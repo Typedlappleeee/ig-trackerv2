@@ -1,0 +1,3623 @@
+{
+  "title": "IG Reels Scaleflow",
+  "desc": "Auto-import — publication Reels Instagram (cover, tags IA, audio tendance, gestion des popups). Natif GeeLark.",
+  "content": {
+    "startParamMap": [
+      {
+        "contentable": true,
+        "createFrom": "",
+        "id": "275b3321-8db9-442b-8355-15530eb907de",
+        "isNotRequired": true,
+        "key": "Caption",
+        "length": 2200,
+        "type": "string",
+        "value": ""
+      },
+      {
+        "createFrom": "",
+        "id": "6744a596-cf3a-4cf1-995b-711b26a72bca",
+        "isNotRequired": false,
+        "key": "Video",
+        "restrict": {
+          "fileType": "video"
+        },
+        "type": "file",
+        "value": []
+      },
+      {
+        "createFrom": "",
+        "id": "9e171730-16d3-4955-a44e-6d452e85acca",
+        "isNotRequired": true,
+        "key": "SameURL",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "createFrom": "",
+        "id": "66ac706b-9883-4206-8738-b788264a3206",
+        "isNotRequired": true,
+        "key": "SameVolume",
+        "type": "number",
+        "value": null
+      },
+      {
+        "createFrom": "",
+        "id": "5c3c7a24-e094-4cb4-bad0-cfc676562029",
+        "isNotRequired": true,
+        "key": "AcousticVolume",
+        "type": "number",
+        "value": null
+      },
+      {
+        "createFrom": "",
+        "id": "2b9558f8-60c6-4563-b7c6-685313e16660",
+        "isNotRequired": false,
+        "key": "AITags",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "createFrom": "",
+        "id": "8a67d7cf-b98f-4af6-8f2f-06064be8ebf3",
+        "isNotRequired": true,
+        "key": "Cover",
+        "type": "file",
+        "value": []
+      }
+    ],
+    "contents": [
+      {
+        "config": {
+          "content": "pm grant com.instagram.android android.permission.CAMERA ; pm grant com.instagram.android android.permission.RECORD_AUDIO ; pm grant com.instagram.android android.permission.WRITE_CONTACTS ; pm grant com.instagram.android android.permission.READ_CONTACTS ; pm grant com.instagram.android android.permission.POST_NOTIFICATIONS ; pm grant com.instagram.android android.permission.READ_EXTERNAL_STORAGE ; pm grant com.instagram.android android.permission.WRITE_EXTERNAL_STORAGE ; pm grant com.instagram.android android.permission.READ_MEDIA_IMAGES ; pm grant com.instagram.android android.permission.READ_MEDIA_VIDEO ; pm grant com.instagram.android android.permission.WRITE_MEDIA_IMAGES ; pm grant com.instagram.android android.permission.WRITE_MEDIA_VIDEO ; pm grant com.instagram.android android.permission.READ_MEDIA_AUDIO ; pm grant com.instagram.android android.permission.WRITE_MEDIA_AUDIO ; pm grant com.instagram.android android.permission.POST_NOTIFICATIONS",
+          "timeout": 30000
+        },
+        "enabled": true,
+        "id": "18c24c59-3137-4f34-9978-adf48c6ac3f3",
+        "name": "执行ADB命令",
+        "type": "executeADB"
+      },
+      {
+        "config": {
+          "path": "/sdcard/Download"
+        },
+        "id": "e5b4c05a-1c55-4ed5-a515-f16da2b0818b",
+        "name": "清空文件夹",
+        "type": "deleteFolder"
+      },
+      {
+        "config": {
+          "error": false,
+          "packgename": "com.instagram.android",
+          "timeout": 30000
+        },
+        "enabled": true,
+        "id": "30172e3d-6982-496c-87fd-d029c53be3e8",
+        "name": "关闭应用",
+        "type": "stopApp"
+      },
+      {
+        "config": {
+          "error": false,
+          "packgename": "com.instagram.android"
+        },
+        "id": "cb116ea1-a007-4d0a-97ff-246e8f99720c",
+        "name": "打开应用",
+        "type": "openApp"
+      },
+      {
+        "config": {
+          "inputType": "taskOrder",
+          "isUseVariable": false,
+          "useVariable": "Video"
+        },
+        "id": "e92b44d2-ccf4-43ee-888a-b2f44ab8383e",
+        "name": "上传文件",
+        "type": "uploadFile"
+      },
+      {
+        "config": {
+          "timeout": 5000,
+          "timeoutType": "fixedValue"
+        },
+        "id": "625712da-5d04-4d4c-ba00-73df0f9ec3fe",
+        "name": "等待时间",
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/creation_tab",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ],
+                  [
+                    {
+                      "content": "com.instagram.android:id/action_bar_buttons_container_left",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "searchTime": 200,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "hasCreate"
+              },
+              "id": "cc4b305c-5cc0-4617-aa2f-791efe5628e3",
+              "name": "等待元素出现",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {},
+                    "id": "5177bcbf-cc96-4379-ae1b-86ec771df970",
+                    "name": "退出循环",
+                    "type": "breakLoop"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "hasCreate"
+                    }
+                  ]
+                ]
+              },
+              "id": "f8c47905-cfc3-4774-b51d-78b6cff3135b",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Got it",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "0a7e2fde-9caf-40c2-8c9f-7d130f8df562",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Use this activity",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "2737e84f-fdce-4a4a-bfad-b3378af3a1d0",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Not now",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "01b96681-0f41-47a8-9edd-24c58828f110",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "ALLOW",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "2f105f8f-b902-49aa-9a40-3d80785e2bb2",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Allow all cookies",
+                      "filterType": "equal",
+                      "type": "desc"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "7812d018-ec87-41da-aa5a-c48e43e88298",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Review whether we can process your data for ads",
+                      "filterType": "equal",
+                      "type": "desc"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "hasDataForAd"
+              },
+              "id": "35484225-febc-4366-81c3-41687abd6595",
+              "name": "等待元素出现",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "error": false,
+                      "packgename": "com.instagram.android",
+                      "timeout": 30000
+                    },
+                    "enabled": true,
+                    "id": "77bf6854-0af2-418a-89f5-5e81f328dbec",
+                    "name": "关闭应用",
+                    "type": "stopApp"
+                  },
+                  {
+                    "config": {
+                      "packgename": "com.instagram.android"
+                    },
+                    "id": "dbded63b-1d30-473d-ab66-b814044e8f11",
+                    "name": "打开应用",
+                    "type": "openApp"
+                  },
+                  {
+                    "config": {
+                      "timeout": 5000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "b290c73d-ad95-4618-b99e-5c0a168c5903",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "hasDataForAd"
+                    }
+                  ]
+                ]
+              },
+              "id": "912609ef-9659-4d46-8a03-ce14f853a701",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/feed_tab",
+                      "filterType": "equal",
+                      "type": "id"
+                    },
+                    {
+                      "content": "Home",
+                      "filterType": "equal",
+                      "type": "desc"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "80278f60-1a43-4543-a2d9-b9fddf967647",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Get started",
+                      "filterType": "equal",
+                      "type": "desc"
+                    }
+                  ],
+                  [
+                    {
+                      "content": "Get started",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 200,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false,
+                "variable": "hasGetStarted"
+              },
+              "id": "962aff97-317c-4360-bac7-62d75630a001",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "timeout": 1000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "5843aafc-af21-4d69-aa78-e5e80161ab77",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Use free of charge with ads",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ],
+                        [
+                          {
+                            "content": "Use free of charge with ads",
+                            "filterType": "equal",
+                            "type": "desc"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 5000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "b01827f9-c482-4f3f-9dae-8b207067ba62",
+                    "name": "点击元素",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "timeout": 1000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "90fd6dea-d52e-4704-9812-8b40b05ed16a",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "doubleClick": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Continue",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "b8db48d6-5474-43ad-ae9f-aa8f64e5957c",
+                    "name": "点击元素",
+                    "type": "click"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "hasGetStarted"
+                    }
+                  ]
+                ]
+              },
+              "id": "23551bed-2fdd-4664-b41f-a14144508c53",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "2a0c1eac-1bbb-484c-ae10-a3b15dba69a1",
+              "name": "等待时间",
+              "type": "waitTime"
+            }
+          ],
+          "serialType": "fixedValue",
+          "times": "5"
+        },
+        "id": "029cbf22-a5ea-49c3-a163-8b0a84421be6",
+        "name": "For循环次数",
+        "type": "forTimes"
+      },
+      {
+        "config": {
+          "apposition": "and",
+          "children": [
+            {
+              "config": {
+                "packgename": "com.instagram.android",
+                "uri": "${SameURL}"
+              },
+              "id": "90d65f78-22e2-4163-ae10-a8d5cbce578f",
+              "name": "打开应用",
+              "type": "openApp"
+            },
+            {
+              "config": {
+                "timeout": 8000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "25c1e152-97e3-4f8f-aee3-846791467365",
+              "name": "等待时间",
+              "parentEnabled": true,
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Use this activity",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "58ebc316-f4e0-45cd-8f49-40ff64711f4f",
+              "name": "点击元素",
+              "parentEnabled": true,
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Not now",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "4b4da164-05d1-4dc8-b0b5-1bc9e13252a9",
+              "name": "点击元素",
+              "parentEnabled": true,
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "ALLOW",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 500,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "2d0af0d9-49ae-48bc-9690-93db409a8bf9",
+              "name": "点击元素",
+              "parentEnabled": true,
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/media_album_art_button",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false,
+                "variable": ""
+              },
+              "id": "50e597b5-d77f-4641-a43b-18db1e928165",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "a6a4de7c-fbae-4653-96e8-c50cd4f650be",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Use audio",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false,
+                "variable": "hasUseAudio"
+              },
+              "id": "e2db2d00-03d8-4a75-acb3-40009cfecba8",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "apposition": "and",
+                "children": [
+                  {
+                    "config": {
+                      "content": "Cannot use the same music",
+                      "error": false
+                    },
+                    "enabled": true,
+                    "id": "de0ed04f-e3f4-4765-a29f-12e0ab0a2058",
+                    "name": "抛出异常",
+                    "parentEnabled": true,
+                    "type": "throwException"
+                  }
+                ],
+                "conditionList": [
+                  {
+                    "probability": 50,
+                    "relation": "notExist",
+                    "useVariable": "hasUseAudio"
+                  }
+                ]
+              },
+              "enabled": true,
+              "id": "22058a51-2067-4ba1-8e07-bcd85e1d5777",
+              "name": "IF条件",
+              "parentEnabled": true,
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "timeout": 3000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "f933eee9-c927-4243-b70e-c783c70eebfd",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "filterType": "contain",
+                "filters": [
+                  {
+                    "content": "ALLOW",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 1000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "d81581b8-722d-4f91-901e-b270979c049e",
+              "name": "点击元素",
+              "parentEnabled": true,
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "contain",
+                "filters": [
+                  {
+                    "content": "WHILE USING THE APP",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "f379091a-81f9-4f6a-a6cf-2de52a2b1ef4",
+              "name": "点击元素",
+              "parentEnabled": true,
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "contain",
+                "filters": [
+                  {
+                    "content": "WHILE USING THE APP",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "cd778509-0c34-4ed9-8ac0-dcd58ad5e51c",
+              "name": "点击元素",
+              "parentEnabled": true,
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/gallery_preview_button",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "af76e9f3-c5f2-4d65-8bfd-aa71a20d294f",
+              "name": "点击元素",
+              "type": "click"
+            }
+          ],
+          "conditionList": [
+            {
+              "probability": 50,
+              "relation": "exist",
+              "useVariable": "SameURL"
+            }
+          ],
+          "other": [
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/feed_tab",
+                      "filterType": "equal",
+                      "type": "id"
+                    },
+                    {
+                      "content": "Home",
+                      "filterType": "equal",
+                      "type": "desc"
+                    }
+                  ]
+                ],
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": "1",
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "ca60f0e9-db49-442f-a821-072ee4f1bdde",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "timeout": 2000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "0f77589e-7508-49d8-9a6f-3aebd87f14f7",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/creation_tab",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ],
+                  [
+                    {
+                      "content": "com.instagram.android:id/action_bar_buttons_container_left",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ]
+                ],
+                "randomDistance": 0,
+                "searchTime": 5000,
+                "serial": "1",
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "59906906-a5b0-46db-acce-4d9b7efbfa24",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "contain",
+                "filters": [
+                  {
+                    "content": "ALLOW",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 1000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "7c4584a5-1eaa-40cf-ad50-b7eff275f9a8",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "contain",
+                "filters": [
+                  {
+                    "content": "WHILE USING THE APP",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "02e2dfba-322c-4bcd-9d73-757b53e5f72c",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "contain",
+                "filters": [
+                  {
+                    "content": "WHILE USING THE APP",
+                    "type": "text"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "6e669511-6795-491c-9883-c75ae4adc712",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "timeout": 3000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "34a27ce9-3328-42f4-85a6-ab8315807dee",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/cam_dest_clips",
+                      "filterType": "equal",
+                      "type": "id"
+                    },
+                    {
+                      "content": "REEL",
+                      "filterType": "equal",
+                      "type": "desc"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "searchTime": 200,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "hasReel"
+              },
+              "enabled": true,
+              "id": "435e652f-a8c9-4e8b-af36-3b48a83668cd",
+              "name": "等待元素出现",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "apposition": "and",
+                "children": [
+                  {
+                    "config": {
+                      "randomDistance": 0,
+                      "x": 550,
+                      "y": 1150
+                    },
+                    "id": "f0f274b1-6667-47ff-9491-99f20925c071",
+                    "name": "点击坐标",
+                    "type": "clickXY"
+                  },
+                  {
+                    "config": {
+                      "timeout": 3000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "207f7749-b98f-40e0-877c-42843da9fff7",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  }
+                ],
+                "conditionList": [
+                  {
+                    "probability": 50,
+                    "relation": "notExist",
+                    "useVariable": "hasReel"
+                  }
+                ]
+              },
+              "id": "a903dd5c-5e3b-4971-9aab-77df0e588013",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/cam_dest_clips",
+                      "filterType": "equal",
+                      "type": "id"
+                    },
+                    {
+                      "content": "REEL",
+                      "filterType": "equal",
+                      "type": "desc"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "searchTime": 200,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "hasReel2"
+              },
+              "enabled": true,
+              "id": "b3d1b9da-2921-4e8b-880a-c1f6181cce19",
+              "name": "等待元素出现",
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "apposition": "and",
+                "children": [
+                  {
+                    "config": {},
+                    "id": "58de44fa-bf46-410f-a580-378a801e6fad",
+                    "name": "页面后退",
+                    "type": "goBack"
+                  },
+                  {
+                    "config": {
+                      "timeout": 3000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "16b2f6ca-0ce3-4b84-bb4e-6c5ec987651e",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "com.instagram.android:id/profile_tab",
+                            "filterType": "equal",
+                            "type": "id"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "5f4bf6dd-4ca3-4e7f-845b-d9abedf5ffd3",
+                    "name": "点击元素",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "Create New",
+                                  "filterType": "equal",
+                                  "type": "desc"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "variable": "hasCreateNew"
+                          },
+                          "id": "aa634a01-46cc-414e-a996-ad93e183bb3b",
+                          "name": "等待元素出现",
+                          "type": "waitEle"
+                        },
+                        {
+                          "config": {
+                            "apposition": "and",
+                            "children": [
+                              {
+                                "config": {},
+                                "id": "888de197-2134-4a00-b631-f342db2a7780",
+                                "name": "页面后退",
+                                "type": "goBack"
+                              },
+                              {
+                                "config": {
+                                  "timeout": 3000,
+                                  "timeoutType": "fixedValue"
+                                },
+                                "id": "67a4e5e2-c87b-4157-80a4-80d95346f767",
+                                "name": "等待时间",
+                                "type": "waitTime"
+                              },
+                              {
+                                "config": {
+                                  "filterCollection": [
+                                    [
+                                      {
+                                        "content": "com.instagram.android:id/profile_tab",
+                                        "filterType": "equal",
+                                        "type": "id"
+                                      }
+                                    ]
+                                  ],
+                                  "hiddenChildren": false,
+                                  "randomDistance": 0,
+                                  "searchTime": 3000,
+                                  "serial": 1,
+                                  "serialType": "fixedValue",
+                                  "useOffset": false
+                                },
+                                "id": "092aef20-7231-43f2-8a38-d3b7068f554e",
+                                "name": "点击元素",
+                                "type": "click"
+                              },
+                              {
+                                "config": {
+                                  "timeout": 3000,
+                                  "timeoutType": "fixedValue"
+                                },
+                                "id": "8d3a7d60-ca27-4d97-a702-b33c0d257162",
+                                "name": "等待时间",
+                                "type": "waitTime"
+                              }
+                            ],
+                            "conditionList": [
+                              {
+                                "probability": 50,
+                                "relation": "notExist",
+                                "useVariable": "hasCreateNew"
+                              }
+                            ],
+                            "other": [
+                              {
+                                "config": {},
+                                "id": "b3007791-2886-4efe-9780-89be8e035ccd",
+                                "name": "退出循环",
+                                "type": "breakLoop"
+                              }
+                            ]
+                          },
+                          "id": "4ace3e46-8426-42de-81fd-9fafbab762c5",
+                          "name": "IF条件",
+                          "type": "ifElse"
+                        }
+                      ],
+                      "serialType": "fixedValue",
+                      "times": "3"
+                    },
+                    "id": "aa95f304-3639-4b2e-833d-c4c236390648",
+                    "name": "For循环次数",
+                    "type": "forTimes"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "timeout": 3000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "fa2c4349-3b14-4527-92fd-a8f2b19a9228",
+                          "name": "等待时间",
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "Create New",
+                                  "filterType": "equal",
+                                  "type": "desc"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false,
+                            "variable": ""
+                          },
+                          "id": "2b199147-81f9-4d4b-942a-8eb0a5983c0a",
+                          "name": "点击元素",
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "timeout": 3000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "531af262-cb26-4368-a75b-1bac9684d4f3",
+                          "name": "等待时间",
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "Reel",
+                                  "filterType": "equal",
+                                  "type": "text"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false,
+                            "variable": "hasReelText"
+                          },
+                          "id": "aecbe845-55ff-4950-8827-9d7fb29a47fd",
+                          "name": "点击元素",
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "children": [
+                              {
+                                "config": {},
+                                "id": "74f6c9ed-f6e3-4324-a12d-acf6414f6cca",
+                                "name": "退出循环",
+                                "type": "breakLoop"
+                              }
+                            ],
+                            "conditionV3": [
+                              [
+                                {
+                                  "probability": 50,
+                                  "relation": "exist",
+                                  "useVariable": "hasReelText"
+                                }
+                              ]
+                            ]
+                          },
+                          "id": "1027cb5d-5c58-447a-afa5-7c9bcf8863a9",
+                          "name": "IF条件",
+                          "type": "ifElse"
+                        }
+                      ],
+                      "serialType": "fixedValue",
+                      "times": "5"
+                    },
+                    "id": "d7e6eddf-6dec-4e3c-9e40-e383fdf34710",
+                    "name": "For循环次数",
+                    "type": "forTimes"
+                  },
+                  {
+                    "config": {
+                      "timeout": 3000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "b636b104-d758-41be-a3a2-c53a572907d7",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  }
+                ],
+                "conditionList": [
+                  {
+                    "probability": 50,
+                    "relation": "notExist",
+                    "useVariable": "hasReel2"
+                  }
+                ]
+              },
+              "id": "5a0f87ba-e216-4c48-9882-a68c22f8b394",
+              "name": "IF条件",
+              "type": "ifElse"
+            }
+          ]
+        },
+        "id": "312e3fe9-078b-4529-9d82-49caacaece35",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "com.instagram.android:id/cam_dest_clips",
+                "filterType": "equal",
+                "type": "id"
+              },
+              {
+                "content": "REEL",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ]
+          ],
+          "randomDistance": 0,
+          "remark": "change reel",
+          "searchTime": 30000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false,
+          "variable": "hasREEL"
+        },
+        "id": "763ccfe8-b417-43e5-b7cf-9f0fcbffa78e",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {},
+        "id": "2755e841-36a2-4050-9d07-61620aaf6dfd",
+        "name": "页面截图",
+        "type": "screenshotPage"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "ALLOW",
+              "type": "text"
+            }
+          ],
+          "randomDistance": 0,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "bcee9e53-1724-416a-ac1d-67662b2fd125",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "ALLOW",
+              "type": "text"
+            }
+          ],
+          "randomDistance": 0,
+          "searchTime": 2000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "cf92a093-e1f1-45f4-b1ba-916bb3a64f5c",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "Enter reels gallery",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ],
+            [
+              {
+                "content": "Gallery",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ]
+          ],
+          "randomDistance": 0,
+          "remark": "",
+          "searchTime": 5000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "7b8649cd-1b82-4fc0-92d3-97a03e0f31bd",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "timeout": 5000,
+          "timeoutType": "fixedValue"
+        },
+        "id": "02b73a90-dbef-4111-98bc-3bfd32375721",
+        "name": "等待时间",
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "com.android.vending:id/0_resource_name_obfuscated",
+                "filterType": "equal",
+                "type": "id"
+              },
+              {
+                "content": "Dismiss update dialog",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ],
+            [
+              {
+                "content": "com.android.vending:id/0_resource_name_obfuscated",
+                "filterType": "equal",
+                "type": "id"
+              },
+              {
+                "content": "关闭更新对话框",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ]
+          ],
+          "hiddenChildren": false,
+          "randomDistance": 0,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "afd774d5-a7a3-4038-b336-b857504ad969",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "android.widget.Button",
+                "filterType": "equal",
+                "type": "class"
+              },
+              {
+                "content": "Start new video",
+                "filterType": "equal",
+                "type": "text"
+              }
+            ]
+          ],
+          "randomDistance": 0,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false,
+          "variable": ""
+        },
+        "id": "0087ab6c-c19b-4677-9c82-388c9e20a5ee",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "com.instagram.android:id/cam_dest_clips",
+                "filterType": "equal",
+                "type": "id"
+              },
+              {
+                "content": "REEL",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ]
+          ],
+          "hiddenChildren": false,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "variable": "hasREEL1"
+        },
+        "id": "1e623f9a-7575-4644-a045-bf2bb577ed4a",
+        "name": "等待元素出现",
+        "type": "waitEle"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "content": "REEL is empty"
+              },
+              "id": "5c912416-66fa-4fee-babb-6df111ff3b7f",
+              "name": "抛出异常",
+              "type": "throwException"
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "probability": 50,
+                "relation": "notExist",
+                "useVariable": "hasREEL"
+              },
+              {
+                "probability": 50,
+                "relation": "notExist",
+                "useVariable": "hasREEL1"
+              }
+            ]
+          ]
+        },
+        "id": "b5045866-fc6e-456c-9752-33462d25b787",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "filterType": "contain",
+          "filters": [
+            {
+              "content": "Video thumbnail created",
+              "type": "desc"
+            }
+          ],
+          "searchTime": 30000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "386c5305-6833-4d38-b882-0bd427e07166",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "Create a sticker",
+              "type": "text"
+            }
+          ],
+          "searchTime": 10000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "variable": "stickerText"
+        },
+        "id": "11d056e2-38d8-4d3a-b24c-3a11a65eeedf",
+        "name": "等待元素出现",
+        "type": "waitEle"
+      },
+      {
+        "config": {
+          "apposition": "and",
+          "children": [
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Not now",
+                    "type": "text"
+                  }
+                ],
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "bf6b7a38-a23d-4a51-8e80-7e3bf22a8fc9",
+              "name": "点击元素",
+              "type": "click"
+            }
+          ],
+          "conditionList": [
+            {
+              "relation": "exist",
+              "useVariable": "stickerText"
+            }
+          ]
+        },
+        "id": "4d89c1ef-7e83-4733-94be-2663d3027e53",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "apposition": "or",
+          "children": [
+            {
+              "config": {
+                "_a": 200,
+                "_b": 300,
+                "direction": "top",
+                "distanceMax": "400",
+                "distanceMin": "300",
+                "error": false,
+                "position": [
+                  260,
+                  "800"
+                ],
+                "randomDistance": 0,
+                "randomWheelSleepTime": [
+                  200,
+                  300
+                ]
+              },
+              "id": "a9a25ad1-354a-45a2-9cd2-132e9852b110",
+              "name": "滑动页面",
+              "type": "scrollPage"
+            },
+            {
+              "config": {
+                "timeout": 3000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "6017390d-7c29-4344-9878-67a23fdb42df",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Got it",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "47d916c0-6625-479a-a5de-29bcf7b669ed",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "apposition": "and",
+                "children": [
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Audio Track ",
+                            "filterType": "contain",
+                            "type": "desc"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": "1",
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "3fc23fbe-4a6e-4eae-b837-de6a89e6c538",
+                    "name": "点击元素",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "timeout": 2000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "6928f655-6027-4770-aeb7-0f5736daf212",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Volume",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "b9c5bd4a-93ac-46a6-a6f1-b0e1a00158dd",
+                    "name": "点击元素",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "timeout": 2000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "61892c9a-39db-4413-91eb-68b74a59fd54",
+                    "name": "等待时间",
+                    "parentEnabled": true,
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Apply volume to all audio clips",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "4b87a04a-7d7e-4fff-b35a-b9b91dcc1622",
+                    "name": "点击元素",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "com.instagram.android:id/volume_control_card_slider",
+                            "filterType": "equal",
+                            "type": "id"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "variable": "t"
+                    },
+                    "id": "1be66c6b-65de-463f-97d8-7433d8541509",
+                    "name": "等待元素出现",
+                    "parentEnabled": true,
+                    "type": "waitEle"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "_a": 500,
+                            "_b": 800,
+                            "direction": "left",
+                            "end": "100",
+                            "isSection": true,
+                            "randomDistance": 0,
+                            "randomWheelSleepTime": [
+                              500,
+                              800
+                            ],
+                            "saveItemName": "t",
+                            "start": "0"
+                          },
+                          "enabled": true,
+                          "id": "bb384ac6-eea5-49f9-8cce-17ec970b362f",
+                          "name": "滑动页面",
+                          "parentEnabled": true,
+                          "type": "scrollPage"
+                        },
+                        {
+                          "config": {
+                            "timeout": 1000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "6889c2e6-bef6-4274-b73a-ba77a8f9348f",
+                          "name": "等待时间",
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "_a": 500,
+                            "_b": 800,
+                            "direction": "right",
+                            "end": "${SameVolume}",
+                            "error": false,
+                            "isSection": true,
+                            "randomDistance": 0,
+                            "randomWheelSleepTime": [
+                              500,
+                              800
+                            ],
+                            "saveItemName": "t",
+                            "start": "0"
+                          },
+                          "enabled": true,
+                          "id": "be0fb7e9-3837-4e67-b9c9-d91978e5762a",
+                          "name": "滑动页面",
+                          "parentEnabled": true,
+                          "type": "scrollPage"
+                        },
+                        {
+                          "config": {
+                            "timeout": 1000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "9f5dd834-3f42-4f98-a1ad-085b3643130c",
+                          "name": "等待时间",
+                          "type": "waitTime"
+                        }
+                      ]
+                    },
+                    "id": "dc082a39-00b1-4d82-9bf1-ba746c727dc3",
+                    "name": "分组",
+                    "type": "group"
+                  }
+                ],
+                "conditionList": [
+                  {
+                    "probability": 50,
+                    "relation": "exist",
+                    "useVariable": "SameVolume"
+                  }
+                ]
+              },
+              "id": "0f8e0a78-a84c-4b28-b818-7eeab9641bb9",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/volume_control_card_slider",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "searchTime": 3000,
+                "serial": "2",
+                "serialType": "fixedValue",
+                "variable": "t2"
+              },
+              "id": "8c2a3df2-b341-4933-a024-2c2757ec971f",
+              "name": "等待元素出现",
+              "parentEnabled": true,
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "_a": 500,
+                      "_b": 800,
+                      "direction": "left",
+                      "end": "100",
+                      "isSection": true,
+                      "randomDistance": 0,
+                      "randomWheelSleepTime": [
+                        500,
+                        800
+                      ],
+                      "saveItemName": "t2",
+                      "simulate": false,
+                      "start": "0"
+                    },
+                    "enabled": true,
+                    "id": "e220ef8a-ca6b-4c22-aa1f-9664f48fac57",
+                    "name": "滑动页面",
+                    "parentEnabled": true,
+                    "type": "scrollPage"
+                  },
+                  {
+                    "config": {
+                      "timeout": 1000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "ede04d92-b9f9-43e3-8e75-fb67bd20b8ed",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "_a": 500,
+                      "_b": 800,
+                      "direction": "right",
+                      "end": "${AcousticVolume}",
+                      "isSection": true,
+                      "randomDistance": 0,
+                      "randomWheelSleepTime": [
+                        500,
+                        800
+                      ],
+                      "saveItemName": "t2",
+                      "simulate": false,
+                      "start": "0"
+                    },
+                    "enabled": true,
+                    "id": "f2336fc4-0156-4a4f-92bb-a1f6d371c6f9",
+                    "name": "滑动页面",
+                    "parentEnabled": true,
+                    "type": "scrollPage"
+                  },
+                  {
+                    "config": {
+                      "timeout": 1000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "3b702762-ff42-4254-a55f-7e02c727c37a",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "t2"
+                    },
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "AcousticVolume"
+                    }
+                  ]
+                ]
+              },
+              "id": "893bb0aa-61ec-4bc6-8000-371f0f9318b4",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "error": false,
+                      "isBase64": false,
+                      "isScope": false
+                    },
+                    "id": "93138835-838a-4e01-bf30-1064903718bf",
+                    "name": "页面截图",
+                    "type": "screenshotPage"
+                  },
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Done",
+                            "filterType": "equal",
+                            "type": "text"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "276da43c-c37d-4487-9cf7-ebc0769a5187",
+                    "name": "点击元素",
+                    "type": "click"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "SameVolume"
+                    }
+                  ]
+                ]
+              },
+              "id": "6e0d3bf2-5a86-4ebd-a499-904f041e5f49",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "error": false,
+                      "timeoutMax": 2000,
+                      "timeoutMin": 1000,
+                      "timeoutType": "randomInterval"
+                    },
+                    "id": "d098015c-fb43-4185-b3e4-8b35ecd3cfdb",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "_a": 200,
+                      "_b": 300,
+                      "direction": "right",
+                      "distanceMax": "550",
+                      "distanceMin": "400",
+                      "error": false,
+                      "position": [
+                        "100",
+                        "850"
+                      ],
+                      "randomDistance": 0,
+                      "randomWheelSleepTime": [
+                        200,
+                        300
+                      ]
+                    },
+                    "id": "1ddabb7f-c459-4a80-b403-c57a6a471d46",
+                    "name": "滑动页面",
+                    "type": "scrollPage"
+                  },
+                  {
+                    "config": {
+                      "error": false,
+                      "timeoutMax": 1000,
+                      "timeoutMin": 500,
+                      "timeoutType": "randomInterval"
+                    },
+                    "id": "91403500-029d-4cb4-8024-6194d0ff84ec",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "error": false,
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Mute track audio",
+                            "filterType": "equal",
+                            "type": "desc"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "randomDistance": 0,
+                      "searchTime": 3000,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "useOffset": false
+                    },
+                    "id": "8c2763dc-3d44-4e90-bc96-72f30d2e929e",
+                    "name": "点击元素",
+                    "type": "click"
+                  },
+                  {
+                    "config": {
+                      "error": false,
+                      "timeoutMax": 1000,
+                      "timeoutMin": 500,
+                      "timeoutType": "randomInterval"
+                    },
+                    "id": "072f3c7c-5035-4192-808e-f85402333886",
+                    "name": "等待时间",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "apposition": "and",
+                      "children": [
+                        {
+                          "config": {
+                            "error": false,
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "Video Clip",
+                                  "filterType": "contain",
+                                  "type": "desc"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 3000,
+                            "serial": "1",
+                            "serialType": "fixedValue",
+                            "useOffset": false
+                          },
+                          "id": "8f3d8f25-e315-4cda-b05c-2197c06938cd",
+                          "name": "点击元素",
+                          "parentEnabled": true,
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "timeout": 2000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "17e86ca2-5626-4173-952f-863d8cf9bbf3",
+                          "name": "等待时间",
+                          "parentEnabled": true,
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "Volume",
+                                  "filterType": "equal",
+                                  "type": "text"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false
+                          },
+                          "id": "8e299cc3-84d3-4a04-bcf6-d6746fd767e4",
+                          "name": "点击元素",
+                          "parentEnabled": true,
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "timeout": 2000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "c4ad15db-ce31-425e-861d-4fac8c7ffb1b",
+                          "name": "等待时间",
+                          "parentEnabled": true,
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "com.instagram.android:id/volume_control_card_slider",
+                                  "filterType": "equal",
+                                  "type": "id"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "variable": "t"
+                          },
+                          "id": "6556fbac-0aa8-4740-9abf-2cf2d8d869ef",
+                          "name": "等待元素出现",
+                          "parentEnabled": true,
+                          "type": "waitEle"
+                        },
+                        {
+                          "config": {
+                            "_a": 500,
+                            "_b": 800,
+                            "direction": "left",
+                            "end": "100",
+                            "error": false,
+                            "isSection": true,
+                            "randomDistance": 0,
+                            "randomWheelSleepTime": [
+                              500,
+                              800
+                            ],
+                            "saveItemName": "t",
+                            "start": "0"
+                          },
+                          "enabled": true,
+                          "id": "4e79f0ba-12ac-4448-a5f0-39dddef28df6",
+                          "name": "滑动页面",
+                          "parentEnabled": true,
+                          "type": "scrollPage"
+                        },
+                        {
+                          "config": {
+                            "timeout": 1000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "e8914195-2cd8-4cf3-a402-2bc754c30e75",
+                          "name": "等待时间",
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "_a": 500,
+                            "_b": 800,
+                            "direction": "right",
+                            "end": "${AcousticVolume}",
+                            "error": false,
+                            "isSection": true,
+                            "randomDistance": 0,
+                            "randomWheelSleepTime": [
+                              500,
+                              800
+                            ],
+                            "saveItemName": "t",
+                            "start": "0"
+                          },
+                          "enabled": true,
+                          "id": "0369c454-674b-4005-8443-bfce273b6878",
+                          "name": "滑动页面",
+                          "parentEnabled": true,
+                          "type": "scrollPage"
+                        },
+                        {
+                          "config": {
+                            "timeout": 1000,
+                            "timeoutType": "fixedValue"
+                          },
+                          "id": "6ed60402-fa99-4dc8-bea1-88deebc9043c",
+                          "name": "等待时间",
+                          "parentEnabled": true,
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "error": false,
+                            "isBase64": false,
+                            "isScope": false
+                          },
+                          "id": "20607945-bd40-4f99-bdde-b67bc0c5dcdd",
+                          "name": "页面截图",
+                          "type": "screenshotPage"
+                        },
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "Done",
+                                  "filterType": "equal",
+                                  "type": "text"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false
+                          },
+                          "id": "fece00d1-98de-4c81-b87e-4fda519620ed",
+                          "name": "点击元素",
+                          "parentEnabled": true,
+                          "type": "click"
+                        }
+                      ],
+                      "conditionList": [
+                        {
+                          "probability": 50,
+                          "relation": "exist",
+                          "useVariable": "AcousticVolume"
+                        }
+                      ]
+                    },
+                    "id": "87aed3df-aed2-472f-aa01-f2833a67adf6",
+                    "name": "IF条件",
+                    "parentEnabled": true,
+                    "type": "ifElse"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "notExist",
+                      "useVariable": "t2"
+                    }
+                  ]
+                ]
+              },
+              "id": "8398570d-675c-4843-a52b-ed347bed522c",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {
+                "error": false,
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "88e06cb1-aedd-4e96-9319-f133f880d9d1",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "error": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "d19b7834-a827-4e2d-bdce-c134ddb35577",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "error": false,
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "f7b9a44d-de94-4ba7-a9e5-e385af9b61f2",
+              "name": "等待时间",
+              "type": "waitTime"
+            }
+          ],
+          "conditionList": [
+            {
+              "probability": 50,
+              "relation": "exist",
+              "useVariable": "SameURL"
+            }
+          ]
+        },
+        "id": "7ac11622-d3ad-44bc-a515-a02d47c647c0",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "Get App",
+                "filterType": "contain",
+                "type": "text"
+              }
+            ]
+          ],
+          "hiddenChildren": false,
+          "searchTime": 1000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "variable": "hasEditLevelUp"
+        },
+        "id": "a7c46fd3-fb73-4ef9-81a9-1c5d8efee86a",
+        "name": "等待元素出现",
+        "type": "waitEle"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "operationStr": "${_SCREEN_WIDTH_} / 2",
+                "variable": "screenCenterX"
+              },
+              "id": "5a86d9aa-b722-46e2-bad3-b9cb86827169",
+              "name": "数学运算",
+              "type": "mathOperation"
+            },
+            {
+              "config": {
+                "operationStr": "${_STATUSBAR_HEIGHT_} / 2",
+                "variable": "screenCenterY"
+              },
+              "id": "4ee05ab7-76ed-42ff-932e-c9a2e1286456",
+              "name": "数学运算",
+              "type": "mathOperation"
+            },
+            {
+              "config": {
+                "randomDistance": 0,
+                "x": "${screenCenterX}",
+                "y": "${screenCenterY}"
+              },
+              "id": "45a3a86e-c8cb-4682-9801-ce79c9714821",
+              "name": "点击坐标",
+              "type": "clickXY"
+            },
+            {
+              "config": {
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "53b3f3d5-9bc7-4a02-943b-c3921bf53a80",
+              "name": "等待时间",
+              "type": "waitTime"
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "probability": 50,
+                "relation": "exist",
+                "useVariable": "hasEditLevelUp"
+              }
+            ]
+          ]
+        },
+        "id": "598994c4-4f2b-4bd1-8eb5-8ae15bcd5e25",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "isBase64": false,
+          "isScope": false
+        },
+        "id": "6ae66d0c-985b-4e98-bb44-56aa25f60f0d",
+        "name": "页面截图",
+        "type": "screenshotPage"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "android.widget.Button",
+                "filterType": "equal",
+                "type": "class"
+              },
+              {
+                "content": "Next",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ]
+          ],
+          "randomDistance": 0,
+          "searchTime": 30000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false,
+          "variable": "hasNext"
+        },
+        "enabled": true,
+        "id": "b1513f0c-d42b-4ade-a6bc-7ecadd2c7234",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "actionType": "click",
+                "baiduApiKey": "",
+                "baiduMode": "general",
+                "baiduSecret": "",
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Next",
+                      "filterType": "contain",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "ocrType": "baidu",
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "6226ae05-53e2-44de-9fa6-bba2cf7f5f9b",
+              "name": "百度OCR识别",
+              "type": "ocr"
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "probability": 50,
+                "relation": "notExist",
+                "useVariable": "hasNext"
+              }
+            ]
+          ]
+        },
+        "id": "07280713-965f-4016-82d4-72f812e1bef8",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "timeout": 3000,
+          "timeoutType": "fixedValue"
+        },
+        "id": "c059fac8-0506-498b-8ca5-dc1a0524a415",
+        "name": "等待时间",
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "com.android.vending:id/0_resource_name_obfuscated",
+                "filterType": "equal",
+                "type": "id"
+              },
+              {
+                "content": "Dismiss update dialog",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ],
+            [
+              {
+                "content": "com.android.vending:id/0_resource_name_obfuscated",
+                "filterType": "equal",
+                "type": "id"
+              },
+              {
+                "content": "关闭更新对话框",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ]
+          ],
+          "hiddenChildren": false,
+          "randomDistance": 0,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "156b7d4b-a2d1-43a6-8ae1-e3c69d8453e1",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "ALLOW",
+              "type": "text"
+            }
+          ],
+          "randomDistance": 0,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "6582d09f-9e7d-4a46-9f65-9ca073925e96",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "OK",
+              "type": "text"
+            }
+          ],
+          "hiddenChildren": false,
+          "randomDistance": 0,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "bc441e69-2f7e-4c9b-b454-2dea558dace4",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "Got it",
+                "filterType": "equal",
+                "type": "text"
+              }
+            ]
+          ],
+          "hiddenChildren": false,
+          "randomDistance": 0,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "575447cc-86e1-4c78-9614-93c07664e2f3",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterType": "contain",
+          "filters": [
+            {
+              "content": "Others can now download and share",
+              "type": "text"
+            }
+          ],
+          "searchTime": 10000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "variable": "shareText"
+        },
+        "id": "5e64d359-3ae9-47c6-933e-de84190286a6",
+        "name": "等待元素出现",
+        "type": "waitEle"
+      },
+      {
+        "config": {
+          "error": false,
+          "isBase64": false,
+          "isScope": false
+        },
+        "id": "ba94bb7b-7b3e-4aa8-aeb9-97014633e970",
+        "name": "页面截图",
+        "type": "screenshotPage"
+      },
+      {
+        "config": {
+          "apposition": "and",
+          "children": [
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "android.widget.Button",
+                    "type": "class"
+                  },
+                  {
+                    "content": "Continue",
+                    "type": "desc"
+                  }
+                ],
+                "searchTime": 30000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "52c18f5b-8d7e-42c6-8c90-8a257861d399",
+              "name": "点击元素",
+              "type": "click"
+            }
+          ],
+          "conditionList": [
+            {
+              "relation": "exist",
+              "useVariable": "shareText"
+            }
+          ]
+        },
+        "id": "2f9bc3db-3dce-4c28-8a75-db4eeab50dcc",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "content": [
+            "${Caption} "
+          ],
+          "filterCollection": [
+            [
+              {
+                "content": "Write a caption",
+                "filterType": "contain",
+                "type": "text"
+              }
+            ]
+          ],
+          "hiddenChildren": true,
+          "inputType": "taskOrder",
+          "searchTime": 30000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "variable": "isInputed"
+        },
+        "id": "6f001e32-d02e-433b-aa6c-d362b059b9bf",
+        "name": "输入内容",
+        "type": "inputContent"
+      },
+      {
+        "config": {
+          "content": "input text %s",
+          "timeout": 30000
+        },
+        "id": "267bd06c-f74e-48e4-ac92-d438d28d153a",
+        "name": "执行ADB命令",
+        "type": "executeADB"
+      },
+      {
+        "config": {},
+        "id": "a76ec7ce-c134-4310-b6fc-957f61d14d23",
+        "name": "页面截图",
+        "type": "screenshotPage"
+      },
+      {
+        "config": {
+          "apposition": "and",
+          "children": [
+            {
+              "config": {
+                "content": "Content is not input"
+              },
+              "id": "724fa665-957a-49e1-a57c-cad0aec35547",
+              "name": "抛出异常",
+              "type": "throwException"
+            }
+          ],
+          "conditionList": [
+            {
+              "probability": 50,
+              "relation": "notExist",
+              "useVariable": "isInputed"
+            }
+          ]
+        },
+        "id": "e21e65a0-207d-408a-bd6a-d993db947860",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "apposition": "and",
+          "children": [
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Add AI label",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": true,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "type": "centerY",
+                "variable": "centerY"
+              },
+              "id": "19c781d7-95a1-4e9a-a3c8-cb50613313c6",
+              "name": "获取元素数据",
+              "type": "getEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "com.instagram.android:id/toggle",
+                            "filterType": "equal",
+                            "type": "id"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": true,
+                      "searchTime": 3000,
+                      "serial": "${times}",
+                      "serialType": "fixedValue",
+                      "variable": "toggle"
+                    },
+                    "id": "28be8034-cc80-4df1-a299-2ac757c315a9",
+                    "name": "等待元素出现",
+                    "type": "waitEle"
+                  },
+                  {
+                    "config": {
+                      "saveItemName": "toggle",
+                      "type": "centerY",
+                      "variable": "toggleCenterY"
+                    },
+                    "id": "9487b2a9-7061-4da6-b389-3b24cc3f4d56",
+                    "name": "获取元素数据",
+                    "type": "getEle"
+                  },
+                  {
+                    "config": {
+                      "saveItemName": "toggle",
+                      "type": "selected",
+                      "variable": "toggleSelected"
+                    },
+                    "id": "779a8ef1-9ea8-4143-ac25-03451d42156d",
+                    "name": "获取元素数据",
+                    "type": "getEle"
+                  },
+                  {
+                    "config": {
+                      "operationStr": "${toggleCenterY} - ${centerY}",
+                      "variable": "diff"
+                    },
+                    "id": "ea40ce21-9b62-461e-808d-de511014b0b3",
+                    "name": "数学运算",
+                    "type": "mathOperation"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "children": [
+                              {
+                                "config": {
+                                  "randomDistance": 0,
+                                  "saveItemName": "toggle",
+                                  "useOffset": false
+                                },
+                                "id": "4cc8dc7d-e9f9-43dd-8896-1f4e56e7c5a6",
+                                "name": "点击元素",
+                                "type": "click"
+                              },
+                              {
+                                "config": {
+                                  "operationStr": "1",
+                                  "variable": "hasBreak"
+                                },
+                                "id": "e05555eb-a4b5-4cd2-b4ac-8d6c6535bd31",
+                                "name": "数学运算",
+                                "type": "mathOperation"
+                              }
+                            ],
+                            "conditionV3": [
+                              [
+                                {
+                                  "probability": 50,
+                                  "relation": "notExist",
+                                  "useVariable": "toggleSelected"
+                                },
+                                {
+                                  "probability": 50,
+                                  "relation": "less",
+                                  "result": "50",
+                                  "useVariable": "diff"
+                                }
+                              ]
+                            ]
+                          },
+                          "id": "83d43dd6-6670-4a8d-ad33-b5535d26f968",
+                          "name": "IF条件",
+                          "type": "ifElse"
+                        },
+                        {
+                          "config": {},
+                          "id": "29c9e40b-d08b-4636-9905-6bb44a4bb1fd",
+                          "name": "退出循环",
+                          "type": "breakLoop"
+                        }
+                      ],
+                      "conditionV3": [
+                        [
+                          {
+                            "probability": 50,
+                            "relation": "moreEqual",
+                            "result": "${centerY}",
+                            "useVariable": "toggleCenterY"
+                          }
+                        ]
+                      ]
+                    },
+                    "id": "89243bc5-866b-458f-906e-1dfb62a9b099",
+                    "name": "IF条件",
+                    "type": "ifElse"
+                  }
+                ],
+                "serialType": "fixedValue",
+                "times": "5",
+                "variableIndex": "times"
+              },
+              "enabled": true,
+              "id": "e38ca63e-54a7-470a-86a2-2c08d75dbbb9",
+              "name": "For循环次数",
+              "type": "forTimes"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "actionType": "have",
+                      "threshold": 0.85,
+                      "url": "https://test-upgrade.geelark.cn/png/icon-rego.png",
+                      "variable": "hasAiContent"
+                    },
+                    "id": "36add2a1-62ad-46b7-ac51-922b33685e70",
+                    "name": "图标识别",
+                    "type": "recognizeImg"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "operationStr": "${_SCREEN_WIDTH_} - 50",
+                            "variable": "x"
+                          },
+                          "id": "f87d8b45-730e-42b8-89d4-3cf2c7a53658",
+                          "name": "数学运算",
+                          "type": "mathOperation"
+                        },
+                        {
+                          "config": {
+                            "operationStr": "${centerY} + 30",
+                            "variable": "y"
+                          },
+                          "id": "70a87a43-fa3d-485a-885d-5e20b62ee165",
+                          "name": "数学运算",
+                          "type": "mathOperation"
+                        },
+                        {
+                          "config": {
+                            "randomDistance": 0,
+                            "x": "${x}",
+                            "y": "${y}"
+                          },
+                          "id": "bb0dedf4-9da5-4246-8f55-d9d7e78eeb2f",
+                          "name": "点击坐标",
+                          "type": "clickXY"
+                        }
+                      ],
+                      "conditionV3": [
+                        [
+                          {
+                            "probability": 50,
+                            "relation": "notExist",
+                            "useVariable": "hasAiContent"
+                          }
+                        ]
+                      ]
+                    },
+                    "id": "f4fd03bc-5f42-4359-b66c-01fc36436fab",
+                    "name": "IF条件",
+                    "type": "ifElse"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "notExist",
+                      "useVariable": "hasBreak"
+                    }
+                  ]
+                ]
+              },
+              "id": "631cd58c-e9d9-4b9e-97fd-4eaab286e6c7",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {},
+              "id": "73645b5b-fe11-4fe8-a19a-25389b996d06",
+              "name": "页面截图",
+              "type": "screenshotPage"
+            }
+          ],
+          "conditionList": [
+            {
+              "probability": 50,
+              "relation": "exist",
+              "useVariable": "AITags"
+            }
+          ]
+        },
+        "id": "bb6d5259-57a5-4938-abe7-91e89483919c",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "inputType": "taskOrder",
+                "isUseVariable": false,
+                "useVariable": "Cover"
+              },
+              "id": "f9338d23-f07f-4dc8-8ea8-301f43566532",
+              "name": "上传文件",
+              "type": "uploadFile"
+            },
+            {
+              "config": {
+                "_a": 200,
+                "_b": 300,
+                "direction": "bottom",
+                "distanceMax": "450",
+                "distanceMin": "300",
+                "position": [
+                  260,
+                  "500"
+                ],
+                "randomDistance": 0,
+                "randomWheelSleepTime": [
+                  200,
+                  300
+                ],
+                "simulate": true
+              },
+              "id": "a1c7f5f6-b49d-4bbb-a929-08bd291c2c9d",
+              "name": "滑动页面",
+              "type": "scrollPage"
+            },
+            {
+              "config": {
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "c156d90b-b0f3-4e67-ae93-86eaeed641e1",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Edit cover",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": true,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "2983685b-6ad9-4503-bade-3efe23137b22",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "351a39b5-06a1-4707-b00e-c4e24e741df7",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Add from camera roll",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "873983c2-a2d4-4875-88ee-ca359c957c38",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "9f8887d5-4002-4ff4-a893-eaab01d945db",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/gallery_image",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "069e2d92-6a4a-410f-8435-f197c0a4835f",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "51a42346-b22e-447d-ae5d-c3d83a4d5aab",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Done",
+                      "filterType": "equal",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "4d540d8d-a96e-4458-8a3f-28a0fe5f4a08",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "timeout": 3000,
+                "timeoutType": "fixedValue"
+              },
+              "id": "22372d84-d573-4bdd-b2cd-cbf487774db5",
+              "name": "等待时间",
+              "type": "waitTime"
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "probability": 50,
+                "relation": "exist",
+                "useVariable": "Cover"
+              }
+            ]
+          ]
+        },
+        "id": "6a0ef557-65b3-43a6-beac-40db84105e8d",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "OK",
+              "type": "text"
+            }
+          ],
+          "hiddenChildren": false,
+          "randomDistance": 0,
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "dc2ff9c2-62f4-4852-a5d6-b86dcc433505",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterCollection": [
+            [
+              {
+                "content": "Share",
+                "filterType": "equal",
+                "type": "desc"
+              }
+            ],
+            [
+              {
+                "content": "Share",
+                "filterType": "equal",
+                "type": "text"
+              }
+            ]
+          ],
+          "randomDistance": 0,
+          "searchTime": 10000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false,
+          "variable": "isShare"
+        },
+        "id": "bd9bb3db-cb1c-4c33-ae26-80c5079a4e57",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "apposition": "and",
+          "children": [
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Next",
+                    "type": "desc"
+                  }
+                ],
+                "randomDistance": 0,
+                "searchTime": 10000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "df0752d7-a55a-432f-bc36-aded1b4ef38b",
+              "name": "点击元素",
+              "type": "click"
+            }
+          ],
+          "conditionList": [
+            {
+              "relation": "notExist",
+              "useVariable": "isShare"
+            }
+          ]
+        },
+        "id": "c47552d8-3a0d-4862-9a2d-9322e3ed8db5",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {},
+        "id": "d1e7d4cc-796b-473f-bc45-eb57e7b18bb9",
+        "name": "页面截图",
+        "type": "screenshotPage"
+      },
+      {
+        "config": {
+          "filterType": "contain",
+          "filters": [
+            {
+              "content": "About Reels",
+              "type": "text"
+            }
+          ],
+          "searchTime": 10000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "variable": "AboutReelsText"
+        },
+        "id": "570eda46-065b-413e-a17a-3528c234f0f1",
+        "name": "等待元素出现",
+        "type": "waitEle"
+      },
+      {
+        "config": {
+          "filterType": "contain",
+          "filters": [
+            {
+              "content": "Update on your original audio",
+              "type": "text"
+            }
+          ],
+          "searchTime": 10000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "variable": "AboutReelsText2"
+        },
+        "id": "db2a1894-bbe8-4ff1-a71f-0a6468980bdd",
+        "name": "等待元素出现",
+        "type": "waitEle"
+      },
+      {
+        "config": {
+          "apposition": "or",
+          "children": [
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "android.widget.Button",
+                    "type": "class"
+                  },
+                  {
+                    "content": "Share",
+                    "type": "desc"
+                  }
+                ],
+                "searchTime": 30000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "6008aa99-3bb7-400b-a5cc-32167b6d2ced",
+              "name": "点击元素",
+              "type": "click"
+            }
+          ],
+          "conditionList": [
+            {
+              "relation": "exist",
+              "useVariable": "AboutReelsText"
+            },
+            {
+              "probability": 50,
+              "relation": "exist",
+              "useVariable": "AboutReelsText2"
+            }
+          ]
+        },
+        "id": "4af47ff5-7ca6-4eaa-8fd8-8536382ea31a",
+        "name": "IF条件",
+        "type": "ifElse"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "Always share reels",
+              "type": "text"
+            }
+          ],
+          "hiddenChildren": false,
+          "randomDistance": 0,
+          "searchTime": 3000,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "id": "90388364-9079-4dd2-bdfa-c2c29e91a27c",
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "timeout": 80000,
+          "timeoutType": "fixedValue"
+        },
+        "id": "2f5a7cf1-c525-43a2-a88c-6c3143c90c23",
+        "name": "等待时间",
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Profile",
+                      "filterType": "equal",
+                      "type": "desc"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "04b0b779-60a2-439c-909f-132582fa8b72",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "timeoutMax": 2000,
+                "timeoutMin": 1000,
+                "timeoutType": "randomInterval"
+              },
+              "id": "2fcda873-b719-4a4b-93da-f3d03633edee",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "_a": 200,
+                "_b": 300,
+                "direction": "bottom",
+                "distanceMax": "450",
+                "distanceMin": "300",
+                "position": [
+                  260,
+                  "200"
+                ],
+                "randomDistance": 0,
+                "randomWheelSleepTime": [
+                  200,
+                  300
+                ]
+              },
+              "id": "420a0791-c7a6-41c6-847f-39f8f3e28326",
+              "name": "滑动页面",
+              "type": "scrollPage"
+            },
+            {
+              "config": {
+                "doubleClick": false,
+                "filterCollection": [
+                  [
+                    {
+                      "content": "com.instagram.android:id/image_button",
+                      "filterType": "equal",
+                      "type": "id"
+                    }
+                  ]
+                ],
+                "hiddenChildren": false,
+                "randomDistance": 0,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "id": "35ef78b3-1fc9-4d92-a7cd-024e32e787d9",
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "filterCollection": [
+                        [
+                          {
+                            "content": "Send post",
+                            "filterType": "equal",
+                            "type": "desc"
+                          }
+                        ]
+                      ],
+                      "hiddenChildren": false,
+                      "searchTime": 500,
+                      "serial": 1,
+                      "serialType": "fixedValue",
+                      "variable": "hasSendPost"
+                    },
+                    "id": "e7d624b8-df5b-4fa3-aee6-5c77aeadf0da",
+                    "name": "等待元素出现",
+                    "type": "waitEle"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "doubleClick": false,
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "Send post",
+                                  "filterType": "equal",
+                                  "type": "desc"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 5000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false
+                          },
+                          "id": "c6214de1-2fa8-4b09-b2ca-79bd950f0277",
+                          "name": "点击元素",
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "doubleClick": false,
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "Copy link",
+                                  "filterType": "equal",
+                                  "type": "desc"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": false,
+                            "randomDistance": 0,
+                            "searchTime": 5000,
+                            "serial": 1,
+                            "serialType": "fixedValue",
+                            "useOffset": false
+                          },
+                          "id": "9581414a-f089-42fe-80df-a0a73d7129db",
+                          "name": "点击元素",
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "timeoutMax": 2000,
+                            "timeoutMin": 1000,
+                            "timeoutType": "randomInterval"
+                          },
+                          "id": "af658522-3485-468a-8d9c-dc1d4ebbb781",
+                          "name": "等待时间",
+                          "type": "waitTime"
+                        },
+                        {
+                          "config": {
+                            "variable": "shareLink"
+                          },
+                          "id": "98f6aea8-459a-4b3d-8687-3c117b6308e6",
+                          "name": "获取剪贴板内容",
+                          "type": "getClipboardData"
+                        },
+                        {
+                          "config": {},
+                          "id": "d5b9d5f3-d2dc-42a9-addd-d4069a3c67e3",
+                          "name": "退出循环",
+                          "type": "breakLoop"
+                        }
+                      ],
+                      "conditionV3": [
+                        [
+                          {
+                            "probability": 50,
+                            "relation": "exist",
+                            "useVariable": "hasSendPost"
+                          }
+                        ]
+                      ]
+                    },
+                    "id": "f8f7dd08-ab34-4ebe-9e8a-a89f8228c4a9",
+                    "name": "IF条件",
+                    "type": "ifElse"
+                  },
+                  {
+                    "config": {
+                      "_a": 200,
+                      "_b": 300,
+                      "direction": "top",
+                      "distanceMax": 150,
+                      "distanceMin": 100,
+                      "position": [
+                        260,
+                        400
+                      ],
+                      "randomDistance": 0,
+                      "randomWheelSleepTime": [
+                        200,
+                        300
+                      ]
+                    },
+                    "id": "da8c7bf8-6f96-4fcc-91b9-e889aeac34e9",
+                    "name": "滑动页面",
+                    "type": "scrollPage"
+                  }
+                ],
+                "serialType": "fixedValue",
+                "times": "5"
+              },
+              "id": "ea1f8a5e-380a-4866-bc71-01dbb00cc2f3",
+              "name": "For循环次数",
+              "type": "forTimes"
+            }
+          ],
+          "conditionV3": [
+            [
+              {
+                "probability": 50,
+                "relation": "exist",
+                "useVariable": "needShareLink"
+              }
+            ]
+          ]
+        },
+        "id": "5749f1bb-b013-46f4-8b28-c710c3e6cd3b",
+        "name": "IF条件",
+        "type": "ifElse"
+      }
+    ],
+    "contentType": "phone",
+    "errorType": "skip",
+    "isDebug": false
+  }
+}
