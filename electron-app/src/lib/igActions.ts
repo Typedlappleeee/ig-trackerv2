@@ -398,6 +398,45 @@ export async function postCarousel(id: string, params: Record<string, unknown>, 
   log('✅ Carrousel publié — vérifie le profil')
 }
 
+// ── Envoyer un message privé (DM) à une liste de comptes ────────────────────
+// Traduction « cœur » du template GeeLark « Send private message ». Pour chaque
+// compte : ouvre le profil (deep link, plus robuste que la recherche), tape
+// « Message », saisit le texte dans le composer, envoie. Ignore proprement les
+// profils sans bouton « Message » (privés/bloqués).
+export async function sendDm(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
+  const raw = String(params.usernames ?? '').trim()
+  const users = raw ? raw.split(/[\n,]+/).map(s => s.trim().replace(/^@/, '')).filter(Boolean) : []
+  const content = String(params.content ?? '').trim()
+  if (!users.length) { log('  · aucun compte fourni'); return }
+  if (!content) { log('  · aucun message fourni'); return }
+  await dismissPopups(id)
+  if (find(await dumpUi(id), { desc: 'Log in' }) || find(await dumpUi(id), { desc: 'Login' })) throw new Error('compte non connecté')
+
+  let sent = 0
+  for (const u of users) {
+    await openProfile(id, u)
+    await sleep(jitter(3500, 1500)); await dismissPopups(id)
+    // Bouton « Message » du profil.
+    if (!await tapFirst(id, [{ desc: 'Message' }, { text: 'Message' }, { text: 'Envoyer un message' }], `Message → ${u}`, log, false)) {
+      log(`  · ${u} : bouton « Message » introuvable (profil privé/bloqué ?)`); await sleep(jitter(2500, 1500)); continue
+    }
+    await sleep(jitter(3000, 1500)); await dismissPopups(id)
+    // Champ de saisie du fil de discussion.
+    const nodes = await dumpUi(id)
+    const box = nodes.find(n => n.id.endsWith('row_thread_composer_edittext')) || nodes.find(n => /EditText/.test(n.cls))
+    if (!box) { log(`  · ${u} : champ message introuvable`); await sleep(jitter(2000, 1500)); continue }
+    await cloudPhones.shell(id, `input tap ${box.cx} ${box.cy}`); await sleep(600)
+    await typeText(id, content); await sleep(700)
+    // Envoyer (bouton dédié par id, sinon libellé Send/Envoyer).
+    const sendNode = (await dumpUi(id)).find(n => n.id.endsWith('row_thread_composer_send_button_container') && n.clickable)
+    if (sendNode) await cloudPhones.shell(id, `input tap ${sendNode.cx} ${sendNode.cy}`)
+    else await tapFirst(id, [{ desc: 'Send' }, { text: 'Send' }, { text: 'Envoyer' }], 'Envoyer', log, false)
+    sent++; log(`  ✉️ ${u} : message envoyé (${sent})`)
+    await sleep(jitter(4500, 3000))  // rythme humain entre chaque DM
+  }
+  log(`✅ ${sent}/${users.length} message(s) envoyé(s)`)
+}
+
 // Registre des actions disponibles dans un flow (do:'action', name:'...').
 export const ACTIONS: Record<string, (id: string, params: Record<string, unknown>, log: Logger) => Promise<void>> = {
   prep_device: prepDevice,
@@ -410,6 +449,7 @@ export const ACTIONS: Record<string, (id: string, params: Record<string, unknown
   warmup_reels: warmupReels,
   set_privacy: setPrivacy,
   bulk_follow: bulkFollow,
+  send_dm: sendDm,
   login: login,
   post_carousel: postCarousel,
 }

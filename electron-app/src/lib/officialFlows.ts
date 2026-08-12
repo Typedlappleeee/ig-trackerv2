@@ -58,6 +58,24 @@ export const OFFICIAL_FLOWS: Flow[] = [
   },
 
   {
+    id: 'ig-send-dm',
+    name: 'Message privé en masse — Instagram',
+    official: true,
+    category: '📈 Croissance',
+    app: 'com.instagram.android',
+    description: 'Envoie le même message privé (DM) à une liste de comptes (un pseudo par ligne). Ignore les profils sans bouton « Message ».',
+    inputs: [
+      { key: 'usernames', label: 'Comptes à contacter', placeholder: 'un pseudo par ligne (sans @)', type: 'textarea', optional: false },
+      { key: 'content',   label: 'Message',             placeholder: 'Le message à envoyer',          type: 'textarea', optional: false },
+    ],
+    steps: [
+      { do: 'open', pkg: 'com.instagram.android' },
+      { do: 'wait', ms: 3000 }, { do: 'popups' },
+      { do: 'action', name: 'send_dm', params: { usernames: '{{usernames}}', content: '{{content}}' } },
+    ],
+  },
+
+  {
     id: 'ig-set-privacy',
     name: 'Confidentialité du compte — Instagram',
     official: true,
