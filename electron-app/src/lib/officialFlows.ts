@@ -10,14 +10,16 @@ export const OFFICIAL_FLOWS: Flow[] = [
     official: true,
     category: '📤 Publication',
     app: 'com.instagram.android',
-    description: 'Publie plusieurs photos en galerie/carrousel, avec légende. (Version cœur : sans tags IA ni audio.)',
+    description: 'Publie une ou plusieurs photos (galerie/carrousel) avec légende, et un son tendance optionnel (ID audio Reels). Les photos doivent déjà être sur le téléphone.',
     inputs: [
-      { key: 'caption', label: 'Légende', placeholder: 'Légende (emoji ok)', optional: true },
+      { key: 'caption', label: 'Légende',            placeholder: 'Légende (emoji ok)',           optional: true },
+      { key: 'count',   label: 'Nombre de photos',   placeholder: 'ex : 3 (défaut 1)',            optional: true },
+      { key: 'musicId', label: 'Son tendance (ID)',  placeholder: 'ID audio Reels (optionnel)',   optional: true },
     ],
     steps: [
       { do: 'open', pkg: 'com.instagram.android' },
       { do: 'wait', ms: 3000 }, { do: 'popups' },
-      { do: 'action', name: 'post_carousel', params: { caption: '{{caption}}', count: '{{count}}' } },
+      { do: 'action', name: 'post_carousel', params: { caption: '{{caption}}', count: '{{count}}', musicId: '{{musicId}}' } },
     ],
   },
 

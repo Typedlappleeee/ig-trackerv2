@@ -364,7 +364,19 @@ export async function login(id: string, params: Record<string, unknown>, log: Lo
 export async function postCarousel(id: string, params: Record<string, unknown>, log: Logger): Promise<void> {
   const caption = String(params.caption ?? '')
   const count = Math.max(1, Number(params.count) || 1)
+  const musicId = String(params.musicId ?? '').trim()
   await dismissPopups(id)
+
+  // Son tendance optionnel : on l'enregistre d'abord (Saved audio) via le deep
+  // link, pour pouvoir l'attacher pendant l'édition du post.
+  if (musicId) {
+    await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'https://www.instagram.com/reels/audio/${musicId}/'`).catch(() => {})
+    await sleep(jitter(5000, 2000)); await dismissPopups(id)
+    await tapFirst(id, [{ desc: 'Save audio' }, { text: 'Save audio' }], 'Enregistrer le son', log, false)
+    await sleep(1500)
+    await cloudPhones.shell(id, `am start -a android.intent.action.VIEW -d 'instagram://share'`).catch(() => {})
+    await sleep(jitter(4000, 2000)); await dismissPopups(id)
+  }
 
   if (!await tapFirst(id, [{ id: 'creation_tab' }, { desc: 'Create' }, { desc: 'Créer' }, { desc: 'New post' }], 'Créer', log)) throw new Error('bouton Créer introuvable')
   await sleep(2500); await dismissPopups(id)
@@ -386,6 +398,17 @@ export async function postCarousel(id: string, params: Record<string, unknown>, 
   await sleep(1000)
   if (!await tapFirst(id, [{ desc: 'Next' }, { text: 'Next' }, { text: 'Suivant' }], 'Suivant', log)) throw new Error('bouton Suivant introuvable')
   await sleep(2500); await dismissPopups(id)
+  // Attacher le son enregistré (best-effort) : Audio → Saved → 1er son.
+  if (musicId) {
+    if (await tapFirst(id, [{ desc: 'Audio' }, { text: 'Audio' }, { contains: 'Add audio' }], 'Ouvrir Audio', log, false)) {
+      await sleep(2500); await dismissPopups(id)
+      await tapFirst(id, [{ text: 'Saved' }, { desc: 'Saved' }], 'Onglet Saved', log, false); await sleep(1500)
+      const track = (await dumpUi(id)).find(n => n.clickable && n.id.endsWith('album_art'))
+      if (track) { await cloudPhones.shell(id, `input tap ${track.cx} ${track.cy}`); await sleep(2500) }
+      await tapFirst(id, [{ text: 'Done' }, { desc: 'Done' }, { text: 'OK' }], 'Valider le son', log, false); await sleep(1500)
+      await dismissPopups(id)
+    } else { log('  · écran Audio non trouvé (son ignoré)') }
+  }
   await tapFirst(id, [{ desc: 'Next' }, { text: 'Next' }, { text: 'Suivant' }], 'Suivant (filtres)', log, false)
   await sleep(2500); await dismissPopups(id)
   // Légende.
