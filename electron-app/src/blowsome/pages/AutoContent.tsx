@@ -119,12 +119,12 @@ export function BlowAutoContent({ user }: { user: User }) {
       const blobUrl = URL.createObjectURL(src.file)
       try {
         const up = await uploadVideoFromPath(blobUrl, scope)
-        return { nativePath: null, url: await getSignedUrl(up.storagePath) }
+        return { nativePath: null, url: (await getSignedUrl(up.storagePath)) ?? '' }
       } finally { URL.revokeObjectURL(blobUrl) }
     }
     const it = src.item!
     const nativePath = hasNative ? await resolveContentToLocalPath(it) : null
-    const url = it.storage_path ? await getSignedUrl(it.storage_path) : (it.file_url ?? '')
+    const url = it.storage_path ? ((await getSignedUrl(it.storage_path)) ?? '') : (it.file_url ?? '')
     return { nativePath, url }
   }
 
@@ -163,8 +163,9 @@ export function BlowAutoContent({ user }: { user: User }) {
             if (hasNative && nativePath && window.electronAPI.readFileBytes) {
               const b = await window.electronAPI.readFileBytes(nativePath)
               if (b?.ok && b.bytes) {
-                const buf = b.bytes instanceof Uint8Array ? b.bytes.buffer : b.bytes
-                const tRes = await window.electronAPI.groqTranscription({ apiKey: conns.groq, audioBytes: buf as ArrayBuffer, filename: 'clip.mp4' }) as { ok?: boolean; data?: { text?: string } }
+                const raw = b.bytes as ArrayBuffer | Uint8Array
+                const buf = (raw instanceof Uint8Array ? raw.buffer : raw) as ArrayBuffer
+                const tRes = await window.electronAPI.groqTranscription({ apiKey: conns.groq, audioBytes: buf, filename: 'clip.mp4' }) as { ok?: boolean; data?: { text?: string } }
                 if (tRes?.ok) transcript = String(tRes.data?.text ?? '').trim()
               }
             } else if (/^https?:/i.test(mediaRef)) {
@@ -225,7 +226,7 @@ export function BlowAutoContent({ user }: { user: User }) {
           if (!window.electronAPI?.runFfmpegMixOverlay) throw new Error(tr('Incrustation indisponible (rebuild desktop ?)', 'Overlay unavailable (rebuild desktop?)'))
           const ov = await window.electronAPI.runFfmpegMixOverlay({ sourcePath: mediaRef, caption, position: textPos, fontSize: 54, fontColor: '#FFFFFF' })
           if (!ov?.ok || !ov.outputPath) throw new Error(`${tr('Incrustation échouée', 'Overlay failed')} : ${ov?.error ?? '?'}`)
-          finalRef = ov.storagePath ? await getSignedUrl(ov.storagePath) : ov.outputPath
+          finalRef = ov.storagePath ? ((await getSignedUrl(ov.storagePath)) ?? ov.outputPath) : ov.outputPath
         }
 
         // 4) Envoi en banque : ré-upload dans l'emplacement permanent (vignette + accès OK)

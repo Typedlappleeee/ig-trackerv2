@@ -194,6 +194,96 @@ const PhoneRow = memo(function PhoneRow({ phone, checked, videoIndex, videoTitle
   )
 })
 
+// ── Sélecteur de cover : scrub la vidéo et capture une frame comme miniature ──
+// La frame capturée (data:image/jpeg) sera uploadée chez GeeLark au moment de
+// poster et passée en `Cover` au flow RPA Reels.
+function CoverPicker({ resolveSrc, initialTime, onCancel, onPick }: {
+  resolveSrc: () => Promise<string | null>
+  initialTime: number
+  onCancel: () => void
+  onPick: (time: number, dataUrl: string) => void
+}) {
+  const tr = useTr()
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [src, setSrc]   = useState<string | null>(null)
+  const [dur, setDur]   = useState(0)
+  const [time, setTime] = useState(initialTime)
+  const [err, setErr]   = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    resolveSrc().then(s => { if (!alive) return; setSrc(s); if (!s) setErr(tr('Vidéo introuvable', 'Video not found')) })
+    return () => { alive = false }
+  }, [])
+
+  function seek(t: number) {
+    setTime(t)
+    const v = videoRef.current
+    if (v && isFinite(t)) v.currentTime = t
+  }
+
+  function capture() {
+    const v = videoRef.current
+    if (!v) return
+    setBusy(true)
+    try {
+      const c = document.createElement('canvas')
+      c.width  = v.videoWidth  || 720
+      c.height = v.videoHeight || 1280
+      const ctx = c.getContext('2d')
+      if (!ctx) throw new Error('no ctx')
+      ctx.drawImage(v, 0, 0, c.width, c.height)
+      const dataUrl = c.toDataURL('image/jpeg', 0.82)
+      onPick(time, dataUrl)
+    } catch {
+      setErr(tr('Capture impossible (protection CORS de la source vidéo).', 'Capture failed (video source CORS protection).'))
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div onClick={onCancel} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} className="sf-card" style={{ width: 'min(420px,94vw)', padding: 18, display: 'flex', flexDirection: 'column', gap: 14, background: 'rgba(18,18,28,0.98)' }}>
+        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#E9EAF0' }}>{tr('Choisir la cover', 'Choose the cover')}</div>
+        {err ? (
+          <div style={{ fontSize: 12, color: '#F87171', lineHeight: 1.5 }}>{err}</div>
+        ) : (
+          <>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '9 / 16', maxHeight: '54vh', margin: '0 auto', background: '#000', borderRadius: 10, overflow: 'hidden' }}>
+              {src && (
+                <video
+                  ref={videoRef}
+                  src={src}
+                  crossOrigin="anonymous"
+                  muted
+                  playsInline
+                  preload="auto"
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  onLoadedMetadata={e => { const d = e.currentTarget.duration; if (isFinite(d)) { setDur(d); const t0 = Math.min(initialTime, d); e.currentTarget.currentTime = t0; setTime(t0) } }}
+                />
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="range" min={0} max={dur || 0} step={0.05} value={time}
+                onChange={e => seek(Number(e.target.value))}
+                style={{ flex: 1, accentColor: '#8B5CF6' }} />
+              <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: '#9CA0AD', minWidth: 42, textAlign: 'right' }}>{time.toFixed(1)}s</span>
+            </div>
+          </>
+        )}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} className="sf-btn sf-btn-ghost cursor-pointer" style={{ fontSize: 12 }}>{tr('Annuler', 'Cancel')}</button>
+          {!err && (
+            <button onClick={capture} disabled={!src || busy} className="sf-btn sf-btn-secondary cursor-pointer" style={{ fontSize: 12, opacity: (!src || busy) ? 0.5 : 1 }}>
+              {tr('Utiliser cette frame', 'Use this frame')}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function MassPosting({ user }: MassPostingProps) {
   const t = useT()
   const tr = useTr()
@@ -246,6 +336,10 @@ export function MassPosting({ user }: MassPostingProps) {
   const [addingFolder, setAddingFolder]     = useState<string | null>(null)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [randomSeed, setRandomSeed]               = useState(0)
+  // Cover perso par vidéo (frame capturée) : videoIndex → { time, dataUrl }.
+  // Non persisté (localStorage) : ne compte qu'au moment du premier post.
+  const [covers, setCovers]                       = useState<Record<number, { time: number; dataUrl: string }>>({})
+  const [coverPickerFor, setCoverPickerFor]       = useState<number | null>(null)
   const stopRef                           = useRef(false)
   const runActiveRef                      = useRef(false)  // ce session pilote un run
   const activePhonesRef                   = useRef<string[]>([])
@@ -1065,6 +1159,21 @@ export function MassPosting({ user }: MassPostingProps) {
         log(tr(`Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, `Video ${vi + 1} uploaded (${sv.item.title.slice(0, 30)}…)`), 'ok')
       }
 
+      // ── Covers perso : upload des frames choisies (image) → resourceUrl GeeLark.
+      // Best-effort : un échec de cover ne bloque pas le post (repli cover auto IG).
+      const coverMap = new Map<number, string>() // videoIndex → resourceUrl cover
+      const coverIdx = usedIndices.filter(vi => covers[vi]?.dataUrl && tokenMap.has(vi))
+      if (coverIdx.length) {
+        log(tr(`Upload de ${coverIdx.length} cover(s)…`, `Uploading ${coverIdx.length} cover(s)…`))
+        for (const vi of coverIdx) {
+          try {
+            const cu = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: covers[vi].dataUrl })
+            if (cu.ok && cu.token) { coverMap.set(vi, cu.token); log(tr(`Cover vidéo ${vi + 1} prête`, `Cover for video ${vi + 1} ready`), 'ok') }
+            else log(tr(`Cover vidéo ${vi + 1} ignorée (${cu.error ?? 'échec'})`, `Cover for video ${vi + 1} skipped (${cu.error ?? 'failed'})`), 'warn')
+          } catch { log(tr(`Cover vidéo ${vi + 1} ignorée`, `Cover for video ${vi + 1} skipped`), 'warn') }
+        }
+      }
+
       // Persiste le média + légende PAR téléphone (+ options) : après un refresh,
       // la reprise pourra RELANCER les téléphones jamais partis sans ré-upload ni
       // nouveau débit (crédits déjà pris ici, tâches déjà envoyées exclues).
@@ -1190,6 +1299,7 @@ export function MassPosting({ user }: MassPostingProps) {
               taskRes = await postReelsTask(bearer, {
                 phoneId: asgn.phone.geelark_id, scheduleAt: Math.floor(Date.now() / 1000),
                 description: capFor(asgn.video), video: [token], reelsTrial: postingOpts.reelsTrial,
+                cover: coverMap.get(asgn.videoIndex) ? [coverMap.get(asgn.videoIndex)!] : undefined,
               })
               if (taskRes['code'] === 0) break
               if (attempt < 2) { log(tr(`  ${asgn.phone.phone_name} : ${taskRes['msg'] ?? 'publication refusée'} — nouvel essai…`, `  ${asgn.phone.phone_name}: ${taskRes['msg'] ?? 'post rejected'} — retrying…`), 'warn'); await new Promise(r => setTimeout(r, 3000 * (attempt + 1))) }
@@ -1354,6 +1464,7 @@ export function MassPosting({ user }: MassPostingProps) {
               description: capFor(asgn.video),
               video:       [token],
               reelsTrial:  postingOpts.reelsTrial,
+              cover:       coverMap.get(asgn.videoIndex) ? [coverMap.get(asgn.videoIndex)!] : undefined,
             })
             outcome = classifyTaskRes(taskRes)
             if (outcome === 'ok') break
@@ -2462,6 +2573,70 @@ export function MassPosting({ user }: MassPostingProps) {
                 </section>
               )}
 
+              {/* ── Récap par compte : vidéo · description · cover ───────────── */}
+              {!posting && phoneList.length > 0 && selectedVideos.length > 0 && (
+                <section className="sf-anim-slide-up">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 7, fontSize: 12, fontWeight: 800, color: 'var(--accent-l)', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.22)' }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: IVORY }}>{tr('Récap par compte', 'Per-account recap')}</span>
+                    <span className="sf-badge sf-badge-muted" style={{ fontSize: 9 }}>{assignments.filter(a => a.videoIndex >= 0).length}</span>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(233,234,240,0.07)' }} />
+                    <span style={{ fontSize: 10, color: FAINT }}>{tr('Description & cover par vidéo', 'Description & cover per video')}</span>
+                  </div>
+                  <div className="sf-card" style={{ padding: 0, overflow: 'hidden' }}>
+                    <div style={{ maxHeight: 340, overflow: 'auto', scrollbarWidth: 'thin', display: 'flex', flexDirection: 'column' }}>
+                      {assignments.filter(a => a.videoIndex >= 0).map((a, ri) => {
+                        const sv = a.video!
+                        const vi = a.videoIndex
+                        const fp = sv.localPath ?? sv.item.file_url
+                        const cover = covers[vi]
+                        const sharedBy = assignments.filter(x => x.videoIndex === vi).length
+                        return (
+                          <div key={a.phone.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderTop: ri === 0 ? 'none' : '1px solid rgba(233,234,240,0.05)' }}>
+                            {/* Vignette vidéo + n° */}
+                            <div style={{ position: 'relative', width: 38, height: 60, flexShrink: 0, borderRadius: 6, overflow: 'hidden', background: 'var(--surface-2)' }}>
+                              <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
+                              <span style={{ position: 'absolute', bottom: 2, left: 2, fontSize: 9, fontWeight: 800, color: '#fff', background: 'rgba(99,102,241,0.9)', borderRadius: 3, padding: '0 3px', lineHeight: '13px' }}>#{vi + 1}</span>
+                            </div>
+                            {/* Compte */}
+                            <div style={{ minWidth: 90, maxWidth: 130, flexShrink: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: IVORY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.phone.ig_username ?? a.phone.phone_name}</div>
+                              {sharedBy > 1 && <div style={{ fontSize: 9, color: FAINT }}>{tr(`partagé ×${sharedBy}`, `shared ×${sharedBy}`)}</div>}
+                            </div>
+                            {/* Description (par vidéo) */}
+                            <input
+                              value={sv.caption ?? ''}
+                              onChange={e => { const val = e.target.value; setSelVideos(prev => prev.map((v, i) => i === vi ? { ...v, caption: val } : v)) }}
+                              placeholder={caption ? tr('(légende globale)', '(global caption)') : tr('Description de cette vidéo…', 'Description for this video…')}
+                              className="sf-input"
+                              style={{ flex: 1, minWidth: 0, fontSize: 12, padding: '7px 9px' }} />
+                            {/* Cover */}
+                            {cover ? (
+                              <div style={{ position: 'relative', width: 30, height: 48, flexShrink: 0, borderRadius: 5, overflow: 'hidden', border: '1px solid rgba(139,92,246,0.5)' }}>
+                                <img src={cover.dataUrl} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <button onClick={() => setCoverPickerFor(vi)} title={tr('Changer la cover', 'Change cover')} className="cursor-pointer" style={{ position: 'absolute', inset: 0, background: 'transparent', border: 'none' }} />
+                                <button onClick={() => setCovers(prev => { const n = { ...prev }; delete n[vi]; return n })} title={tr('Retirer', 'Remove')} className="cursor-pointer" style={{ position: 'absolute', top: 1, right: 1, width: 13, height: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(6,6,8,0.85)', borderRadius: 3, border: 'none', color: ERR }}>
+                                  <svg width="6" height="6" viewBox="0 0 8 8" fill="none"><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setCoverPickerFor(vi)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer" style={{ flexShrink: 0, fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 5, color: FAINT }}
+                                onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-l)' }}
+                                onMouseLeave={e => { e.currentTarget.style.color = FAINT }}>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                                {tr('Cover', 'Cover')}
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </section>
+              )}
+
               {/* ── Journal ──────────────────────────────────────────────────── */}
               {logs.length > 0 && (
                 <section className="sf-anim-slide-up">
@@ -2646,6 +2821,15 @@ export function MassPosting({ user }: MassPostingProps) {
       )}
 
       {/* Bank picker modal */}
+      {coverPickerFor !== null && selectedVideos[coverPickerFor] && (
+        <CoverPicker
+          resolveSrc={() => resolveVideoPath(selectedVideos[coverPickerFor])}
+          initialTime={covers[coverPickerFor]?.time ?? 0.5}
+          onCancel={() => setCoverPickerFor(null)}
+          onPick={(time, dataUrl) => { setCovers(prev => ({ ...prev, [coverPickerFor]: { time, dataUrl } })); setCoverPickerFor(null) }}
+        />
+      )}
+
       {showBankPicker && (
         <BankPicker
           user={user}
