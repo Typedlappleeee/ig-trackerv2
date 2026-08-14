@@ -308,12 +308,18 @@ export function buildWebAPI() {
         // Preferred path: server-side proxy (/api/geelark-upload) does
         // download + getUrl + PUT entirely côté serveur — pas de CORS.
         // Works whenever the source is an https URL (Supabase signed/public URL).
-        if (/^https?:\/\//.test(opts.filePath)) {
+        const isDataUrl = /^data:/.test(opts.filePath)
+        if (/^https?:\/\//.test(opts.filePath) || isDataUrl) {
           try {
+            // Cover (data: URL) → on envoie le base64 au proxy. Le navigateur ne peut
+            // pas PUT au S3 GeeLark (CORS), mais le serveur, lui, le peut.
+            const proxyBody = isDataUrl
+              ? { dataBase64: opts.filePath.split(',')[1] || '', bearer: opts.bearer, fileType }
+              : { signedUrl: opts.filePath, bearer: opts.bearer, fileType }
             const r = await fetch('/api/geelark-upload', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer, fileType }),
+              body: JSON.stringify(proxyBody),
             })
             const j = await r.json() as { ok: boolean; token?: string; error?: string }
             if (j.ok && j.token) return { ok: true, token: j.token }
