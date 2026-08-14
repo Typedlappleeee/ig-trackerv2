@@ -325,7 +325,21 @@ export function buildWebAPI() {
         // Fallback client-side (blob: URLs, ou proxy serveur indisponible)
         // Step 1: get video bytes — try multiple strategies in order
         let bytes: Uint8Array | null = null
-        try {
+        // data: URL (cover = frame JPEG en base64 via canvas.toDataURL) → décodage
+        // DIRECT en octets. Un fetch(data:) est souvent bloqué par la CSP du site →
+        // c'était LA cause de l'échec des covers sur le web (« E001 »). Le décodage
+        // base64 n'utilise aucun réseau → passe toujours.
+        if (/^data:/.test(opts.filePath)) {
+          try {
+            const b64 = opts.filePath.split(',')[1] || ''
+            const bin = atob(b64)
+            const arr = new Uint8Array(bin.length)
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+            bytes = arr
+            console.log(`${V} [A] data: décodé, ${bytes.length} octets`)
+          } catch (e) { console.warn(`${V} [A] data: decode échec: ${e}`) }
+        }
+        if (!bytes) try {
           const r = await fetch(opts.filePath)
           if (r.ok) {
             bytes = new Uint8Array(await r.arrayBuffer())
