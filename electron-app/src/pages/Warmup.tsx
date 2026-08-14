@@ -352,22 +352,37 @@ export function Warmup({ user }: WarmupProps) {
         return
       }
       updateJob(phone.id, { status: 'running' })
-      // 1) Login RPA NATIF GeeLark (template « Instagram auto login ») s'il est présent
-      //    dans le compte → fiable, piloté côté serveur.
-      let result: { ok: boolean; error?: string; noFlow?: boolean } = await loginInstagramViaRpa(
-        bearer, phone.id,
-        { email: cred.email, password: cred.password, totp: cred.totpSecret },
-        msg => addLog(phone.id, msg),
-      )
-      // 2) Repli automatique sur le login ADB si aucun flow natif n'est trouvé.
-      if (result.noFlow) {
-        addLog(phone.id, tr('Pas de flow login GeeLark → connexion ADB de secours…', 'No GeeLark login flow → ADB login fallback…'))
+      const has2FA = !!cred.totpSecret?.trim()
+      let result: { ok: boolean; error?: string; noFlow?: boolean }
+      if (has2FA) {
+        // Comptes AVEC 2FA → chemin ADB : le code TOTP est généré EN LOCAL (totp.ts)
+        // AU MOMENT où l'écran 2FA apparaît → fiable. Le flow natif, lui, récupère le
+        // code sur le site externe twofa.co (souvent en échec → code jamais tapé).
+        // C'est LA cause de « le 2FA ne s'écrit plus depuis la maj ».
+        addLog(phone.id, tr('Compte 2FA → login ADB (code 2FA généré en local)…', '2FA account → ADB login (2FA code generated locally)…'))
         result = await loginInstagramAccount(
           bearer, phone.id, cred.email, cred.password,
           msg => addLog(phone.id, msg),
           abortRef.current,
           cred.totpSecret || undefined,
         )
+      } else {
+        // 1) Sans 2FA : login RPA NATIF GeeLark (fiable, piloté côté serveur, pas de twofa.co).
+        result = await loginInstagramViaRpa(
+          bearer, phone.id,
+          { email: cred.email, password: cred.password, totp: cred.totpSecret },
+          msg => addLog(phone.id, msg),
+        )
+        // 2) Repli automatique sur le login ADB si aucun flow natif n'est trouvé.
+        if (result.noFlow) {
+          addLog(phone.id, tr('Pas de flow login GeeLark → connexion ADB de secours…', 'No GeeLark login flow → ADB login fallback…'))
+          result = await loginInstagramAccount(
+            bearer, phone.id, cred.email, cred.password,
+            msg => addLog(phone.id, msg),
+            abortRef.current,
+            cred.totpSecret || undefined,
+          )
+        }
       }
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, tr('Extinction du téléphone…', 'Shutting down phone…'))
