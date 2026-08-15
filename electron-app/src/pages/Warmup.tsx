@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, warmupTikTokNative, updateInstagramProfile, editInstagramProfileNative, editTikTokProfileNative, loginInstagramAccount, loginInstagramViaRpa, warmupInstagramViaRpa, stopPhone,
+  fetchAllPhones, warmupAccount, warmupTikTokNative, editInstagramProfileNative, editTikTokProfileNative, loginInstagramAccount, loginInstagramViaRpa, warmupInstagramViaRpa, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -434,31 +434,19 @@ export function Warmup({ user }: WarmupProps) {
           // le champ (select-all + suppr) avant de taper — le RPA natif, lui,
           // n'efface pas l'ancien username. Sinon (nom/bio/photo/lien) → natif
           // (une seule tâche gère nom + bio + photo + lien).
-          : config.username
-            ? await updateInstagramProfile(bearer, phone.id, {
-                profileName:   config.profileName,
-                username:      config.username,
-                bio:           config.bio,
-                profilePicUrl: config.profilePicUrl,
-                rotationUrls,
-              }, msg => addLog(phone.id, msg)).then(async () => {
-                // Le lien bio n'est pas géré par le chemin ADB → on l'applique via
-                // le RPA natif juste après (petite tâche dédiée) si demandé.
-                if (config.linkURL) {
-                  return editInstagramProfileNative(bearer, phone.id, {
-                    linkURL: config.linkURL, linkTitle: config.linkTitle, rotationUrls,
-                  }, msg => addLog(phone.id, msg))
-                }
-                return { ok: true as const }
-              })
-            : await editInstagramProfileNative(bearer, phone.id, {
-                nickname:  config.profileName,
-                biography: config.bio,
-                avatarUrl: config.profilePicUrl,
-                linkURL:   config.linkURL,
-                linkTitle: config.linkTitle,
-                rotationUrls,
-              }, msg => addLog(phone.id, msg))
+          // TOUJOURS via le RPA natif « edit profile » (instagramEdit) : il écrit
+          // correctement nom + pseudo + bio + photo + lien en une seule tâche. Avant,
+          // dès qu'on changeait le @username, TOUT basculait sur le chemin ADB — qui
+          // « n'écrivait rien » sur certains tel. Le natif gère aussi le username.
+          : await editInstagramProfileNative(bearer, phone.id, {
+              nickname:  config.profileName,
+              username:  config.username,
+              biography: config.bio,
+              avatarUrl: config.profilePicUrl,
+              linkURL:   config.linkURL,
+              linkTitle: config.linkTitle,
+              rotationUrls,
+            }, msg => addLog(phone.id, msg))
         updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
