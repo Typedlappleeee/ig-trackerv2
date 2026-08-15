@@ -341,7 +341,10 @@ export function Warmup({ user }: WarmupProps) {
     })
     initJobs(targets, tr(`Login · ${targets.length} compte${targets.length > 1 ? 's' : ''}`, `Login · ${targets.length} account${targets.length > 1 ? 's' : ''}`))
 
-    await pLimit(targets, MAX_CONCURRENCY, async phone => {
+    // Rotation proxy (si activée) : une IP par tel, concurrence bornée au nb d'IP.
+    const rotationUrls = rotProxy ? activeRotationUrls() : []
+    const concurrency  = rotProxy ? Math.max(1, Math.min(rotationUrls.length || 1, targets.length)) : MAX_CONCURRENCY
+    await pLimit(targets, concurrency, async phone => {
       if (abortRef.current.abort) {
         updateJob(phone.id, { status: 'error', error: tr('Annulé', 'Cancelled') })
         return
@@ -365,12 +368,13 @@ export function Warmup({ user }: WarmupProps) {
           msg => addLog(phone.id, msg),
           abortRef.current,
           cred.totpSecret || undefined,
+          rotationUrls,
         )
       } else {
         // 1) Sans 2FA : login RPA NATIF GeeLark (fiable, piloté côté serveur, pas de twofa.co).
         result = await loginInstagramViaRpa(
           bearer, phone.id,
-          { email: cred.email, password: cred.password, totp: cred.totpSecret },
+          { email: cred.email, password: cred.password, totp: cred.totpSecret, rotationUrls },
           msg => addLog(phone.id, msg),
         )
         // 2) Repli automatique sur le login ADB si aucun flow natif n'est trouvé.
@@ -381,6 +385,7 @@ export function Warmup({ user }: WarmupProps) {
             msg => addLog(phone.id, msg),
             abortRef.current,
             cred.totpSecret || undefined,
+            rotationUrls,
           )
         }
       }
@@ -1165,6 +1170,8 @@ export function Warmup({ user }: WarmupProps) {
                   <span style={{ flexShrink: 0, marginTop: 1, display: 'flex' }}><IconAlertTriangle size={15} /></span>
                   <p style={{ fontSize: 11.5, fontFamily: 'monospace', lineHeight: 1.6, fontWeight: 500 }}>{t('warmupLoginWarning')}</p>
                 </div>
+
+                <ProxyRotToggle on={rotProxy} setOn={setRotProxy} />
 
                 <Button
                   className="w-full btn-sf-primary cursor-pointer"

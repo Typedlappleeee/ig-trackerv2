@@ -2171,9 +2171,10 @@ export async function loginInstagramAccount(
   log: (m: string) => void,
   abortSignal: { abort: boolean },
   totpSecret?: string,
+  rotationUrls?: string[],
 ): Promise<{ ok: boolean; error?: string }> {
   return withPhoneAutoStop(bearer, phoneId, 5 * 60_000, '5min', log,
-    () => _loginInstagramAccountInner(bearer, phoneId, email, password, log, abortSignal, totpSecret))
+    () => _loginInstagramAccountInner(bearer, phoneId, email, password, log, abortSignal, totpSecret, rotationUrls))
 }
 
 async function _loginInstagramAccountInner(
@@ -2184,9 +2185,13 @@ async function _loginInstagramAccountInner(
   log: (m: string) => void,
   abortSignal: { abort: boolean },
   totpSecret?: string,
+  rotationUrls?: string[],
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    // Rotation d'IP AVANT le boot si des URLs de rotation sont fournies (sinon boot simple).
+    const ready = rotationUrls && rotationUrls.length
+      ? await rotateThenEnsureRunning(bearer, phoneId, rotationUrls, log)
+      : await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     if (abortSignal.abort) return { ok: false, error: 'Annulé' }
 
@@ -2590,7 +2595,7 @@ async function ensureLoginFlowId(bearer: string, log?: (m: string) => void): Pro
 export async function loginInstagramViaRpa(
   bearer: string,
   phoneId: string,
-  creds: { email: string; password: string; totp?: string },
+  creds: { email: string; password: string; totp?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string; noFlow?: boolean }> {
   const flowId = await ensureLoginFlowId(bearer, log)
@@ -2609,7 +2614,10 @@ export async function loginInstagramViaRpa(
   }
 
   return withPhoneAutoStop(bearer, phoneId, 12 * 60_000, '12min', log, async () => {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    // Rotation d'IP AVANT le boot si demandée (sinon boot simple).
+    const ready = creds.rotationUrls && creds.rotationUrls.length
+      ? await rotateThenEnsureRunning(bearer, phoneId, creds.rotationUrls, log)
+      : await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     log('🔐 Connexion via RPA GeeLark natif…')
     const addTask = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {
