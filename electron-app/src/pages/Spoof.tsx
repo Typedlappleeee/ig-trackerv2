@@ -38,8 +38,11 @@ const GPS_GROUPS: { id: string; country: string; cities: Record<string, string> 
   { id: 'central-eu', country: '🇩🇪 Europe centrale', cities: {
     berlin: 'Berlin', munich: 'Munich', amsterdam: 'Amsterdam', brussels: 'Bruxelles', zurich: 'Zurich', geneva: 'Genève',
   }},
+  { id: 'usa', country: '🇺🇸 États-Unis', cities: {
+    newyork: 'New York', losangeles: 'Los Angeles', chicago: 'Chicago', miami: 'Miami', houston: 'Houston', phoenix: 'Phoenix', dallas: 'Dallas', atlanta: 'Atlanta', lasvegas: 'Las Vegas', seattle: 'Seattle', denver: 'Denver', boston: 'Boston', sanfrancisco: 'San Francisco', sandiego: 'San Diego', austin: 'Austin', washington: 'Washington',
+  }},
   { id: 'americas', country: '🌎 Amériques', cities: {
-    newyork: 'New York', losangeles: 'Los Angeles', miami: 'Miami', toronto: 'Toronto', montreal: 'Montréal', mexico: 'Mexico', saopaulo: 'São Paulo',
+    toronto: 'Toronto', montreal: 'Montréal', mexico: 'Mexico', saopaulo: 'São Paulo',
   }},
   { id: 'asia', country: '🌏 Asie / Moyen-Orient / Océanie', cities: {
     dubai: 'Dubaï', istanbul: 'Istanbul', tokyo: 'Tokyo', singapore: 'Singapour', sydney: 'Sydney',
