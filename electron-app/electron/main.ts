@@ -1061,9 +1061,14 @@ ipcMain.handle('save-file-as', async (_event, opts: { sourcePath: string; defaul
 ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
   sourcePath: string
   caption:    string
-  position:   'top' | 'middle' | 'bottom'
+  position:   'top' | 'middle' | 'bottom' | 'custom'
   fontSize:   number
   fontColor:  string
+  posX?:      number
+  posY?:      number
+  gpsSpoof?:  boolean
+  gpsCity?:   string
+  audioPath?: string   // URL signée d'un MP3 (remplace la piste d'origine)
 }) => {
   const ffmpegBin = getFfmpegBin()
   const dir = path.join(os.tmpdir(), 'ig-tracker-mixer')
@@ -1136,11 +1141,19 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
   const lineH  = Math.round(fs * 1.5)   // generous line height
   const totalH = lines.length * lineH
 
-  const startY = opts.position === 'bottom'
-    ? VH - totalH - 170
-    : opts.position === 'top'
-      ? 80
-      : Math.round((VH - totalH) / 2)
+  const isCustom = opts.position === 'custom'
+    && Number.isFinite(Number(opts.posX)) && Number.isFinite(Number(opts.posY))
+  const startY = isCustom
+    ? Math.round(Number(opts.posY) * VH - totalH / 2)
+    : opts.position === 'bottom'
+      ? VH - totalH - 170
+      : opts.position === 'top'
+        ? 80
+        : Math.round((VH - totalH) / 2)
+  // Placement libre : centre le texte sur posX (chaque ligne recentrée sur text_w).
+  const xExpr = isCustom
+    ? `${Math.round(Number(opts.posX) * VW)}-(text_w/2)`
+    : `(w-text_w)/2`
 
   const borderPx = Math.max(3, Math.round(fs * 0.07))
 
@@ -1149,7 +1162,7 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
     const dtParts = [`text='${escText(line)}'`]
     if (fontFile) dtParts.push(`fontfile='${fontFile}'`)
     dtParts.push(
-      `x=(w-text_w)/2`,
+      `x=${xExpr}`,
       `y=${y}`,
       `fontsize=${fs}`,
       `fontcolor=${opts.fontColor}`,
@@ -1166,10 +1179,67 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
     ...dtFilters,
   ].join(',')
 
+  // ── GPS/localisation optionnelle (ISO 6709) — spoof intégré au mix ──────────
+  const gpsArgs: string[] = []
+  if (opts.gpsSpoof) {
+    const CITIES: Record<string, { lat: number; lon: number; tz: string; alt: number }> = {
+      newyork: { lat: 40.7128, lon: -74.0060, tz: '-0400', alt: 10 },
+      losangeles: { lat: 34.0522, lon: -118.2437, tz: '-0700', alt: 89 },
+      miami: { lat: 25.7617, lon: -80.1918, tz: '-0400', alt: 2 },
+      lasvegas: { lat: 36.1699, lon: -115.1398, tz: '-0700', alt: 610 },
+      paris: { lat: 48.8566, lon: 2.3522, tz: '+0200', alt: 35 },
+      london: { lat: 51.5074, lon: -0.1278, tz: '+0100', alt: 11 },
+      dubai: { lat: 25.2048, lon: 55.2708, tz: '+0400', alt: 5 },
+      tokyo: { lat: 35.6762, lon: 139.6503, tz: '+0900', alt: 40 },
+    }
+    const US = ['newyork', 'losangeles', 'miami', 'lasvegas']
+    const keys = Object.keys(CITIES)
+    const sel = opts.gpsCity ?? 'random'
+    const wide = sel === 'random_usa'
+    const key = wide ? US[Math.floor(Math.random() * US.length)]
+      : (CITIES[sel] ? sel : keys[Math.floor(Math.random() * keys.length)])
+    const c = CITIES[key]
+    const amp = wide ? 0.5 : 0.006
+    const lat = (c.lat + (Math.random() - 0.5) * amp * 2).toFixed(6)
+    const lon = (c.lon + (Math.random() - 0.5) * amp * 2).toFixed(6)
+    const alt = (c.alt + (Math.random() - 0.5) * 8).toFixed(3)
+    const sLat = `${Number(lat) >= 0 ? '+' : '-'}${Math.abs(Number(lat)).toFixed(6).padStart(9, '0')}`
+    const sLon = `${Number(lon) >= 0 ? '+' : '-'}${Math.abs(Number(lon)).toFixed(6).padStart(10, '0')}`
+    const sAlt = `${Number(alt) >= 0 ? '+' : '-'}${Math.abs(Number(alt)).toFixed(3).padStart(7, '0')}`
+    const iso = `${sLat}${sLon}${sAlt}/`
+    gpsArgs.push(
+      '-metadata', `location=${iso}`,
+      '-metadata', `location-eng=${iso}`,
+      '-metadata', `com.apple.quicktime.location.ISO6709=${iso}`,
+    )
+  }
+
+  // ── Piste audio MP3 optionnelle : télécharge l'URL signée puis remplace l'audio ─
+  let audioSrc: string | null = null
+  if (opts.audioPath) {
+    try {
+      if (/^https?:\/\//.test(opts.audioPath)) {
+        const ares = await net.fetch(opts.audioPath)
+        if (ares.ok) {
+          audioSrc = path.join(dir, `mixaudio-${Date.now()}.mp3`)
+          writeFileSync(audioSrc, Buffer.from(await ares.arrayBuffer()))
+        }
+      } else if (existsSync(opts.audioPath)) {
+        audioSrc = opts.audioPath
+      }
+    } catch { audioSrc = null }
+  }
+
   const out = path.join(dir, `mixer-${Date.now()}.mov`)
+  const inputArgs = audioSrc
+    ? ['-i', srcPath, '-stream_loop', '-1', '-i', audioSrc]
+    : ['-i', srcPath]
+  const mapArgs = audioSrc
+    ? ['-map', '0:v:0', '-map', '1:a:0', '-shortest']
+    : ['-map', '0:v:0', '-map', '0:a?']
   const args = [
-    '-nostdin', '-fflags', '+genpts', '-i', srcPath,
-    '-map', '0:v:0', '-map', '0:a?',
+    '-nostdin', '-fflags', '+genpts', ...inputArgs,
+    ...mapArgs,
     '-map_metadata', '-1', '-map_chapters', '-1',
     '-vf', vf,
     '-r', '30', '-fps_mode', 'cfr',
@@ -1177,13 +1247,15 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
     '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
     '-g', '30', '-keyint_min', '15',
     '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
-    '-movflags', '+faststart',
+    ...gpsArgs,
+    '-movflags', gpsArgs.length ? 'use_metadata_tags+faststart' : '+faststart',
     '-y', out,
   ]
 
   return new Promise(resolve => {
     execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024, timeout: FFMPEG_REMIX_TIMEOUT, killSignal: 'SIGKILL' }, (err, _stdout, stderr) => {
       if (tempSrc) { try { rmSync(tempSrc) } catch { /* ignore */ } }
+      if (audioSrc && audioSrc.startsWith(dir)) { try { rmSync(audioSrc) } catch { /* ignore */ } }
       if (err) {
         const detail = (stderr ?? '').split('\n').filter((l: string) => /error|invalid/i.test(l)).slice(-2).join(' ')
         return resolve({ ok: false, error: err.message.split('\n')[0] + (detail ? ` — ${detail.slice(0, 160)}` : '') })

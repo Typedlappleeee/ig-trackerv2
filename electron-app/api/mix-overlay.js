@@ -10,6 +10,7 @@ const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { createClient } = require('@supabase/supabase-js')
 const { assertAllowedMediaUrl, fetchMediaFollow, isOwnStoragePath } = require('./_ssrf')
+const { resolveCityKey, buildGpsMetadataArgs } = require('./_gps')
 const fs   = require('fs')
 const path = require('path')
 const os   = require('os')
@@ -115,15 +116,17 @@ async function buildCaptionOverlay(caption, fontSize, fontColor, fontPath, famil
   return { buf, w: canvasW, h: canvasH }
 }
 
-function buildAssFile(caption, fontSize, fontColor, position) {
+function buildAssFile(caption, fontSize, fontColor, position, custom) {
   const h = String(fontColor).replace('#', '').padEnd(6, '0')
   const r = h.slice(0, 2), g = h.slice(2, 4), b = h.slice(4, 6)
   const assColor    = `&H00${b}${g}${r}`.toUpperCase()
   const outColor    = luminance(fontColor) > 0.55 ? '&H00000000' : '&H00FFFFFF'
   const alignMap    = { top: 8, center: 5, middle: 5, bottom: 2 }
-  const alignment   = alignMap[position] ?? 2
+  // Placement libre : alignement centré + override \pos(x,y) en pixels (PlayRes 1080×1920).
+  const alignment   = custom ? 5 : (alignMap[position] ?? 2)
   const marginV     = position === 'top' ? 120 : position === 'center' || position === 'middle' ? 0 : 220
-  const safeCaption = String(caption).replace(/[\r\n]+/g, '\\N')
+  const posTag      = custom ? `{\\pos(${Math.round(custom.x * 1080)},${Math.round(custom.y * 1920)})}` : ''
+  const safeCaption = posTag + String(caption).replace(/[\r\n]+/g, '\\N')
 
   return (
     '[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 0\n\n' +
@@ -153,7 +156,7 @@ async function handleMediaOverlay(req, res) {
   const ts = Date.now(); const tmpDir = os.tmpdir()
   const inPath  = path.join(tmpDir, `movl_in_${ts}.mp4`)
   const ovPath  = path.join(tmpDir, `movl_ov_${ts}`)
-  const outPath = path.join(tmpDir, `movl_out_${ts}.mp4`)
+  const outPath = path.join(tmpDir, `movl_out_${ts}.mov`)
   const thumbPath = path.join(tmpDir, `movl_th_${ts}.jpg`)
   try {
     const r1 = await fetchMediaFollow(videoUrl, { timeoutMs: 120000 })  // gros fichiers (banque 100 Mo)
@@ -274,9 +277,9 @@ async function handleMediaOverlay(req, res) {
     }
 
     const rand = Math.random().toString(36).slice(2)
-    const resultPath = userId ? `videos/users/${userId}/overlay-${ts}_${rand}.mp4` : `mix-results/${ts}_${rand}.mp4`
+    const resultPath = userId ? `videos/users/${userId}/overlay-${ts}_${rand}.mov` : `mix-results/${ts}_${rand}.mov`
     const outBuf = fs.readFileSync(outPath)
-    const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, { contentType: 'video/mp4', upsert: true })
+    const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, { contentType: 'video/quicktime', upsert: true })
     if (upErr) throw new Error(upErr.message)
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
 
@@ -312,6 +315,12 @@ module.exports = async (req, res) => {
     position  = 'bottom',
     fontSize  = 52,
     fontColor = '#ffffff',
+    // Placement libre (fractions 0..1 du CENTRE du texte) quand position==='custom'.
+    posX, posY,
+    // Spoof intégré : nettoie toujours les métadonnées ; injecte un GPS si gpsSpoof.
+    gpsSpoof = false, gpsCity = 'random',
+    // Piste audio MP3 optionnelle (remplace le son d'origine), depuis la banque.
+    audioStoragePath,
     supabaseToken, supabaseAnonKey,
   } = req.body ?? {}
 
@@ -324,7 +333,10 @@ module.exports = async (req, res) => {
   const inputPath   = path.join(tmpDir, `mix_in_${ts}.mp4`)
   const overlayPath = path.join(tmpDir, `mix_ov_${ts}.png`)
   const assPath     = path.join(tmpDir, `mix_as_${ts}.ass`)
-  const outPath     = path.join(tmpDir, `mix_out_${ts}.mp4`)
+  const audioPath   = path.join(tmpDir, `mix_au_${ts}.mp3`)
+  const outPath     = path.join(tmpDir, `mix_out_${ts}.mov`)
+
+  const isCustom = position === 'custom' && Number.isFinite(Number(posX)) && Number.isFinite(Number(posY))
 
   try {
     // ── Download source video ────────────────────────────────────────────────
@@ -339,6 +351,38 @@ module.exports = async (req, res) => {
       const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
       if (dlErr) return res.status(400).json({ ok: false, error: dlErr.message })
       fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
+    }
+
+    // ── Optional MP3 audio track (from the bank) ─────────────────────────────
+    let hasAudio = false
+    if (audioStoragePath && isOwnStoragePath(audioStoragePath)) {
+      const { data: aBlob, error: aErr } = await supabase.storage.from(bucket).download(audioStoragePath)
+      if (aErr) throw new Error(`audio: ${aErr.message}`)
+      fs.writeFileSync(audioPath, Buffer.from(await aBlob.arrayBuffer()))
+      hasAudio = true
+    }
+
+    // ── GPS metadata (ISO 6709) + city label, resolved server-side ───────────
+    let gpsMeta = null
+    if (gpsSpoof) {
+      const key = resolveCityKey(gpsCity)
+      gpsMeta = buildGpsMetadataArgs(key, { wide: gpsCity === 'random_usa' })
+    }
+
+    // ── Common tail : strip source metadata, (opt.) inject GPS, .mov muxer ────
+    // On nettoie TOUJOURS les métadonnées d'origine (`-map_metadata -1`) : une
+    // vidéo re-postée ne doit pas trimballer les tags du fichier source.
+    const buildTail = () => {
+      const tail = [
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+        '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-map_metadata', '-1', '-map_chapters', '-1',
+      ]
+      if (gpsMeta) tail.push(...gpsMeta.args, '-movflags', 'use_metadata_tags+faststart')
+      else tail.push('-movflags', '+faststart')
+      tail.push('-y', outPath)
+      return tail
     }
 
     // ── Build caption overlay ─────────────────────────────────────────────────
@@ -357,46 +401,54 @@ module.exports = async (req, res) => {
       if (!overlayBuf || !overlayBuf.length) throw new Error('sharp returned empty buffer')
       fs.writeFileSync(overlayPath, overlayBuf)
 
-      const ox = Math.round((VW - ovW) / 2)
-      const oy = position === 'top' ? 120
+      const clampI = (v, lo, hi) => Math.min(Math.max(v, lo), hi)
+      const ox = isCustom
+        ? clampI(Math.round(Number(posX) * VW - ovW / 2), 0, VW - ovW)
+        : Math.round((VW - ovW) / 2)
+      const oy = isCustom
+        ? clampI(Math.round(Number(posY) * VH - ovH / 2), 0, VH - ovH)
+        : position === 'top' ? 120
         : (position === 'center' || position === 'middle') ? Math.round((VH - ovH) / 2)
         : VH - ovH - 130
+
+      // 0 = vidéo, 1 = overlay png, (2 = audio mp3 si présent)
+      const inputs = ['-i', inputPath, '-i', overlayPath]
+      if (hasAudio) inputs.push('-stream_loop', '-1', '-i', audioPath)
+      const audioMap = hasAudio ? ['-map', '2:a:0', '-shortest'] : ['-map', '0:a?']
 
       const filterComplex =
         `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,` +
         `pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg];` +
-        `[bg][1:v]overlay=${ox}:${oy}`
+        `[bg][1:v]overlay=${ox}:${oy}[vout]`
 
       ffArgs = [
         '-nostdin', '-threads', '0',
-        '-i', inputPath, '-i', overlayPath,
+        ...inputs,
         '-filter_complex', filterComplex,
-        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
-        '-c:a', 'aac', '-b:a', '128k',
-        '-movflags', '+faststart',
-        '-y', outPath,
+        '-map', '[vout]', ...audioMap,
+        ...buildTail(),
       ]
     } catch (_sharpErr) {
       // Fallback: burn caption via ASS subtitle — works without Pango system libs
-      fs.writeFileSync(assPath, buildAssFile(String(caption), Number(fontSize), String(fontColor), position))
+      fs.writeFileSync(assPath, buildAssFile(String(caption), Number(fontSize), String(fontColor), position, isCustom ? { x: Number(posX), y: Number(posY) } : null))
 
       // ffmpeg subtitles filter path: escape colons/backslashes for the filter option
       const safeAssPath = assPath.replace(/\\/g, '/').replace(/:/g, '\\:')
-      const vf =
-        `scale=${VW}:${VH}:force_original_aspect_ratio=decrease,` +
+      const filterComplex =
+        `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,` +
         `pad=${VW}:${VH}:-1:-1:color=black,setsar=1,` +
-        `subtitles=${safeAssPath}`
+        `subtitles=${safeAssPath}[vout]`
+
+      const inputs = ['-i', inputPath]
+      if (hasAudio) inputs.push('-stream_loop', '-1', '-i', audioPath)
+      const audioMap = hasAudio ? ['-map', '1:a:0', '-shortest'] : ['-map', '0:a?']
 
       ffArgs = [
         '-nostdin', '-threads', '0',
-        '-i', inputPath,
-        '-vf', vf,
-        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-max_muxing_queue_size', '9999',
-        '-c:a', 'aac', '-b:a', '128k',
-        '-movflags', '+faststart',
-        '-y', outPath,
+        ...inputs,
+        '-filter_complex', filterComplex,
+        '-map', '[vout]', ...audioMap,
+        ...buildTail(),
       ]
     }
 
@@ -409,23 +461,24 @@ module.exports = async (req, res) => {
 
     // ── Upload result ────────────────────────────────────────────────────────
     const resultPath = userId
-      ? `videos/users/${userId}/mix-out-${ts}_${Math.random().toString(36).slice(2)}.mp4`
-      : `mix-results/${ts}_${Math.random().toString(36).slice(2)}.mp4`
+      ? `videos/users/${userId}/mix-out-${ts}_${Math.random().toString(36).slice(2)}.mov`
+      : `mix-results/${ts}_${Math.random().toString(36).slice(2)}.mov`
 
     const outBuf = fs.readFileSync(outPath)
     const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
-      contentType: 'video/mp4', upsert: true,
+      contentType: 'video/quicktime', upsert: true,
     })
     if (upErr) throw new Error(upErr.message)
 
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
-    res.json({ ok: true, url: publicUrl, storagePath: resultPath })
+    res.json({ ok: true, url: publicUrl, storagePath: resultPath, gps: gpsMeta ? gpsMeta.city : null })
   } catch (err) {
     res.status(500).json({ ok: false, error: (err instanceof Error ? err.message : String(err)).slice(0, 1000) })
   } finally {
     fs.rmSync(inputPath,   { force: true })
     fs.rmSync(overlayPath, { force: true })
     fs.rmSync(assPath,     { force: true })
+    fs.rmSync(audioPath,   { force: true })
     fs.rmSync(outPath,     { force: true })
   }
 }

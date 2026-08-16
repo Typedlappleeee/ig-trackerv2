@@ -61,6 +61,9 @@ const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.lengt
 // Résout une sélection de ville (éventuellement aléatoire) en une ville concrète.
 function resolveCity(sel: string): string {
   if (sel === 'random') return pickRandom(GPS_CITY_KEYS)
+  // 'random_usa' est résolu CÔTÉ SERVEUR (jitter large réparti sur tout le pays)
+  // → on le laisse passer tel quel plutôt que de figer une ville ici.
+  if (sel === 'random_usa') return 'random_usa'
   if (sel === 'random_france') return pickRandom(FRANCE_CITY_KEYS)
   if (REGION_CITY_KEYS[sel]) return pickRandom(REGION_CITY_KEYS[sel])
   return sel
@@ -578,6 +581,7 @@ export function Spoof({ user }: { user: User }) {
                 style={{ width: '100%', fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
               >
                 <option value="random" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{tr('🎲 Aléatoire (tous pays)', '🎲 Random (all countries)')}</option>
+                <option value="random_usa" style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{tr('🇺🇸 Aléatoire USA (tout le pays)', '🇺🇸 Random USA (whole country)')}</option>
                 <optgroup label={tr('🎲 Aléatoire par région', '🎲 Random by region')} style={{ color: '#a0a0c0', background: '#0f0f1e', fontWeight: 600 }}>
                   {GPS_GROUPS.map(group => (
                     <option key={`rnd-${group.id}`} value={`random_region:${group.id}`} style={{ color: '#e8e8f0', background: '#1a1a2e' }}>
