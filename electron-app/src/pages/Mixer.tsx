@@ -6,11 +6,26 @@ import { useOrg } from '@/lib/orgContext'
 import { getSignedUrl, uploadVideoFromPath } from '@/lib/storage'
 import { BankFolderSelect } from '@/components/BankFolderSelect'
 import { useTr } from '@/lib/i18n'
+import { nextScaleflowNumber, scaleflowName } from '@/lib/bankNaming'
 import type { CaptionItem } from './CaptionBank'
 import { OverlayComposer } from './OverlayComposer'
 
 interface MixerProps { user: User }
-type MixPosition = 'bottom' | 'middle' | 'top'
+type MixPosition = 'bottom' | 'middle' | 'top' | 'custom'
+
+// Localisation GPS proposée dans le Mixer (résolue côté serveur, comme le Spoof).
+const MIX_GPS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'random',       label: '🎲 Aléatoire (tous pays)' },
+  { value: 'random_usa',   label: '🇺🇸 Aléatoire USA (tout le pays)' },
+  { value: 'newyork',      label: 'New York' },
+  { value: 'losangeles',   label: 'Los Angeles' },
+  { value: 'miami',        label: 'Miami' },
+  { value: 'lasvegas',     label: 'Las Vegas' },
+  { value: 'paris',        label: 'Paris' },
+  { value: 'london',       label: 'Londres' },
+  { value: 'dubai',        label: 'Dubaï' },
+  { value: 'tokyo',        label: 'Tokyo' },
+]
 
 // ── Inline Lucide-style icons (no emoji UI icons) ─────────────────────────────
 function SfIcon({ size = 16, children, ...rest }: { size?: number; children: React.ReactNode } & React.SVGProps<SVGSVGElement>) {
@@ -51,6 +66,59 @@ function VideoThumb({ item, size = 'sm' }: { item: ContentItem; size?: 'sm' | 'm
         ? <img src={url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: TEXT_3 }}><IconClapperboard size={18} /></div>
       }
+    </div>
+  )
+}
+
+// ── Draggable caption placement preview (9:16) ───────────────────────────────
+// Affiche la miniature de la 1re vidéo et un chip texte déplaçable. Renvoie la
+// position en fractions (0..1) du CENTRE — mêmes coordonnées que le serveur.
+function CaptionDragPreview({
+  bgItem, value, onChange, sample, color,
+}: {
+  bgItem?: ContentItem
+  value: { x: number; y: number }
+  onChange: (v: { x: number; y: number }) => void
+  sample: string
+  color: string
+}) {
+  const [bg, setBg] = useState<string | null>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const dragging = useRef(false)
+  useEffect(() => {
+    if (bgItem) getSignedUrl(bgItem.thumbnail_path ?? bgItem.storage_path).then(setBg)
+    else setBg(null)
+  }, [bgItem?.thumbnail_path, bgItem?.storage_path])
+
+  const moveTo = (clientX: number, clientY: number) => {
+    const el = boxRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const x = Math.min(Math.max((clientX - r.left) / r.width, 0), 1)
+    const y = Math.min(Math.max((clientY - r.top) / r.height, 0), 1)
+    onChange({ x: +x.toFixed(4), y: +y.toFixed(4) })
+  }
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+      <div
+        ref={boxRef}
+        onPointerDown={e => { dragging.current = true; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); moveTo(e.clientX, e.clientY) }}
+        onPointerMove={e => { if (dragging.current) moveTo(e.clientX, e.clientY) }}
+        onPointerUp={() => { dragging.current = false }}
+        style={{ position: 'relative', width: 150, aspectRatio: '9 / 16', borderRadius: 10, overflow: 'hidden', border: `1px solid ${HAIR}`, background: bg ? `#000 url(${bg}) center/cover` : BG_2, cursor: 'crosshair', touchAction: 'none' }}
+      >
+        <div
+          style={{
+            position: 'absolute', left: `${value.x * 100}%`, top: `${value.y * 100}%`,
+            transform: 'translate(-50%, -50%)', maxWidth: '92%', padding: '2px 6px', borderRadius: 5,
+            background: 'rgba(0,0,0,0.35)', color, fontWeight: 800, fontSize: 11, lineHeight: 1.15,
+            textAlign: 'center', textShadow: '0 1px 2px #000, 0 0 2px #000', pointerEvents: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}
+        >
+          {sample || 'Aa'}
+        </div>
+      </div>
     </div>
   )
 }
@@ -312,10 +380,19 @@ export function Mixer({ user }: MixerProps) {
   const [showCaptionPicker, setShowCaptionPicker] = useState(false)
 
   const [position,  setPosition]  = useState<MixPosition>('bottom')
+  // Placement libre : fraction (0..1) du CENTRE du texte quand position==='custom'.
+  const [customXY,  setCustomXY]  = useState<{ x: number; y: number }>({ x: 0.5, y: 0.85 })
   const [fontSize,  setFontSize]  = useState(52)
   const [fontColor, setFontColor] = useState('#ffffff')
   const [mode,      setMode]      = useState<'random' | 'all'>('random')
   const [composerMode, setComposerMode] = useState<'caption' | 'overlay'>('caption')
+
+  // Spoof intégré : nettoyage métadonnées + injection GPS directement au mix.
+  const [gpsSpoof,  setGpsSpoof]  = useState(true)
+  const [gpsCity,   setGpsCity]   = useState('random')
+  // Piste audio MP3 optionnelle (remplace le son d'origine).
+  const [mp3, setMp3]             = useState<{ name: string; storagePath: string; url: string } | null>(null)
+  const [mp3Uploading, setMp3Uploading] = useState(false)
 
   const [jobs,    setJobs]    = useState<MixJob[]>([])
   const [running, setRunning] = useState(false)
@@ -323,6 +400,9 @@ export function Mixer({ user }: MixerProps) {
   const [cancelling, setCancelling] = useState(false)
   const [error,   setError]   = useState('')
   const [saveFolder, setSaveFolder] = useState<string | null>(null)
+  // Numérotation « scaleflowN » réservée avant le lot : JS mono-thread ⇒ pas de
+  // doublon entre les workers parallèles de l'auto-enregistrement.
+  const bankNum = useRef(0)
 
   const removeVideo   = (id: string) => setSelVideos(p => p.filter(v => v.id !== id))
   const removeCaption = (id: string) => setSelCaptions(p => p.filter(c => c.id !== id))
@@ -334,6 +414,29 @@ export function Mixer({ user }: MixerProps) {
   const addCaptions = (items: CaptionItem[]) => {
     setSelCaptions(p => { const ids = new Set(p.map(c => c.id)); return [...p, ...items.filter(i => !ids.has(i.id))] })
     setShowCaptionPicker(false)
+  }
+
+  // Upload d'un MP3 dans le storage (bucket content, arborescence de l'utilisateur
+  // → accepté par la garde SSRF isOwnStoragePath). Une fois uploadé, le même fichier
+  // sert pour tout le lot (son injecté à la place de la piste d'origine).
+  const onPickMp3 = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!/\.(mp3|m4a|aac|wav)$/i.test(file.name)) { setError(tr('Formats audio acceptés : mp3, m4a, aac, wav', 'Accepted audio: mp3, m4a, aac, wav')); return }
+    setMp3Uploading(true); setError('')
+    try {
+      const ext = (file.name.match(/\.[^.]+$/)?.[0] ?? '.mp3').toLowerCase()
+      const storagePath = `videos/users/${user.id}/mixaudio-${Date.now()}${ext}`
+      const { error: upErr } = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || 'audio/mpeg', upsert: true })
+      if (upErr) throw upErr
+      const url = await getSignedUrl(storagePath)
+      setMp3({ name: file.name, storagePath, url: url ?? '' })
+    } catch (err) {
+      setError(tr('Échec upload audio : ', 'Audio upload failed: ') + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setMp3Uploading(false)
+    }
   }
 
   const canStart = selVideos.length > 0 && selCaptions.length > 0 && !running
@@ -356,7 +459,7 @@ export function Mixer({ user }: MixerProps) {
   // Enregistre une vidéo terminée dans la banque. Sur le web, la vidéo est déjà
   // dans le storage (job.storagePath) → simple insert. Sur Electron, on upload
   // d'abord le fichier local. Idempotent (ne ré-enregistre pas).
-  const saveJobToBank = async (job: MixJob): Promise<boolean> => {
+  const saveJobToBank = async (job: MixJob, assignedNum?: number): Promise<boolean> => {
     if (job.savedToBank) return true
     try {
       let storagePath = job.storagePath ?? null
@@ -368,9 +471,11 @@ export function Mixer({ user }: MixerProps) {
         thumbnailPath = up.thumbnailPath
       }
       if (!storagePath) return false
+      // Numéro réservé pendant le lot (pas de course), sinon requête fraîche (bouton manuel).
+      const n = assignedNum ?? await nextScaleflowNumber(user.id, currentOrg?.id ?? null)
       const { error } = await supabase.from('content_bank').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
-        title: `Mixer — ${job.videoItem.title}`,
+        title: scaleflowName(n),
         file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
         folder: saveFolder, tags: [], notes: '',
       })
@@ -389,6 +494,7 @@ export function Mixer({ user }: MixerProps) {
     const newJobs = buildJobs()
     setJobs(newJobs)
     setRunning(true)
+    bankNum.current = await nextScaleflowNumber(user.id, currentOrg?.id ?? null)   // numérotation du lot
 
     const CONCURRENCY = 3
     const processJob = async (job: MixJob) => {
@@ -407,8 +513,12 @@ export function Mixer({ user }: MixerProps) {
           sourcePath: signedUrl,
           caption:    job.caption.content,
           position,
+          ...(position === 'custom' ? { posX: customXY.x, posY: customXY.y } : {}),
           fontSize,
           fontColor,
+          gpsSpoof,
+          gpsCity,
+          ...(mp3 ? { audioStoragePath: mp3.storagePath, audioPath: mp3.url } : {}),
         })
         if (!res.ok || !res.outputPath) throw new Error(res.error ?? tr('Échec ffmpeg', 'ffmpeg failed'))
 
@@ -425,8 +535,8 @@ export function Mixer({ user }: MixerProps) {
         const storagePath = (res as any).storagePath
         updateJob(job.id, { status: 'done', outputUrl: localUrl, localPath: res.outputPath, storagePath })
         supabase.from('caption_bank').update({ used_count: (job.caption.used_count ?? 0) + 1 }).eq('id', job.caption.id).then(() => {})
-        // Enregistrement automatique dans la banque.
-        await saveJobToBank({ ...job, status: 'done', outputUrl: localUrl, localPath: res.outputPath, storagePath })
+        // Enregistrement automatique dans la banque (numéro scaleflow réservé).
+        await saveJobToBank({ ...job, status: 'done', outputUrl: localUrl, localPath: res.outputPath, storagePath }, bankNum.current++)
       } catch (e: unknown) {
         updateJob(job.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
@@ -642,14 +752,28 @@ export function Mixer({ user }: MixerProps) {
             <div style={{ marginBottom: 20 }}>
               <p className="sf-section-label" style={{ marginBottom: 8 }}>{tr('Position du texte', 'Text position')}</p>
               <div className="sf-segment" style={{ display: 'flex', width: '100%' }}>
-                {(['top', 'middle', 'bottom'] as MixPosition[]).map(p => (
+                {(['top', 'middle', 'bottom', 'custom'] as MixPosition[]).map(p => (
                   <button key={p} onClick={() => setPosition(p)}
                     className={`sf-segment-item${position === p ? ' is-active' : ''}`}
                     style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    {p === 'top' ? <><IconChevronUp size={14} /> {tr('Haut', 'Top')}</> : p === 'middle' ? <><IconAlignCenter size={14} /> {tr('Centre', 'Center')}</> : <><IconChevronDown size={14} /> {tr('Bas', 'Bottom')}</>}
+                    {p === 'top' ? <><IconChevronUp size={14} /> {tr('Haut', 'Top')}</> : p === 'middle' ? <><IconAlignCenter size={14} /> {tr('Centre', 'Center')}</> : p === 'bottom' ? <><IconChevronDown size={14} /> {tr('Bas', 'Bottom')}</> : <>✋ {tr('Libre', 'Free')}</>}
                   </button>
                 ))}
               </div>
+              {position === 'custom' && (
+                <>
+                  <CaptionDragPreview
+                    bgItem={selVideos[0]}
+                    value={customXY}
+                    onChange={setCustomXY}
+                    sample={selCaptions[0]?.content?.split('\n')[0]?.slice(0, 22) ?? 'Aa'}
+                    color={fontColor}
+                  />
+                  <p style={{ fontSize: 10.5, color: TEXT_3, textAlign: 'center', marginTop: 6 }}>
+                    {tr('Glisse le texte où tu veux · appliqué à toutes les vidéos', 'Drag the text anywhere · applied to every video')}
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Font size */}
@@ -673,6 +797,50 @@ export function Mixer({ user }: MixerProps) {
                     style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: `2px solid ${fontColor === c ? ACCENT : 'rgba(255,255,255,0.12)'}`, cursor: 'pointer', transform: fontColor === c ? 'scale(1.15)' : 'scale(1)', transition: 'all 0.1s' }} />
                 ))}
               </div>
+            </div>
+
+            {/* Spoof intégré — nettoyage métadonnées + GPS (plus besoin de spoof après) */}
+            <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input type="checkbox" checked={gpsSpoof} onChange={e => setGpsSpoof(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#6366F1', cursor: 'pointer' }} />
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)' }}>{tr('🛡 Nettoyer les métadonnées + injecter un GPS', '🛡 Strip metadata + inject GPS')}</span>
+              </label>
+              <p style={{ fontSize: 10.5, color: TEXT_3, margin: '6px 0 0 26px' }}>
+                {tr('Le mix sort déjà « spoofé » — inutile de repasser par l\'onglet Spoof.', 'The mix comes out already spoofed — no need for the Spoof tab.')}
+              </p>
+              {gpsSpoof && (
+                <select
+                  value={gpsCity}
+                  onChange={e => setGpsCity(e.target.value)}
+                  className="sf-input"
+                  style={{ width: '100%', marginTop: 10, fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
+                >
+                  {MIX_GPS_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value} style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{o.label}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Piste audio MP3 optionnelle (remplace le son d'origine) */}
+            <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
+              <p className="sf-section-label" style={{ marginBottom: 8 }}>{tr('🎵 Musique (MP3) — optionnel', '🎵 Music (MP3) — optional')}</p>
+              {mp3 ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="sf-badge sf-badge-accent" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mp3.name}</span>
+                  <button onClick={() => setMp3(null)} className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer">{tr('Retirer', 'Remove')}</button>
+                </div>
+              ) : (
+                <label className="sf-btn sf-btn-ghost cursor-pointer" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  {mp3Uploading
+                    ? <><div className="sf-spinner" style={{ width: 13, height: 13, borderWidth: 2 }} />{tr('Upload…', 'Uploading…')}</>
+                    : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>{tr('Choisir un MP3', 'Choose an MP3')}</>}
+                  <input type="file" accept="audio/*,.mp3,.m4a,.aac,.wav" onChange={onPickMp3} disabled={mp3Uploading} style={{ display: 'none' }} />
+                </label>
+              )}
+              <p style={{ fontSize: 10.5, color: TEXT_3, marginTop: 6 }}>
+                {tr('Remplace la bande-son de chaque vidéo (bouclée si plus courte).', 'Replaces each video\'s soundtrack (looped if shorter).')}
+              </p>
             </div>
 
             {/* Bank destination — chosen before launching */}
@@ -764,10 +932,10 @@ export function Mixer({ user }: MixerProps) {
                         onClick={async e => {
                           e.stopPropagation()
                           if (job.localPath && window.electronAPI?.saveFileAs) {
-                            const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: `mixer-${job.videoItem.title}.mov` })
+                            const r = await window.electronAPI.saveFileAs({ sourcePath: job.localPath, defaultName: `scaleflow-${job.videoItem.title}.mov` })
                             if (r.ok || r.canceled) return
                           }
-                          const a = document.createElement('a'); a.href = job.outputUrl!; a.download = `mixer-${job.videoItem.title}.mov`; a.click()
+                          const a = document.createElement('a'); a.href = job.outputUrl!; a.download = `scaleflow-${job.videoItem.title}.mov`; a.click()
                         }}
                         className="sf-press cursor-pointer"
                         style={{ background: 'rgba(0,0,0,0.7)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>

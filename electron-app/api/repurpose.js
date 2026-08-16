@@ -91,8 +91,15 @@ const GPS_CITIES = {
   saopaulo:     { lat: '-23.5505', lon: '-046.6333', city: 'Sao Paulo, Brazil',    tz: '-0300', alt: 760 },
 }
 
-function jitter(coord) {
-  const offset = (Math.random() - 0.5) * 0.01
+// Toutes les villes US → aléatoire « full US ».
+const US_KEYS = [
+  'newyork', 'losangeles', 'chicago', 'miami', 'houston', 'phoenix', 'dallas',
+  'atlanta', 'lasvegas', 'seattle', 'denver', 'boston', 'sanfrancisco',
+  'sandiego', 'austin', 'washington',
+]
+
+function jitter(coord, amp = 0.01) {
+  const offset = (Math.random() - 0.5) * amp
   return (parseFloat(coord) + offset).toFixed(6)
 }
 
@@ -143,7 +150,7 @@ async function handleSpoof(req, res) {
   const ts        = Date.now()
   const rand      = Math.random().toString(36).slice(2)
   const inputPath = path.join(tmpDir, `spoof_in_${ts}.mp4`)
-  const outPath   = path.join(tmpDir, `spoof_out_${ts}_${rand}.mp4`)
+  const outPath   = path.join(tmpDir, `spoof_out_${ts}_${rand}.mov`)
 
   try {
     if (sourceUrl) {
@@ -164,12 +171,17 @@ async function handleSpoof(req, res) {
     const presetKeys = Object.keys(PRESETS)
     const cityKeys   = Object.keys(GPS_CITIES)
     const presetKey  = PRESETS[preset] ? preset : presetKeys[Math.floor(Math.random() * presetKeys.length)]
-    const cityKey    = GPS_CITIES[gpsCity] ? gpsCity : cityKeys[Math.floor(Math.random() * cityKeys.length)]
+    // 'random_usa' → n'importe quelle ville US, avec un jitter large (points répartis
+    // sur tout le pays). Sinon ville demandée, ou aléatoire mondial en filet.
+    const wideJitter = gpsCity === 'random_usa'
+    const cityKey    = wideJitter
+      ? US_KEYS[Math.floor(Math.random() * US_KEYS.length)]
+      : (GPS_CITIES[gpsCity] ? gpsCity : cityKeys[Math.floor(Math.random() * cityKeys.length)])
     const meta = PRESETS[presetKey]
     const gps  = GPS_CITIES[cityKey]
     console.log(`[SPOOF] start user=${String(userId).slice(0, 8)} preset=${presetKey} city=${cityKey} src=${sourceUrl ? 'url' : 'path'}`)
-    const lat  = jitter(gps.lat)
-    const lon  = jitter(gps.lon)
+    const lat  = jitter(gps.lat, wideJitter ? 1.0 : 0.01)
+    const lon  = jitter(gps.lon, wideJitter ? 1.0 : 0.01)
     // GPS fix with random altitude → ISO 6709 (e.g. +48.8571+002.3490+035.123/)
     const altVal = ((gps.alt ?? 10) + (Math.random() - 0.5) * 8).toFixed(3)
     const altStr = `${parseFloat(altVal) >= 0 ? '+' : '-'}${Math.abs(parseFloat(altVal)).toFixed(3).padStart(7, '0')}`
@@ -346,10 +358,10 @@ async function handleSpoof(req, res) {
       throw e
     }
 
-    const resultPath = `videos/users/${userId}/spoof-${ts}_${rand}.mp4`
+    const resultPath = `videos/users/${userId}/spoof-${ts}_${rand}.mov`
     const outBuf = fs.readFileSync(outPath)
     const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
-      contentType: 'video/mp4', upsert: true,
+      contentType: 'video/quicktime', upsert: true,
     })
     if (upErr) throw new Error(upErr.message)
 

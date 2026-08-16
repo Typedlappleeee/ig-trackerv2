@@ -18,4 +18,4 @@ export async function nextScaleflowNumber(userId: string, orgId?: string | null)
   return next
 }
 
-export function scaleflowName(n: number): string { return `scaleflow${n}.mp4` }
+export function scaleflowName(n: number): string { return `scaleflow${n}.mov` }
