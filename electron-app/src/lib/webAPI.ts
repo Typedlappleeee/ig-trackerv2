@@ -308,12 +308,18 @@ export function buildWebAPI() {
         // Preferred path: server-side proxy (/api/geelark-upload) does
         // download + getUrl + PUT entirely côté serveur — pas de CORS.
         // Works whenever the source is an https URL (Supabase signed/public URL).
-        if (/^https?:\/\//.test(opts.filePath)) {
+        const isDataUrl = /^data:/.test(opts.filePath)
+        if (/^https?:\/\//.test(opts.filePath) || isDataUrl) {
           try {
+            // Cover (data: URL) → on envoie le base64 au proxy. Le navigateur ne peut
+            // pas PUT au S3 GeeLark (CORS), mais le serveur, lui, le peut.
+            const proxyBody = isDataUrl
+              ? { dataBase64: opts.filePath.split(',')[1] || '', bearer: opts.bearer, fileType }
+              : { signedUrl: opts.filePath, bearer: opts.bearer, fileType }
             const r = await fetch('/api/geelark-upload', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer, fileType }),
+              body: JSON.stringify(proxyBody),
             })
             const j = await r.json() as { ok: boolean; token?: string; error?: string }
             if (j.ok && j.token) return { ok: true, token: j.token }
@@ -325,7 +331,21 @@ export function buildWebAPI() {
         // Fallback client-side (blob: URLs, ou proxy serveur indisponible)
         // Step 1: get video bytes — try multiple strategies in order
         let bytes: Uint8Array | null = null
-        try {
+        // data: URL (cover = frame JPEG en base64 via canvas.toDataURL) → décodage
+        // DIRECT en octets. Un fetch(data:) est souvent bloqué par la CSP du site →
+        // c'était LA cause de l'échec des covers sur le web (« E001 »). Le décodage
+        // base64 n'utilise aucun réseau → passe toujours.
+        if (/^data:/.test(opts.filePath)) {
+          try {
+            const b64 = opts.filePath.split(',')[1] || ''
+            const bin = atob(b64)
+            const arr = new Uint8Array(bin.length)
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+            bytes = arr
+            console.log(`${V} [A] data: décodé, ${bytes.length} octets`)
+          } catch (e) { console.warn(`${V} [A] data: decode échec: ${e}`) }
+        }
+        if (!bytes) try {
           const r = await fetch(opts.filePath)
           if (r.ok) {
             bytes = new Uint8Array(await r.arrayBuffer())

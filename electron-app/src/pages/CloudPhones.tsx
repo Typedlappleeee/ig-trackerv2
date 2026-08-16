@@ -14,7 +14,7 @@ import {
   loadAutoInstall, saveAutoInstall, loadCpGroups, saveCpGroups,
   type CpInstance, type CpMeta, type CpAutoApp,
 } from '@/lib/cloudPhones'
-import { openCpWindow, closeCpWindow, dropCpWindow, useCpWindows } from '@/lib/cpWindowStore'
+import { openCpWindow, closeCpWindow, dropCpWindow, stopCpPhone, useCpWindows } from '@/lib/cpWindowStore'
 import { listProxies, proxyLabel, type Proxy } from '@/lib/proxyStore'
 import { ExitIpCell } from '@/components/ui/ExitIpCell'
 import { runProxyCheck, runProxyChecks } from '@/lib/proxyChecks'
@@ -209,8 +209,9 @@ export function CloudPhones({ user }: Props) {
     if (!inst) return
     openCpWindow({ id, inst, name: meta[id]?.name || inst.name, proxyId: meta[id]?.proxyId })
   }
-  // Fermer la fenêtre = éteindre le tel (il se rallume à la prochaine ouverture).
-  const closeWindow = (id: string) => { closeCpWindow(id).finally(() => loadInstances()) }
+  // Fermer la fenêtre = cacher la vue, SANS éteindre le tel (tel allumés 24h/24).
+  // Pour éteindre : bouton « Arrêter » (doAction 'stop') ou Suppr.
+  const closeWindow = (id: string) => { closeCpWindow(id) }
 
   const loadInstances = useCallback(async () => {
     const r = await cloudPhones.list()
@@ -621,6 +622,7 @@ export function CloudPhones({ user }: Props) {
                                   <div style={{ position: 'absolute', right: 0, top: '110%', zIndex: 20, background: '#12131d', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 16px 40px -14px rgba(0,0,0,0.8)', padding: 6, minWidth: 180 }}>
                                     <button onClick={() => { setMenuId(null); openEdit(inst.id, 'proxy') }} style={menuItem}>🌐 {tr('Modifier le proxy', 'Edit proxy')}</button>
                                     <button onClick={() => { setMenuId(null); openEdit(inst.id, 'profile') }} style={menuItem}>✏️ {tr('Modifier le profil', 'Edit profile')}</button>
+                                    {isRunning(inst.state) && <button onClick={() => { setMenuId(null); stopCpPhone(inst.id).finally(() => loadInstances()) }} style={{ ...menuItem, color: '#F87171' }}>⏻ {tr('Arrêter le téléphone', 'Stop phone')}</button>}
                                   </div>
                                 )}
                               </div>

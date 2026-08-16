@@ -67,7 +67,7 @@ module.exports = async (req, res) => {
       return res.status(405).json({ ok: false, error: `${SV} Method not allowed` })
     }
 
-    const { storagePath, bucket = 'content', bearer, signedUrl, fileType: fileTypeArg } = req.body ?? {}
+    const { storagePath, bucket = 'content', bearer, signedUrl, dataBase64, fileType: fileTypeArg } = req.body ?? {}
     // Extension réelle (photo vs vidéo). Pour une VIDÉO on force 'mp4' : les
     // templates RPA (Insta/TikTok/Threads) exigent du mp4 — une resourceUrl .mov
     // /.webm casse le posting. Une PHOTO garde son extension (threadsImage la veut).
@@ -76,12 +76,21 @@ module.exports = async (req, res) => {
     const fileType = isImage ? realExt : 'mp4'
     console.log(`${SV} body keys: ${Object.keys(req.body ?? {}).join(',')} | signedUrl=${!!signedUrl} | storagePath=${!!storagePath}`)
 
-    if ((!storagePath && !signedUrl) || !bearer) {
-      return res.status(400).json({ ok: false, error: `${SV}[SV-E001] Missing storagePath/signedUrl or bearer` })
+    if ((!storagePath && !signedUrl && !dataBase64) || !bearer) {
+      return res.status(400).json({ ok: false, error: `${SV}[SV-E001] Missing storagePath/signedUrl/dataBase64 or bearer` })
     }
 
     let bytes
-    if (signedUrl) {
+    if (dataBase64) {
+      // Cover perso envoyée en base64 (frame JPEG) → décodage direct côté serveur,
+      // puis PUT au S3 GeeLark ici (le navigateur en est incapable — CORS).
+      try { bytes = Buffer.from(String(dataBase64), 'base64') }
+      catch (e) { return res.status(400).json({ ok: false, error: `${SV}[SV-E002b] base64 invalide: ${e?.message ?? e}` }) }
+      if (!bytes || !bytes.length) {
+        return res.status(400).json({ ok: false, error: `${SV}[SV-E002b] base64 vide` })
+      }
+      console.log(`${SV} [SV-0] dataBase64 décodé, ${bytes.length} bytes`)
+    } else if (signedUrl) {
       // Anti-SSRF : le signedUrl doit être une URL de la banque Supabase de l'app,
       // et on ne suit PAS les redirections (une 3xx vers une IP interne
       // contournerait l'allowlist). Sinon cet endpoint fetch n'importe quelle URL.

@@ -330,11 +330,11 @@ export function Spoof({ user }: { user: User }) {
     }
 
     try {
-      // Parallélisme : chaque job = 1 requête vers /api/repurpose, donc 1 instance
-      // serverless Vercel séparée (pas de contention CPU entre elles). On lance un
-      // pool borné (3) pour aller bien plus vite sans saturer. Chaque sortie reste
-      // 100 % indépendante → aucun risque de "tout casser".
-      const CONCURRENCY = Math.min(5, initialJobs.length)
+      // Parallélisme borné. ⚠ Vercel « Fluid Compute » peut router plusieurs
+      // requêtes sur LA MÊME instance → elles partagent le même /tmp (~512 Mo).
+      // Trop de spoofs en parallèle = fichiers temp cumulés > 512 Mo → « ENOSPC:
+      // no space left on device ». On limite à 2 pour que le pic de /tmp tienne.
+      const CONCURRENCY = Math.min(2, initialJobs.length)
       let cursor = 0
       const worker = async () => {
         while (cursor < initialJobs.length) {

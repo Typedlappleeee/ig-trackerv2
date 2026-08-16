@@ -72,8 +72,21 @@ async function listInstances() {
 
 // Trouve un port ADB libre pour une nouvelle instance.
 async function nextPort() {
-  const list = await listInstances()
-  const used = new Set(list.map(i => i.adbPort).filter(Boolean))
+  // IMPORTANT : on lit le port configuré de CHAQUE container (même arrêté) via
+  // `docker inspect`. `docker ps` n'affiche le mapping que pour les containers
+  // EN MARCHE → un tel arrêté apparaîtrait « sans port » et on réattribuerait
+  // le sien à un nouveau tel → deux tel sur le même port hôte = collision, ni
+  // l'un ni l'autre ne démarre. inspect voit le port même à l'arrêt.
+  const out = await docker(['ps', '-a', '--filter', 'name=sfphone_', '--format', '{{.Names}}'])
+  const names = out.split('\n').map(s => s.trim()).filter(Boolean)
+  const used = new Set()
+  for (const n of names) {
+    try {
+      const insp = await docker(['inspect', '-f',
+        '{{range $k,$v := .HostConfig.PortBindings}}{{range $v}}{{.HostPort}} {{end}}{{end}}', n])
+      insp.split(/\s+/).filter(Boolean).forEach(hp => used.add(Number(hp)))
+    } catch { /* container en cours de suppression : on ignore */ }
+  }
   let p = PORT_BASE
   while (used.has(p)) p++
   return p
@@ -105,6 +118,8 @@ async function createInstance({ name, androidVersion }) {
     `ro.product.manufacturer=${m.brand}`, `ro.serialno=${hex(16)}`,
     'redroid.width=1080', 'redroid.height=1920', 'redroid.dpi=420',
     'redroid.gpu.mode=guest',            // rendu logiciel (pas de GPU requis)
+    'ro.hwui.use_vulkan=0',              // force OpenGL : le Vulkan logiciel (pastel) fait
+                                          // crasher le RenderThread d'Instagram sur le feed.
   ]
   await docker(['run', '-d', '--privileged', '--restart', 'unless-stopped',
     '--name', cname(name),
