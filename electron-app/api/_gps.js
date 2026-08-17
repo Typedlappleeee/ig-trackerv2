@@ -119,4 +119,107 @@ function buildGpsMetadataArgs(cityKey, { wide = false } = {}) {
   }
 }
 
-module.exports = { GPS_CITIES, US_KEYS, resolveCityKey, jitter, buildGpsMetadataArgs }
+// ── Appareils (device spoof) ─────────────────────────────────────────────────
+// Mêmes presets que le Spoof : iPhone → tags com.apple.quicktime.*, Android →
+// tags com.android.*. Mélanger les deux serait un red flag.
+const PRESETS = {
+  iphone17pro: { platform: 'apple', make: 'Apple', model: 'iPhone 17 Pro', software: 'iOS 26.2', encoder: 'com.apple.quicktime', lens: 'iPhone 17 Pro back triple camera 6.9mm f/1.78' },
+  iphone16pro: { platform: 'apple', make: 'Apple', model: 'iPhone 16 Pro', software: 'iOS 18.5', encoder: 'com.apple.quicktime', lens: 'iPhone 16 Pro back triple camera 6.765mm f/1.78' },
+  iphone16:    { platform: 'apple', make: 'Apple', model: 'iPhone 16',      software: 'iOS 18.4', encoder: 'com.apple.quicktime', lens: 'iPhone 16 back dual camera 5.96mm f/1.6' },
+  iphone15pro: { platform: 'apple', make: 'Apple', model: 'iPhone 15 Pro', software: 'iOS 17.5', encoder: 'com.apple.quicktime', lens: 'iPhone 15 Pro back triple camera 6.765mm f/1.78' },
+  iphone15:    { platform: 'apple', make: 'Apple', model: 'iPhone 15',      software: 'iOS 17.4', encoder: 'com.apple.quicktime', lens: 'iPhone 15 back dual camera 5.7mm f/1.6' },
+  s24ultra:    { platform: 'android', make: 'samsung', model: 'Galaxy S24 Ultra', androidModel: 'SM-S928B', software: 'Android 14', encoder: 'Lavf' },
+  s23ultra:    { platform: 'android', make: 'samsung', model: 'Galaxy S23 Ultra', androidModel: 'SM-S918B', software: 'Android 14', encoder: 'Lavf' },
+  pixel8pro:   { platform: 'android', make: 'Google',  model: 'Pixel 8 Pro',      androidModel: 'Pixel 8 Pro', software: 'Android 14', encoder: 'Lavf' },
+  pixel9pro:   { platform: 'android', make: 'Google',  model: 'Pixel 9 Pro',      androidModel: 'Pixel 9 Pro', software: 'Android 15', encoder: 'Lavf' },
+}
+
+function randId(len) {
+  const hex = '0123456789ABCDEF'
+  let s = ''
+  for (let i = 0; i < len; i++) s += hex[Math.floor(Math.random() * 16)]
+  return s
+}
+
+// Construit TOUS les tags -metadata d'un spoof (appareil + GPS + date), pour un
+// mix « déjà spoofé ». `dateDays > 0` → date de prise de vue aléatoire dans les N
+// derniers jours ; sinon aujourd'hui. Renvoie { args, info }.
+function buildSpoofMetadataArgs({ preset = 'random', gpsCity = 'random', dateDays = 0 } = {}) {
+  const presetKeys = Object.keys(PRESETS)
+  const presetKey  = PRESETS[preset] ? preset : presetKeys[Math.floor(Math.random() * presetKeys.length)]
+  const meta       = PRESETS[presetKey]
+  const isAndroid  = meta.platform === 'android'
+
+  const cityKey = resolveCityKey(gpsCity)
+  const gps     = GPS_CITIES[cityKey] || GPS_CITIES.newyork
+  const wide    = gpsCity === 'random_usa'
+  const lat = jitter(gps.lat, wide ? 0.5 : 0.006)
+  const lon = jitter(gps.lon, wide ? 0.5 : 0.006)
+  const altVal = ((gps.alt ?? 10) + (Math.random() - 0.5) * 8).toFixed(3)
+  const altStr = `${parseFloat(altVal) >= 0 ? '+' : '-'}${Math.abs(parseFloat(altVal)).toFixed(3).padStart(7, '0')}`
+  const locationAltStr = `${parseFloat(lat) >= 0 ? '+' : ''}${lat}${parseFloat(lon) >= 0 ? '+' : ''}${lon}${altStr}/`
+
+  // Date : aujourd'hui, ou un jour au hasard dans les `dateDays` derniers jours.
+  const days = Math.max(0, Number(dateDays) || 0)
+  const base = new Date(Date.now() - Math.floor(Math.random() * (days > 0 ? days : 1)) * 86400000)
+  const dateDash = base.toISOString().slice(0, 10)
+  const hh = String(Math.floor(Math.random() * 14) + 7).padStart(2, '0')
+  const mm = String(Math.floor(Math.random() * 60)).padStart(2, '0')
+  const ss = String(Math.floor(Math.random() * 60)).padStart(2, '0')
+  const ms = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
+  const creationTime  = `${dateDash}T${hh}:${mm}:${ss}.${ms}Z`
+  const creationLocal = `${dateDash}T${hh}:${mm}:${ss}${gps.tz ?? '+0000'}`
+
+  const cameraId  = `${randId(8)}-${randId(4)}-${randId(4)}-${randId(4)}-${randId(12)}`
+  const focalLen  = (meta.lens?.match(/([\d.]+)mm/) || [])[1] || '6.9'
+  const apertureF = (meta.lens?.match(/f\/([\d.]+)/) || [])[1] || '1.78'
+  const iso       = [32, 40, 50, 64, 80, 100, 125, 160, 200, 250][Math.floor(Math.random() * 10)]
+  const exposure  = ['1/30', '1/40', '1/60', '1/80', '1/120', '1/250', '1/500'][Math.floor(Math.random() * 7)]
+
+  let args
+  if (isAndroid) {
+    args = [
+      '-metadata', `make=${meta.make}`,
+      '-metadata', `model=${meta.androidModel ?? meta.model}`,
+      '-metadata', `com.android.manufacturer=${meta.make}`,
+      '-metadata', `com.android.model=${meta.androidModel ?? meta.model}`,
+      '-metadata', `com.android.version=${(meta.software.match(/(\d+)/) || [])[1] || '14'}`,
+      '-metadata', `location=${locationAltStr}`,
+      '-metadata', `location-eng=${locationAltStr}`,
+      '-metadata', `com.apple.quicktime.location.ISO6709=${locationAltStr}`,
+      '-metadata', `creation_time=${creationTime}`,
+      '-metadata', `date=${dateDash}`,
+      '-metadata', `comment=${gps.city}`,
+    ]
+  } else {
+    args = [
+      '-metadata', `make=${meta.make}`,
+      '-metadata', `model=${meta.model}`,
+      '-metadata', `software=${meta.software}`,
+      '-metadata', `encoder=${meta.encoder}`,
+      '-metadata', `location=${locationAltStr}`,
+      '-metadata', `location-eng=${locationAltStr}`,
+      '-metadata', `com.apple.quicktime.location.ISO6709=${locationAltStr}`,
+      '-metadata', `com.apple.quicktime.location.accuracy.horizontal=${(Math.random() * 8 + 2).toFixed(6)}`,
+      '-metadata', `com.apple.quicktime.make=${meta.make}`,
+      '-metadata', `com.apple.quicktime.model=${meta.model}`,
+      '-metadata', `com.apple.quicktime.software=${meta.software}`,
+      '-metadata', `com.apple.quicktime.creationdate=${creationLocal}`,
+      '-metadata', `com.apple.quicktime.camera.identifier=${cameraId}`,
+      '-metadata', `com.apple.quicktime.camera.lens_model=${meta.lens}`,
+      '-metadata', `com.apple.quicktime.camera.focal_length.35mm_equivalent=${focalLen}`,
+      '-metadata', `com.apple.quicktime.camera.aperture=${apertureF}`,
+      '-metadata', `com.apple.quicktime.camera.exposure_time=1/${exposure.split('/')[1] || 60}`,
+      '-metadata', `com.apple.quicktime.camera.iso=${iso}`,
+      '-metadata', `creation_time=${creationTime}`,
+      '-metadata', `date=${dateDash}`,
+      '-metadata', `comment=${gps.city}`,
+      '-metadata', `description=Shot on ${meta.model}`,
+      '-metadata', `copyright=© ${dateDash.slice(0, 4)} ${meta.make}`,
+    ]
+  }
+
+  return { args, info: { model: meta.model, city: gps.city, date: dateDash } }
+}
+
+module.exports = { GPS_CITIES, US_KEYS, PRESETS, resolveCityKey, jitter, buildGpsMetadataArgs, buildSpoofMetadataArgs }

@@ -104,7 +104,7 @@ interface ElectronAPI {
     Promise<{ ok: boolean; results: Array<{ ok: boolean; outputPath?: string; error?: string }>; error?: string }>
   saveFileAs: (opts: { sourcePath: string; defaultName: string }) =>
     Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>
-  runFfmpegMixOverlay: (opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom' | 'custom'; fontSize: number; fontColor: string; posX?: number; posY?: number; gpsSpoof?: boolean; gpsCity?: string; audioStoragePath?: string; audioPath?: string }) =>
+  runFfmpegMixOverlay: (opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom' | 'custom'; fontSize: number; fontColor: string; posX?: number; posY?: number; gpsSpoof?: boolean; gpsCity?: string; preset?: string; dateDays?: number; audioStoragePath?: string; audioPath?: string }) =>
     Promise<{ ok: boolean; outputPath?: string; storagePath?: string; error?: string }>
   groqTranscription: (opts: { apiKey: string; audioBytes?: ArrayBuffer; videoUrl?: string; filename: string; language?: string }) =>
     Promise<{ ok: boolean; data?: { words?: Array<{ word: string; start: number; end: number }>; text?: string }; error?: string }>

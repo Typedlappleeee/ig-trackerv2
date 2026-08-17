@@ -1068,6 +1068,8 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
   posY?:      number
   gpsSpoof?:  boolean
   gpsCity?:   string
+  preset?:    string   // appareil (iphone… / android…), 'random' par défaut
+  dateDays?:  number   // date de prise de vue aléatoire dans les N derniers jours
   audioPath?: string   // URL signée d'un MP3 (remplace la piste d'origine)
 }) => {
   const ffmpegBin = getFfmpegBin()
@@ -1179,7 +1181,7 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
     ...dtFilters,
   ].join(',')
 
-  // ── GPS/localisation optionnelle (ISO 6709) — spoof intégré au mix ──────────
+  // ── Spoof intégré au mix : appareil + GPS (ISO 6709) + date ─────────────────
   const gpsArgs: string[] = []
   if (opts.gpsSpoof) {
     const CITIES: Record<string, { lat: number; lon: number; tz: string; alt: number }> = {
@@ -1191,6 +1193,17 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
       london: { lat: 51.5074, lon: -0.1278, tz: '+0100', alt: 11 },
       dubai: { lat: 25.2048, lon: 55.2708, tz: '+0400', alt: 5 },
       tokyo: { lat: 35.6762, lon: 139.6503, tz: '+0900', alt: 40 },
+    }
+    const DEVICES: Record<string, { make: string; model: string; software: string; android?: boolean }> = {
+      iphone17pro: { make: 'Apple', model: 'iPhone 17 Pro', software: 'iOS 26.2' },
+      iphone16pro: { make: 'Apple', model: 'iPhone 16 Pro', software: 'iOS 18.5' },
+      iphone16:    { make: 'Apple', model: 'iPhone 16',      software: 'iOS 18.4' },
+      iphone15pro: { make: 'Apple', model: 'iPhone 15 Pro', software: 'iOS 17.5' },
+      iphone15:    { make: 'Apple', model: 'iPhone 15',      software: 'iOS 17.4' },
+      s24ultra:    { make: 'samsung', model: 'SM-S928B', software: 'Android 14', android: true },
+      s23ultra:    { make: 'samsung', model: 'SM-S918B', software: 'Android 14', android: true },
+      pixel8pro:   { make: 'Google',  model: 'Pixel 8 Pro', software: 'Android 14', android: true },
+      pixel9pro:   { make: 'Google',  model: 'Pixel 9 Pro', software: 'Android 15', android: true },
     }
     const US = ['newyork', 'losangeles', 'miami', 'lasvegas']
     const keys = Object.keys(CITIES)
@@ -1207,11 +1220,48 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
     const sLon = `${Number(lon) >= 0 ? '+' : '-'}${Math.abs(Number(lon)).toFixed(6).padStart(10, '0')}`
     const sAlt = `${Number(alt) >= 0 ? '+' : '-'}${Math.abs(Number(alt)).toFixed(3).padStart(7, '0')}`
     const iso = `${sLat}${sLon}${sAlt}/`
+
+    // Date de prise de vue : aujourd'hui ou un jour au hasard dans les N derniers.
+    const days = Math.max(0, Number(opts.dateDays) || 0)
+    const base = new Date(Date.now() - Math.floor(Math.random() * (days > 0 ? days : 1)) * 86400000)
+    const dateDash = base.toISOString().slice(0, 10)
+    const hh = String(Math.floor(Math.random() * 14) + 7).padStart(2, '0')
+    const mm = String(Math.floor(Math.random() * 60)).padStart(2, '0')
+    const ss = String(Math.floor(Math.random() * 60)).padStart(2, '0')
+    const creationTime = `${dateDash}T${hh}:${mm}:${ss}.000Z`
+    const creationLocal = `${dateDash}T${hh}:${mm}:${ss}${c.tz}`
+
+    // Appareil : preset demandé, ou aléatoire.
+    const dkeys = Object.keys(DEVICES)
+    const psel = opts.preset ?? 'random'
+    const dkey = DEVICES[psel] ? psel : dkeys[Math.floor(Math.random() * dkeys.length)]
+    const dev = DEVICES[dkey]
+
     gpsArgs.push(
       '-metadata', `location=${iso}`,
       '-metadata', `location-eng=${iso}`,
       '-metadata', `com.apple.quicktime.location.ISO6709=${iso}`,
+      '-metadata', `make=${dev.make}`,
+      '-metadata', `model=${dev.model}`,
+      '-metadata', `creation_time=${creationTime}`,
+      '-metadata', `date=${dateDash}`,
+      '-metadata', `comment=${key}`,
     )
+    if (dev.android) {
+      gpsArgs.push(
+        '-metadata', `com.android.manufacturer=${dev.make}`,
+        '-metadata', `com.android.model=${dev.model}`,
+        '-metadata', `com.android.version=${(dev.software.match(/(\d+)/) || [])[1] || '14'}`,
+      )
+    } else {
+      gpsArgs.push(
+        '-metadata', `software=${dev.software}`,
+        '-metadata', `com.apple.quicktime.make=${dev.make}`,
+        '-metadata', `com.apple.quicktime.model=${dev.model}`,
+        '-metadata', `com.apple.quicktime.software=${dev.software}`,
+        '-metadata', `com.apple.quicktime.creationdate=${creationLocal}`,
+      )
+    }
   }
 
   // ── Piste audio MP3 optionnelle : télécharge l'URL signée puis remplace l'audio ─

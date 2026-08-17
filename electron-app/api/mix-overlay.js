@@ -10,7 +10,7 @@ const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { createClient } = require('@supabase/supabase-js')
 const { assertAllowedMediaUrl, fetchMediaFollow, isOwnStoragePath } = require('./_ssrf')
-const { resolveCityKey, buildGpsMetadataArgs } = require('./_gps')
+const { buildSpoofMetadataArgs } = require('./_gps')
 const fs   = require('fs')
 const path = require('path')
 const os   = require('os')
@@ -156,7 +156,9 @@ async function handleMediaOverlay(req, res) {
   const ts = Date.now(); const tmpDir = os.tmpdir()
   const inPath  = path.join(tmpDir, `movl_in_${ts}.mp4`)
   const ovPath  = path.join(tmpDir, `movl_ov_${ts}`)
-  const outPath = path.join(tmpDir, `movl_out_${ts}.mov`)
+  // Overlay photo/vidéo : on garde .mp4 (video/mp4) — le .mov (video/quicktime) était
+  // illisible dans le lecteur <video> du navigateur (rendu web du composer).
+  const outPath = path.join(tmpDir, `movl_out_${ts}.mp4`)
   const thumbPath = path.join(tmpDir, `movl_th_${ts}.jpg`)
   try {
     const r1 = await fetchMediaFollow(videoUrl, { timeoutMs: 120000 })  // gros fichiers (banque 100 Mo)
@@ -277,9 +279,9 @@ async function handleMediaOverlay(req, res) {
     }
 
     const rand = Math.random().toString(36).slice(2)
-    const resultPath = userId ? `videos/users/${userId}/overlay-${ts}_${rand}.mov` : `mix-results/${ts}_${rand}.mov`
+    const resultPath = userId ? `videos/users/${userId}/overlay-${ts}_${rand}.mp4` : `mix-results/${ts}_${rand}.mp4`
     const outBuf = fs.readFileSync(outPath)
-    const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, { contentType: 'video/quicktime', upsert: true })
+    const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, { contentType: 'video/mp4', upsert: true })
     if (upErr) throw new Error(upErr.message)
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
 
@@ -317,8 +319,9 @@ module.exports = async (req, res) => {
     fontColor = '#ffffff',
     // Placement libre (fractions 0..1 du CENTRE du texte) quand position==='custom'.
     posX, posY,
-    // Spoof intégré : nettoie toujours les métadonnées ; injecte un GPS si gpsSpoof.
-    gpsSpoof = false, gpsCity = 'random',
+    // Spoof intégré : nettoie toujours les métadonnées ; si gpsSpoof, injecte
+    // appareil (preset) + GPS + date (dateDays derniers jours, 0 = aujourd'hui).
+    gpsSpoof = false, gpsCity = 'random', preset = 'random', dateDays = 0,
     // Piste audio MP3 optionnelle (remplace le son d'origine), depuis la banque.
     audioStoragePath,
     supabaseToken, supabaseAnonKey,
@@ -362,11 +365,11 @@ module.exports = async (req, res) => {
       hasAudio = true
     }
 
-    // ── GPS metadata (ISO 6709) + city label, resolved server-side ───────────
+    // ── Spoof metadata (appareil + GPS ISO 6709 + date), résolu côté serveur ──
     let gpsMeta = null
     if (gpsSpoof) {
-      const key = resolveCityKey(gpsCity)
-      gpsMeta = buildGpsMetadataArgs(key, { wide: gpsCity === 'random_usa' })
+      const built = buildSpoofMetadataArgs({ preset, gpsCity, dateDays })
+      gpsMeta = { args: built.args, city: built.info.city, model: built.info.model, date: built.info.date }
     }
 
     // ── Common tail : strip source metadata, (opt.) inject GPS, .mov muxer ────
@@ -471,7 +474,7 @@ module.exports = async (req, res) => {
     if (upErr) throw new Error(upErr.message)
 
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
-    res.json({ ok: true, url: publicUrl, storagePath: resultPath, gps: gpsMeta ? gpsMeta.city : null })
+    res.json({ ok: true, url: publicUrl, storagePath: resultPath, spoof: gpsMeta ? { city: gpsMeta.city, model: gpsMeta.model, date: gpsMeta.date } : null })
   } catch (err) {
     res.status(500).json({ ok: false, error: (err instanceof Error ? err.message : String(err)).slice(0, 1000) })
   } finally {
