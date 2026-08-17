@@ -13,6 +13,20 @@ import { OverlayComposer } from './OverlayComposer'
 interface MixerProps { user: User }
 type MixPosition = 'bottom' | 'middle' | 'top' | 'custom'
 
+// Appareils proposés dans le Mixer (mêmes presets que le Spoof).
+const MIX_DEVICE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'random',      label: '🎲 Aléatoire (iPhone + Android)' },
+  { value: 'iphone17pro', label: 'iPhone 17 Pro' },
+  { value: 'iphone16pro', label: 'iPhone 16 Pro' },
+  { value: 'iphone16',    label: 'iPhone 16' },
+  { value: 'iphone15pro', label: 'iPhone 15 Pro' },
+  { value: 'iphone15',    label: 'iPhone 15' },
+  { value: 's24ultra',    label: 'Samsung Galaxy S24 Ultra' },
+  { value: 's23ultra',    label: 'Samsung Galaxy S23 Ultra' },
+  { value: 'pixel8pro',   label: 'Google Pixel 8 Pro' },
+  { value: 'pixel9pro',   label: 'Google Pixel 9 Pro' },
+]
+
 // Localisation GPS proposée dans le Mixer (résolue côté serveur, comme le Spoof).
 const MIX_GPS_OPTIONS: { value: string; label: string }[] = [
   { value: 'random',       label: '🎲 Aléatoire (tous pays)' },
@@ -387,9 +401,11 @@ export function Mixer({ user }: MixerProps) {
   const [mode,      setMode]      = useState<'random' | 'all'>('random')
   const [composerMode, setComposerMode] = useState<'caption' | 'overlay'>('caption')
 
-  // Spoof intégré : nettoyage métadonnées + injection GPS directement au mix.
+  // Spoof intégré : nettoyage métadonnées + appareil + GPS + date directement au mix.
   const [gpsSpoof,  setGpsSpoof]  = useState(true)
   const [gpsCity,   setGpsCity]   = useState('random')
+  const [spoofPreset, setSpoofPreset] = useState('random')       // appareil
+  const [spoofDate,   setSpoofDate]   = useState(true)           // date aléatoire 30j
   // Piste audio MP3 optionnelle (remplace le son d'origine).
   const [mp3, setMp3]             = useState<{ name: string; storagePath: string; url: string } | null>(null)
   const [mp3Uploading, setMp3Uploading] = useState(false)
@@ -518,6 +534,8 @@ export function Mixer({ user }: MixerProps) {
           fontColor,
           gpsSpoof,
           gpsCity,
+          preset:   spoofPreset,
+          dateDays: spoofDate ? 30 : 0,
           ...(mp3 ? { audioStoragePath: mp3.storagePath, audioPath: mp3.url } : {}),
         })
         if (!res.ok || !res.outputPath) throw new Error(res.error ?? tr('Échec ffmpeg', 'ffmpeg failed'))
@@ -809,16 +827,41 @@ export function Mixer({ user }: MixerProps) {
                 {tr('Le mix sort déjà « spoofé » — inutile de repasser par l\'onglet Spoof.', 'The mix comes out already spoofed — no need for the Spoof tab.')}
               </p>
               {gpsSpoof && (
-                <select
-                  value={gpsCity}
-                  onChange={e => setGpsCity(e.target.value)}
-                  className="sf-input"
-                  style={{ width: '100%', marginTop: 10, fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
-                >
-                  {MIX_GPS_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value} style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{o.label}</option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                  {/* Appareil */}
+                  <div>
+                    <p className="sf-section-label" style={{ marginBottom: 6 }}>{tr('📱 Appareil', '📱 Device')}</p>
+                    <select
+                      value={spoofPreset}
+                      onChange={e => setSpoofPreset(e.target.value)}
+                      className="sf-input"
+                      style={{ width: '100%', fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
+                    >
+                      {MIX_DEVICE_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value} style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Localisation GPS */}
+                  <div>
+                    <p className="sf-section-label" style={{ marginBottom: 6 }}>{tr('🏙 Localisation GPS', '🏙 GPS location')}</p>
+                    <select
+                      value={gpsCity}
+                      onChange={e => setGpsCity(e.target.value)}
+                      className="sf-input"
+                      style={{ width: '100%', fontSize: 12, color: '#e8e8f0', background: '#1a1a2e' }}
+                    >
+                      {MIX_GPS_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value} style={{ color: '#e8e8f0', background: '#1a1a2e' }}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Date de prise de vue */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={spoofDate} onChange={e => setSpoofDate(e.target.checked)} style={{ width: 15, height: 15, accentColor: '#6366F1', cursor: 'pointer' }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{tr('📅 Date aléatoire (30 derniers jours)', '📅 Random date (last 30 days)')}</span>
+                  </label>
+                </div>
               )}
             </div>
 
