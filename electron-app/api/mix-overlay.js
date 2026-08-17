@@ -156,9 +156,10 @@ async function handleMediaOverlay(req, res) {
   const ts = Date.now(); const tmpDir = os.tmpdir()
   const inPath  = path.join(tmpDir, `movl_in_${ts}.mp4`)
   const ovPath  = path.join(tmpDir, `movl_ov_${ts}`)
-  // Overlay photo/vidéo : on garde .mp4 (video/mp4) — le .mov (video/quicktime) était
-  // illisible dans le lecteur <video> du navigateur (rendu web du composer).
-  const outPath = path.join(tmpDir, `movl_out_${ts}.mp4`)
+  // Sortie .mov, MAIS servie en `video/mp4` (cf. upload) : le MIME video/quicktime
+  // était refusé par le lecteur <video> du navigateur ; les octets H.264/AAC sont
+  // lus sans souci quand la réponse est étiquetée video/mp4.
+  const outPath = path.join(tmpDir, `movl_out_${ts}.mov`)
   const thumbPath = path.join(tmpDir, `movl_th_${ts}.jpg`)
   try {
     const r1 = await fetchMediaFollow(videoUrl, { timeoutMs: 120000 })  // gros fichiers (banque 100 Mo)
@@ -253,7 +254,10 @@ async function handleMediaOverlay(req, res) {
       '-c:a', 'aac', '-b:a', '128k',
       // PAS de -shortest : la longueur suit la vidéo de BASE (sinon un overlay
       // court — ou une image d'une frame — tronquait toute la sortie).
-      '-movflags', '+faststart', '-y', outPath,
+      // `-f mp4` : on écrit des octets MP4 (isom) dans le fichier .mov → lisible par
+      // TOUS les lecteurs <video> (le container QuickTime pur restait illisible sur
+      // le rendu web), tout en gardant l'extension .mov demandée.
+      '-movflags', '+faststart', '-f', 'mp4', '-y', outPath,
     ]
     try {
       await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 200 * 1024 * 1024, timeout: 290000, killSignal: 'SIGKILL' })
@@ -279,7 +283,7 @@ async function handleMediaOverlay(req, res) {
     }
 
     const rand = Math.random().toString(36).slice(2)
-    const resultPath = userId ? `videos/users/${userId}/overlay-${ts}_${rand}.mp4` : `mix-results/${ts}_${rand}.mp4`
+    const resultPath = userId ? `videos/users/${userId}/overlay-${ts}_${rand}.mov` : `mix-results/${ts}_${rand}.mov`
     const outBuf = fs.readFileSync(outPath)
     const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, { contentType: 'video/mp4', upsert: true })
     if (upErr) throw new Error(upErr.message)
@@ -469,7 +473,8 @@ module.exports = async (req, res) => {
 
     const outBuf = fs.readFileSync(outPath)
     const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
-      contentType: 'video/quicktime', upsert: true,
+      // .mov servi en video/mp4 → lecture fiable dans le <video> du navigateur.
+      contentType: 'video/mp4', upsert: true,
     })
     if (upErr) throw new Error(upErr.message)
 

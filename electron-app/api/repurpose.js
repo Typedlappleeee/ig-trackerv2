@@ -361,7 +361,8 @@ async function handleSpoof(req, res) {
     const resultPath = `videos/users/${userId}/spoof-${ts}_${rand}.mov`
     const outBuf = fs.readFileSync(outPath)
     const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
-      contentType: 'video/quicktime', upsert: true,
+      // .mov servi en video/mp4 → lecture fiable dans le <video> du navigateur.
+      contentType: 'video/mp4', upsert: true,
     })
     if (upErr) throw new Error(upErr.message)
 
@@ -485,7 +486,8 @@ module.exports = async (req, res) => {
 
         const outBuf = fs.readFileSync(outPaths[i])
         const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
-          contentType: 'video/quicktime', upsert: true,
+          // .mov servi en video/mp4 → lecture fiable dans le <video> du navigateur.
+          contentType: 'video/mp4', upsert: true,
         })
         if (upErr) throw new Error(upErr.message)
 
