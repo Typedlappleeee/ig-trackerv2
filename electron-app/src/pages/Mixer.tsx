@@ -763,7 +763,11 @@ export function Mixer({ user }: MixerProps) {
         <div className="anim-stagger" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: 'var(--base)', padding: '24px 28px', gap: 20 }}>
 
           {/* Config card */}
-          <div className="sf-card sf-spotlight" style={{ padding: '20px 22px' }}>
+          {/* flexShrink:0 : sans ça, la carte se COMPRIME pour tenir dans la colonne
+              (flex column) au lieu de déborder → le contenu (MP3, dossier) est rogné
+              et rien ne défile. On la laisse à sa hauteur naturelle pour que la
+              colonne scrolle. */}
+          <div className="sf-card sf-spotlight" style={{ padding: '20px 22px', flexShrink: 0 }}>
             <p className="sf-section-label" style={{ marginBottom: 20 }}>{tr('Configuration du texte', 'Text configuration')}</p>
 
             {/* Position */}
@@ -894,7 +898,7 @@ export function Mixer({ user }: MixerProps) {
 
           {/* Summary card */}
           {canStart && (
-            <div className="sf-card anim-scale-in sf-glow-accent" style={{ padding: '16px 20px', borderColor: 'rgba(139,92,246,0.28)', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06))' }}>
+            <div className="sf-card anim-scale-in sf-glow-accent" style={{ padding: '16px 20px', flexShrink: 0, borderColor: 'rgba(139,92,246,0.28)', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06))' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.15)', flexShrink: 0 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ACCENT_L} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -914,7 +918,7 @@ export function Mixer({ user }: MixerProps) {
 
           {/* Error */}
           {error && (
-            <div className="sf-banner is-danger sf-anim-slide-up" role="alert">
+            <div className="sf-banner is-danger sf-anim-slide-up" role="alert" style={{ flexShrink: 0 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <span>{error}</span>
             </div>
