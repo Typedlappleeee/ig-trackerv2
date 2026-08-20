@@ -309,9 +309,10 @@ async function handleSpoof(req, res) {
     if (flipH) filters.push('hflip')
     if (vignette) filters.push('vignette=PI/5')
 
-    // Micro-vitesse — change légèrement la durée (signal d'unicité fort) en gardant
-    // l'audio synchro via atempo. Sans toucher au contenu visuel.
-    const spd = clamp(Number(speed) || 1, 0.9, 1.1)
+    // Vitesse — change la durée + le rythme audio (signal d'unicité FORT pour l'anti-
+    // duplication IG, qui matche sur l'empreinte audio/visuelle, pas les métadonnées).
+    // Plage élargie jusqu'à x1.35 (atempo accepte 0.5–2.0). L'audio reste synchro via atempo.
+    const spd = clamp(Number(speed) || 1, 0.9, 1.35)
     if (spd !== 1) filters.push(`setpts=PTS/${spd.toFixed(4)}`)
 
     // Plafonne la résolution à 1920px sur le grand côté (aspect conservé). IG/TikTok
