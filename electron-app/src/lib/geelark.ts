@@ -3091,7 +3091,7 @@ const STORY_FLOW_TITLE = (storyFlowDef as { title: string }).title   // « Story
 // Bump à CHAQUE modification du flow JSON. Comme l'update-en-place (import avec `id`)
 // s'est révélé peu fiable, un changement de version → on RÉ-IMPORTE un flow frais
 // (garanti à jour). L'ancien flow devient orphelin (à supprimer 1 fois côté GeeLark).
-const STORY_FLOW_VERSION = '8'   // v8 = publication « Your stor » en CONTAIN (matche « Your story » ET « Your stories »)
+const STORY_FLOW_VERSION = '9'   // v9 = RETOUR à « Your story » equal (le v8 « contain » cassait la publication) — force le ré-import du flow sain
 const _storyFlowIdCache = new Map<string, Promise<string | null>>()
 
 // Persistance par compte GeeLark (suffixe du token). On mémorise le flowId EN DUR
