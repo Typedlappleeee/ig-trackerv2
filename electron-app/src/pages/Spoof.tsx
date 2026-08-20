@@ -145,6 +145,7 @@ export function Spoof({ user }: { user: User }) {
   const bankNum                           = useRef(1)
   const [cancelling, setCancelling]       = useState(false)
   const [autoMode, setAutoMode]           = useState(true)
+  const [mirror, setMirror]               = useState(false)   // miroir opt-in (inverse le texte)
   const [randomDate, setRandomDate]       = useState(false)
   const [randomDateDays, setRandomDateDays] = useState(30) // fenêtre (jours) pour la date aléatoire
   const [showDebug, setShowDebug]         = useState(false)
@@ -267,7 +268,11 @@ export function Spoof({ user }: { user: User }) {
       updateJob(job.id, { status: 'processing' })
 
       // Mode automatique : chaque vidéo/copie reçoit ses propres réglages aléatoires.
-      const adj = autoMode ? randomAdjustments() : { brightness, saturation, contrast, noise, vignette, flipH, zoomPct }
+      // Le toggle « Miroir » l'emporte sur le flipH auto (désactivé par défaut car
+      // il inverse le texte). Actif aussi bien en mode auto qu'en manuel.
+      const adj = autoMode
+        ? { ...randomAdjustments(), flipH: mirror }
+        : { brightness, saturation, contrast, noise, vignette, flipH: flipH || mirror, zoomPct }
       // Résolution PAR JOB : téléphone + ville peuvent être aléatoires → chaque
       // sortie a un device et une localisation différents (empreinte plus variée).
       const resolvedPreset = preset === 'random' ? pickRandom(PRESET_KEYS) : preset
@@ -503,6 +508,19 @@ export function Spoof({ user }: { user: User }) {
                   <p style={{ fontSize: 10.5, color: 'var(--text-4)', margin: '2px 0 0' }}>{tr('Recommandé · chaque vidéo unique, réglé pour toi', 'Recommended · every video unique, tuned for you')}</p>
                 </div>
                 <span className={`sf-toggle-track ${autoMode ? 'on' : 'off'}`} style={{ flexShrink: 0 }}>
+                  <span className="sf-toggle-thumb" />
+                </span>
+              </button>
+
+              {/* Miroir horizontal — levier fort contre l'empreinte IG, mais il INVERSE
+                  le texte à l'écran → opt-in (désactivé par défaut). */}
+              <button onClick={() => setMirror(v => !v)} disabled={running} className="cursor-pointer"
+                style={{ marginTop: 10, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: 11, background: mirror ? 'rgba(99,102,241,0.12)' : 'var(--surface-2)', border: `1px solid ${mirror ? 'rgba(99,102,241,0.35)' : 'var(--border)'}` }}>
+                <div style={{ textAlign: 'left' }}>
+                  <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>{tr('🪞 Miroir horizontal', '🪞 Horizontal mirror')}</p>
+                  <p style={{ fontSize: 10.5, color: '#F59E0B', margin: '2px 0 0' }}>{tr('Fort contre IG — mais inverse le texte à l\'écran', 'Strong vs IG — but flips on-screen text')}</p>
+                </div>
+                <span className={`sf-toggle-track ${mirror ? 'on' : 'off'}`} style={{ flexShrink: 0 }}>
                   <span className="sf-toggle-thumb" />
                 </span>
               </button>
