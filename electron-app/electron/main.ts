@@ -1145,19 +1145,23 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
 
   const isCustom = opts.position === 'custom'
     && Number.isFinite(Number(opts.posX)) && Number.isFinite(Number(opts.posY))
+  // Petit jitter vertical (±35 px) → la hauteur varie « un peu mais très peu ».
+  const jitterY = Math.round((Math.random() - 0.5) * 70)
   const startY = isCustom
     ? Math.round(Number(opts.posY) * VH - totalH / 2)
     : opts.position === 'bottom'
-      ? VH - totalH - 170
+      // Bas REMONTÉ (~82 % de la hauteur, plus collé au bord) + jitter.
+      ? Math.max(60, VH - totalH - 340 + jitterY)
       : opts.position === 'top'
-        ? 80
-        : Math.round((VH - totalH) / 2)
+        ? 150 + jitterY
+        : Math.round((VH - totalH) / 2) + jitterY
   // Placement libre : centre le texte sur posX (chaque ligne recentrée sur text_w).
   const xExpr = isCustom
     ? `${Math.round(Number(opts.posX) * VW)}-(text_w/2)`
     : `(w-text_w)/2`
 
-  const borderPx = Math.max(3, Math.round(fs * 0.07))
+  // Contour plus fin (style caption propre) — l'ancien 0.07 faisait un liseré épais.
+  const borderPx = Math.max(2, Math.round(fs * 0.045))
 
   const dtFilters = lines.map((line, i) => {
     const y = startY + i * lineH
