@@ -176,17 +176,19 @@ export function Spoof({ user }: { user: User }) {
   const randInt   = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
   const randFloat = (min: number, max: number, d = 3) => +(Math.random() * (max - min) + min).toFixed(d)
   const randomAdjustments = () => ({
-    brightness: randInt(-10, 10),
-    saturation: randInt(-12, 12),
-    contrast:   randInt(-10, 10),
-    gamma:      randFloat(0.92, 1.08),   // gamma léger
-    hue:        randInt(-6, 6),          // teinte ±6°
-    noise:      randInt(4, 12),          // grain/pixels
-    sharpen:    randFloat(0, 0.5, 2),    // netteté subtile
-    zoomPct:    randInt(2, 7),           // léger zoom
-    panX:       randInt(-20, 20),        // recadrage horizontal (% de la marge)
-    panY:       randInt(-20, 20),        // recadrage vertical
-    speed:      randFloat(0.97, 1.03),   // micro-vitesse
+    brightness: randInt(-12, 12),
+    saturation: randInt(-15, 15),
+    contrast:   randInt(-12, 12),
+    gamma:      randFloat(0.90, 1.10),   // gamma
+    hue:        randInt(-15, 15),        // teinte ±15° (décalage colorimétrique varié)
+    noise:      randInt(5, 14),          // grain/pixels
+    sharpen:    randFloat(0, 0.6, 2),    // netteté subtile
+    zoomPct:    randInt(3, 9),           // zoom/recadrage
+    panX:       randInt(-25, 25),        // recadrage horizontal (% de la marge)
+    panY:       randInt(-25, 25),        // recadrage vertical
+    // Vitesse x1.0 → x1.3 : casse fort l'empreinte audio+vidéo côté IG (le point
+    // le plus efficace ; les métadonnées seules ne trompent pas la détection IG).
+    speed:      randFloat(1.0, 1.3),
     vignette:   Math.random() < 0.35,
     flipH:      false,                   // JAMAIS — le miroir casse le texte
   })
