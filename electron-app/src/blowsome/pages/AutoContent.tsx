@@ -156,6 +156,18 @@ export function BlowAutoContent({ user }: { user: User }) {
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
     const styleLines = style.split('\n').map(s => s.trim()).filter(Boolean)
 
+    // Nettoyage d'une phrase (partagé caption + variantes anti-doublon).
+    const cleanCap = (raw: string): string => raw
+      .replace(/#[^\s#]+/g, '')
+      .replace(/["«»]/g, '')
+      .replace(/\p{Extended_Pictographic}/gu, '')
+      .replace(/\bh+m+\b/gi, '')
+      .split(/[\n]/)[0].replace(/\s+/g, ' ').trim()
+      .replace(/^['’"]+|['’"]+$/g, '').trim()
+    // Unicité du lot : on ne réutilise JAMAIS deux fois la même phrase.
+    const usedCaptions = new Set<string>()
+    const normCap = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+
     setRunning(true)
     setJobs(Array.from({ length: count }, (_, i) => ({ i, status: 'queued' as JobStatus })))
 
@@ -204,8 +216,9 @@ export function BlowAutoContent({ user }: { user: User }) {
         const haveExamples = styleLines.length > 0
         const baseLine = haveExamples ? styleLines[i % styleLines.length] : ''  // rotation
         const roll = Math.random()
+        // ~15 % verbatim · ~60 % variante légère · ~25 % hook frais réactif à la vidéo.
         const strategy: 'verbatim' | 'variation' | 'fresh' =
-          !haveExamples ? 'fresh' : roll < 0.40 ? 'verbatim' : roll < 0.75 ? 'variation' : 'fresh'
+          !haveExamples ? 'fresh' : roll < 0.15 ? 'verbatim' : roll < 0.75 ? 'variation' : 'fresh'
 
         if (strategy === 'verbatim') {
           caption = baseLine
@@ -246,15 +259,32 @@ export function BlowAutoContent({ user }: { user: User }) {
         }
         if (!caption) caption = styleLines[Math.floor(Math.random() * styleLines.length)] ?? src.title
 
-        // Nettoyage SANS charcuter la phrase (on garde la 1re ligne ENTIÈRE pour ne
-        // pas couper au milieu et produire un hook qui ne veut rien dire).
-        caption = caption
-          .replace(/#[^\s#]+/g, '')                    // hashtags
-          .replace(/["«»]/g, '')                        // guillemets (mais on GARDE les apostrophes : qu'elle, j'ai…)
-          .replace(/\p{Extended_Pictographic}/gu, '')   // emoji
-          .replace(/\bh+m+\b/gi, '')                    // « hmm », « hmmm »
-          .split(/[\n]/)[0].replace(/\s+/g, ' ').trim()
-          .replace(/^['’"]+|['’"]+$/g, '').trim()        // enlève une apostrophe/quote seulement en tout début/fin
+        // Nettoyage SANS charcuter la phrase (on garde la 1re ligne ENTIÈRE).
+        caption = cleanCap(caption)
+
+        // Anti-doublon : si cette phrase est déjà sortie dans le lot, on en régénère
+        // une variante (IA) — ou on pioche un autre exemple — jusqu'à obtenir une
+        // phrase INÉDITE. Jamais deux vidéos avec exactement le même texte.
+        let dedupGuard = 0
+        while (caption && usedCaptions.has(normCap(caption)) && dedupGuard < 5) {
+          dedupGuard++
+          let alt = ''
+          if (haveExamples && conns.anthropic && window.electronAPI?.anthropicVisionRequest) {
+            try {
+              const vprompt = buildVariationPrompt(baseLine || caption, styleLines, tr)
+              const vRes = await window.electronAPI.anthropicVisionRequest({ apiKey: conns.anthropic, model: 'claude-haiku-4-5-20251001', maxTokens: 100, messages: [{ role: 'user', content: [{ type: 'text', text: vprompt }] }] })
+              if (vRes?.ok) {
+                const data = vRes.data as { content?: Array<{ type: string; text?: string }> }
+                alt = (data?.content?.find(b => b.type === 'text')?.text ?? '').trim()
+              }
+            } catch { /* ignore → tentative suivante */ }
+          } else if (haveExamples) {
+            alt = styleLines[(i + dedupGuard) % styleLines.length]   // pas d'IA : autre exemple
+          }
+          if (!alt) break
+          caption = cleanCap(alt)
+        }
+        if (caption) usedCaptions.add(normCap(caption))
 
         // 3b) Incruste la caption SUR la vidéo (hook POV à l'écran). Bloquant si activé :
         // en cas d'échec on remonte l'erreur au lieu de sauver une vidéo sans texte.
