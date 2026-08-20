@@ -98,7 +98,9 @@ async function buildCaptionOverlay(caption, fontSize, fontColor, fontPath, famil
   const outline = await renderTextLayer(caption, family, fontPath, fontSize, outlineColor)
 
   const W = fill.info.width, H = fill.info.height
-  const OFF = Math.max(2, Math.round(fontSize * 0.07))
+  // Contour plus FIN (style « caption propre » type CapCut/TikTok) — l'ancien
+  // 0.07 faisait un liseré noir épais qui ne collait pas au rendu habituel.
+  const OFF = Math.max(1, Math.round(fontSize * 0.045))
   const canvasW = W + OFF * 2, canvasH = H + OFF * 2
 
   const offsets = [
@@ -124,7 +126,7 @@ function buildAssFile(caption, fontSize, fontColor, position, custom) {
   const alignMap    = { top: 8, center: 5, middle: 5, bottom: 2 }
   // Placement libre : alignement centré + override \pos(x,y) en pixels (PlayRes 1080×1920).
   const alignment   = custom ? 5 : (alignMap[position] ?? 2)
-  const marginV     = position === 'top' ? 120 : position === 'center' || position === 'middle' ? 0 : 220
+  const marginV     = position === 'top' ? 150 : position === 'center' || position === 'middle' ? 0 : 300
   const posTag      = custom ? `{\\pos(${Math.round(custom.x * 1080)},${Math.round(custom.y * 1920)})}` : ''
   const safeCaption = posTag + String(caption).replace(/[\r\n]+/g, '\\N')
 
@@ -135,7 +137,7 @@ function buildAssFile(caption, fontSize, fontColor, position, custom) {
     'Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, ' +
     'Alignment, MarginL, MarginR, MarginV, Encoding\n' +
     `Style: Default,Arial,${fontSize},${assColor},&H000000FF,${outColor},&H80000000,` +
-    `-1,0,0,0,100,100,0,0,1,3,1,${alignment},60,60,${marginV},1\n\n` +
+    `-1,0,0,0,100,100,0,0,1,2,1,${alignment},60,60,${marginV},1\n\n` +
     '[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n' +
     `Dialogue: 0,0:00:00.00,9:59:59.00,Default,,0,0,0,,${safeCaption}\n`
   )
@@ -412,11 +414,15 @@ module.exports = async (req, res) => {
       const ox = isCustom
         ? clampI(Math.round(Number(posX) * VW - ovW / 2), 0, VW - ovW)
         : Math.round((VW - ovW) / 2)
+      // Petit jitter vertical (±35 px) → la hauteur varie « un peu mais très peu »
+      // d'une vidéo à l'autre (jamais pixel-identique, reste au même endroit).
+      const jitterY = Math.round((Math.random() - 0.5) * 70)
       const oy = isCustom
         ? clampI(Math.round(Number(posY) * VH - ovH / 2), 0, VH - ovH)
-        : position === 'top' ? 120
-        : (position === 'center' || position === 'middle') ? Math.round((VH - ovH) / 2)
-        : VH - ovH - 130
+        : position === 'top' ? 150 + jitterY
+        : (position === 'center' || position === 'middle') ? Math.round((VH - ovH) / 2) + jitterY
+        // Bas REMONTÉ (~82 % de la hauteur, pas collé au bord) — cf. 3e capture.
+        : clampI(VH - ovH - 300 + jitterY, 60, VH - ovH - 60)
 
       // 0 = vidéo, 1 = overlay png, (2 = audio mp3 si présent)
       const inputs = ['-i', inputPath, '-i', overlayPath]
