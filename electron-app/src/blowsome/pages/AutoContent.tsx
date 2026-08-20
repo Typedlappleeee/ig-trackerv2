@@ -193,12 +193,37 @@ export function BlowAutoContent({ user }: { user: User }) {
           } catch { /* transcription optionnelle */ }
         }
 
-        // 3) Caption IA — frames SI dispo + transcript + style. On n'évoque les
-        // images dans le prompt QUE si on en a (sinon l'IA répond « je ne vois pas »).
+        // 3) Caption — « un peu des deux », en PRIORISANT tes phrases :
+        //   ~40 % → ta phrase EXACTE (verbatim)
+        //   ~35 % → variante minime de ta phrase (ajoute/enlève/change 1-2 mots)
+        //   ~25 % → hook frais réactif à la vidéo, dans ton ton
+        // (si aucun exemple fourni → toujours un hook frais réactif à la vidéo).
         setJob(i, { status: 'caption' })
         let caption = ''
         let gotFrames = 0
-        if (conns.anthropic && window.electronAPI?.anthropicVisionRequest) {
+        const haveExamples = styleLines.length > 0
+        const baseLine = haveExamples ? styleLines[i % styleLines.length] : ''  // rotation
+        const roll = Math.random()
+        const strategy: 'verbatim' | 'variation' | 'fresh' =
+          !haveExamples ? 'fresh' : roll < 0.40 ? 'verbatim' : roll < 0.75 ? 'variation' : 'fresh'
+
+        if (strategy === 'verbatim') {
+          caption = baseLine
+        } else if (strategy === 'variation') {
+          caption = baseLine  // repli si l'IA n'est pas dispo / échoue
+          if (conns.anthropic && window.electronAPI?.anthropicVisionRequest) {
+            try {
+              const prompt = buildVariationPrompt(baseLine, styleLines, tr)
+              const vRes = await window.electronAPI.anthropicVisionRequest({ apiKey: conns.anthropic, model: 'claude-haiku-4-5-20251001', maxTokens: 100, messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }] })
+              if (vRes?.ok) {
+                const data = vRes.data as { content?: Array<{ type: string; text?: string }> }
+                const t = (data?.content?.find(b => b.type === 'text')?.text ?? '').trim().replace(/^["'«»\s]+|["'«»\s]+$/g, '')
+                if (t) caption = t
+              }
+            } catch { /* variation best-effort → verbatim */ }
+          }
+        } else if (conns.anthropic && window.electronAPI?.anthropicVisionRequest) {
+          // Hook frais réactif à la vidéo, dans ton ton (buildCaptionPrompt imite tes exemples).
           try {
             let images: Array<{ type: 'image'; source: { type: 'base64'; media_type: 'image/jpeg'; data: string } }> = []
             if (window.electronAPI.extractFrames) {
@@ -207,8 +232,6 @@ export function BlowAutoContent({ user }: { user: User }) {
               images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
             }
             gotFrames = images.length
-            // Toujours « POV : ta coloc … » ; angle de réaction tiré au sort → évite les
-            // formulations répétées (chaque hook est un appel indépendant, sinon ça converge).
             const ANGLES = ['la surprise', 'l\'agacement léger', 'l\'amusement', 'la gêne', 'le défi / la provoc', 'la résignation', 'l\'incrédulité', 'l\'admiration à contrecœur', 'le « j\'y crois pas »', 'la lassitude', 'la jalousie taquine', 'le fatalisme']
             const angle = ANGLES[Math.floor(Math.random() * ANGLES.length)]
             const prompt = buildCaptionPrompt(styleLines, transcript, images.length > 0, spice, false, angle, tr)
@@ -217,7 +240,6 @@ export function BlowAutoContent({ user }: { user: User }) {
             if (vRes?.ok) {
               const data = vRes.data as { content?: Array<{ type: string; text?: string }> }
               const t = (data?.content?.find(b => b.type === 'text')?.text ?? '').trim().replace(/^["'«»\s]+|["'«»\s]+$/g, '')
-              // Rejette les réponses « méta » (refus faute d'images/contexte).
               if (t && !/ne vois pas|n'ai pas accès|pas d'accès|peux-tu (partager|me décrire|m'envoyer)|don'?t see|no access|can you (share|describe)|unable to (see|access)|share the (video|image)/i.test(t)) caption = t
             }
           } catch { /* caption best-effort */ }
@@ -522,6 +544,21 @@ export function BlowAutoContent({ user }: { user: User }) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+// Variante MINIME d'une phrase de l'utilisateur : on garde le sens et le ton, on
+// change/ajoute/enlève seulement 1 ou 2 mots. Reste très proche de l'original.
+function buildVariationPrompt(baseLine: string, styleLines: string[], tr: (fr: string, en: string) => string): string {
+  const examples = styleLines.slice(0, 8).map(l => `- ${l}`).join('\n')
+  return [
+    tr('Voici une phrase que j\'utilise comme texte sur mes vidéos :', 'Here is a line I use as on-screen text on my videos:'),
+    `« ${baseLine} »`,
+    tr('Réécris-la en une VARIANTE TRÈS PROCHE : garde le MÊME sens, le MÊME ton et presque les mêmes mots. Change / ajoute / enlève SEULEMENT 1 ou 2 mots (synonyme, petite reformulation). NE change PAS le sujet ni le format. Elle doit rester reconnaissable comme la même phrase.',
+       'Rewrite it as a VERY CLOSE VARIANT: keep the SAME meaning, SAME tone and almost the same words. Change / add / remove ONLY 1 or 2 words (synonym, slight rephrasing). Do NOT change the subject or the format. It must stay recognizable as the same line.'),
+    tr('Reste dans le style de mes phrases :', 'Stay in the style of my lines:'),
+    examples,
+    tr('Réponds UNIQUEMENT par la phrase, sans guillemets, sans emoji, sans hashtag.', 'Reply with ONLY the line, no quotes, no emoji, no hashtag.'),
+  ].filter(Boolean).join('\n\n')
+}
+
 function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', hasSpeech: boolean, angle: string, tr: (fr: string, en: string) => string): string {
   const examples = styleLines.length ? styleLines.map(l => `- ${l}`).join('\n') : tr('(aucun exemple fourni)', '(no example provided)')
   const spiceLine = spice === 'medium'
