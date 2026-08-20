@@ -23,8 +23,9 @@ interface Recipe {
   burnText?: boolean     // écrire la caption sur la vidéo
   textPos?: 'top' | 'middle' | 'bottom'
   spice?: 'soft' | 'medium'   // intensité du sous-entendu (contenu suggestif)
+  spoof?: boolean        // rendre chaque variante « 100% neuve » (anti-détection IG)
 }
-type JobStatus = 'queued' | 'clip' | 'reframe' | 'transcribe' | 'caption' | 'overlay' | 'saving' | 'done' | 'error'
+type JobStatus = 'queued' | 'clip' | 'reframe' | 'transcribe' | 'caption' | 'overlay' | 'spoof' | 'saving' | 'done' | 'error'
 interface GenJob { i: number; status: JobStatus; sourceTitle?: string; caption?: string; error?: string; noCtx?: boolean }
 
 const RECIPES_KEY = 'sf-blow-autocontent-recipes'
@@ -35,7 +36,7 @@ const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).sli
 const STATUS_LABEL: Record<JobStatus, [string, string]> = {
   queued: ['En attente', 'Queued'], clip: ['Choix du clip', 'Picking clip'],
   reframe: ['Recadrage 9:16', 'Reframing 9:16'], transcribe: ['Transcription', 'Transcribing'],
-  caption: ['Caption IA', 'AI caption'], overlay: ['Texte sur la vidéo', 'Text on video'], saving: ['Envoi banque', 'Saving to bank'],
+  caption: ['Caption IA', 'AI caption'], overlay: ['Texte sur la vidéo', 'Text on video'], spoof: ['Rendre unique', 'Making unique'], saving: ['Envoi banque', 'Saving to bank'],
   done: ['Prêt', 'Ready'], error: ['Erreur', 'Error'],
 }
 
@@ -63,6 +64,7 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [burnText, setBurnText] = useState(true)
   const [textPos, setTextPos] = useState<'top' | 'middle' | 'bottom'>('bottom')
   const [spice, setSpice] = useState<'soft' | 'medium'>('soft')
+  const [spoof, setSpoof] = useState(true)   // « 100% neuve » : transforme + casse la signature
 
   const [jobs, setJobs] = useState<GenJob[]>([])
   const [running, setRunning] = useState(false)
@@ -89,14 +91,14 @@ export function BlowAutoContent({ user }: { user: User }) {
   const allTags = useMemo(() => Array.from(new Set(items.flatMap(i => i.tags ?? []).filter(Boolean))).sort(), [items])
   const poolFor = (t: string) => items.filter(i => (i.tags ?? []).includes(t))
 
-  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setBurnText(true); setTextPos('bottom'); setSpice('soft') }
+  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setBurnText(true); setTextPos('bottom'); setSpice('soft'); setSpoof(true) }
   function loadRecipe(r: Recipe) {
     setEditingId(r.id); setName(r.name); setTag(r.tag); setCount(r.count); setStyle(r.style)
-    setUseTranscript(r.useTranscript); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'bottom'); setSpice(r.spice ?? 'soft')
+    setUseTranscript(r.useTranscript); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'bottom'); setSpice(r.spice ?? 'soft'); setSpoof(r.spoof ?? true)
   }
   function persistRecipe() {
     if (!name.trim() || !tag) return
-    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, burnText, textPos, spice }
+    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, burnText, textPos, spice, spoof }
     const next = editingId ? recipes.map(x => x.id === editingId ? r : x) : [...recipes, r]
     setRecipes(next); saveRecipes(next); setEditingId(r.id)
   }
@@ -129,6 +131,19 @@ export function BlowAutoContent({ user }: { user: User }) {
   }
 
   // ── Génération ─────────────────────────────────────────────────────────────
+  // Réglages aléatoires PAR vidéo pour le spoof (mêmes leviers que l'onglet Spoof) :
+  // vitesse x1→1.3, teinte, grain, zoom… → casse l'empreinte audio+visuelle côté IG.
+  // Pas de miroir ici (le texte incrusté serait inversé).
+  const randI = (a: number, b: number) => Math.floor(Math.random() * (b - a + 1)) + a
+  const randF = (a: number, b: number, d = 3) => +(Math.random() * (b - a) + a).toFixed(d)
+  const randomAdjustments = () => ({
+    brightness: randI(-12, 12), saturation: randI(-15, 15), contrast: randI(-12, 12),
+    gamma: randF(0.90, 1.10), hue: randI(-15, 15), noise: randI(5, 14),
+    sharpen: randF(0, 0.6, 2), zoomPct: randI(3, 9), panX: randI(-25, 25), panY: randI(-25, 25),
+    speed: randF(1.0, 1.3), vignette: Math.random() < 0.35, flipH: false,
+  })
+  const randDate30 = () => new Date(Date.now() - randI(0, 30) * 86400000).toISOString().slice(0, 10)
+
   async function generate() {
     if (running) return
     const srcList: Array<{ title: string; item?: ContentItem; file?: File }> =
@@ -149,8 +164,9 @@ export function BlowAutoContent({ user }: { user: User }) {
       try {
         setJob(i, { status: 'clip', sourceTitle: src.title })
         const { nativePath, url } = await resolveSource(src)
-        // PAS de spoof : on travaille directement sur la vidéo ORIGINALE (couleurs
-        // intactes). L'unicité vient des clips différents + du hook incrusté.
+        // Overlay + caption sur la vidéo ORIGINALE (couleurs intactes pour l'IA/frames).
+        // Le spoof (transforms + métadonnées) est appliqué APRÈS, à l'étape 4b, pour
+        // que chaque variante soit « 100% neuve » côté IG.
         // desktop → chemin local ; web → URL (signée pour la banque, blob pour un upload).
         const mediaRef = (hasNative && nativePath) ? nativePath : url
         if (!mediaRef) throw new Error(tr('Source introuvable', 'Source not found'))
@@ -232,8 +248,32 @@ export function BlowAutoContent({ user }: { user: User }) {
         // 4) Envoi en banque : ré-upload dans l'emplacement permanent (vignette + accès OK)
         setJob(i, { status: 'saving', caption })
         const up = await uploadVideoFromPath(finalRef, scope)
-        const storagePath = up.storagePath
+        let storagePath = up.storagePath
         const thumbnailPath = up.thumbnailPath
+
+        // 4b) Spoof « 100% neuve » : transforme (vitesse/teinte/grain/zoom) + nouvelles
+        // métadonnées (appareil/GPS/date) + ré-encodage → casse l'empreinte IG. On
+        // spoofe le fichier DÉJÀ uploadé (URL signée) et on garde la miniature d'origine
+        // (même visuel). Best-effort : si le spoof échoue on garde la version overlay.
+        if (spoof) {
+          setJob(i, { status: 'spoof', caption })
+          try {
+            const sUrl = await getSignedUrl(storagePath)
+            const { data: { session } } = await supabase.auth.getSession()
+            const rr = await fetch('/api/repurpose', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                mode: 'spoof', sourceUrl: sUrl, userId: user.id,
+                preset: 'random', gpsCity: 'random',
+                customDate: randDate30().replace(/-/g, ':'),
+                adjustments: randomAdjustments(),
+                supabaseToken: session?.access_token, supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+              }),
+            }).then(r => r.json()).catch(() => ({ ok: false }))
+            if (rr?.ok && rr.storagePath) storagePath = rr.storagePath
+          } catch { /* spoof best-effort : on garde le fichier overlay */ }
+        }
+
         const baseTag = sourceMode === 'bank' ? tag : (name.trim() || 'autocontent')
         const title = `${src.title || baseTag} · auto ${i + 1}`
         const { error } = await supabase.from('content_bank').insert({
@@ -372,6 +412,15 @@ export function BlowAutoContent({ user }: { user: User }) {
               ))}
             </div>
           )}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', marginBottom: 12 }}>
+            <input type="checkbox" checked={spoof} onChange={e => setSpoof(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16, marginTop: 2 }} />
+            <span style={{ fontSize: 13, color: INK }}>
+              {tr('🛡 Rendre chaque variante « 100% neuve » (anti-détection IG)', '🛡 Make each variant “100% new” (IG anti-detection)')}
+              <span style={{ display: 'block', fontSize: 11, color: MUTED, marginTop: 2 }}>
+                {tr('Vitesse x1→1.3, teinte, grain, zoom + nouvelles métadonnées (appareil/GPS/date) + ré-encodage.', 'Speed x1→1.3, hue, grain, zoom + fresh metadata (device/GPS/date) + re-encode.')}
+              </span>
+            </span>
+          </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Sous-entendu', 'Innuendo')}</span>
             {(['soft', 'medium'] as const).map(v => (
