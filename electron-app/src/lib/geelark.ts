@@ -1917,6 +1917,21 @@ async function runWarmupActions(
   let likeCount = 0
   let followCount = 0
 
+  // ── Décisions aléatoires PROPRES À CE TÉLÉPHONE ────────────────────────────
+  // Chaque téléphone tire SES seuils au démarrage → deux téléphones ne font
+  // jamais la même chose au même moment (scroll/like/abonnement décorrélés).
+  //   • like            4–12 % des vidéos
+  //   • regard complet  ~11 % (on reste jusqu'au bout)
+  //   • zapping direct  22–31 % (on passe tout de suite à la suivante)
+  //   • abonnement      1–3 % des comptes vus
+  const rnd = (min: number, max: number) => min + Math.random() * (max - min)
+  const pLike       = config.likePosts       ? rnd(0.04, 0.12) : 0
+  const pFollow     = config.followSuggested ? rnd(0.01, 0.03) : 0
+  const pWatchFull  = 0.11
+  const pScrollFast = rnd(0.22, 0.31)
+  const followCap   = Math.max(1, Math.round(rnd(1, 3)))   // borne d'abonnements (1–3)
+  log(`🎲 Profil ${phoneId.slice(-4)} : like ${(pLike * 100).toFixed(0)}% · regard complet ${(pWatchFull * 100).toFixed(0)}% · zap ${(pScrollFast * 100).toFixed(0)}% · abo ${(pFollow * 100).toFixed(0)}%`)
+
   // Résolution RÉELLE → coordonnées proportionnelles. Sans ça, les swipes en dur
   // (540/1400…) tombent hors écran sur d'autres résolutions → aucun défilement
   // (le warmup reste bloqué sur le même reel/post pendant toute la durée).
@@ -2021,17 +2036,21 @@ async function runWarmupActions(
 
   while (Date.now() < endTime && !abortSignal.abort) {
    try {
-    // Scroll the feed (coords proportionnelles à l'écran réel)
-    const swipeY1 = Math.floor(sh * 0.72 + Math.random() * sh * 0.06)
-    const swipeY2 = Math.floor(sh * 0.22 + Math.random() * sh * 0.06)
-    const swipeDuration = 500 + Math.floor(Math.random() * 350)
-    await shellExec(bearer, phoneId, `input swipe ${cx} ${swipeY1} ${cx} ${swipeY2} ${swipeDuration}`)
-    await sleep(1500 + Math.floor(Math.random() * 2000))
+    // ── Temps passé sur CETTE vidéo (décidé par tirage) ──────────────────────
+    //   zapping direct  → on reste à peine (on scrolle presque tout de suite)
+    //   regard complet  → on reste longtemps (comme si on regardait jusqu'au bout)
+    //   sinon           → regard partiel « normal »
+    const roll = Math.random()
+    let dwellMs: number
+    if (roll < pScrollFast)                    dwellMs = 400 + Math.floor(Math.random() * 900)     // zap direct
+    else if (roll < pScrollFast + pWatchFull)  dwellMs = 8000 + Math.floor(Math.random() * 9000)   // jusqu'au bout
+    else                                       dwellMs = 2000 + Math.floor(Math.random() * 3500)   // partiel
+    await sleep(dwellMs)
 
     if (abortSignal.abort) break
 
-    // Randomly like posts
-    if (config.likePosts && Math.random() < 0.35) {
+    // Randomly like posts (probabilité propre au téléphone : 4–12 %)
+    if (pLike > 0 && Math.random() < pLike) {
       const xml = await dumpXml(bearer, phoneId)
       // Une popup peut être apparue en plein scroll — l'éjecter d'abord
       if (await dismissPopups(xml)) continue
@@ -2053,20 +2072,30 @@ async function runWarmupActions(
       await sleep(800 + Math.floor(Math.random() * 500))
     }
 
-    // Randomly follow suggested accounts
-    if (config.followSuggested && Math.random() < 0.1 && followCount < 3) {
+    // Randomly follow suggested accounts (probabilité propre au téléphone : 1–3 %)
+    if (pFollow > 0 && Math.random() < pFollow && followCount < followCap) {
       const xml = await dumpXml(bearer, phoneId)
       const followBtn = findByText(xml, 'Follow', 'Suivre', 'S\'abonner')
       if (followBtn) {
         await shellExec(bearer, phoneId, `input tap ${followBtn[0]} ${followBtn[1]}`)
         followCount++
-        log(`➕ Follow (${followCount})`)
+        log(`➕ Follow (${followCount}/${followCap})`)
         await sleep(1000)
       }
     }
 
+    // Passe à la vidéo suivante (le temps passé sur celle-ci a été géré par le
+    // dwell en début de boucle — zap direct / regard partiel / jusqu'au bout).
+    if (!abortSignal.abort) {
+      const swipeY1 = Math.floor(sh * 0.72 + Math.random() * sh * 0.06)
+      const swipeY2 = Math.floor(sh * 0.22 + Math.random() * sh * 0.06)
+      const swipeDuration = 260 + Math.floor(Math.random() * 340)
+      await shellExec(bearer, phoneId, `input swipe ${cx} ${swipeY1} ${cx} ${swipeY2} ${swipeDuration}`)
+      await sleep(500 + Math.floor(Math.random() * 600))
+    }
+
     // Occasionally watch reels
-    if (config.watchReels && Math.random() < 0.2 && !abortSignal.abort) {
+    if (config.watchReels && Math.random() < 0.12 && !abortSignal.abort) {
       log('🎬 Ouverture des Reels…')
       const xml = await dumpXml(bearer, phoneId)
       const reelsTab = findByText(xml, 'Reels', 'Réels') ??
