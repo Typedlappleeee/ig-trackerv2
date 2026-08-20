@@ -216,9 +216,9 @@ export function BlowAutoContent({ user }: { user: User }) {
         const haveExamples = styleLines.length > 0
         const baseLine = haveExamples ? styleLines[i % styleLines.length] : ''  // rotation
         const roll = Math.random()
-        // ~15 % verbatim · ~60 % variante légère · ~25 % hook frais réactif à la vidéo.
+        // ~15 % verbatim · ~30 % variante légère · ~55 % hook frais réactif à la vidéo.
         const strategy: 'verbatim' | 'variation' | 'fresh' =
-          !haveExamples ? 'fresh' : roll < 0.15 ? 'verbatim' : roll < 0.75 ? 'variation' : 'fresh'
+          !haveExamples ? 'fresh' : roll < 0.15 ? 'verbatim' : roll < 0.45 ? 'variation' : 'fresh'
 
         if (strategy === 'verbatim') {
           caption = baseLine
@@ -574,16 +574,15 @@ export function BlowAutoContent({ user }: { user: User }) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-// Variante d'une phrase de l'utilisateur : on garde le sens, le sujet et le ton,
-// mais on reformule ~30 % de la phrase (environ un tiers des mots) → pas du
-// mot-à-mot, tout en restant clairement la même idée.
+// Variante MINIME d'une phrase de l'utilisateur : on garde le sens et le ton, on
+// change/ajoute/enlève seulement 1 ou 2 mots. Reste très proche de l'original.
 function buildVariationPrompt(baseLine: string, styleLines: string[], tr: (fr: string, en: string) => string): string {
   const examples = styleLines.slice(0, 8).map(l => `- ${l}`).join('\n')
   return [
     tr('Voici une phrase que j\'utilise comme texte sur mes vidéos :', 'Here is a line I use as on-screen text on my videos:'),
     `« ${baseLine} »`,
-    tr('Réécris-la en une VARIANTE : garde le MÊME sens, le MÊME sujet et le MÊME ton, mais reformule environ 30 % de la phrase (à peu près un tiers des mots) — synonymes, petit changement de tournure. Elle doit rester reconnaissable comme la même idée, mais PAS identique au mot près. NE change PAS le sujet ni le format.',
-       'Rewrite it as a VARIANT: keep the SAME meaning, SAME subject and SAME tone, but reword about 30% of the line (roughly a third of the words) — synonyms, slight phrasing change. It must stay recognizable as the same idea, but NOT word-for-word identical. Do NOT change the subject or the format.'),
+    tr('Réécris-la en une VARIANTE TRÈS PROCHE : garde le MÊME sens, le MÊME ton et presque les mêmes mots. Change / ajoute / enlève SEULEMENT 1 ou 2 mots (synonyme, petite reformulation). NE change PAS le sujet ni le format. Elle doit rester reconnaissable comme la même phrase.',
+       'Rewrite it as a VERY CLOSE VARIANT: keep the SAME meaning, SAME tone and almost the same words. Change / add / remove ONLY 1 or 2 words (synonym, slight rephrasing). Do NOT change the subject or the format. It must stay recognizable as the same line.'),
     tr('Reste dans le style de mes phrases :', 'Stay in the style of my lines:'),
     examples,
     tr('Réponds UNIQUEMENT par la phrase, sans guillemets, sans emoji, sans hashtag.', 'Reply with ONLY the line, no quotes, no emoji, no hashtag.'),
