@@ -514,8 +514,8 @@
                       "filterCollection": [
                         [
                           {
-                            "content": "Your story",
-                            "filterType": "equal",
+                            "content": "Your stor",
+                            "filterType": "contain",
                             "type": "text"
                           }
                         ]
@@ -557,8 +557,8 @@
                 "filterCollection": [
                   [
                     {
-                      "content": "Your story",
-                      "filterType": "equal",
+                      "content": "Your stor",
+                      "filterType": "contain",
                       "type": "text"
                     }
                   ]
@@ -583,8 +583,8 @@
                       "filterCollection": [
                         [
                           {
-                            "content": "Your story",
-                            "filterType": "equal",
+                            "content": "Your stor",
+                            "filterType": "contain",
                             "type": "text"
                           }
                         ]
