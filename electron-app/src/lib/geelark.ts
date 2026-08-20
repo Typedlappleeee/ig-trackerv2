@@ -733,6 +733,31 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
   return null
 }
 
+// Cherche l'élément CLIQUABLE dont le centre tombe dans une région (fractions de
+// l'écran 0..1), le plus proche d'un point cible. Sert de repli RÉSOLUTION-PROOF :
+// au lieu de taper une coordonnée fixe (qui rate selon la résolution/UI), on tape
+// le vrai bouton présent dans la zone (ex. « Your story » en bas à gauche).
+function findClickableInRegion(
+  xml: string, sw: number, sh: number,
+  region: { xMin: number; xMax: number; yMin: number; yMax: number },
+  target: { x: number; y: number },
+): [number, number] | null {
+  const re = /<[^>]*\bclickable="true"[^>]*>/g
+  let m: RegExpExecArray | null
+  let best: [number, number] | null = null
+  let bestScore = Infinity
+  while ((m = re.exec(xml)) !== null) {
+    const b = m[0].match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
+    if (!b) continue
+    const cx = (+b[1] + +b[3]) / 2, cy = (+b[2] + +b[4]) / 2
+    const fx = cx / sw, fy = cy / sh
+    if (fx < region.xMin || fx > region.xMax || fy < region.yMin || fy > region.yMax) continue
+    const score = Math.hypot(fx - target.x, fy - target.y)
+    if (score < bestScore) { bestScore = score; best = [Math.round(cx), Math.round(cy)] }
+  }
+  return best
+}
+
 async function dumpXml(bearer: string, phoneId: string): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
   // Sous charge, `uiautomator dump` peut échouer/renvoyer un XML vide ou tronqué
@@ -1883,13 +1908,19 @@ async function _postInstagramStoryInner(
   for (let attempt = 1; attempt <= 3 && !published; attempt++) {
     xml = await dumpXml(bearer, phoneId)
     const sharePt =
-      findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story') ??
+      // « Your stories » (PLURIEL) et « Your story » (singulier) selon la version IG.
+      findByText(xml, 'Your stories', 'Your story', 'Vos stories', 'Votre story', 'Add to story', 'Ajouter à la story') ??
       findByResourceId(xml, 'share_story_button', 'your_story_button', 'send_button', 'share_footer_button') ??
-      findByTextPartial(xml, 'Your story', 'Votre story', 'to story', 'à la story', 'ta story')
+      // Partiel sur « your stor » → matche story ET stories (idem FR « vos stor »).
+      findByTextPartial(xml, 'your stor', 'vos stor', 'votre stor', 'to stor', 'ta stor') ??
+      // Repli RÉSOLUTION-PROOF : le vrai bouton cliquable de la rangée de partage,
+      // en bas à gauche (Your stories). La cible (0.25, 0.87) vise la pastille, pas
+      // la barre de navigation système juste en dessous.
+      findClickableInRegion(xml, sw, sh, { xMin: 0, xMax: 0.46, yMin: 0.72, yMax: 0.95 }, { x: 0.25, y: 0.87 })
     if (sharePt) {
       await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
     } else {
-      // Repli : le bouton « Your story » est en bas à gauche de l'écran de partage.
+      // Dernier recours : coordonnée fixe en bas à gauche.
       await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.2)} ${Math.floor(sh * 0.93)}`)
     }
     await sleep(5500)
@@ -3060,7 +3091,7 @@ const STORY_FLOW_TITLE = (storyFlowDef as { title: string }).title   // « Story
 // Bump à CHAQUE modification du flow JSON. Comme l'update-en-place (import avec `id`)
 // s'est révélé peu fiable, un changement de version → on RÉ-IMPORTE un flow frais
 // (garanti à jour). L'ancien flow devient orphelin (à supprimer 1 fois côté GeeLark).
-const STORY_FLOW_VERSION = '7'   // v7 = drag bas-droite SANS dump (evite le double), swipe long 2s
+const STORY_FLOW_VERSION = '8'   // v8 = publication « Your stor » en CONTAIN (matche « Your story » ET « Your stories »)
 const _storyFlowIdCache = new Map<string, Promise<string | null>>()
 
 // Persistance par compte GeeLark (suffixe du token). On mémorise le flowId EN DUR

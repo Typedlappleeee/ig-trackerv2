@@ -286,6 +286,29 @@ function findByResourceId(xml: string, ...ids: string[]): [number, number] | nul
   return null
 }
 
+// Repli RÉSOLUTION-PROOF : élément CLIQUABLE dans une région (fractions 0..1),
+// le plus proche d'un point cible — au lieu d'une coordonnée fixe qui rate.
+function findClickableInRegion(
+  xml: string, sw: number, sh: number,
+  region: { xMin: number; xMax: number; yMin: number; yMax: number },
+  target: { x: number; y: number },
+): [number, number] | null {
+  const re = /<[^>]*\bclickable="true"[^>]*>/g
+  let m: RegExpExecArray | null
+  let best: [number, number] | null = null
+  let bestScore = Infinity
+  while ((m = re.exec(xml)) !== null) {
+    const b = m[0].match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
+    if (!b) continue
+    const cx = (+b[1] + +b[3]) / 2, cy = (+b[2] + +b[4]) / 2
+    const fx = cx / sw, fy = cy / sh
+    if (fx < region.xMin || fx > region.xMax || fy < region.yMin || fy > region.yMax) continue
+    const score = Math.hypot(fx - target.x, fy - target.y)
+    if (score < bestScore) { bestScore = score; best = [Math.round(cx), Math.round(cy)] }
+  }
+  return best
+}
+
 // Dump uiautomator robuste (cf. client) : cat systématique + réessais → corrige
 // les échecs intermittents de story dus à un dump vide.
 async function dumpXml(bearer: string, phoneId: string, log?: (m: string) => void): Promise<string> {
@@ -876,13 +899,17 @@ export async function postStoryServer(
   for (let attempt = 1; attempt <= 3 && !published; attempt++) {
     xml = await dumpXml(bearer, phoneId)
     const sharePt =
-      findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story') ??
+      // « Your stories » (PLURIEL) et « Your story » (singulier) selon la version IG.
+      findByText(xml, 'Your stories', 'Your story', 'Vos stories', 'Votre story', 'Add to story', 'Ajouter à la story') ??
       findByResourceId(xml, 'share_story_button', 'your_story_button', 'send_button', 'share_footer_button') ??
-      findByTextPartial(xml, 'your story', 'votre story', 'to story', 'à la story')
+      // Partiel sur « your stor » → matche story ET stories.
+      findByTextPartial(xml, 'your stor', 'vos stor', 'votre stor', 'to stor') ??
+      // Repli RÉSOLUTION-PROOF : bouton cliquable de la rangée de partage (bas gauche).
+      findClickableInRegion(xml, sw, sh, { xMin: 0, xMax: 0.46, yMin: 0.72, yMax: 0.95 }, { x: 0.25, y: 0.87 })
     if (sharePt) {
       await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
     } else {
-      // "Your story" button sits bottom-left of the share screen
+      // Dernier recours : coordonnée fixe en bas à gauche.
       await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.2)} ${Math.floor(sh * 0.93)}`)
     }
     await sleep(5500)
