@@ -858,27 +858,43 @@ export async function postStoryServer(
     return { ok: true }
   }
   log('🚀 Publication de la story…')
-  xml = await dumpXml(bearer, phoneId)
-  const sharePt =
-    findByText(xml, 'Your story', 'Votre story', 'Share', 'Partager', 'Add to story', 'Ajouter à la story') ??
-    findByResourceId(xml, 'share_story_button', 'your_story_button', 'send_button')
-  if (sharePt) {
-    await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
-  } else {
-    // "Your story" button sits bottom-left of the share screen
-    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.2)} ${Math.floor(sh * 0.93)}`)
+  // Détecte si on est ENCORE dans l'éditeur (donc pas publié). null = inconclusif.
+  const stillInEditor = async (): Promise<boolean | null> => {
+    try {
+      const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
+      if (!finalXml.trim()) return null
+      return /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text|story_editor|creation_toolbar/.test(finalXml)
+    } catch {
+      return null
+    }
   }
-  await sleep(5000)
 
-  // ── Verify we left the editor (best-effort) ────────────────────────────────
-  // Only check editor-specific elements. "Your story" must NOT be in this list:
-  // after a successful publish IG returns to the home feed, whose story tray
-  // contains "Your story" — matching it produced false "failed" results on
-  // stories that were actually published.
-  const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
-  const stillEditing = /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text/.test(finalXml)
-  if (stillEditing) {
-    log('   ⚠️ L\'éditeur semble encore ouvert — vérifie manuellement.')
+  // Jusqu'à 3 tentatives. RE-TAPER est SÛR : encore dans l'éditeur = pas parti =
+  // aucun risque de double post. Le partiel rattrape le bouton « + Your story »
+  // (content-desc) que findByText exact ratait par moments.
+  let published = false
+  for (let attempt = 1; attempt <= 3 && !published; attempt++) {
+    xml = await dumpXml(bearer, phoneId)
+    const sharePt =
+      findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story') ??
+      findByResourceId(xml, 'share_story_button', 'your_story_button', 'send_button', 'share_footer_button') ??
+      findByTextPartial(xml, 'your story', 'votre story', 'to story', 'à la story')
+    if (sharePt) {
+      await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
+    } else {
+      // "Your story" button sits bottom-left of the share screen
+      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.2)} ${Math.floor(sh * 0.93)}`)
+    }
+    await sleep(5500)
+
+    const editing = await stillInEditor()
+    if (editing === false || editing === null) { published = true; break }
+    if (attempt < 3) log(`   ↻ Toujours dans l'éditeur — nouvelle tentative de partage (${attempt + 1}/3)…`)
+    await sleep(1200)
+  }
+
+  if (!published) {
+    log('   ⚠️ L\'éditeur semble encore ouvert après 3 tentatives — story non publiée.')
     return { ok: false, error: 'Publication non confirmée (UI Instagram a peut-être changé)' }
   }
 
