@@ -1864,40 +1864,47 @@ async function _postInstagramStoryInner(
     return { ok: true }
   }
   log('🚀 Publication de la story…')
-  xml = await dumpXml(bearer, phoneId)
-  const sharePt =
-    findByText(xml, 'Your story', 'Votre story', 'Share', 'Partager', 'Add to story', 'Ajouter à la story') ??
-    findByResourceId(xml, 'share_story_button', 'your_story_button', 'send_button')
-  if (sharePt) {
-    await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
-  } else {
-    // "Your story" button sits bottom-left of the share screen
-    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.2)} ${Math.floor(sh * 0.93)}`)
-  }
-  await sleep(5000)
-
-  // ── Verify we left the editor (best-effort) ────────────────────────────────
-  // Only check editor-specific elements. "Your story" must NOT be in this list:
-  // after a successful publish IG returns to the home feed, whose story tray
-  // contains "Your story" — matching it produced false "failed" results on
-  // stories that were actually published.
-  //
-  // ANTI FAUX-NÉGATIF : on a DÉJÀ tapé « Partager ». On ne compte en échec QUE si
-  // on détecte POSITIVEMENT qu'on est encore dans l'éditeur. Si le dump de
-  // vérification plante (shell « pas prêt » sous charge) ou est inconclusif, on
-  // considère la story comme publiée — sinon des stories réellement postées sont
-  // comptées « échec » (et re-tenter risquerait un double post).
-  let stillEditing = false
-  try {
-    const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
-    if (finalXml.trim()) {
-      stillEditing = /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text/.test(finalXml)
+  // Détecte si on est ENCORE dans l'éditeur de story (donc pas publié).
+  const stillInEditor = async (): Promise<boolean | null> => {
+    try {
+      const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
+      if (!finalXml.trim()) return null   // dump vide → inconclusif
+      return /sticker_button|sticker_tray_button|link_url|url_edit_text|link_edit_text|story_editor|creation_toolbar/.test(finalXml)
+    } catch {
+      return null   // shell occupé → inconclusif
     }
-  } catch {
-    log('   ⚠️ Vérification impossible (shell occupé) — story considérée publiée.')
   }
-  if (stillEditing) {
-    log('   ⚠️ L\'éditeur est encore ouvert — publication non aboutie.')
+
+  // Jusqu'à 3 tentatives de partage. RE-TAPER est SÛR : si on est encore dans
+  // l'éditeur, c'est que la story n'est PAS partie → aucun risque de double post.
+  // Le blind-tap seul ratait par moments (bouton « Your story » en content-desc
+  // « + Your story » non matché par findByText exact → d'où l'ajout du partiel).
+  let published = false
+  for (let attempt = 1; attempt <= 3 && !published; attempt++) {
+    xml = await dumpXml(bearer, phoneId)
+    const sharePt =
+      findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story') ??
+      findByResourceId(xml, 'share_story_button', 'your_story_button', 'send_button', 'share_footer_button') ??
+      findByTextPartial(xml, 'Your story', 'Votre story', 'to story', 'à la story', 'ta story')
+    if (sharePt) {
+      await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
+    } else {
+      // Repli : le bouton « Your story » est en bas à gauche de l'écran de partage.
+      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.2)} ${Math.floor(sh * 0.93)}`)
+    }
+    await sleep(5500)
+
+    // ANTI FAUX-NÉGATIF : on ne compte en échec QUE si on détecte POSITIVEMENT
+    // l'éditeur encore ouvert. Un dump inconclusif (null) après un tap de partage
+    // = on considère publié (ne pas re-taper à l'aveugle une story déjà partie).
+    const editing = await stillInEditor()
+    if (editing === false || editing === null) { published = true; break }
+    if (attempt < 3) log(`   ↻ Toujours dans l'éditeur — nouvelle tentative de partage (${attempt + 1}/3)…`)
+    await sleep(1200)
+  }
+
+  if (!published) {
+    log('   ⚠️ L\'éditeur est encore ouvert après 3 tentatives — story non publiée.')
     return { ok: false, error: 'Éditeur encore ouvert — story non publiée' }
   }
 
