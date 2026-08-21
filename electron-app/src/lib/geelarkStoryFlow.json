@@ -514,11 +514,11 @@
                       "filterCollection": [
                         [
                           {
-                            "content": "Your story",
-                            "filterType": "equal",
+                            "content": "Your stor",
+                            "filterType": "contains",
                             "type": "text"
                           }
-                        ]
+                        ], [ { "content": "Your story", "filterType": "equal", "type": "text" } ]
                       ],
                       "hiddenChildren": false,
                       "randomDistance": 0,
@@ -557,11 +557,11 @@
                 "filterCollection": [
                   [
                     {
-                      "content": "Your story",
-                      "filterType": "equal",
+                      "content": "Your stor",
+                      "filterType": "contains",
                       "type": "text"
                     }
-                  ]
+                  ], [ { "content": "Your story", "filterType": "equal", "type": "text" } ]
                 ],
                 "hiddenChildren": false,
                 "searchTime": 3000,
@@ -583,11 +583,11 @@
                       "filterCollection": [
                         [
                           {
-                            "content": "Your story",
-                            "filterType": "equal",
+                            "content": "Your stor",
+                            "filterType": "contains",
                             "type": "text"
                           }
-                        ]
+                        ], [ { "content": "Your story", "filterType": "equal", "type": "text" } ]
                       ],
                       "hiddenChildren": false,
                       "randomDistance": 0,
