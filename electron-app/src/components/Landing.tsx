@@ -1621,25 +1621,33 @@ export function Landing() {
             </div>
           </FadeIn>
           <FadeIn delay={0.1}>
-            <div style={{ borderTop: `1px solid ${HAIR}` }}>
-              {QA.map((item, i) => (
-                <div key={i} style={{ borderBottom: `1px solid ${HAIR}` }}>
-                  <button onClick={() => setFaqOpen(faqOpen === i ? null : i)}
-                    aria-expanded={faqOpen === i}
-                    style={{ width: '100%', padding: '26px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 16 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 18 }}>
-                      <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 14, color: faqOpen === i ? GOLD : FAINT, transition: 'color 0.25s', flexShrink: 0 }}>0{i + 1}</span>
-                      <span style={{ fontFamily: SANS, fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.01em', color: IVORY }}>{tr(item.q, item.qEn)}</span>
+            <div>
+              {QA.map((item, i) => {
+                const open = faqOpen === i
+                return (
+                <div key={i} style={{
+                  marginBottom: 10, borderRadius: 14, overflow: 'hidden',
+                  background: open ? 'linear-gradient(160deg, rgba(129,140,248,0.10), rgba(255,255,255,0.02))' : 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${open ? 'rgba(129,140,248,0.4)' : HAIR}`,
+                  transition: 'background 0.25s, border-color 0.25s',
+                }}>
+                  <button onClick={() => setFaqOpen(open ? null : i)}
+                    aria-expanded={open}
+                    style={{ width: '100%', padding: '22px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 16 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 16 }}>
+                      <span style={{ fontFamily: DISPLAY, fontSize: 13, fontWeight: 700, color: open ? '#A5B4FC' : FAINT, transition: 'color 0.25s', flexShrink: 0 }}>0{i + 1}</span>
+                      <span style={{ fontFamily: SANS, fontSize: 15.5, fontWeight: 700, letterSpacing: '-0.01em', color: IVORY }}>{tr(item.q, item.qEn)}</span>
                     </span>
-                    <span aria-hidden style={{ color: faqOpen === i ? GOLD : FAINT, fontSize: 22, lineHeight: 1, flexShrink: 0, transition: 'transform 0.3s, color 0.3s', display: 'inline-block', transform: faqOpen === i ? 'rotate(45deg)' : 'none', fontWeight: 300 }}>+</span>
+                    <span aria-hidden style={{ color: open ? '#A5B4FC' : FAINT, fontSize: 22, lineHeight: 1, flexShrink: 0, transition: 'transform 0.3s, color 0.3s', display: 'inline-block', transform: open ? 'rotate(45deg)' : 'none', fontWeight: 300 }}>+</span>
                   </button>
-                  {faqOpen === i && (
-                    <div style={{ padding: '0 8px 28px 50px', fontFamily: SANS, fontSize: 13.5, color: MUTED, lineHeight: 1.85, animation: 'sf-fade-up 0.3s ease both' }}>
+                  {open && (
+                    <div style={{ padding: '0 20px 24px 51px', fontFamily: SANS, fontSize: 13.5, color: MUTED, lineHeight: 1.8, animation: 'sf-fade-up 0.3s ease both' }}>
                       {tr(item.a, item.aEn)}
                     </div>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           </FadeIn>
         </div>
