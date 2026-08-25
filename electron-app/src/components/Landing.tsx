@@ -199,11 +199,30 @@ function FadeIn({ children, delay = 0, style = {} }: { children: React.ReactNode
 }
 
 // ── Wordmark ──────────────────────────────────────────────────────────────────
+// Nouveau logo : tuile violette + 2 barres blanches inclinées en sens opposés.
+function LogoMark({ size = 32 }: { size?: number }) {
+  const w = Math.round(size * 0.44)
+  const h = Math.max(2, Math.round(size * 0.095))
+  return (
+    <span aria-hidden="true" style={{
+      width: size, height: size, flexShrink: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: Math.max(2, Math.round(size * 0.1)), borderRadius: Math.round(size * 0.25),
+      background: 'linear-gradient(145deg,#A855F7,#7C3AED)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+    }}>
+      <span style={{ width: w, height: h, borderRadius: 99, background: '#fff', transform: 'skewX(-14deg)' }} />
+      <span style={{ width: w, height: h, borderRadius: 99, background: '#fff', transform: 'skewX(14deg)' }} />
+    </span>
+  )
+}
+
 function Wordmark({ size = 17, onClick }: { size?: number; onClick?: () => void }) {
   const inner = (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', whiteSpace: 'nowrap' }}>
-      <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: size, letterSpacing: '-0.02em', color: IVORY }}>SCALE</span>
-      <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: size * 1.12, color: GOLD, marginLeft: 1 }}>Flow</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: Math.round(size * 0.5), whiteSpace: 'nowrap' }}>
+      <LogoMark size={Math.round(size * 1.7)} />
+      <span style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: size, letterSpacing: '-0.03em' }}>
+        <span style={{ color: IVORY }}>scale</span><span style={{ color: '#A855F7' }}>flow</span>
+      </span>
     </span>
   )
   if (!onClick) return inner
@@ -1632,12 +1651,49 @@ function SiteHowItWorks() {
 }
 
 // ── Témoignages — au nom d'agences (maquette) ────────────────────────────────
+// Lecteur de message vocal maison (forme d'onde qui se remplit à la lecture).
+function VoiceNote() {
+  const tr = useTr()
+  const audio = useRef<HTMLAudioElement>(null)
+  const [playing, setPlaying] = useState(false)
+  const [pct, setPct] = useState(0)
+  const [time, setTime] = useState('0:00')
+  const fmt = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`
+  const toggle = () => { const a = audio.current; if (!a) return; if (a.paused) a.play().then(() => setPlaying(true)).catch(() => {}); else { a.pause(); setPlaying(false) } }
+  return (
+    <figure style={{ gridColumn: '1 / -1', margin: 0, display: 'flex', alignItems: 'center', gap: 18, padding: 20, borderRadius: 20, border: '1px solid rgba(52,211,153,0.28)', background: 'linear-gradient(120deg, rgba(52,211,153,0.09), rgba(255,255,255,0.03))' }}>
+      <button type="button" onClick={toggle} aria-label={playing ? tr('Pause', 'Pause') : tr('Écouter', 'Play')}
+        style={{ width: 52, height: 52, flexShrink: 0, borderRadius: '50%', border: 'none', cursor: 'pointer', color: '#04140C', fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#34D399,#10B981)', boxShadow: '0 0 30px -8px rgba(52,211,153,0.8)' }}>
+        {playing ? '❚❚' : '▶'}
+      </button>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 2.5, height: 30 }}>
+          {Array.from({ length: 56 }, (_, i) => { const seed = Math.abs(Math.sin(i * 2.7) * Math.cos(i * 0.9)); return (
+            <span key={i} style={{ flex: 1, borderRadius: 99, height: `${22 + seed * 68}%`, background: i / 56 <= pct ? '#34D399' : 'rgba(255,255,255,0.16)', transition: 'background 0.15s' }} />
+          )})}
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: SANS, fontSize: 11.5, fontWeight: 700, color: MUTED }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: 'rgba(226,222,255,0.88)' }}>{tr('Message vocal d\'un client', 'A client\'s voice note')}</span>
+          <span style={{ fontFamily: 'monospace' }}>{time}</span>
+          <span style={{ marginLeft: 'auto' }}>Telegram</span>
+        </span>
+      </span>
+      <audio ref={audio} src="/avis/avis-vocal.ogg" preload="metadata" style={{ display: 'none' }}
+        onTimeUpdate={e => { const a = e.currentTarget; if (!a.duration || !isFinite(a.duration)) return; setPct(a.currentTime / a.duration); setTime(`${fmt(a.currentTime)} / ${fmt(a.duration)}`) }}
+        onEnded={() => { setPlaying(false); setPct(0); setTime('0:00') }} />
+    </figure>
+  )
+}
+
+// Avis clients — captures Telegram brutes + message vocal (v3).
 function SiteTestimonials() {
   const tr = useTr()
-  const T = [
-    { stat: '+340%', statL: tr('de reach en 2 mois', 'reach in 2 months'), grad: 'linear-gradient(90deg,#22D3EE,#818CF8)', quote: tr('Avant ScaleFlow on copiait-collait des reels téléphone par téléphone. Maintenant on programme 120 comptes le lundi matin et c\'est plié pour la semaine.', 'Before ScaleFlow we copy-pasted reels phone by phone. Now we schedule 120 accounts on Monday morning and we\'re done for the week.'), agency: 'AGENCE GROWTHPULSE', role: tr('Agence Growth · 120 comptes', 'Growth agency · 120 accounts'), initials: 'GP', av: 'linear-gradient(135deg,#22D3EE,#818CF8)', glow: 'rgba(34,211,238,0.3)' },
-    { stat: '90%+', statL: tr('de comptes conservés', 'accounts kept'), grad: 'linear-gradient(90deg,#A855F7,#EC4899)', quote: tr('L\'auto-warmup nous a sauvés. On perdait la moitié de nos nouveaux comptes ; depuis, le taux de survie dépasse 90%. Rien que ça vaut l\'abonnement.', 'Auto-warmup saved us. We lost half our new accounts; since then survival is above 90%. That alone is worth the subscription.'), agency: 'AGENCE UGC LAB', role: tr('Contenu UGC · 45 comptes', 'UGC content · 45 accounts'), initials: 'UL', av: 'linear-gradient(135deg,#A855F7,#EC4899)', glow: 'rgba(168,85,247,0.35)' },
-    { stat: '15h', statL: tr('gagnées par semaine', 'saved per week'), grad: 'linear-gradient(90deg,#818CF8,#34D399)', quote: tr('On gère 12 clients sur GeeLark et le dashboard ScaleFlow est notre tour de contrôle. Rôles d\'équipe, stats par compte, studio remix : tout pour bosser à plusieurs.', 'We manage 12 clients on GeeLark and the ScaleFlow dashboard is our control tower. Team roles, per-account stats, remix studio: everything to work as a team.'), agency: 'AGENCE SCALEUP MEDIA', role: tr('SMMA · 300+ comptes', 'SMMA · 300+ accounts'), initials: 'SM', av: 'linear-gradient(135deg,#818CF8,#34D399)', glow: 'rgba(52,211,153,0.3)' },
+  const REVIEWS = [
+    { name: 'Francis', date: '19 juin', src: '/avis/avis-francis.png', glow: 'rgba(34,211,238,0.32)' },
+    { name: 'France Killian', date: '19 juin', src: '/avis/avis-france-killian.png', glow: 'rgba(168,85,247,0.35)' },
+    { name: 'Leon', date: '20 juin', src: '/avis/avis-leon.png', glow: 'rgba(52,211,153,0.3)' },
+    { name: 'Alx', date: '4 juillet', src: '/avis/avis-alx.png', glow: 'rgba(129,140,248,0.32)' },
+    { name: 'Njmoss', date: '6 juillet', src: '/avis/avis-njmoss.png', glow: 'rgba(245,158,11,0.3)' },
   ]
   return (
     <section id="testimonials" style={{ position: 'relative', zIndex: 1, padding: '100px 24px', background: 'rgba(124,58,237,0.04)', borderTop: `1px solid rgba(139,92,246,0.18)`, borderBottom: `1px solid rgba(139,92,246,0.18)` }}>
@@ -1646,27 +1702,25 @@ function SiteTestimonials() {
           <div style={{ textAlign: 'center', marginBottom: 52, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto' }}>
             <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 20 }}>Social proof</MicroLabel>
             <h2 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(30px, 4.4vw, 46px)', letterSpacing: '-0.02em', color: IVORY }}>{tr('Ils font tourner ', 'They run ')}<span style={{ background: 'linear-gradient(90deg,#F472B6,#C4B5FD 55%,#818CF8)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>ScaleFlow.</span></h2>
+            <p style={{ marginTop: 16, fontFamily: SANS, fontSize: 15, color: MUTED }}>{tr('Les messages reçus, tels quels. Rien de réécrit.', 'The messages we received, as they are. Nothing rewritten.')}</p>
           </div>
         </FadeIn>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-          {T.map((t, i) => (
-            <FadeIn key={t.agency} delay={i * 0.08}>
-              <figure style={{ height: '100%', margin: 0, display: 'flex', flexDirection: 'column', gap: 18, padding: '28px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}` }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 34, lineHeight: 1, background: t.grad, WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t.stat}</span>
-                  <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: MUTED }}>{t.statL}</span>
-                </div>
-                <blockquote style={{ margin: 0, flex: 1, fontFamily: SANS, fontSize: 14.5, lineHeight: 1.7, color: 'rgba(226,222,255,0.85)' }}>« {t.quote} »</blockquote>
-                <figcaption style={{ display: 'flex', alignItems: 'center', gap: 12, borderTop: `1px solid ${HAIR}`, paddingTop: 16 }}>
-                  <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SANS, fontSize: 13, fontWeight: 800, color: '#0A0A16', background: t.av }}>{t.initials}</span>
-                  <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                    <span style={{ fontFamily: SANS, fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', color: IVORY }}>{t.agency}</span>
-                    <span style={{ fontFamily: SANS, fontSize: 12, color: MUTED }}>{t.role}</span>
-                  </span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20, alignItems: 'start' }}>
+          {REVIEWS.map((r, i) => (
+            <FadeIn key={r.name} delay={i * 0.06}>
+              <figure style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 14, padding: 16, borderRadius: 20, background: 'rgba(255,255,255,0.035)', border: `1px solid rgba(255,255,255,0.1)`, transition: 'transform 0.3s, box-shadow 0.3s' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = `0 26px 60px -22px ${r.glow}` }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}>
+                <img src={r.src} alt={tr(`Avis de ${r.name} sur Telegram`, `${r.name}'s review on Telegram`)} loading="lazy" style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 12 }} />
+                <figcaption style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap', padding: '0 4px 4px' }}>
+                  <span style={{ letterSpacing: 1.5, fontSize: 12, color: '#FBBF24' }}>★★★★★</span>
+                  <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 800, color: 'rgba(226,222,255,0.88)' }}>{r.name}</span>
+                  <span style={{ marginLeft: 'auto', fontFamily: SANS, fontSize: 11, fontWeight: 700, color: MUTED }}>Telegram · {r.date}</span>
                 </figcaption>
               </figure>
             </FadeIn>
           ))}
+          <VoiceNote />
         </div>
       </div>
     </section>
