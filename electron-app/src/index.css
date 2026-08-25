@@ -2876,14 +2876,15 @@ select.sf-input:disabled {
 
 /* Boutons primaires — dégradé tri-color premium + halo */
 .sf-btn-primary {
-  background: linear-gradient(100deg, #818CF8, #8B5CF6 50%, #6366F1) !important;
+  /* Redesign : dégradé de marque cyan → indigo → violet (spec). */
+  background: linear-gradient(120deg, #22D3EE, #818CF8 46%, #A855F7) !important;
   background-size: 180% auto !important;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 14px 30px -14px rgba(139,92,246,0.7),
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 0 28px -8px rgba(129,140,248,0.7),
               inset 0 1px 0 rgba(255,255,255,0.2) !important;
 }
 .sf-btn-primary:hover {
   background-position: 100% 0 !important;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.3), 0 18px 40px -12px rgba(99,102,241,0.7),
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3), 0 0 44px -6px rgba(129,140,248,1),
               inset 0 1px 0 rgba(255,255,255,0.24) !important;
   transform: translateY(-1px);
 }
