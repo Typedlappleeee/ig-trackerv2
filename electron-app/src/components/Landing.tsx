@@ -1455,6 +1455,81 @@ function stageFromHash(): Stage {
   return 'tunnel'
 }
 
+// ── Comment ça marche — 3 étapes (maquette) ──────────────────────────────────
+function SiteHowItWorks() {
+  const tr = useTr()
+  const STEPS = [
+    { n: '01', t: tr('Connecte tes comptes', 'Connect your accounts'), d: tr('Relie tes cloud phones GeeLark ou ton serveur auto-hébergé. Tes comptes Instagram & TikTok apparaissent dans le dashboard.', 'Link your GeeLark cloud phones or your self-hosted server. Your Instagram & TikTok accounts show up in the dashboard.') },
+    { n: '02', t: tr('Prépare ton contenu', 'Prepare your content'), d: tr('Importe tes vidéos, génère des variantes uniques (Remix, Spoof), écris tes captions — ou laisse l\'IA le faire.', 'Import your videos, generate unique variants (Remix, Spoof), write your captions — or let the AI do it.') },
+    { n: '03', t: tr('Publie en un clic', 'Publish in one click'), d: tr('Sélectionne tes comptes, lance. Chaque téléphone publie en parallèle et s\'éteint tout seul. Suivi en direct.', 'Select your accounts, launch. Each phone posts in parallel and shuts down on its own. Live tracking.') },
+  ]
+  return (
+    <section id="how" style={{ position: 'relative', zIndex: 1, padding: '40px 24px 120px' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+        <FadeIn>
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 20 }}>{tr('Comment ça marche', 'How it works')}</MicroLabel>
+            <h2 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(30px, 4.4vw, 48px)', letterSpacing: '-0.03em', color: IVORY }}>{tr('Trois étapes. ', 'Three steps. ')}<span style={{ background: 'linear-gradient(90deg,#818CF8,#F472B6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{tr('C\'est tout.', 'That\'s it.')}</span></h2>
+          </div>
+        </FadeIn>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          {STEPS.map((s, i) => (
+            <FadeIn key={s.n} delay={i * 0.1}>
+              <div style={{ height: '100%', padding: '30px 26px', borderRadius: 18, background: 'rgba(255,255,255,0.025)', border: `1px solid ${HAIR}` }}>
+                <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 40, lineHeight: 1, background: 'linear-gradient(120deg,#22D3EE,#818CF8 55%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{s.n}</div>
+                <h3 style={{ margin: '18px 0 10px', fontFamily: DISPLAY, fontWeight: 700, fontSize: 20, color: IVORY }}>{s.t}</h3>
+                <p style={{ margin: 0, fontFamily: SANS, fontSize: 13.5, color: MUTED, lineHeight: 1.7 }}>{s.d}</p>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Témoignages — au nom d'agences (maquette) ────────────────────────────────
+function SiteTestimonials() {
+  const tr = useTr()
+  const T = [
+    { stat: '+340%', statL: tr('de reach en 2 mois', 'reach in 2 months'), grad: 'linear-gradient(90deg,#22D3EE,#818CF8)', quote: tr('Avant ScaleFlow on copiait-collait des reels téléphone par téléphone. Maintenant on programme 120 comptes le lundi matin et c\'est plié pour la semaine.', 'Before ScaleFlow we copy-pasted reels phone by phone. Now we schedule 120 accounts on Monday morning and we\'re done for the week.'), agency: 'AGENCE GROWTHPULSE', role: tr('Agence Growth · 120 comptes', 'Growth agency · 120 accounts'), initials: 'GP', av: 'linear-gradient(135deg,#22D3EE,#818CF8)', glow: 'rgba(34,211,238,0.3)' },
+    { stat: '90%+', statL: tr('de comptes conservés', 'accounts kept'), grad: 'linear-gradient(90deg,#A855F7,#EC4899)', quote: tr('L\'auto-warmup nous a sauvés. On perdait la moitié de nos nouveaux comptes ; depuis, le taux de survie dépasse 90%. Rien que ça vaut l\'abonnement.', 'Auto-warmup saved us. We lost half our new accounts; since then survival is above 90%. That alone is worth the subscription.'), agency: 'AGENCE UGC LAB', role: tr('Contenu UGC · 45 comptes', 'UGC content · 45 accounts'), initials: 'UL', av: 'linear-gradient(135deg,#A855F7,#EC4899)', glow: 'rgba(168,85,247,0.35)' },
+    { stat: '15h', statL: tr('gagnées par semaine', 'saved per week'), grad: 'linear-gradient(90deg,#818CF8,#34D399)', quote: tr('On gère 12 clients sur GeeLark et le dashboard ScaleFlow est notre tour de contrôle. Rôles d\'équipe, stats par compte, studio remix : tout pour bosser à plusieurs.', 'We manage 12 clients on GeeLark and the ScaleFlow dashboard is our control tower. Team roles, per-account stats, remix studio: everything to work as a team.'), agency: 'AGENCE SCALEUP MEDIA', role: tr('SMMA · 300+ comptes', 'SMMA · 300+ accounts'), initials: 'SM', av: 'linear-gradient(135deg,#818CF8,#34D399)', glow: 'rgba(52,211,153,0.3)' },
+  ]
+  return (
+    <section id="testimonials" style={{ position: 'relative', zIndex: 1, padding: '100px 24px', background: 'rgba(124,58,237,0.04)', borderTop: `1px solid rgba(139,92,246,0.18)`, borderBottom: `1px solid rgba(139,92,246,0.18)` }}>
+      <div style={{ maxWidth: 1140, margin: '0 auto' }}>
+        <FadeIn>
+          <div style={{ textAlign: 'center', marginBottom: 52, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto' }}>
+            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 20 }}>Social proof</MicroLabel>
+            <h2 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(30px, 4.4vw, 46px)', letterSpacing: '-0.02em', color: IVORY }}>{tr('Ils font tourner ', 'They run ')}<span style={{ background: 'linear-gradient(90deg,#F472B6,#C4B5FD 55%,#818CF8)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>ScaleFlow.</span></h2>
+          </div>
+        </FadeIn>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+          {T.map((t, i) => (
+            <FadeIn key={t.agency} delay={i * 0.08}>
+              <figure style={{ height: '100%', margin: 0, display: 'flex', flexDirection: 'column', gap: 18, padding: '28px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}` }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                  <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 34, lineHeight: 1, background: t.grad, WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t.stat}</span>
+                  <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: MUTED }}>{t.statL}</span>
+                </div>
+                <blockquote style={{ margin: 0, flex: 1, fontFamily: SANS, fontSize: 14.5, lineHeight: 1.7, color: 'rgba(226,222,255,0.85)' }}>« {t.quote} »</blockquote>
+                <figcaption style={{ display: 'flex', alignItems: 'center', gap: 12, borderTop: `1px solid ${HAIR}`, paddingTop: 16 }}>
+                  <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SANS, fontSize: 13, fontWeight: 800, color: '#0A0A16', background: t.av }}>{t.initials}</span>
+                  <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={{ fontFamily: SANS, fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', color: IVORY }}>{t.agency}</span>
+                    <span style={{ fontFamily: SANS, fontSize: 12, color: MUTED }}>{t.role}</span>
+                  </span>
+                </figcaption>
+              </figure>
+            </FadeIn>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function Landing() {
   const tr = useTr()
   const [stage,   setStageRaw] = useState<Stage>(stageFromHash)
@@ -1571,6 +1646,12 @@ export function Landing() {
           </div>
         </div>
       </section>
+
+      {/* ── Comment ça marche ── */}
+      <SiteHowItWorks />
+
+      {/* ── Témoignages ── */}
+      <SiteTestimonials />
 
       <Marquee items={[tr('Standard', 'Standard'), tr('Pro', 'Pro'), tr('Organisation', 'Organization'), tr('Crédits', 'Credits'), tr('Activation immédiate', 'Instant activation'), tr('Support 24/7', '24/7 Support')]} dark />
 
