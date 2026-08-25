@@ -1,25 +1,92 @@
+import { useRef, useState } from 'react'
 import { useReveal } from '../hooks/useReveal'
 
-const TESTIMONIALS = [
-  {
-    stat: '+340%', statLabel: 'de reach en 2 mois', statGrad: 'linear-gradient(90deg,#22D3EE,#818CF8)',
-    quote: "Avant ScaleFlow je passais mes journées à copier-coller des reels téléphone par téléphone. Maintenant je programme 120 comptes le lundi matin et c'est plié pour la semaine. Le mass posting parallèle est juste irréel.",
-    agency: 'Agence GrowthPulse', role: 'Agence Growth · 120 comptes',
-    initials: 'GP', avatar: 'linear-gradient(135deg,#22D3EE,#818CF8)', glow: 'rgba(34,211,238,0.3)',
-  },
-  {
-    stat: '90%+', statLabel: 'de comptes conservés', statGrad: 'linear-gradient(90deg,#A855F7,#EC4899)',
-    quote: "L'auto-warmup m'a sauvé. Je montais 30 nouveaux comptes par mois et j'en perdais la moitié. Depuis que ScaleFlow gère les routines de chauffe, mon taux de survie est passé au-dessus de 90%. Rien que ça vaut l'abonnement.",
-    agency: 'Agence UGC Lab', role: 'Contenu UGC · 45 comptes',
-    initials: 'UL', avatar: 'linear-gradient(135deg,#A855F7,#EC4899)', glow: 'rgba(168,85,247,0.35)',
-  },
-  {
-    stat: '15h', statLabel: 'gagnées par semaine', statGrad: 'linear-gradient(90deg,#818CF8,#34D399)',
-    quote: 'On gère les comptes de 12 clients sur GeeLark et le dashboard ScaleFlow est devenu notre tour de contrôle. Les rôles d\'équipe, les stats par compte, le studio remix... tout est pensé pour bosser à plusieurs sans se marcher dessus.',
-    agency: 'Agence ScaleUp Media', role: 'SMMA · 300+ comptes',
-    initials: 'SM', avatar: 'linear-gradient(135deg,#818CF8,#34D399)', glow: 'rgba(52,211,153,0.3)',
-  },
+/**
+ * Avis clients — les captures Telegram telles quelles, plus un message vocal.
+ * Copie les fichiers de _redesign/assets/ dans website/public/avis/.
+ */
+const REVIEWS = [
+  { name: 'Francis', date: '19 juin', src: '/avis/avis-francis.png', glow: 'rgba(34,211,238,0.32)',
+    alt: "Avis de Francis sur Telegram : très bon CRM, staff réduit de 90 %, très bon service, je recommande." },
+  { name: 'France Killian', date: '19 juin', src: '/avis/avis-france-killian.png', glow: 'rgba(168,85,247,0.35)',
+    alt: "Avis de France Killian sur Telegram : comptes augmentés de 300 % en réduisant le staff de plus de la moitié, je recommande à fond." },
+  { name: 'Leon', date: '20 juin', src: '/avis/avis-leon.png', glow: 'rgba(52,211,153,0.3)',
+    alt: "Avis de Leon sur Telegram : logiciel performant et intuitif, accompagnement irréprochable, je recommande sans hésiter." },
+  { name: 'Alx', date: '4 juillet', src: '/avis/avis-alx.png', glow: 'rgba(129,140,248,0.32)',
+    alt: "Avis d'Alx sur Telegram : tout est regroupé en une seule app, très clairement le meilleur outil GeeLark." },
+  { name: 'Njmoss', date: '6 juillet', src: '/avis/avis-njmoss.png', glow: 'rgba(245,158,11,0.3)',
+    alt: "Avis de Njmoss sur Telegram : logiciel propre, beaucoup de choses en automatisé, un gain de temps et de performance." },
 ]
+
+const fmt = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`
+
+/** Message vocal : lecteur maison, forme d'onde qui se remplit à la lecture. */
+function VoiceNote() {
+  const audio = useRef<HTMLAudioElement>(null)
+  const [playing, setPlaying] = useState(false)
+  const [pct, setPct] = useState(0)
+  const [time, setTime] = useState('0:00')
+
+  const toggle = () => {
+    const a = audio.current
+    if (!a) return
+    if (a.paused) a.play().then(() => setPlaying(true)).catch(() => {})
+    else { a.pause(); setPlaying(false) }
+  }
+
+  return (
+    <figure
+      data-reveal
+      className="col-span-full m-0 flex items-center gap-4.5 rounded-[20px] border border-emerald/[0.28] p-5 transition-transform duration-300"
+      style={{ background: 'linear-gradient(120deg, rgba(52,211,153,0.09), rgba(255,255,255,0.03))' }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-4px)'
+        e.currentTarget.style.boxShadow = '0 26px 60px -22px rgba(52,211,153,0.35)'
+      }}
+      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
+    >
+      <button
+        type="button" onClick={toggle}
+        aria-label={playing ? 'Mettre en pause' : 'Écouter le message vocal'}
+        className="flex h-13 w-13 shrink-0 cursor-pointer items-center justify-center rounded-full border-none text-[17px] text-[#04140C]"
+        style={{ background: 'linear-gradient(135deg,#34D399,#10B981)', boxShadow: '0 0 30px -8px rgba(52,211,153,0.8)' }}
+      >
+        {playing ? '❚❚' : '▶'}
+      </button>
+
+      <span className="flex min-w-0 flex-1 flex-col gap-2.5">
+        <span className="flex h-[30px] items-center gap-[2.5px]">
+          {Array.from({ length: 56 }, (_, i) => {
+            const seed = Math.abs(Math.sin(i * 2.7) * Math.cos(i * 0.9))
+            return (
+              <span
+                key={i}
+                className="flex-1 rounded-full transition-colors duration-150"
+                style={{ height: `${22 + seed * 68}%`, background: i / 56 <= pct ? '#34D399' : 'rgba(255,255,255,0.16)' }}
+              />
+            )
+          })}
+        </span>
+        <span className="flex items-center gap-2.5 text-[11.5px] font-bold text-muted">
+          <span className="text-[12.5px] font-extrabold text-[rgba(226,222,255,0.88)]">Message vocal d'un client</span>
+          <span className="font-mono">{time}</span>
+          <span className="ml-auto">Telegram</span>
+        </span>
+      </span>
+
+      <audio
+        ref={audio} src="/avis/avis-vocal.ogg" preload="metadata" className="hidden"
+        onTimeUpdate={e => {
+          const a = e.currentTarget
+          if (!a.duration || !isFinite(a.duration)) return
+          setPct(a.currentTime / a.duration)
+          setTime(`${fmt(a.currentTime)} / ${fmt(a.duration)}`)
+        }}
+        onEnded={() => { setPlaying(false); setPct(0); setTime('0:00') }}
+      />
+    </figure>
+  )
+}
 
 export function Testimonials() {
   const ref = useReveal<HTMLElement>()
@@ -42,57 +109,31 @@ export function Testimonials() {
             Ils font tourner <span className="gradient-text-warm">ScaleFlow.</span>
           </h2>
           <p className="mt-4.5 text-base leading-relaxed text-text2">
-            Agences &amp; créateurs Instagram/TikTok qui scalent leurs fermes de comptes tous les jours avec nous.
+            Les messages reçus, tels quels. Rien de réécrit.
           </p>
         </div>
 
-        <div className="mt-14 grid grid-cols-1 gap-4 md:grid-cols-3">
-          {TESTIMONIALS.map((t, i) => (
+        <div data-stagger className="mt-14 grid grid-cols-1 items-start gap-5 md:grid-cols-2">
+          {REVIEWS.map(r => (
             <figure
-              key={t.agency}
-              className="reveal m-0 flex flex-col gap-4.5 rounded-[20px] border border-white/[0.09] bg-white/[0.03] p-7"
-              style={{
-                transitionDelay: `${i * 0.08}s`,
-                transition: 'transform 0.3s ease, box-shadow 0.3s ease, opacity 0.7s cubic-bezier(0.22,1,0.36,1)',
-              }}
+              key={r.name}
+              data-reveal
+              className="m-0 flex flex-col gap-3.5 rounded-[20px] border border-white/[0.1] bg-white/[0.035] p-4 transition-transform duration-300"
               onMouseEnter={e => {
                 e.currentTarget.style.transform = 'translateY(-4px)'
-                e.currentTarget.style.boxShadow = `0 24px 60px -20px ${t.glow}`
+                e.currentTarget.style.boxShadow = `0 26px 60px -22px ${r.glow}`
               }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = ''
-                e.currentTarget.style.boxShadow = ''
-              }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
             >
-              <div className="flex items-baseline gap-2.5">
-                <span
-                  className="font-display text-[34px] font-bold leading-none"
-                  style={{ background: t.statGrad, WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
-                >
-                  {t.stat}
-                </span>
-                <span className="text-xs font-semibold text-text2">{t.statLabel}</span>
-              </div>
-
-              <blockquote className="m-0 flex-1 text-[14.5px] leading-[1.7] text-[rgba(226,222,255,0.85)]">
-                « {t.quote} »
-              </blockquote>
-
-              <figcaption className="flex items-center gap-3 border-t border-white/[0.07] pt-4">
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold text-[#0A0A16]"
-                  style={{ background: t.avatar }}
-                  aria-hidden="true"
-                >
-                  {t.initials}
-                </span>
-                <span className="flex min-w-0 flex-col gap-px">
-                  <span className="truncate text-[13px] font-extrabold uppercase tracking-[0.08em] text-text">{t.agency}</span>
-                  <span className="truncate text-xs font-semibold text-text2">{t.role}</span>
-                </span>
+              <img src={r.src} alt={r.alt} loading="lazy" className="block h-auto w-full rounded-xl" />
+              <figcaption className="flex items-center gap-2.5 whitespace-nowrap px-1 pb-1">
+                <span className="tracking-[1.5px] text-xs text-[#FBBF24]">★★★★★</span>
+                <span className="text-[12.5px] font-extrabold text-[rgba(226,222,255,0.88)]">{r.name}</span>
+                <span className="ml-auto text-[11px] font-bold text-muted">Telegram · {r.date}</span>
               </figcaption>
             </figure>
           ))}
+          <VoiceNote />
         </div>
       </div>
     </section>
