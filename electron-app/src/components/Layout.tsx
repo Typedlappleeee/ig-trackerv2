@@ -901,12 +901,14 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
       {/* ── Sidebar (desktop only) ───────────────────────────────────────── */}
       <aside
         style={{
-          width: collapsed ? 54 : 248,
+          width: collapsed ? 54 : 232,
           flexShrink: 0,
           display: isMobile ? 'none' : 'flex',
           flexDirection: 'column',
-          background: '#0F1014',
-          borderRight: '1px solid rgba(233,234,240,0.07)',
+          background: 'rgba(8,8,20,0.85)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderRight: '1px solid rgba(255,255,255,0.07)',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
           overflow: 'hidden',
           position: 'relative',
