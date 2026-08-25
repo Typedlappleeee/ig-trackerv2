@@ -1,283 +1,227 @@
-import { useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
+import { useReveal } from '../hooks/useReveal'
 
-// ── Inline SVG icons ─────────────────────────────────────────────────────────
-const ILayers   = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-const ICalendar = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-const ISparkles = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M5 3l.5 1.5L7 5l-1.5.5L5 7l-.5-1.5L3 5l1.5-.5z"/><path d="M19 13l.5 1.5L21 15l-1.5.5L19 17l-.5-1.5L17 15l1.5-.5z"/></svg>
-const IFlame    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3z"/></svg>
-const IScissors = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
-const IPhone    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-const IUsers    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-const ICoins    = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><line x1="16.71" y1="13.88" x2="13.38" y2="17.21"/></svg>
+interface Feature {
+  title: string
+  text: string
+  accent: string
+  titleColor: string
+  span?: string
+  tinted?: boolean
+  horizontal?: boolean
+  preview?: ReactNode
+}
 
-const FEATURES = [
+const PhonePills = () => (
+  <div className="mt-2 flex flex-wrap gap-2">
+    {['iPhone-01', 'iPhone-02', 'iPhone-03', 'iPhone-04'].map((n, i) => (
+      <span
+        key={n}
+        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[11px] font-extrabold text-[#D8B4FE]"
+        style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)' }}
+      >
+        <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-emerald" style={{ animationDelay: `-${i * 0.6}s` }} />
+        {n}
+      </span>
+    ))}
+    <span className="rounded-full border border-white/[0.12] px-3 py-1.5 text-[11px] font-extrabold text-text2">+47 appareils…</span>
+  </div>
+)
+
+const MiniCalendar = () => {
+  const posted = [2, 5, 7, 9, 11, 14, 16, 18]
+  return (
+    <div className="mt-2 grid grid-cols-7 gap-1">
+      {Array.from({ length: 21 }, (_, i) => {
+        const on = posted.includes(i)
+        return (
+          <div
+            key={i}
+            className="flex aspect-square items-center justify-center rounded-md text-[10px] font-bold"
+            style={{
+              background: on ? 'rgba(34,211,238,0.14)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${on ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.05)'}`,
+              color: on ? '#67E8F9' : 'rgba(255,255,255,0.22)',
+            }}
+          >
+            {i + 1}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const CaptionSample = () => (
+  <div
+    className="mt-2 rounded-xl p-3.5 text-xs leading-relaxed text-text2"
+    style={{ background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.22)' }}
+  >
+    <span className="font-mono text-indigo">✦</span>{' '}
+    « Chaque matin est une nouvelle chance de créer du contenu qui connecte avec ton audience. 🔥
+    <br /><span className="mt-1 inline-block text-indigo opacity-75">#motivation #contentcreator #instagram</span> »
+  </div>
+)
+
+const RatioPreview = () => (
+  <div className="mt-2 flex items-end gap-4.5">
+    {[{ r: '9:16', w: 26, h: 46 }, { r: '1:1', w: 38, h: 38 }, { r: '16:9', w: 58, h: 32 }].map(({ r, w, h }) => (
+      <div key={r} className="flex flex-col items-center gap-1.5">
+        <div
+          className="rounded-[7px]"
+          style={{ width: w, height: h, background: 'rgba(244,114,182,0.08)', border: '1.5px solid rgba(244,114,182,0.5)' }}
+        />
+        <span className="text-[10px] font-bold text-muted">{r}</span>
+      </div>
+    ))}
+    <div className="flex flex-1 flex-col gap-1.5 pb-4.5">
+      {[75, 50, 66].map(w => (
+        <div key={w} className="h-1.5 rounded-full" style={{ background: 'rgba(244,114,182,0.15)' }}>
+          <div className="h-full rounded-full" style={{ width: `${w}%`, background: 'linear-gradient(90deg,#F472B6,#EC4899)' }} />
+        </div>
+      ))}
+    </div>
+  </div>
+)
+
+const WarmupGauges = () => (
+  <div className="mt-2 flex flex-col gap-2.5 text-[11px] font-bold text-muted">
+    {[{ l: 'Likes/h', v: 8, m: 15 }, { l: 'Follows/h', v: 5, m: 10 }, { l: 'Vues/h', v: 12, m: 20 }].map(r => (
+      <div key={r.l} className="flex items-center gap-2.5">
+        <span className="w-[58px] shrink-0">{r.l}</span>
+        <div className="h-1.5 flex-1 rounded-full bg-white/[0.06]">
+          <div className="h-full rounded-full" style={{ width: `${(r.v / r.m) * 100}%`, background: 'linear-gradient(90deg,#FB923C,#F97316)' }} />
+        </div>
+        <span className="w-5 text-right font-mono text-[#FB923C]">{r.v}</span>
+      </div>
+    ))}
+  </div>
+)
+
+const PhoneStatus = () => (
+  <div className="mt-2 flex flex-col gap-1.5">
+    {[
+      { name: 'iPhone-01', followers: '12,4K', status: 'online' },
+      { name: 'iPhone-02', followers: '8,9K',  status: 'posting' },
+      { name: 'iPhone-03', followers: '23,1K', status: 'online' },
+    ].map(p => (
+      <div
+        key={p.name}
+        className="flex items-center justify-between rounded-[10px] px-3 py-2 text-[11px] font-bold"
+        style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.16)' }}
+      >
+        <span className="font-mono text-text">{p.name}</span>
+        <span className="text-text2">{p.followers}</span>
+        <span style={{ color: p.status === 'posting' ? '#FCD34D' : '#34D399' }}>● {p.status}</span>
+      </div>
+    ))}
+  </div>
+)
+
+const RolePills = () => (
+  <div className="mt-2 flex flex-wrap gap-2">
+    {[
+      { role: 'admin',  bg: 'rgba(96,165,250,0.16)',  bd: 'rgba(96,165,250,0.4)',  fg: '#93C5FD' },
+      { role: 'membre', bg: 'rgba(129,140,248,0.14)', bd: 'rgba(129,140,248,0.35)', fg: '#A5B4FC' },
+      { role: 'viewer', bg: 'rgba(255,255,255,0.05)', bd: 'rgba(255,255,255,0.12)', fg: 'rgba(226,232,240,0.75)' },
+    ].map(r => (
+      <span key={r.role} className="rounded-full px-3.5 py-1.5 text-[11px] font-extrabold" style={{ background: r.bg, border: `1px solid ${r.bd}`, color: r.fg }}>
+        {r.role}
+      </span>
+    ))}
+  </div>
+)
+
+const CreditBalance = () => (
+  <div
+    className="flex items-baseline gap-3 rounded-2xl px-6 py-4.5"
+    style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}
+  >
+    <span className="text-xs font-bold text-text2">Solde partagé</span>
+    <span className="font-display text-[26px] font-bold text-[#FCD34D]">2 480</span>
+  </div>
+)
+
+const FEATURES: Feature[] = [
   {
-    icon: ILayers,
-    title: 'Mass Posting',
+    title: 'Mass Posting', accent: '#A855F7', titleColor: '#E9D5FF', span: 'lg:col-span-2', tinted: true,
     text: 'Publie simultanément sur des dizaines de comptes Instagram ET TikTok. Chaque phone se libère dès que sa publication est terminée.',
-    accent: '#A855F7',
-    span: 'lg:col-span-2',
-    big: true,
-    preview: (
-      <div className="mt-5 flex flex-wrap gap-2">
-        {['iPhone-01', 'iPhone-02', 'iPhone-03', 'iPhone-04', 'iPhone-05'].map((n) => (
-          <div key={n} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold"
-            style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.28)', color: '#D8B4FE' }}>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-dot" />
-            {n}
-          </div>
-        ))}
-        <div className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(226,232,240,0.7)' }}>
-          +47 appareils…
-        </div>
-        <div className="ml-auto inline-flex items-center gap-2 self-center text-[10px] font-semibold text-text2">
-          <span className="inline-flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><rect x="2" y="2" width="20" height="20" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none"/></svg>
-            Instagram
-          </span>
-          <span className="text-muted">·</span>
-          <span className="inline-flex items-center gap-1">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.5 3c.4 2.4 2 4.1 4.5 4.4v3c-1.7.1-3.2-.4-4.6-1.3v6.2c0 3.6-2.7 5.9-6 5.9-3.2 0-5.6-2.5-5.6-5.5 0-3.4 2.9-5.9 6.4-5.3v3.1c-.4-.1-.9-.2-1.3-.2-1.4 0-2.4 1-2.4 2.4 0 1.4 1 2.4 2.5 2.4 1.6 0 2.6-1.1 2.6-2.9V3h3.9z"/></svg>
-            TikTok
-          </span>
-        </div>
-      </div>
-    ),
+    preview: <PhonePills />,
   },
   {
-    icon: ICalendar,
-    title: 'Programmation',
-    text: 'Calendrier visuel, files d\'attente par compte, fuseaux horaires et créneaux récurrents.',
-    accent: '#22D3EE',
-    span: 'lg:col-span-1',
-    preview: (
-      <div className="mt-5 grid grid-cols-7 gap-1">
-        {Array.from({ length: 21 }, (_, i) => {
-          const hasPost = [2, 5, 7, 9, 11, 14, 16, 18].includes(i)
-          return (
-            <div key={i} className="flex aspect-square items-center justify-center rounded-md text-[9px] font-medium"
-              style={{
-                background: hasPost ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${hasPost ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.05)'}`,
-                color: hasPost ? '#67E8F9' : 'rgba(255,255,255,0.22)',
-              }}>
-              {i + 1}
-            </div>
-          )
-        })}
-      </div>
-    ),
+    title: 'Programmation', accent: '#22D3EE', titleColor: '#A5F3FC',
+    text: "Calendrier visuel, files d'attente par compte, fuseaux horaires et créneaux récurrents.",
+    preview: <MiniCalendar />,
   },
   {
-    icon: ISparkles,
-    title: 'Captions IA',
+    title: 'Captions IA', accent: '#818CF8', titleColor: '#C7D2FE',
     text: 'Génère captions, hashtags et idées de contenu. Propulsé par Claude & Groq.',
-    accent: '#818CF8',
-    span: 'lg:col-span-1',
-    preview: (
-      <div className="mt-5 rounded-xl p-3 text-[11px] leading-relaxed text-text2"
-        style={{ background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)' }}>
-        <span className="font-mono text-indigo">✦</span>{' '}
-        « Chaque matin est une nouvelle chance de créer du contenu qui connecte avec ton audience. 🔥
-        <br /><span className="mt-1.5 inline-block text-indigo opacity-70">#motivation #contentcreator #instagram</span> »
-      </div>
-    ),
+    preview: <CaptionSample />,
   },
   {
-    icon: IScissors,
-    title: 'Remix & Repurpose vidéo',
+    title: 'Remix & Repurpose vidéo', accent: '#EC4899', titleColor: '#FBCFE8', span: 'lg:col-span-2', tinted: true,
     text: 'Mixe, recoupe et réinvente tes vidéos. Sous-titres, watermarks et préréglages pour produire en masse.',
-    accent: '#F472B6',
-    span: 'lg:col-span-2',
-    big: true,
-    preview: (
-      <div className="mt-5 flex items-center gap-3">
-        {['9:16', '1:1', '16:9'].map(ratio => (
-          <div key={ratio} className="flex flex-col items-center gap-1.5">
-            <div className="flex items-center justify-center rounded-lg text-[8px] font-bold text-pink-300"
-              style={{
-                width: ratio === '9:16' ? 28 : ratio === '1:1' ? 40 : 60,
-                height: ratio === '9:16' ? 48 : ratio === '1:1' ? 40 : 34,
-                background: 'rgba(244,114,182,0.1)',
-                border: '1.5px solid rgba(244,114,182,0.4)',
-              }}>
-              {ratio === '9:16' ? '↕' : '□'}
-            </div>
-            <span className="text-[9px] text-muted">{ratio}</span>
-          </div>
-        ))}
-        <div className="flex flex-1 flex-col justify-center gap-1.5">
-          <div className="h-1.5 rounded-full bg-pink-400/20"><div className="h-full w-3/4 rounded-full bg-pink-400/60" /></div>
-          <div className="h-1.5 rounded-full bg-pink-400/20"><div className="h-full w-1/2 rounded-full bg-pink-400/60" /></div>
-          <div className="h-1.5 rounded-full bg-pink-400/20"><div className="h-full w-2/3 rounded-full bg-pink-400/60" /></div>
-        </div>
-      </div>
-    ),
+    preview: <RatioPreview />,
   },
   {
-    icon: IFlame,
-    title: 'Auto-Warmup',
+    title: 'Auto-Warmup', accent: '#FB923C', titleColor: '#FED7AA',
     text: 'Chauffe tes nouveaux comptes automatiquement : likes, follows à rythme humain. Routines configurables.',
-    accent: '#FB923C',
-    span: 'lg:col-span-1',
-    preview: (
-      <div className="mt-5 space-y-2.5">
-        {[
-          { label: 'Likes/h', val: 8, max: 15 },
-          { label: 'Follows/h', val: 5, max: 10 },
-          { label: 'Vues/h', val: 12, max: 20 },
-        ].map(r => (
-          <div key={r.label} className="flex items-center gap-2">
-            <span className="w-16 shrink-0 text-[10px] text-muted">{r.label}</span>
-            <div className="h-1.5 flex-1 rounded-full bg-white/[0.06]">
-              <div className="h-full rounded-full" style={{ width: `${(r.val / r.max) * 100}%`, background: 'linear-gradient(90deg, #FB923C, #F97316)' }} />
-            </div>
-            <span className="w-4 text-right font-mono text-[10px] text-orange-400">{r.val}</span>
-          </div>
-        ))}
-      </div>
-    ),
+    preview: <WarmupGauges />,
   },
   {
-    icon: IPhone,
-    title: 'Cloud Phones GeeLark',
+    title: 'Cloud Phones GeeLark', accent: '#34D399', titleColor: '#A7F3D0',
     text: 'Pilote tes cloud phones depuis un seul dashboard. Statut en temps réel, IP et sessions isolées.',
-    accent: '#34D399',
-    span: 'lg:col-span-1',
-    preview: (
-      <div className="mt-5 space-y-1.5">
-        {[
-          { name: 'iPhone-01', status: 'online', followers: '12,4K' },
-          { name: 'iPhone-02', status: 'posting', followers: '8,9K' },
-          { name: 'iPhone-03', status: 'online', followers: '23,1K' },
-        ].map(p => (
-          <div key={p.name} className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[10px]"
-            style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
-            <span className="font-mono text-text">{p.name}</span>
-            <span className="text-text2">{p.followers}</span>
-            <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-semibold"
-              style={{ background: p.status === 'posting' ? 'rgba(251,191,36,0.15)' : 'rgba(52,211,153,0.15)', color: p.status === 'posting' ? '#FCD34D' : '#34D399' }}>
-              <span className="h-1 w-1 rounded-full" style={{ background: 'currentColor' }} />
-              {p.status}
-            </span>
-          </div>
-        ))}
-      </div>
-    ),
+    preview: <PhoneStatus />,
   },
   {
-    icon: IUsers,
-    title: 'Collaboration d\'équipe',
+    title: "Collaboration d'équipe", accent: '#60A5FA', titleColor: '#BFDBFE',
     text: 'Invite ton organisation, attribue des rôles (admin, membre, viewer) et restreins les accès.',
-    accent: '#60A5FA',
-    span: 'lg:col-span-1',
-    preview: (
-      <div className="mt-5 flex flex-wrap gap-1.5">
-        {[
-          { role: 'admin', tone: 'rgba(96,165,250,0.16)', ring: 'rgba(96,165,250,0.4)', fg: '#93C5FD' },
-          { role: 'membre', tone: 'rgba(129,140,248,0.14)', ring: 'rgba(129,140,248,0.35)', fg: '#A5B4FC' },
-          { role: 'viewer', tone: 'rgba(255,255,255,0.05)', ring: 'rgba(255,255,255,0.12)', fg: 'rgba(226,232,240,0.75)' },
-        ].map(r => (
-          <span key={r.role} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold"
-            style={{ background: r.tone, border: `1px solid ${r.ring}`, color: r.fg }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'currentColor' }} />
-            {r.role}
-          </span>
-        ))}
-      </div>
-    ),
+    preview: <RolePills />,
   },
   {
-    icon: ICoins,
-    title: 'Crédits à la demande',
-    text: 'Un solde unique pour l\'IA et les automatisations. Recharge à la demande, partagé par organisation.',
-    accent: '#FBBF24',
-    span: 'lg:col-span-1',
-    preview: (
-      <div className="mt-5 flex items-center justify-between rounded-xl px-3 py-2.5"
-        style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.22)' }}>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-[#08060F]"
-            style={{ background: 'linear-gradient(135deg, #FCD34D, #F59E0B)' }}>¢</span>
-          <span className="text-[11px] text-text2">Solde partagé</span>
-        </div>
-        <span className="font-mono text-sm font-bold text-amber-300">2 480</span>
-      </div>
-    ),
+    title: 'Crédits à la demande', accent: '#FBBF24', titleColor: '#FDE68A', span: 'lg:col-span-2', tinted: true, horizontal: true,
+    text: "Un solde unique pour l'IA et les automatisations. Recharge à la demande, partagé par organisation.",
+    preview: <CreditBalance />,
   },
 ]
 
-function useReveal() {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const obs = new IntersectionObserver(
-      entries => entries.forEach(e => e.isIntersecting && e.target.classList.add('visible')),
-      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
-    )
-    el.querySelectorAll('.reveal').forEach(n => obs.observe(n))
-    return () => obs.disconnect()
-  }, [])
-  return ref
-}
-
 export function Features() {
-  const ref = useReveal()
+  const ref = useReveal<HTMLElement>()
 
   return (
-    <section id="features" className="relative px-5 py-28" ref={ref}>
-      {/* Soft background */}
-      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
-        <div className="absolute left-1/2 top-1/3 h-[620px] w-[620px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-[0.06]"
-          style={{ background: 'radial-gradient(circle, #818CF8, transparent 68%)', filter: 'blur(90px)' }} />
-        <div className="absolute right-[8%] top-2/3 h-[420px] w-[420px] rounded-full opacity-[0.05]"
-          style={{ background: 'radial-gradient(circle, #C084FC, transparent 70%)', filter: 'blur(90px)' }} />
+    <section id="features" className="relative z-[1] mx-auto max-w-[1140px] px-6 pt-[110px] pb-15" ref={ref}>
+      <div className="reveal mx-auto max-w-[660px] text-center">
+        <span className="section-label">Tout pour scaler</span>
+        <h2 className="font-display text-[2rem] font-bold leading-[1.1] tracking-[-0.02em] text-text sm:text-[46px]">
+          Une seule app, <span className="gradient-text-warm">tout dedans.</span>
+        </h2>
+        <p className="mx-auto mt-4.5 text-base leading-relaxed text-text2">
+          Fini de jongler entre dix outils. ScaleFlow réunit publication, automatisation et production de contenu
+          pour faire grandir ton empire Instagram &amp; TikTok.
+        </p>
       </div>
 
-      <div className="mx-auto max-w-6xl">
-        <div className="mx-auto max-w-2xl text-center reveal">
-          <span className="section-label">Tout pour scaler</span>
-          <h2 className="font-display h-section">
-            Une seule app,{' '}
-            <span className="gradient-text">tout dedans.</span>
-          </h2>
-          <p className="mt-4 text-text2">
-            Fini de jongler entre dix outils. ScaleFlow réunit publication, automatisation
-            et production de contenu pour faire grandir ton empire Instagram &amp; TikTok.
-          </p>
-        </div>
-
-        <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f, i) => {
-            const delay = (i % 3) * 0.08
-            return (
-              <article
-                key={f.title}
-                className={`reveal glass-card group flex flex-col rounded-2xl p-6 ${f.span}`}
-                style={{ transitionDelay: `${delay}s` }}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105"
-                    style={{
-                      background: `linear-gradient(150deg, ${f.accent}26, ${f.accent}0D)`,
-                      border: `1px solid ${f.accent}3D`,
-                      color: f.accent,
-                      boxShadow: `inset 0 1px 0 0 ${f.accent}26`,
-                    }}
-                  >
-                    <f.icon />
-                  </span>
-                  <h3 className="font-display text-base font-bold leading-tight text-text">{f.title}</h3>
-                </div>
-                <p className="mt-3 text-sm leading-relaxed text-text2">{f.text}</p>
-                {f.preview && <div className="mt-auto">{f.preview}</div>}
-              </article>
-            )
-          })}
-        </div>
+      <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {FEATURES.map((f, i) => (
+          <article
+            key={f.title}
+            className={`reveal group flex rounded-[20px] p-7 ${f.span ?? ''} ${f.horizontal ? 'items-center gap-7' : 'flex-col gap-3'}`}
+            style={{
+              transitionDelay: `${(i % 3) * 0.08}s`,
+              background: f.tinted
+                ? `linear-gradient(160deg, ${f.accent}17, rgba(255,255,255,0.02))`
+                : 'rgba(255,255,255,0.025)',
+              border: `1px solid ${f.tinted ? `${f.accent}40` : 'rgba(255,255,255,0.09)'}`,
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, opacity 0.7s cubic-bezier(0.22,1,0.36,1)',
+            }}
+          >
+            <div className={f.horizontal ? 'flex flex-1 flex-col gap-3' : 'contents'}>
+              <h3 className="font-display text-lg font-bold" style={{ color: f.titleColor }}>{f.title}</h3>
+              <p className="text-sm leading-relaxed text-text2">{f.text}</p>
+            </div>
+            {f.preview && (f.horizontal ? f.preview : <div className="mt-auto">{f.preview}</div>)}
+          </article>
+        ))}
       </div>
     </section>
   )

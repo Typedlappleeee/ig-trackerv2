@@ -1,21 +1,19 @@
-export function Logo({ size = 30 }: { size?: number }) {
+export function Logo({ size = 32 }: { size?: number }) {
   return (
     <span className="flex items-center gap-2.5">
-      <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#22D3EE" />
-            <stop offset="45%" stopColor="#818CF8" />
-            <stop offset="100%" stopColor="#A855F7" />
-          </linearGradient>
-        </defs>
-        <rect width="32" height="32" rx="9" fill="url(#logo-grad)" />
-        <path
-          d="M9 22V10h4l4 7 4-7h4v12h-3v-7l-3 5h-4l-3-5v7H9z"
-          fill="#0a0a16"
-        />
-      </svg>
-      <span className="text-lg font-extrabold tracking-tight text-text">
+      <span
+        className="flex shrink-0 items-center justify-center rounded-[9px] font-display font-bold text-[#0A0A16]"
+        style={{
+          width: size,
+          height: size,
+          fontSize: size * 0.5,
+          background: 'linear-gradient(135deg,#22D3EE,#818CF8,#A855F7)',
+        }}
+        aria-hidden="true"
+      >
+        S
+      </span>
+      <span className="font-display text-[17px] font-bold tracking-tight text-text">
         Scale<span className="gradient-text">Flow</span>
       </span>
     </span>
