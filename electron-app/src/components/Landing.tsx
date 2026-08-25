@@ -1455,6 +1455,91 @@ function stageFromHash(): Stage {
   return 'tunnel'
 }
 
+// ── Mockup de l'app — fenêtre macOS (maquette) ───────────────────────────────
+function SiteAppMockup() {
+  const tr = useTr()
+  const ROWS = [
+    { name: '@brand.paris',   st: tr('Publié', 'Posted'),    c: '#34D399', dot: false },
+    { name: '@studio.crea',   st: tr('En cours', 'Running'), c: '#FB923C', dot: true  },
+    { name: '@ugc.factory',   st: tr('En cours', 'Running'), c: '#FB923C', dot: true  },
+    { name: '@growth.media',  st: tr('En file', 'Queued'),   c: 'rgba(196,181,253,0.5)', dot: false },
+  ]
+  const NAV = [tr('Accueil', 'Home'), tr('Téléphones', 'Phones'), tr('Publication', 'Post'), tr('Banque', 'Bank'), tr('Studio', 'Studio')]
+  return (
+    <section style={{ position: 'relative', zIndex: 1, padding: '20px 24px 120px' }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', position: 'relative' }}>
+        {/* halo */}
+        <div aria-hidden style={{ position: 'absolute', top: -40, left: '50%', width: '80%', height: 200, transform: 'translateX(-50%)', background: 'radial-gradient(ellipse at center, rgba(124,58,237,0.28), transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
+        <FadeIn>
+          <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: `1px solid rgba(255,255,255,0.1)`, background: '#0B0B16', boxShadow: '0 40px 100px -30px rgba(124,58,237,0.45), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+            {/* Barre de titre macOS */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 16px', borderBottom: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.02)' }}>
+              <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#FF5F57' }} />
+              <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#FEBC2E' }} />
+              <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#28C840' }} />
+              <span style={{ marginLeft: 12, fontFamily: SANS, fontSize: 11.5, fontWeight: 600, color: MUTED }}>ScaleFlow — {tr('Mass Posting', 'Mass Posting')}</span>
+              <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SANS, fontSize: 10.5, fontWeight: 700, color: '#34D399' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 8px #34D399' }} /> 52 {tr('phones en ligne', 'phones online')}
+              </span>
+            </div>
+            {/* Corps */}
+            <div style={{ display: 'flex', minHeight: 320 }}>
+              {/* Sidebar */}
+              <div style={{ width: 168, flexShrink: 0, borderRight: `1px solid ${HAIR}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, color: IVORY, padding: '4px 8px 12px' }}>Scale<span style={{ color: '#818CF8' }}>Flow</span></div>
+                {NAV.map((n, i) => (
+                  <div key={n} style={{ padding: '8px 10px', borderRadius: 8, fontFamily: SANS, fontSize: 12, fontWeight: i === 2 ? 800 : 600,
+                    color: i === 2 ? '#E9D5FF' : 'rgba(196,181,253,0.6)',
+                    background: i === 2 ? 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(34,211,238,0.10))' : 'transparent',
+                    border: i === 2 ? '1px solid rgba(139,92,246,0.35)' : '1px solid transparent' }}>{n}</div>
+                ))}
+                <div style={{ marginTop: 'auto', padding: '12px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}` }}>
+                  <div style={{ fontFamily: SANS, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: MUTED, marginBottom: 8 }}>{tr('Crédits', 'Credits')}</div>
+                  <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                    <div style={{ width: '68%', height: '100%', background: 'linear-gradient(90deg,#22D3EE,#818CF8,#A855F7)' }} />
+                  </div>
+                  <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, color: IVORY, marginTop: 8 }}>3 740</div>
+                </div>
+              </div>
+              {/* Main */}
+              <div style={{ flex: 1, padding: '20px 22px' }}>
+                {/* stepper */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 22 }}>
+                  {[0, 1, 2].map(i => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SANS, fontSize: 11, fontWeight: 800, color: i <= 1 ? '#0A0A16' : MUTED, background: i <= 1 ? 'linear-gradient(120deg,#22D3EE,#818CF8)' : 'rgba(255,255,255,0.06)' }}>{i + 1}</span>
+                      {i < 2 && <span style={{ width: 40, height: 2, background: i < 1 ? '#818CF8' : 'rgba(255,255,255,0.08)' }} />}
+                    </div>
+                  ))}
+                  <span style={{ marginLeft: 8, fontFamily: SANS, fontSize: 12, color: MUTED }}>{tr('Diffusion en cours', 'Broadcasting')}</span>
+                </div>
+                {/* phone rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {ROWS.map(r => (
+                    <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: `1px solid ${HAIR}` }}>
+                      <span style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', flexShrink: 0 }} />
+                      <span style={{ fontFamily: 'monospace', fontSize: 12, color: IVORY }}>{r.name}</span>
+                      <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: SANS, fontSize: 11, fontWeight: 700, color: r.c }}>
+                        {r.dot && <span style={{ width: 6, height: 6, borderRadius: '50%', background: r.c, animation: 'sf-status-pulse 1.6s ease-in-out infinite' }} />}
+                        {r.st}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <button style={{ marginTop: 18, width: '100%', padding: '13px', borderRadius: 11, border: 'none', cursor: 'default',
+                  background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', color: '#0A0A16',
+                  fontFamily: SANS, fontSize: 13, fontWeight: 800, boxShadow: '0 0 28px -8px rgba(129,140,248,0.7)' }}>
+                  ⚡ {tr('Lancer la diffusion sur 52 comptes', 'Launch broadcast on 52 accounts')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </FadeIn>
+      </div>
+    </section>
+  )
+}
+
 // ── Comment ça marche — 3 étapes (maquette) ──────────────────────────────────
 function SiteHowItWorks() {
   const tr = useTr()
@@ -1604,6 +1689,9 @@ export function Landing() {
       {stage === 'site' && <>
 
       <SiteHero onStudio={onStudio} />
+
+      {/* ── Mockup de l'app ──────────────────────────────────────────────────── */}
+      <SiteAppMockup />
 
       {/* ── Manifeste ────────────────────────────────────────────────────────── */}
       <section id="manifesto" style={{ position: 'relative', zIndex: 1, padding: '140px 24px', overflow: 'hidden' }}>
