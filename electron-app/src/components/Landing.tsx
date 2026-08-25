@@ -985,22 +985,36 @@ function PricingSection() {
           </div>
         </FadeIn>
 
-        {/* Plan cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 1, background: HAIR, border: `1px solid ${HAIR}`, marginBottom: 100 }}>
+        {/* Plan cards — maquette : cartes séparées arrondies, Pro en bordure dégradée */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 100 }}>
           {PLANS.map((p, i) => {
-            const inverted = p.popular
+            const inverted = false  // maquette : toutes les cartes sombres
             return (
               <FadeIn key={p.name} delay={i * 0.08} style={{ display: 'flex', flex: 1 }}>
                 <div
                   className="sf-plan-card"
                   style={{
                     position: 'relative',
-                    background: inverted ? IVORY : BG,
+                    borderRadius: 20,
+                    background: p.popular
+                      ? 'linear-gradient(#0A0A1C,#0A0A1C) padding-box, linear-gradient(135deg,#22D3EE,#818CF8,#A855F7) border-box'
+                      : 'rgba(255,255,255,0.025)',
+                    border: p.popular ? '1.5px solid transparent' : `1px solid ${HAIR}`,
+                    boxShadow: p.popular ? '0 30px 80px -30px rgba(124,58,237,0.5)' : 'none',
                     display: 'flex', flexDirection: 'column',
                     padding: '40px 34px',
                     flex: 1,
                   }}
                 >
+                  {p.popular && (
+                    <span style={{
+                      position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
+                      padding: '5px 16px', borderRadius: 99,
+                      background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', color: '#0A0A16',
+                      fontFamily: SANS, fontSize: 10.5, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
+                      whiteSpace: 'nowrap',
+                    }}>{tr('Populaire', 'Popular')}</span>
+                  )}
                   {/* Tag */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 30 }}>
                     <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 17, color: inverted ? 'rgba(10,10,12,0.5)' : FAINT }}>0{i + 1}</span>
@@ -1070,25 +1084,26 @@ function PricingSection() {
                     ))}
                   </ul>
 
-                  {/* CTA */}
-                  <a href={TELEGRAM_URL} target="_blank" rel="noreferrer" className="sf-shine"
+                  {/* CTA — Pro en dégradé de marque, les autres en contour */}
+                  <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
                     style={{
                       display: 'block', textAlign: 'center', marginTop: 34,
-                      padding: '15px',
-                      fontFamily: SANS, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
+                      padding: '15px', borderRadius: 12,
+                      fontFamily: SANS, fontSize: 13, fontWeight: p.popular ? 800 : 700, letterSpacing: '0.02em',
                       textDecoration: 'none',
-                      background: inverted ? '#0F1014' : 'transparent',
-                      color: inverted ? IVORY : IVORY,
-                      border: `1px solid ${inverted ? '#0F1014' : 'rgba(233,234,240,0.3)'}`,
-                      transition: 'all 0.3s',
+                      background: p.popular ? 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)' : 'rgba(255,255,255,0.03)',
+                      color: p.popular ? '#0A0A16' : IVORY,
+                      border: p.popular ? 'none' : `1px solid ${HAIR}`,
+                      boxShadow: p.popular ? '0 0 28px -8px rgba(129,140,248,0.7)' : 'none',
+                      transition: 'all 0.25s',
                     }}
                     onMouseEnter={e => {
-                      if (inverted) { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.color = '#0F1014' }
-                      else { e.currentTarget.style.background = IVORY; e.currentTarget.style.color = '#0F1014'; e.currentTarget.style.borderColor = IVORY }
+                      if (p.popular) { e.currentTarget.style.boxShadow = '0 0 44px -6px rgba(129,140,248,1)'; e.currentTarget.style.transform = 'translateY(-1px)' }
+                      else { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }
                     }}
                     onMouseLeave={e => {
-                      if (inverted) { e.currentTarget.style.background = '#0F1014'; e.currentTarget.style.borderColor = '#0F1014'; e.currentTarget.style.color = IVORY }
-                      else { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = IVORY; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.3)' }
+                      if (p.popular) { e.currentTarget.style.boxShadow = '0 0 28px -8px rgba(129,140,248,0.7)'; e.currentTarget.style.transform = 'none' }
+                      else { e.currentTarget.style.borderColor = HAIR as string; e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }
                     }}>
                     {tr(p.btnLabel, p.btnLabelEn)}
                   </a>
