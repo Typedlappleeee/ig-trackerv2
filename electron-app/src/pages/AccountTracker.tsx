@@ -312,7 +312,7 @@ function StatCard({ label, value, accent, glyph, tint, fg }: { label: string; va
         <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)' }}>{label}</span>
         <span aria-hidden style={{ width: 26, height: 26, borderRadius: 8, display: 'grid', placeItems: 'center', background: tint, color: fg, fontSize: 12, flex: '0 0 auto' }}>{glyph}</span>
       </div>
-      <div className="sf-tabular" style={{ fontSize: 30, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--text-1)' }}>{value}</div>
+      <div className="sf-tabular" style={{ fontFamily: "'Space Grotesk', 'Manrope', sans-serif", fontSize: 30, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--text-1)' }}>{value}</div>
       <div aria-hidden style={{ height: 3, borderRadius: 3, background: accent, opacity: 0.85, width: '100%' }} />
     </div>
   )

@@ -472,7 +472,7 @@ function StatCard({ icon, label, value, sub, accent }: { icon: string; label: st
         <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-4)' }}>{label}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-        <span style={{ fontSize: 24, fontWeight: 800, color: accent ?? 'var(--text-1)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+        <span style={{ fontFamily: "'Space Grotesk', 'Manrope', sans-serif", fontSize: 24, fontWeight: 700, color: accent ?? 'var(--text-1)', lineHeight: 1, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
         {sub && <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{sub}</span>}
       </div>
     </div>

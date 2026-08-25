@@ -151,7 +151,7 @@ function Kpi({ label, value, delta, sub, accent }: {
           </span>
         )}
       </div>
-      <p className="sf-tabular" style={{ fontSize: 26, fontWeight: 800, color: IVORY, marginTop: 8, lineHeight: 1 }}>{value}</p>
+      <p className="sf-tabular" style={{ fontFamily: "'Space Grotesk', 'Manrope', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: IVORY, marginTop: 8, lineHeight: 1 }}>{value}</p>
       {sub
         ? <p style={{ fontSize: 11.5, color: FAINT, marginTop: 8 }}>{sub}</p>
         : hasDelta && <p style={{ fontSize: 11.5, color: FAINT, marginTop: 8 }}>{tr('sur la période', 'over the period')}</p>}

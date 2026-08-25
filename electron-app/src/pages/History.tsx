@@ -366,7 +366,7 @@ export function History({ user, onNavigate }: { user: User; onNavigate?: (p: Pag
           }}>
             <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: accent, opacity: 0.85 }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ fontSize: 19, fontWeight: 900, color: accent, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</span>
+              <span style={{ fontFamily: "'Space Grotesk', 'Manrope', sans-serif", fontSize: 21, fontWeight: 700, color: accent, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</span>
               <span style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</span>
             </div>
           </div>
