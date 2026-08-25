@@ -1073,7 +1073,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                   onMouseLeave={clickable ? e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = 'none' } : undefined}
                 >
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 8px ${color}` }} />
-                  <span style={{ fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{val}</span>
+                  <span style={{ fontFamily: "'Space Grotesk', 'Manrope', sans-serif", fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{val}</span>
                   <span style={{ fontSize: 12, color: 'rgba(233,234,240,0.5)', fontWeight: 600 }}>{label}</span>
                   {clickable && <span style={{ opacity: 0.5, marginLeft: 2 }}>›</span>}
                 </button>
