@@ -79,7 +79,7 @@ function Preview({ kind, accent }: { kind: PreviewKind; accent: string }) {
           ))}
         </div>
         <div style={{ marginLeft: 'auto', textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 24, fontWeight: 900, color: accent, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>×24</div>
+          <div style={{ fontFamily: "'Space Grotesk', 'Manrope', sans-serif", fontSize: 24, fontWeight: 700, color: accent, lineHeight: 1, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>×24</div>
           <div style={{ fontSize: 8.5, color: 'rgba(233,234,240,0.45)', marginTop: 3 }}>uniques</div>
         </div>
       </div>
