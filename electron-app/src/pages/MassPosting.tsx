@@ -2638,19 +2638,19 @@ export function MassPosting({ user }: MassPostingProps) {
             {/* Summary stats */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 22, color: phoneList.length > 0 ? 'var(--accent)' : FAINT, lineHeight: 1, fontWeight: 800 }}>{phoneList.length}</span>
+                <span style={{ fontFamily: "'Space Grotesk', 'Manrope', sans-serif", fontStyle: 'normal', fontSize: 22, letterSpacing: '-0.02em', color: phoneList.length > 0 ? 'var(--accent)' : FAINT, lineHeight: 1, fontWeight: 800 }}>{phoneList.length}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: FAINT }}>{lang === 'en' ? 'phones' : 'téléphones'}</span>
               </div>
               <div style={{ width: 1, height: 20, background: 'rgba(233,234,240,0.08)' }} />
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 22, color: selectedVideos.length > 0 ? 'var(--accent)' : FAINT, lineHeight: 1, fontWeight: 800 }}>{selectedVideos.length}</span>
+                <span style={{ fontFamily: "'Space Grotesk', 'Manrope', sans-serif", fontStyle: 'normal', fontSize: 22, letterSpacing: '-0.02em', color: selectedVideos.length > 0 ? 'var(--accent)' : FAINT, lineHeight: 1, fontWeight: 800 }}>{selectedVideos.length}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: FAINT }}>{lang === 'en' ? 'videos' : 'vidéos'}</span>
               </div>
               {phoneList.length > 0 && (
                 <>
                   <div style={{ width: 1, height: 20, background: 'rgba(233,234,240,0.08)' }} />
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span style={{ fontFamily: SANS, fontStyle: 'normal', fontSize: 22, color: 'var(--accent-l)', lineHeight: 1, fontWeight: 800 }}>{phoneList.length * CREDIT_COSTS.mass_posting}</span>
+                    <span style={{ fontFamily: "'Space Grotesk', 'Manrope', sans-serif", fontStyle: 'normal', fontSize: 22, letterSpacing: '-0.02em', color: 'var(--accent-l)', lineHeight: 1, fontWeight: 800 }}>{phoneList.length * CREDIT_COSTS.mass_posting}</span>
                     <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: FAINT }}>{lang === 'en' ? 'credits' : 'crédits'}</span>
                   </div>
                 </>
