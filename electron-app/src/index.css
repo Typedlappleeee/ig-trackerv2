@@ -906,11 +906,11 @@ html[data-theme="light"] body { background: var(--base); color: var(--text-1); }
 }
 .sf-page-title {
   font-family: 'Space Grotesk', 'Manrope', sans-serif;
-  font-size: 21px;
+  font-size: 30px;          /* Redesign : H1 page 30–34px (spec) — était 21px */
   font-weight: 700;
   color: var(--text-1);
-  letter-spacing: -0.02em;
-  line-height: 1.12;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
 }
 .sf-page-sub {
   font-size: 12.5px;
