@@ -7,9 +7,10 @@
 
 html, body, #root {
   height: 100%;
-  background: #0A0B0E;
+  background: #06060E;
   color: #E9EAF0;
-  font-family: 'Inter', system-ui, sans-serif;
+  /* Redesign : corps en Manrope, titres en Space Grotesk (cf. .sf-page-title). */
+  font-family: 'Manrope', 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -24,18 +25,18 @@ html, body, #root {
 ::-webkit-scrollbar       { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(233,234,240,0.14);
+  background: rgba(255,255,255,0.12);
   border-radius: 99px;
   border: 2px solid transparent;
   background-clip: padding-box;
   transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99,102,241,0.4);
+  background: rgba(139,92,246,0.45);
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-corner { background: transparent; }
-* { scrollbar-width: thin; scrollbar-color: rgba(233,234,240,0.18) transparent; }
+* { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.3) transparent; }
 
 /* ── Selection ──────────────────────────────────────────────────────────────── */
 ::selection { background: rgba(99,102,241,0.3); color: #E9EAF0; }
@@ -831,8 +832,8 @@ html[data-theme="light"] body { background: var(--base); color: var(--text-1); }
   --surface-3:  #17172A;
   --overlay:    rgba(2,2,5,0.96);
 
-  --border:        rgba(255,255,255,0.055);
-  --border-md:     rgba(255,255,255,0.09);
+  --border:        rgba(255,255,255,0.08);
+  --border-md:     rgba(255,255,255,0.11);
   --border-strong: rgba(255,255,255,0.14);
   --border-accent: rgba(99,102,241,0.22);
 
@@ -845,8 +846,11 @@ html[data-theme="light"] body { background: var(--base); color: var(--text-1); }
 
   --text-1: #F2F0FF;
   --text-2: rgba(196,181,253,0.72);
-  --text-3: rgba(148,163,184,0.52);
-  --text-4: rgba(100,116,139,0.38);
+  --text-3: rgba(196,181,253,0.6);
+  --text-4: rgba(148,163,184,0.55);
+
+  /* Dégradé de marque (cyan → indigo → violet) — boutons, logo, chiffres. */
+  --brand-grad: linear-gradient(135deg, #22D3EE, #818CF8, #A855F7);
 
   --ok:      #22C55E;
   --ok-dim:  rgba(34,197,94,0.1);
@@ -901,11 +905,12 @@ html[data-theme="light"] body { background: var(--base); color: var(--text-1); }
   border-radius: 0 0 1px 1px;
 }
 .sf-page-title {
+  font-family: 'Space Grotesk', 'Manrope', sans-serif;
   font-size: 21px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-1);
-  letter-spacing: -0.04em;
-  line-height: 1.18;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
 }
 .sf-page-sub {
   font-size: 12.5px;
