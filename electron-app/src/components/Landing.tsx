@@ -13,8 +13,9 @@ const REEL_PHOTOS = [
 ]
 
 // ── Design tokens — "ScaleFlow Noir" ─────────────────────────────────────────
-const SERIF = "'Instrument Serif', 'Times New Roman', Georgia, serif"
-const SANS  = "'Inter', system-ui, sans-serif"
+const SERIF   = "'Instrument Serif', 'Times New Roman', Georgia, serif"
+const SANS    = "'Manrope', 'Inter', system-ui, sans-serif"
+const DISPLAY = "'Space Grotesk', 'Manrope', sans-serif"
 const BG    = '#0A0B0E'
 const IVORY = '#E9EAF0'
 // Contraste relevé : les anciens 0.42 / 0.22 échouaient WCAG AA (illisibles).
@@ -29,7 +30,7 @@ type IconName =
   | 'zap' | 'send' | 'users' | 'bot' | 'clapperboard' | 'bar-chart-3'
   | 'calendar' | 'timer' | 'folder-archive' | 'shuffle' | 'smartphone'
   | 'crown' | 'building-2' | 'eye' | 'eye-off' | 'alert-triangle' | 'check'
-  | 'arrow-right' | 'arrow-up-right'
+  | 'arrow-right' | 'arrow-up-right' | 'download'
 
 const ICON_PATHS: Record<IconName, React.ReactNode> = {
   zap:              <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z" />,
@@ -51,6 +52,7 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
   check:            <path d="M20 6 9 17l-5-5" />,
   'arrow-right':   (<><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></>),
   'arrow-up-right':(<><path d="M7 7h10v10" /><path d="M7 17 17 7" /></>),
+  download:        (<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></>),
 }
 
 function Icon({ name, size = 16, label, style }: { name: IconName; size?: number; label?: string; style?: React.CSSProperties }) {
@@ -695,127 +697,103 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
   const tr = useTr()
   const [ctaHover, setCtaHover] = useState(false)
 
-  const CARDS = [
-    { x: -36, y: -16, rot: -7, views: '870K' },
-    { x:  32, y: -18, rot:  6, views: '1.1M' },
-    { x: -30, y:  22, rot: -4, views: '920K' },
-    { x:  34, y:  20, rot:  5, views: '990K' },
-  ]
-  const cW = 128, cH = 182
+  // Dégradés de marque (maquette) — cyan pour « 100+ comptes », indigo→rose pour « un seul clic ».
+  const CYAN_GRAD   = 'linear-gradient(90deg,#22D3EE,#67E8F9)'
+  const CLICK_GRAD  = 'linear-gradient(90deg,#818CF8,#C4B5FD 55%,#F472B6)'
+  const BRAND_GRAD  = 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)'
+  const gradText = (g: string): React.CSSProperties => ({ background: g, WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' })
 
   return (
-    <section style={{ position: 'relative', minHeight: 'calc(100vh - 64px)', overflow: 'hidden', background: BG, display: 'flex', flexDirection: 'column' }}>
-      {/* glow */}
-      <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%,-50%)', width: 900, height: 700, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(99,102,241,0.04), transparent)', filter: 'blur(80px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', top: '46%', left: '50%', transform: 'translate(-50%,-50%)', width: 560, height: 420, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(99,102,241,0.05), transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
+    <section style={{ position: 'relative', overflow: 'hidden', background: BG, display: 'flex', flexDirection: 'column' }}>
+      {/* Halo d'ambiance centré (aurora douce) */}
+      <div aria-hidden style={{ position: 'absolute', top: -80, left: '50%', width: 900, height: 620, transform: 'translateX(-50%)', background: 'radial-gradient(ellipse 60% 55% at 50% 30%, rgba(124,58,237,0.22), transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none', zIndex: 0 }} />
 
-      {/* Floating reels — refined monochrome frames */}
-      {CARDS.map((c, i) => (
-        <div key={i} style={{
-          position: 'absolute',
-          left: `calc(50% + ${c.x}% - ${cW / 2}px)`,
-          top: `calc(48% + ${c.y}% - ${cH / 2}px)`,
-          width: cW, height: cH,
-          transform: `rotate(${c.rot}deg)`,
-          borderRadius: 6, overflow: 'hidden',
-          border: `1px solid rgba(233,234,240,0.14)`,
-          boxShadow: '0 32px 80px rgba(0,0,0,0.85)',
-          animation: `sf-float ${5 + i * 0.7}s ease-in-out ${i * 0.8}s infinite`,
-          zIndex: 2, opacity: 0.85,
-        }}>
-          <img src={REEL_PHOTOS[i % REEL_PHOTOS.length]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'saturate(0.85) brightness(0.82)' }} loading="lazy" />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 55%, rgba(6,6,8,0.85) 100%)' }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width="8" height="8" viewBox="0 0 24 24" fill={GOLD}><path d="M8 5v14l11-7z"/></svg>
-            <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 700, color: IVORY, letterSpacing: '0.04em' }}>{c.views}</span>
-            <span style={{ fontFamily: SANS, fontSize: 8, fontWeight: 600, color: FAINT, letterSpacing: '0.18em', marginLeft: 'auto', textTransform: 'uppercase' }}>{tr('vues', 'views')}</span>
-          </div>
-        </div>
-      ))}
-
-      {/* vignette to keep center readable */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3, background: 'radial-gradient(ellipse 46% 50% at 50% 48%, rgba(6,6,8,0.82) 0%, rgba(6,6,8,0.25) 55%, transparent 100%)' }} />
-
-      {/* Center content */}
-      <div style={{ position: 'relative', zIndex: 10, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '64px 24px 40px' }}>
+      {/* Contenu centré */}
+      <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '96px 24px 40px', maxWidth: 1000, margin: '0 auto' }}>
+        {/* Badge pill */}
         <FadeIn>
-          <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 34 }}>{tr('Le studio nouvelle génération', 'The next-generation studio')}</MicroLabel>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, padding: '8px 16px', borderRadius: 99, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, marginBottom: 34 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399', boxShadow: '0 0 10px #34D399', animation: 'sf-status-pulse 2.4s ease-in-out infinite' }} />
+            <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: 'rgba(226,222,255,0.85)' }}>{tr('Automatisation Instagram & TikTok multi-comptes', 'Multi-account Instagram & TikTok automation')}</span>
+          </div>
         </FadeIn>
 
+        {/* H1 maquette */}
         <FadeIn delay={0.08}>
-          <h1 style={{ margin: 0, lineHeight: 1.0, letterSpacing: '-0.04em', maxWidth: 1040 }}>
-            <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(40px, 6.6vw, 92px)', color: IVORY }}>
-              {tr('L’automatisation', 'Instagram & TikTok')}
-            </span>
-            <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(40px, 6.6vw, 92px)', color: IVORY }}>
-              {tr('Instagram & TikTok,', 'automation,')}
-            </span>
-            <span className="sf-serif-shimmer" style={{ display: 'block', fontFamily: SERIF, fontStyle: 'italic', fontWeight: 400, fontSize: 'clamp(44px, 7vw, 100px)', color: GOLD, letterSpacing: '-0.005em', marginTop: '0.06em' }}>
-              {tr('élevée au rang d’art.', 'elevated to an art.')}
-            </span>
+          <h1 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(44px, 7.2vw, 82px)', lineHeight: 1.02, letterSpacing: '-0.03em', color: IVORY, maxWidth: 900 }}>
+            {tr('Publie sur ', 'Post to ')}
+            <span style={gradText(CYAN_GRAD)}>{tr('100+ comptes', '100+ accounts')}</span><br />
+            {tr('en ', 'in ')}<span style={gradText(CLICK_GRAD)}>{tr('un seul clic', 'a single click')}</span>.
           </h1>
         </FadeIn>
 
+        {/* Sous-titre */}
         <FadeIn delay={0.16}>
-          <p style={{ fontFamily: SANS, fontSize: 15, color: MUTED, margin: '30px auto 44px', lineHeight: 1.8, maxWidth: 480, fontWeight: 400 }}>
-            {tr('Des dizaines de comptes. Des centaines de publications. Une seule interface — pensée pour ceux qui voient grand.', 'Dozens of accounts. Hundreds of posts. One interface — built for those who think big.')}
+          <p style={{ fontFamily: SANS, fontSize: 17, color: MUTED, margin: '26px auto 40px', lineHeight: 1.65, maxWidth: 560, fontWeight: 400 }}>
+            {tr('Mass posting, programmation, warmup et remix vidéo réunis dans ', 'Mass posting, scheduling, warmup and video remix in ')}
+            <span style={{ color: IVORY, fontWeight: 600 }}>{tr('un seul poste de pilotage', 'one control center')}</span>.
+            {tr(' Ce qui te prenait la semaine se fait en 5 minutes.', ' What used to take a week now takes 5 minutes.')}
           </p>
         </FadeIn>
 
+        {/* CTAs */}
         <FadeIn delay={0.24}>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button onClick={onStudio}
-              onMouseEnter={() => setCtaHover(true)}
-              onMouseLeave={() => setCtaHover(false)}
+              onMouseEnter={() => setCtaHover(true)} onMouseLeave={() => setCtaHover(false)}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 12,
-                padding: '17px 38px',
-                background: ctaHover ? GOLD : IVORY,
-                border: `1px solid ${ctaHover ? GOLD : IVORY}`,
-                color: '#0F1014',
-                fontFamily: SANS, fontSize: 11, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
-                cursor: 'pointer',
-                transition: 'all 0.4s cubic-bezier(0.16,1,0.3,1)',
+                display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 30px', borderRadius: 12,
+                background: BRAND_GRAD, border: 'none', color: '#0A0A16',
+                fontFamily: SANS, fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
+                boxShadow: ctaHover ? '0 0 44px -6px rgba(129,140,248,1)' : '0 0 28px -8px rgba(129,140,248,0.7)',
+                transform: ctaHover ? 'translateY(-1px)' : 'none',
+                transition: 'all 0.3s cubic-bezier(0.16,1,0.3,1)',
               }}>
-              {tr('Entrer au Studio', 'Enter the Studio')} <Icon name="arrow-right" size={14} />
+              {tr('Commencer gratuitement', 'Start for free')} <Icon name="arrow-right" size={16} />
             </button>
-            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer" className="sf-shine"
+            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 12,
-                padding: '17px 38px',
-                background: 'transparent',
-                border: `1px solid rgba(233,234,240,0.25)`,
-                color: IVORY,
-                fontFamily: SANS, fontSize: 11, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
-                textDecoration: 'none',
-                transition: 'all 0.35s',
+                display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 30px', borderRadius: 12,
+                background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}`, color: IVORY,
+                fontFamily: SANS, fontSize: 14.5, fontWeight: 700, textDecoration: 'none', transition: 'all 0.25s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(233,234,240,0.6)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(233,234,240,0.25)' }}>
-              {tr('Acheter une clé', 'Buy a key')}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = HAIR as string; e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}>
+              <Icon name="download" size={16} /> {tr('Télécharger pour Windows', 'Download for Windows')}
             </a>
           </div>
         </FadeIn>
 
-        {/* Stats row — chiffres animés au scroll */}
-        <FadeIn delay={0.34}>
-          <div style={{ display: 'flex', gap: 0, marginTop: 70, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {/* Micro-réassurances */}
+        <FadeIn delay={0.3}>
+          <div style={{ display: 'flex', gap: 22, justifyContent: 'center', flexWrap: 'wrap', marginTop: 18 }}>
+            {[tr('Sans carte bancaire', 'No credit card'), tr('Windows, Mac & Web', 'Windows, Mac & Web'), tr('Setup en < 5 min', 'Setup in < 5 min')].map(t => (
+              <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: 'rgba(196,181,253,0.6)' }}>
+                <span style={{ color: '#34D399' }}>✓</span> {t}
+              </span>
+            ))}
+          </div>
+        </FadeIn>
+
+        {/* Stats maquette : 100+ / 1 M+ / 15h */}
+        <FadeIn delay={0.4}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14, marginTop: 64, width: '100%', maxWidth: 680 }}>
             {[
-              { node: <CountUp to={50} suffix="+" />,  l: tr('Téléphones pilotés en parallèle', 'Phones driven in parallel') },
-              { node: <CountUp to={10} suffix="K" />,  l: tr('Publications chaque mois', 'Posts every month') },
-              { node: <>24/7</>,                        l: tr('Scheduler autonome dans le cloud', 'Autonomous scheduler in the cloud') },
-            ].map((s, i, a) => (
-              <div key={i} style={{ padding: '0 44px', textAlign: 'center', borderRight: i < a.length - 1 ? `1px solid ${HAIR}` : 'none' }}>
-                <div style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 'clamp(30px, 3.4vw, 44px)', color: IVORY, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.node}</div>
-                <div style={{ fontFamily: SANS, fontSize: 9.5, fontWeight: 600, letterSpacing: '0.22em', textTransform: 'uppercase', color: FAINT, marginTop: 10, maxWidth: 170 }}>{s.l}</div>
+              { node: <CountUp to={100} suffix="+" />, l: tr('comptes en parallèle', 'accounts in parallel') },
+              { node: <>1 M+</>,                        l: tr('posts publiés', 'posts published') },
+              { node: <>15h</>,                         l: tr('gagnées / semaine', 'saved / week') },
+            ].map((s, i) => (
+              <div key={i} style={{ padding: '20px 18px', borderRadius: 16, background: 'rgba(255,255,255,0.025)', border: `1px solid ${HAIR}` }}>
+                <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(24px, 3.2vw, 34px)', color: IVORY, lineHeight: 1, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{s.node}</div>
+                <div style={{ fontFamily: SANS, fontSize: 12, fontWeight: 500, color: MUTED, marginTop: 8 }}>{s.l}</div>
               </div>
             ))}
           </div>
         </FadeIn>
       </div>
 
-      {/* Marquee bottom */}
-      <div style={{ position: 'relative', zIndex: 10 }}>
+      {/* Marquee bas */}
+      <div style={{ position: 'relative', zIndex: 10, marginTop: 40 }}>
         <Marquee items={[tr('Mass Posting', 'Mass Posting'), tr('Précision', 'Precision'), tr('Multi-Comptes', 'Multi-Account'), tr('Élégance', 'Elegance'), tr('Reels & Stories', 'Reels & Stories'), tr('Échelle', 'Scale'), tr('Cloud Phones', 'Cloud Phones'), tr('Autonomie', 'Autonomy'), tr('Intelligence Artificielle', 'Artificial Intelligence'), tr('Vitesse', 'Speed')]} />
       </div>
     </section>
