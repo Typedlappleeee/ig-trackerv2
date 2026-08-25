@@ -1540,6 +1540,64 @@ function SiteAppMockup() {
   )
 }
 
+// ── Cloud Phones — auto-hébergé (maquette) ───────────────────────────────────
+function SiteCloudPhones() {
+  const tr = useTr()
+  const POINTS = [
+    tr('Tes propres appareils Android, sur ton serveur — plus de dépendance à GeeLark.', 'Your own Android devices, on your server — no more GeeLark dependency.'),
+    tr('Comptes illimités : ajoute autant de cloud phones que ta machine peut en faire tourner.', 'Unlimited accounts: add as many cloud phones as your machine can run.'),
+    tr('Un proxy propre par appareil, contrôle ADB en direct, démarrage / arrêt à la demande.', 'A clean proxy per device, live ADB control, start / stop on demand.'),
+  ]
+  const DEV = [
+    { n: 'sf-cloud-01', s: tr('Démarré', 'Started'), c: '#34D399' },
+    { n: 'sf-cloud-02', s: tr('Démarré', 'Started'), c: '#34D399' },
+    { n: 'sf-cloud-03', s: tr('Démarrage', 'Booting'), c: '#FB923C' },
+    { n: 'sf-cloud-04', s: tr('Arrêté', 'Stopped'), c: 'rgba(196,181,253,0.5)' },
+  ]
+  return (
+    <section id="cloud" style={{ position: 'relative', zIndex: 1, padding: '40px 24px 120px', overflow: 'hidden' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 48, alignItems: 'center' }}>
+        <FadeIn>
+          <div>
+            <MicroLabel color="rgba(52,211,153,0.6)" style={{ marginBottom: 20 }}>{tr('Infrastructure', 'Infrastructure')}</MicroLabel>
+            <h2 style={{ margin: '0 0 20px', fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(30px, 4.4vw, 48px)', letterSpacing: '-0.03em', color: IVORY, lineHeight: 1.05 }}>
+              {tr('Tes ', 'Your ')}<span style={{ background: 'linear-gradient(120deg,#34D399,#22D3EE)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Cloud Phones</span>{tr('.', '.')}
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {POINTS.map(p => (
+                <div key={p} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <span style={{ flexShrink: 0, marginTop: 3, color: '#34D399' }}><Icon name="check" size={16} /></span>
+                  <span style={{ fontFamily: SANS, fontSize: 14, color: MUTED, lineHeight: 1.65 }}>{p}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </FadeIn>
+        <FadeIn delay={0.1}>
+          <div style={{ borderRadius: 18, border: `1px solid rgba(52,211,153,0.28)`, background: 'linear-gradient(120deg, rgba(52,211,153,0.08), rgba(255,255,255,0.015))', padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <span style={{ fontSize: 18 }}>🖥</span>
+              <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 700, color: '#34D399' }}>{tr('Agent connecté', 'Agent connected')}</span>
+              <span style={{ marginLeft: 'auto', fontFamily: 'monospace', fontSize: 11, color: MUTED }}>v1.4 · 18 ms</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {DEV.map(d => (
+                <div key={d.n} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: `1px solid ${HAIR}` }}>
+                  <span style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg,#10B981,#059669)', flexShrink: 0 }} />
+                  <span style={{ fontFamily: 'monospace', fontSize: 12, color: IVORY }}>{d.n}</span>
+                  <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: SANS, fontSize: 11, fontWeight: 700, color: d.c }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: d.c }} /> {d.s}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </FadeIn>
+      </div>
+    </section>
+  )
+}
+
 // ── Comment ça marche — 3 étapes (maquette) ──────────────────────────────────
 function SiteHowItWorks() {
   const tr = useTr()
@@ -1737,6 +1795,9 @@ export function Landing() {
 
       {/* ── Comment ça marche ── */}
       <SiteHowItWorks />
+
+      {/* ── Cloud Phones ── */}
+      <SiteCloudPhones />
 
       {/* ── Témoignages ── */}
       <SiteTestimonials />
