@@ -1656,26 +1656,36 @@ export function Landing() {
       {/* ── Footer ───────────────────────────────────────────────────────────── */}
       <footer style={{ position: 'relative', zIndex: 1, borderTop: `1px solid ${HAIR}`, overflow: 'hidden' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '60px 28px 40px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 60 }}>
+          {/* Colonnes façon maquette : marque + Produit / Ressources / Légal */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 2fr) repeat(3, 1fr)', gap: 40, marginBottom: 56 }}>
             <div>
               <Wordmark size={18} />
-              <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 14, color: MUTED, margin: '14px 0 0', maxWidth: 260, lineHeight: 1.6 }}>
-                {tr('L’usine de contenu des marques qui dominent Instagram.', 'The content factory behind the brands that dominate Instagram.')}
+              <p style={{ fontFamily: SANS, fontSize: 13.5, color: MUTED, margin: '14px 0 0', maxWidth: 280, lineHeight: 1.7 }}>
+                {tr('L’usine de contenu des marques qui dominent Instagram & TikTok.', 'The content factory behind the brands that dominate Instagram & TikTok.')}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: 36 }}>
-              {[['#manifesto',tr('Manifeste','Manifesto')], ['#features',tr('Fonctionnalités','Features')], ['#pricing',tr('Tarifs','Pricing')], ['#faq','FAQ'], [TELEGRAM_URL,'Telegram']].map(([href, label]) => (
-                <a key={label} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
-                  style={{ fontFamily: SANS, fontSize: 10, fontWeight: 600, letterSpacing: '0.22em', textTransform: 'uppercase', color: FAINT, textDecoration: 'none', transition: 'color 0.2s' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = IVORY)} onMouseLeave={e => (e.currentTarget.style.color = FAINT as string)}>
-                  {label}
-                </a>
-              ))}
-            </div>
+            {[
+              { title: tr('Produit', 'Product'), links: [['#features', tr('Fonctionnalités', 'Features')], ['#pricing', tr('Tarifs', 'Pricing')], ['#manifesto', tr('Manifeste', 'Manifesto')]] as [string, string][] },
+              { title: tr('Ressources', 'Resources'), links: [['#faq', 'FAQ'], [TELEGRAM_URL, 'Telegram']] as [string, string][] },
+              { title: tr('Légal', 'Legal'), links: [['#faq', tr('Mentions légales', 'Legal notice')], ['#faq', tr('Confidentialité', 'Privacy')]] as [string, string][] },
+            ].map(col => (
+              <div key={col.title}>
+                <div style={{ fontFamily: DISPLAY, fontSize: 11, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.7)', marginBottom: 16 }}>{col.title}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  {col.links.map(([href, label]) => (
+                    <a key={label} href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
+                      style={{ fontFamily: SANS, fontSize: 13, fontWeight: 500, color: MUTED, textDecoration: 'none', transition: 'color 0.2s' }}
+                      onMouseEnter={e => (e.currentTarget.style.color = IVORY)} onMouseLeave={e => (e.currentTarget.style.color = MUTED as string)}>
+                      {label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
           <div style={{ borderTop: `1px solid ${HAIR}`, paddingTop: 24, display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }}>
-            <p style={{ fontFamily: SANS, fontSize: 10.5, letterSpacing: '0.14em', color: FAINT, margin: 0 }}>© {new Date().getFullYear()} {tr('SCALEFLOW — TOUS DROITS RÉSERVÉS', 'SCALEFLOW — ALL RIGHTS RESERVED')}</p>
-            <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 13, color: 'rgba(99,102,241,0.5)', margin: 0 }}>{tr('La révolution commence.', 'The revolution begins.')}</p>
+            <p style={{ fontFamily: SANS, fontSize: 11, letterSpacing: '0.1em', color: FAINT, margin: 0 }}>© {new Date().getFullYear()} {tr('SCALEFLOW — Tous droits réservés', 'SCALEFLOW — All rights reserved')}</p>
+            <p style={{ fontFamily: SANS, fontSize: 11.5, color: MUTED, margin: 0 }}>{tr('Conçu en France', 'Made in France')} 🇫🇷</p>
           </div>
         </div>
         {/* Giant ghost wordmark */}
