@@ -19,7 +19,10 @@ export const OK    = '#34D399'
 export const WARN  = '#FBBF24'
 export const ERR   = '#F87171'
 
-export const SANS = "'Inter', system-ui, sans-serif"
+// Redesign : corps en Manrope, display (titres / gros chiffres / KPI) en Space
+// Grotesk. Fallback Inter partout (chargées via le lien Google Fonts de index.html).
+export const SANS    = "'Manrope', 'Inter', system-ui, sans-serif"
+export const DISPLAY = "'Space Grotesk', 'Manrope', 'Inter', sans-serif"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOKENS v2 (additifs) — miroir JS des variables CSS introduites dans index.css.
