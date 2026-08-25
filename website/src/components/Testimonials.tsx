@@ -14,11 +14,10 @@ const IQuote = () => (
 const TESTIMONIALS = [
   {
     quote:
-      "Avant ScaleFlow je passais mes journées à copier-coller des reels téléphone par téléphone. Maintenant je programme 120 comptes le lundi matin et c'est plié pour la semaine. Le mass posting parallèle est juste irréel.",
-    name: 'Quentin M.',
+      "Avant ScaleFlow on passait nos journées à copier-coller des reels téléphone par téléphone. Maintenant on programme 120 comptes le lundi matin et c'est plié pour la semaine. Le mass posting parallèle est juste irréel.",
+    name: 'AGENCE GROWTHPULSE',
     role: 'Agence Growth · 120 comptes',
-    handle: '@quentin.growth',
-    initials: 'QM',
+    initials: 'GP',
     gradient: 'linear-gradient(135deg, #22D3EE, #818CF8)',
     stars: 5,
     stat: '+340%',
@@ -26,11 +25,10 @@ const TESTIMONIALS = [
   },
   {
     quote:
-      "L'auto-warmup m'a sauvé. Je montais 30 nouveaux comptes par mois et j'en perdais la moitié. Depuis que ScaleFlow gère les routines de chauffe, mon taux de survie est passé au-dessus de 90%. Rien que ça vaut l'abonnement.",
-    name: 'Sarah L.',
-    role: 'Créatrice UGC · 45 comptes',
-    handle: '@sarah.ugc',
-    initials: 'SL',
+      "L'auto-warmup nous a sauvés. On montait 30 nouveaux comptes par mois et on en perdait la moitié. Depuis que ScaleFlow gère les routines de chauffe, notre taux de survie est passé au-dessus de 90%. Rien que ça vaut l'abonnement.",
+    name: 'AGENCE UGC LAB',
+    role: 'Contenu UGC · 45 comptes',
+    initials: 'UL',
     gradient: 'linear-gradient(135deg, #A855F7, #EC4899)',
     stars: 5,
     stat: '90%+',
@@ -39,10 +37,9 @@ const TESTIMONIALS = [
   {
     quote:
       "On gère les comptes de 12 clients sur GeeLark et le dashboard ScaleFlow est devenu notre tour de contrôle. Les rôles d'équipe, les stats par compte, le studio remix... tout est pensé pour bosser à plusieurs sans se marcher dessus.",
-    name: 'Mehdi K.',
-    role: 'Co-fondateur SMMA · 300+ comptes',
-    handle: '@mehdi.smma',
-    initials: 'MK',
+    name: 'AGENCE SCALEUP MEDIA',
+    role: 'SMMA · 300+ comptes',
+    initials: 'SM',
     gradient: 'linear-gradient(135deg, #818CF8, #34D399)',
     stars: 5,
     stat: '15h',
@@ -141,9 +138,8 @@ export function Testimonials() {
                   {t.initials}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-bold text-text">{t.name}</span>
-                  <span className="block truncate text-xs text-text2">{t.role}</span>
-                  <span className="mt-0.5 block truncate text-[11px] font-medium text-muted">{t.handle}</span>
+                  <span className="block truncate text-sm font-extrabold uppercase tracking-wide text-text">{t.name}</span>
+                  <span className="mt-0.5 block truncate text-xs text-text2">{t.role}</span>
                 </span>
               </figcaption>
             </figure>
