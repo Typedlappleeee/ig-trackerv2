@@ -13,7 +13,7 @@ import type { Page } from '@/components/Layout'
 import {
   ACCENT as GOLD,
   TEXT_1 as IVORY, TEXT_2 as MUTED, TEXT_3 as FAINT, HAIR,
-  BG_0 as BG, BG_1 as BG2, OK, ERR, SANS,
+  BG_0 as BG, BG_1 as BG2, OK, ERR, SANS, DISPLAY,
 } from '@/lib/theme'
 
 // ── SVG paths ──────────────────────────────────────────────────────────────────
@@ -119,9 +119,9 @@ function KpiCard({ label, value, icon, loading, delay = 0, grad, glow, accentCol
       ) : (
         <p style={{
           position: 'relative', zIndex: 1,
-          fontSize: 32, fontWeight: 900, letterSpacing: '-0.035em',
+          fontSize: 32, fontWeight: 700, letterSpacing: '-0.02em',
           color: accentColor, margin: 0, lineHeight: 1,
-          fontFamily: SANS, fontVariantNumeric: 'tabular-nums',
+          fontFamily: DISPLAY, fontVariantNumeric: 'tabular-nums',
         }}>{value}</p>
       )}
     </div>

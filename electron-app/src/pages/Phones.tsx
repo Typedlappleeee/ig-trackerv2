@@ -12,7 +12,7 @@ import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/Toast'
-import { ACCENT, HAIR, SANS, TEXT_1, TEXT_3 } from '@/lib/theme'
+import { ACCENT, HAIR, SANS, DISPLAY, TEXT_1, TEXT_3 } from '@/lib/theme'
 import { useLicense, effectivePlan } from '@/lib/license'
 import { PLAN_MAX_PHONES } from '@/lib/credits'
 
@@ -1289,7 +1289,7 @@ export function Phones({ user }: PhonesProps) {
                     }}>{card.icon}</span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                        <span style={{ fontSize: 22, fontWeight: 900, color: card.valColor, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{card.value}</span>
+                        <span style={{ fontFamily: DISPLAY, fontSize: 24, fontWeight: 700, color: card.valColor, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{card.value}</span>
                         {card.sub && <span style={{ fontSize: 11, color: card.valColor, fontWeight: 800, opacity: 0.85 }}>{card.sub}</span>}
                       </div>
                       <span style={{ fontSize: 10.5, color: 'rgba(233,234,240,0.5)', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{card.label}</span>
