@@ -200,7 +200,7 @@ export function OverlayComposer({ user, onExit }: { user: User; onExit: () => vo
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="6" rx="1"/></svg>
           </div>
           <div style={{ minWidth: 0 }}>
-            <h1 className="sf-page-title sf-title-grad" style={{ fontSize: 22, fontWeight: 800 }}>{tr('Incrustation', 'Overlay')}</h1>
+            <h1 className="sf-page-title sf-title-grad">{tr('Incrustation', 'Overlay')}</h1>
             <p className="sf-page-sub">{tr('Photo/vidéo placée où tu veux, quand tu veux', 'Photo/video placed where and when you want')}</p>
           </div>
         </div>

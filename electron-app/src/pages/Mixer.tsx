@@ -590,7 +590,7 @@ export function Mixer({ user }: MixerProps) {
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h1 className="sf-page-title sf-title-grad" style={{ fontSize: 22, fontWeight: 800 }}>
+              <h1 className="sf-page-title sf-title-grad">
                 Mixer
               </h1>
               {running ? (
