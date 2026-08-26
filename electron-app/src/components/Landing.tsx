@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { SiteLanding } from './SiteLanding'
 import { supabase } from '@/lib/supabase'
 import { useTr } from '@/lib/i18n'
 
@@ -1817,8 +1818,11 @@ export function Landing() {
       {stage === 'studio' && <StudioAuth onBack={() => goTo('reveal')} />}
       {stage === 'tunnel' && <TunnelHero onEnter={() => goTo('reveal')} />}
 
-      {/* ── Nav ───────────────────────────────────────────────────────────────── */}
-      {stage === 'site' && (
+      {/* ── Nouvelle landing (Claude Design) ─────────────────────────────────── */}
+      {stage === 'site' && <SiteLanding onStudio={onStudio} />}
+
+      {/* ── Ancienne landing (désactivée, conservée temporairement) ──────────── */}
+      {false && (
       <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(6,6,8,0.85)', backdropFilter: 'blur(20px)', borderBottom: `1px solid ${HAIR}` }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 28px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Wordmark size={16} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
@@ -1847,8 +1851,8 @@ export function Landing() {
       </nav>
       )}
 
-      {/* ── Site content ──────────────────────────────────────────────────────── */}
-      {stage === 'site' && <>
+      {/* ── Site content (ancien, désactivé) ──────────────────────────────────── */}
+      {false && <>
 
       <SiteHero onStudio={onStudio} />
 
