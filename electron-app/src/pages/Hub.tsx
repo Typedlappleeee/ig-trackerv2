@@ -60,6 +60,10 @@ const HUB_CSS = `
   @keyframes hub-float-a { 0%,100%{transform:translate(0,0)} 50%{transform:translate(34px,24px)} }
   @keyframes hub-float-b { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-28px,30px)} }
   @keyframes hub-line-grow { from{transform:scaleX(0)} to{transform:scaleX(1)} }
+  @keyframes hub-ring { 0%{transform:scale(.7);opacity:.55} 100%{transform:scale(2.1);opacity:0} }
+  @keyframes hub-sweep { 0%{transform:translateX(-130%)} 100%{transform:translateX(340%)} }
+  .hub-teaser { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+  .hub-teaser:hover { transform: translateY(-3px); box-shadow: 0 26px 60px -24px rgba(34,211,238,0.5); }
   .hub-row { transition: background 0.22s ease, padding-left 0.22s ease; position: relative; }
   .hub-row::before { content:''; position:absolute; left:0; top:8px; bottom:8px; width:2px; border-radius:2px; background:linear-gradient(180deg,#818CF8,#8B5CF6); opacity:0; transform:scaleY(0.4); transition:opacity 0.22s ease, transform 0.22s ease; }
   .hub-row:hover { background: rgba(139,92,246,0.05); padding-left: 24px; }
@@ -469,6 +473,27 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
                        grad={k.grad} glow={k.glow} accentColor={k.accentColor} />
             </Fragment>
           ))}
+        </div>
+
+        {/* ── Teaser Cloud Phones (BIENTÔT · Q4 2026) ─────────────────────── */}
+        <div className="hub-teaser" style={{
+          position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 22,
+          width: '100%', marginBottom: 28, padding: '22px 26px', borderRadius: 20, boxSizing: 'border-box',
+          border: '1px solid rgba(34,211,238,0.32)',
+          background: 'linear-gradient(110deg, rgba(34,211,238,0.11), rgba(139,92,246,0.08) 55%, rgba(255,255,255,0.015))',
+          animation: 'hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 0.22s both',
+        }}>
+          <span aria-hidden style={{ position: 'absolute', top: -120, left: '14%', width: 340, height: 340, borderRadius: '99em', border: '1px solid rgba(34,211,238,0.22)', animation: 'hub-ring 4s ease-out infinite', pointerEvents: 'none' }} />
+          <span aria-hidden style={{ position: 'absolute', top: -120, left: '14%', width: 340, height: 340, borderRadius: '99em', border: '1px solid rgba(129,140,248,0.18)', animation: 'hub-ring 4s ease-out infinite', animationDelay: '-2s', pointerEvents: 'none' }} />
+          <span aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, width: 60, background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.16),transparent)', animation: 'hub-sweep 4.5s ease-in-out infinite', pointerEvents: 'none' }} />
+          <span style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 18, background: 'linear-gradient(135deg,#06B6D4,#3B82F6)', fontSize: 25, flexShrink: 0, boxShadow: '0 14px 34px -12px rgba(34,211,238,0.7)' }}>☁️</span>
+          <span style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 7, flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
+              <span style={{ padding: '3px 10px', borderRadius: 99, background: 'rgba(34,211,238,0.18)', border: '1px solid rgba(34,211,238,0.4)', color: '#67E8F9', fontSize: 9.5, fontWeight: 800, letterSpacing: '0.1em', fontFamily: SANS }}>{tr('BIENTÔT · Q4 2026', 'SOON · Q4 2026')}</span>
+            </span>
+            <span style={{ fontFamily: DISPLAY, fontSize: 21, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.15, color: '#FFFFFF' }}>{tr('Les Cloud Phones ScaleFlow arrivent', 'ScaleFlow Cloud Phones are coming')}</span>
+            <span style={{ fontSize: 12.5, lineHeight: 1.55, color: MUTED, fontFamily: SANS }}>{tr('Tes propres appareils Android, démarrés en ', 'Your own Android devices, booted in ')}<strong style={{ color: '#67E8F9' }}>3,2 s</strong>{tr(', en nombre ', ', in ')}<strong style={{ color: '#C4B5FD' }}>{tr('illimité', 'unlimited')}</strong>{tr(', sans payer GeeLark.', ' numbers, no GeeLark fees.')}</span>
+          </span>
         </div>
 
         {/* ── Quick actions ──────────────────────────────────────────────── */}
