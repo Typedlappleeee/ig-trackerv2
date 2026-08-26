@@ -1660,35 +1660,41 @@ export default function StoryLink({ user }: { user: User }) {
                       </div>
                     )}
 
-                    {/* Per-phone link input */}
-                    <div style={{ position: 'relative', marginTop: 6 }}>
-                      <span style={{
-                        position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
-                        pointerEvents: 'none', color: getLink(a.phoneId).trim() ? 'var(--accent)' : 'var(--text-4)',
-                      }}>
-                        <IconLinkSm />
-                      </span>
-                      <input
-                        value={getLink(a.phoneId)}
-                        onChange={e => setLink(a.phoneId, e.target.value)}
-                        disabled={running}
-                        placeholder={tr('lien de ce compte…', "this account's link…")}
-                        className="sf-input"
-                        style={{
-                          height: 30, paddingLeft: 26, paddingRight: getLink(a.phoneId).trim() ? 28 : 9,
-                          fontSize: 11.5, borderRadius: 8,
-                          borderColor: getLink(a.phoneId).trim() ? 'rgba(99,102,241,0.28)' : 'rgba(245,158,11,0.28)',
-                        }}
-                      />
-                      {getLink(a.phoneId).trim() && (
-                        <span style={{
-                          position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                          pointerEvents: 'none', display: 'inline-flex', color: 'var(--accent)',
-                        }} title={tr('Enregistré', 'Saved')} aria-label={tr('Enregistré', 'Saved')}>
-                          <IconSave />
-                        </span>
-                      )}
-                    </div>
+                    {/* Per-phone link input — bordé cyan quand rempli, rose quand manquant */}
+                    {(() => {
+                      const filled = !!getLink(a.phoneId).trim()
+                      return (
+                        <div style={{ position: 'relative', marginTop: 6 }}>
+                          <span style={{
+                            position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+                            pointerEvents: 'none', color: filled ? '#22D3EE' : '#FB7185',
+                          }}>
+                            <IconLinkSm />
+                          </span>
+                          <input
+                            value={getLink(a.phoneId)}
+                            onChange={e => setLink(a.phoneId, e.target.value)}
+                            disabled={running}
+                            placeholder={tr('lien de ce compte…', "this account's link…")}
+                            className="sf-input"
+                            style={{
+                              height: 30, paddingLeft: 26, paddingRight: filled ? 28 : 9,
+                              fontSize: 11.5, borderRadius: 8,
+                              borderColor: filled ? 'rgba(34,211,238,0.55)' : 'rgba(251,113,133,0.5)',
+                              boxShadow: filled ? '0 0 0 1px rgba(34,211,238,0.14)' : '0 0 0 1px rgba(251,113,133,0.12)',
+                            }}
+                          />
+                          {filled && (
+                            <span style={{
+                              position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                              pointerEvents: 'none', display: 'inline-flex', color: '#22D3EE',
+                            }} title={tr('Enregistré', 'Saved')} aria-label={tr('Enregistré', 'Saved')}>
+                              <IconSave />
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Log panel */}
@@ -1713,6 +1719,46 @@ export default function StoryLink({ user }: { user: User }) {
               )
             })}
           </div>
+
+          {/* Pied de validation — comptes / photos / liens + état bloquant + coût */}
+          {!running && (
+            <div style={{ flexShrink: 0, padding: '12px', borderTop: '1px solid var(--border)', background: 'rgba(255,255,255,0.012)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 7 }}>
+                {([
+                  { label: tr('Comptes', 'Accounts'), value: String(selectedIds.length), ok: selectedIds.length > 0 },
+                  { label: tr('Photos', 'Photos'),   value: String(photoPool.length),   ok: photoPool.length > 0 },
+                  { label: tr('Liens', 'Links'),     value: `${selectedIds.length - missingLinkIds.length}/${selectedIds.length}`, ok: selectedIds.length > 0 && missingLinkIds.length === 0 },
+                ]).map(s => (
+                  <div key={s.label} style={{
+                    flex: 1, textAlign: 'center', padding: '8px 4px', borderRadius: 9,
+                    background: s.ok ? 'rgba(34,211,238,0.07)' : 'rgba(255,255,255,0.025)',
+                    border: `1px solid ${s.ok ? 'rgba(34,211,238,0.28)' : 'var(--border)'}`,
+                  }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: s.ok ? '#22D3EE' : 'var(--text-2)' }}>{s.value}</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-4)', marginTop: 4 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              {canRun ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 11px', borderRadius: 9, background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.28)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 700, color: '#22D3EE' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                    {dryRun ? tr('Prêt — mode test', 'Ready — test mode') : tr('Prêt à publier', 'Ready to publish')}
+                  </span>
+                  {!dryRun && (
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
+                      {tr(`${storyCost} crédits`, `${storyCost} credits`)}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="sf-banner is-warn" style={{ alignItems: 'flex-start', margin: 0 }}>
+                  <span style={{ flexShrink: 0, marginTop: 1 }}><IconWarn /></span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{blockReason}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Stop button — shown in col 3 when running */}
           {running && (

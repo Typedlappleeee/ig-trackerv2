@@ -2139,69 +2139,22 @@ export function MassPosting({ user }: MassPostingProps) {
           {/* Phone list */}
           <div className="anim-stagger" style={{ flex: 1, overflow: 'auto', scrollbarWidth: 'thin' }}>
             {phonePickMode === 'phones' && visiblePhones.map(phone => {
-              const checked = selectedPhones.has(phone.id)
+              // Ligne enrichie (PhoneRow) : avatar pp_url/initiale, @username,
+              // badges ⚠ BANNI / ⚠ SHADOW? + date du dernier post, badge #N de la
+              // vidéo assignée. La sélection et le suivi restent inchangés.
               const asgn = assignmentByPhone.get(phone.id)
               const ts = taskStatuses.get(phone.id)
-              const isActive = ts && (ts.status === 'uploading' || ts.status === 'posting')
-              const initials = (phone.ig_username?.[0] ?? phone.phone_name?.[0] ?? '?').toUpperCase()
               return (
-                <button key={phone.id} onClick={() => togglePhone(phone.id)}
-                  className="cursor-pointer"
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 11,
-                    padding: '9px 14px', textAlign: 'left', position: 'relative', border: 'none',
-                    borderBottom: '1px solid rgba(233,234,240,0.04)',
-                    borderLeft: isActive ? '2px solid var(--accent)' : checked ? '2px solid rgba(99,102,241,0.5)' : '2px solid transparent',
-                    background: isActive ? 'rgba(99,102,241,0.09)' : checked ? 'rgba(99,102,241,0.06)' : 'transparent',
-                    boxShadow: isActive ? 'inset 0 0 18px rgba(99,102,241,0.07)' : 'none',
-                    transition: 'background 0.15s, box-shadow 0.15s, border-left-color 0.15s',
-                  }}
-                  onMouseEnter={e => { if (!checked && !isActive) e.currentTarget.style.background = 'rgba(233,234,240,0.03)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'rgba(99,102,241,0.09)' : checked ? 'rgba(99,102,241,0.06)' : 'transparent' }}>
-
-                  {/* Avatar */}
-                  <div style={{
-                    width: 30, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 11, fontWeight: 800, borderRadius: 8,
-                    border: `1px solid ${checked || isActive ? 'rgba(99,102,241,0.45)' : HAIR}`,
-                    color: checked || isActive ? 'var(--accent)' : FAINT,
-                    background: checked || isActive ? 'rgba(99,102,241,0.08)' : 'transparent',
-                    transition: 'all 0.15s',
-                  }}>
-                    {initials}
-                  </div>
-
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: checked || isActive ? IVORY : 'rgba(233,234,240,0.6)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {phone.phone_name}
-                    </p>
-                    {phone.ig_username && (
-                      <p style={{ fontSize: 10, color: checked || isActive ? 'rgba(99,102,241,0.7)' : FAINT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{phone.ig_username}</p>
-                    )}
-                    {ts && ts.status !== 'idle' && ts.status !== 'pending' && (
-                      <span className={STATUS_BADGE[ts.status] ?? 'sf-badge sf-badge-muted'} style={{ marginTop: 3, display: 'inline-flex', fontSize: 9 }}>
-                        {STATUS_LABEL[ts.status]}
-                      </span>
-                    )}
-                  </div>
-
-                  {asgn?.video && (
-                    <span className="sf-badge sf-badge-accent" style={{ fontSize: 9, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                      #{asgn.videoIndex + 1}
-                    </span>
-                  )}
-
-                  {/* Checkbox */}
-                  <div style={{
-                    width: 14, height: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    borderRadius: 4,
-                    background: checked ? 'var(--accent)' : 'transparent',
-                    border: checked ? 'none' : '1px solid rgba(233,234,240,0.18)',
-                    transition: 'all 0.15s',
-                  }}>
-                    {checked && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                  </div>
-                </button>
+                <PhoneRow
+                  key={phone.id}
+                  phone={phone}
+                  checked={selectedPhones.has(phone.id)}
+                  videoIndex={asgn?.video ? asgn.videoIndex : -1}
+                  videoTitle={asgn?.video?.item.title ?? null}
+                  ts={ts}
+                  statusLabel={ts ? (STATUS_LABEL[ts.status] ?? '') : ''}
+                  onToggle={togglePhone}
+                />
               )
             })}
 
