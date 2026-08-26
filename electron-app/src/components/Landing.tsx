@@ -1469,9 +1469,11 @@ type Stage = 'tunnel' | 'reveal' | 'site' | 'studio'
 
 function stageFromHash(): Stage {
   const h = window.location.hash
-  if (h === '#discover') return 'site'
-  if (h === '#studio')   return 'studio'
-  return 'tunnel'
+  if (h === '#studio')  return 'studio'
+  if (h === '#intro')   return 'tunnel'    // ancienne intro « ENTRER » (accessible si besoin)
+  if (h === '#choix')   return 'reveal'
+  // Par défaut : la nouvelle landing Claude Design s'affiche DIRECTEMENT.
+  return 'site'
 }
 
 // ── Mockup de l'app — fenêtre macOS (maquette) ───────────────────────────────
@@ -1771,7 +1773,7 @@ export function Landing() {
       {stage === 'site' && (
       <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(6,6,8,0.85)', backdropFilter: 'blur(20px)', borderBottom: `1px solid ${HAIR}` }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 28px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Wordmark size={16} onClick={() => goTo('tunnel')} />
+          <Wordmark size={16} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {[['#manifesto',tr('Manifeste','Manifesto')], ['#features',tr('Fonctionnalités','Features')], ['#pricing',tr('Tarifs','Pricing')], ['#faq','FAQ']].map(([href, label]) => (
               <a key={href} href={href} style={{ fontFamily: SANS, fontSize: 10.5, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: MUTED, textDecoration: 'none', padding: '8px 14px', transition: 'color 0.2s' }}
