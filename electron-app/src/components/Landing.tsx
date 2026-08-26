@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { SiteLanding } from './SiteLanding'
 import { SeuilScreen } from './SeuilScreen'
+import { EntreeScreen } from './EntreeScreen'
 import { supabase } from '@/lib/supabase'
 import { useTr } from '@/lib/i18n'
 
@@ -1816,7 +1817,7 @@ export function Landing() {
       {stage !== 'site' && <CustomCursor />}
       <Grain opacity={0.045} />
 
-      {stage === 'reveal' && <RevealScreen onDiscover={onDiscover} onStudio={onStudio} />}
+      {stage === 'reveal' && <EntreeScreen onDiscover={onDiscover} onStudio={onStudio} />}
       {stage === 'studio' && <StudioAuth onBack={() => goTo('reveal')} />}
       {stage === 'tunnel' && <SeuilScreen onEnter={() => goTo('reveal')} />}
 
