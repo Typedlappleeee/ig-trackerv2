@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { LogoMark } from './Logo'
 
 const PERKS = [
   { icon: '⚡', title: 'Démarrage instantané', rgb: '34,211,238',  grad: 'linear-gradient(135deg,#06B6D4,#3B82F6)',
@@ -89,7 +90,7 @@ export function CloudPhones() {
 
                 <div className="flex flex-1 flex-col gap-2.5 px-4 pb-4.5 pt-5">
                   <div className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-brand-gradient font-display text-sm font-bold text-[#0A0A16]">S</span>
+                    <LogoMark size={28} />
                     <span className="flex flex-col gap-px text-left">
                       <span className="font-display text-[11.5px] font-bold text-text">sf-cloud-07</span>
                       <span className="text-[9px] font-bold text-emerald">● démarré · Android 14</span>

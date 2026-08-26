@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { SiteLanding } from './SiteLanding'
 import { supabase } from '@/lib/supabase'
 import { useTr } from '@/lib/i18n'
 
@@ -199,11 +200,30 @@ function FadeIn({ children, delay = 0, style = {} }: { children: React.ReactNode
 }
 
 // ── Wordmark ──────────────────────────────────────────────────────────────────
+// Nouveau logo : tuile violette + 2 barres blanches inclinées en sens opposés.
+function LogoMark({ size = 32 }: { size?: number }) {
+  const w = Math.round(size * 0.44)
+  const h = Math.max(2, Math.round(size * 0.095))
+  return (
+    <span aria-hidden="true" style={{
+      width: size, height: size, flexShrink: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: Math.max(2, Math.round(size * 0.1)), borderRadius: Math.round(size * 0.25),
+      background: 'linear-gradient(145deg,#A855F7,#7C3AED)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+    }}>
+      <span style={{ width: w, height: h, borderRadius: 99, background: '#fff', transform: 'skewX(-14deg)' }} />
+      <span style={{ width: w, height: h, borderRadius: 99, background: '#fff', transform: 'skewX(14deg)' }} />
+    </span>
+  )
+}
+
 function Wordmark({ size = 17, onClick }: { size?: number; onClick?: () => void }) {
   const inner = (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', whiteSpace: 'nowrap' }}>
-      <span style={{ fontFamily: SANS, fontWeight: 800, fontSize: size, letterSpacing: '-0.02em', color: IVORY }}>SCALE</span>
-      <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: size * 1.12, color: GOLD, marginLeft: 1 }}>Flow</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: Math.round(size * 0.5), whiteSpace: 'nowrap' }}>
+      <LogoMark size={Math.round(size * 1.7)} />
+      <span style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: size, letterSpacing: '-0.03em' }}>
+        <span style={{ color: IVORY }}>scale</span><span style={{ color: '#A855F7' }}>flow</span>
+      </span>
     </span>
   )
   if (!onClick) return inner
@@ -808,6 +828,8 @@ const FEATURES: { num: string; title: string; titleEn: string; serif: string; se
   { num: '04', title: 'Outils',    titleEn: 'AI',         serif: 'IA',         serifEn: 'tools',      icon: 'bot',             text: 'Scripts, hooks, captions virales, analyse de miniatures. Llama et Claude Vision intégrés directement dans ton flux de travail.', textEn: 'Scripts, hooks, viral captions, thumbnail analysis. Llama and Claude Vision built right into your workflow.' },
   { num: '05', title: 'Programmation', titleEn: 'Scheduling', serif: '',          serifEn: '',           icon: 'calendar',        text: "Planifie tes publications à l’avance. Le scheduler s’exécute dans le cloud, même application fermée.", textEn: 'Schedule your posts in advance. The scheduler runs in the cloud, even with the app closed.' },
   { num: '06', title: 'Suivi',     titleEn: 'Real-time',  serif: 'temps réel', serifEn: 'monitoring', icon: 'smartphone',      text: 'Le statut de chaque cloud phone, en direct. Sessions Instagram, groupes, batteries — tout sous contrôle.', textEn: 'The status of every cloud phone, live. Instagram sessions, groups, batteries — all under control.' },
+  { num: '07', title: 'Auto',      titleEn: 'Auto',       serif: 'Warmup',     serifEn: 'Warmup',     icon: 'timer',           text: 'Chauffe tes comptes tout seuls : likes, visionnages, abonnements par sessions humaines. Ton taux de survie explose.', textEn: 'Warm up your accounts on autopilot: likes, watches, follows in human-like sessions. Your survival rate soars.' },
+  { num: '08', title: 'Équipe &',  titleEn: 'Team &',     serif: 'Organisations', serifEn: 'Orgs',    icon: 'users',           text: 'Rôles owner / admin / membre, organisations multi-comptes, contenu et stats partagés — pour bosser à plusieurs sans se marcher dessus.', textEn: 'Owner / admin / member roles, multi-account organizations, shared content and stats — to work as a team without stepping on each other.' },
 ]
 
 function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number }) {
@@ -953,9 +975,9 @@ function PricingSection() {
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>{tr('Investissement', 'Investment')}</MicroLabel>
-            <h2 style={{ margin: '0 0 34px', lineHeight: 1, letterSpacing: '-0.04em' }}>
-              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 5vw, 62px)', color: IVORY }}>{tr('Trois plans. ', 'Three plans. ')}</span>
-              <span className="sf-serif-shimmer" style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 5.3vw, 66px)', color: GOLD }}>{tr('Zéro limite.', 'Zero limits.')}</span>
+            <h2 style={{ margin: '0 0 34px', lineHeight: 1.02, letterSpacing: '-0.04em', fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(34px, 5vw, 58px)' }}>
+              <span style={{ color: IVORY }}>{tr('Trois plans. ', 'Three plans. ')}</span>
+              <span style={{ background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' }}>{tr('Zéro limite.', 'Zero limits.')}</span>
             </h2>
             {/* Billing toggle */}
             <div style={{ display: 'inline-flex', border: `1px solid ${HAIR}`, padding: 3, gap: 0 }}>
@@ -1009,7 +1031,7 @@ function PricingSection() {
                   )}
                   {/* Tag */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 30 }}>
-                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 17, color: inverted ? 'rgba(10,10,12,0.5)' : FAINT }}>0{i + 1}</span>
+                    <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 15, color: inverted ? 'rgba(10,10,12,0.5)' : FAINT }}>0{i + 1}</span>
                     {(p.popular || p.bestValue) && (
                       <span style={{
                         fontFamily: SANS, fontSize: 9, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
@@ -1023,17 +1045,17 @@ function PricingSection() {
                   </div>
 
                   <h3 style={{ margin: '0 0 4px', fontFamily: SANS, fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: inverted ? '#0F1014' : IVORY }}>{tr(p.name, p.nameEn)}</h3>
-                  <p style={{ margin: '0 0 30px', fontFamily: SERIF, fontStyle: 'normal', fontSize: 15, color: inverted ? 'rgba(10,10,12,0.55)' : MUTED }}>{tr(p.tagline, p.taglineEn)}</p>
+                  <p style={{ margin: '0 0 30px', fontFamily: SANS, fontSize: 14, color: inverted ? 'rgba(10,10,12,0.55)' : MUTED }}>{tr(p.tagline, p.taglineEn)}</p>
 
                   {/* Price */}
                   <div style={{ marginBottom: 8, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                     {yearly && p.originalMonthly && (
-                      <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 17, color: inverted ? 'rgba(10,10,12,0.35)' : FAINT, textDecoration: 'line-through' }}>{p.originalMonthly}</span>
+                      <span style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: 17, color: inverted ? 'rgba(10,10,12,0.35)' : FAINT, textDecoration: 'line-through' }}>{p.originalMonthly}</span>
                     )}
                     <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 52, letterSpacing: '-0.05em', lineHeight: 1, color: inverted ? '#0F1014' : IVORY }}>
                       {yearly ? p.yearlyPrice : p.monthlyPrice}
                     </span>
-                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 16, color: inverted ? 'rgba(10,10,12,0.5)' : MUTED }}>{tr('/mois', '/month')}</span>
+                    <span style={{ fontFamily: SANS, fontSize: 15, color: inverted ? 'rgba(10,10,12,0.5)' : MUTED }}>{tr('/mois', '/month')}</span>
                     {yearly && p.discount && (
                       <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: inverted ? '#0F1014' : GOLD }}>{p.discount}</span>
                     )}
@@ -1122,9 +1144,9 @@ function PricingSection() {
         {/* ── Credit packs — ligne éditoriale ── */}
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <h3 style={{ margin: '0 0 10px', lineHeight: 1 }}>
-              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(24px, 3.4vw, 40px)', letterSpacing: '-0.03em', color: IVORY }}>{tr('Packs de ', 'Credit ')}</span>
-              <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(26px, 3.6vw, 43px)', color: GOLD }}>{tr('crédits', 'packs')}</span>
+            <h3 style={{ margin: '0 0 10px', lineHeight: 1.02, fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(24px, 3.4vw, 38px)', letterSpacing: '-0.03em' }}>
+              <span style={{ color: IVORY }}>{tr('Packs de ', 'Credit ')}</span>
+              <span style={{ background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' }}>{tr('crédits', 'packs')}</span>
             </h3>
             <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: 0 }}>{tr('Recharge à tout moment — les crédits n’expirent jamais.', 'Top up anytime — credits never expire.')}</p>
           </div>
@@ -1141,7 +1163,7 @@ function PricingSection() {
                 <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.3em', textTransform: 'uppercase', color: pack.note ? GOLD : FAINT, margin: '0 0 18px', minHeight: 12 }}>
                   {pack.note ? tr(pack.note, pack.noteEn) : pack.name}
                 </p>
-                <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 42, color: IVORY, margin: '0 0 2px', lineHeight: 1 }}>{pack.credits}</p>
+                <p style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 40, color: IVORY, margin: '0 0 2px', lineHeight: 1 }}>{pack.credits}</p>
                 <p style={{ fontFamily: SANS, fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: FAINT, margin: '0 0 22px' }}>{tr('crédits', 'credits')}</p>
                 <p style={{ fontFamily: SANS, fontWeight: 900, fontSize: 26, letterSpacing: '-0.03em', color: IVORY, margin: '0 0 24px' }}>{pack.price}</p>
                 <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
@@ -1450,8 +1472,11 @@ type Stage = 'tunnel' | 'reveal' | 'site' | 'studio'
 
 function stageFromHash(): Stage {
   const h = window.location.hash
-  if (h === '#discover') return 'site'
-  if (h === '#studio')   return 'studio'
+  if (h === '#studio')  return 'studio'
+  if (h === '#intro')   return 'tunnel'    // ancienne intro « ENTRER » (accessible si besoin)
+  if (h === '#choix')   return 'reveal'
+  if (h === '#discover' || h === '#site') return 'site'
+  // Par défaut : l'intro cinématique « Découvrir ScaleFlow » d'abord, puis la landing.
   return 'tunnel'
 }
 
@@ -1533,6 +1558,52 @@ function SiteAppMockup() {
                 </button>
               </div>
             </div>
+          </div>
+        </FadeIn>
+      </div>
+    </section>
+  )
+}
+
+// ── Grille de consommation des crédits (maquette) ────────────────────────────
+function SiteCreditsGrid() {
+  const tr = useTr()
+  const COSTS = [
+    { icon: '🎬', name: tr('Publication', 'Publishing'),        per: tr('par téléphone', 'per phone'),            cost: '2 cr',                  c: '#A5B4FC', bg: 'rgba(129,140,248,0.12)' },
+    { icon: '⚡', name: 'Mass Posting',                          per: tr('par téléphone', 'per phone'),            cost: '2 cr',                  c: '#D8B4FE', bg: 'rgba(168,85,247,0.12)' },
+    { icon: '🔗', name: 'Story',                                 per: tr('par téléphone', 'per phone'),            cost: '1 cr',                  c: '#67E8F9', bg: 'rgba(34,211,238,0.12)' },
+    { icon: '🎞', name: 'Remix & Spoof',                         per: tr('par vidéo', 'per video'),                cost: tr('Gratuit', 'Free'),   c: '#34D399', bg: 'rgba(52,211,153,0.12)' },
+    { icon: '🤖', name: tr('Tâche automatique', 'Automated task'), per: tr('par jour, tâche active', 'per day, active task'), cost: '50 cr',        c: '#FCD34D', bg: 'rgba(251,191,36,0.12)' },
+    { icon: '↻', name: tr('Exécution de tâche', 'Task run'),     per: tr('par téléphone', 'per phone'),            cost: '2 cr',                  c: '#FED7AA', bg: 'rgba(251,146,60,0.12)' },
+  ]
+  return (
+    <section style={{ position: 'relative', zIndex: 1, padding: '0 24px 120px' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+        <FadeIn>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 20 }}>{tr('Crédits', 'Credits')}</MicroLabel>
+            <h2 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-0.03em', color: IVORY }}>{tr('La consommation, ', 'Usage, ')}<span style={{ background: 'linear-gradient(90deg,#22D3EE,#818CF8 55%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{tr('au clair.', 'crystal clear.')}</span></h2>
+          </div>
+        </FadeIn>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+          {COSTS.map((x, i) => (
+            <FadeIn key={x.name} delay={i * 0.05}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '18px 18px', borderRadius: 16, background: 'rgba(255,255,255,0.025)', border: `1px solid ${HAIR}`, height: '100%' }}>
+                <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: x.bg }}>{x.icon}</span>
+                <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                  <span style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: IVORY }}>{x.name}</span>
+                  <span style={{ fontFamily: SANS, fontSize: 11, color: MUTED }}>{x.per}</span>
+                </span>
+                <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 16, color: x.c, whiteSpace: 'nowrap' }}>{x.cost}</span>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+        <FadeIn delay={0.2}>
+          <div style={{ marginTop: 20, padding: '20px 24px', borderRadius: 16, textAlign: 'center', border: '1px solid rgba(129,140,248,0.3)', background: 'linear-gradient(120deg, rgba(129,140,248,0.09), rgba(255,255,255,0.015))' }}>
+            <span style={{ fontFamily: SANS, fontSize: 14.5, color: 'rgba(226,222,255,0.85)' }}>
+              {tr('Exemple : ', 'Example: ')}<b style={{ color: IVORY }}>{tr('52 comptes = 104 crédits', '52 accounts = 104 credits')}</b>{tr(' par diffusion, soit ', ' per broadcast — that\'s ')}<b style={{ color: '#A5B4FC' }}>{tr('52 diffusions / mois', '52 broadcasts / month')}</b>{tr(' en plan Pro.', ' on the Pro plan.')}
+            </span>
           </div>
         </FadeIn>
       </div>
@@ -1632,12 +1703,49 @@ function SiteHowItWorks() {
 }
 
 // ── Témoignages — au nom d'agences (maquette) ────────────────────────────────
+// Lecteur de message vocal maison (forme d'onde qui se remplit à la lecture).
+function VoiceNote() {
+  const tr = useTr()
+  const audio = useRef<HTMLAudioElement>(null)
+  const [playing, setPlaying] = useState(false)
+  const [pct, setPct] = useState(0)
+  const [time, setTime] = useState('0:00')
+  const fmt = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`
+  const toggle = () => { const a = audio.current; if (!a) return; if (a.paused) a.play().then(() => setPlaying(true)).catch(() => {}); else { a.pause(); setPlaying(false) } }
+  return (
+    <figure style={{ gridColumn: '1 / -1', margin: 0, display: 'flex', alignItems: 'center', gap: 18, padding: 20, borderRadius: 20, border: '1px solid rgba(52,211,153,0.28)', background: 'linear-gradient(120deg, rgba(52,211,153,0.09), rgba(255,255,255,0.03))' }}>
+      <button type="button" onClick={toggle} aria-label={playing ? tr('Pause', 'Pause') : tr('Écouter', 'Play')}
+        style={{ width: 52, height: 52, flexShrink: 0, borderRadius: '50%', border: 'none', cursor: 'pointer', color: '#04140C', fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#34D399,#10B981)', boxShadow: '0 0 30px -8px rgba(52,211,153,0.8)' }}>
+        {playing ? '❚❚' : '▶'}
+      </button>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 2.5, height: 30 }}>
+          {Array.from({ length: 56 }, (_, i) => { const seed = Math.abs(Math.sin(i * 2.7) * Math.cos(i * 0.9)); return (
+            <span key={i} style={{ flex: 1, borderRadius: 99, height: `${22 + seed * 68}%`, background: i / 56 <= pct ? '#34D399' : 'rgba(255,255,255,0.16)', transition: 'background 0.15s' }} />
+          )})}
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: SANS, fontSize: 11.5, fontWeight: 700, color: MUTED }}>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: 'rgba(226,222,255,0.88)' }}>{tr('Message vocal d\'un client', 'A client\'s voice note')}</span>
+          <span style={{ fontFamily: 'monospace' }}>{time}</span>
+          <span style={{ marginLeft: 'auto' }}>Telegram</span>
+        </span>
+      </span>
+      <audio ref={audio} src="/avis/avis-vocal.ogg" preload="metadata" style={{ display: 'none' }}
+        onTimeUpdate={e => { const a = e.currentTarget; if (!a.duration || !isFinite(a.duration)) return; setPct(a.currentTime / a.duration); setTime(`${fmt(a.currentTime)} / ${fmt(a.duration)}`) }}
+        onEnded={() => { setPlaying(false); setPct(0); setTime('0:00') }} />
+    </figure>
+  )
+}
+
+// Avis clients — captures Telegram brutes + message vocal (v3).
 function SiteTestimonials() {
   const tr = useTr()
-  const T = [
-    { stat: '+340%', statL: tr('de reach en 2 mois', 'reach in 2 months'), grad: 'linear-gradient(90deg,#22D3EE,#818CF8)', quote: tr('Avant ScaleFlow on copiait-collait des reels téléphone par téléphone. Maintenant on programme 120 comptes le lundi matin et c\'est plié pour la semaine.', 'Before ScaleFlow we copy-pasted reels phone by phone. Now we schedule 120 accounts on Monday morning and we\'re done for the week.'), agency: 'AGENCE GROWTHPULSE', role: tr('Agence Growth · 120 comptes', 'Growth agency · 120 accounts'), initials: 'GP', av: 'linear-gradient(135deg,#22D3EE,#818CF8)', glow: 'rgba(34,211,238,0.3)' },
-    { stat: '90%+', statL: tr('de comptes conservés', 'accounts kept'), grad: 'linear-gradient(90deg,#A855F7,#EC4899)', quote: tr('L\'auto-warmup nous a sauvés. On perdait la moitié de nos nouveaux comptes ; depuis, le taux de survie dépasse 90%. Rien que ça vaut l\'abonnement.', 'Auto-warmup saved us. We lost half our new accounts; since then survival is above 90%. That alone is worth the subscription.'), agency: 'AGENCE UGC LAB', role: tr('Contenu UGC · 45 comptes', 'UGC content · 45 accounts'), initials: 'UL', av: 'linear-gradient(135deg,#A855F7,#EC4899)', glow: 'rgba(168,85,247,0.35)' },
-    { stat: '15h', statL: tr('gagnées par semaine', 'saved per week'), grad: 'linear-gradient(90deg,#818CF8,#34D399)', quote: tr('On gère 12 clients sur GeeLark et le dashboard ScaleFlow est notre tour de contrôle. Rôles d\'équipe, stats par compte, studio remix : tout pour bosser à plusieurs.', 'We manage 12 clients on GeeLark and the ScaleFlow dashboard is our control tower. Team roles, per-account stats, remix studio: everything to work as a team.'), agency: 'AGENCE SCALEUP MEDIA', role: tr('SMMA · 300+ comptes', 'SMMA · 300+ accounts'), initials: 'SM', av: 'linear-gradient(135deg,#818CF8,#34D399)', glow: 'rgba(52,211,153,0.3)' },
+  const REVIEWS = [
+    { name: 'Francis', date: '19 juin', src: '/avis/avis-francis.png', glow: 'rgba(34,211,238,0.32)' },
+    { name: 'France Killian', date: '19 juin', src: '/avis/avis-france-killian.png', glow: 'rgba(168,85,247,0.35)' },
+    { name: 'Leon', date: '20 juin', src: '/avis/avis-leon.png', glow: 'rgba(52,211,153,0.3)' },
+    { name: 'Alx', date: '4 juillet', src: '/avis/avis-alx.png', glow: 'rgba(129,140,248,0.32)' },
+    { name: 'Njmoss', date: '6 juillet', src: '/avis/avis-njmoss.png', glow: 'rgba(245,158,11,0.3)' },
   ]
   return (
     <section id="testimonials" style={{ position: 'relative', zIndex: 1, padding: '100px 24px', background: 'rgba(124,58,237,0.04)', borderTop: `1px solid rgba(139,92,246,0.18)`, borderBottom: `1px solid rgba(139,92,246,0.18)` }}>
@@ -1646,27 +1754,25 @@ function SiteTestimonials() {
           <div style={{ textAlign: 'center', marginBottom: 52, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto' }}>
             <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 20 }}>Social proof</MicroLabel>
             <h2 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(30px, 4.4vw, 46px)', letterSpacing: '-0.02em', color: IVORY }}>{tr('Ils font tourner ', 'They run ')}<span style={{ background: 'linear-gradient(90deg,#F472B6,#C4B5FD 55%,#818CF8)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>ScaleFlow.</span></h2>
+            <p style={{ marginTop: 16, fontFamily: SANS, fontSize: 15, color: MUTED }}>{tr('Les messages reçus, tels quels. Rien de réécrit.', 'The messages we received, as they are. Nothing rewritten.')}</p>
           </div>
         </FadeIn>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-          {T.map((t, i) => (
-            <FadeIn key={t.agency} delay={i * 0.08}>
-              <figure style={{ height: '100%', margin: 0, display: 'flex', flexDirection: 'column', gap: 18, padding: '28px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: `1px solid ${HAIR}` }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 34, lineHeight: 1, background: t.grad, WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t.stat}</span>
-                  <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 600, color: MUTED }}>{t.statL}</span>
-                </div>
-                <blockquote style={{ margin: 0, flex: 1, fontFamily: SANS, fontSize: 14.5, lineHeight: 1.7, color: 'rgba(226,222,255,0.85)' }}>« {t.quote} »</blockquote>
-                <figcaption style={{ display: 'flex', alignItems: 'center', gap: 12, borderTop: `1px solid ${HAIR}`, paddingTop: 16 }}>
-                  <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SANS, fontSize: 13, fontWeight: 800, color: '#0A0A16', background: t.av }}>{t.initials}</span>
-                  <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                    <span style={{ fontFamily: SANS, fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', color: IVORY }}>{t.agency}</span>
-                    <span style={{ fontFamily: SANS, fontSize: 12, color: MUTED }}>{t.role}</span>
-                  </span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20, alignItems: 'start' }}>
+          {REVIEWS.map((r, i) => (
+            <FadeIn key={r.name} delay={i * 0.06}>
+              <figure style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 14, padding: 16, borderRadius: 20, background: 'rgba(255,255,255,0.035)', border: `1px solid rgba(255,255,255,0.1)`, transition: 'transform 0.3s, box-shadow 0.3s' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = `0 26px 60px -22px ${r.glow}` }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}>
+                <img src={r.src} alt={tr(`Avis de ${r.name} sur Telegram`, `${r.name}'s review on Telegram`)} loading="lazy" style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 12 }} />
+                <figcaption style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap', padding: '0 4px 4px' }}>
+                  <span style={{ letterSpacing: 1.5, fontSize: 12, color: '#FBBF24' }}>★★★★★</span>
+                  <span style={{ fontFamily: SANS, fontSize: 12.5, fontWeight: 800, color: 'rgba(226,222,255,0.88)' }}>{r.name}</span>
+                  <span style={{ marginLeft: 'auto', fontFamily: SANS, fontSize: 11, fontWeight: 700, color: MUTED }}>Telegram · {r.date}</span>
                 </figcaption>
               </figure>
             </FadeIn>
           ))}
+          <VoiceNote />
         </div>
       </div>
     </section>
@@ -1713,74 +1819,55 @@ export function Landing() {
       {stage === 'studio' && <StudioAuth onBack={() => goTo('reveal')} />}
       {stage === 'tunnel' && <TunnelHero onEnter={() => goTo('reveal')} />}
 
-      {/* ── Nav ───────────────────────────────────────────────────────────────── */}
-      {stage === 'site' && (
+      {/* ── Nouvelle landing (Claude Design) ─────────────────────────────────── */}
+      {stage === 'site' && <SiteLanding onStudio={onStudio} />}
+
+      {/* ── Ancienne landing (désactivée, conservée temporairement) ──────────── */}
+      {false && (
       <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(6,6,8,0.85)', backdropFilter: 'blur(20px)', borderBottom: `1px solid ${HAIR}` }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 28px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Wordmark size={16} onClick={() => goTo('tunnel')} />
+          <Wordmark size={16} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {[['#manifesto',tr('Manifeste','Manifesto')], ['#features',tr('Fonctionnalités','Features')], ['#pricing',tr('Tarifs','Pricing')], ['#faq','FAQ']].map(([href, label]) => (
-              <a key={href} href={href} style={{ fontFamily: SANS, fontSize: 10.5, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: MUTED, textDecoration: 'none', padding: '8px 14px', transition: 'color 0.2s' }}
+            {[['#features',tr('Fonctionnalités','Features')], ['#how',tr('Comment ça marche','How it works')], ['#pricing',tr('Tarifs','Pricing')], ['#faq','FAQ']].map(([href, label]) => (
+              <a key={href} href={href} style={{ fontFamily: SANS, fontSize: 13, fontWeight: 600, color: MUTED, textDecoration: 'none', padding: '8px 14px', transition: 'color 0.2s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = IVORY)} onMouseLeave={e => (e.currentTarget.style.color = MUTED as string)}>
                 {label}
               </a>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', background: 'transparent', border: `1px solid rgba(233,234,240,0.2)`, color: IVORY, textDecoration: 'none', transition: 'border-color 0.2s' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(233,234,240,0.55)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(233,234,240,0.2)')}>
-              <TGIcon size={12} /> {tr('Clé', 'Key')}
-            </a>
             <button onClick={onStudio}
-              style={{ padding: '9px 22px', background: IVORY, border: `1px solid ${IVORY}`, color: '#0F1014', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.3s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD }}
-              onMouseLeave={e => { e.currentTarget.style.background = IVORY; e.currentTarget.style.borderColor = IVORY }}>
-              {tr('Studio', 'Studio')}
+              style={{ padding: '10px 18px', background: 'transparent', border: 'none', color: MUTED, fontFamily: SANS, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'color 0.2s' }}
+              onMouseEnter={e => (e.currentTarget.style.color = IVORY)} onMouseLeave={e => (e.currentTarget.style.color = MUTED as string)}>
+              {tr('Connexion', 'Log in')}
+            </button>
+            <button onClick={onStudio}
+              style={{ padding: '10px 20px', borderRadius: 12, background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', border: 'none', color: '#0A0A16', fontFamily: DISPLAY, fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 10px 30px -8px rgba(129,140,248,0.6)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}>
+              {tr('Commencer', 'Get started')}
             </button>
           </div>
         </div>
       </nav>
       )}
 
-      {/* ── Site content ──────────────────────────────────────────────────────── */}
-      {stage === 'site' && <>
+      {/* ── Site content (ancien, désactivé) ──────────────────────────────────── */}
+      {false && <>
 
       <SiteHero onStudio={onStudio} />
 
       {/* ── Mockup de l'app ──────────────────────────────────────────────────── */}
       <SiteAppMockup />
 
-      {/* ── Manifeste ────────────────────────────────────────────────────────── */}
-      <section id="manifesto" style={{ position: 'relative', zIndex: 1, padding: '140px 24px', overflow: 'hidden' }}>
-        <Aurora />
-        <div style={{ maxWidth: 880, margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 1 }}>
-          <FadeIn>
-            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 38 }}>{tr('Manifeste', 'Manifesto')}</MicroLabel>
-          </FadeIn>
-          <FadeIn delay={0.1}>
-            <p style={{ fontFamily: SERIF, fontSize: 'clamp(24px, 3.4vw, 40px)', lineHeight: 1.45, color: 'rgba(233,234,240,0.85)', margin: 0, fontWeight: 400 }}>
-              {tr('Pendant que d’autres publient un post par jour,', 'While others publish one post a day,')}
-              <span style={{ fontStyle: 'normal', color: GOLD }}>{tr(' nos studios en orchestrent des centaines', ' our studios orchestrate hundreds')}</span> —
-              {tr(' sur des dizaines de comptes, sans lever le petit doigt.', ' across dozens of accounts, without lifting a finger.')}
-            </p>
-          </FadeIn>
-          <FadeIn delay={0.2}>
-            <p style={{ fontFamily: SANS, fontSize: 13, letterSpacing: '0.24em', textTransform: 'uppercase', color: FAINT, marginTop: 44 }}>
-              {tr('Le volume est une stratégie. ScaleFlow est l’outil.', 'Volume is a strategy. ScaleFlow is the tool.')}
-            </p>
-          </FadeIn>
-        </div>
-      </section>
-
       {/* ── Features ─────────────────────────────────────────────────────────── */}
       <section id="features" style={{ position: 'relative', zIndex: 1, padding: '40px 24px 140px' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto' }}>
           <FadeIn>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 30, flexWrap: 'wrap', gap: 16 }}>
-              <h2 style={{ margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>
-                <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(36px, 5.4vw, 66px)', color: IVORY }}>{tr('L’arsenal', 'The complete')}</span>
-                <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(38px, 5.7vw, 70px)', color: GOLD }}>{tr('complet.', 'arsenal.')}</span>
+              <h2 style={{ margin: 0, lineHeight: 1.02, letterSpacing: '-0.04em' }}>
+                <span style={{ display: 'block', fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(36px, 5.4vw, 62px)', color: IVORY }}>{tr('L’arsenal', 'The complete')}</span>
+                <span style={{ display: 'block', fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(36px, 5.4vw, 62px)', background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' }}>{tr('complet.', 'arsenal.')}</span>
               </h2>
               <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, maxWidth: 300, lineHeight: 1.7, margin: 0, paddingBottom: 8 }}>
                 {tr('Six pôles d’outils. Une interface. Plus besoin de jongler entre dix applications.', 'Six tool hubs. One interface. No more juggling ten apps.')}
@@ -1807,36 +1894,8 @@ export function Landing() {
       {/* ── Pricing ── */}
       <PricingSection />
 
-      {/* ── Telegram CTA ─────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '40px 24px 140px' }}>
-        <FadeIn>
-          <div style={{ maxWidth: 1080, margin: '0 auto', border: `1px solid ${HAIR}`, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 300, background: 'radial-gradient(ellipse closest-side, rgba(99,102,241,0.06), transparent)', filter: 'blur(50px)', pointerEvents: 'none' }} />
-            <div style={{ padding: '90px 40px', textAlign: 'center', position: 'relative' }}>
-              <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 30 }}>{tr('Accès', 'Access')}</MicroLabel>
-              <h3 style={{ margin: '0 0 18px', lineHeight: 1.04, letterSpacing: '-0.04em' }}>
-                <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.6vw, 56px)', color: IVORY }}>{tr('Ta clé. ', 'Your key. ')}</span>
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.9vw, 60px)', color: GOLD }}>{tr('Ton empire.', 'Your empire.')}</span>
-              </h3>
-              <p style={{ fontFamily: SANS, fontSize: 13.5, color: MUTED, margin: '0 0 44px', lineHeight: 1.8 }}>
-                {tr('Activation immédiate après paiement — crypto ou virement.', 'Instant activation after payment — crypto or bank transfer.')}<br />{tr('Réponse en moins d’une heure.', 'Reply in under an hour.')}
-              </p>
-              <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 14, padding: '18px 46px',
-                  background: IVORY, color: '#0F1014', textDecoration: 'none',
-                  fontFamily: SANS, fontSize: 11, fontWeight: 700, letterSpacing: '0.28em', textTransform: 'uppercase',
-                  border: `1px solid ${IVORY}`,
-                  transition: 'all 0.35s cubic-bezier(0.16,1,0.3,1)',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD }}
-                onMouseLeave={e => { e.currentTarget.style.background = IVORY; e.currentTarget.style.borderColor = IVORY }}>
-                <TGIcon size={14} /> {tr('Obtenir ma clé', 'Get my key')}
-              </a>
-            </div>
-          </div>
-        </FadeIn>
-      </section>
+      {/* ── Grille des crédits ── */}
+      <SiteCreditsGrid />
 
       {/* ── FAQ ──────────────────────────────────────────────────────────────── */}
       <section id="faq" style={{ position: 'relative', zIndex: 1, padding: '0 24px 140px' }}>
@@ -1844,9 +1903,9 @@ export function Landing() {
           <FadeIn>
             <div style={{ textAlign: 'center', marginBottom: 54 }}>
               <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>{tr('Questions', 'Questions')}</MicroLabel>
-              <h2 style={{ margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>
-                <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.4vw, 52px)', color: IVORY }}>{tr('On répond à ', 'We answer ')}</span>
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.7vw, 56px)', color: GOLD }}>{tr('tout.', 'everything.')}</span>
+              <h2 style={{ margin: 0, lineHeight: 1.02, letterSpacing: '-0.04em', fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(30px, 4.4vw, 52px)' }}>
+                <span style={{ color: IVORY }}>{tr('On répond à ', 'We answer ')}</span>
+                <span style={{ background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' }}>{tr('tout.', 'everything.')}</span>
               </h2>
             </div>
           </FadeIn>
@@ -1895,7 +1954,7 @@ export function Landing() {
               </p>
             </div>
             {[
-              { title: tr('Produit', 'Product'), links: [['#features', tr('Fonctionnalités', 'Features')], ['#pricing', tr('Tarifs', 'Pricing')], ['#manifesto', tr('Manifeste', 'Manifesto')]] as [string, string][] },
+              { title: tr('Produit', 'Product'), links: [['#features', tr('Fonctionnalités', 'Features')], ['#pricing', tr('Tarifs', 'Pricing')], ['#how', tr('Comment ça marche', 'How it works')]] as [string, string][] },
               { title: tr('Ressources', 'Resources'), links: [['#faq', 'FAQ'], [TELEGRAM_URL, 'Telegram']] as [string, string][] },
               { title: tr('Légal', 'Legal'), links: [['#faq', tr('Mentions légales', 'Legal notice')], ['#faq', tr('Confidentialité', 'Privacy')]] as [string, string][] },
             ].map(col => (
@@ -1917,13 +1976,6 @@ export function Landing() {
             <p style={{ fontFamily: SANS, fontSize: 11, letterSpacing: '0.1em', color: FAINT, margin: 0 }}>© {new Date().getFullYear()} {tr('SCALEFLOW — Tous droits réservés', 'SCALEFLOW — All rights reserved')}</p>
             <p style={{ fontFamily: SANS, fontSize: 11.5, color: MUTED, margin: 0 }}>{tr('Conçu en France', 'Made in France')} 🇫🇷</p>
           </div>
-        </div>
-        {/* Giant ghost wordmark */}
-        <div aria-hidden style={{ textAlign: 'center', lineHeight: 0.72, userSelect: 'none', pointerEvents: 'none', marginBottom: -30 }}>
-          <span style={{
-            fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(80px, 14.5vw, 230px)', letterSpacing: '-0.05em',
-            color: 'transparent', WebkitTextStroke: '1px rgba(233,234,240,0.07)',
-          }}>SCALEFLOW</span>
         </div>
       </footer>
 

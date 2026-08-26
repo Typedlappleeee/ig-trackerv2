@@ -36,7 +36,7 @@ export function AppMockup() {
           <span className="h-[11px] w-[11px] rounded-full bg-[#FF5F57]" />
           <span className="h-[11px] w-[11px] rounded-full bg-[#FEBC2E]" />
           <span className="h-[11px] w-[11px] rounded-full bg-[#28C840]" />
-          <span className="ml-3 text-xs font-bold text-muted">ScaleFlow — Mass Posting</span>
+          <span className="ml-3 text-xs font-bold text-muted">scaleflow — Mass Posting</span>
           <span
             className="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-extrabold text-emerald"
             style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)' }}
