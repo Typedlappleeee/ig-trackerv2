@@ -974,9 +974,9 @@ function PricingSection() {
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>{tr('Investissement', 'Investment')}</MicroLabel>
-            <h2 style={{ margin: '0 0 34px', lineHeight: 1, letterSpacing: '-0.04em' }}>
-              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(34px, 5vw, 62px)', color: IVORY }}>{tr('Trois plans. ', 'Three plans. ')}</span>
-              <span className="sf-serif-shimmer" style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(36px, 5.3vw, 66px)', color: GOLD }}>{tr('Zéro limite.', 'Zero limits.')}</span>
+            <h2 style={{ margin: '0 0 34px', lineHeight: 1.02, letterSpacing: '-0.04em', fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(34px, 5vw, 58px)' }}>
+              <span style={{ color: IVORY }}>{tr('Trois plans. ', 'Three plans. ')}</span>
+              <span style={{ background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' }}>{tr('Zéro limite.', 'Zero limits.')}</span>
             </h2>
             {/* Billing toggle */}
             <div style={{ display: 'inline-flex', border: `1px solid ${HAIR}`, padding: 3, gap: 0 }}>
@@ -1030,7 +1030,7 @@ function PricingSection() {
                   )}
                   {/* Tag */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 30 }}>
-                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 17, color: inverted ? 'rgba(10,10,12,0.5)' : FAINT }}>0{i + 1}</span>
+                    <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 15, color: inverted ? 'rgba(10,10,12,0.5)' : FAINT }}>0{i + 1}</span>
                     {(p.popular || p.bestValue) && (
                       <span style={{
                         fontFamily: SANS, fontSize: 9, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase',
@@ -1044,17 +1044,17 @@ function PricingSection() {
                   </div>
 
                   <h3 style={{ margin: '0 0 4px', fontFamily: SANS, fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: inverted ? '#0F1014' : IVORY }}>{tr(p.name, p.nameEn)}</h3>
-                  <p style={{ margin: '0 0 30px', fontFamily: SERIF, fontStyle: 'normal', fontSize: 15, color: inverted ? 'rgba(10,10,12,0.55)' : MUTED }}>{tr(p.tagline, p.taglineEn)}</p>
+                  <p style={{ margin: '0 0 30px', fontFamily: SANS, fontSize: 14, color: inverted ? 'rgba(10,10,12,0.55)' : MUTED }}>{tr(p.tagline, p.taglineEn)}</p>
 
                   {/* Price */}
                   <div style={{ marginBottom: 8, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                     {yearly && p.originalMonthly && (
-                      <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 17, color: inverted ? 'rgba(10,10,12,0.35)' : FAINT, textDecoration: 'line-through' }}>{p.originalMonthly}</span>
+                      <span style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: 17, color: inverted ? 'rgba(10,10,12,0.35)' : FAINT, textDecoration: 'line-through' }}>{p.originalMonthly}</span>
                     )}
                     <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 52, letterSpacing: '-0.05em', lineHeight: 1, color: inverted ? '#0F1014' : IVORY }}>
                       {yearly ? p.yearlyPrice : p.monthlyPrice}
                     </span>
-                    <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 16, color: inverted ? 'rgba(10,10,12,0.5)' : MUTED }}>{tr('/mois', '/month')}</span>
+                    <span style={{ fontFamily: SANS, fontSize: 15, color: inverted ? 'rgba(10,10,12,0.5)' : MUTED }}>{tr('/mois', '/month')}</span>
                     {yearly && p.discount && (
                       <span style={{ fontFamily: SANS, fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: inverted ? '#0F1014' : GOLD }}>{p.discount}</span>
                     )}
@@ -1143,9 +1143,9 @@ function PricingSection() {
         {/* ── Credit packs — ligne éditoriale ── */}
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <h3 style={{ margin: '0 0 10px', lineHeight: 1 }}>
-              <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(24px, 3.4vw, 40px)', letterSpacing: '-0.03em', color: IVORY }}>{tr('Packs de ', 'Credit ')}</span>
-              <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(26px, 3.6vw, 43px)', color: GOLD }}>{tr('crédits', 'packs')}</span>
+            <h3 style={{ margin: '0 0 10px', lineHeight: 1.02, fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(24px, 3.4vw, 38px)', letterSpacing: '-0.03em' }}>
+              <span style={{ color: IVORY }}>{tr('Packs de ', 'Credit ')}</span>
+              <span style={{ background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' }}>{tr('crédits', 'packs')}</span>
             </h3>
             <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, margin: 0 }}>{tr('Recharge à tout moment — les crédits n’expirent jamais.', 'Top up anytime — credits never expire.')}</p>
           </div>
@@ -1162,7 +1162,7 @@ function PricingSection() {
                 <p style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.3em', textTransform: 'uppercase', color: pack.note ? GOLD : FAINT, margin: '0 0 18px', minHeight: 12 }}>
                   {pack.note ? tr(pack.note, pack.noteEn) : pack.name}
                 </p>
-                <p style={{ fontFamily: SERIF, fontStyle: 'normal', fontSize: 42, color: IVORY, margin: '0 0 2px', lineHeight: 1 }}>{pack.credits}</p>
+                <p style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 40, color: IVORY, margin: '0 0 2px', lineHeight: 1 }}>{pack.credits}</p>
                 <p style={{ fontFamily: SANS, fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase', color: FAINT, margin: '0 0 22px' }}>{tr('crédits', 'credits')}</p>
                 <p style={{ fontFamily: SANS, fontWeight: 900, fontSize: 26, letterSpacing: '-0.03em', color: IVORY, margin: '0 0 24px' }}>{pack.price}</p>
                 <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
@@ -1823,24 +1823,24 @@ export function Landing() {
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 28px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Wordmark size={16} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {[['#manifesto',tr('Manifeste','Manifesto')], ['#features',tr('Fonctionnalités','Features')], ['#pricing',tr('Tarifs','Pricing')], ['#faq','FAQ']].map(([href, label]) => (
-              <a key={href} href={href} style={{ fontFamily: SANS, fontSize: 10.5, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: MUTED, textDecoration: 'none', padding: '8px 14px', transition: 'color 0.2s' }}
+            {[['#features',tr('Fonctionnalités','Features')], ['#how',tr('Comment ça marche','How it works')], ['#pricing',tr('Tarifs','Pricing')], ['#faq','FAQ']].map(([href, label]) => (
+              <a key={href} href={href} style={{ fontFamily: SANS, fontSize: 13, fontWeight: 600, color: MUTED, textDecoration: 'none', padding: '8px 14px', transition: 'color 0.2s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = IVORY)} onMouseLeave={e => (e.currentTarget.style.color = MUTED as string)}>
                 {label}
               </a>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', background: 'transparent', border: `1px solid rgba(233,234,240,0.2)`, color: IVORY, textDecoration: 'none', transition: 'border-color 0.2s' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(233,234,240,0.55)')} onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(233,234,240,0.2)')}>
-              <TGIcon size={12} /> {tr('Clé', 'Key')}
-            </a>
             <button onClick={onStudio}
-              style={{ padding: '9px 22px', background: IVORY, border: `1px solid ${IVORY}`, color: '#0F1014', fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.3s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD }}
-              onMouseLeave={e => { e.currentTarget.style.background = IVORY; e.currentTarget.style.borderColor = IVORY }}>
-              {tr('Studio', 'Studio')}
+              style={{ padding: '10px 18px', background: 'transparent', border: 'none', color: MUTED, fontFamily: SANS, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'color 0.2s' }}
+              onMouseEnter={e => (e.currentTarget.style.color = IVORY)} onMouseLeave={e => (e.currentTarget.style.color = MUTED as string)}>
+              {tr('Connexion', 'Log in')}
+            </button>
+            <button onClick={onStudio}
+              style={{ padding: '10px 20px', borderRadius: 12, background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', border: 'none', color: '#0A0A16', fontFamily: DISPLAY, fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 10px 30px -8px rgba(129,140,248,0.6)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}>
+              {tr('Commencer', 'Get started')}
             </button>
           </div>
         </div>
