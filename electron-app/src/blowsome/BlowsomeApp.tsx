@@ -47,8 +47,13 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
         <div style={{ position: 'absolute', bottom: '-6%', right: '10%', width: 520, height: 460, borderRadius: '50%', background: 'radial-gradient(circle, rgba(236,72,153,0.16), transparent 68%)', filter: 'blur(74px)', animation: 'blow-orb 24s ease-in-out infinite reverse' }} />
       </div>
 
+      {/* Grain */}
+      <div aria-hidden style={{ position: 'absolute', inset: '-50%', zIndex: 36, pointerEvents: 'none', opacity: 0.03, animation: 'blow-grain 1.1s steps(4) infinite', backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
+
       {/* ── Sidebar ─────────────────────────────────────────────── */}
       <aside style={{ position: 'relative', zIndex: 1, width: 234, flexShrink: 0, borderRight: `1px solid ${HAIR}`, background: 'rgba(10,7,16,0.6)', backdropFilter: 'blur(14px)', display: 'flex', flexDirection: 'column', padding: '20px 14px' }}>
+        {/* Filet or — marqueur du contrat VIP */}
+        <span aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(233,196,106,0.4), transparent)' }} />
         {/* Wordmark */}
         <div style={{ padding: '4px 8px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 34, height: 34, borderRadius: 11, display: 'grid', placeItems: 'center', color: '#fff', background: GRAD, boxShadow: '0 10px 24px -10px rgba(168,85,247,0.8)', fontWeight: 900 }}>✦</span>
@@ -64,6 +69,7 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
                 onClick={() => setTab(n.id)}
                 className="blow-tap"
                 style={{
+                  position: 'relative',
                   display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
                   fontSize: 13.5, fontWeight: active ? 800 : 600, textAlign: 'left',
                   color: active ? '#fff' : MUTED,
@@ -71,6 +77,12 @@ export function BlowsomeApp({ user, onExit }: { user: User; onExit: () => void }
                   boxShadow: active ? 'inset 0 0 0 1px rgba(168,85,247,0.35)' : 'none',
                 }}
               >
+                <span aria-hidden style={{
+                  position: 'absolute', left: 0, top: '50%',
+                  width: 2, height: active ? 20 : 0, marginTop: active ? -10 : 0,
+                  borderRadius: 99, background: 'linear-gradient(180deg,#EC4899,#6366F1)',
+                  transition: 'height .3s cubic-bezier(.16,1,.3,1), margin-top .3s cubic-bezier(.16,1,.3,1)',
+                }} />
                 <span style={{ color: active ? '#D8B4FE' : FAINTish }}><Ico d={n.icon} size={18} /></span>
                 {n.label}
               </button>

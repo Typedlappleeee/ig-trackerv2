@@ -4,6 +4,7 @@ import type { User } from '@supabase/supabase-js'
 import { useAuth }           from '@/hooks/useAuth'
 import { supabase }          from '@/lib/supabase'
 import { AuthPage }          from '@/components/auth/AuthPage'
+import { BootOverlay }       from '@/components/BootOverlay'
 import { ChunkErrorBoundary } from '@/components/ChunkErrorBoundary'
 import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
@@ -1030,7 +1031,7 @@ export default function App() {
 
   return (
     <>
-      {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
+      {!splashDone && <BootOverlay onDone={() => setSplashDone(true)} />}
       {splashDone && (
         loading             ? <FullPageLoader /> :
         isPasswordRecovery  ? <AuthPage initialTab="reset" onResetDone={clearPasswordRecovery} /> :
