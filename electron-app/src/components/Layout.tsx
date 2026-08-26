@@ -26,34 +26,28 @@ const CREDIT_AUTO_RECHARGE = 10_000
 const CREDIT_MAX_DISPLAY   = 150_000
 
 function SFLogo({ size = 28 }: { size?: number }) {
-  // Logo officiel ScaleFlow : tuile sombre + « S » néon lumineux (violet→rose).
+  // Logo ScaleFlow (maquette Claude Design) : tuile violette + deux barres blanches
+  // en biais, avec un léger reflet qui balaie la tuile en continu.
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
       <defs>
-        <linearGradient id="sfl-tile" x1="50" y1="6" x2="50" y2="94" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#23233f"/>
-          <stop offset="100%" stopColor="#0a0a15"/>
+        <linearGradient id="sfl-tile" x1="14" y1="4" x2="86" y2="96" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#A855F7"/>
+          <stop offset="100%" stopColor="#7C3AED"/>
         </linearGradient>
-        <linearGradient id="sfl-s" x1="50" y1="24" x2="50" y2="78" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#E7ECFF"/>
-          <stop offset="50%"  stopColor="#C4B5FD"/>
-          <stop offset="100%" stopColor="#F5B8F5"/>
-        </linearGradient>
-        <filter id="sfl-neon" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="4" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="b"/></feMerge>
-        </filter>
+        <clipPath id="sfl-clip"><rect x="4" y="4" width="92" height="92" rx="26"/></clipPath>
       </defs>
-      <rect x="6" y="6" width="88" height="88" rx="27"
-        fill="url(#sfl-tile)" stroke="rgba(150,130,255,0.28)" strokeWidth="1.5"/>
-      {/* halo néon */}
-      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
-        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
-        letterSpacing="-2" fill="#A855F7" filter="url(#sfl-neon)" opacity="0.9">S</text>
-      {/* S net */}
-      <text x="50" y="54" textAnchor="middle" dominantBaseline="central"
-        fontFamily="'Inter', system-ui, sans-serif" fontWeight="900" fontSize="58"
-        letterSpacing="-2" fill="url(#sfl-s)">S</text>
+      <rect x="4" y="4" width="92" height="92" rx="26" fill="url(#sfl-tile)"/>
+      <rect x="4.75" y="4.75" width="90.5" height="90.5" rx="25.5" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="1.5"/>
+      {/* reflet qui balaie la tuile */}
+      <g clipPath="url(#sfl-clip)">
+        <rect x="-46" y="-10" width="26" height="120" fill="#fff" opacity="0.20" transform="skewX(-16)">
+          <animate attributeName="x" from="-60" to="130" dur="3.6s" repeatCount="indefinite"/>
+        </rect>
+      </g>
+      {/* deux barres en biais */}
+      <g transform="translate(50 43)"><rect x="-23" y="-5.5" width="46" height="10.5" rx="5.25" fill="#fff" transform="skewX(-14)"/></g>
+      <g transform="translate(50 61)"><rect x="-23" y="-5.5" width="46" height="10.5" rx="5.25" fill="#fff" transform="skewX(14)"/></g>
     </svg>
   )
 }
@@ -934,16 +928,16 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           </div>
 
           {!collapsed && (
-            <span style={{ flex: 1, fontFamily: "'Space Grotesk','Manrope',sans-serif", fontSize: 18, fontWeight: 600, letterSpacing: '-0.03em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            <span style={{ flex: 1, minWidth: 0, fontFamily: "'Space Grotesk','Manrope',sans-serif", fontSize: 16, fontWeight: 600, letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>
               <span style={{ color: '#FFFFFF' }}>scale</span>
               <span style={{ color: '#A855F7' }}>flow</span>
             </span>
           )}
           {!collapsed && (
             <span style={{
-              padding: '3px 8px', borderRadius: 99, marginRight: 2,
+              padding: '2px 6px', borderRadius: 99, marginRight: 2, flexShrink: 0,
               background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)',
-              color: '#C4B5FD', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+              color: '#C4B5FD', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap',
             }}>{license.isSuperAdmin ? 'ADMIN' : license.plan === 'organisation' ? 'ORG' : license.plan === 'pro' ? 'PRO' : license.plan === 'standard' ? 'STD' : 'FREE'}</span>
           )}
 
@@ -1080,6 +1074,30 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
 
         {/* ── Bottom section ────────────────────────────────────────────── */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+
+          {/* Teaser Cloud Phones ScaleFlow (maquette Claude Design) */}
+          {!collapsed && (
+            <button
+              onClick={() => { if (license.isSuperAdmin) { playNav(); onNavigate('cloudphones') } }}
+              title={tr('Cloud Phones ScaleFlow — Bientôt', 'ScaleFlow Cloud Phones — Soon')}
+              style={{
+                position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', marginBottom: 4, padding: 12, borderRadius: 12,
+                border: '1px solid rgba(34,211,238,0.35)',
+                background: 'linear-gradient(135deg, rgba(34,211,238,0.14), rgba(139,92,246,0.10))',
+                cursor: 'pointer', textAlign: 'left', color: '#F2F0FF',
+              }}
+            >
+              <style>{`@keyframes sf-sb-sweep{0%{transform:translateX(-130%)}100%{transform:translateX(340%)}}`}</style>
+              <span style={{ fontSize: 15, flexShrink: 0 }}>☁️</span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: '#A5F3FC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tr('Cloud Phones ScaleFlow', 'ScaleFlow Cloud Phones')}</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(148,163,184,0.65)' }}>{tr('Bientôt · accès prioritaire', 'Soon · priority access')}</span>
+              </span>
+              <span style={{ flexShrink: 0, padding: '2px 7px', borderRadius: 99, background: 'rgba(34,211,238,0.2)', color: '#67E8F9', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.08em' }}>SOON</span>
+              <span aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 34, background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent)', animation: 'sf-sb-sweep 3.6s ease-in-out infinite' }} />
+            </button>
+          )}
 
           {/* Mon organisation */}
           <button
