@@ -934,10 +934,17 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           </div>
 
           {!collapsed && (
-            <span style={{ flex: 1, fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.025em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              <span style={{ background: 'linear-gradient(90deg, #E9EAF0, #D8D5CD)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scale</span>
-              <span style={{ background: 'linear-gradient(90deg, #6366F1, #818CF8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+            <span style={{ flex: 1, fontFamily: "'Space Grotesk','Manrope',sans-serif", fontSize: 18, fontWeight: 600, letterSpacing: '-0.03em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              <span style={{ color: '#FFFFFF' }}>scale</span>
+              <span style={{ color: '#A855F7' }}>flow</span>
             </span>
+          )}
+          {!collapsed && (
+            <span style={{
+              padding: '3px 8px', borderRadius: 99, marginRight: 2,
+              background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)',
+              color: '#C4B5FD', fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+            }}>{license.isSuperAdmin ? 'ADMIN' : license.plan === 'organisation' ? 'ORG' : license.plan === 'pro' ? 'PRO' : license.plan === 'standard' ? 'STD' : 'FREE'}</span>
           )}
 
           {/* Collapse toggle */}
