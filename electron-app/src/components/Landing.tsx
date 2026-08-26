@@ -827,6 +827,8 @@ const FEATURES: { num: string; title: string; titleEn: string; serif: string; se
   { num: '04', title: 'Outils',    titleEn: 'AI',         serif: 'IA',         serifEn: 'tools',      icon: 'bot',             text: 'Scripts, hooks, captions virales, analyse de miniatures. Llama et Claude Vision intégrés directement dans ton flux de travail.', textEn: 'Scripts, hooks, viral captions, thumbnail analysis. Llama and Claude Vision built right into your workflow.' },
   { num: '05', title: 'Programmation', titleEn: 'Scheduling', serif: '',          serifEn: '',           icon: 'calendar',        text: "Planifie tes publications à l’avance. Le scheduler s’exécute dans le cloud, même application fermée.", textEn: 'Schedule your posts in advance. The scheduler runs in the cloud, even with the app closed.' },
   { num: '06', title: 'Suivi',     titleEn: 'Real-time',  serif: 'temps réel', serifEn: 'monitoring', icon: 'smartphone',      text: 'Le statut de chaque cloud phone, en direct. Sessions Instagram, groupes, batteries — tout sous contrôle.', textEn: 'The status of every cloud phone, live. Instagram sessions, groups, batteries — all under control.' },
+  { num: '07', title: 'Auto',      titleEn: 'Auto',       serif: 'Warmup',     serifEn: 'Warmup',     icon: 'timer',           text: 'Chauffe tes comptes tout seuls : likes, visionnages, abonnements par sessions humaines. Ton taux de survie explose.', textEn: 'Warm up your accounts on autopilot: likes, watches, follows in human-like sessions. Your survival rate soars.' },
+  { num: '08', title: 'Équipe &',  titleEn: 'Team &',     serif: 'Organisations', serifEn: 'Orgs',    icon: 'users',           text: 'Rôles owner / admin / membre, organisations multi-comptes, contenu et stats partagés — pour bosser à plusieurs sans se marcher dessus.', textEn: 'Owner / admin / member roles, multi-account organizations, shared content and stats — to work as a team without stepping on each other.' },
 ]
 
 function FeatureRow({ f, index }: { f: typeof FEATURES[number]; index: number }) {
@@ -1561,6 +1563,52 @@ function SiteAppMockup() {
   )
 }
 
+// ── Grille de consommation des crédits (maquette) ────────────────────────────
+function SiteCreditsGrid() {
+  const tr = useTr()
+  const COSTS = [
+    { icon: '🎬', name: tr('Publication', 'Publishing'),        per: tr('par téléphone', 'per phone'),            cost: '2 cr',                  c: '#A5B4FC', bg: 'rgba(129,140,248,0.12)' },
+    { icon: '⚡', name: 'Mass Posting',                          per: tr('par téléphone', 'per phone'),            cost: '2 cr',                  c: '#D8B4FE', bg: 'rgba(168,85,247,0.12)' },
+    { icon: '🔗', name: 'Story',                                 per: tr('par téléphone', 'per phone'),            cost: '1 cr',                  c: '#67E8F9', bg: 'rgba(34,211,238,0.12)' },
+    { icon: '🎞', name: 'Remix & Spoof',                         per: tr('par vidéo', 'per video'),                cost: tr('Gratuit', 'Free'),   c: '#34D399', bg: 'rgba(52,211,153,0.12)' },
+    { icon: '🤖', name: tr('Tâche automatique', 'Automated task'), per: tr('par jour, tâche active', 'per day, active task'), cost: '50 cr',        c: '#FCD34D', bg: 'rgba(251,191,36,0.12)' },
+    { icon: '↻', name: tr('Exécution de tâche', 'Task run'),     per: tr('par téléphone', 'per phone'),            cost: '2 cr',                  c: '#FED7AA', bg: 'rgba(251,146,60,0.12)' },
+  ]
+  return (
+    <section style={{ position: 'relative', zIndex: 1, padding: '0 24px 120px' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+        <FadeIn>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 20 }}>{tr('Crédits', 'Credits')}</MicroLabel>
+            <h2 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-0.03em', color: IVORY }}>{tr('La consommation, ', 'Usage, ')}<span style={{ background: 'linear-gradient(90deg,#22D3EE,#818CF8 55%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{tr('au clair.', 'crystal clear.')}</span></h2>
+          </div>
+        </FadeIn>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+          {COSTS.map((x, i) => (
+            <FadeIn key={x.name} delay={i * 0.05}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '18px 18px', borderRadius: 16, background: 'rgba(255,255,255,0.025)', border: `1px solid ${HAIR}`, height: '100%' }}>
+                <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: x.bg }}>{x.icon}</span>
+                <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                  <span style={{ fontFamily: SANS, fontSize: 13.5, fontWeight: 700, color: IVORY }}>{x.name}</span>
+                  <span style={{ fontFamily: SANS, fontSize: 11, color: MUTED }}>{x.per}</span>
+                </span>
+                <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 16, color: x.c, whiteSpace: 'nowrap' }}>{x.cost}</span>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+        <FadeIn delay={0.2}>
+          <div style={{ marginTop: 20, padding: '20px 24px', borderRadius: 16, textAlign: 'center', border: '1px solid rgba(129,140,248,0.3)', background: 'linear-gradient(120deg, rgba(129,140,248,0.09), rgba(255,255,255,0.015))' }}>
+            <span style={{ fontFamily: SANS, fontSize: 14.5, color: 'rgba(226,222,255,0.85)' }}>
+              {tr('Exemple : ', 'Example: ')}<b style={{ color: IVORY }}>{tr('52 comptes = 104 crédits', '52 accounts = 104 credits')}</b>{tr(' par diffusion, soit ', ' per broadcast — that\'s ')}<b style={{ color: '#A5B4FC' }}>{tr('52 diffusions / mois', '52 broadcasts / month')}</b>{tr(' en plan Pro.', ' on the Pro plan.')}
+            </span>
+          </div>
+        </FadeIn>
+      </div>
+    </section>
+  )
+}
+
 // ── Cloud Phones — auto-hébergé (maquette) ───────────────────────────────────
 function SiteCloudPhones() {
   const tr = useTr()
@@ -1862,6 +1910,9 @@ export function Landing() {
 
       {/* ── Pricing ── */}
       <PricingSection />
+
+      {/* ── Grille des crédits ── */}
+      <SiteCreditsGrid />
 
       {/* ── Telegram CTA ─────────────────────────────────────────────────────── */}
       <section style={{ position: 'relative', zIndex: 1, padding: '40px 24px 140px' }}>
