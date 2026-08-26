@@ -1855,36 +1855,14 @@ export function Landing() {
       {/* ── Mockup de l'app ──────────────────────────────────────────────────── */}
       <SiteAppMockup />
 
-      {/* ── Manifeste ────────────────────────────────────────────────────────── */}
-      <section id="manifesto" style={{ position: 'relative', zIndex: 1, padding: '140px 24px', overflow: 'hidden' }}>
-        <Aurora />
-        <div style={{ maxWidth: 880, margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 1 }}>
-          <FadeIn>
-            <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 38 }}>{tr('Manifeste', 'Manifesto')}</MicroLabel>
-          </FadeIn>
-          <FadeIn delay={0.1}>
-            <p style={{ fontFamily: SERIF, fontSize: 'clamp(24px, 3.4vw, 40px)', lineHeight: 1.45, color: 'rgba(233,234,240,0.85)', margin: 0, fontWeight: 400 }}>
-              {tr('Pendant que d’autres publient un post par jour,', 'While others publish one post a day,')}
-              <span style={{ fontStyle: 'normal', color: GOLD }}>{tr(' nos studios en orchestrent des centaines', ' our studios orchestrate hundreds')}</span> —
-              {tr(' sur des dizaines de comptes, sans lever le petit doigt.', ' across dozens of accounts, without lifting a finger.')}
-            </p>
-          </FadeIn>
-          <FadeIn delay={0.2}>
-            <p style={{ fontFamily: SANS, fontSize: 13, letterSpacing: '0.24em', textTransform: 'uppercase', color: FAINT, marginTop: 44 }}>
-              {tr('Le volume est une stratégie. ScaleFlow est l’outil.', 'Volume is a strategy. ScaleFlow is the tool.')}
-            </p>
-          </FadeIn>
-        </div>
-      </section>
-
       {/* ── Features ─────────────────────────────────────────────────────────── */}
       <section id="features" style={{ position: 'relative', zIndex: 1, padding: '40px 24px 140px' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto' }}>
           <FadeIn>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 30, flexWrap: 'wrap', gap: 16 }}>
-              <h2 style={{ margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>
-                <span style={{ display: 'block', fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(36px, 5.4vw, 66px)', color: IVORY }}>{tr('L’arsenal', 'The complete')}</span>
-                <span style={{ display: 'block', fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(38px, 5.7vw, 70px)', color: GOLD }}>{tr('complet.', 'arsenal.')}</span>
+              <h2 style={{ margin: 0, lineHeight: 1.02, letterSpacing: '-0.04em' }}>
+                <span style={{ display: 'block', fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(36px, 5.4vw, 62px)', color: IVORY }}>{tr('L’arsenal', 'The complete')}</span>
+                <span style={{ display: 'block', fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(36px, 5.4vw, 62px)', background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' }}>{tr('complet.', 'arsenal.')}</span>
               </h2>
               <p style={{ fontFamily: SANS, fontSize: 12.5, color: MUTED, maxWidth: 300, lineHeight: 1.7, margin: 0, paddingBottom: 8 }}>
                 {tr('Six pôles d’outils. Une interface. Plus besoin de jongler entre dix applications.', 'Six tool hubs. One interface. No more juggling ten apps.')}
@@ -1914,46 +1892,15 @@ export function Landing() {
       {/* ── Grille des crédits ── */}
       <SiteCreditsGrid />
 
-      {/* ── Telegram CTA ─────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '40px 24px 140px' }}>
-        <FadeIn>
-          <div style={{ maxWidth: 1080, margin: '0 auto', border: `1px solid ${HAIR}`, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 300, background: 'radial-gradient(ellipse closest-side, rgba(99,102,241,0.06), transparent)', filter: 'blur(50px)', pointerEvents: 'none' }} />
-            <div style={{ padding: '90px 40px', textAlign: 'center', position: 'relative' }}>
-              <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 30 }}>{tr('Accès', 'Access')}</MicroLabel>
-              <h3 style={{ margin: '0 0 18px', lineHeight: 1.04, letterSpacing: '-0.04em' }}>
-                <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.6vw, 56px)', color: IVORY }}>{tr('Ta clé. ', 'Your key. ')}</span>
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.9vw, 60px)', color: GOLD }}>{tr('Ton empire.', 'Your empire.')}</span>
-              </h3>
-              <p style={{ fontFamily: SANS, fontSize: 13.5, color: MUTED, margin: '0 0 44px', lineHeight: 1.8 }}>
-                {tr('Activation immédiate après paiement — crypto ou virement.', 'Instant activation after payment — crypto or bank transfer.')}<br />{tr('Réponse en moins d’une heure.', 'Reply in under an hour.')}
-              </p>
-              <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 14, padding: '18px 46px',
-                  background: IVORY, color: '#0F1014', textDecoration: 'none',
-                  fontFamily: SANS, fontSize: 11, fontWeight: 700, letterSpacing: '0.28em', textTransform: 'uppercase',
-                  border: `1px solid ${IVORY}`,
-                  transition: 'all 0.35s cubic-bezier(0.16,1,0.3,1)',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.borderColor = GOLD }}
-                onMouseLeave={e => { e.currentTarget.style.background = IVORY; e.currentTarget.style.borderColor = IVORY }}>
-                <TGIcon size={14} /> {tr('Obtenir ma clé', 'Get my key')}
-              </a>
-            </div>
-          </div>
-        </FadeIn>
-      </section>
-
       {/* ── FAQ ──────────────────────────────────────────────────────────────── */}
       <section id="faq" style={{ position: 'relative', zIndex: 1, padding: '0 24px 140px' }}>
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
           <FadeIn>
             <div style={{ textAlign: 'center', marginBottom: 54 }}>
               <MicroLabel color="rgba(99,102,241,0.55)" style={{ marginBottom: 26 }}>{tr('Questions', 'Questions')}</MicroLabel>
-              <h2 style={{ margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>
-                <span style={{ fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(30px, 4.4vw, 52px)', color: IVORY }}>{tr('On répond à ', 'We answer ')}</span>
-                <span style={{ fontFamily: SERIF, fontStyle: 'normal', fontWeight: 400, fontSize: 'clamp(32px, 4.7vw, 56px)', color: GOLD }}>{tr('tout.', 'everything.')}</span>
+              <h2 style={{ margin: 0, lineHeight: 1.02, letterSpacing: '-0.04em', fontFamily: DISPLAY, fontWeight: 700, fontSize: 'clamp(30px, 4.4vw, 52px)' }}>
+                <span style={{ color: IVORY }}>{tr('On répond à ', 'We answer ')}</span>
+                <span style={{ background: 'linear-gradient(120deg,#22D3EE,#818CF8 46%,#A855F7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' }}>{tr('tout.', 'everything.')}</span>
               </h2>
             </div>
           </FadeIn>
@@ -2002,7 +1949,7 @@ export function Landing() {
               </p>
             </div>
             {[
-              { title: tr('Produit', 'Product'), links: [['#features', tr('Fonctionnalités', 'Features')], ['#pricing', tr('Tarifs', 'Pricing')], ['#manifesto', tr('Manifeste', 'Manifesto')]] as [string, string][] },
+              { title: tr('Produit', 'Product'), links: [['#features', tr('Fonctionnalités', 'Features')], ['#pricing', tr('Tarifs', 'Pricing')], ['#how', tr('Comment ça marche', 'How it works')]] as [string, string][] },
               { title: tr('Ressources', 'Resources'), links: [['#faq', 'FAQ'], [TELEGRAM_URL, 'Telegram']] as [string, string][] },
               { title: tr('Légal', 'Legal'), links: [['#faq', tr('Mentions légales', 'Legal notice')], ['#faq', tr('Confidentialité', 'Privacy')]] as [string, string][] },
             ].map(col => (
@@ -2024,13 +1971,6 @@ export function Landing() {
             <p style={{ fontFamily: SANS, fontSize: 11, letterSpacing: '0.1em', color: FAINT, margin: 0 }}>© {new Date().getFullYear()} {tr('SCALEFLOW — Tous droits réservés', 'SCALEFLOW — All rights reserved')}</p>
             <p style={{ fontFamily: SANS, fontSize: 11.5, color: MUTED, margin: 0 }}>{tr('Conçu en France', 'Made in France')} 🇫🇷</p>
           </div>
-        </div>
-        {/* Giant ghost wordmark */}
-        <div aria-hidden style={{ textAlign: 'center', lineHeight: 0.72, userSelect: 'none', pointerEvents: 'none', marginBottom: -30 }}>
-          <span style={{
-            fontFamily: SANS, fontWeight: 900, fontSize: 'clamp(80px, 14.5vw, 230px)', letterSpacing: '-0.05em',
-            color: 'transparent', WebkitTextStroke: '1px rgba(233,234,240,0.07)',
-          }}>SCALEFLOW</span>
         </div>
       </footer>
 
