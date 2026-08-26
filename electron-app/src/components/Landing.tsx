@@ -1475,8 +1475,9 @@ function stageFromHash(): Stage {
   if (h === '#studio')  return 'studio'
   if (h === '#intro')   return 'tunnel'    // ancienne intro « ENTRER » (accessible si besoin)
   if (h === '#choix')   return 'reveal'
-  // Par défaut : la nouvelle landing Claude Design s'affiche DIRECTEMENT.
-  return 'site'
+  if (h === '#discover' || h === '#site') return 'site'
+  // Par défaut : l'intro cinématique « Découvrir ScaleFlow » d'abord, puis la landing.
+  return 'tunnel'
 }
 
 // ── Mockup de l'app — fenêtre macOS (maquette) ───────────────────────────────
