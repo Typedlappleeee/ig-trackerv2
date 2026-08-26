@@ -64,6 +64,8 @@ const HUB_CSS = `
   @keyframes hub-sweep { 0%{transform:translateX(-130%)} 100%{transform:translateX(340%)} }
   .hub-teaser { transition: transform 0.25s ease, box-shadow 0.25s ease; }
   .hub-teaser:hover { transform: translateY(-3px); box-shadow: 0 26px 60px -24px rgba(34,211,238,0.5); }
+  .hub-kpi-card { transition: transform 0.25s ease; }
+  .hub-kpi-card:hover { transform: translateY(-3px); }
   .hub-row { transition: background 0.22s ease, padding-left 0.22s ease; position: relative; }
   .hub-row::before { content:''; position:absolute; left:0; top:8px; bottom:8px; width:2px; border-radius:2px; background:linear-gradient(180deg,#818CF8,#8B5CF6); opacity:0; transform:scaleY(0.4); transition:opacity 0.22s ease, transform 0.22s ease; }
   .hub-row:hover { background: rgba(139,92,246,0.05); padding-left: 24px; }
@@ -452,26 +454,18 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
 
         {/* ── KPI row — reliée par un flux lumineux ───────────────────────── */}
         <div className="sf-section-label" style={{ marginBottom: 12 }}>{tr('Aperçu', 'Overview')}</div>
-        <div style={{ display: 'flex', gap: 0, marginBottom: 28, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
           {([
-            { label: t('hubKpiPhones'),    value: phoneCount, load: loading,     icon: 'phone',    delay: 0.05, grad: 'linear-gradient(135deg,#6366F1,#818CF8)', glow: 'rgba(99,102,241,0.5)', accentColor: '#fff', c: '#818CF8' },
-            { label: t('hubKpiVideos'),    value: videoCount, load: loading,     icon: 'video',    delay: 0.10, grad: 'linear-gradient(135deg,#8B5CF6,#A5B4FC)', glow: 'rgba(139,92,246,0.5)', accentColor: '#fff', c: '#A5B4FC' },
-            { label: t('hubKpiWeekPosts'), value: weekPosts,  load: loading,     icon: 'send',     delay: 0.15, grad: 'linear-gradient(135deg,#10B981,#059669)', glow: 'rgba(16,185,129,0.5)', accentColor: '#fff', c: '#34D399' },
-            { label: t('hubKpiCredits'),   value: balance.toLocaleString(locale), load: credLoading, icon: 'sparkles', delay: 0.20, grad: 'linear-gradient(135deg,#F59E0B,#F59E0B)', glow: 'rgba(245,158,11,0.5)', accentColor: '#FBBF24', c: '#FBBF24' },
-          ]).map((k, i, arr) => (
-            <Fragment key={k.label}>
-              {i > 0 && (
-                <div style={{ position: 'relative', width: 22, height: 2, flexShrink: 0, margin: '0 -1px', zIndex: 1 }}>
-                  <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(90deg, ${arr[i - 1].c}4d, ${k.c}4d)` }} />
-                  <div style={{ position: 'absolute', top: -2, left: 0, width: 16, height: 6, animation: 'hub-kpi-flow 2.4s cubic-bezier(.45,0,.55,1) infinite', animationDelay: `${(i - 1) * 0.5}s` }}>
-                    <div style={{ position: 'absolute', right: 5, top: 2, width: 11, height: 2, borderRadius: 2, background: 'linear-gradient(90deg, transparent, rgba(199,210,254,0.9))' }} />
-                    <div style={{ position: 'absolute', right: 0, top: 0, width: 6, height: 6, borderRadius: 99, background: '#E0E7FF', boxShadow: '0 0 10px 3px rgba(165,180,252,0.85)' }} />
-                  </div>
-                </div>
-              )}
-              <KpiCard label={k.label} value={k.value} icon={k.icon} delay={k.delay} loading={k.load}
-                       grad={k.grad} glow={k.glow} accentColor={k.accentColor} />
-            </Fragment>
+            { label: t('hubKpiPhones'),    value: phoneCount,  load: loading,     emoji: '📱', bg: 'linear-gradient(160deg, rgba(99,102,241,0.10), rgba(255,255,255,0.015))', border: 'rgba(99,102,241,0.25)', vColor: '#fff',    sub: '' },
+            { label: t('hubKpiVideos'),    value: videoCount,  load: loading,     emoji: '🎬', bg: 'linear-gradient(160deg, rgba(139,92,246,0.10), rgba(255,255,255,0.015))', border: 'rgba(139,92,246,0.25)', vColor: '#fff',    sub: '' },
+            { label: t('hubKpiWeekPosts'), value: weekPosts,   load: loading,     emoji: '🚀', bg: 'linear-gradient(160deg, rgba(16,185,129,0.09), rgba(255,255,255,0.015))', border: 'rgba(52,211,153,0.25)', vColor: '#34D399', sub: '' },
+            { label: t('hubKpiCredits'),   value: credLoading ? '—' : balance.toLocaleString(locale), load: credLoading, emoji: '✨', bg: 'linear-gradient(160deg, rgba(245,158,11,0.09), rgba(255,255,255,0.015))', border: 'rgba(251,191,36,0.25)', vColor: '#FBBF24', sub: credLoading ? '' : `≈ ${Math.floor(balance / 2).toLocaleString(locale)} ${tr('posts restants', 'posts left')}` },
+          ]).map((k, i) => (
+            <div key={k.label} className="hub-kpi-card" style={{ padding: 20, borderRadius: 16, background: k.bg, border: `1px solid ${k.border}`, animation: `hub-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) ${(0.05 + i * 0.05).toFixed(2)}s both` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(196,181,253,0.6)', fontFamily: SANS }}>{k.label}<span style={{ fontSize: 14 }}>{k.emoji}</span></div>
+              <div style={{ marginTop: 12, fontFamily: DISPLAY, fontSize: 32, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: k.vColor, lineHeight: 1 }}>{k.load ? '—' : k.value}</div>
+              {k.sub ? <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(196,181,253,0.6)', fontWeight: 700, fontFamily: SANS }}>{k.sub}</div> : null}
+            </div>
           ))}
         </div>
 
