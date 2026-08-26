@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { SiteLanding } from './SiteLanding'
+import { SeuilScreen } from './SeuilScreen'
 import { supabase } from '@/lib/supabase'
 import { useTr } from '@/lib/i18n'
 
@@ -1817,7 +1818,7 @@ export function Landing() {
 
       {stage === 'reveal' && <RevealScreen onDiscover={onDiscover} onStudio={onStudio} />}
       {stage === 'studio' && <StudioAuth onBack={() => goTo('reveal')} />}
-      {stage === 'tunnel' && <TunnelHero onEnter={() => goTo('reveal')} />}
+      {stage === 'tunnel' && <SeuilScreen onEnter={() => goTo('reveal')} />}
 
       {/* ── Nouvelle landing (Claude Design) ─────────────────────────────────── */}
       {stage === 'site' && <SiteLanding onStudio={onStudio} />}
