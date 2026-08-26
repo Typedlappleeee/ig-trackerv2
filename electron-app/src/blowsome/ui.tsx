@@ -5,6 +5,7 @@ import { useEffect, type CSSProperties, type ReactNode } from 'react'
 
 export const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
 export const GOLD = '#E9C46A'
+export const SERIF = "'Instrument Serif',Georgia,serif"
 export const INK = '#ECE9F5'
 export const MUTED = 'rgba(236,233,245,0.62)'
 export const FAINT = 'rgba(236,233,245,0.4)'
@@ -17,6 +18,13 @@ export const BLOW_CSS = `
 @keyframes blow-orb{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,30px) scale(1.12)}}
 @keyframes blow-glow{0%,100%{opacity:.45}50%{opacity:.9}}
 @keyframes blow-spin{to{transform:rotate(360deg)}}
+@keyframes blow-grain{0%,100%{transform:translate(0,0)}20%{transform:translate(-2%,1%)}40%{transform:translate(1%,-2%)}60%{transform:translate(-1%,2%)}80%{transform:translate(2%,-1%)}}
+@keyframes blow-cascade{from{opacity:0;transform:translateY(18px) scale(.985);filter:blur(5px)}to{opacity:1;transform:none;filter:blur(0)}}
+[data-cascade]>*{animation:blow-cascade .6s cubic-bezier(.16,1,.3,1) both}
+[data-cascade]>*:nth-child(1){animation-delay:.52s}
+[data-cascade]>*:nth-child(2){animation-delay:.6s}
+[data-cascade]>*:nth-child(3){animation-delay:.68s}
+@media (prefers-reduced-motion: reduce){[data-cascade]>*{animation:none}}
 .blow-scroll::-webkit-scrollbar{width:9px;height:9px}
 .blow-scroll::-webkit-scrollbar-thumb{background:rgba(168,85,247,0.28);border-radius:9px}
 .blow-scroll::-webkit-scrollbar-thumb:hover{background:rgba(168,85,247,0.45)}
@@ -71,17 +79,17 @@ export function BlowCard({ children, style, hover, onClick, className }: {
 }
 
 // KPI / stat tile
-export function BlowStat({ label, value, delta, icon, accent = '#A855F7', delay = 0 }: {
-  label: string; value: string | number; delta?: string; icon?: ReactNode; accent?: string; delay?: number
+export function BlowStat({ label, value, delta, icon, accent = '#A855F7' }: {
+  label: string; value: string | number; delta?: string; icon?: ReactNode; accent?: string
 }) {
   return (
-    <BlowCard hover style={{ flex: 1, minWidth: 180, padding: 20, position: 'relative', overflow: 'hidden', animation: `blow-rise .5s cubic-bezier(.16,1,.3,1) ${delay}s both` }}>
+    <BlowCard hover style={{ flex: 1, minWidth: 180, padding: 20, position: 'relative', overflow: 'hidden' }}>
       <div aria-hidden style={{ position: 'absolute', top: -30, right: -20, width: 120, height: 120, borderRadius: '50%', background: `radial-gradient(circle, ${accent}44, transparent 68%)`, opacity: .5 }} />
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: MUTED }}>{label}</span>
         {icon && <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', color: '#fff', background: `linear-gradient(135deg, ${accent}, #6366F1)`, boxShadow: `0 8px 20px -8px ${accent}` }}>{icon}</span>}
       </div>
-      <p style={{ position: 'relative', margin: 0, fontSize: 30, fontWeight: 900, letterSpacing: '-.03em', color: INK, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</p>
+      <p style={{ position: 'relative', margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 34, fontWeight: 700, letterSpacing: '-.035em', color: INK, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</p>
       {delta && <p style={{ position: 'relative', margin: '8px 0 0', fontSize: 12, fontWeight: 600, color: delta.startsWith('-') ? '#F87171' : '#34D399' }}>{delta}</p>}
     </BlowCard>
   )
@@ -122,7 +130,10 @@ export function BlowButton({ children, onClick, variant = 'primary', style }: {
 export function BlowEmpty({ title, hint, icon }: { title: string; hint?: string; icon?: ReactNode }) {
   return (
     <div style={{ display: 'grid', placeItems: 'center', textAlign: 'center', padding: '54px 20px', gap: 10 }}>
-      <div style={{ width: 56, height: 56, borderRadius: 16, display: 'grid', placeItems: 'center', color: '#D8B4FE', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)' }}>{icon ?? '✦'}</div>
+      <div style={{ position: 'relative', width: 56, height: 56, borderRadius: 16, display: 'grid', placeItems: 'center', color: '#D8B4FE', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)' }}>
+        <span aria-hidden style={{ position: 'absolute', inset: -9, borderRadius: 23, border: '1px solid rgba(168,85,247,0.16)', animation: 'blow-glow 4s ease-in-out infinite' }} />
+        {icon ?? '✦'}
+      </div>
       <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: INK }}>{title}</p>
       {hint && <p style={{ margin: 0, fontSize: 13, color: MUTED, maxWidth: 360 }}>{hint}</p>}
     </div>

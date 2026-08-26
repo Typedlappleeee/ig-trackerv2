@@ -7,7 +7,7 @@ import { useOrg } from '@/lib/orgContext'
 import { getActiveRuns, subscribeActiveRuns, type ActiveRun } from '@/lib/activeRuns'
 import { useTr } from '@/lib/i18n'
 import {
-  useBlowCSS, Grad, Ico, ICON, GRAD, GOLD, INK, MUTED, FAINT, HAIR,
+  useBlowCSS, Grad, Ico, ICON, GRAD, GOLD, SERIF, INK, MUTED, FAINT, HAIR,
   BlowCard, BlowStat, BlowBadge, BlowButton, BlowEmpty,
 } from '../ui'
 
@@ -52,12 +52,14 @@ export function BlowDashboard({ user, onGo, onPublish }: { user: User; onGo: (t:
       {/* Hero */}
       <BlowCard style={{ padding: 28, marginBottom: 24, position: 'relative', overflow: 'hidden' }}>
         <div aria-hidden style={{ position: 'absolute', top: -60, right: -30, width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.28), transparent 66%)', animation: 'blow-glow 6s ease-in-out infinite' }} />
+        <span aria-hidden style={{ position: 'absolute', top: 0, left: 28, right: 28, height: 1, background: 'linear-gradient(90deg, transparent, rgba(233,196,106,0.45), transparent)' }} />
         <div style={{ position: 'relative' }}>
           <BlowBadge tone="accent">✦ {tr('Espace Blowsome', 'Blowsome Space')}</BlowBadge>
-          <h1 style={{ margin: '14px 0 6px', fontSize: 34, fontWeight: 900, letterSpacing: '-.035em', textTransform: 'capitalize' }}>
-            {tr('Bonjour,', 'Hello,')} <Grad style={{ animation: 'blow-shimmer 6s linear infinite' }}>{firstName}</Grad>
+          <h1 style={{ margin: '16px 0 0', display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '.28em', fontSize: 'clamp(30px,4vw,46px)', lineHeight: 1, letterSpacing: '-.035em' }}>
+            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, color: INK }}>{tr('Bonjour,', 'Hello,')}</span>
+            <Grad style={{ fontFamily: SERIF, fontWeight: 400, textTransform: 'capitalize', animation: 'blow-shimmer 6s linear 4.4s infinite' }}>{firstName}</Grad>
           </h1>
-          <p style={{ margin: 0, fontSize: 14.5, color: MUTED, maxWidth: 520 }}>
+          <p style={{ margin: '14px 0 0', fontSize: 14.5, color: MUTED, maxWidth: 520 }}>
             {tr('Ton cockpit VIP — publie, pilote tes flottes et retrouve toute ta banque, sans quitter Blowsome.', 'Your VIP cockpit — publish, manage your fleets and find your whole bank, without leaving Blowsome.')}
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
@@ -68,10 +70,10 @@ export function BlowDashboard({ user, onGo, onPublish }: { user: User; onGo: (t:
       </BlowCard>
 
       {/* KPIs réels */}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 24 }}>
-        <BlowStat label={tr('Postings en cours', 'Postings in progress')} value={running.length} icon={<Ico d={ICON.send} size={16} />} accent="#A855F7" delay={0.05} />
-        <BlowStat label={tr('Téléphones', 'Phones')} value={phoneCount === null ? '…' : phoneCount} icon={<Ico d={ICON.phone} size={16} />} accent="#EC4899" delay={0.1} />
-        <BlowStat label={tr('Vidéos en banque', 'Videos in bank')} value={videoCount === null ? '…' : videoCount} icon={<Ico d={ICON.folder} size={16} />} accent="#6366F1" delay={0.15} />
+      <div data-cascade="" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 24 }}>
+        <BlowStat label={tr('Postings en cours', 'Postings in progress')} value={running.length} icon={<Ico d={ICON.send} size={16} />} accent="#A855F7" />
+        <BlowStat label={tr('Téléphones', 'Phones')} value={phoneCount === null ? '…' : phoneCount} icon={<Ico d={ICON.phone} size={16} />} accent="#EC4899" />
+        <BlowStat label={tr('Vidéos en banque', 'Videos in bank')} value={videoCount === null ? '…' : videoCount} icon={<Ico d={ICON.folder} size={16} />} accent="#6366F1" />
       </div>
 
       {/* Deux colonnes : postings en cours (réel) + carte publier */}
@@ -102,11 +104,12 @@ export function BlowDashboard({ user, onGo, onPublish }: { user: User; onGo: (t:
           )}
         </BlowCard>
 
-        <BlowCard style={{ padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 12, position: 'relative', overflow: 'hidden' }}>
-          <div aria-hidden style={{ position: 'absolute', bottom: -40, right: -20, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(233,196,106,0.16), transparent 68%)' }} />
+        <BlowCard style={{ padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 12, position: 'relative', overflow: 'hidden', border: '1px solid rgba(233,196,106,0.24)' }}>
+          <div aria-hidden style={{ position: 'absolute', bottom: -40, right: -20, width: 220, height: 220, borderRadius: '50%', background: 'radial-gradient(circle, rgba(233,196,106,0.18), transparent 68%)', animation: 'blow-glow 7s ease-in-out infinite' }} />
+          <span aria-hidden style={{ position: 'absolute', top: 0, left: 22, right: 22, height: 1, background: 'linear-gradient(90deg, transparent, rgba(233,196,106,0.55), transparent)' }} />
           <BlowBadge tone="gold">✦ VIP</BlowBadge>
-          <p style={{ margin: 0, fontSize: 18, fontWeight: 800, lineHeight: 1.35, position: 'relative' }}>
-            {tr('Publie sur toutes tes flottes', 'Publish to all your fleets')} <Grad>{tr('en un clic', 'in one click')}</Grad>.
+          <p style={{ margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-.025em', position: 'relative' }}>
+            {tr('Publie sur toutes tes flottes', 'Publish to all your fleets')} <Grad style={{ fontFamily: SERIF, fontWeight: 400 }}>{tr('en un clic', 'in one click')}</Grad>.
           </p>
           <p style={{ margin: 0, fontSize: 13, color: MUTED, lineHeight: 1.5, position: 'relative' }}>
             {tr('Ouvre le posting ScaleFlow directement ici, sans quitter ton espace Blowsome.', 'Open ScaleFlow posting directly here, without leaving your Blowsome space.')}
