@@ -11,6 +11,9 @@ import Proxies from '@/pages/Proxies'
 import Activity from '@/pages/Activity'
 import Health from '@/pages/Health'
 import Recipes from '@/pages/Recipes'
+import Publish from '@/pages/Publish'
+import Warmup from '@/pages/Warmup'
+import Studio from '@/pages/Studio'
 import Automation from '@/pages/Automation'
 import Settings from '@/pages/Settings'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
@@ -89,6 +92,12 @@ function AppInner({ user }: { user: User }) {
         ? <Health theme={theme} infra={infra} user={user} org={org} />
         : page === 'recipes'
         ? <Recipes theme={theme} infra={infra} user={user} org={org} />
+        : page === 'publish'
+        ? <Publish theme={theme} infra={infra} user={user} org={org} />
+        : page === 'warmup'
+        ? <Warmup theme={theme} infra={infra} user={user} org={org} />
+        : page === 'studio'
+        ? <Studio theme={theme} infra={infra} user={user} org={org} />
         : (page === 'flows' || page === 'automation')
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
         : page === 'settings'
