@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ScheduledPost, type PostRun } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Icon, Panel, PageHead, Kpi, Empty } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PageHead, Kpi, Empty, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 
 // ── Un « run » unifié (post_runs directs + scheduled_posts exécutés) ────────────
@@ -63,6 +63,21 @@ export default function Activity({ theme, infra, user, org }: {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
+  const [detail, setDetail] = useState<RunItem | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  // Relancer : un post programmé échoué repasse en 'pending' (le serveur le relance).
+  // Un run client (id 'run-…') ne peut pas être relancé côté serveur → message.
+  async function relancer(r: RunItem) {
+    if (r.id.startsWith('sched-')) {
+      const id = r.id.slice('sched-'.length)
+      const { error } = await supabase.from('scheduled_posts').update({ status: 'pending' }).eq('id', id)
+      setNotice(error ? `Échec : ${error.message}` : 'Post remis en file — le serveur relancera les comptes échoués.')
+      if (!error) load()
+    } else {
+      setNotice('Ce run a été lancé depuis ton PC — relance-le depuis Publication (les runs serveur, eux, sont relançables ici).')
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -132,6 +147,10 @@ export default function Activity({ theme, infra, user, org }: {
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Activité" sub="L'historique de tous tes runs. Relance les comptes échoués sans reconstruire la diffusion." />
 
+      {notice && (
+        <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 8, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 12, color: '#E4E4E7' }}>{notice}</div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 14 }}>
         <Kpi theme={theme} label="Runs · 7 jours" value={kpi.count7} />
         <Kpi theme={theme} label="Taux de succès" value={kpi.count7 ? `${kpi.rate} %` : '—'} color={kpi.count7 ? '#34D399' : undefined} />
@@ -196,13 +215,29 @@ export default function Activity({ theme, infra, user, org }: {
               <span style={{ fontSize: 11, color: '#52525B', minWidth: 84, textAlign: 'right', flexShrink: 0 }}>{r.when}</span>
               <span style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                 {ok
-                  ? <Btn theme={theme} sm tone="quiet" icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6" label="Détails" />
-                  : <Btn theme={theme} sm icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={`Relancer ${r.total - r.ok}`} />}
+                  ? <Btn theme={theme} sm tone="quiet" icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6" label="Détails" onClick={() => setDetail(r)} />
+                  : <Btn theme={theme} sm icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={`Relancer ${r.total - r.ok}`} onClick={() => relancer(r)} />}
               </span>
             </div>
           )
         })}
       </Panel>
+
+      {detail && (
+        <Modal theme={theme} title={detail.title} sub={detail.meta} icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6"
+          onClose={() => setDetail(null)} footer={<Btn theme={theme} tone="quiet" label="Fermer" onClick={() => setDetail(null)} />}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+            {([['Comptes réussis', `${detail.ok} / ${detail.total}`], ['Taux', `${detail.total ? Math.round((detail.ok / detail.total) * 100) : 0} %`], ['Quand', detail.when], ['Type', detail.meta]] as [string, string][]).map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: '#E4E4E7' }}>{v}</span>
+              </div>
+            ))}
+            <div style={{ marginTop: 4 }}>
+              <Chip text={detail.ok === detail.total ? 'Tous publiés' : `${detail.total - detail.ok} échec(s)`} tone={detail.ok === detail.total ? 'ok' : 'warn'} />
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
