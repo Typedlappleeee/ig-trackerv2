@@ -91,7 +91,7 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
       <PageHead
         title="Santé des comptes"
         sub="Un score par compte, calculé sur l'âge, la cadence, les blocages récents et le taux de succès. Agis avant de perdre un compte."
-        actions={<Btn theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Recalculer" />}
+        actions={<Btn theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label={loading ? 'Recalcul…' : 'Recalculer'} disabled={loading} onClick={load} />}
       />
 
       <ConnectBanner theme={theme} onConnect={() => onNavigate?.('connections')} />

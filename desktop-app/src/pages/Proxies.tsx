@@ -3,8 +3,29 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Panel, PanelHead, PageHead, Kpi, Empty } from '@/lib/ui'
+import { Btn, Chip, Panel, PanelHead, PageHead, Kpi, Empty, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+
+// Parse une ligne d'import de proxy (porté de electron-app/src/lib/proxyStore.ts).
+function parseProxyLine(line: string, defType: 'socks5' | 'http'): { type: 'socks5' | 'http'; host: string; port: number; username?: string; password?: string } | null {
+  let s = line.trim(); if (!s) return null
+  let type = defType
+  const scheme = /^(socks5|http|https):\/\//i.exec(s)
+  if (scheme) { type = /socks/i.test(scheme[1]) ? 'socks5' : 'http'; s = s.slice(scheme[0].length) }
+  let user: string | undefined, pass: string | undefined, host = '', port = 0
+  if (s.includes('@')) {
+    const [cred, hp] = s.split('@');[user, pass] = cred.split(':')
+    const [h, p] = hp.split(':'); host = h; port = Number(p)
+  } else {
+    const parts = s.split(':'); host = parts[0]; port = Number(parts[1])
+    if (parts.length >= 4) { user = parts[2]; pass = parts[3] }
+  }
+  if (!host || !port || Number.isNaN(port)) return null
+  return { type, host, port, username: user, password: pass }
+}
+function newProxyId(): string {
+  return 'px-' + Array.from({ length: 10 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')
+}
 
 // ── Type Proxy (sous-ensemble RÉEL de la table `cloud_proxies`, aligné sur
 //    electron-app/src/lib/proxyStore.ts). Lecture seule pour cette passe. ────────
@@ -38,6 +59,32 @@ export default function Proxies({ theme, infra, user, org }: {
   const [error, setError] = useState<string | null>(null)
   const [pool, setPool] = useState<string>('Tous')
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const [addOpen, setAddOpen] = useState(false)
+  const [addText, setAddText] = useState('')
+  const [addType, setAddType] = useState<'socks5' | 'http'>('socks5')
+  const [addGroup, setAddGroup] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  async function doDelete(id: string) {
+    await supabase.from('cloud_proxies').delete().eq('id', id)
+    setRows(r => r.filter(x => x.id !== id))
+  }
+  async function doAdd() {
+    const parsed = addText.split('\n').map(l => parseProxyLine(l, addType)).filter(Boolean) as ReturnType<typeof parseProxyLine>[]
+    if (parsed.length === 0) { setNotice('Aucun proxy valide (format host:port ou user:pass@host:port).'); return }
+    setAdding(true)
+    const rowsToInsert = parsed.map(p => ({
+      id: newProxyId(), user_id: user.id, org_id: currentOrg?.id ?? null,
+      label: null, group_name: addGroup.trim() || null, type: p!.type, host: p!.host, port: p!.port,
+      username: p!.username ?? null, password: p!.password ?? null,
+    }))
+    const { error: err } = await supabase.from('cloud_proxies').insert(rowsToInsert)
+    setAdding(false)
+    if (err) { setNotice(`Échec de l'ajout : ${err.message}`); return }
+    setAddOpen(false); setAddText(''); setAddGroup(''); setNotice(`${rowsToInsert.length} proxy(s) ajouté(s).`)
+    load()
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -101,7 +148,7 @@ export default function Proxies({ theme, infra, user, org }: {
         sub="SOCKS5 recommandé. Crée des groupes, teste les IP — l'assignation se fait ensuite depuis les réglages de l'appareil."
         actions={<>
           <Btn theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label="Vérifier" />
-          <Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Ajouter" />
+          <Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Ajouter" onClick={() => setAddOpen(true)} />
         </>}
       />
 
@@ -120,7 +167,7 @@ export default function Proxies({ theme, infra, user, org }: {
         <Panel theme={theme}>
           <Empty icon="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z"
             title="Aucun proxy" text="Ajoute tes proxies (SOCKS5 de préférence) pour attribuer une IP dédiée à chaque appareil cloud."
-            action={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Ajouter des proxies" />} />
+            action={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Ajouter des proxies" onClick={() => setAddOpen(true)} />} />
         </Panel>
       ) : (
         <Panel theme={theme} style={{ overflow: 'visible' }}>
@@ -189,7 +236,7 @@ export default function Proxies({ theme, infra, user, org }: {
                   </span>
                   <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 3 }}>
                     <Btn theme={theme} sm tone="quiet" label="Tester" />
-                    <Btn theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" label="Supprimer" />
+                    <Btn theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" label="Supprimer" onClick={() => doDelete(r.id)} />
                   </span>
                 </div>
               )
@@ -199,6 +246,35 @@ export default function Proxies({ theme, infra, user, org }: {
             )}
           </div>
         </Panel>
+      )}
+
+      {notice && (
+        <div style={{ marginTop: 12, padding: '9px 13px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, color: '#D4D4D8' }}>{notice}</div>
+      )}
+
+      {addOpen && (
+        <Modal theme={theme} title="Ajouter des proxies" sub="Un proxy par ligne. SOCKS5 recommandé." icon="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z"
+          onClose={() => setAddOpen(false)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setAddOpen(false)} />
+            <Btn theme={theme} tone="primary" label={adding ? 'Ajout…' : 'Ajouter'} disabled={adding} onClick={doAdd} />
+          </>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: '#A1A1AA' }}>Type par défaut</span>
+              <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                {(['socks5', 'http'] as const).map(t => (
+                  <button key={t} onClick={() => setAddType(t)} style={{ height: 24, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', background: addType === t ? `rgba(${theme.tone},0.16)` : 'transparent', color: addType === t ? theme.accentText : '#71717A', fontSize: 11.5, fontWeight: 700 }}>{t.toUpperCase()}</button>
+                ))}
+              </span>
+              <input value={addGroup} onChange={e => setAddGroup(e.target.value)} placeholder="Groupe (optionnel)"
+                style={{ marginLeft: 'auto', height: 30, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12, outline: 'none' }} />
+            </div>
+            <textarea value={addText} onChange={e => setAddText(e.target.value)} rows={8}
+              placeholder={'host:port\nhost:port:user:pass\nuser:pass@host:port\nsocks5://user:pass@host:port'}
+              style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", lineHeight: 1.7, outline: 'none' }} />
+          </div>
+        </Modal>
       )}
     </div>
   )

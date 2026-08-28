@@ -153,6 +153,38 @@ export function Kpi({ theme, label, value, color, hint, hintColor }: {
   )
 }
 
+// ── _modal — fenêtre modale générique (portée du prototype _modal()) ──────────
+export function Modal({ title, sub, icon, theme, onClose, footer, width, children }: {
+  title: string; sub?: string; icon?: string; theme: Theme; onClose: () => void
+  footer?: ReactNode; width?: number; children: ReactNode
+}) {
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 28,
+      background: 'rgba(4,6,8,0.72)', backdropFilter: 'blur(6px)', animation: 'aFade .16s ease both',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        display: 'flex', flexDirection: 'column', width: width ?? 560, maxWidth: '100%', maxHeight: '86vh', borderRadius: 13, overflow: 'hidden',
+        background: '#131318', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 32px 80px -22px rgba(0,0,0,0.8)',
+        animation: 'aPop .22s cubic-bezier(0.16,1,0.3,1) both',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 13, padding: '17px 18px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
+          {icon && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.26)`, color: theme.accentText }}><Icon d={icon} size={16} /></span>}
+          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <span style={{ fontSize: 14.5, fontWeight: 700, color: '#F4F4F6' }}>{title}</span>
+            {sub && <span style={{ fontSize: 12, color: '#71717A' }}>{sub}</span>}
+          </span>
+          <button onClick={onClose} aria-label="Fermer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 7, border: 'none', background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', cursor: 'pointer', flexShrink: 0 }}>
+            <Icon d="M18 6L6 18|M6 6l12 12" size={14} />
+          </button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 18 }}>{children}</div>
+        {footer && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '13px 18px', borderTop: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>{footer}</div>}
+      </div>
+    </div>
+  )
+}
+
 // ── Bannière « Connecter tes comptes » (stats officielles Metricool) ──────────
 // Introduit la connexion IG en haut de Performances / Santé (plutôt qu'un onglet).
 export function ConnectBanner({ theme, onConnect }: { theme: Theme; onConnect: () => void }) {

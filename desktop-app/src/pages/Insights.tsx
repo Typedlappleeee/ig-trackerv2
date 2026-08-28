@@ -54,6 +54,17 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
   const avgV = ranked.length ? Math.round(totalViews / ranked.length) : 0
   const topViews = ranked.slice(0, 8)
 
+  // Export CSV réel du classement (téléchargé — l'app desktop Electron l'autorise).
+  function exportCsv() {
+    const rows = [['Rang', 'Compte', 'Vues', 'Groupe', 'Statut'],
+      ...ranked.map((p, i) => [String(i + 1), `@${p.ig_username ?? ''}`, String(p.views), p.group_name ?? '', p.status])]
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = `performances-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   // Répartition des vues par groupe (RÉEL, somme des total_views par group_name).
   const byGroup = useMemo(() => {
     const m = new Map<string, number>()
@@ -69,7 +80,7 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
       <PageHead
         title="Performances"
         sub="Tes vues cumulées par compte et par groupe, remontées depuis tes appareils. Les métriques natives détaillées (croissance, engagement) arrivent bientôt."
-        actions={<Btn theme={theme} tone="ghost" icon="M12 15V3|M7 10l5 5 5-5|M4 21h16" label="Exporter" />}
+        actions={<Btn theme={theme} tone="ghost" icon="M12 15V3|M7 10l5 5 5-5|M4 21h16" label="Exporter" disabled={ranked.length === 0} onClick={exportCsv} />}
       />
 
       <ConnectBanner theme={theme} onConnect={() => onNavigate?.('connections')} />
