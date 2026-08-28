@@ -127,7 +127,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'automation'
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
         : page === 'settings'
-        ? <Settings theme={theme} user={user} org={org} onSignOut={signOut} />
+        ? <Settings theme={theme} user={user} org={org} onSignOut={signOut} onNavigate={(p) => setPage(p as PageKey)} />
         : <Placeholder theme={theme} spec={SPECS[page] ?? SPECS.settings!} />
 
   return (
