@@ -41,7 +41,7 @@ function fmtViews(n: number | null): string {
   return String(n)
 }
 
-const COLS = '30px minmax(0,1.4fr) 110px 96px 76px 210px'
+const COLS = '30px minmax(0,1.4fr) 110px 96px 210px'
 
 
 // ── Case à cocher (portée du prototype) ────────────────────────────────────────
@@ -249,7 +249,6 @@ export default function Phones({ theme, infra, user, org }: {
           <span style={TH}>Compte</span>
           <span style={TH}>Groupe</span>
           <span style={TH}>Statut</span>
-          <span style={TH}>Vues 30j</span>
           <span style={{ ...TH, textAlign: 'right' }} />
         </div>
 
@@ -329,9 +328,6 @@ export default function Phones({ theme, infra, user, org }: {
                     <StatusDot kind={dotKind(p.status)} />
                     <span style={{ fontSize: 11.5, color: '#A1A1AA' }}>{STATUS_LABEL[p.status] ?? p.status}</span>
                   </span>
-
-                  {/* Vues 30j (total_views réel) */}
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#D4D4D8' }}>{fmtViews(p.total_views)}</span>
 
                   {/* Actions : GeeLark sert à l'automatisation — pas de démarrage manuel. */}
                   <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 5 }} onClick={e => e.stopPropagation()}>
