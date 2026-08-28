@@ -80,12 +80,14 @@ const TITLES: Record<PageKey, string[]> = {
 
 export default function Shell({
   theme, infra, setInfra, page, setPage,
-  userName, orgName, role, balance, phoneCount, videoCount, canBlowsome, onSignOut, children,
+  userName, orgName, role, balance, phoneCount, videoCount, canBlowsome,
+  orgs, currentOrgId, onSwitchOrg, onSignOut, children,
 }: {
   theme: Theme; infra: InfraKey; setInfra: (k: InfraKey) => void
   page: PageKey; setPage: (p: PageKey) => void
   userName: string; orgName: string; role: string; balance: number | null
   phoneCount: number | null; videoCount: number | null; canBlowsome: boolean
+  orgs: { id: string; name: string }[]; currentOrgId: string | null; onSwitchOrg: (id: string | null) => void
   onSignOut: () => void; children: ReactNode
 }) {
   const [navOpen, setNavOpen] = useState(true)
@@ -267,13 +269,28 @@ export default function Shell({
               position: 'absolute', left: 10, right: 10, bottom: 'calc(100% - 4px)', zIndex: 40, borderRadius: 10, overflow: 'hidden',
               background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)', animation: 'aIn 0.2s cubic-bezier(0.16,1,0.3,1) both',
             }}>
+              {/* Organisations : espace perso + chaque orga. Clic = bascule. */}
+              <div style={{ padding: '9px 12px 5px', fontSize: 9.5, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#52525B' }}>Organisation</div>
+              <button onClick={() => { onSwitchOrg(null); setUserMenu(false) }} style={{ ...menuItemStyle, paddingTop: 8, paddingBottom: 8 }}>
+                <span style={{ color: currentOrgId === null ? T.accentText : '#52525B', display: 'flex' }}><Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={14} /></span>
+                <span style={{ flex: 1 }}>Espace perso</span>
+                {currentOrgId === null && <span style={{ color: T.accentText, display: 'flex' }}><Icon d="M20 6L9 17l-5-5" size={13} sw={2.4} /></span>}
+              </button>
+              {orgs.map(o => (
+                <button key={o.id} onClick={() => { onSwitchOrg(o.id); setUserMenu(false) }} style={{ ...menuItemStyle, paddingTop: 8, paddingBottom: 8 }}>
+                  <span style={{ color: currentOrgId === o.id ? T.accentText : '#52525B', display: 'flex' }}><Icon d="M3 21h18|M5 21V7l8-4v18|M19 21V11l-6-4" size={14} /></span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+                  {currentOrgId === o.id && <span style={{ color: T.accentText, display: 'flex' }}><Icon d="M20 6L9 17l-5-5" size={13} sw={2.4} /></span>}
+                </button>
+              ))}
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '5px 0' }} />
               <button onClick={() => { setPage('settings'); setUserMenu(false) }} style={menuItemStyle}>
                 <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V15z" size={14} /></span>
                 Réglages
               </button>
               <button onClick={onSignOut} style={{ ...menuItemStyle, color: '#F87171' }}>
                 <span style={{ display: 'flex' }}><Icon d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9" size={14} /></span>
-                Se déconnecter
+                Changer de compte
               </button>
             </div>
           )}

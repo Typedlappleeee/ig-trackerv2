@@ -63,8 +63,8 @@ const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet'
 
 type Tab = 'sched' | 'rec'
 
-export default function Automation({ theme, infra, user, org }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState
+export default function Automation({ theme, infra, user, org, embedded }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; embedded?: boolean
 }) {
   const { currentOrg } = org
   const [tab, setTab] = useState<Tab>('sched')
@@ -140,14 +140,16 @@ export default function Automation({ theme, infra, user, org }: {
   })
 
   return (
-    <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead
-        title="Automatisation"
-        sub={tab === 'sched'
-          ? 'Posts programmés, exécutés côté serveur — ton PC peut être éteint.'
-          : '50 crédits/jour par tâche active, plus 2 crédits par téléphone à chaque exécution.'}
-        actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label={tab === 'sched' ? 'Programmer' : 'Nouvelle tâche'} />}
-      />
+    <div style={{ animation: embedded ? 'none' : 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
+      {!embedded && (
+        <PageHead
+          title="Automatisation"
+          sub={tab === 'sched'
+            ? 'Posts programmés, exécutés côté serveur — ton PC peut être éteint.'
+            : '50 crédits/jour par tâche active, plus 2 crédits par téléphone à chaque exécution.'}
+          actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label={tab === 'sched' ? 'Programmer' : 'Nouvelle tâche'} />}
+        />
+      )}
 
       {/* segmented Programmé / Récurrent */}
       <div style={{

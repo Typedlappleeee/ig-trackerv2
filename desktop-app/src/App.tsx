@@ -19,6 +19,7 @@ import Studio from '@/pages/Studio'
 import Insights from '@/pages/Insights'
 import Connections from '@/pages/Connections'
 import Automation from '@/pages/Automation'
+import Flows from '@/pages/Flows'
 import Settings from '@/pages/Settings'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 
@@ -117,7 +118,9 @@ function AppInner({ user }: { user: User }) {
         ? <Insights theme={theme} infra={infra} user={user} org={org} />
         : page === 'connections'
         ? <Connections theme={theme} infra={infra} user={user} org={org} />
-        : (page === 'flows' || page === 'automation')
+        : page === 'flows'
+        ? <Flows theme={theme} infra={infra} user={user} org={org} />
+        : page === 'automation'
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
         : page === 'settings'
         ? <Settings theme={theme} user={user} org={org} onSignOut={signOut} />
@@ -132,6 +135,9 @@ function AppInner({ user }: { user: User }) {
       phoneCount={data?.phoneCount ?? null}
       videoCount={data?.videoCount ?? null}
       canBlowsome={license.blowsome}
+      orgs={org.myOrgs.map(o => ({ id: o.org.id, name: o.org.name }))}
+      currentOrgId={org.currentOrg?.id ?? null}
+      onSwitchOrg={org.switchOrg}
       onSignOut={signOut}
     >
       {content}

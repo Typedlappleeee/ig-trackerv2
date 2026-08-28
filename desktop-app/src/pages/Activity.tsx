@@ -178,7 +178,13 @@ export default function Activity({ theme, infra, user, org }: {
                 color: ok ? '#34D399' : '#FBBF24',
               }}><Icon d={ok ? 'M20 6L9 17l-5-5' : 'M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'} size={13} /></span>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                  {/* Sticker infra : d'où vient le run. (Tous GeeLark aujourd'hui ; ScaleFlow Cloud se taguera quand l'infra sera active.) */}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, flexShrink: 0, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.24)', fontSize: 9.5, fontWeight: 800, color: '#C4B5FD' }}>
+                    <span style={{ width: 5, height: 5, borderRadius: 99, background: '#A78BFA' }} />GeeLark
+                  </span>
+                </span>
                 <span style={{ fontSize: 11, color: '#52525B' }}>{r.meta}</span>
               </span>
               <span style={{ width: 90, display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
