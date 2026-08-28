@@ -197,21 +197,29 @@ export default function Bank({ theme, infra, user, org }: {
     setCaptions(c => c.filter(x => x.id !== id))
   }
 
-  // ── Signatures en lot : les objets sont dans un bucket privé. On signe les
-  //    thumbnail_path ET les storage_path (média source) pour pouvoir afficher la
-  //    VRAIE vidéo/image quand il n'y a pas de miniature (au lieu d'un placeholder). ──
+  // ── Signatures : bucket privé. On signe les thumbnail_path ET les storage_path
+  //    (média source) — mais PAR LOTS de 100 (createSignedUrls échoue si on lui passe
+  //    des centaines de chemins d'un coup → c'était la régression des vignettes). On
+  //    fusionne les résultats au fur et à mesure. ─────────────────────────────────────
   useEffect(() => {
     const thumbPaths = items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
     const mediaPaths = items.filter(i => i.storage_path).map(i => i.storage_path as string)
     const paths = [...new Set([...thumbPaths, ...mediaPaths])]
     if (paths.length === 0) return
     let cancelled = false
-    supabase.storage.from('content').createSignedUrls(paths, 3600).then(({ data }) => {
-      if (cancelled || !data) return
-      const map: Record<string, string> = {}
-      data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl })
-      setThumbs(map)
-    })
+    ;(async () => {
+      const CHUNK = 100
+      for (let i = 0; i < paths.length; i += CHUNK) {
+        const batch = paths.slice(i, i + CHUNK)
+        const { data } = await supabase.storage.from('content').createSignedUrls(batch, 3600)
+        if (cancelled) return
+        if (data) setThumbs(prev => {
+          const map = { ...prev }
+          data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl })
+          return map
+        })
+      }
+    })()
     return () => { cancelled = true }
   }, [items])
 
