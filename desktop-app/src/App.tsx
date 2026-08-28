@@ -103,7 +103,7 @@ function AppInner({ user }: { user: User }) {
     : (page === 'cloud' || page === 'phones')
       ? <Phones theme={theme} infra={infra} user={user} org={org} />
       : page === 'bank'
-        ? <Bank theme={theme} infra={infra} user={user} org={org} />
+        ? <Bank theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'proxies'
         ? <Proxies theme={theme} infra={infra} user={user} org={org} />
         : page === 'activity'

@@ -132,8 +132,8 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onDragStart }: {
 
 const el = '…'
 
-export default function Bank({ theme, infra, user, org }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState
+export default function Bank({ theme, infra, user, org, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
 }) {
   const { currentOrg } = org
   const [items, setItems] = useState<ContentItem[]>([])
@@ -598,9 +598,9 @@ export default function Bank({ theme, infra, user, org }: {
             <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A1A1AA' }}>sélectionnée{sel.size > 1 ? 's' : ''}</span>
           </span>
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
-          <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" />
+          <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
           {sel.size === 1 && <Btn label="Description" theme={theme} sm icon="M4 7V4h16v3|M9 20h6|M12 4v16" onClick={openDesc} />}
-          <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => setNotice('Remix : ouvre le Studio vidéo (Production) pour générer des variantes de tes vidéos.')} />
+          <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => onNavigate?.('studio')} />
           <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setMoveOpen(true)} />
           <span style={{ marginLeft: 'auto' }}>
             <Btn label="Désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
