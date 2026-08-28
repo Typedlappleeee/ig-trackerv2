@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Kpi, Empty } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Kpi, Empty, ConnectBanner } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { scopeInfra } from '@/lib/data'
 
@@ -18,8 +18,8 @@ function fmtViews(n: number): string {
 const TONES = ['6,182,212', '139,92,246', '236,72,153', '16,185,129', '245,158,11', '99,102,241', '113,113,122']
 function toneFor(i: number): string { return TONES[i % TONES.length] }
 
-export default function Insights({ theme, infra, user, org }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState
+export default function Insights({ theme, infra, user, org, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
 }) {
   const { currentOrg } = org
   const [phones, setPhones] = useState<Phone[]>([])
@@ -71,6 +71,8 @@ export default function Insights({ theme, infra, user, org }: {
         sub="Tes vues cumulées par compte et par groupe, remontées depuis tes appareils. Les métriques natives détaillées (croissance, engagement) arrivent bientôt."
         actions={<Btn theme={theme} tone="ghost" icon="M12 15V3|M7 10l5 5 5-5|M4 21h16" label="Exporter" />}
       />
+
+      <ConnectBanner theme={theme} onConnect={() => onNavigate?.('connections')} />
 
       {loading ? (
         <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div></Panel>

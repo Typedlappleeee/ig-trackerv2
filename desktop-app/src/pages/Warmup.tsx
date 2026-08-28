@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
+import { Btn, Chip, Empty, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { scopeInfra } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -13,6 +13,7 @@ function dotKind(status: string): string { return status === 'warming' ? 'warmup
 
 type RunPhase = 'pending' | 'running' | 'done' | 'failed'
 interface RunItem { id: string; name: string; phase: RunPhase; detail?: string }
+type WTab = 'login' | 'edit' | 'warm'
 
 const DURATIONS: { v: number; h: string }[] = [
   { v: 15, h: 'échauffement' }, { v: 30, h: 'recommandé' }, { v: 60, h: 'session longue' }, { v: 120, h: 'compte mûr' },
@@ -40,6 +41,7 @@ export default function Warmup({ theme, infra, user, org }: {
   const [running, setRunning] = useState(false)
   const [runItems, setRunItems] = useState<RunItem[]>([])
   const [logs, setLogs] = useState<string[]>([])
+  const [wtab, setWtab] = useState<WTab>('warm')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -82,14 +84,43 @@ export default function Warmup({ theme, infra, user, org }: {
   const nSel = sel.size
   const durLabel = dur < 60 ? `${dur} min` : `${dur / 60} h`
 
+  const TABS: [WTab, string][] = [['login', 'Connexion'], ['edit', 'Édition en masse'], ['warm', 'Warmup']]
+  const subFor: Record<WTab, string> = {
+    login: 'Connecte automatiquement tes comptes Instagram sur les appareils (auto-login).',
+    edit: 'Édite en masse le profil de tes comptes (nom, bio, lien, photo).',
+    warm: "Chauffe tes comptes par sessions de durée fixe. Les appareils s'éteignent à la fin.",
+  }
+
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead
-        title="Warmup"
-        sub="Chauffe tes comptes par sessions de durée fixe. Les appareils s'éteignent à la fin — pas besoin de les laisser tourner."
-        actions={<Chip text={`${nSel} sélectionnés`} tone="mute" />}
+        title="Automatisations comptes"
+        sub={subFor[wtab]}
+        actions={wtab === 'warm' ? <Chip text={`${nSel} sélectionnés`} tone="mute" /> : undefined}
       />
 
+      {/* Onglets Connexion / Édition en masse / Warmup */}
+      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, marginBottom: 14, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
+        {TABS.map(([k, l]) => (
+          <button key={k} onClick={() => setWtab(k)} style={{
+            height: 28, padding: '0 14px', border: 'none', borderRadius: 6, cursor: 'pointer',
+            background: wtab === k ? `rgba(${theme.tone},0.16)` : 'transparent',
+            color: wtab === k ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 700, transition: 'all .14s ease',
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {wtab !== 'warm' ? (
+        <Panel theme={theme}>
+          <Empty
+            icon={wtab === 'login' ? 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4|M10 17l5-5-5-5|M15 12H3' : 'M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z'}
+            title={wtab === 'login' ? 'Connexion automatique' : 'Édition de profil en masse'}
+            text={wtab === 'login'
+              ? "L'auto-login connecte tes comptes IG sur les appareils via le flow RPA GeeLark. Le câblage arrive à la prochaine passe (il réutilise geelarkLoginFlow)."
+              : "L'édition en masse met à jour nom, bio, lien et photo de profil sur les comptes sélectionnés (RPA instagramEdit). Câblage à la prochaine passe."}
+          />
+        </Panel>
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
         {/* Téléphones */}
         <Panel theme={theme}>
@@ -204,6 +235,7 @@ export default function Warmup({ theme, infra, user, org }: {
           </Panel>
         </div>
       </div>
+      )}
     </div>
   )
 }

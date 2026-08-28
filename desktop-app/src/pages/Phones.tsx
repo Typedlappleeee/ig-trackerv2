@@ -7,8 +7,6 @@ import { Btn, Empty, Icon, Kpi, Panel, StatusDot } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
-import { useConnections } from '@/lib/connections'
-import { startPhones, stopPhones } from '@/lib/geelark'
 
 // ── Type Phone (sous-ensemble réel de la table `phones`, aligné sur
 //    electron-app/src/lib/supabase.ts). Lecture seule pour cette passe. ──────────
@@ -70,13 +68,9 @@ export default function Phones({ theme, infra, user, org }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState
 }) {
   const { currentOrg, role, perms } = org
-  const conns = useConnections(user, org)
-  const bearer = conns.bearer
   const [phones, setPhones] = useState<Phone[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<Set<string>>(new Set()) // ids de téléphones en cours d'action
-  const [notice, setNotice] = useState<string | null>(null)
 
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<'all' | 'on' | 'off' | 'risk'>('all')
@@ -106,29 +100,6 @@ export default function Phones({ theme, infra, user, org }: {
   }, [currentOrg?.id, user.id, role, perms, infra])
 
   useEffect(() => { load() }, [load])
-
-  // ── Actions RÉELLES GeeLark : démarrer / arrêter des téléphones ──────────────
-  async function runAction(kind: 'start' | 'stop', targets: Phone[]) {
-    const withId = targets.filter(p => p.geelark_id)
-    if (withId.length === 0 || !bearer) {
-      if (!bearer) setNotice('Connecte ton compte GeeLark (token) dans les Réglages de l\'app web.')
-      else setNotice('Ces appareils n\'ont pas d\'identifiant GeeLark.')
-      return
-    }
-    setNotice(null)
-    const ids = withId.map(p => p.id)
-    setBusy(b => { const n = new Set(b); ids.forEach(i => n.add(i)); return n })
-    try {
-      const n = kind === 'start'
-        ? await startPhones(bearer, withId.map(p => p.geelark_id!))
-        : await stopPhones(bearer, withId.map(p => p.geelark_id!))
-      setNotice(kind === 'start' ? `${n} appareil(s) démarré(s).` : `${n} appareil(s) arrêté(s).`)
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : 'Action GeeLark échouée.')
-    } finally {
-      setBusy(b => { const n = new Set(b); ids.forEach(i => n.delete(i)); return n })
-    }
-  }
 
   // Rows enrichies d'un score de santé dérivé (déterministe).
   const rows = useMemo(() => phones.map(p => ({ ...p, health: deriveHealth(p) })), [phones])
@@ -362,11 +333,8 @@ export default function Phones({ theme, infra, user, org }: {
                   {/* Vues 30j (total_views réel) */}
                   <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#D4D4D8' }}>{fmtViews(p.total_views)}</span>
 
-                  {/* Actions RÉELLES (démarrer/arrêter le téléphone GeeLark) */}
+                  {/* Actions : GeeLark sert à l'automatisation — pas de démarrage manuel. */}
                   <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 5 }} onClick={e => e.stopPropagation()}>
-                    {p.status === 'online'
-                      ? <Btn theme={theme} sm tone="quiet" icon="M6 6h12v12H6z" label={busy.has(p.id) ? '…' : 'Arrêter'} disabled={busy.has(p.id) || !p.geelark_id} onClick={() => runAction('stop', [p])} />
-                      : <Btn theme={theme} sm tone="ghost" icon="M5 3l14 9-14 9z" label={busy.has(p.id) ? '…' : 'Démarrer'} disabled={busy.has(p.id) || !p.geelark_id} onClick={() => runAction('start', [p])} />}
                     <Btn theme={theme} sm tone="quiet" icon="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M4 12h2|M18 12h2|M12 4v2|M12 18v2" label="Réglages" />
                   </span>
                 </div>
@@ -392,19 +360,10 @@ export default function Phones({ theme, infra, user, org }: {
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           <Btn label="Publier" theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" />
           <Btn label="Chauffer" theme={theme} sm icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" />
-          <Btn label="Démarrer" theme={theme} sm icon="M5 3l14 9-14 9z" disabled={!bearer} onClick={() => runAction('start', phones.filter(p => sel.has(p.id)))} />
-          <Btn label="Arrêter" theme={theme} sm tone="quiet" icon="M6 6h12v12H6z" disabled={!bearer} onClick={() => runAction('stop', phones.filter(p => sel.has(p.id)))} />
+          <Btn label="Groupe" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" />
           <span style={{ marginLeft: 'auto' }}>
             <Btn label="Tout désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
           </span>
-        </div>
-      )}
-
-      {/* Retour d'action GeeLark */}
-      {notice && (
-        <div style={{ marginTop: 12, padding: '9px 13px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, color: '#D4D4D8', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: theme.accentText, display: 'flex' }}><Icon d="M12 16v-4|M12 8h.01|M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" size={14} /></span>
-          {notice}
         </div>
       )}
     </div>

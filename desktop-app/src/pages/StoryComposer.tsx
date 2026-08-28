@@ -52,7 +52,11 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     ])
     const ph = (phRes.data ?? []) as Phone[]
     setPhones(ph)
-    setImages(((mRes.data ?? []) as Media[]).filter(isImage))
+    // Exclut les dossiers-sentinelles, garde les images ; fallback : si aucune image
+    // détectée (chemins sans extension claire), on montre tout le média réel.
+    const all = ((mRes.data ?? []) as Media[]).filter(m => !(SENTINELS.includes(m.notes ?? '') && !m.storage_path && !m.file_url))
+    const imgs = all.filter(isImage)
+    setImages(imgs.length > 0 ? imgs : all)
     // Pré-remplit les liens depuis localStorage (partagé avec l'onglet Story web).
     const initial: Record<string, string> = {}
     for (const p of ph) { try { const v = localStorage.getItem(linkKey(p)); if (v) initial[p.id] = v } catch { /* ignore */ } }

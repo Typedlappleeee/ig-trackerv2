@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, StatusDot, Panel, PanelHead, PageHead, Kpi, Empty } from '@/lib/ui'
+import { Btn, Chip, Icon, StatusDot, Panel, PanelHead, PageHead, Kpi, Empty, ConnectBanner } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { scopeInfra } from '@/lib/data'
 import { deriveHealth, healthColor, healthReason } from '@/lib/health'
@@ -54,8 +54,8 @@ const CRITERIA: [string, number, string, string][] = [
   ['Warmup', 10, 'Sessions de chauffe effectuées ce mois', '#F59E0B'],
 ]
 
-export default function Health({ theme, infra, user, org }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState
+export default function Health({ theme, infra, user, org, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
 }) {
   const { currentOrg } = org
   const [phones, setPhones] = useState<Phone[]>([])
@@ -93,6 +93,8 @@ export default function Health({ theme, infra, user, org }: {
         sub="Un score par compte, calculé sur l'âge, la cadence, les blocages récents et le taux de succès. Agis avant de perdre un compte."
         actions={<Btn theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Recalculer" />}
       />
+
+      <ConnectBanner theme={theme} onConnect={() => onNavigate?.('connections')} />
 
       {/* Comment le score est calculé */}
       <div style={{ marginBottom: 14 }}>

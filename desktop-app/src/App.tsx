@@ -105,7 +105,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'activity'
         ? <Activity theme={theme} infra={infra} user={user} org={org} />
         : page === 'health'
-        ? <Health theme={theme} infra={infra} user={user} org={org} />
+        ? <Health theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'recipes'
         ? <Recipes theme={theme} infra={infra} user={user} org={org} />
         : page === 'publish'
@@ -115,7 +115,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'studio'
         ? <Studio theme={theme} infra={infra} user={user} org={org} />
         : page === 'insights'
-        ? <Insights theme={theme} infra={infra} user={user} org={org} />
+        ? <Insights theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'connections'
         ? <Connections theme={theme} infra={infra} user={user} org={org} />
         : page === 'flows'

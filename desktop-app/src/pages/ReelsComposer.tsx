@@ -50,7 +50,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_path,thumbnail_url,notes')).order('created_at', { ascending: false }),
     ])
     setPhones((phRes.data ?? []) as Phone[])
-    setVideos(((vRes.data ?? []) as Video[]).filter(isVideo))
+    // On exclut les dossiers-sentinelles, puis on garde les vidéos ; si la détection
+    // par extension ne trouve rien (chemins sans extension claire), on montre TOUT le
+    // média réel plutôt que d'afficher « banque vide » à tort.
+    const all = ((vRes.data ?? []) as Video[]).filter(v => !(SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url))
+    const vids = all.filter(isVideo)
+    setVideos(vids.length > 0 ? vids : all)
     setLoading(false)
   }, [currentOrg?.id, user.id])
 
