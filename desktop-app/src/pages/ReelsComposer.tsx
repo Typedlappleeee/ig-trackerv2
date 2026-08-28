@@ -5,13 +5,14 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { useBankThumbs } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, postReelToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null; ig_status: string | null; last_post_at: string | null; account_state: string | null }
-interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; duration: number | null; notes: string | null }
+interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; duration: number | null; notes: string | null }
 
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
 const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
@@ -57,7 +58,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, vRes, balRes] = await Promise.all([
       scope(supabase.from('phones').select('id,ig_username,phone_name,status,group_name,geelark_id,ig_status,last_post_at,account_state')).not('geelark_id', 'is', null).order('phone_name'),
-      scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,duration,notes')).order('created_at', { ascending: false }),
+      scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,thumbnail_path,duration,notes')).order('created_at', { ascending: false }),
       currentOrg ? supabase.rpc('get_org_credit_balance', { p_org_id: currentOrg.id }) : supabase.from('user_credits').select('balance').eq('user_id', user.id).maybeSingle(),
     ])
     setPhones((phRes.data ?? []) as Phone[])
@@ -80,6 +81,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     (group === 'Tous' || p.group_name === group) && (!healthy || deriveHealth(p) >= 70)
   ), [phones, group, healthy])
 
+  const { thumbFor } = useBankThumbs(videos)
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleVid = (id: string) => setVidSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const nSel = sel.size
@@ -236,12 +238,16 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(84px,1fr))', gap: 8, padding: 13, maxHeight: 420, overflowY: 'auto' }}>
               {videos.map((v, i) => {
                 const on = vidSel.has(v.id); const h = HUES[i % 6]
+                const prev = thumbFor(v); const vid = isVideo(v)
                 return (
                   <button key={v.id} onClick={() => toggleVid(v.id)} title={v.title} style={{
                     position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden',
                     border: '1.5px solid ' + (on ? theme.accent : 'rgba(255,255,255,0.07)'),
-                    background: v.thumbnail_url ? `center/cover url(${v.thumbnail_url})` : `linear-gradient(160deg, rgba(${h},0.16), rgba(${h},0.04))`,
+                    background: `linear-gradient(160deg, rgba(${h},0.16), rgba(${h},0.04))`,
                   }}>
+                    {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
+                      ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
                     <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? theme.accentBtn : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
                     {fmtDur(v.duration) && <span style={{ position: 'absolute', bottom: 5, left: 6, fontFamily: "'JetBrains Mono',monospace", fontSize: 8.5, color: 'rgba(255,255,255,0.7)' }}>{fmtDur(v.duration)}</span>}
                   </button>

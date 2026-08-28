@@ -4,12 +4,13 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { useBankThumbs } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadImage, postStoryToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 
 interface Phone { id: string; ig_username: string | null; status: string; group_name: string | null; geelark_id: string | null }
-interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; notes: string | null }
+interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
 
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
 const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
@@ -48,7 +49,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, mRes] = await Promise.all([
       scope(supabase.from('phones').select('id,ig_username,status,group_name,geelark_id')).not('geelark_id', 'is', null).order('phone_name'),
-      scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,notes')).order('created_at', { ascending: false }),
+      scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,thumbnail_path,notes')).order('created_at', { ascending: false }),
     ])
     const ph = (phRes.data ?? []) as Phone[]
     setPhones(ph)
@@ -66,6 +67,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
 
   useEffect(() => { load() }, [load])
 
+  const { thumbFor } = useBankThumbs(images)
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const setLink = (p: Phone, v: string) => {
     setLinks(l => ({ ...l, [p.id]: v }))
@@ -180,12 +182,14 @@ export default function StoryComposer({ theme, user, org, onBack }: {
                 {images.map((m, i) => {
                   const on = imageId === m.id
                   const hue = ['139,92,246', '6,182,212', '236,72,153', '16,185,129', '245,158,11'][i % 5]
+                  const prev = thumbFor(m)
                   return (
                     <button key={m.id} onClick={() => setImageId(m.id)} title={m.title} style={{
                       position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden',
                       border: '1.5px solid ' + (on ? theme.accent : 'rgba(255,255,255,0.07)'),
-                      background: m.thumbnail_url ? `center/cover url(${m.thumbnail_url})` : `linear-gradient(160deg, rgba(${hue},0.16), rgba(${hue},0.035))`,
+                      background: `linear-gradient(160deg, rgba(${hue},0.16), rgba(${hue},0.035))`,
                     }}>
+                      {prev && <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
                       <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? theme.accent : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
                     </button>
                   )

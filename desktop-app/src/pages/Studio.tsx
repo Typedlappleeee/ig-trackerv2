@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Chip, Icon, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { useBankThumbs } from '@/lib/data'
 
 // Studio vidéo : hub des outils (gratuits) + wizard par outil (fidèle à _studio()).
 // La génération n'est pas encore branchée (outils serveur) — le wizard prépare tout.
@@ -21,8 +22,13 @@ const SETTINGS: Record<string, [string, string][]> = {
   mixer: [['Hook', 'POV : tu découvres ça'], ['Position', 'Haut'], ['Fond', 'Noir'], ['Rendu', 'Serveur']],
 }
 
-interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; notes: string | null }
+interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
+const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
+function isVid(v: Video): boolean {
+  const ext = (v.storage_path ?? v.file_url ?? '').toLowerCase().split('.').pop() ?? ''
+  return !IMG_EXT.includes(ext)
+}
 
 export default function Studio({ theme, infra, user, org }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState
@@ -31,15 +37,43 @@ export default function Studio({ theme, infra, user, org }: {
   const [tool, setTool] = useState<string | null>(null)
   const [videos, setVideos] = useState<Video[]>([])
   const [src, setSrc] = useState<Set<string>>(new Set())
+  const [uploading, setUploading] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const { thumbFor } = useBankThumbs(videos)
 
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,notes')).order('created_at', { ascending: false })
+    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,thumbnail_path,notes')).order('created_at', { ascending: false })
     setVideos(((data ?? []) as Video[]).filter(v => !(SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url)))
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
 
   const toggleSrc = (id: string) => setSrc(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  // Import « Mon PC » : upload vers le bucket content puis insert content_bank (comme la banque).
+  async function importFromPC(files: FileList | File[]) {
+    const list = Array.from(files); if (list.length === 0) return
+    const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
+    let done = 0
+    for (const file of list) {
+      setUploading(`${file.name} (${++done}/${list.length})`)
+      try {
+        let ext = (file.name.split('.').pop() ?? '').toLowerCase()
+        if (!ext) ext = file.type.startsWith('image') ? 'jpg' : 'mp4'
+        const id = crypto.randomUUID()
+        const storagePath = `videos/${scopeFolder}/${id}.${ext}`
+        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
+        if (up.error) continue
+        await supabase.from('content_bank').insert({
+          user_id: user.id, org_id: currentOrg?.id ?? null,
+          title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: null,
+          file_url: null, folder: null, duration: null, tags: [], notes: null, used_count: 0,
+        })
+      } catch { /* ignore */ }
+    }
+    setUploading(null)
+    await load()
+  }
 
   // ── Hub ──
   if (!tool) {
@@ -84,20 +118,25 @@ export default function Studio({ theme, infra, user, org }: {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Panel theme={theme}>
-            <PanelHead title="Vidéos sources" sub={`${nSrc} sélectionnée${nSrc > 1 ? 's' : ''}`} right={<>
-              <Btn theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Banque" />
-              <Btn theme={theme} sm tone="quiet" icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" label="Mon PC" />
+            <PanelHead title="Vidéos sources" sub={uploading ? `Import : ${uploading}` : `${nSrc} sélectionnée${nSrc > 1 ? 's' : ''}`} right={<>
+              <Btn theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Banque" onClick={() => load()} />
+              <Btn theme={theme} sm tone="quiet" icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" label="Mon PC" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
+              <input ref={fileRef} type="file" accept="video/*,image/*" multiple style={{ display: 'none' }}
+                onChange={e => { if (e.target.files) importFromPC(e.target.files); e.target.value = '' }} />
             </>} />
-            {videos.length === 0 ? <div style={{ padding: 28, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucune vidéo dans la banque.</div> : (
+            {videos.length === 0 ? <div style={{ padding: 28, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucune vidéo dans la banque. Clique « Mon PC » pour en importer.</div> : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 13, maxHeight: 300, overflowY: 'auto' }}>
-                {videos.map((v, i) => {
-                  const on = src.has(v.id)
+                {videos.map((v) => {
+                  const on = src.has(v.id); const prev = thumbFor(v); const vid = isVid(v)
                   return (
                     <button key={v.id} onClick={() => toggleSrc(v.id)} title={v.title} style={{
                       position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden',
                       border: '1.5px solid ' + (on ? `rgb(${T.tone})` : 'rgba(255,255,255,0.07)'),
-                      background: v.thumbnail_url ? `center/cover url(${v.thumbnail_url})` : `linear-gradient(160deg, rgba(${T.tone},0.16), rgba(${T.tone},0.035))`,
+                      background: `linear-gradient(160deg, rgba(${T.tone},0.16), rgba(${T.tone},0.035))`,
                     }}>
+                      {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
+                        ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
                       <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? `rgb(${T.tone})` : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
                     </button>
                   )

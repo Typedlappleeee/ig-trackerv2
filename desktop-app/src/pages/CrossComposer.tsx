@@ -4,14 +4,19 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
-import { phoneLabel, phoneSub } from '@/lib/data'
+import { phoneLabel, phoneSub, useBankThumbs } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, crossPostToPhone, CROSS_PLATFORMS, type CrossPlatform } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null }
-interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; notes: string | null }
+interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
+const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
+function isVid(v: Video): boolean {
+  const ext = (v.storage_path ?? v.file_url ?? '').toLowerCase().split('.').pop() ?? ''
+  return !IMG_EXT.includes(ext)
+}
 function dotKind(s: string): string { return s === 'warming' ? 'warmup' : s }
 type Phase = 'pending' | 'running' | 'done' | 'failed'
 interface RunItem { id: string; name: string; phase: Phase; detail?: string }
@@ -38,7 +43,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, vRes] = await Promise.all([
       scope(supabase.from('phones').select('id,ig_username,phone_name,status,geelark_id')).not('geelark_id', 'is', null).order('phone_name'),
-      scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,notes')).order('created_at', { ascending: false }),
+      scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,thumbnail_path,notes')).order('created_at', { ascending: false }),
     ])
     setPhones((phRes.data ?? []) as Phone[])
     setVideos(((vRes.data ?? []) as Video[]).filter(v => !(SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url)))
@@ -46,6 +51,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
 
+  const { thumbFor } = useBankThumbs(videos)
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const togglePlat = (p: CrossPlatform) => setPlats(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n })
   const nSel = sel.size
@@ -141,8 +147,12 @@ export default function CrossComposer({ theme, user, org, onBack }: {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 13, maxHeight: 240, overflowY: 'auto' }}>
                 {videos.map((v, i) => {
                   const on = videoId === v.id; const hue = ['139,92,246', '6,182,212', '236,72,153', '16,185,129', '245,158,11'][i % 5]
+                  const prev = thumbFor(v); const vid = isVid(v)
                   return (
-                    <button key={v.id} onClick={() => setVideoId(v.id)} title={v.title} style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden', border: '1.5px solid ' + (on ? theme.accent : 'rgba(255,255,255,0.07)'), background: v.thumbnail_url ? `center/cover url(${v.thumbnail_url})` : `linear-gradient(160deg, rgba(${hue},0.16), rgba(${hue},0.035))` }}>
+                    <button key={v.id} onClick={() => setVideoId(v.id)} title={v.title} style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden', border: '1.5px solid ' + (on ? theme.accent : 'rgba(255,255,255,0.07)'), background: `linear-gradient(160deg, rgba(${hue},0.16), rgba(${hue},0.035))` }}>
+                      {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
+                        ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
                       <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? theme.accentBtn : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
                     </button>
                   )

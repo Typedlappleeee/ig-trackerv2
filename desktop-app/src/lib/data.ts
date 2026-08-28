@@ -190,6 +190,50 @@ export function useHubData(user: User, org: OrgState, infra: InfraKey) {
   return { data, loading: loading || orgLoading, reload: load }
 }
 
+// ── Vignettes de la banque (bucket privé → URLs signées) ─────────────────────
+// Le bucket `content` est privé : on ne peut pas afficher les médias/vignettes
+// directement, il faut signer les chemins. On signe PAR LOTS de 100 (createSignedUrls
+// échoue si on lui passe des centaines de chemins d'un coup). Réutilisé par la
+// banque, Reels, Story, Cross et Studio pour que les aperçus s'affichent partout.
+export interface BankThumbItem {
+  id: string
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  storage_path?: string | null
+  file_url?: string | null
+}
+export function useBankThumbs(items: BankThumbItem[]) {
+  const [thumbs, setThumbs] = useState<Record<string, string>>({})
+  useEffect(() => {
+    const thumbPaths = items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
+    const mediaPaths = items.filter(i => i.storage_path).map(i => i.storage_path as string)
+    const paths = [...new Set([...thumbPaths, ...mediaPaths])]
+    if (paths.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      const CHUNK = 100
+      for (let i = 0; i < paths.length; i += CHUNK) {
+        const batch = paths.slice(i, i + CHUNK)
+        const { data } = await supabase.storage.from('content').createSignedUrls(batch, 3600)
+        if (cancelled) return
+        if (data) setThumbs(prev => {
+          const map = { ...prev }
+          data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl })
+          return map
+        })
+      }
+    })()
+    return () => { cancelled = true }
+  }, [items])
+  const thumbFor = useCallback((i: BankThumbItem): string | null => {
+    if (i.thumbnail_url) return i.thumbnail_url
+    if (i.thumbnail_path && thumbs[i.thumbnail_path]) return thumbs[i.thumbnail_path]
+    if (i.storage_path && thumbs[i.storage_path]) return thumbs[i.storage_path]
+    return null
+  }, [thumbs])
+  return { thumbFor }
+}
+
 // ── Helpers d'affichage ──────────────────────────────────────────────────────
 export function firstNameFrom(displayName: string | null, email: string | undefined): string {
   if (displayName && displayName.trim()) return displayName.trim().split(/\s+/)[0]
