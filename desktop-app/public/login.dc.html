@@ -427,17 +427,27 @@ class Component extends DCLogic {
 </script>
 <script>
 (function(){
-  function goApp(){ location.href='./app.dc.html'; }
-  document.addEventListener('click', function(e){
-    var t=e.target;
-    for(var i=0;i<5 && t;i++){
-      var txt=((t.textContent||'')+'').trim().toLowerCase();
-      if(txt.indexOf('entrer au studio')>=0 || (t.getAttribute && t.getAttribute('type')==='submit')){ e.preventDefault(); goApp(); return; }
-      t=t.parentElement;
-    }
-  }, true);
-  document.addEventListener('keydown', function(e){ if(e.key==='Enter'){ goApp(); } });
+  var SUPA='https://fvmkmkspfksscgqyvysl.supabase.co';
+  var KEY='sb_publishable_hip63djbBYnu3EsSx2gA4w_0tgjweEo';
+  function msg(m,bad){ var el=document.getElementById('sf-msg'); if(!el){el=document.createElement('div');el.id='sf-msg';el.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:99999;padding:11px 20px;border-radius:11px;font:600 13px Manrope,sans-serif;box-shadow:0 20px 50px -16px rgba(0,0,0,.7)';document.body.appendChild(el);} el.style.background=bad?'rgba(40,12,20,.96)':'rgba(20,16,34,.96)'; el.style.border='1px solid '+(bad?'rgba(248,113,113,.45)':'rgba(168,85,247,.45)'); el.style.color=bad?'#FCA5A5':'#ECEAF5'; el.textContent=m; }
+  function val(sel){ var e=document.querySelector(sel); return e?e.value.trim():''; }
+  async function login(){
+    var email=val('input[type=email]')||val('input[autocomplete="username"]')||val('input:not([type=password]):not([type=checkbox]):not([type=button])');
+    var pass=val('input[type=password]');
+    if(!email||!pass){ msg('Entre ton email et ton mot de passe.',true); return; }
+    msg('Connexion…',false);
+    try{
+      var r=await fetch(SUPA+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass})});
+      var j=await r.json();
+      if(!r.ok||j.error||j.error_code){ msg(j.error_description||j.msg||j.error||'Identifiants incorrects.',true); return; }
+      var now=Math.floor(Date.now()/1000);
+      var session={access_token:j.access_token,token_type:j.token_type||'bearer',expires_in:j.expires_in,expires_at:j.expires_at||now+(j.expires_in||3600),refresh_token:j.refresh_token,user:j.user};
+      localStorage.setItem('sb-fvmkmkspfksscgqyvysl-auth-token',JSON.stringify(session));
+      location.href='./app.dc.html';
+    }catch(e){ msg('Erreur réseau — vérifie ta connexion internet.',true); }
+  }
+  document.addEventListener('click',function(e){var t=e.target;for(var i=0;i<5&&t;i++){var tx=((t.textContent||'')+'').trim().toLowerCase();if(tx.indexOf('entrer au studio')>=0||(t.getAttribute&&t.getAttribute('type')==='submit')){e.preventDefault();login();return;}t=t.parentElement;}},true);
+  document.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();login();}});
 })();
-</script>
-</body>
+</script></body>
 </html>

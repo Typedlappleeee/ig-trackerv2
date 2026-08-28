@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
 </head>
-<body>
+<body><script>
+(function(){ try{ var s=localStorage.getItem('sb-fvmkmkspfksscgqyvysl-auth-token'); if(!s){ location.replace('./login.dc.html'); } }catch(e){} })();
+</script>
 <x-dc>
 <helmet>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -5111,5 +5113,21 @@ activity: ['Pilotage', 'Activité'],
   }
 }
 </script>
-</body>
+<script>
+(function(){
+  function logout(){ if(!confirm('Se déconnecter de ScaleFlow ?')) return; try{localStorage.removeItem('sb-fvmkmkspfksscgqyvysl-auth-token');}catch(e){} location.replace('./login.dc.html'); }
+  window.__sfLogout=logout;
+  // Clic sur la carte profil (bas gauche de la sidebar) => menu déconnexion
+  document.addEventListener('click', function(e){
+    var x=e.clientX, y=e.clientY;
+    var bottomLeft = (x < 214 && y > (window.innerHeight - 74));
+    var t=e.target, ownerHit=false;
+    for(var i=0;i<6&&t;i++){ if(((t.textContent||'')+'').indexOf('Owner')>=0 && (t.offsetWidth||0) < 220){ ownerHit=true; break; } t=t.parentElement; }
+    if(bottomLeft || ownerHit){ e.preventDefault(); e.stopPropagation(); logout(); }
+  }, true);
+  // petit indice visuel "⏏" discret sur la carte profil
+  function hint(){ if(document.getElementById('sf-lo-hint'))return; var h=document.createElement('div'); h.id='sf-lo-hint'; h.textContent='⏏'; h.title='Se déconnecter'; h.style.cssText='position:fixed;left:186px;bottom:16px;z-index:99999;color:#71717A;font-size:13px;cursor:pointer;pointer-events:auto'; h.onmouseenter=function(){h.style.color='#F87171';}; h.onmouseleave=function(){h.style.color='#71717A';}; h.onclick=function(ev){ev.stopPropagation();logout();}; document.body.appendChild(h); }
+  var iv=setInterval(function(){ if(document.body) hint(); },500); setTimeout(function(){clearInterval(iv);},9000);
+})();
+</script></body>
 </html>
