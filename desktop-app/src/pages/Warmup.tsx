@@ -6,7 +6,7 @@ import { Btn, Chip, Empty, StatusDot, Panel, PanelHead, PageHead } from '@/lib/u
 import type { OrgState } from '@/lib/data'
 import { scopeInfra, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
-import { warmupAccountNative, editProfileOnPhone } from '@/lib/geelark'
+import { warmupAccountNative, editProfileOnPhone, loginInstagramOnPhone } from '@/lib/geelark'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null; group_name: string | null }
 function dotKind(status: string): string { return status === 'warming' ? 'warmup' : status }
@@ -44,6 +44,7 @@ export default function Warmup({ theme, infra, user, org }: {
   const [wtab, setWtab] = useState<WTab>('warm')
   const [wgroup, setWgroup] = useState('Tous')
   const [edit, setEdit] = useState({ nickname: '', biography: '', linkURL: '', linkTitle: '' })
+  const [creds, setCreds] = useState<Record<string, { email: string; password: string; totp: string }>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -97,6 +98,25 @@ export default function Warmup({ theme, infra, user, org }: {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
     push('✔ Édition terminée.')
+    setRunning(false)
+  }
+
+  // Auto-login (RÉEL) : flow RPA login par téléphone, avec les identifiants saisis.
+  async function launchLogin() {
+    const targets = phones.filter(p => sel.has(p.id) && p.geelark_id && (creds[p.id]?.email?.trim() && creds[p.id]?.password?.trim()))
+    if (targets.length === 0 || !bearer || running) return
+    setRunning(true); setLogs([])
+    setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as RunPhase })))
+    const push = (m: string) => setLogs(l => [...l.slice(-200), m])
+    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
+    for (const p of targets) {
+      setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
+      push(`— ${phoneLabel(p)} —`)
+      const c = creds[p.id]
+      const r = await loginInstagramOnPhone(bearer, p.geelark_id!, { email: c.email.trim(), password: c.password.trim(), totp: c.totp, rotationUrls: rot }, push)
+      setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
+    }
+    push('✔ Connexions terminées.')
     setRunning(false)
   }
 
@@ -182,15 +202,30 @@ export default function Warmup({ theme, infra, user, org }: {
               </Panel>
             ) : (
               <Panel theme={theme}>
-                <PanelHead title="Connexion automatique" sub="Reconnecte les comptes IG sur les appareils (flow RPA GeeLark)" />
-                <div style={{ padding: 16 }}>
-                  <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
-                    L'auto-login utilise les identifiants IG stockés sur chaque appareil GeeLark pour rouvrir la session. Sélectionne les comptes puis lance — l'agent ouvre l'app et se connecte.
-                  </p>
-                </div>
+                <PanelHead title="Connexion automatique" sub="Identifiants IG par compte (flow RPA GeeLark, 2FA supporté)" />
+                {nSel === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Sélectionne des comptes à gauche pour saisir leurs identifiants.</div>
+                ) : (
+                  <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+                    {phones.filter(p => sel.has(p.id)).map(p => {
+                      const c = creds[p.id] ?? { email: '', password: '', totp: '' }
+                      const set = (k: 'email' | 'password' | 'totp', v: string) => setCreds(cr => ({ ...cr, [p.id]: { ...c, [k]: v } }))
+                      return (
+                        <div key={p.id} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#E4E4E7', marginBottom: 7 }}>{phoneLabel(p)}</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: 6 }}>
+                            <input value={c.email} onChange={e => set('email', e.target.value)} placeholder="email / identifiant" style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 11.5, outline: 'none' }} />
+                            <input value={c.password} onChange={e => set('password', e.target.value)} type="password" placeholder="mot de passe" style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 11.5, outline: 'none' }} />
+                            <input value={c.totp} onChange={e => set('totp', e.target.value)} placeholder="clé 2FA" style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 11.5, outline: 'none', fontFamily: "'JetBrains Mono',monospace" }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ flex: 1, fontSize: 12, color: '#71717A' }}>Connecte <b style={{ color: '#E4E4E7' }}>{nSel}</b> compte{nSel > 1 ? 's' : ''}.</span>
-                  <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer} icon="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4|M10 17l5-5-5-5|M15 12H3" label="Lancer la connexion" onClick={() => setLogs(l => [...l, 'La connexion automatique s\'appuie sur le flow de login GeeLark — branchement RPA en cours.'])} />
+                  <span style={{ flex: 1, fontSize: 12, color: '#71717A' }}>Connecte les comptes avec identifiants renseignés.</span>
+                  <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running} icon="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4|M10 17l5-5-5-5|M15 12H3" label={running ? 'Connexion…' : 'Lancer la connexion'} onClick={launchLogin} />
                 </div>
               </Panel>
             )}

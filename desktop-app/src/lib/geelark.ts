@@ -6,6 +6,7 @@
 // démarrage/arrêt de téléphone, sonde de tâche RPA). Best-effort, jamais de secret loggé.
 
 import storyFlowDef from './geelarkStoryFlow.json'
+import loginFlowDef from './geelarkLoginFlow.json'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -158,6 +159,56 @@ export async function warmupAccountNative(
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
     // Anti-coût : on éteint toujours le téléphone à la fin.
+    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+  }
+}
+
+// ── Auto-login Instagram via flow RPA GeeLark ────────────────────────────────
+const LOGIN_FLOW_VERSION = '1'
+const _loginFlowCache = new Map<string, Promise<string | null>>()
+async function ensureLoginFlowId(bearer: string, log: (m: string) => void): Promise<string | null> {
+  const cached = _loginFlowCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, ver: string | null = null
+    try { stored = localStorage.getItem(`sf-login-flowid:${bearer.slice(-14)}`); ver = localStorage.getItem(`sf-login-flowver:${bearer.slice(-14)}`) } catch { /* ignore */ }
+    if (stored && ver === LOGIN_FLOW_VERSION) return stored
+    log('📥 Import du flow « Login » dans GeeLark…')
+    try {
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(loginFlowDef) }, bearer)
+      if (Number(res['code']) !== 0) { log(`⚠ Import flow login : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(`sf-login-flowid:${bearer.slice(-14)}`, id); localStorage.setItem(`sf-login-flowver:${bearer.slice(-14)}`, LOGIN_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log(`⚠ Import flow login : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _loginFlowCache.set(bearer, p)
+  p.then(v => { if (!v) _loginFlowCache.delete(bearer) }).catch(() => _loginFlowCache.delete(bearer))
+  return p
+}
+
+// Connecte un compte IG sur UN téléphone via le flow RPA (User/Password/Key 2FA).
+export async function loginInstagramOnPhone(
+  bearer: string, phoneId: string,
+  creds: { email: string; password: string; totp?: string; rotationUrls?: string[] },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const flowId = await ensureLoginFlowId(bearer, log)
+    if (!flowId) return { ok: false, error: 'Flow login indisponible' }
+    const ready = await ensurePhoneRunning(bearer, phoneId, log, creds.rotationUrls)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log('🔐 Connexion via RPA…')
+    const paramMap = { User: creds.email, Password: creds.password, Key: (creds.totp ?? '').replace(/[\s=]/g, '').toUpperCase() }
+    const res = await geelarkFetch('/task/rpa/add', { id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 3, name: 'Login Scaleflow', paramMap }, bearer)
+    if (Number(res['code']) !== 0) return { ok: false, error: `GeeLark login : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
+    log('   Tâche créée — connexion en cours…')
+    return await pollRpaTask(bearer, taskId, log, 10 * 60_000)
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
+  } finally {
     try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
   }
 }
