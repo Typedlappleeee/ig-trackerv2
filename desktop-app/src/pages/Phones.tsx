@@ -6,6 +6,7 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Kpi, Panel, StatusDot } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber } from '@/lib/data'
+import { deriveHealth, healthColor } from '@/lib/health'
 
 // ── Type Phone (sous-ensemble réel de la table `phones`, aligné sur
 //    electron-app/src/lib/supabase.ts). Lecture seule pour cette passe. ──────────
@@ -22,28 +23,7 @@ interface Phone {
   account_state: string | null
 }
 
-// ── Santé : dérivation HONNÊTE et déterministe (la table `phones` n'a pas de
-//    colonne de santé). On part de 100 et on retranche selon des signaux RÉELS :
-//    account_state (banni/shadow), status, ig_status, et l'ancienneté du dernier
-//    post. Aucun aléatoire — même entrée ⇒ même score. Documenté ici volontairement.
-function deriveHealth(p: Phone): number {
-  if (p.account_state === 'banned') return 12
-  let s = 100
-  if (p.account_state === 'shadow') s -= 40
-  if (p.ig_status === 'error') s -= 30
-  else if (p.ig_status === 'rate_limited') s -= 20
-  if (p.status === 'error') s -= 25
-  else if (p.status === 'offline') s -= 8
-  else if (p.status === 'warming') s -= 5
-  if (p.last_post_at) {
-    const days = (Date.now() - new Date(p.last_post_at).getTime()) / 86_400_000
-    if (days > 30) s -= 25
-    else if (days > 14) s -= 12
-  } else {
-    s -= 8 // jamais posté / date inconnue
-  }
-  return Math.max(0, Math.min(100, Math.round(s)))
-}
+// La santé est dérivée honnêtement dans src/lib/health.ts (partagé avec l'écran Santé).
 
 const STATUS_LABEL: Record<string, string> = {
   online: 'En ligne', warming: 'Warmup', limited: 'Limité', offline: 'Hors ligne', error: 'Erreur',
@@ -51,10 +31,6 @@ const STATUS_LABEL: Record<string, string> = {
 // La fabrique StatusDot attend 'warmup' pour l'animation (la DB stocke 'warming').
 function dotKind(status: string): string {
   return status === 'warming' ? 'warmup' : status
-}
-
-function healthColor(v: number): string {
-  return v >= 85 ? '#10B981' : v >= 70 ? '#F59E0B' : '#EF4444'
 }
 
 function fmtViews(n: number | null): string {
