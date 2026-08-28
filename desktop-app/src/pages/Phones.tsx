@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Kpi, Panel, StatusDot } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
-import { fmtNumber } from '@/lib/data'
+import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth, healthColor } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
 import { startPhones, stopPhones } from '@/lib/geelark'
@@ -112,12 +112,13 @@ export default function Phones({ theme, infra, user, org }: {
     query = currentOrg
       ? query.eq('org_id', currentOrg.id)
       : query.eq('user_id', user.id).is('org_id', null)
+    query = scopeInfra(query, infra)
     if (restrictedGroups) query = query.in('group_name', restrictedGroups)
     const { data, error: err } = await query
     if (err) { setError('Erreur de chargement des appareils.'); setPhones([]) }
     else setPhones((data ?? []) as Phone[])
     setLoading(false)
-  }, [currentOrg?.id, user.id, role, perms])
+  }, [currentOrg?.id, user.id, role, perms, infra])
 
   useEffect(() => { load() }, [load])
 

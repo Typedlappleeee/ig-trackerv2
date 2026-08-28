@@ -63,10 +63,12 @@ export default function App() {
 }
 
 function AppInner({ user }: { user: User }) {
-  const [infra, setInfra] = useState<InfraKey>('cloud')
+  // On ouvre sur l'infra GeeLark : c'est là que sont tes données aujourd'hui.
+  // ScaleFlow Cloud (auto-hébergé) reste vide tant que tu n'as pas branché tes serveurs.
+  const [infra, setInfra] = useState<InfraKey>('geelark')
   const [page, setPage] = useState<PageKey>('hub')
   const org = useOrg(user)
-  const { data, loading, reload } = useHubData(user, org)
+  const { data, loading, reload } = useHubData(user, org, infra)
   const theme = themeFor(infra)
 
   async function signOut() {

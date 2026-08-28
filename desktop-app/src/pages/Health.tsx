@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Chip, Icon, StatusDot, Panel, PanelHead, PageHead, Kpi, Empty } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { scopeInfra } from '@/lib/data'
 import { deriveHealth, healthColor, healthReason } from '@/lib/health'
 
 interface Phone {
@@ -66,11 +67,12 @@ export default function Health({ theme, infra, user, org }: {
     setError(null)
     let q = supabase.from('phones').select('id,ig_username,ig_status,status,group_name,last_post_at,account_state,created_at')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    q = scopeInfra(q, infra)
     const { data, error: err } = await q
     if (err) { setError('Impossible de charger la santé des comptes.'); setLoading(false); return }
     setPhones((data ?? []) as Phone[])
     setLoading(false)
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, infra])
 
   useEffect(() => { load() }, [load])
 

@@ -5,6 +5,17 @@ import {
   type Organization, type OrgMember, type OrgRole, type PermOverrides,
   type ScheduledPost, type PostRun,
 } from './supabase'
+import type { InfraKey } from './theme'
+
+// ── Séparation des infrastructures ───────────────────────────────────────────
+// Les deux infras sont distinctes niveau données. Discriminateur : la colonne
+// `geelark_id` de la table `phones`. Un téléphone GeeLark en a un ; un téléphone
+// ScaleFlow Cloud (auto-hébergé) n'en a pas. Donc ScaleFlow Cloud n'affiche JAMAIS
+// les appareils GeeLark (et vice-versa). Aucune modif de schéma nécessaire.
+export function scopeInfra<T>(q: T, infra: InfraKey): T {
+  const anyQ = q as any
+  return (infra === 'cloud' ? anyQ.is('geelark_id', null) : anyQ.not('geelark_id', 'is', null)) as T
+}
 
 const LS_ORG = 'ig-tracker-current-org'
 const EMPTY_PERMS: PermOverrides = {}
@@ -106,7 +117,7 @@ export interface HubData {
   >
 }
 
-export function useHubData(user: User, org: OrgState) {
+export function useHubData(user: User, org: OrgState, infra: InfraKey) {
   const { currentOrg, role, perms, loading: orgLoading } = org
   const [data, setData] = useState<HubData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -123,6 +134,7 @@ export function useHubData(user: User, org: OrgState) {
     let phonesQ = currentOrg
       ? supabase.from('phones').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
       : supabase.from('phones').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
+    phonesQ = scopeInfra(phonesQ, infra)
     if (restrictedGroups) phonesQ = phonesQ.in('group_name', restrictedGroups)
 
     const bankQ = currentOrg
@@ -171,7 +183,7 @@ export function useHubData(user: User, org: OrgState) {
       recent: merged.map(({ kind, data }) => ({ kind, data } as HubData['recent'][number])),
     })
     setLoading(false)
-  }, [currentOrg?.id, currentOrg?.owner_id, user.id, role, perms])
+  }, [currentOrg?.id, currentOrg?.owner_id, user.id, role, perms, infra])
 
   useEffect(() => { if (!orgLoading) load() }, [load, orgLoading])
 

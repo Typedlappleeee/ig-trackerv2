@@ -41,13 +41,16 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       ],
     },
     { g: 'Production', items: [{ k: 'studio', l: 'Studio vidéo', i: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z' }] },
-    ...(cloud ? [{
+    {
+      // Analyse : disponible sur les DEUX infras. Chaque infra montre SES propres
+      // données (GeeLark vs ScaleFlow Cloud), scopées par la présence de geelark_id.
       g: 'Analyse', items: [
         { k: 'insights' as PageKey, l: 'Performances', i: 'M3 3v18h18|M7 15l4-6 4 3 5-8' },
         { k: 'health' as PageKey, l: 'Santé des comptes', i: 'M12 21s-8-4.5-8-11a5 5 0 0 1 8-3 5 5 0 0 1 8 3c0 6.5-8 11-8 11z|M9 12h2l1-2 1 4 1-2h2' },
-        { k: 'activity' as PageKey, l: 'Activité', i: 'M22 12h-4l-3 9L9 3l-3 9H2' },
+        // Activité n'est PAS répétée ici en GeeLark (déjà dans Pilotage) ; en Cloud elle vit ici.
+        ...(cloud ? [{ k: 'activity' as PageKey, l: 'Activité', i: 'M22 12h-4l-3 9L9 3l-3 9H2' }] : []),
       ],
-    }] : []),
+    },
   ]
 }
 

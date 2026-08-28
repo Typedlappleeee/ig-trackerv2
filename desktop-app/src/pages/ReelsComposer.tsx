@@ -45,7 +45,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     setLoading(true)
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, vRes] = await Promise.all([
-      scope(supabase.from('phones').select('id,ig_username,status,group_name,geelark_id')).order('phone_name'),
+      scope(supabase.from('phones').select('id,ig_username,status,group_name,geelark_id')).not('geelark_id', 'is', null).order('phone_name'),
       scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_path,thumbnail_url,notes')).order('created_at', { ascending: false }),
     ])
     setPhones((phRes.data ?? []) as Phone[])

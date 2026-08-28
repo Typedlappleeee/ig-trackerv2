@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Kpi, Empty } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { scopeInfra } from '@/lib/data'
 
 interface Phone { id: string; ig_username: string | null; status: string; group_name: string | null; total_views: number | null }
 function dotKind(status: string): string { return status === 'warming' ? 'warmup' : status }
@@ -31,7 +32,7 @@ export default function Insights({ theme, infra, user, org }: {
     setError(null)
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, prRes, spRes] = await Promise.all([
-      scope(supabase.from('phones').select('id,ig_username,status,group_name,total_views')),
+      scopeInfra(scope(supabase.from('phones').select('id,ig_username,status,group_name,total_views')), infra),
       scope(supabase.from('post_runs').select('ok_count')),
       scope(supabase.from('scheduled_posts').select('id', { count: 'exact', head: true })).eq('status', 'done'),
     ])
@@ -40,7 +41,7 @@ export default function Insights({ theme, infra, user, org }: {
     const runPosts = ((prRes.data ?? []) as { ok_count: number | null }[]).reduce((s, r) => s + (r.ok_count ?? 0), 0)
     setPosts(runPosts + (spRes.count ?? 0))
     setLoading(false)
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, infra])
 
   useEffect(() => { load() }, [load])
 
