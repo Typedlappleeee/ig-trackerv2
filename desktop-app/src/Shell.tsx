@@ -10,6 +10,7 @@ export type PageKey =
   | 'flows' | 'recipes' | 'publish' | 'automation' | 'warmup'
   | 'studio'
   | 'insights' | 'health'
+  | 'blowParc' | 'blowContent' | 'blowTools'
   | 'settings'
 
 interface NavItem { k: PageKey; l: string; i: string; n?: number }
@@ -17,8 +18,14 @@ interface NavSection { g: string | null; items: NavItem[] }
 
 function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number | null): NavSection[] {
   if (infra === 'blowsome') {
-    // Nav VIP minimale : l'accueil cockpit. Les pages internes arrivent ensuite.
-    return [{ g: null, items: [{ k: 'hub', l: 'Accueil VIP', i: 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z' }] }]
+    return [
+      { g: null, items: [{ k: 'hub', l: 'Accueil VIP', i: 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z' }] },
+      { g: 'Cockpit', items: [
+        { k: 'blowParc', l: 'Parc VIP', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01' },
+        { k: 'blowContent', l: 'Contenu auto', i: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' },
+        { k: 'blowTools', l: 'Outils VIP', i: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-2-2 2.1-2.1z' },
+      ] },
+    ]
   }
   const cloud = infra === 'cloud'
   const dev: NavItem = cloud
@@ -75,6 +82,9 @@ const TITLES: Record<PageKey, string[]> = {
   studio: ['Production', 'Studio vidéo'],
   insights: ['Analyse', 'Performances'],
   health: ['Analyse', 'Santé des comptes'],
+  blowParc: ['Blowsome', 'Parc VIP'],
+  blowContent: ['Blowsome', 'Contenu auto'],
+  blowTools: ['Blowsome', 'Outils VIP'],
   settings: ['Réglages'],
 }
 

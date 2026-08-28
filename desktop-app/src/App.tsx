@@ -7,6 +7,7 @@ import { useLicense } from '@/lib/license'
 import Shell, { type PageKey } from '@/Shell'
 import Home from '@/pages/Home'
 import BlowsomeHome from '@/pages/BlowsomeHome'
+import { BlowParc, BlowContent, BlowTools } from '@/pages/BlowsomePages'
 import Phones from '@/pages/Phones'
 import Bank from '@/pages/Bank'
 import Proxies from '@/pages/Proxies'
@@ -93,7 +94,10 @@ function AppInner({ user }: { user: User }) {
   const roleLabel = org.role ? org.role.charAt(0).toUpperCase() + org.role.slice(1) : ''
 
   const content = infra === 'blowsome'
-    ? <BlowsomeHome user={user} org={org} />
+    ? (page === 'blowParc' ? <BlowParc user={user} org={org} />
+      : page === 'blowContent' ? <BlowContent user={user} org={org} />
+      : page === 'blowTools' ? <BlowTools />
+      : <BlowsomeHome user={user} org={org} />)
     : page === 'hub'
     ? <Home theme={theme} infra={infra} user={user} data={data} loading={loading} reload={reload} onNavigate={setPage} />
     : (page === 'cloud' || page === 'phones')
