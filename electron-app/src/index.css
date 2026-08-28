@@ -7,47 +7,44 @@
 
 html, body, #root {
   height: 100%;
-  background: #06060E;
-  color: #E9EAF0;
+  /* Design v10 : fond app neutre, aucun halo violet ambiant. */
+  background: #0B0B0F;
+  color: #F4F4F6;
   /* Redesign : corps en Manrope, titres en Space Grotesk (cf. .sf-page-title). */
   font-family: 'Manrope', 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'kern', 'liga', 'calt', 'ss01';
-  /* Lueur or/violette à peine perceptible */
-  background-image:
-    radial-gradient(ellipse 700px 460px at 18% 8%,  rgba(99,102,241,0.025) 0%, transparent 68%),
-    radial-gradient(ellipse 540px 400px at 85% 85%, rgba(99,102,241,0.022) 0%, transparent 70%);
 }
 
-/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar       { width: 8px; height: 8px; }
+/* ── Scrollbar (neutre) ───────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.11);
   border-radius: 99px;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   background-clip: padding-box;
   transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(139,92,246,0.45);
+  background: rgba(255,255,255,0.20);
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-corner { background: transparent; }
-* { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.3) transparent; }
+* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.14) transparent; }
 
-/* ── Selection ──────────────────────────────────────────────────────────────── */
-::selection { background: rgba(99,102,241,0.3); color: #E9EAF0; }
+/* ── Selection (accent violet) ────────────────────────────────────────────────── */
+::selection { background: rgba(139,92,246,0.35); color: #F4F4F6; }
 
 /* ── Focus ──────────────────────────────────────────────────────────────────── */
 *:focus { outline: none; }
 *:focus-visible {
-  outline: 1px solid rgba(99,102,241,0.8);
+  outline: 1px solid rgba(139,92,246,0.8);
   outline-offset: 2px;
   border-radius: 0;
-  box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
+  box-shadow: 0 0 0 4px rgba(139,92,246,0.12);
 }
 
 /* ── Logo neon spin ─────────────────────────────────────────────────────────── */
@@ -432,21 +429,22 @@ input, select, textarea { border-radius: 7px; }
 
 /* Primary gradient button */
 .btn-sf-primary {
-  background: #6366F1;
-  border-color: #6366F1 !important;
+  background: #8B5CF6;
+  border-color: #8B5CF6 !important;
   border-radius: 8px !important;
   color: #fff !important;
   font-weight: 600;
   letter-spacing: 0.01em;
+  box-shadow: 0 0 24px -8px rgba(139,92,246,0.7);
   transition: background 0.18s ease, border-color 0.18s, transform 0.12s;
 }
 .btn-sf-primary:hover:not(:disabled) {
-  background: #818CF8;
-  border-color: #818CF8 !important;
+  background: #A78BFA;
+  border-color: #A78BFA !important;
   transform: translateY(-1px);
 }
 .btn-sf-primary:active:not(:disabled) {
-  background: #4F46E5;
+  background: #7C3AED;
   transform: translateY(0);
 }
 
@@ -825,32 +823,34 @@ html[data-theme="light"] body { background: var(--base); color: var(--text-1); }
 
 /* ── CSS Custom Properties ─────────────────────────────────────────────────── */
 :root {
-  --void:       #020205;
-  --base:       #07070C;
-  --surface:    #0C0C15;
-  --surface-2:  #111120;
-  --surface-3:  #17172A;
-  --overlay:    rgba(2,2,5,0.96);
+  /* ── Design v10 — neutre & dense. Fond app #0B0B0F, panneaux #101015.
+     Le violet ne décore plus, il SIGNIFIE (sélection, actif, action primaire). ── */
+  --void:       #08080B;
+  --base:       #0B0B0F;
+  --surface:    #101015;
+  --surface-2:  #131318;
+  --surface-3:  #1A1A20;
+  --overlay:    rgba(11,11,15,0.96);
 
-  --border:        rgba(255,255,255,0.08);
-  --border-md:     rgba(255,255,255,0.11);
-  --border-strong: rgba(255,255,255,0.14);
-  --border-accent: rgba(99,102,241,0.22);
+  --border:        rgba(255,255,255,0.06);
+  --border-md:     rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.18);
+  --border-accent: rgba(139,92,246,0.30);
 
-  --accent:      #6366F1;
-  --accent-lt:   #818CF8;
-  --accent-l:    #818CF8;
-  --accent-glow: #A5B4FC;
-  --accent-dim:  rgba(99,102,241,0.12);
-  --accent-dim2: rgba(99,102,241,0.06);
+  --accent:      #8B5CF6;
+  --accent-lt:   #A78BFA;
+  --accent-l:    #A78BFA;
+  --accent-glow: #C4B5FD;
+  --accent-dim:  rgba(139,92,246,0.14);
+  --accent-dim2: rgba(139,92,246,0.06);
 
-  --text-1: #F2F0FF;
-  --text-2: rgba(196,181,253,0.72);
-  --text-3: rgba(196,181,253,0.6);
-  --text-4: rgba(148,163,184,0.55);
+  --text-1: #F4F4F6;
+  --text-2: #A1A1AA;
+  --text-3: #71717A;
+  --text-4: #52525B;
 
-  /* Dégradé de marque (cyan → indigo → violet) — boutons, logo, chiffres. */
-  --brand-grad: linear-gradient(135deg, #22D3EE, #818CF8, #A855F7);
+  /* Dégradé de marque — réservé au logo / action primaire (plus d'ambiance). */
+  --brand-grad: linear-gradient(135deg, #A855F7, #8B5CF6);
 
   --ok:      #22C55E;
   --ok-dim:  rgba(34,197,94,0.1);
@@ -861,17 +861,18 @@ html[data-theme="light"] body { background: var(--base); color: var(--text-1); }
   --info:    #38BDF8;
   --info-dim:rgba(56,189,248,0.1);
 
-  --r-xs: 5px;
+  /* Rayons v10 : 6px badges · 8px boutons · 10px panneaux. */
+  --r-xs: 6px;
   --r-sm: 8px;
-  --r-md: 11px;
-  --r-lg: 15px;
-  --r-xl: 20px;
-  --r-2xl:28px;
+  --r-md: 10px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-2xl:22px;
 
   --shadow-sm:  0 1px 3px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.2);
   --shadow-md:  0 4px 16px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.25);
   --shadow-lg:  0 8px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3);
-  --shadow-glow:0 0 28px -6px rgba(99,102,241,0.45);
+  --shadow-glow:0 0 24px -8px rgba(139,92,246,0.45);
   --shadow-card:0 1px 3px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.2);
 }
 
@@ -1037,9 +1038,9 @@ html[data-theme="light"] body { background: var(--base); color: var(--text-1); }
 .sf-btn:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
 
 .sf-btn-primary {
-  background: linear-gradient(140deg, #6366F1 0%, #4F46E5 100%);
+  background: linear-gradient(140deg, #8B5CF6 0%, #7C3AED 100%);
   color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 0 22px -6px rgba(99,102,241,0.6),
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 0 22px -6px rgba(139,92,246,0.6),
               inset 0 1px 0 rgba(255,255,255,0.14);
   position: relative;
   overflow: hidden;
@@ -1058,8 +1059,8 @@ html[data-theme="light"] body { background: var(--base); color: var(--text-1); }
   background-position: 200% 0;
 }
 .sf-btn-primary:hover {
-  background: linear-gradient(140deg, #6366F1 0%, #6D28D9 100%);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 36px -4px rgba(99,102,241,0.75),
+  background: linear-gradient(140deg, #A78BFA 0%, #7C3AED 100%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 36px -4px rgba(139,92,246,0.75),
               inset 0 1px 0 rgba(255,255,255,0.18);
   transform: translateY(-1px);
 }
@@ -2153,7 +2154,7 @@ html[data-glass="off"] #root::after { display: none; }
   cursor: pointer;
   border: none;
   background: transparent;
-  color: rgba(148,163,184,0.52);
+  color: #A1A1AA;
   transition: background 140ms cubic-bezier(0.22,1,0.36,1),
               color 140ms cubic-bezier(0.22,1,0.36,1),
               transform 100ms ease;
@@ -2164,28 +2165,23 @@ html[data-glass="off"] #root::after { display: none; }
   white-space: nowrap;
 }
 .sf-sidebar-item:hover:not(.is-active) {
-  background: rgba(255,255,255,0.058);
-  color: rgba(241,240,247,0.84);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+  background: rgba(255,255,255,0.05);
+  color: #E4E4E7;
 }
 .sf-sidebar-item:active {
   transform: scale(0.965);
 }
 .sf-sidebar-item:focus-visible {
-  box-shadow: 0 0 0 2px rgba(99,102,241,0.55);
+  box-shadow: 0 0 0 2px rgba(139,92,246,0.55);
 }
 .sf-sidebar-item.is-active {
-  /* Redesign : dégradé violet → cyan, plus léger, texte lavande clair. */
-  background: linear-gradient(135deg,
-    rgba(139,92,246,0.22) 0%,
-    rgba(34,211,238,0.10) 100%
-  );
-  color: #E9D5FF;
-  font-weight: 800;
-  box-shadow: inset 0 0 0 1px rgba(139,92,246,0.35),
-              inset 0 1px 0 rgba(255,255,255,0.08);
+  /* Design v10 : accent violet net, à plat (plus de dégradé cyan ambiant). */
+  background: rgba(139,92,246,0.14);
+  color: #F4F4F6;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(139,92,246,0.20);
 }
-/* Animated accent rail — clear "actif" cue on the left edge */
+/* Accent rail — repère "actif" net sur le bord gauche */
 .sf-sidebar-item.is-active::before {
   content: '';
   position: absolute;
@@ -2193,8 +2189,7 @@ html[data-glass="off"] #root::after { display: none; }
   width: 3px; height: 18px;
   margin-top: -9px;
   border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, #C7D2FE 0%, #818CF8 55%, #6366F1 100%);
-  box-shadow: 0 0 10px 0 rgba(129,140,248,0.75);
+  background: #8B5CF6;
   animation: sf-nav-active 0.26s cubic-bezier(0.22,1,0.36,1) both;
 }
 
@@ -2202,16 +2197,16 @@ html[data-glass="off"] #root::after { display: none; }
 .sf-sidebar-item .sf-sidebar-icon {
   flex-shrink: 0;
   display: flex;
-  color: rgba(148,163,184,0.35);
+  color: #71717A;
   transition: color 140ms ease;
 }
 .sf-sidebar-item:hover .sf-sidebar-icon {
-  color: rgba(233,234,240,0.65);
+  color: #E4E4E7;
   transform: scale(1.08);
   transition: color 140ms, transform 140ms cubic-bezier(0.22,1,0.36,1);
 }
 .sf-sidebar-item.is-active .sf-sidebar-icon {
-  color: #C7D2FE;
+  color: #C4B5FD;
   transform: scale(1.06);
   transition: color 140ms, transform 140ms cubic-bezier(0.22,1,0.36,1);
 }
@@ -2232,19 +2227,19 @@ html[data-glass="off"] #root::after { display: none; }
 .sf-sidebar-section:hover { opacity: 0.85; }
 .sf-sidebar-section-label {
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.11em;
-  color: rgba(165,180,252,0.62);
+  letter-spacing: 0.12em;
+  color: #71717A;
   flex-shrink: 0;
 }
 .sf-sidebar-section-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, rgba(99,102,241,0.2), transparent);
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
 }
 .sf-sidebar-section-arrow {
-  color: rgba(148,163,184,0.28);
+  color: #52525B;
   flex-shrink: 0;
   display: flex;
   transition: transform 200ms cubic-bezier(0.22,1,0.36,1), color 140ms;
@@ -2273,8 +2268,8 @@ html[data-glass="off"] #root::after { display: none; }
   position: fixed;
   pointer-events: none;
   z-index: 9999;
-  background: #1A1B26;
-  border: 1px solid rgba(99,102,241,0.3);
+  background: #101015;
+  border: 1px solid rgba(255,255,255,0.10);
   border-radius: 8px;
   padding: 5px 12px;
   font-size: 12px;
@@ -2946,17 +2941,15 @@ select.sf-input:disabled {
 }
 .sf-float { animation: sf-float-y 6s ease-in-out infinite; }
 
-/* Barre latérale — état actif premium (accent dégradé) */
+/* Barre latérale — état actif v10 (accent violet net, à plat) */
 .sf-sidebar-item { position: relative; }
 .sf-sidebar-item.is-active {
-  /* Redesign : dégradé violet → cyan (spec). Garde le !important pour gagner. */
-  background: linear-gradient(135deg, rgba(139,92,246,0.22), rgba(34,211,238,0.10)) !important;
+  background: rgba(139,92,246,0.14) !important;
 }
 .sf-sidebar-item.is-active::before {
   content: ''; position: absolute; left: 0; top: 18%; bottom: 18%; width: 3px;
   border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, #22D3EE, #8B5CF6);
-  box-shadow: 0 0 10px 0 rgba(139,92,246,0.6);
+  background: #8B5CF6;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2999,25 +2992,17 @@ select.sf-input:disabled {
 /* Fond statique plus riche — évite l'effet "vide/plat" maintenant que les halos
    ne sont plus animés. Deux lueurs douces (haut + bas) peintes une seule fois. */
 .sf-page {
-  background:
-    radial-gradient(760px 440px at 88% 106%, rgba(139,92,246,0.07), transparent 72%),
-    radial-gradient(680px 380px at 8% 96%, rgba(99,102,241,0.05), transparent 72%),
-    radial-gradient(1100px 380px at 50% -12%, rgba(99,102,241,0.06), transparent 70%),
-    var(--base) !important;
+  background: var(--base) !important;
 }
 
-/* Fond moins "fade" : grille très discrète + lueurs un peu plus présentes.
-   100% statique (aucune animation) → aucun impact perf. Grille = texture/
-   profondeur qui fait "designé" au lieu de "vide". */
+/* Design v10 : fond neutre & dense. Plus de halos violet ambiants — seulement
+   une grille très discrète pour la texture (100% statique, aucun coût perf). */
 .sf-page {
   background-color: var(--base) !important;
   background-image:
-    radial-gradient(780px 480px at 88% 106%, rgba(139,92,246,0.11), transparent 68%),
-    radial-gradient(680px 420px at 6% 92%, rgba(99,102,241,0.09), transparent 70%),
-    radial-gradient(1100px 420px at 50% -10%, rgba(99,102,241,0.09), transparent 68%),
-    linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px) !important;
-  background-size: 100% 100%, 100% 100%, 100% 100%, 46px 46px, 46px 46px !important;
-  background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat !important;
+    linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px) !important;
+  background-size: 46px 46px, 46px 46px !important;
+  background-repeat: repeat, repeat !important;
 }
 

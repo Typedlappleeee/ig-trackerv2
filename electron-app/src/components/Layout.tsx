@@ -89,19 +89,19 @@ interface LayoutProps {
 interface NavItem  { id: Page; label: string; icon: string; beta?: boolean; isNew?: boolean; dev?: boolean }
 interface NavSection { title: string; items: NavItem[]; defaultOpen?: boolean }
 
+// Design v10 : nav regroupée par INTENTION (pas par ordre historique). Mêmes
+// pages/permissions — seuls les regroupements et titres changent.
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: 'Principal',
+    title: 'Pilotage',
     defaultOpen: true,
     items: [
       { id: 'phones',      label: 'navPhones',       icon: '📱' },
-      { id: 'bank',        label: 'navBank',         icon: '🗂' },
-      { id: 'library',     label: 'navLibrary',      icon: '📚', isNew: true },
       { id: 'activity',    label: 'navActivity',     icon: '📊' },
     ],
   },
   {
-    title: 'Publier',
+    title: 'Diffusion',
     defaultOpen: true,
     items: [
       { id: 'publishhub',  label: 'navPublishVideo', icon: '🚀' },
@@ -110,16 +110,18 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: 'Studio vidéo',
+    title: 'Production',
     defaultOpen: true,
     items: [
       { id: 'videostudio', label: 'navVideoStudio',  icon: '🎬' },
+      { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'library',     label: 'navLibrary',      icon: '📚', isNew: true },
     ],
   },
-  // Section admin (super-admin uniquement — items filtrés par isVisibleTab, la
+  // Infrastructure (super-admin uniquement — items filtrés par isVisibleTab, la
   // section entière disparaît pour les non-admins).
   {
-    title: 'Cloud',
+    title: 'Infrastructure',
     defaultOpen: true,
     items: [
       { id: 'cloudphones', label: 'Cloud Phones',   icon: '📱' },
@@ -131,10 +133,10 @@ const NAV_SECTIONS: NavSection[] = [
 
 // Libellés anglais des sections de nav (titres FR en dur ci-dessus).
 const SECTION_LABEL_EN: Record<string, string> = {
-  'Principal': 'Main',
-  'Publier': 'Publish',
-  'Studio vidéo': 'Video Studio',
-  'Cloud': 'Cloud',
+  'Pilotage': 'Control',
+  'Diffusion': 'Distribution',
+  'Production': 'Production',
+  'Infrastructure': 'Infrastructure',
 }
 
 // Correspondance onglet de nav (Page) → clé de permission (PageKey). Seules les
@@ -890,7 +892,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
   }
 
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', background: '#0A0B0E' }}>
+    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', background: '#0B0B0F' }}>
 
       {/* ── Sidebar (desktop only) ───────────────────────────────────────── */}
       <aside
@@ -899,22 +901,14 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           flexShrink: 0,
           display: isMobile ? 'none' : 'flex',
           flexDirection: 'column',
-          background: 'rgba(8,8,20,0.85)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderRight: '1px solid rgba(255,255,255,0.07)',
+          /* Design v10 : fond neutre, aucun halo violet ambiant. */
+          background: '#0B0B0F',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
           overflow: 'hidden',
           position: 'relative',
         }}
       >
-        {/* Ambient glow behind logo area */}
-        <div style={{
-          position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)',
-          width: 220, height: 180, borderRadius: '50%',
-          background: 'radial-gradient(ellipse at center, rgba(99,102,241,0.10) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
 
         {/* ── Logo area ─────────────────────────────────────────────────── */}
         <div style={{ height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', flexShrink: 0 }}>
@@ -922,7 +916,6 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
           <div style={{
             position: 'relative', width: 32, height: 32, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            filter: 'drop-shadow(0 4px 12px rgba(124,58,237,0.5))',
           }}>
             <SFLogo size={32} />
           </div>
@@ -973,16 +966,27 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
             style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
               justifyContent: collapsed ? 'center' : 'flex-start',
-              height: 36, padding: collapsed ? 0 : '0 11px', borderRadius: 10, cursor: 'pointer',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(233,234,240,0.09)',
-              color: 'rgba(233,234,240,0.55)', fontSize: 13, fontWeight: 500, transition: 'all .15s',
+              height: 36, padding: collapsed ? 0 : '0 11px', borderRadius: 8, cursor: 'pointer',
+              background: '#101015', border: '1px solid rgba(255,255,255,0.08)',
+              color: '#71717A', fontSize: 13, fontWeight: 500, transition: 'all .15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; e.currentTarget.style.color = 'rgba(241,240,247,0.85)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(233,234,240,0.09)'; e.currentTarget.style.color = 'rgba(233,234,240,0.55)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#131318'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.color = '#E4E4E7' }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#101015'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#71717A' }}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
             {!collapsed && <span style={{ flex: 1, textAlign: 'left' }}>{tr('Rechercher…', 'Search…')}</span>}
-            {!collapsed && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(233,234,240,0.1)', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>Ctrl K</span>}
+            {!collapsed && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                {['⌘', 'K'].map(k => (
+                  <span key={k} style={{
+                    fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 500,
+                    minWidth: 16, textAlign: 'center', padding: '2px 4px', borderRadius: 6,
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
+                    color: '#A1A1AA', lineHeight: 1,
+                  }}>{k}</span>
+                ))}
+              </span>
+            )}
           </button>
         </div>
 
@@ -1042,6 +1046,10 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
                       onClick={() => toggleSection(section.title)}
                     >
                       <span className="sf-sidebar-section-label">{tr(section.title, SECTION_LABEL_EN[section.title] ?? section.title)}</span>
+                      <span style={{
+                        fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, fontWeight: 500,
+                        color: '#52525B', flexShrink: 0, letterSpacing: 0,
+                      }}>{items.length}</span>
                       <span className="sf-sidebar-section-line" />
                       <span className="sf-sidebar-section-arrow">
                         <NavIcon d={ICONS.chevronDown} size={10} />
@@ -1241,13 +1249,10 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
         {/* ── Topbar ──────────────────────────────────────────────────────── */}
         <header style={{
           height: 54, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 22px',
-          background: 'rgba(6,6,8,0.94)',
-          backdropFilter: 'blur(20px) saturate(1.3)',
-          WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
-          borderBottom: '1px solid transparent',
-          borderImage: 'linear-gradient(90deg, rgba(99,102,241,0.18), rgba(233,234,240,0.08), rgba(99,102,241,0.18)) 1',
+          /* Design v10 : barre haute neutre, filet simple, aucune lueur violette. */
+          background: '#101015',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
           position: 'relative', zIndex: 10,
-          boxShadow: '0 1px 24px rgba(99,102,241,0.03)',
         }}>
 
           {/* Left: page title + breadcrumb */}
@@ -1546,7 +1551,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
         </header>
 
         {/* ── Scrollable content ────────────────────────────────────────── */}
-        <main style={{ flex: 1, overflow: 'auto', position: 'relative', background: '#0A0B0E', zIndex: 0 }}>
+        <main style={{ flex: 1, overflow: 'auto', position: 'relative', background: '#0B0B0F', zIndex: 0 }}>
           {/* Demo mode banner */}
           {demoMode && (
             <div style={{
