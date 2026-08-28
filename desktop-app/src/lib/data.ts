@@ -157,9 +157,9 @@ export function useHubData(user: User, org: OrgState) {
     const recentScheduled = ((recentRes.data ?? []) as ScheduledPost[])
       .map(d => ({ kind: 'scheduled' as const, data: d, _date: d.executed_at ?? d.created_at ?? '' }))
     const recentRuns = ((directRunsRes?.data ?? []) as PostRun[])
-      .map(d => ({ kind: 'run' as const, data: d, _date: d.created_at }))
+      .map(d => ({ kind: 'run' as const, data: d, _date: d.created_at ?? '' }))
     const merged = [...recentScheduled, ...recentRuns]
-      .sort((a, b) => b._date.localeCompare(a._date)).slice(0, 5)
+      .sort((a, b) => (b._date ?? '').localeCompare(a._date ?? '')).slice(0, 5)
 
     setData({
       displayName: (profileRes.data as { display_name?: string } | null)?.display_name ?? null,
