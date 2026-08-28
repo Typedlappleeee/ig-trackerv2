@@ -50,6 +50,8 @@ export interface ScheduledPost {
   scheduled_at: string
   executed_at: string | null
   created_at: string
+  created_by_name?: string | null
+  result?: unknown
 }
 
 export interface PostRun {

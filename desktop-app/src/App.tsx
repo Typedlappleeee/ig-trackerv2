@@ -8,6 +8,7 @@ import Home from '@/pages/Home'
 import Phones from '@/pages/Phones'
 import Bank from '@/pages/Bank'
 import Proxies from '@/pages/Proxies'
+import Activity from '@/pages/Activity'
 import Automation from '@/pages/Automation'
 import Settings from '@/pages/Settings'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
@@ -80,6 +81,8 @@ function AppInner({ user }: { user: User }) {
         ? <Bank theme={theme} infra={infra} user={user} org={org} />
         : page === 'proxies'
         ? <Proxies theme={theme} infra={infra} user={user} org={org} />
+        : page === 'activity'
+        ? <Activity theme={theme} infra={infra} user={user} org={org} />
         : (page === 'flows' || page === 'automation')
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
         : page === 'settings'
