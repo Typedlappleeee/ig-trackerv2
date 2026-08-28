@@ -8,6 +8,7 @@ import { phoneLabel, phoneSub, useBankThumbs } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, crossPostToPhone, CROSS_PLATFORMS, type CrossPlatform } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
+import BankPicker from '@/components/BankPicker'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
@@ -37,6 +38,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
   const [running, setRunning] = useState(false)
   const [runItems, setRunItems] = useState<RunItem[]>([])
   const [logs, setLogs] = useState<string[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -142,7 +144,8 @@ export default function CrossComposer({ theme, user, org, onBack }: {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Panel theme={theme}>
-            <PanelHead title="Vidéo" sub={chosen ? chosen.title : 'choisis une vidéo'} />
+            <PanelHead title="Vidéo" sub={chosen ? chosen.title : 'choisis une vidéo'}
+              right={<Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPickerOpen(true)} />} />
             {videos.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Banque vide.</div> : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 13, maxHeight: 240, overflowY: 'auto' }}>
                 {videos.map((v, i) => {
@@ -177,6 +180,13 @@ export default function CrossComposer({ theme, user, org, onBack }: {
           )}
         </div>
       </div>
+
+      {pickerOpen && (
+        <BankPicker theme={theme} user={user} org={org} kind="videos" multi={false}
+          initialIds={videoId ? [videoId] : []} title="Choisir une vidéo"
+          onClose={() => setPickerOpen(false)}
+          onApply={r => { if (r.kind === 'videos') setVideoId(r.ids[0] ?? null) }} />
+      )}
     </div>
   )
 }

@@ -4,12 +4,13 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
-import { useBankThumbs } from '@/lib/data'
+import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
+import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { geelarkUploadImage, postStoryToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 
-interface Phone { id: string; ig_username: string | null; status: string; group_name: string | null; geelark_id: string | null }
+interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null }
 interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
 
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
@@ -43,12 +44,13 @@ export default function StoryComposer({ theme, user, org, onBack }: {
   const [running, setRunning] = useState(false)
   const [runItems, setRunItems] = useState<RunItem[]>([])
   const [logs, setLogs] = useState<string[]>([])
+  const [picker, setPicker] = useState<PickerKind | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, mRes] = await Promise.all([
-      scope(supabase.from('phones').select('id,ig_username,status,group_name,geelark_id')).not('geelark_id', 'is', null).order('phone_name'),
+      scope(supabase.from('phones').select('id,ig_username,phone_name,status,group_name,geelark_id')).not('geelark_id', 'is', null).order('phone_name'),
       scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,thumbnail_path,notes')).order('created_at', { ascending: false }),
     ])
     const ph = (phRes.data ?? []) as Phone[]
@@ -158,7 +160,10 @@ export default function StoryComposer({ theme, user, org, onBack }: {
                     <button onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 13px', border: 'none', cursor: 'pointer', textAlign: 'left', background: 'transparent', boxSizing: 'border-box' }}>
                       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accent : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 8.5, fontWeight: 900 }}>{on ? '✓' : ''}</span>
                       <StatusDot kind={dotKind(p.status)} />
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.ig_username ?? '—'}</span>
+                      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                      </span>
                     </button>
                     {on && (
                       <div style={{ padding: '0 13px 9px 34px' }}>
@@ -174,7 +179,8 @@ export default function StoryComposer({ theme, user, org, onBack }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {/* Image */}
           <Panel theme={theme}>
-            <PanelHead title="Image de la story" sub={chosen ? chosen.title : 'choisis une image de la banque'} />
+            <PanelHead title="Image de la story" sub={chosen ? chosen.title : 'choisis une image de la banque'}
+              right={<Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPicker('images')} />} />
             {images.length === 0 ? (
               <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucune image dans la banque.</div>
             ) : (
@@ -224,6 +230,13 @@ export default function StoryComposer({ theme, user, org, onBack }: {
           )}
         </div>
       </div>
+
+      {picker && (
+        <BankPicker theme={theme} user={user} org={org} kind="images" multi={false}
+          initialIds={imageId ? [imageId] : []} title="Choisir une image"
+          onClose={() => setPicker(null)}
+          onApply={r => { if (r.kind === 'images') setImageId(r.ids[0] ?? null) }} />
+      )}
     </div>
   )
 }

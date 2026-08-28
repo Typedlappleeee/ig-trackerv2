@@ -5,11 +5,12 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
-import { useBankThumbs } from '@/lib/data'
+import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, postReelToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
+import BankPicker, { type PickerKind } from '@/components/BankPicker'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null; ig_status: string | null; last_post_at: string | null; account_state: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; duration: number | null; notes: string | null }
@@ -52,6 +53,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [running, setRunning] = useState(false)
   const [runItems, setRunItems] = useState<RunItem[]>([])
   const [logs, setLogs] = useState<string[]>([])
+  const [picker, setPicker] = useState<PickerKind | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -218,8 +220,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                   }}>
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <span style={{ fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.ig_username ?? '—'}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.phone_name}</span>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                     <StatusDot kind={dotKind(p.status)} />
                   </button>
@@ -233,7 +235,10 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       {/* ── Étape 2 : Vidéos ── */}
       {step === 2 && (
         <Panel theme={theme}>
-          <PanelHead title="Quel contenu ?" sub="Plusieurs vidéos ? Elles seront réparties entre les comptes." right={<Chip text={`${nVid} sélectionnée${nVid > 1 ? 's' : ''}`} tone={nVid ? 'violet' : 'mute'} />} />
+          <PanelHead title="Quel contenu ?" sub="Plusieurs vidéos ? Elles seront réparties entre les comptes." right={<>
+            <Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPicker('videos')} />
+            <Chip text={`${nVid} sélectionnée${nVid > 1 ? 's' : ''}`} tone={nVid ? 'violet' : 'mute'} />
+          </>} />
           {videos.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucune vidéo dans la banque.</div> : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(84px,1fr))', gap: 8, padding: 13, maxHeight: 420, overflowY: 'auto' }}>
               {videos.map((v, i) => {
@@ -267,8 +272,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
               <textarea value={caption} onChange={e => setCaption(e.target.value)} placeholder="Écris une légende (facultatif)…" rows={6}
                 style={{ width: '100%', minHeight: 124, resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', color: '#D4D4D8', fontSize: 12.5, lineHeight: 1.65, fontFamily: 'inherit', outline: 'none' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <Btn theme={theme} sm tone="quiet" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Depuis la banque" />
-                <Btn theme={theme} sm tone="quiet" label="Variante par compte" />
+                <Btn theme={theme} sm tone="quiet" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Depuis la banque" onClick={() => setPicker('captions')} />
                 <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: '#52525B' }}>{caption.length} / 2 200</span>
               </div>
             </div>
@@ -343,6 +347,18 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             </div>
           )}
         </div>
+      )}
+
+      {picker && (
+        <BankPicker theme={theme} user={user} org={org} kind={picker}
+          multi={picker !== 'captions'}
+          initialIds={picker === 'videos' ? [...vidSel] : []}
+          title={picker === 'captions' ? 'Choisir une légende' : 'Choisir des vidéos'}
+          onClose={() => setPicker(null)}
+          onApply={r => {
+            if (r.kind === 'captions') setCaption(r.text)
+            else setVidSel(new Set(r.ids))
+          }} />
       )}
     </div>
   )

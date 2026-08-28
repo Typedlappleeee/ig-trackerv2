@@ -5,6 +5,7 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Chip, Icon, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs } from '@/lib/data'
+import BankPicker from '@/components/BankPicker'
 
 // Studio vidéo : hub des outils (gratuits) + wizard par outil (fidèle à _studio()).
 // La génération n'est pas encore branchée (outils serveur) — le wizard prépare tout.
@@ -38,6 +39,7 @@ export default function Studio({ theme, infra, user, org }: {
   const [videos, setVideos] = useState<Video[]>([])
   const [src, setSrc] = useState<Set<string>>(new Set())
   const [uploading, setUploading] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const { thumbFor } = useBankThumbs(videos)
 
@@ -119,7 +121,7 @@ export default function Studio({ theme, infra, user, org }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Panel theme={theme}>
             <PanelHead title="Vidéos sources" sub={uploading ? `Import : ${uploading}` : `${nSrc} sélectionnée${nSrc > 1 ? 's' : ''}`} right={<>
-              <Btn theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Banque" onClick={() => load()} />
+              <Btn theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Banque" onClick={() => setPickerOpen(true)} />
               <Btn theme={theme} sm tone="quiet" icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" label="Mon PC" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
               <input ref={fileRef} type="file" accept="video/*,image/*" multiple style={{ display: 'none' }}
                 onChange={e => { if (e.target.files) importFromPC(e.target.files); e.target.value = '' }} />
@@ -171,6 +173,12 @@ export default function Studio({ theme, infra, user, org }: {
           </div>
         </Panel>
       </div>
+
+      {pickerOpen && (
+        <BankPicker theme={theme} user={user} org={org} kind="videos" multi initialIds={[...src]}
+          title="Choisir des vidéos sources" onClose={() => setPickerOpen(false)}
+          onApply={r => { if (r.kind === 'videos') setSrc(new Set(r.ids)) }} />
+      )}
     </div>
   )
 }
