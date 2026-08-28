@@ -5117,17 +5117,8 @@ activity: ['Pilotage', 'Activité'],
 (function(){
   function logout(){ if(!confirm('Se déconnecter de ScaleFlow ?')) return; try{localStorage.removeItem('sb-fvmkmkspfksscgqyvysl-auth-token');}catch(e){} location.replace('./login.dc.html'); }
   window.__sfLogout=logout;
-  // Clic sur la carte profil (bas gauche de la sidebar) => menu déconnexion
-  document.addEventListener('click', function(e){
-    var x=e.clientX, y=e.clientY;
-    var bottomLeft = (x < 214 && y > (window.innerHeight - 74));
-    var t=e.target, ownerHit=false;
-    for(var i=0;i<6&&t;i++){ if(((t.textContent||'')+'').indexOf('Owner')>=0 && (t.offsetWidth||0) < 220){ ownerHit=true; break; } t=t.parentElement; }
-    if(bottomLeft || ownerHit){ e.preventDefault(); e.stopPropagation(); logout(); }
-  }, true);
-  // petit indice visuel "⏏" discret sur la carte profil
-  function hint(){ if(document.getElementById('sf-lo-hint'))return; var h=document.createElement('div'); h.id='sf-lo-hint'; h.textContent='⏏'; h.title='Se déconnecter'; h.style.cssText='position:fixed;left:186px;bottom:16px;z-index:99999;color:#71717A;font-size:13px;cursor:pointer;pointer-events:auto'; h.onmouseenter=function(){h.style.color='#F87171';}; h.onmouseleave=function(){h.style.color='#71717A';}; h.onclick=function(ev){ev.stopPropagation();logout();}; document.body.appendChild(h); }
-  var iv=setInterval(function(){ if(document.body) hint(); },500); setTimeout(function(){clearInterval(iv);},9000);
+  function add(){ if(document.getElementById('sf-logout'))return; var b=document.createElement('button'); b.id='sf-logout'; b.title='Se déconnecter'; b.innerHTML='&#9099; Déconnexion'; b.style.cssText='position:fixed;bottom:16px;right:18px;z-index:99999;height:30px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(16,16,21,.9);color:#71717A;font:700 12px Manrope,sans-serif;cursor:pointer;transition:all .15s;backdrop-filter:blur(6px)'; b.onmouseenter=function(){b.style.color='#F87171';b.style.borderColor='rgba(248,113,113,.4)';}; b.onmouseleave=function(){b.style.color='#71717A';b.style.borderColor='rgba(255,255,255,.12)';}; b.onclick=logout; document.body.appendChild(b); }
+  var iv=setInterval(function(){ if(document.body) add(); },500); setTimeout(function(){clearInterval(iv);},9000);
 })();
 </script></body>
 </html>
