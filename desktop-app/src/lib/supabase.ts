@@ -60,3 +60,22 @@ export interface PostRun {
   total: number
   created_at: string
 }
+
+// Tâche récurrente (sous-ensemble RÉEL de la table `recurring_tasks`, aligné sur
+// electron-app/src/pages/Tasks.tsx).
+export interface RecurringTask {
+  id: string
+  name: string
+  status: 'active' | 'paused'
+  task_type: string          // 'publication' | 'story' | ...
+  phones: unknown            // jsonb → tableau de comptes
+  caption: string | null
+  story_texts: unknown
+  mode: string | null        // 'seq' | 'random'
+  recur_hours: number | null
+  next_run_at: string | null
+  steps: unknown             // jsonb → tableau d'étapes
+  created_at: string
+  last_run_at: string | null
+  run_count: number | null
+}
