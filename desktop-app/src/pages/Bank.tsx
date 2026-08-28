@@ -322,6 +322,17 @@ export default function Bank({ theme, infra, user, org }: {
   const [moveOpen, setMoveOpen] = useState(false)
   const [moving, setMoving] = useState(false)
   const [newFolder, setNewFolder] = useState('')
+  const [folderModal, setFolderModal] = useState(false)
+  const [folderName, setFolderName] = useState('')
+  async function createFolder() {
+    const name = folderName.trim(); if (!name) return
+    await supabase.from('content_bank').insert({
+      user_id: user.id, org_id: currentOrg?.id ?? null,
+      title: name, folder: name, file_url: null, storage_path: null, thumbnail_path: null,
+      duration: null, tags: [], notes: '__sf_folder__',
+    })
+    setFolderModal(false); setFolderName(''); setFolder(name); load()
+  }
   const [notice, setNotice] = useState<string | null>(null)
   const moveFolders = useMemo(() => folders.filter(f => f.n !== 'Tous' && !f.special).map(f => f.n), [folders])
 
@@ -430,7 +441,7 @@ export default function Bank({ theme, infra, user, org }: {
           }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6' }}>Dossiers</span>
             <span style={{ marginLeft: 'auto' }}>
-              <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Nouveau dossier" />
+              <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Nouveau dossier" onClick={() => { setFolderName(''); setFolderModal(true) }} />
             </span>
           </div>
           <div>
@@ -631,6 +642,17 @@ export default function Bank({ theme, infra, user, org }: {
             <input value={capTitle} onChange={e => setCapTitle(e.target.value)} placeholder="Titre (optionnel)" style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
             <textarea value={capContent} onChange={e => setCapContent(e.target.value)} rows={6} placeholder="Ta légende…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
           </div>
+        </Modal>
+      )}
+
+      {folderModal && (
+        <Modal theme={theme} title="Nouveau dossier" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClose={() => setFolderModal(false)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setFolderModal(false)} />
+            <Btn theme={theme} tone="primary" label="Créer" disabled={!folderName.trim()} onClick={createFolder} />
+          </>}>
+          <input autoFocus value={folderName} onChange={e => setFolderName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && folderName.trim()) createFolder() }} placeholder="Nom du dossier"
+            style={{ width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 13, outline: 'none' }} />
         </Modal>
       )}
 
