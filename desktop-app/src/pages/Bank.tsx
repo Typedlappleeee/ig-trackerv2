@@ -74,8 +74,8 @@ function TileCheck({ on }: { on: boolean }) {
 
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
-function Tile({ item, type, thumb, media, on, theme, onToggle, onDragStart }: {
-  item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: () => void; onDragStart?: (e: React.DragEvent) => void
+function Tile({ item, type, thumb, media, on, theme, onToggle, onDragStart, onContextMenu, onDoubleClick }: {
+  item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void; onDoubleClick?: () => void
 }) {
   const h = hueFor(item.id)
   const fresh = (item.used_count ?? 0) === 0
@@ -87,9 +87,11 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onDragStart }: {
   return (
     <button
       onClick={onToggle}
+      onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
       draggable
       onDragStart={onDragStart}
-      title="Glisse vers un dossier pour ranger"
+      title="Double-clic pour lire · clic droit pour les actions"
       style={{
         position: 'relative', aspectRatio: type === 'image' ? '4 / 5' : '9 / 16', borderRadius: 9, padding: 0,
         cursor: 'grab', overflow: 'hidden', transition: 'all .14s ease',
@@ -290,6 +292,63 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     load()
   }
 
+  // ── Suppression (média unitaire ou sélection) + nettoyage du storage ─────────
+  const [confirmDel, setConfirmDel] = useState<string[] | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  async function deleteMedia(ids: string[]) {
+    if (ids.length === 0) return
+    setDeleting(true)
+    const targets = items.filter(i => ids.includes(i.id))
+    const objs = targets.flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
+    try { if (objs.length) await supabase.storage.from('content').remove(objs) } catch { /* best-effort */ }
+    const { error: err } = await supabase.from('content_bank').delete().in('id', ids)
+    setDeleting(false); setConfirmDel(null)
+    if (err) { setNotice(`Échec de la suppression : ${err.message}`); return }
+    setNotice(`${ids.length} média(s) supprimé(s).`); setSel(new Set()); load()
+  }
+
+  // ── Renommer un média + éditer les tags ──────────────────────────────────────
+  const [renameItem, setRenameItem] = useState<ContentItem | null>(null)
+  const [renameVal, setRenameVal] = useState('')
+  const [tagsVal, setTagsVal] = useState('')
+  const [savingRename, setSavingRename] = useState(false)
+  function openRename(i: ContentItem) { setRenameItem(i); setRenameVal(i.title); setTagsVal((i.tags ?? []).join(', ')) }
+  async function saveRename() {
+    if (!renameItem) return
+    setSavingRename(true)
+    const tags = tagsVal.split(',').map(t => t.trim()).filter(Boolean)
+    const { error: err } = await supabase.from('content_bank').update({ title: renameVal.trim() || renameItem.title, tags }).eq('id', renameItem.id)
+    setSavingRename(false)
+    if (!err) { setRenameItem(null); load() }
+    else setNotice(`Échec : ${err.message}`)
+  }
+
+  // ── Renommer / supprimer un dossier ──────────────────────────────────────────
+  const [folderMenu, setFolderMenu] = useState<string | null>(null)
+  const [folderCtx, setFolderCtx] = useState<{ x: number; y: number; name: string } | null>(null)
+  const [renameFolderOf, setRenameFolderOf] = useState<string | null>(null)
+  const [renameFolderVal, setRenameFolderVal] = useState('')
+  const scopeQ = (qq: any) => currentOrg ? qq.eq('org_id', currentOrg.id) : qq.eq('user_id', user.id).is('org_id', null)
+  async function renameFolder(oldName: string, newName: string) {
+    const n = newName.trim(); if (!n || n === oldName) { setFolderMenu(null); return }
+    await scopeQ(supabase.from('content_bank').update({ folder: n }).eq('folder', oldName))
+    setFolderMenu(null); if (folder === oldName) setFolder(n); load()
+  }
+  async function deleteFolder(name: string) {
+    // Dégroupe les médias (folder → null) puis supprime la ligne sentinelle du dossier.
+    await scopeQ(supabase.from('content_bank').update({ folder: null }).eq('folder', name).not('notes', 'in', '("__sf_folder__","__sf_drive_folder__")'))
+    await scopeQ(supabase.from('content_bank').delete().eq('folder', name).in('notes', ['__sf_folder__', '__sf_drive_folder__']))
+    setFolderMenu(null); if (folder === name) setFolder('Tous'); load()
+  }
+
+  // ── Lecteur vidéo (double-clic) + menu contextuel (clic droit) ───────────────
+  const [player, setPlayer] = useState<{ url: string; title: string; type: MediaType } | null>(null)
+  const [ctx, setCtx] = useState<{ x: number; y: number; item: ContentItem } | null>(null)
+  function openPlayer(i: ContentItem) {
+    const url = (i.storage_path && thumbs[i.storage_path]) || i.file_url
+    if (url) setPlayer({ url, title: i.title, type: inferType(i) })
+  }
+
   // ── Glisser-déposer un média (ou la sélection) dans un dossier ───────────────
   const [dragOver, setDragOver] = useState<string | null>(null)
   async function dropOnFolder(target: string, draggedId: string) {
@@ -451,6 +510,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                 <button
                   key={f.n}
                   onClick={() => setFolder(f.n)}
+                  onContextMenu={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setFolderCtx({ x: e.clientX, y: e.clientY, name: f.n }) } }}
                   onDragOver={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setDragOver(f.n) } }}
                   onDragLeave={() => setDragOver(d => d === f.n ? null : d)}
                   onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDragOver(null); if (id) dropOnFolder(f.n, id) }}
@@ -577,6 +637,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   key={i.id} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={() => toggle(i.id)}
                   onDragStart={e => e.dataTransfer.setData('text/plain', i.id)}
+                  onDoubleClick={() => openPlayer(i)}
+                  onContextMenu={e => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, item: i }) }}
                 />
               ))}
             </div>
@@ -602,6 +664,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           {sel.size === 1 && <Btn label="Description" theme={theme} sm icon="M4 7V4h16v3|M9 20h6|M12 4v16" onClick={openDesc} />}
           <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => onNavigate?.('studio')} />
           <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setMoveOpen(true)} />
+          <Btn label="Supprimer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />
           <span style={{ marginLeft: 'auto' }}>
             <Btn label="Désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
           </span>
@@ -641,6 +704,99 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <input value={capTitle} onChange={e => setCapTitle(e.target.value)} placeholder="Titre (optionnel)" style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
             <textarea value={capContent} onChange={e => setCapContent(e.target.value)} rows={6} placeholder="Ta légende…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
+          </div>
+        </Modal>
+      )}
+
+      {/* Menu contextuel (clic droit sur une vignette) */}
+      {ctx && (
+        <>
+          <div onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
+          <div style={{ position: 'fixed', top: Math.min(ctx.y, window.innerHeight - 230), left: Math.min(ctx.x, window.innerWidth - 190), zIndex: 61, width: 180, borderRadius: 10, overflow: 'hidden', background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)' }}>
+            {[
+              { l: 'Lire', d: 'M5 3l14 9-14 9z', fn: () => openPlayer(ctx.item) },
+              { l: 'Renommer', d: 'M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z', fn: () => openRename(ctx.item) },
+              { l: 'Description', d: 'M4 7V4h16v3|M9 20h6|M12 4v16', fn: () => { setDescItem(ctx.item); setDescVal((ctx.item as any).description ?? '') } },
+              { l: 'Déplacer', d: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z', fn: () => { setSel(new Set([ctx.item.id])); setMoveOpen(true) } },
+            ].map(o => (
+              <button key={o.l} onClick={() => { o.fn(); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', background: 'transparent', color: '#D4D4D8', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span style={{ color: '#71717A', display: 'flex' }}><Icon d={o.d} size={14} /></span>{o.l}
+              </button>
+            ))}
+            <button onClick={() => { setConfirmDel([ctx.item.id]); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ display: 'flex' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={14} /></span>Supprimer
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Menu contextuel dossier (clic droit) */}
+      {folderCtx && (
+        <>
+          <div onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
+          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 110), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 10, overflow: 'hidden', background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)' }}>
+            <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', background: 'transparent', color: '#D4D4D8', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" size={14} /></span>Renommer
+            </button>
+            <button onClick={() => { deleteFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ display: 'flex' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={14} /></span>Supprimer le dossier
+            </button>
+          </div>
+        </>
+      )}
+
+      {renameFolderOf && (
+        <Modal theme={theme} title="Renommer le dossier" onClose={() => setRenameFolderOf(null)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setRenameFolderOf(null)} />
+            <Btn theme={theme} tone="primary" label="Renommer" disabled={!renameFolderVal.trim()} onClick={() => { renameFolder(renameFolderOf, renameFolderVal); setRenameFolderOf(null) }} />
+          </>}>
+          <input autoFocus value={renameFolderVal} onChange={e => setRenameFolderVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && renameFolderVal.trim()) { renameFolder(renameFolderOf, renameFolderVal); setRenameFolderOf(null) } }}
+            style={{ width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 13, outline: 'none' }} />
+        </Modal>
+      )}
+
+      {/* Lecteur vidéo / image */}
+      {player && (
+        <Modal theme={theme} title={player.title} onClose={() => setPlayer(null)} width={420}>
+          {player.type === 'video'
+            ? <video src={player.url} controls autoPlay style={{ width: '100%', maxHeight: '70vh', borderRadius: 8, background: '#000' }} />
+            : <img src={player.url} alt="" style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 8 }} />}
+        </Modal>
+      )}
+
+      {/* Confirmation de suppression */}
+      {confirmDel && (
+        <Modal theme={theme} title={`Supprimer ${confirmDel.length} média(s) ?`} sub="Action irréversible — les fichiers sont retirés du stockage." icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6"
+          onClose={() => setConfirmDel(null)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDel(null)} />
+            <Btn theme={theme} tone="danger" label={deleting ? 'Suppression…' : 'Supprimer'} disabled={deleting} onClick={() => deleteMedia(confirmDel)} />
+          </>}>
+          <p style={{ margin: 0, fontSize: 12.5, color: '#A1A1AA' }}>Les médias sélectionnés seront définitivement supprimés de ta banque.</p>
+        </Modal>
+      )}
+
+      {/* Renommer + tags */}
+      {renameItem && (
+        <Modal theme={theme} title="Renommer" sub={renameItem.title} icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" onClose={() => setRenameItem(null)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setRenameItem(null)} />
+            <Btn theme={theme} tone="primary" label={savingRename ? '…' : 'Enregistrer'} disabled={savingRename} onClick={saveRename} />
+          </>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Nom</span>
+              <input value={renameVal} onChange={e => setRenameVal(e.target.value)} style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Tags (séparés par des virgules)</span>
+              <input value={tagsVal} onChange={e => setTagsVal(e.target.value)} placeholder="motivation, produit…" style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+            </label>
           </div>
         </Modal>
       )}
