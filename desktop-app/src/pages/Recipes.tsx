@@ -66,6 +66,16 @@ export default function Recipes({ theme, infra, user, org }: {
   const [tasks, setTasks] = useState<RecurringTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  // Rejouer : planifie l'exécution de la séquence MAINTENANT (le serveur la prendra
+  // au prochain tick). Écrit next_run_at = now + réactive la tâche.
+  async function replay(t: RecurringTask) {
+    setNotice(null)
+    const { error: err } = await supabase.from('recurring_tasks')
+      .update({ next_run_at: new Date().toISOString(), status: 'active' }).eq('id', t.id)
+    setNotice(err ? `Échec : ${err.message}` : `« ${t.name || 'Séquence'} » planifiée maintenant — le serveur la lance au prochain passage.`)
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -87,6 +97,10 @@ export default function Recipes({ theme, infra, user, org }: {
         sub="Une séquence enregistrée : les comptes, le contenu, les réglages et l'horaire. Tu la rejoues en un clic au lieu de refaire le parcours."
         actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Nouvelle séquence" />}
       />
+
+      {notice && (
+        <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 8, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 12, color: '#E4E4E7' }}>{notice}</div>
+      )}
 
       {loading ? (
         <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div></Panel>
@@ -131,7 +145,7 @@ export default function Recipes({ theme, infra, user, org }: {
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                     <Btn theme={theme} sm tone="quiet" icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" label="Modifier" />
                     <Btn theme={theme} sm tone="quiet" icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" label="Programmer" />
-                    <Btn theme={theme} sm tone="primary" icon="M5 3l14 9-14 9z" label="Rejouer" />
+                    <Btn theme={theme} sm tone="primary" icon="M5 3l14 9-14 9z" label="Rejouer" onClick={() => replay(t)} />
                   </span>
                 </div>
               </Panel>
