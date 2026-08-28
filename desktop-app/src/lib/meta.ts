@@ -63,6 +63,23 @@ export async function fetchMetaConnections(user: User, org: OrgState): Promise<M
   return (data ?? []) as MetaConnection[]
 }
 
+export interface MediaInsight {
+  id: string; ig_username: string | null; media_type: string | null; caption: string | null
+  thumbnail_url: string | null; permalink: string | null
+  views: number; likes: number; comments: number; reach: number; taken_at: string | null
+}
+
+// Lit les insights média (Reels) sur une fenêtre (jours), triés par vues.
+export async function fetchTopReels(user: User, org: OrgState, sinceDays: number | null): Promise<MediaInsight[]> {
+  const { currentOrg } = org
+  let q = currentOrg
+    ? supabase.from('media_insights').select('*').eq('org_id', currentOrg.id)
+    : supabase.from('media_insights').select('*').eq('user_id', user.id).is('org_id', null)
+  if (sinceDays != null) q = q.gte('taken_at', new Date(Date.now() - sinceDays * 86400000).toISOString())
+  const { data } = await q.order('views', { ascending: false }).limit(200)
+  return (data ?? []) as MediaInsight[]
+}
+
 // Poller d'insights OFFICIELS : pour chaque compte connecté, lit followers_count
 // (fiable) + une somme best-effort des vues des médias récents, puis écrit dans la
 // table phones (match par ig_username). Tourne dans Electron (fetch direct Graph).
@@ -80,16 +97,26 @@ export async function syncMetaInsights(
       if (info.error) throw new Error(info.error.message)
       const followers = Number(info.followers_count ?? 0)
 
-      // Vues : somme best-effort sur les médias récents (métrique `views`).
+      // Vues + insights PAR MÉDIA (Reels) → table media_insights (classement + courbe).
       let totalViews = 0
       try {
-        const mediaRes = await fetch(`${GRAPH}/${c.ig_user_id}/media?fields=insights.metric(views)&limit=25&access_token=${encodeURIComponent(c.page_access_token)}`)
+        const mediaRes = await fetch(`${GRAPH}/${c.ig_user_id}/media?fields=id,caption,media_type,thumbnail_url,permalink,timestamp,like_count,comments_count,insights.metric(views,reach)&limit=50&access_token=${encodeURIComponent(c.page_access_token)}`)
         const media = await mediaRes.json()
+        const rows: any[] = []
         for (const m of (media.data ?? [])) {
-          const v = m?.insights?.data?.find((x: any) => x.metric === 'views')?.values?.[0]?.value
-          if (typeof v === 'number') totalViews += v
+          const views = Number(m?.insights?.data?.find((x: any) => x.metric === 'views')?.values?.[0]?.value ?? 0)
+          const reach = Number(m?.insights?.data?.find((x: any) => x.metric === 'reach')?.values?.[0]?.value ?? 0)
+          if (views > 0) totalViews += views
+          rows.push({
+            user_id: user.id, org_id: currentOrg?.id ?? null, ig_user_id: c.ig_user_id, ig_username: c.ig_username,
+            media_id: String(m.id), media_type: m.media_type ?? null, caption: (m.caption ?? '').slice(0, 300),
+            thumbnail_url: m.thumbnail_url ?? null, permalink: m.permalink ?? null,
+            views, likes: Number(m.like_count ?? 0), comments: Number(m.comments_count ?? 0), reach,
+            taken_at: m.timestamp ?? null, synced_at: new Date().toISOString(),
+          })
         }
-      } catch { /* insights vues indisponibles sur ce compte — on garde les abonnés */ }
+        if (rows.length) await supabase.from('media_insights').upsert(rows, { onConflict: 'user_id,media_id' })
+      } catch { /* insights média indisponibles — on garde les abonnés */ }
 
       // Écriture dans phones (match par username, scoping orga/perso).
       let upd = supabase.from('phones').update({
