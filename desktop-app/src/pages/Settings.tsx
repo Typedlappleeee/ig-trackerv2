@@ -8,14 +8,14 @@ import { fetchBalance, fetchOrgBalance, fmtNumber, type OrgState } from '@/lib/d
 
 // ── Sections (portées de _settings() du prototype v10) ───────────────────────────
 type Tab = 'account' | 'org' | 'members' | 'billing' | 'infra' | 'notif' | 'security'
+// On ne garde que les sections RÉELLES. Les onglets placeholder (Infrastructure /
+// Notifications / Sécurité, tous « à venir ») sont retirés : pas de config proxy à
+// gérer côté desktop (tout passe par GeeLark / la config web).
 const SECTIONS: { k: Tab; l: string; i: string }[] = [
   { k: 'account', l: 'Profil', i: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
   { k: 'org', l: 'Organisation', i: 'M3 21h18|M5 21V7l8-4v18|M19 21V11l-6-4' },
   { k: 'members', l: 'Membres & rôles', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M22 21v-2a4 4 0 0 0-3-3.9|M16 3.1a4 4 0 0 1 0 7.8' },
   { k: 'billing', l: 'Abonnement & crédits', i: 'M2 8h20v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z|M2 8l2-4h16l2 4|M12 12v4' },
-  { k: 'infra', l: 'Infrastructure', i: 'M20 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 20 16z' },
-  { k: 'notif', l: 'Notifications', i: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9|M13.7 21a2 2 0 0 1-3.4 0' },
-  { k: 'security', l: 'Sécurité', i: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z|M9 12l2 2 4-4' },
 ]
 
 // ── Rôles ────────────────────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ export default function Settings({ theme, user, org, onSignOut }: {
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead title="Réglages" sub="Profil, organisation, membres, abonnement, infrastructure et sécurité." />
+      <PageHead title="Réglages" sub="Ton profil, ton organisation, tes membres et ton abonnement." />
       <div style={{ display: 'grid', gridTemplateColumns: '208px minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
         {menu}
         <div style={{ minWidth: 0 }}>
