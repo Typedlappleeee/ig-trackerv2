@@ -68,6 +68,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
 }) {
   const { currentOrg } = org
   const [tab, setTab] = useState<Tab>('sched')
+  const [net, setNet] = useState('Tous')
   const [posts, setPosts] = useState<ScheduledPost[]>([])
   const [tasks, setTasks] = useState<RecurringTask[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,8 +109,10 @@ export default function Automation({ theme, infra, user, org, embedded }: {
       .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))
     const recent = posts.filter(p => p.status === 'done' || p.status === 'failed')
       .sort((a, b) => (b.executed_at ?? b.scheduled_at).localeCompare(a.executed_at ?? a.scheduled_at))
-    return [...pending, ...recent].slice(0, 12)
-  }, [posts])
+    const all = [...pending, ...recent]
+    const netOf = (t?: string) => t === 'tiktok' ? 'TikTok' : t === 'threads' ? 'Threads' : 'Instagram'
+    return all.filter(p => net === 'Tous' || netOf(p.type) === net).slice(0, 12)
+  }, [posts, net])
 
   const schedCount = posts.filter(p => p.status === 'pending' || p.status === 'running').length
   const activeCount = tasks.filter(t => t.status === 'active').length
@@ -172,7 +175,14 @@ export default function Automation({ theme, infra, user, org, embedded }: {
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 10 }}>
           {/* File d'attente */}
           <Panel theme={theme}>
-            <PanelHead title="File d'attente" sub="Exécutés côté serveur — ton PC peut être éteint" />
+            <PanelHead title="File d'attente" sub="Exécutés côté serveur — ton PC peut être éteint"
+              right={
+                <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  {['Tous', 'Instagram', 'TikTok', 'Threads'].map(n => (
+                    <button key={n} onClick={() => setNet(n)} style={{ height: 22, padding: '0 8px', border: 'none', borderRadius: 5, cursor: 'pointer', background: net === n ? `rgba(${theme.tone},0.16)` : 'transparent', color: net === n ? theme.accentText : '#71717A', fontSize: 10.5, fontWeight: 700 }}>{n}</button>
+                  ))}
+                </span>
+              } />
             {queue.length === 0 ? (
               <Empty icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
                 title="Rien de programmé" text="Programme un post pour le voir exécuté côté serveur, même PC éteint." />
