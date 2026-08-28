@@ -72,8 +72,8 @@ function TileCheck({ on }: { on: boolean }) {
 
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
-function Tile({ item, type, thumb, on, theme, onToggle }: {
-  item: ContentItem; type: MediaType; thumb: string | null; on: boolean; theme: Theme; onToggle: () => void
+function Tile({ item, type, thumb, media, on, theme, onToggle }: {
+  item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: () => void
 }) {
   const h = hueFor(item.id)
   const fresh = (item.used_count ?? 0) === 0
@@ -94,7 +94,12 @@ function Tile({ item, type, thumb, on, theme, onToggle }: {
     >
       {thumb
         ? <img src={thumb} alt="" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <span style={placeholder} />}
+        : media
+          ? (type === 'video'
+              // Vraie vidéo : on affiche sa 1re image (metadata + #t=0.1) — plus de placeholder chelou.
+              ? <video src={`${media}#t=0.1`} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <img src={media} alt="" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)
+          : <span style={placeholder} />}
 
       <TileCheck on={on} />
 
@@ -157,10 +162,13 @@ export default function Bank({ theme, infra, user, org }: {
   useEffect(() => { load() }, [load])
   useEffect(() => { setSel(new Set()) }, [tab, folder])
 
-  // ── Miniatures signées : les objets sont dans un bucket privé, on signe en lot
-  //    les thumbnail_path des items visibles. thumbnail_url direct est prioritaire. ──
+  // ── Signatures en lot : les objets sont dans un bucket privé. On signe les
+  //    thumbnail_path ET les storage_path (média source) pour pouvoir afficher la
+  //    VRAIE vidéo/image quand il n'y a pas de miniature (au lieu d'un placeholder). ──
   useEffect(() => {
-    const paths = [...new Set(items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string))]
+    const thumbPaths = items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
+    const mediaPaths = items.filter(i => i.storage_path).map(i => i.storage_path as string)
+    const paths = [...new Set([...thumbPaths, ...mediaPaths])]
     if (paths.length === 0) return
     let cancelled = false
     supabase.storage.from('content').createSignedUrls(paths, 3600).then(({ data }) => {
@@ -176,6 +184,11 @@ export default function Bank({ theme, infra, user, org }: {
     if (i.thumbnail_url) return i.thumbnail_url
     if (i.thumbnail_path && thumbs[i.thumbnail_path]) return thumbs[i.thumbnail_path]
     return null
+  }
+  // URL signée du média source (pour afficher la vidéo/image quand pas de miniature).
+  function mediaFor(i: ContentItem): string | null {
+    if (i.storage_path && thumbs[i.storage_path]) return thumbs[i.storage_path]
+    return i.file_url ?? null
   }
 
   // Compteurs par type (réels).
@@ -403,7 +416,7 @@ export default function Bank({ theme, infra, user, org }: {
             }}>
               {shown.map(i => (
                 <Tile
-                  key={i.id} item={i} type={tab} thumb={thumbFor(i)}
+                  key={i.id} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={() => toggle(i.id)}
                 />
               ))}
