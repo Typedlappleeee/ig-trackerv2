@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Panel } from '@/lib/ui'
+import { Btn, Empty, Icon, Panel, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 
 // ── Type ContentItem (sous-ensemble RÉEL de la table `content_bank`, aligné sur
@@ -214,6 +214,23 @@ export default function Bank({ theme, infra, user, org }: {
       { n: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true },
     ]
   }, [typed, folderNames])
+
+  // ── Déplacer (réel) + Remixer (renvoi) ──────────────────────────────────────
+  const [moveOpen, setMoveOpen] = useState(false)
+  const [moving, setMoving] = useState(false)
+  const [newFolder, setNewFolder] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
+  const moveFolders = useMemo(() => folders.filter(f => f.n !== 'Tous' && !f.special).map(f => f.n), [folders])
+
+  async function doMove(target: string) {
+    const dest = target.trim(); if (!dest || sel.size === 0) return
+    setMoving(true)
+    const { error: err } = await supabase.from('content_bank').update({ folder: dest }).in('id', [...sel])
+    setMoving(false)
+    if (err) { setNotice(`Échec du déplacement : ${err.message}`); return }
+    setMoveOpen(false); setNewFolder(''); setNotice(`${sel.size} média(s) déplacé(s) vers « ${dest} ».`); setSel(new Set())
+    load()
+  }
 
   // Filtrage + tri.
   const ql = q.trim().toLowerCase()
@@ -440,12 +457,36 @@ export default function Bank({ theme, infra, user, org }: {
           </span>
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" />
-          <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" />
-          <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" />
+          <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => setNotice('Remix : ouvre le Studio vidéo (Production) pour générer des variantes de tes vidéos.')} />
+          <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setMoveOpen(true)} />
           <span style={{ marginLeft: 'auto' }}>
             <Btn label="Désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
           </span>
         </div>
+      )}
+
+      {notice && (
+        <div style={{ marginTop: 12, padding: '9px 13px', borderRadius: 8, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 12, color: '#E4E4E7' }}>{notice}</div>
+      )}
+
+      {moveOpen && (
+        <Modal theme={theme} title={`Déplacer ${sel.size} média(s)`} sub="Choisis un dossier ou crée-en un." icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
+          onClose={() => setMoveOpen(false)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setMoveOpen(false)} />
+            <Btn theme={theme} tone="primary" label={moving ? 'Déplacement…' : 'Déplacer ici'} disabled={moving || !newFolder.trim()} onClick={() => doMove(newFolder)} />
+          </>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {moveFolders.map(f => (
+              <button key={f} onClick={() => doMove(f)} disabled={moving} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#E4E4E7', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ color: theme.accentText, display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={15} /></span>{f}
+              </button>
+            ))}
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="Nouveau dossier…" style={{ flex: 1, height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )
