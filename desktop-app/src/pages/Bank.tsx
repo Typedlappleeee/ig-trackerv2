@@ -55,7 +55,8 @@ function hueFor(id: string): string {
   return HUES[h % HUES.length]
 }
 
-type TabKey = 'video' | 'image'
+type TabKey = 'video' | 'image' | 'caption'
+interface Caption { id: string; title: string | null; content: string; used_count: number | null; created_at: string }
 type SortKey = 'recent' | 'name' | 'used'
 
 // ── Case à cocher de vignette (portée du prototype _tile) ──────────────────────
@@ -142,6 +143,11 @@ export default function Bank({ theme, infra, user, org }: {
   const [error, setError] = useState<string | null>(null)
 
   const [tab, setTab] = useState<TabKey>('video')
+  const [captions, setCaptions] = useState<Caption[]>([])
+  const [capOpen, setCapOpen] = useState(false)
+  const [capTitle, setCapTitle] = useState('')
+  const [capContent, setCapContent] = useState('')
+  const [savingCap, setSavingCap] = useState(false)
   const [folder, setFolder] = useState<string>('Tous')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<SortKey>('recent')
@@ -165,6 +171,31 @@ export default function Bank({ theme, infra, user, org }: {
 
   useEffect(() => { load() }, [load])
   useEffect(() => { setSel(new Set()) }, [tab, folder])
+
+  // ── Légendes (caption_bank) ──────────────────────────────────────────────────
+  const loadCaptions = useCallback(async () => {
+    const q = currentOrg
+      ? supabase.from('caption_bank').select('id,title,content,used_count,created_at').eq('org_id', currentOrg.id)
+      : supabase.from('caption_bank').select('id,title,content,used_count,created_at').eq('user_id', user.id).is('org_id', null)
+    const { data } = await q.order('created_at', { ascending: false })
+    setCaptions((data ?? []) as Caption[])
+  }, [currentOrg?.id, user.id])
+  useEffect(() => { loadCaptions() }, [loadCaptions])
+
+  async function addCaption() {
+    if (!capContent.trim()) return
+    setSavingCap(true)
+    const { error: err } = await supabase.from('caption_bank').insert({
+      user_id: user.id, org_id: currentOrg?.id ?? null,
+      title: capTitle.trim() || capContent.trim().slice(0, 40), content: capContent.trim(), used_count: 0,
+    })
+    setSavingCap(false)
+    if (!err) { setCapOpen(false); setCapTitle(''); setCapContent(''); loadCaptions() }
+  }
+  async function deleteCaption(id: string) {
+    await supabase.from('caption_bank').delete().eq('id', id)
+    setCaptions(c => c.filter(x => x.id !== id))
+  }
 
   // ── Signatures en lot : les objets sont dans un bucket privé. On signe les
   //    thumbnail_path ET les storage_path (média source) pour pouvoir afficher la
@@ -328,6 +359,7 @@ export default function Bank({ theme, infra, user, org }: {
   const TABS: { k: TabKey; l: string; n: number }[] = [
     { k: 'video', l: 'Vidéos', n: counts.video },
     { k: 'image', l: 'Images', n: counts.image },
+    { k: 'caption', l: 'Légendes', n: captions.length },
   ]
   const SORTS: { k: SortKey; l: string }[] = [
     { k: 'recent', l: 'Récentes' },
@@ -475,7 +507,30 @@ export default function Bank({ theme, infra, user, org }: {
           </div>
 
           {/* Contenu */}
-          {loading ? (
+          {tab === 'caption' ? (
+            <div style={{ padding: 13 }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ fontSize: 12, color: '#71717A' }}>Des légendes réutilisables pour tes posts et stories.</span>
+                <span style={{ marginLeft: 'auto' }}><Btn label="Nouvelle légende" theme={theme} sm tone="primary" icon="M12 5v14|M5 12h14" onClick={() => { setCapTitle(''); setCapContent(''); setCapOpen(true) }} /></span>
+              </div>
+              {captions.length === 0 ? (
+                <Empty icon="M4 7V4h16v3|M9 20h6|M12 4v16" title="Aucune légende" text="Crée des légendes prêtes à coller dans tes publications." action={<Btn label="Nouvelle légende" theme={theme} sm tone="primary" onClick={() => setCapOpen(true)} />} />
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 10 }}>
+                  {captions.map(c => (
+                    <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 10, background: theme.panelBg, border: `1px solid ${theme.panelEdge}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'Légende'}</span>
+                        <button onClick={() => deleteCaption(c.id)} title="Supprimer" style={{ marginLeft: 'auto', display: 'flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={13} /></button>
+                      </div>
+                      <div style={{ fontSize: 11.5, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap', maxHeight: 110, overflow: 'hidden' }}>{c.content}</div>
+                      <button onClick={() => { navigator.clipboard?.writeText(c.content); setNotice('Légende copiée.') }} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#A1A1AA', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Copier</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : loading ? (
             <div style={{ padding: '48px 15px', textAlign: 'center', fontSize: 13, color: '#52525B' }}>{el}</div>
           ) : error ? (
             <div style={{ padding: '40px 15px', textAlign: 'center', fontSize: 12.5, color: '#F87171' }}>{error}</div>
@@ -554,6 +609,19 @@ export default function Bank({ theme, infra, user, org }: {
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
               <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="Nouveau dossier…" style={{ flex: 1, height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {capOpen && (
+        <Modal theme={theme} title="Nouvelle légende" icon="M4 7V4h16v3|M9 20h6|M12 4v16" onClose={() => setCapOpen(false)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setCapOpen(false)} />
+            <Btn theme={theme} tone="primary" label={savingCap ? 'Enregistrement…' : 'Enregistrer'} disabled={savingCap || !capContent.trim()} onClick={addCaption} />
+          </>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input value={capTitle} onChange={e => setCapTitle(e.target.value)} placeholder="Titre (optionnel)" style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+            <textarea value={capContent} onChange={e => setCapContent(e.target.value)} rows={6} placeholder="Ta légende…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
           </div>
         </Modal>
       )}
