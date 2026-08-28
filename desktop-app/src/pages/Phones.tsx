@@ -64,8 +64,10 @@ const TH: CSSProperties = {
   fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B',
 }
 
-export default function Phones({ theme, infra, user, org }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState
+function ctaKey(p: { geelark_id: string | null; id: string }): string { return `sf-story-link-${p.geelark_id ?? p.id}` }
+
+export default function Phones({ theme, infra, user, org, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
 }) {
   const { currentOrg, role, perms } = org
   const [phones, setPhones] = useState<Phone[]>([])
@@ -77,6 +79,8 @@ export default function Phones({ theme, infra, user, org }: {
   const [group, setGroup] = useState('Tous')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [createOpen, setCreateOpen] = useState(false)
+  const [settingsPhone, setSettingsPhone] = useState<Phone | null>(null)
+  const [groupModal, setGroupModal] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -164,8 +168,9 @@ export default function Phones({ theme, infra, user, org }: {
           <p style={{ margin: '6px 0 0', fontSize: 12.5, lineHeight: 1.55, color: '#71717A', maxWidth: 620 }}>{sub}</p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <Btn label="Sync GeeLark" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
-          <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
+          {isCloud
+            ? <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
+            : <Btn label="Sync GeeLark" theme={theme} tone="primary" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />}
         </div>
       </div>
 
@@ -332,7 +337,7 @@ export default function Phones({ theme, infra, user, org }: {
 
                   {/* Actions : GeeLark sert à l'automatisation — pas de démarrage manuel. */}
                   <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 5 }} onClick={e => e.stopPropagation()}>
-                    <Btn theme={theme} sm tone="quiet" icon="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M4 12h2|M18 12h2|M12 4v2|M12 18v2" label="Réglages" />
+                    <Btn theme={theme} sm tone="quiet" icon="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M4 12h2|M18 12h2|M12 4v2|M12 18v2" label="Réglages" onClick={() => setSettingsPhone(p)} />
                   </span>
                 </div>
               )
@@ -355,9 +360,9 @@ export default function Phones({ theme, infra, user, org }: {
             <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A1A1AA' }}>sélectionné{sel.size > 1 ? 's' : ''}</span>
           </span>
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
-          <Btn label="Publier" theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" />
-          <Btn label="Chauffer" theme={theme} sm icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" />
-          <Btn label="Groupe" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" />
+          <Btn label="Publier" theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
+          <Btn label="Chauffer" theme={theme} sm icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" onClick={() => onNavigate?.('warmup')} />
+          <Btn label="Groupe" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setGroupModal(true)} />
           <span style={{ marginLeft: 'auto' }}>
             <Btn label="Tout désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
           </span>
@@ -387,6 +392,94 @@ export default function Phones({ theme, infra, user, org }: {
           )}
         </Modal>
       )}
+
+      {settingsPhone && (
+        <PhoneSettings theme={theme} phone={settingsPhone} groups={groups.filter(g => g !== 'Tous')}
+          onClose={() => setSettingsPhone(null)}
+          onSaved={() => { setSettingsPhone(null); load() }} />
+      )}
+
+      {groupModal && (
+        <GroupAssign theme={theme} count={sel.size} groups={groups.filter(g => g !== 'Tous')}
+          onClose={() => setGroupModal(false)}
+          onApply={async (name) => {
+            const ids = [...sel]
+            await supabase.from('phones').update({ group_name: name || null }).in('id', ids)
+            setGroupModal(false); setSel(new Set()); load()
+          }} />
+      )}
     </div>
+  )
+}
+
+// ── Réglages d'un appareil : @compte, groupe, et lien CTA (sticker story) ──────
+function PhoneSettings({ theme, phone, groups, onClose, onSaved }: {
+  theme: Theme; phone: Phone; groups: string[]; onClose: () => void; onSaved: () => void
+}) {
+  const [username, setUsername] = useState(phone.ig_username ?? '')
+  const [grp, setGrp] = useState(phone.group_name ?? '')
+  const [cta, setCta] = useState<string>(() => { try { return localStorage.getItem(ctaKey(phone)) ?? '' } catch { return '' } })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function save() {
+    setSaving(true); setErr(null)
+    const { error } = await supabase.from('phones').update({
+      ig_username: username.trim() || null,
+      group_name: grp.trim() || null,
+    }).eq('id', phone.id)
+    if (error) { setErr(error.message); setSaving(false); return }
+    try { const v = cta.trim(); if (v) localStorage.setItem(ctaKey(phone), v); else localStorage.removeItem(ctaKey(phone)) } catch { /* ignore */ }
+    setSaving(false); onSaved()
+  }
+
+  const lbl: CSSProperties = { fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
+
+  return (
+    <Modal theme={theme} title={phone.phone_name || 'Appareil'} sub="Compte, groupe et lien CTA de la story"
+      icon="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M4 12h2|M18 12h2|M12 4v2|M12 18v2" onClose={onClose} width={480}
+      footer={<>
+        <Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} />
+        <Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={save} />
+      </>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+        <div>
+          <label style={lbl}>Compte Instagram (@)</label>
+          <input value={username} onChange={e => setUsername(e.target.value)} placeholder="mon.compte" style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>Groupe</label>
+          <input value={grp} onChange={e => setGrp(e.target.value)} placeholder="ex. Luna-Posting" list="phone-groups" style={inp} />
+          <datalist id="phone-groups">{groups.map(g => <option key={g} value={g} />)}</datalist>
+        </div>
+        <div>
+          <label style={lbl}>Lien CTA (sticker story)</label>
+          <input value={cta} onChange={e => setCta(e.target.value)} placeholder="https://mon-lien.com" style={inp} />
+          <p style={{ margin: '6px 0 0', fontSize: 11, color: '#52525B', lineHeight: 1.5 }}>Le lien utilisé pour le sticker de cet appareil quand tu postes une story. Pré-rempli automatiquement dans l'onglet Story.</p>
+        </div>
+        {err && <p style={{ margin: 0, fontSize: 11.5, color: '#F87171' }}>{err}</p>}
+      </div>
+    </Modal>
+  )
+}
+
+// ── Assignation de groupe en masse ────────────────────────────────────────────
+function GroupAssign({ theme, count, groups, onClose, onApply }: {
+  theme: Theme; count: number; groups: string[]; onClose: () => void; onApply: (name: string) => void
+}) {
+  const [name, setName] = useState('')
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
+  return (
+    <Modal theme={theme} title="Assigner un groupe" sub={`${count} appareil${count > 1 ? 's' : ''} sélectionné${count > 1 ? 's' : ''}`}
+      icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClose={onClose} width={440}
+      footer={<>
+        <Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} />
+        <Btn theme={theme} tone="primary" label="Appliquer" onClick={() => onApply(name.trim())} />
+      </>}>
+      <label style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }}>Nom du groupe</label>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="ex. Luna-Posting (vide = retirer du groupe)" list="grp-list" style={inp} autoFocus />
+      <datalist id="grp-list">{groups.map(g => <option key={g} value={g} />)}</datalist>
+    </Modal>
   )
 }
