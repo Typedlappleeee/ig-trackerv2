@@ -5,6 +5,7 @@ import { supabase, type ScheduledPost, type RecurringTask } from '@/lib/supabase
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Chip, Panel, PanelHead, PageHead, Empty } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import CreateTaskModal, { type TaskMode } from '@/components/CreateTaskModal'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function asArray(v: unknown): any[] {
@@ -74,6 +75,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null) // id de tâche en cours de bascule
+  const [createMode, setCreateMode] = useState<TaskMode | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -150,7 +152,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
           sub={tab === 'sched'
             ? 'Posts programmés, exécutés côté serveur — ton PC peut être éteint.'
             : '50 crédits/jour par tâche active, plus 2 crédits par téléphone à chaque exécution.'}
-          actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label={tab === 'sched' ? 'Programmer' : 'Nouvelle tâche'} />}
+          actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label={tab === 'sched' ? 'Programmer' : 'Nouvelle tâche'} onClick={() => setCreateMode(tab === 'sched' ? 'schedule' : 'recurring')} />}
         />
       )}
 
@@ -258,7 +260,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
           <Panel theme={theme}>
             <Empty icon="M4 4h16v16H4z|M9 16h6|M12 8V4H8"
               title="Aucune tâche automatique" text="Crée une tâche récurrente pour publier ou chauffer tes comptes automatiquement, jour après jour."
-              action={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Nouvelle tâche" />} />
+              action={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Nouvelle tâche" onClick={() => setCreateMode('recurring')} />} />
           </Panel>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -308,6 +310,12 @@ export default function Automation({ theme, infra, user, org, embedded }: {
             })}
           </div>
         )
+      )}
+
+      {createMode && (
+        <CreateTaskModal theme={theme} user={user} org={org} mode={createMode}
+          onClose={() => setCreateMode(null)}
+          onCreated={() => { setCreateMode(null); setTab(createMode === 'schedule' ? 'sched' : 'rec'); load() }} />
       )}
     </div>
   )

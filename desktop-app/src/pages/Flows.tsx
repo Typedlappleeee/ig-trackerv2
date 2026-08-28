@@ -7,6 +7,7 @@ import { Btn, Chip, Icon, PageHead, Modal, StatusDot } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { scopeInfra } from '@/lib/data'
 import Automation from './Automation'
+import CreateTaskModal from '@/components/CreateTaskModal'
 
 interface Flow { k: string; t: string; d: string; p: string; n: number; tone: string; reco?: boolean; beta?: boolean; ok: boolean; i: string }
 const FLOWS: Flow[] = [
@@ -38,6 +39,7 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
   const [flowMode, setFlowMode] = useState<'now' | 'sched' | null>(null)
   const [cloudPhones, setCloudPhones] = useState<{ id: string; phone_name: string; ig_username: string | null; status: string }[]>([])
   const [flowSel, setFlowSel] = useState<Set<string>>(new Set())
+  const [createOpen, setCreateOpen] = useState(false)
 
   // Appareils ScaleFlow Cloud (auto-hébergés) — pour le wizard de flux.
   useEffect(() => {
@@ -138,7 +140,7 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Automatisation" sub="Flux exécutés par ton agent, en natif. Marque tes favoris, lance à la demande ou programme-les."
-        actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Créer un flux" />} />
+        actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Créer un flux" onClick={() => setCreateOpen(true)} />} />
 
       <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, marginBottom: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
         {([['catalog', 'Catalogue', FLOWS.length], ['sched', 'Planifié', 3]] as [Tab, string, number][]).map(([k, l, n]) => (
@@ -226,6 +228,11 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
             </div>
           )}
         </Modal>
+      )}
+
+      {createOpen && (
+        <CreateTaskModal theme={theme} user={user} org={org} mode="recurring"
+          onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); setTab('sched') }} />
       )}
     </div>
   )
