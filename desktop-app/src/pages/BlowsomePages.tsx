@@ -98,7 +98,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
 }
 
 // ── Contenu auto ──────────────────────────────────────────────────────────────
-export function BlowContent({ user, org }: { user: User; org: OrgState }) {
+export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgState; onNavigate?: (p: string) => void }) {
   const { currentOrg } = org
   const [count, setCount] = useState<number | null>(null)
   const [note, setNote] = useState(false)
@@ -108,20 +108,31 @@ export function BlowContent({ user, org }: { user: User; org: OrgState }) {
     setCount(c ?? 0)
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
+  const shortcuts = [
+    { t: 'Ouvrir le Studio', d: 'Remix, spoof, sous-titres, mixer — génère des variantes uniques.', go: 'blowTools' },
+    { t: 'Voir la banque', d: 'Tout ton contenu VIP, prêt à publier.', go: 'bank' },
+    { t: 'Publier maintenant', d: 'Envoie une vidéo sur tes comptes en un parcours guidé.', go: 'publish' },
+  ]
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <Head title="Contenu auto" sub="Génère des vidéos + légendes prêtes à poster, en pilote automatique." right={<BlowBtn label="Générer" onClick={() => setNote(true)} />} />
-      {note && <Card style={{ padding: '12px 16px', marginBottom: 12 }}><span style={{ fontSize: 12, color: GOLD, lineHeight: 1.5 }}>Le moteur de génération Blowsome (vidéos + captions) arrive très bientôt — ta banque ({count ?? 0} médias) est déjà prête à l'alimenter.</span></Card>}
+      <Head title="Auto-contenu" sub="Génère des vidéos + légendes prêtes à poster, en pilote automatique." right={<BlowBtn label="Générer" onClick={() => setNote(true)} />} />
+      {note && <Card style={{ padding: '12px 16px', marginBottom: 12 }}><span style={{ fontSize: 12, color: GOLD, lineHeight: 1.5 }}>Le moteur de génération auto Blowsome (variantes + captions en pilote) arrive très bientôt — ta banque ({count ?? 0} médias) est déjà prête à l'alimenter. En attendant, utilise le Studio pour créer tes variantes.</span></Card>}
       <Card style={{ padding: 22, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <span style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: INK }}>{count === null ? '…' : count}</span>
           <span style={{ fontSize: 12.5, color: MUTED }}>médias dans ta banque, prêts à alimenter la génération</span>
         </div>
       </Card>
-      <Card style={{ padding: 22 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 6 }}>Pilote automatique</div>
-        <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: MUTED, maxWidth: 560 }}>Choisis un tag, colle ton style, lance — le moteur produit des variantes + captions. Le câblage du moteur serveur arrive à la prochaine passe.</p>
-      </Card>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
+        {shortcuts.map(s => (
+          <button key={s.t} onClick={() => onNavigate?.(s.go)} style={{ textAlign: 'left', cursor: 'pointer', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.12)', boxShadow: '0 20px 50px -30px rgba(168,85,247,0.5)', transition: 'border-color .16s ease' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(216,180,254,0.12)' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: INK, marginBottom: 6 }}>{s.t}</div>
+            <div style={{ fontSize: 12, lineHeight: 1.55, color: MUTED }}>{s.d}</div>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

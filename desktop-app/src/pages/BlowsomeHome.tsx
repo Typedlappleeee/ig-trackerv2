@@ -75,20 +75,39 @@ export default function BlowsomeHome({ user, org, onNavigate }: { user: User; or
         </div>
       </Card>
 
-      {/* Stats réelles */}
+      {/* Stats réelles (cliquables) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 12, marginBottom: 22 }}>
-        <Stat label="Appareils du parc" value={phoneCount === null ? '…' : fmtNumber(phoneCount)} accent="#A855F7" />
-        <Stat label="Vidéos en banque" value={videoCount === null ? '…' : fmtNumber(videoCount)} accent="#EC4899" />
+        <button onClick={() => onNavigate?.('blowParc')} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+          <Stat label="Appareils du parc" value={phoneCount === null ? '…' : fmtNumber(phoneCount)} accent="#A855F7" />
+        </button>
+        <button onClick={() => onNavigate?.('bank')} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+          <Stat label="Vidéos en banque" value={videoCount === null ? '…' : fmtNumber(videoCount)} accent="#EC4899" />
+        </button>
         <Stat label="Statut agence" value={<span style={{ color: GOLD }}>VIP</span>} accent="#E9C46A" />
       </div>
 
-      {/* Sections à venir (honnête) */}
-      <Card style={{ padding: 22 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 6 }}>Cockpit Blowsome</div>
-        <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: MUTED, maxWidth: 560 }}>
-          Cette infrastructure VIP est réservée aux comptes qui ont l'accès Blowsome — tu la vois parce que ton compte y a droit. Le parc VIP, le contenu auto et le gestionnaire d'outils seront branchés ici à la prochaine passe.
-        </p>
-      </Card>
+      {/* Accès rapide — tout cliquable */}
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 12 }}>Accès rapide</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
+        {[
+          { t: 'Posting', d: 'Publie sur tes comptes (Reels, Story, cross-post).', go: 'publish', i: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
+          { t: 'Auto-contenu', d: 'Génération de variantes en pilote.', go: 'blowContent', i: 'M13 2 3 14h9l-1 8 10-12h-9z' },
+          { t: 'Banque', d: 'Tout ton contenu VIP.', go: 'bank', i: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' },
+          { t: 'Gestionnaire de tools', d: 'Remix, spoof, sous-titres, mixer.', go: 'blowTools', i: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-2-2 2.1-2.1z' },
+          { t: 'Phone Farm', d: 'Tes iPhones VIP pilotés à distance.', go: 'blowParc', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01' },
+          { t: 'Performances', d: 'Vues et engagement de tes comptes.', go: 'insights', i: 'M22 12h-4l-3 9L9 3l-3 9H2' },
+        ].map(x => (
+          <button key={x.t} onClick={() => onNavigate?.(x.go)} style={{ textAlign: 'left', cursor: 'pointer', padding: 18, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.12)', boxShadow: '0 20px 50px -30px rgba(168,85,247,0.5)', transition: 'border-color .16s ease' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(168,85,247,0.5)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(216,180,254,0.12)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.28)', color: '#D8B4FE', marginBottom: 11 }}>
+              <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">{x.i.split('|').map((d, k) => <path key={k} d={d} />)}</svg>
+            </span>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>{x.t}</div>
+            <div style={{ fontSize: 12, lineHeight: 1.5, color: MUTED }}>{x.d}</div>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

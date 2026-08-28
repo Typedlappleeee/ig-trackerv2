@@ -19,11 +19,18 @@ interface NavSection { g: string | null; items: NavItem[] }
 function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number | null): NavSection[] {
   if (infra === 'blowsome') {
     return [
-      { g: null, items: [{ k: 'hub', l: 'Accueil VIP', i: 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z' }] },
-      { g: 'Cockpit', items: [
-        { k: 'blowParc', l: 'Parc VIP', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01' },
-        { k: 'blowContent', l: 'Contenu auto', i: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' },
-        { k: 'blowTools', l: 'Outils VIP', i: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-2-2 2.1-2.1z' },
+      { g: null, items: [{ k: 'hub', l: 'Dashboard', i: 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z' }] },
+      { g: 'Diffusion', items: [
+        { k: 'publish', l: 'Posting', i: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
+        { k: 'blowContent', l: 'Auto-contenu', i: 'M13 2 3 14h9l-1 8 10-12h-9z' },
+      ] },
+      { g: 'Studio', items: [
+        { k: 'bank', l: 'Banque', i: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z', n: videoCount ?? undefined },
+        { k: 'blowTools', l: 'Gestionnaire de tools', i: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-2-2 2.1-2.1z' },
+      ] },
+      { g: 'Parc', items: [
+        { k: 'blowParc', l: 'Phone Farm', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined },
+        { k: 'insights', l: 'Performances', i: 'M22 12h-4l-3 9L9 3l-3 9H2' },
       ] },
     ]
   }
@@ -82,8 +89,8 @@ const TITLES: Record<PageKey, string[]> = {
   studio: ['Production', 'Studio vidéo'],
   insights: ['Analyse', 'Performances'],
   health: ['Analyse', 'Santé des comptes'],
-  blowParc: ['Blowsome', 'Parc VIP'],
-  blowContent: ['Blowsome', 'Contenu auto'],
+  blowParc: ['Blowsome', 'Phone Farm'],
+  blowContent: ['Blowsome', 'Auto-contenu'],
   blowTools: ['Blowsome', 'Outils VIP'],
   settings: ['Réglages'],
 }
