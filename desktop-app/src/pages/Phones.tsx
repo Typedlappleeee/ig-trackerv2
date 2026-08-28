@@ -6,7 +6,7 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Kpi, Panel, StatusDot } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
-import { deriveHealth, healthColor } from '@/lib/health'
+import { deriveHealth } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
 import { startPhones, stopPhones } from '@/lib/geelark'
 
@@ -43,23 +43,8 @@ function fmtViews(n: number | null): string {
   return String(n)
 }
 
-const COLS = '30px minmax(0,1.4fr) 110px 96px 104px 76px 210px'
+const COLS = '30px minmax(0,1.4fr) 110px 96px 76px 210px'
 
-// ── Barre de santé (barre colorée + score mono), portée du prototype _phones() ──
-function HealthBar({ v }: { v: number }) {
-  const c = healthColor(v)
-  return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-      <span style={{ flex: 1, height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-        <span style={{ display: 'block', height: '100%', width: `${v}%`, borderRadius: 99, background: c }} />
-      </span>
-      <span style={{
-        fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 700,
-        color: c, minWidth: 20, textAlign: 'right',
-      }}>{v}</span>
-    </span>
-  )
-}
 
 // ── Case à cocher (portée du prototype) ────────────────────────────────────────
 function Check({ on, mid, onClick }: { on: boolean; mid?: boolean; onClick: () => void }) {
@@ -185,8 +170,8 @@ export default function Phones({ theme, infra, user, org }: {
   const isCloud = infra === 'cloud'
   const title = isCloud ? 'Mes appareils' : 'Téléphones GeeLark'
   const sub = isCloud
-    ? 'Tes appareils cloud et leur santé. La colonne Santé anticipe les blocages — surveille tout ce qui passe sous 70.'
-    : 'Tes cloud phones GeeLark et leur santé. La colonne Santé anticipe les blocages — surveille tout ce qui passe sous 70.'
+    ? 'Tes appareils cloud : statut, vues et actions. Le détail de santé par compte est dans « Santé des comptes ».'
+    : 'Tes cloud phones GeeLark : statut, vues et actions. Le détail de santé par compte est dans « Santé des comptes ».'
 
   const FILTERS: { k: typeof filter; l: string; n: number }[] = [
     { k: 'all', l: 'Tous', n: total },
@@ -293,7 +278,6 @@ export default function Phones({ theme, infra, user, org }: {
           <span style={TH}>Compte</span>
           <span style={TH}>Groupe</span>
           <span style={TH}>Statut</span>
-          <span style={TH}>Santé</span>
           <span style={TH}>Vues 30j</span>
           <span style={{ ...TH, textAlign: 'right' }} />
         </div>
@@ -374,9 +358,6 @@ export default function Phones({ theme, infra, user, org }: {
                     <StatusDot kind={dotKind(p.status)} />
                     <span style={{ fontSize: 11.5, color: '#A1A1AA' }}>{STATUS_LABEL[p.status] ?? p.status}</span>
                   </span>
-
-                  {/* Santé */}
-                  <span><HealthBar v={p.health} /></span>
 
                   {/* Vues 30j (total_views réel) */}
                   <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#D4D4D8' }}>{fmtViews(p.total_views)}</span>
