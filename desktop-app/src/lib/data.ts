@@ -201,6 +201,15 @@ export function fmtNumber(n: number): string {
   return n.toLocaleString('fr-FR')
 }
 
+// Libellé d'affichage d'un téléphone : le NOM GeeLark d'abord (beaucoup de comptes
+// n'ont pas de @username), le compte IG en secondaire.
+export function phoneLabel(p: { phone_name?: string | null; ig_username?: string | null }): string {
+  return (p.phone_name && p.phone_name.trim()) || (p.ig_username ? `@${p.ig_username}` : 'Appareil')
+}
+export function phoneSub(p: { ig_username?: string | null }): string {
+  return p.ig_username ? `@${p.ig_username}` : 'sans compte lié'
+}
+
 export function fmtTime(iso: string | null): string {
   if (!iso) return '—'
   const d = new Date(iso)

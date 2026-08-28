@@ -293,7 +293,7 @@ export default function Phones({ theme, infra, user, org }: {
                 >
                   <span><Check on={on} onClick={() => toggle(p.id)} /></span>
 
-                  {/* Compte : avatar + @compte + nom d'appareil en mono */}
+                  {/* Appareil : avatar + NOM DU TÉLÉPHONE (GeeLark) en avant + @compte en dessous */}
                   <span style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
                     {p.pp_url ? (
                       <img src={p.pp_url} alt="" referrerPolicy="no-referrer" style={{
@@ -306,14 +306,14 @@ export default function Phones({ theme, infra, user, org }: {
                         width: 24, height: 24, borderRadius: 6, flexShrink: 0,
                         background: 'linear-gradient(140deg,#3F3F46,#27272A)',
                         border: '1px solid rgba(255,255,255,0.07)', fontSize: 10, fontWeight: 800, color: '#D4D4D8',
-                      }}>{(p.ig_username || p.phone_name || '?').charAt(0).toUpperCase()}</span>
+                      }}>{(p.phone_name || p.ig_username || '?').charAt(0).toUpperCase()}</span>
                     )}
                     <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {p.ig_username ? `@${p.ig_username}` : <span style={{ color: '#71717A' }}>Sans compte</span>}
+                        {p.phone_name || 'Appareil'}
                       </span>
                       <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {p.phone_name}
+                        {p.ig_username ? `@${p.ig_username}` : 'sans compte lié'}
                       </span>
                     </span>
                   </span>

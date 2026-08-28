@@ -4,11 +4,11 @@ import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Chip, Empty, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
-import { scopeInfra } from '@/lib/data'
+import { scopeInfra, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { warmupAccountNative } from '@/lib/geelark'
 
-interface Phone { id: string; ig_username: string | null; status: string; geelark_id: string | null }
+interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null; group_name: string | null }
 function dotKind(status: string): string { return status === 'warming' ? 'warmup' : status }
 
 type RunPhase = 'pending' | 'running' | 'done' | 'failed'
@@ -42,11 +42,12 @@ export default function Warmup({ theme, infra, user, org }: {
   const [runItems, setRunItems] = useState<RunItem[]>([])
   const [logs, setLogs] = useState<string[]>([])
   const [wtab, setWtab] = useState<WTab>('warm')
+  const [wgroup, setWgroup] = useState('Tous')
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    let q = supabase.from('phones').select('id,ig_username,status,geelark_id')
+    let q = supabase.from('phones').select('id,ig_username,phone_name,status,geelark_id,group_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q = scopeInfra(q, infra)
     const { data, error: err } = await q
@@ -83,6 +84,8 @@ export default function Warmup({ theme, infra, user, org }: {
   const toggleAct = (k: string) => setActs(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const nSel = sel.size
   const durLabel = dur < 60 ? `${dur} min` : `${dur / 60} h`
+  const groups = ['Tous', ...[...new Set(phones.map(p => p.group_name).filter(Boolean) as string[])].sort()]
+  const shownWarm = phones.filter(p => wgroup === 'Tous' || p.group_name === wgroup)
 
   const TABS: [WTab, string][] = [['login', 'Connexion'], ['edit', 'Édition en masse'], ['warm', 'Warmup']]
   const subFor: Record<WTab, string> = {
@@ -124,16 +127,23 @@ export default function Warmup({ theme, infra, user, org }: {
       <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
         {/* Téléphones */}
         <Panel theme={theme}>
-          <PanelHead title="Téléphones" right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(phones.map(p => p.id)))} />} />
+          <PanelHead title="Téléphones" right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(shownWarm.map(p => p.id)))} />} />
+          {/* Filtre groupe (menu déroulant) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
+            <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`, background: '#101015', color: wgroup !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 700, outline: 'none' }}>
+              {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
+            </select>
+          </div>
           {loading ? (
             <div style={{ padding: 30, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div>
           ) : error ? (
             <div style={{ padding: 20, textAlign: 'center', color: '#F87171', fontSize: 12 }}>{error}</div>
-          ) : phones.length === 0 ? (
+          ) : shownWarm.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun téléphone.</div>
           ) : (
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-              {phones.map(p => {
+              {shownWarm.map(p => {
                 const on = sel.has(p.id)
                 return (
                   <button key={p.id} onClick={() => toggle(p.id)} style={{
@@ -146,7 +156,10 @@ export default function Warmup({ theme, infra, user, org }: {
                       background: on ? '#D97706' : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 8.5, fontWeight: 900,
                     }}>{on ? '✓' : ''}</span>
                     <StatusDot kind={dotKind(p.status)} />
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.ig_username ?? '—'}</span>
+                    <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                    </span>
                   </button>
                 )
               })}
