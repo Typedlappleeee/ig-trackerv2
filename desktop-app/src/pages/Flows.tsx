@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, PageHead } from '@/lib/ui'
+import { Btn, Chip, Icon, PageHead, Modal, StatusDot } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { scopeInfra } from '@/lib/data'
 import Automation from './Automation'
 
 interface Flow { k: string; t: string; d: string; p: string; n: number; tone: string; reco?: boolean; beta?: boolean; ok: boolean; i: string }
@@ -32,6 +34,25 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
   const [favs, setFavs] = useState<string[]>(readFavs)
   const [plat, setPlat] = useState('Tous')
   const [q, setQ] = useState('')
+  const [flowOpen, setFlowOpen] = useState<Flow | null>(null)
+  const [flowMode, setFlowMode] = useState<'now' | 'sched' | null>(null)
+  const [cloudPhones, setCloudPhones] = useState<{ id: string; phone_name: string; ig_username: string | null; status: string }[]>([])
+  const [flowSel, setFlowSel] = useState<Set<string>>(new Set())
+
+  // Appareils ScaleFlow Cloud (auto-hébergés) — pour le wizard de flux.
+  useEffect(() => {
+    if (!flowOpen) return
+    const { currentOrg } = org
+    let q2 = supabase.from('phones').select('id,phone_name,ig_username,status')
+    q2 = currentOrg ? q2.eq('org_id', currentOrg.id) : q2.eq('user_id', user.id).is('org_id', null)
+    q2 = scopeInfra(q2, 'cloud')
+    q2.order('phone_name').then(({ data }) => setCloudPhones((data ?? []) as any[]))
+  }, [flowOpen, org.currentOrg?.id, user.id])
+
+  function openFlow(f: Flow, mode: 'now' | 'sched' | null = null) {
+    if (!f.ok) return
+    setFlowOpen(f); setFlowMode(mode); setFlowSel(new Set())
+  }
 
   const toggleFav = (k: string) => setFavs(f => {
     const next = f.includes(k) ? f.filter(x => x !== k) : [...f, k]
@@ -68,7 +89,7 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
 
   // Carte de flux, deux tailles (fidèle au ZIP : big = ligne, small = colonne).
   const card = (f: Flow, big?: boolean): ReactNode => (
-    <div key={f.k} onClick={() => f.ok && onLaunch?.(f.k)} style={{
+    <div key={f.k} onClick={() => openFlow(f)} style={{
       position: 'relative', display: 'flex', flexDirection: big ? 'row' : 'column', alignItems: big ? 'center' : 'stretch', gap: big ? 15 : 11,
       padding: big ? 17 : 15, borderRadius: 10, cursor: f.ok ? 'pointer' : 'default',
       background: big ? `linear-gradient(120deg, rgba(${f.tone},0.09), ${theme.cloud ? 'rgba(14,22,27,0.9)' : 'rgba(16,16,21,0.9)'})` : theme.panelBg,
@@ -92,10 +113,10 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
           <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#3F3F46' }}>{f.n} étapes</span>
         </span>}
         <Star k={f.k} big={big} />
-        <IconBtn d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" title="Programmer" onClick={(e) => { e.stopPropagation() }} disabled={!f.ok} />
+        <IconBtn d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" title="Programmer" onClick={(e) => { e.stopPropagation(); openFlow(f, 'sched') }} disabled={!f.ok} />
         {big
-          ? <Btn theme={theme} sm tone="primary" icon="M5 3l14 9-14 9z" label="Lancer" disabled={!f.ok} onClick={() => onLaunch?.(f.k)} />
-          : <IconBtn d="M5 3l14 9-14 9z" title="Lancer" onClick={(e) => { e.stopPropagation(); if (f.ok) onLaunch?.(f.k) }} disabled={!f.ok} />}
+          ? <Btn theme={theme} sm tone="primary" icon="M5 3l14 9-14 9z" label="Lancer" disabled={!f.ok} onClick={() => openFlow(f, 'now')} />
+          : <IconBtn d="M5 3l14 9-14 9z" title="Lancer" onClick={(e) => { e.stopPropagation(); openFlow(f, 'now') }} disabled={!f.ok} />}
       </span>
     </div>
   )
@@ -145,6 +166,66 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
           {section('Tous les flux', others)}
           {favList.length === 0 && others.length === 0 && <div style={{ padding: '40px 15px', textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun flux ne correspond.</div>}
         </>
+      )}
+
+      {/* Fenêtre de lancement d'un flux (fidèle au ZIP : choix du mode → appareils) */}
+      {flowOpen && (
+        <Modal theme={theme} title={flowOpen.t} sub={flowOpen.d} icon={flowOpen.i} onClose={() => { setFlowOpen(null); setFlowMode(null) }} width={540}
+          footer={flowMode ? <>
+            <Btn theme={theme} tone="quiet" label="Retour" onClick={() => setFlowMode(null)} />
+            <Btn theme={theme} tone="primary" disabled={flowSel.size === 0} icon={flowMode === 'now' ? 'M5 3l14 9-14 9z' : 'M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z'}
+              label={flowMode === 'now' ? `Lancer sur ${flowSel.size}` : 'Programmer'} onClick={() => { setFlowOpen(null); setFlowMode(null) }} />
+          </> : undefined}>
+          {/* Récap plateforme / étapes / coût */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 22, padding: '12px 14px', borderRadius: 9, marginBottom: 12, background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            {([['Plateforme', flowOpen.p], ['Étapes', String(flowOpen.n)], ['Coût', '2 cr / appareil']] as [string, string][]).map(([l, v]) => (
+              <span key={l} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52525B' }}>{l}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#E4E4E7' }}>{v}</span>
+              </span>
+            ))}
+          </div>
+
+          {!flowMode ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {([['now', 'M5 3l14 9-14 9z', 'Lancer maintenant', 'Choisis les appareils, puis exécute tout de suite.'], ['sched', 'M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z', 'Programmer', 'Une fois, ou tous les jours à heure fixe.']] as [any, string, string, string][]).map(([k, ic, t, h]) => (
+                <button key={k} onClick={() => setFlowMode(k)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 11, cursor: 'pointer', textAlign: 'left', width: '100%', background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = theme.selEdge }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: `rgba(${theme.tone},0.13)`, border: `1px solid rgba(${theme.tone},0.26)`, color: theme.accentText }}><Icon d={ic} size={17} /></span>
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: '#F4F4F6' }}>{t}</span>
+                    <span style={{ fontSize: 11.5, lineHeight: 1.5, color: '#71717A' }}>{h}</span>
+                  </span>
+                  <span style={{ display: 'flex', color: '#3F3F46' }}><Icon d="M9 18l6-6-6-6" size={15} /></span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#A1A1AA', marginBottom: 8 }}>Appareils ScaleFlow Cloud</div>
+              {cloudPhones.length === 0 ? (
+                <div style={{ padding: '24px 15px', textAlign: 'center', borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#E4E4E7' }}>Aucun appareil ScaleFlow Cloud</div>
+                  <div style={{ fontSize: 11.5, color: '#71717A', marginTop: 5, lineHeight: 1.6 }}>ScaleFlow Cloud tourne sur tes propres serveurs auto-hébergés — branche-les pour lancer ce flux ici. (Pour publier sur GeeLark, bascule d'infrastructure.)</div>
+                </div>
+              ) : (
+                <div style={{ maxHeight: 280, overflowY: 'auto', borderRadius: 9, border: '1px solid rgba(255,255,255,0.06)' }}>
+                  {cloudPhones.map(p => {
+                    const on = flowSel.has(p.id)
+                    return (
+                      <button key={p.id} onClick={() => setFlowSel(s => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
+                        style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.03)', cursor: 'pointer', textAlign: 'left', background: on ? `rgba(${theme.tone},0.07)` : 'transparent' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 8.5, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                        <StatusDot kind={p.status === 'warming' ? 'warmup' : p.status} />
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: on ? '#F4F4F6' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.phone_name || (p.ig_username ? `@${p.ig_username}` : 'Appareil')}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   )
