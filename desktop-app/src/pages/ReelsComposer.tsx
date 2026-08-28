@@ -6,6 +6,7 @@ import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, postReelToPhone } from '@/lib/geelark'
+import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 
 interface Phone { id: string; ig_username: string | null; status: string; group_name: string | null; geelark_id: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_path: string | null; thumbnail_url: string | null; notes: string | null }
@@ -85,20 +86,33 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as Phase })))
     const pushLog = (m: string) => setLogs(l => [...l.slice(-250), m])
 
+    // 0) Débit des crédits d'avance (2/compte). Débité sur le propriétaire de l'orga
+    //    (ou l'utilisateur en perso). Les comptes échoués sont remboursés au settle().
+    const ownerId = currentOrg?.owner_id ?? user.id
+    const run = await startCreditRun(ownerId, CREDIT_COSTS.mass_posting, targets.length)
+    if (isCreditError(run)) {
+      pushLog(`❌ Crédits insuffisants : ${run.error} (il faut ${CREDIT_COSTS.mass_posting * targets.length} crédits).`)
+      setRunItems([]); setRunning(false); return
+    }
+    pushLog(`💳 ${CREDIT_COSTS.mass_posting * targets.length} crédits débités (${CREDIT_COSTS.mass_posting}/compte).`)
+
     // 1) Résoudre l'URL de la vidéo puis l'héberger UNE fois chez GeeLark.
     pushLog('🔗 Préparation de la vidéo…')
     const url = await resolveVideoUrl(chosen)
-    if (!url) { pushLog('❌ Impossible de récupérer la vidéo.'); setRunning(false); return }
+    if (!url) { pushLog('❌ Impossible de récupérer la vidéo.'); run.abort(); await run.settle(); pushLog('↩︎ Crédits remboursés.'); setRunning(false); return }
     const resourceUrl = await geelarkUploadVideo(bearer, url, pushLog)
-    if (!resourceUrl) { pushLog('❌ Envoi de la vidéo échoué.'); setRunning(false); return }
+    if (!resourceUrl) { pushLog('❌ Envoi de la vidéo échoué.'); run.abort(); await run.settle(); pushLog('↩︎ Crédits remboursés.'); setRunning(false); return }
 
     // 2) Publier sur chaque téléphone (séquentiel : évite de saturer le démon shell).
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       pushLog(`— @${p.ig_username ?? p.geelark_id} —`)
       const r = await postReelToPhone(bearer, p.geelark_id!, resourceUrl, caption, pushLog)
+      if (!r.ok) run.markFailed()
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
+    const { refunded } = await run.settle()
+    if (refunded > 0) pushLog(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)
     pushLog('✔ Publication terminée.')
     setRunning(false)
   }

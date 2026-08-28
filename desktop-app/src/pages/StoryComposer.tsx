@@ -6,6 +6,7 @@ import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadImage, postStoryToPhone } from '@/lib/geelark'
+import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 
 interface Phone { id: string; ig_username: string | null; status: string; group_name: string | null; geelark_id: string | null }
 interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; notes: string | null }
@@ -87,18 +88,30 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-250), m])
 
+    // Débit d'avance (1 crédit/compte pour une story), remboursement des échecs.
+    const ownerId = currentOrg?.owner_id ?? user.id
+    const run = await startCreditRun(ownerId, CREDIT_COSTS.story, targets.length)
+    if (isCreditError(run)) {
+      push(`❌ Crédits insuffisants : ${run.error} (il faut ${CREDIT_COSTS.story * targets.length} crédits).`)
+      setRunItems([]); setRunning(false); return
+    }
+    push(`💳 ${CREDIT_COSTS.story * targets.length} crédits débités (${CREDIT_COSTS.story}/compte).`)
+
     push('🔗 Préparation de l\'image…')
     const url = await resolveUrl(chosen)
-    if (!url) { push('❌ Image introuvable.'); setRunning(false); return }
+    if (!url) { push('❌ Image introuvable.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
     const imageResourceUrl = await geelarkUploadImage(bearer, url, push)
-    if (!imageResourceUrl) { push('❌ Envoi de l\'image échoué.'); setRunning(false); return }
+    if (!imageResourceUrl) { push('❌ Envoi de l\'image échoué.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
 
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— @${p.ig_username ?? p.geelark_id} —`)
       const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl, linkUrl: links[p.id], linkText }, push)
+      if (!r.ok) run.markFailed()
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
+    const { refunded } = await run.settle()
+    if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)
     push('✔ Stories terminées.')
     setRunning(false)
   }
