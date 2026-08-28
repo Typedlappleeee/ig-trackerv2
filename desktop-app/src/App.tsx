@@ -5,6 +5,7 @@ import { themeFor, type InfraKey } from '@/lib/theme'
 import { useOrg, useHubData, firstNameFrom } from '@/lib/data'
 import Shell, { type PageKey } from '@/Shell'
 import Home from '@/pages/Home'
+import Phones from '@/pages/Phones'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 
 // Spécifications des écrans encore en placeholder (gabarit PageHead + état vide).
@@ -69,7 +70,9 @@ function AppInner({ user }: { user: User }) {
 
   const content = page === 'hub'
     ? <Home theme={theme} infra={infra} user={user} data={data} loading={loading} reload={reload} onNavigate={setPage} />
-    : <Placeholder theme={theme} spec={SPECS[page] ?? SPECS.settings!} />
+    : (page === 'cloud' || page === 'phones')
+      ? <Phones theme={theme} infra={infra} user={user} org={org} />
+      : <Placeholder theme={theme} spec={SPECS[page] ?? SPECS.settings!} />
 
   return (
     <Shell
