@@ -91,6 +91,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     setRunning(true); setLogs([])
     setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-250), m])
+    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
 
     // Débit d'avance (1 crédit/compte pour une story), remboursement des échecs.
     const ownerId = currentOrg?.owner_id ?? user.id
@@ -110,7 +111,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— @${p.ig_username ?? p.geelark_id} —`)
-      const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl, linkUrl: links[p.id], linkText }, push)
+      const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl, linkUrl: links[p.id], linkText, rotationUrls: rot }, push)
       if (!r.ok) run.markFailed()
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }

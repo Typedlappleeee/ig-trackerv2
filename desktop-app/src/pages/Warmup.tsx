@@ -70,11 +70,12 @@ export default function Warmup({ theme, infra, user, org }: {
     // Nb de vidéos parcourues dérivé de la durée (≈2/min, plafonné à 100).
     const browseVideo = Math.max(1, Math.min(100, Math.round(dur * 2)))
     const pushLog = (m: string) => setLogs(l => [...l.slice(-200), m])
+    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
 
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       pushLog(`— @${p.ig_username ?? p.geelark_id} —`)
-      const r = await warmupAccountNative(bearer, p.geelark_id!, { browseVideo }, pushLog)
+      const r = await warmupAccountNative(bearer, p.geelark_id!, { browseVideo, rotationUrls: rot }, pushLog)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
     pushLog('✔ Warmup terminé.')

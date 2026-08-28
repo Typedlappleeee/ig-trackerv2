@@ -65,6 +65,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     setRunning(true); setLogs([])
     setRunItems(targets.flatMap(p => platList.map(pl => ({ id: `${p.id}:${pl}`, name: `${phoneLabel(p)} · ${pl}`, phase: 'pending' as Phase }))))
     const push = (m: string) => setLogs(l => [...l.slice(-300), m])
+    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
     const ownerId = currentOrg?.owner_id ?? user.id
     const run = await startCreditRun(ownerId, CREDIT_COSTS.mass_posting, targets.length * platList.length)
     if (isCreditError(run)) { push(`❌ Crédits insuffisants (il faut ${cost}).`); setRunItems([]); setRunning(false); return }
@@ -79,7 +80,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
         const key = `${p.id}:${pl}`
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: 'running' } : it))
         push(`— ${phoneLabel(p)} · ${pl} —`)
-        const r = await crossPostToPhone(bearer, p.geelark_id!, pl, { mediaResourceUrl: resourceUrl, caption }, push)
+        const r = await crossPostToPhone(bearer, p.geelark_id!, pl, { mediaResourceUrl: resourceUrl, caption, rotationUrls: rot }, push)
         if (!r.ok) run.markFailed()
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
       }

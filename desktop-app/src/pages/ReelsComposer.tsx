@@ -103,6 +103,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     setRunning(true); setLogs([])
     setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-300), m])
+    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
 
     const ownerId = currentOrg?.owner_id ?? user.id
     const run = await startCreditRun(ownerId, CREDIT_COSTS.mass_posting, targets.length)
@@ -125,7 +126,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       const v = usable[i % usable.length]; i++
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— @${p.ig_username ?? p.geelark_id} · ${v.title} —`)
-      const r = await postReelToPhone(bearer, p.geelark_id!, resourceByVid.get(v.id)!, caption, push)
+      const r = await postReelToPhone(bearer, p.geelark_id!, resourceByVid.get(v.id)!, caption, push, rot)
       if (!r.ok) run.markFailed()
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }

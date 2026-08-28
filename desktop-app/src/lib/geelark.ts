@@ -62,8 +62,32 @@ export async function stopPhones(bearer: string, ids: string[]): Promise<number>
   return Number.isFinite(success) ? success : ids.length
 }
 
+// ── Rotation d'IP proxy (best-effort, ne throw jamais) ───────────────────────
+// Appelle le « Change IP URL » du fournisseur (ex. dongle 4G / Prox'Easy). En
+// Electron (webSecurity:false) le GET direct passe. Laisse le temps à la nouvelle
+// IP de s'attribuer avant le boot.
+export const ROTATION_SETTLE_MS = 12000
+export async function rotateProxyIp(url: string, log?: (m: string) => void): Promise<boolean> {
+  const clean = (url ?? '').trim()
+  if (!/^https?:\/\//i.test(clean)) return false
+  try {
+    const res = await fetch(clean, { method: 'GET' })
+    log?.(res.ok ? '🔄 Rotation IP : nouvelle IP demandée ✓' : `⚠ Rotation IP : réponse ${res.status}`)
+    return res.ok
+  } catch { log?.('⚠ Rotation IP : proxy injoignable — on continue'); return false }
+}
+export async function rotateAllProxies(urls: string[], log?: (m: string) => void): Promise<void> {
+  const list = (urls ?? []).map(u => (u ?? '').trim()).filter(u => /^https?:\/\//i.test(u))
+  if (list.length === 0) return
+  await Promise.all(list.map(u => rotateProxyIp(u, log)))
+  log?.('⏳ Nouvelle IP en cours d\'attribution — attente 12 s…')
+  await sleep(ROTATION_SETTLE_MS)
+}
+
 // Démarre un téléphone et attend qu'il soit en marche (status=0), max 120 s.
-async function ensurePhoneRunning(bearer: string, phoneId: string, log: (m: string) => void): Promise<boolean> {
+// rotationUrls : si fourni, on rote l'IP AVANT le boot (le tel démarre sur la nouvelle IP).
+async function ensurePhoneRunning(bearer: string, phoneId: string, log: (m: string) => void, rotationUrls?: string[]): Promise<boolean> {
+  if (rotationUrls && rotationUrls.length) await rotateAllProxies(rotationUrls, log)
   log('📱 Démarrage du téléphone…')
   const startRes = await geelarkFetch('/phone/start', { ids: [phoneId] }, bearer)
   const code = Number(startRes['code'] ?? -1)
@@ -109,11 +133,11 @@ async function pollRpaTask(bearer: string, taskId: string, log: (m: string) => v
 export async function warmupAccountNative(
   bearer: string,
   phoneId: string,
-  config: { browseVideo: number; keyword?: string },
+  config: { browseVideo: number; keyword?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await ensurePhoneRunning(bearer, phoneId, log, config.rotationUrls)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     const browseVideo = Math.max(1, Math.min(100, Math.round(config.browseVideo)))
     log(`🔥 Création de la tâche de warmup (${browseVideo} vidéos${config.keyword ? `, mot-clé « ${config.keyword} »` : ''})…`)
@@ -155,12 +179,12 @@ export const CROSS_PLATFORMS: { key: CrossPlatform; label: string; endpoint: str
 
 export async function crossPostToPhone(
   bearer: string, phoneId: string, platform: CrossPlatform,
-  opts: { mediaResourceUrl: string; isImage?: boolean; caption?: string },
+  opts: { mediaResourceUrl: string; isImage?: boolean; caption?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   const cfg = CROSS_PLATFORMS.find(p => p.key === platform)!
   try {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await ensurePhoneRunning(bearer, phoneId, log, opts.rotationUrls)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     let endpoint = cfg.endpoint
     let mediaField: 'video' | 'images' = 'video'
@@ -289,13 +313,13 @@ export async function geelarkUploadImage(bearer: string, fileUrl: string, log: (
 export async function postStoryToPhone(
   bearer: string,
   phoneId: string,
-  opts: { imageResourceUrl: string; linkUrl: string; linkText?: string },
+  opts: { imageResourceUrl: string; linkUrl: string; linkText?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const flowId = await ensureStoryFlowId(bearer, log)
     if (!flowId) return { ok: false, error: 'Flow story indisponible' }
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await ensurePhoneRunning(bearer, phoneId, log, opts.rotationUrls)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     log('📸 Lancement de la story…')
     const paramMap = {
@@ -328,9 +352,10 @@ export async function postReelToPhone(
   videoResourceUrl: string,
   caption: string,
   log: (m: string) => void,
+  rotationUrls?: string[],
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await ensurePhoneRunning(bearer, phoneId, log, rotationUrls)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
     log('🎬 Création de la tâche de publication Reels…')
     const res = await geelarkFetch('/rpa/task/instagramPubReels', {
