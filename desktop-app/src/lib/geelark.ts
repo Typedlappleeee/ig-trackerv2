@@ -138,6 +138,35 @@ export async function warmupAccountNative(
   }
 }
 
+// Édition de profil Instagram native (instagramEdit) sur UN téléphone.
+export async function editProfileOnPhone(
+  bearer: string, phoneId: string,
+  fields: { nickname?: string; biography?: string; linkURL?: string; linkTitle?: string },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log('✏️ Création de la tâche d\'édition de profil…')
+    const res = await geelarkFetch('/rpa/task/instagramEdit', {
+      id: phoneId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'ScaleFlow profile edit',
+      ...(fields.nickname?.trim() ? { nickname: fields.nickname.trim() } : {}),
+      ...(fields.biography != null ? { biography: fields.biography } : {}),
+      ...(fields.linkURL?.trim() ? { linkURL: fields.linkURL.trim() } : {}),
+      ...(fields.linkTitle?.trim() ? { linkTitle: fields.linkTitle.trim() } : {}),
+    }, bearer)
+    if (Number(res['code']) !== 0) return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
+    log('   Tâche créée — édition en cours…')
+    return await pollRpaTask(bearer, taskId, log, 8 * 60_000)
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
+  } finally {
+    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+  }
+}
+
 // ── Publication de Reels (Mass Posting) ──────────────────────────────────────
 // Héberge une vidéo chez GeeLark : /upload/getUrl → PUT des octets → resourceUrl.
 // Les templates RPA n'acceptent QUE des URL hébergées par GeeLark, pas une URL

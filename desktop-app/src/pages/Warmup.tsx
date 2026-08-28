@@ -6,7 +6,7 @@ import { Btn, Chip, Empty, StatusDot, Panel, PanelHead, PageHead } from '@/lib/u
 import type { OrgState } from '@/lib/data'
 import { scopeInfra, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
-import { warmupAccountNative } from '@/lib/geelark'
+import { warmupAccountNative, editProfileOnPhone } from '@/lib/geelark'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null; group_name: string | null }
 function dotKind(status: string): string { return status === 'warming' ? 'warmup' : status }
@@ -43,6 +43,7 @@ export default function Warmup({ theme, infra, user, org }: {
   const [logs, setLogs] = useState<string[]>([])
   const [wtab, setWtab] = useState<WTab>('warm')
   const [wgroup, setWgroup] = useState('Tous')
+  const [edit, setEdit] = useState({ nickname: '', biography: '', linkURL: '', linkTitle: '' })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -80,6 +81,24 @@ export default function Warmup({ theme, infra, user, org }: {
     setRunning(false)
   }
 
+  // Édition de profil en masse (RÉELLE) : instagramEdit par téléphone.
+  async function launchEdit() {
+    const targets = phones.filter(p => sel.has(p.id) && p.geelark_id)
+    if (targets.length === 0 || !bearer || running) return
+    if (!edit.nickname.trim() && !edit.biography.trim() && !edit.linkURL.trim()) return
+    setRunning(true); setLogs([])
+    setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as RunPhase })))
+    const push = (m: string) => setLogs(l => [...l.slice(-200), m])
+    for (const p of targets) {
+      setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
+      push(`— ${phoneLabel(p)} —`)
+      const r = await editProfileOnPhone(bearer, p.geelark_id!, edit, push)
+      setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
+    }
+    push('✔ Édition terminée.')
+    setRunning(false)
+  }
+
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleAct = (k: string) => setActs(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const nSel = sel.size
@@ -114,15 +133,77 @@ export default function Warmup({ theme, infra, user, org }: {
       </div>
 
       {wtab !== 'warm' ? (
-        <Panel theme={theme}>
-          <Empty
-            icon={wtab === 'login' ? 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4|M10 17l5-5-5-5|M15 12H3' : 'M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z'}
-            title={wtab === 'login' ? 'Connexion automatique' : 'Édition de profil en masse'}
-            text={wtab === 'login'
-              ? "L'auto-login connecte tes comptes IG sur les appareils via le flow RPA GeeLark. Le câblage arrive à la prochaine passe (il réutilise geelarkLoginFlow)."
-              : "L'édition en masse met à jour nom, bio, lien et photo de profil sur les comptes sélectionnés (RPA instagramEdit). Câblage à la prochaine passe."}
-          />
-        </Panel>
+        <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
+          {/* Sélecteur de téléphones (partagé) */}
+          <Panel theme={theme}>
+            <PanelHead title="Téléphones" right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(shownWarm.map(p => p.id)))} />} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
+              <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`, background: '#101015', color: wgroup !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 700, outline: 'none' }}>
+                {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
+              </select>
+            </div>
+            <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+              {shownWarm.map(p => {
+                const on = sel.has(p.id)
+                return (
+                  <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 13px', border: 'none', cursor: 'pointer', textAlign: 'left', borderLeft: '2px solid ' + (on ? theme.accent : 'transparent'), background: on ? `rgba(${theme.tone},0.06)` : 'transparent', boxSizing: 'border-box' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 8.5, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                    <StatusDot kind={dotKind(p.status)} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </Panel>
+
+          {/* Config */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {wtab === 'edit' ? (
+              <Panel theme={theme}>
+                <PanelHead title="Nouveau profil" sub="Appliqué à tous les comptes sélectionnés (RPA instagramEdit)" />
+                <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {([['nickname', 'Nom affiché'], ['linkURL', 'Lien (URL)'], ['linkTitle', 'Titre du lien']] as [keyof typeof edit, string][]).map(([k, l]) => (
+                    <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{l}</span>
+                      <input value={edit[k]} onChange={e => setEdit(v => ({ ...v, [k]: e.target.value }))} placeholder={l} style={{ height: 32, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+                    </label>
+                  ))}
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Bio</span>
+                    <textarea value={edit.biography} onChange={e => setEdit(v => ({ ...v, biography: e.target.value }))} rows={3} placeholder="Bio…" style={{ resize: 'vertical', padding: 11, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, fontFamily: 'inherit', outline: 'none' }} />
+                  </label>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ flex: 1, fontSize: 12, color: '#71717A' }}>Édite <b style={{ color: '#E4E4E7' }}>{nSel}</b> compte{nSel > 1 ? 's' : ''}.</span>
+                  <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running || (!edit.nickname.trim() && !edit.biography.trim() && !edit.linkURL.trim())} icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" label={running ? 'Édition…' : 'Lancer l\'édition'} onClick={launchEdit} />
+                </div>
+              </Panel>
+            ) : (
+              <Panel theme={theme}>
+                <PanelHead title="Connexion automatique" sub="Reconnecte les comptes IG sur les appareils (flow RPA GeeLark)" />
+                <div style={{ padding: 16 }}>
+                  <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+                    L'auto-login utilise les identifiants IG stockés sur chaque appareil GeeLark pour rouvrir la session. Sélectionne les comptes puis lance — l'agent ouvre l'app et se connecte.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ flex: 1, fontSize: 12, color: '#71717A' }}>Connecte <b style={{ color: '#E4E4E7' }}>{nSel}</b> compte{nSel > 1 ? 's' : ''}.</span>
+                  <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer} icon="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4|M10 17l5-5-5-5|M15 12H3" label="Lancer la connexion" onClick={() => setLogs(l => [...l, 'La connexion automatique s\'appuie sur le flow de login GeeLark — branchement RPA en cours.'])} />
+                </div>
+              </Panel>
+            )}
+            {runItems.length > 0 && (
+              <Panel theme={theme}>
+                <PanelHead title="En direct" sub={`${runItems.filter(r => r.phase === 'done').length}/${runItems.length} terminés`} />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '11px 15px' }}>
+                  {runItems.map(it => <Chip key={it.id} text={`${it.phase === 'done' ? '✓' : it.phase === 'failed' ? '✕' : it.phase === 'running' ? '…' : '·'} ${it.name}`} tone={(it.phase === 'done' ? 'ok' : it.phase === 'failed' ? 'bad' : it.phase === 'running' ? 'warn' : 'mute') as any} />)}
+                </div>
+                <div style={{ margin: '0 15px 13px', padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.05)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.length === 0 ? '…' : logs.join('\n')}</div>
+              </Panel>
+            )}
+          </div>
+        </div>
       ) : (
       <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
         {/* Téléphones */}
