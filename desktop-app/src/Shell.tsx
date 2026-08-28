@@ -93,12 +93,18 @@ export default function Shell({
   const [navOpen, setNavOpen] = useState(true)
   const [infraOpen, setInfraOpen] = useState(false)
   const [userMenu, setUserMenu] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [paletteQ, setPaletteQ] = useState('')
+  const [bellOpen, setBellOpen] = useState(false)
   const inf = INFRAS[infra]
   const T = theme
 
-  // ⌘K visuel uniquement (pas de palette fonctionnelle dans cette fondation).
+  // ⌘K / Ctrl+K ouvre la palette de commandes ; Échap ferme les menus.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setInfraOpen(false); setUserMenu(false) } }
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o); setPaletteQ('') }
+      if (e.key === 'Escape') { setInfraOpen(false); setUserMenu(false); setPaletteOpen(false); setBellOpen(false) }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
@@ -200,7 +206,7 @@ export default function Shell({
         {/* recherche ⌘K (visuel) */}
         {navOpen && (
           <div style={{ flexShrink: 0, padding: '6px 10px' }}>
-            <button style={{
+            <button onClick={() => { setPaletteOpen(true); setPaletteQ('') }} style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 32, padding: '0 10px',
               border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, background: 'rgba(255,255,255,0.02)', color: '#71717A',
               fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box', transition: 'all 0.16s ease',
@@ -260,7 +266,7 @@ export default function Shell({
                   <span style={{ display: 'block', height: '100%', width: `${balance === null ? 0 : Math.min(100, Math.round((balance / 5000) * 100))}%`, borderRadius: 99, background: 'linear-gradient(90deg,#8B5CF6,#A78BFA)' }} />
                 </span>
               </span>
-              <button style={{ height: 22, padding: '0 8px', border: '1px solid rgba(139,92,246,0.28)', borderRadius: 6, background: 'rgba(139,92,246,0.1)', color: '#C4B5FD', fontSize: 10, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>＋</button>
+              <button onClick={() => setPage('settings')} title="Acheter des crédits" style={{ height: 22, padding: '0 8px', border: '1px solid rgba(139,92,246,0.28)', borderRadius: 6, background: 'rgba(139,92,246,0.1)', color: '#C4B5FD', fontSize: 10, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>＋</button>
             </div>
           )}
 
@@ -349,12 +355,19 @@ export default function Shell({
               </span>
               <span style={{ position: 'relative', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap' }}>Activité</span>
             </button>
-            <button style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, background: 'transparent', color: '#71717A', cursor: 'pointer', transition: 'all 0.16s ease' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'; e.currentTarget.style.color = '#E4E4E7' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#71717A' }}
-              aria-label="Notifications">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-            </button>
+            <span style={{ position: 'relative' }}>
+              <button onClick={() => setBellOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, border: `1px solid ${bellOpen ? `rgba(${T.tone},0.4)` : 'rgba(255,255,255,0.07)'}`, borderRadius: 8, background: bellOpen ? `rgba(${T.tone},0.1)` : 'transparent', color: bellOpen ? T.accentText : '#71717A', cursor: 'pointer', transition: 'all 0.16s ease' }}
+                aria-label="Notifications">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+              </button>
+              {bellOpen && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 260, zIndex: 50, borderRadius: 10, overflow: 'hidden', background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)', animation: 'aIn 0.18s cubic-bezier(0.16,1,0.3,1) both' }}>
+                  <div style={{ padding: '11px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12, fontWeight: 700, color: '#E4E4E7' }}>Notifications</div>
+                  <div style={{ padding: '22px 13px', textAlign: 'center', color: '#52525B', fontSize: 12 }}>Tu es à jour — rien de nouveau.</div>
+                  <button onClick={() => { setPage('activity'); setBellOpen(false) }} style={{ ...menuItemStyle, borderTop: '1px solid rgba(255,255,255,0.05)', justifyContent: 'center', color: T.accentText, fontWeight: 700 }}>Voir l'activité</button>
+                </div>
+              )}
+            </span>
             <button onClick={() => setPage('settings')} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30,
               border: `1px solid ${page === 'settings' ? `rgba(${T.tone},0.4)` : 'rgba(255,255,255,0.07)'}`, borderRadius: 8,
@@ -370,6 +383,37 @@ export default function Shell({
           <div style={{ maxWidth: 1520, margin: '0 auto', padding: '24px 24px 40px', width: '100%', boxSizing: 'border-box' }}>{children}</div>
         </main>
       </div>
+
+      {/* ══════════ PALETTE DE COMMANDES (⌘K) ══════════ */}
+      {paletteOpen && (() => {
+        const all = [...NAV.flatMap(s => s.items), { k: 'settings' as PageKey, l: 'Réglages', i: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z' }]
+        const ql = paletteQ.trim().toLowerCase()
+        const list = ql ? all.filter(it => it.l.toLowerCase().includes(ql)) : all
+        return (
+          <div onClick={() => setPaletteOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh', background: 'rgba(4,6,8,0.72)', backdropFilter: 'blur(6px)', animation: 'aFade .14s ease both' }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: 520, maxWidth: '92%', borderRadius: 13, overflow: 'hidden', background: '#131318', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 32px 80px -22px rgba(0,0,0,0.85)', animation: 'aPop .2s cubic-bezier(0.16,1,0.3,1) both' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 15px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#71717A" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.35-4.35" /></svg>
+                <input autoFocus value={paletteQ} onChange={e => setPaletteQ(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && list[0]) { setPage(list[0].k); setPaletteOpen(false) } }}
+                  placeholder="Aller à…" style={{ flex: 1, border: 'none', background: 'transparent', color: '#F4F4F6', fontSize: 14, outline: 'none' }} />
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#52525B' }}>ESC</span>
+              </div>
+              <div style={{ maxHeight: 340, overflowY: 'auto', padding: 6 }}>
+                {list.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun résultat.</div>
+                  : list.map(it => (
+                    <button key={it.k} onClick={() => { setPage(it.k); setPaletteOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '9px 11px', border: 'none', borderRadius: 8, cursor: 'pointer', background: page === it.k ? `rgba(${T.tone},0.12)` : 'transparent', color: page === it.k ? T.accentText : '#D4D4D8', fontSize: 12.5, fontWeight: 600, textAlign: 'left' }}
+                      onMouseEnter={e => { if (page !== it.k) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+                      onMouseLeave={e => { if (page !== it.k) e.currentTarget.style.background = 'transparent' }}>
+                      <span style={{ display: 'flex', color: page === it.k ? T.accentText : '#71717A' }}><Icon d={it.i} size={15} /></span>
+                      {it.l}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
