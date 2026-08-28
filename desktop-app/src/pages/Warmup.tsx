@@ -4,9 +4,14 @@ import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { useConnections } from '@/lib/connections'
+import { warmupAccountNative } from '@/lib/geelark'
 
-interface Phone { id: string; ig_username: string | null; status: string }
+interface Phone { id: string; ig_username: string | null; status: string; geelark_id: string | null }
 function dotKind(status: string): string { return status === 'warming' ? 'warmup' : status }
+
+type RunPhase = 'pending' | 'running' | 'done' | 'failed'
+interface RunItem { id: string; name: string; phase: RunPhase; detail?: string }
 
 const DURATIONS: { v: number; h: string }[] = [
   { v: 15, h: 'échauffement' }, { v: 30, h: 'recommandé' }, { v: 60, h: 'session longue' }, { v: 120, h: 'compte mûr' },
@@ -21,6 +26,8 @@ export default function Warmup({ theme, infra, user, org }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState
 }) {
   const { currentOrg } = org
+  const conns = useConnections(user, org)
+  const bearer = conns.bearer
   const [phones, setPhones] = useState<Phone[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -28,10 +35,15 @@ export default function Warmup({ theme, infra, user, org }: {
   const [dur, setDur] = useState(30)
   const [acts, setActs] = useState<Set<string>>(new Set(['like', 'reels', 'follow']))
 
+  // État d'exécution réelle du warmup (GeeLark).
+  const [running, setRunning] = useState(false)
+  const [runItems, setRunItems] = useState<RunItem[]>([])
+  const [logs, setLogs] = useState<string[]>([])
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    let q = supabase.from('phones').select('id,ig_username,status')
+    let q = supabase.from('phones').select('id,ig_username,status,geelark_id')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data, error: err } = await q
     if (err) { setError('Impossible de charger les téléphones.'); setLoading(false); return }
@@ -40,6 +52,28 @@ export default function Warmup({ theme, infra, user, org }: {
   }, [currentOrg?.id, user.id])
 
   useEffect(() => { load() }, [load])
+
+  // Lancement RÉEL : warmup natif GeeLark, un téléphone après l'autre (les tâches
+  // durent longtemps ; le séquentiel évite de saturer le démon shell).
+  async function launch() {
+    const targets = phones.filter(p => sel.has(p.id) && p.geelark_id)
+    if (targets.length === 0 || !bearer || running) return
+    setRunning(true)
+    setLogs([])
+    setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as RunPhase })))
+    // Nb de vidéos parcourues dérivé de la durée (≈2/min, plafonné à 100).
+    const browseVideo = Math.max(1, Math.min(100, Math.round(dur * 2)))
+    const pushLog = (m: string) => setLogs(l => [...l.slice(-200), m])
+
+    for (const p of targets) {
+      setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
+      pushLog(`— @${p.ig_username ?? p.geelark_id} —`)
+      const r = await warmupAccountNative(bearer, p.geelark_id!, { browseVideo }, pushLog)
+      setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
+    }
+    pushLog('✔ Warmup terminé.')
+    setRunning(false)
+  }
 
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleAct = (k: string) => setActs(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
@@ -134,10 +168,37 @@ export default function Warmup({ theme, infra, user, org }: {
           <Panel theme={theme}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 15px', flexWrap: 'wrap' }}>
               <span style={{ flex: 1, minWidth: 200, fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>
-                Session de <span style={{ color: '#FBBF24', fontWeight: 700 }}>{durLabel}</span> sur <span style={{ color: '#E4E4E7', fontWeight: 700 }}>{nSel}</span> téléphone{nSel > 1 ? 's' : ''}. Les appareils s'éteignent à la fin.
+                {!bearer && !conns.loading ? (
+                  <span style={{ color: '#FBBF24' }}>Connecte d'abord ton compte GeeLark (token) dans les Réglages de l'app web, puis reviens ici.</span>
+                ) : (
+                  <>Session de <span style={{ color: '#FBBF24', fontWeight: 700 }}>{durLabel}</span> sur <span style={{ color: '#E4E4E7', fontWeight: 700 }}>{nSel}</span> téléphone{nSel > 1 ? 's' : ''}. Les appareils s'éteignent à la fin.</>
+                )}
               </span>
-              <Btn theme={theme} tone="primary" disabled={nSel === 0} icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" label={nSel === 0 ? 'Sélectionne des comptes' : 'Lancer le warmup'} />
+              <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running}
+                icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z"
+                label={running ? 'Warmup en cours…' : nSel === 0 ? 'Sélectionne des comptes' : 'Lancer le warmup'}
+                onClick={launch} />
             </div>
+
+            {/* Progression + logs en direct */}
+            {runItems.length > 0 && (
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '11px 15px' }}>
+                  {runItems.map(it => {
+                    const c = it.phase === 'done' ? 'ok' : it.phase === 'failed' ? 'bad' : it.phase === 'running' ? 'warn' : 'mute'
+                    const label = it.phase === 'done' ? '✓' : it.phase === 'failed' ? '✕' : it.phase === 'running' ? '…' : '·'
+                    return <Chip key={it.id} text={`${label} @${it.name}`} tone={c as any} />
+                  })}
+                </div>
+                <div style={{
+                  margin: '0 15px 13px', padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.28)',
+                  border: '1px solid rgba(255,255,255,0.05)', maxHeight: 220, overflowY: 'auto',
+                  fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap',
+                }}>
+                  {logs.length === 0 ? '…' : logs.join('\n')}
+                </div>
+              </div>
+            )}
           </Panel>
         </div>
       </div>
