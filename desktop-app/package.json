@@ -2,6 +2,9 @@
   "name": "scaleflow-desktop",
   "private": true,
   "version": "0.1.0",
+  "description": "ScaleFlow — automatisation Instagram & TikTok multi-comptes",
+  "author": "ScaleFlow",
+  "repository": "https://github.com/Typedlappleeee/ig-trackerv2",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -23,9 +26,8 @@
     "productName": "ScaleFlow",
     "directories": { "output": "release" },
     "files": ["dist/**/*", "electron/**/*"],
-    "win": { "target": ["nsis", "portable"], "artifactName": "ScaleFlow-Setup-${version}.${ext}" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
-    "mac": { "target": ["dmg"] },
-    "linux": { "target": ["AppImage"] }
+    "publish": null,
+    "win": { "target": ["nsis"], "artifactName": "ScaleFlow-Setup-${version}.${ext}" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   }
 }
