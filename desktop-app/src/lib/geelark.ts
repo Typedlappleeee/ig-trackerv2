@@ -138,6 +138,50 @@ export async function warmupAccountNative(
   }
 }
 
+// ── Cross-posting multi-plateforme (+ TikTok) ────────────────────────────────
+// Réutilise upload → boot → RPA → poll pour publier une vidéo sur d'autres réseaux.
+// ⚠ Noms d'endpoints selon la convention documentée GeeLark — le message d'erreur
+// remonte tel quel si un template diffère selon la version de l'API.
+export type CrossPlatform = 'tiktok' | 'threads' | 'facebook' | 'youtube' | 'x' | 'reddit' | 'pinterest'
+export const CROSS_PLATFORMS: { key: CrossPlatform; label: string; endpoint: string; emoji: string }[] = [
+  { key: 'tiktok', label: 'TikTok', endpoint: '/rpa/task/tiktokPublish', emoji: '🎵' },
+  { key: 'threads', label: 'Threads', endpoint: '/rpa/task/threadsVideo', emoji: '🧵' },
+  { key: 'facebook', label: 'Facebook Reels', endpoint: '/rpa/task/facebookReels', emoji: '📘' },
+  { key: 'youtube', label: 'YouTube Shorts', endpoint: '/rpa/task/youtubePubShort', emoji: '▶️' },
+  { key: 'x', label: 'X (Twitter)', endpoint: '/rpa/task/xPublish', emoji: '✖️' },
+  { key: 'reddit', label: 'Reddit', endpoint: '/rpa/task/redditVideo', emoji: '👽' },
+  { key: 'pinterest', label: 'Pinterest', endpoint: '/rpa/task/pinterestVideo', emoji: '📌' },
+]
+
+export async function crossPostToPhone(
+  bearer: string, phoneId: string, platform: CrossPlatform,
+  opts: { mediaResourceUrl: string; isImage?: boolean; caption?: string },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  const cfg = CROSS_PLATFORMS.find(p => p.key === platform)!
+  try {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    let endpoint = cfg.endpoint
+    let mediaField: 'video' | 'images' = 'video'
+    if (platform === 'threads' && opts.isImage) { endpoint = '/rpa/task/threadsImage'; mediaField = 'images' }
+    log(`📤 Publication ${cfg.label}…`)
+    const res = await geelarkFetch(endpoint, {
+      id: phoneId, scheduleAt: Math.floor(Date.now() / 1000) + 5,
+      title: (opts.caption ?? '').slice(0, 500), [mediaField]: [opts.mediaResourceUrl], name: `ScaleFlow ${cfg.label}`.slice(0, 128),
+    }, bearer)
+    if (Number(res['code']) !== 0) return { ok: false, error: `GeeLark (${cfg.label}) : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
+    log('   Tâche créée — publication en cours…')
+    return await pollRpaTask(bearer, taskId, log, 8 * 60_000)
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
+  } finally {
+    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+  }
+}
+
 // Édition de profil Instagram native (instagramEdit) sur UN téléphone.
 export async function editProfileOnPhone(
   bearer: string, phoneId: string,
