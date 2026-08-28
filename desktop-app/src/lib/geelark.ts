@@ -5,6 +5,8 @@
 // Porté fidèlement des primitives de electron-app/src/lib/geelark.ts (warmup natif,
 // démarrage/arrêt de téléphone, sonde de tâche RPA). Best-effort, jamais de secret loggé.
 
+import storyFlowDef from './geelarkStoryFlow.json'
+
 const BASE = 'https://openapi.geelark.com/open/v1'
 
 export function sleep(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)) }
@@ -158,6 +160,89 @@ export async function geelarkUploadVideo(
   } catch (e) {
     log(`   ⚠ upload vidéo échoué : ${e instanceof Error ? e.message : String(e)}`)
     return null
+  }
+}
+
+// ── Story via RPA custom GeeLark ─────────────────────────────────────────────
+// La story n'a pas d'endpoint natif : on importe un flow RPA (« Story Scaleflow »)
+// dans le compte GeeLark (une seule fois, mis en cache), puis on l'exécute par
+// téléphone via /task/rpa/add avec un paramMap (image + lien + texte du sticker).
+const STORY_FLOW_VERSION = 'v10'
+const _storyFlowCache = new Map<string, Promise<string | null>>()
+function storyFlowLsKey(b: string) { return `sf-story-flowid:${b.slice(-14)}` }
+function storyFlowVerKey(b: string) { return `sf-story-flowver:${b.slice(-14)}` }
+
+async function ensureStoryFlowId(bearer: string, log: (m: string) => void): Promise<string | null> {
+  const cached = _storyFlowCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, ver: string | null = null
+    try { stored = localStorage.getItem(storyFlowLsKey(bearer)); ver = localStorage.getItem(storyFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && ver === STORY_FLOW_VERSION) return stored
+    log(stored ? '🔄 Mise à jour du flow « Story »…' : '📥 Import du flow « Story » dans GeeLark…')
+    try {
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(storyFlowDef) }, bearer)
+      if (Number(res['code']) !== 0) { log(`⚠ Import flow story : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(storyFlowLsKey(bearer), id); localStorage.setItem(storyFlowVerKey(bearer), STORY_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log(`⚠ Import flow story : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _storyFlowCache.set(bearer, p)
+  p.then(v => { if (!v) _storyFlowCache.delete(bearer) }).catch(() => _storyFlowCache.delete(bearer))
+  return p
+}
+
+// Héberge une IMAGE chez GeeLark (garde l'extension réelle — les images, contrairement
+// aux vidéos, ne sont pas forcées en mp4). Renvoie le resourceUrl hébergé.
+export async function geelarkUploadImage(bearer: string, fileUrl: string, log: (m: string) => void): Promise<string | null> {
+  try {
+    const ext = (fileUrl.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'jpg').toLowerCase()
+    log('⬆️ Envoi de l\'image vers GeeLark…')
+    const res = await geelarkFetch('/upload/getUrl', { fileType: ext }, bearer)
+    if (Number(res['code']) !== 0) { log(`   ⚠ upload/getUrl : ${res['msg'] ?? res['code']}`); return null }
+    const d = res['data'] as { uploadUrl?: string; resourceUrl?: string } | undefined
+    if (!d?.uploadUrl || !d?.resourceUrl) { log('   ⚠ pas d\'URL d\'upload'); return null }
+    const bytes = await (await fetch(fileUrl)).arrayBuffer()
+    const put = await fetch(d.uploadUrl, { method: 'PUT', body: bytes })
+    if (!put.ok) { log(`   ⚠ envoi image : HTTP ${put.status}`); return null }
+    log('   ✅ Image hébergée.')
+    return d.resourceUrl
+  } catch (e) { log(`   ⚠ upload image échoué : ${e instanceof Error ? e.message : String(e)}`); return null }
+}
+
+// Publie une Story sur UN téléphone : import flow (si besoin) → démarre → tâche RPA
+// story (image + lien sticker propre au compte + texte) → suit → éteint (anti-coût).
+export async function postStoryToPhone(
+  bearer: string,
+  phoneId: string,
+  opts: { imageResourceUrl: string; linkUrl: string; linkText?: string },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const flowId = await ensureStoryFlowId(bearer, log)
+    if (!flowId) return { ok: false, error: 'Flow story indisponible' }
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log('📸 Lancement de la story…')
+    const paramMap = {
+      Media: [opts.imageResourceUrl],
+      Link: opts.linkUrl ?? '',
+      NameLink: opts.linkText ?? '',
+      AddtoHighlights: false, CreateHighlights: '', AddtoHighlightName: '',
+    }
+    const res = await geelarkFetch('/task/rpa/add', {
+      id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 3, name: 'Story Scaleflow', paramMap,
+    }, bearer)
+    if (Number(res['code']) !== 0) return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
+    log('   Tâche créée — story en cours…')
+    return await pollRpaTask(bearer, taskId, log, 15 * 60_000)
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
+  } finally {
+    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
   }
 }
 
