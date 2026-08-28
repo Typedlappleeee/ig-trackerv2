@@ -101,6 +101,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
 export function BlowContent({ user, org }: { user: User; org: OrgState }) {
   const { currentOrg } = org
   const [count, setCount] = useState<number | null>(null)
+  const [note, setNote] = useState(false)
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { count: c } = await scope(supabase.from('content_bank').select('id', { count: 'exact', head: true }))
@@ -109,7 +110,8 @@ export function BlowContent({ user, org }: { user: User; org: OrgState }) {
   useEffect(() => { load() }, [load])
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <Head title="Contenu auto" sub="Génère des vidéos + légendes prêtes à poster, en pilote automatique." right={<BlowBtn label="Générer" />} />
+      <Head title="Contenu auto" sub="Génère des vidéos + légendes prêtes à poster, en pilote automatique." right={<BlowBtn label="Générer" onClick={() => setNote(true)} />} />
+      {note && <Card style={{ padding: '12px 16px', marginBottom: 12 }}><span style={{ fontSize: 12, color: GOLD, lineHeight: 1.5 }}>Le moteur de génération Blowsome (vidéos + captions) arrive très bientôt — ta banque ({count ?? 0} médias) est déjà prête à l'alimenter.</span></Card>}
       <Card style={{ padding: 22, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <span style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: INK }}>{count === null ? '…' : count}</span>

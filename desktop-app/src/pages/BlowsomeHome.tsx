@@ -34,7 +34,7 @@ function Stat({ label, value, accent }: { label: string; value: ReactNode; accen
   )
 }
 
-export default function BlowsomeHome({ user, org }: { user: User; org: OrgState }) {
+export default function BlowsomeHome({ user, org, onNavigate }: { user: User; org: OrgState; onNavigate?: (p: string) => void }) {
   const { currentOrg } = org
   const firstName = (user.email?.split('@')[0] ?? 'VIP').replace(/[._]/g, ' ')
   const [phoneCount, setPhoneCount] = useState<number | null>(null)
@@ -69,8 +69,8 @@ export default function BlowsomeHome({ user, org }: { user: User; org: OrgState 
             Ton cockpit VIP — pilote tes flottes premium et retrouve toute ta banque, sans quitter Blowsome.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-            <button style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 18px', borderRadius: 11, border: 'none', cursor: 'pointer', background: GRAD, color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 12px 30px -12px rgba(168,85,247,0.8)' }}>Publier maintenant</button>
-            <button style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px', borderRadius: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.2)', color: '#D8B4FE', fontSize: 13, fontWeight: 700 }}>Ouvrir la banque</button>
+            <button onClick={() => onNavigate?.('blowContent')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 18px', borderRadius: 11, border: 'none', cursor: 'pointer', background: GRAD, color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 12px 30px -12px rgba(168,85,247,0.8)' }}>Publier maintenant</button>
+            <button onClick={() => onNavigate?.('blowParc')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px', borderRadius: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.2)', color: '#D8B4FE', fontSize: 13, fontWeight: 700 }}>Voir le parc VIP</button>
           </div>
         </div>
       </Card>

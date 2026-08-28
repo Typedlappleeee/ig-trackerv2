@@ -97,7 +97,7 @@ function AppInner({ user }: { user: User }) {
     ? (page === 'blowParc' ? <BlowParc user={user} org={org} />
       : page === 'blowContent' ? <BlowContent user={user} org={org} />
       : page === 'blowTools' ? <BlowTools />
-      : <BlowsomeHome user={user} org={org} />)
+      : <BlowsomeHome user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />)
     : page === 'hub'
     ? <Home theme={theme} infra={infra} user={user} data={data} loading={loading} reload={reload} onNavigate={setPage} />
     : (page === 'cloud' || page === 'phones')
