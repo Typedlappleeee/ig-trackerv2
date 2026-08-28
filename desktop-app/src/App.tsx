@@ -17,6 +17,7 @@ import Publish from '@/pages/Publish'
 import Warmup from '@/pages/Warmup'
 import Studio from '@/pages/Studio'
 import Insights from '@/pages/Insights'
+import Connections from '@/pages/Connections'
 import Automation from '@/pages/Automation'
 import Settings from '@/pages/Settings'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
@@ -114,6 +115,8 @@ function AppInner({ user }: { user: User }) {
         ? <Studio theme={theme} infra={infra} user={user} org={org} />
         : page === 'insights'
         ? <Insights theme={theme} infra={infra} user={user} org={org} />
+        : page === 'connections'
+        ? <Connections theme={theme} infra={infra} user={user} org={org} />
         : (page === 'flows' || page === 'automation')
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
         : page === 'settings'

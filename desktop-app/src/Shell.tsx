@@ -6,7 +6,7 @@ import { fmtNumber } from '@/lib/data'
 
 export type PageKey =
   | 'hub'
-  | 'cloud' | 'phones' | 'proxies' | 'bank' | 'activity'
+  | 'cloud' | 'phones' | 'proxies' | 'bank' | 'activity' | 'connections'
   | 'flows' | 'recipes' | 'publish' | 'automation' | 'warmup'
   | 'studio'
   | 'insights' | 'health'
@@ -51,6 +51,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       g: 'Analyse', items: [
         { k: 'insights' as PageKey, l: 'Performances', i: 'M3 3v18h18|M7 15l4-6 4 3 5-8' },
         { k: 'health' as PageKey, l: 'Santé des comptes', i: 'M12 21s-8-4.5-8-11a5 5 0 0 1 8-3 5 5 0 0 1 8 3c0 6.5-8 11-8 11z|M9 12h2l1-2 1 4 1-2h2' },
+        { k: 'connections' as PageKey, l: 'Connexions IG', i: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1' },
         // Activité n'est PAS répétée ici en GeeLark (déjà dans Pilotage) ; en Cloud elle vit ici.
         ...(cloud ? [{ k: 'activity' as PageKey, l: 'Activité', i: 'M22 12h-4l-3 9L9 3l-3 9H2' }] : []),
       ],
@@ -65,6 +66,7 @@ const TITLES: Record<PageKey, string[]> = {
   proxies: ['Pilotage', 'Proxies'],
   bank: ['Pilotage', 'Banque'],
   activity: ['Pilotage', 'Activité'],
+  connections: ['Analyse', 'Connexions IG'],
   flows: ['Diffusion', 'Automatisation'],
   recipes: ['Diffusion', 'Mes séquences'],
   publish: ['Diffusion', 'Publication'],
