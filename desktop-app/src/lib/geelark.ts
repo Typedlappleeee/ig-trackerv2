@@ -135,3 +135,60 @@ export async function warmupAccountNative(
     try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
   }
 }
+
+// ── Publication de Reels (Mass Posting) ──────────────────────────────────────
+// Héberge une vidéo chez GeeLark : /upload/getUrl → PUT des octets → resourceUrl.
+// Les templates RPA n'acceptent QUE des URL hébergées par GeeLark, pas une URL
+// externe. Les vidéos DOIVENT être uploadées en fileType 'mp4' (les templates IG/
+// TikTok/Threads refusent .mov/.webm) — voir CLAUDE.md.
+export async function geelarkUploadVideo(
+  bearer: string, fileUrl: string, log: (m: string) => void,
+): Promise<string | null> {
+  try {
+    log('⬆️ Envoi de la vidéo vers GeeLark…')
+    const res = await geelarkFetch('/upload/getUrl', { fileType: 'mp4' }, bearer)
+    if (Number(res['code']) !== 0) { log(`   ⚠ upload/getUrl : ${res['msg'] ?? res['code']}`); return null }
+    const d = res['data'] as { uploadUrl?: string; resourceUrl?: string } | undefined
+    if (!d?.uploadUrl || !d?.resourceUrl) { log('   ⚠ pas d\'URL d\'upload renvoyée'); return null }
+    const bytes = await (await fetch(fileUrl)).arrayBuffer()
+    const put = await fetch(d.uploadUrl, { method: 'PUT', body: bytes })
+    if (!put.ok) { log(`   ⚠ envoi du média : HTTP ${put.status}`); return null }
+    log('   ✅ Vidéo hébergée.')
+    return d.resourceUrl
+  } catch (e) {
+    log(`   ⚠ upload vidéo échoué : ${e instanceof Error ? e.message : String(e)}`)
+    return null
+  }
+}
+
+// Publie un Reel sur UN téléphone : démarre → tâche native instagramPubReels →
+// suit jusqu'au bout → éteint (anti-coût). `videoResourceUrl` doit être une URL
+// hébergée par GeeLark (voir geelarkUploadVideo). Best-effort, ne throw jamais.
+export async function postReelToPhone(
+  bearer: string,
+  phoneId: string,
+  videoResourceUrl: string,
+  caption: string,
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log('🎬 Création de la tâche de publication Reels…')
+    const res = await geelarkFetch('/rpa/task/instagramPubReels', {
+      id: phoneId,
+      scheduleAt: Math.floor(Date.now() / 1000) + 5,
+      description: caption ?? '',
+      video: [videoResourceUrl],
+    }, bearer)
+    if (Number(res['code']) !== 0) return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
+    log('   Tâche créée — publication en cours…')
+    return await pollRpaTask(bearer, taskId, log, 20 * 60_000)
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
+  } finally {
+    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+  }
+}

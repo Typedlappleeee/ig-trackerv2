@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Chip, Icon, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import ReelsComposer from './ReelsComposer'
 
 // Hub de publication : choix du format. Le contenu et les comptes se règlent à
 // l'étape suivante (wizards Reels/Story — branchés à la phase actions).
@@ -16,12 +18,16 @@ const FORMATS: Format[] = [
 export default function Publish({ theme, infra, user, org }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState
 }) {
+  const [mode, setMode] = useState<string | null>(null)
+
+  if (mode === 'reels') return <ReelsComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
+
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Publication" sub="Choisis un format. Les comptes et le contenu se règlent à l'étape suivante." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
         {FORMATS.map(f => (
-          <button key={f.id} disabled={!f.ready} style={{
+          <button key={f.id} disabled={!f.ready} onClick={f.id === 'reels' ? () => setMode('reels') : undefined} style={{
             display: 'flex', flexDirection: 'column', gap: 12, padding: 18, borderRadius: 10, background: '#101015',
             border: '1px solid rgba(255,255,255,0.06)', cursor: f.ready ? 'pointer' : 'not-allowed', opacity: f.ready ? 1 : 0.5,
             textAlign: 'left', transition: 'all .18s ease', boxSizing: 'border-box',
