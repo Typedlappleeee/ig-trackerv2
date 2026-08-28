@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Kpi, Panel, StatusDot } from '@/lib/ui'
+import { Btn, Empty, Icon, Kpi, Panel, StatusDot, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -76,6 +76,7 @@ export default function Phones({ theme, infra, user, org }: {
   const [filter, setFilter] = useState<'all' | 'on' | 'off' | 'risk'>('all')
   const [group, setGroup] = useState('Tous')
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const [createOpen, setCreateOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -164,7 +165,7 @@ export default function Phones({ theme, infra, user, org }: {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Btn label="Sync GeeLark" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
-          <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" />
+          <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
         </div>
       </div>
 
@@ -361,6 +362,30 @@ export default function Phones({ theme, infra, user, org }: {
             <Btn label="Tout désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
           </span>
         </div>
+      )}
+
+      {createOpen && (
+        <Modal theme={theme} title={infra === 'cloud' ? 'Créer un appareil ScaleFlow Cloud' : 'Ajouter un téléphone GeeLark'}
+          icon="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01"
+          onClose={() => setCreateOpen(false)}
+          footer={infra === 'cloud'
+            ? <Btn theme={theme} tone="quiet" label="Fermer" onClick={() => setCreateOpen(false)} />
+            : <><Btn theme={theme} tone="quiet" label="Fermer" onClick={() => setCreateOpen(false)} /><Btn theme={theme} tone="primary" label="Synchroniser" onClick={() => { setCreateOpen(false); load() }} /></>}>
+          {infra === 'cloud' ? (
+            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+              Les appareils ScaleFlow Cloud tournent sur <b>tes propres serveurs</b> auto-hébergés. Le provisionnement automatique arrive avec l'infra Cloud — pour l'instant, ajoute tes appareils côté GeeLark et bascule d'infra pour les gérer.
+            </p>
+          ) : (
+            <div style={{ fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+              <p style={{ margin: '0 0 10px' }}>Les téléphones sont créés dans ton <b>tableau de bord GeeLark</b> (cloud phones). Une fois créés :</p>
+              <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <li>Crée / loue tes cloud phones sur geelark.com</li>
+                <li>Assure-toi que ton token GeeLark est configuré (Réglages app web)</li>
+                <li>Clique <b>Synchroniser</b> ci-dessous — ils apparaîtront ici</li>
+              </ol>
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   )
