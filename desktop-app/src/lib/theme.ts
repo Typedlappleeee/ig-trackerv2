@@ -1,7 +1,7 @@
 // Thèmes portés à l'identique du prototype ScaleFlow.dc.html (_theme()).
 // Le thème suit l'infrastructure choisie : Cloud = cyan premium, GeeLark = violet.
 
-export type InfraKey = 'geelark' | 'cloud'
+export type InfraKey = 'geelark' | 'cloud' | 'blowsome'
 
 export interface Theme {
   cloud: boolean
@@ -22,6 +22,22 @@ export interface Theme {
 }
 
 export function themeFor(infra: InfraKey): Theme {
+  if (infra === 'blowsome') {
+    // Thème VIP Blowsome — mauve premium + or (design system de la sous-app web).
+    return {
+      cloud: false,
+      accent: '#A855F7', accentSoft: '#C084FC', accentText: '#D8B4FE',
+      accentBtn: '#9333EA', accentBtnEdge: '#A855F7',
+      tone: '168,85,247',
+      selBg: 'rgba(168,85,247,0.1)', selEdge: 'rgba(168,85,247,0.45)',
+      navBg: 'linear-gradient(178deg,#140E1C,#0E0A14 62%)',
+      appBg: '#0C0910',
+      panelBg: 'linear-gradient(168deg,#16101F,#120C19)',
+      panelEdge: 'rgba(216,180,254,0.12)',
+      mainWash: 'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(168,85,247,0.08), transparent 62%)',
+      rim: 'linear-gradient(180deg, transparent, rgba(233,196,106,0.4) 22%, rgba(216,180,254,0.34) 78%, transparent)',
+    }
+  }
   return infra === 'cloud'
     ? {
         cloud: true,
@@ -79,5 +95,12 @@ export const INFRAS: Record<InfraKey, Infra> = {
     icon: 'M17.5 19a4.5 4.5 0 1 0-1.2-8.8A6 6 0 0 0 5 12.5 3.5 3.5 0 0 0 6.5 19z',
     desc: 'Nos appareils · agent natif ScaleFlow',
     boot: '3,2 s', quota: 'illimité', beta: true,
+  },
+  blowsome: {
+    k: 'blowsome', name: 'Blowsome', short: 'VIP',
+    tone: '168,85,247', color: '#D8B4FE',
+    icon: 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z',
+    desc: 'Agence VIP · gestion de parc premium',
+    boot: '—', quota: 'sur mesure',
   },
 }

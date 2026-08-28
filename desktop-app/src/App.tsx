@@ -3,8 +3,10 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { themeFor, type InfraKey } from '@/lib/theme'
 import { useOrg, useHubData, firstNameFrom } from '@/lib/data'
+import { useLicense } from '@/lib/license'
 import Shell, { type PageKey } from '@/Shell'
 import Home from '@/pages/Home'
+import BlowsomeHome from '@/pages/BlowsomeHome'
 import Phones from '@/pages/Phones'
 import Bank from '@/pages/Bank'
 import Proxies from '@/pages/Proxies'
@@ -68,8 +70,15 @@ function AppInner({ user }: { user: User }) {
   const [infra, setInfra] = useState<InfraKey>('geelark')
   const [page, setPage] = useState<PageKey>('hub')
   const org = useOrg(user)
+  const license = useLicense(user, org)
   const { data, loading, reload } = useHubData(user, org, infra)
   const theme = themeFor(infra)
+
+  // Garde-fou : si l'accès Blowsome n'est pas (ou plus) accordé, on ne reste jamais
+  // sur cette infra VIP — retour GeeLark. (Même logique de porte que le web.)
+  useEffect(() => {
+    if (infra === 'blowsome' && !license.loading && !license.blowsome) setInfra('geelark')
+  }, [infra, license.loading, license.blowsome])
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -81,7 +90,9 @@ function AppInner({ user }: { user: User }) {
   const orgName = org.currentOrg?.name ?? 'Espace perso'
   const roleLabel = org.role ? org.role.charAt(0).toUpperCase() + org.role.slice(1) : ''
 
-  const content = page === 'hub'
+  const content = infra === 'blowsome'
+    ? <BlowsomeHome user={user} org={org} />
+    : page === 'hub'
     ? <Home theme={theme} infra={infra} user={user} data={data} loading={loading} reload={reload} onNavigate={setPage} />
     : (page === 'cloud' || page === 'phones')
       ? <Phones theme={theme} infra={infra} user={user} org={org} />
@@ -117,6 +128,7 @@ function AppInner({ user }: { user: User }) {
       balance={data?.balance ?? null}
       phoneCount={data?.phoneCount ?? null}
       videoCount={data?.videoCount ?? null}
+      canBlowsome={license.blowsome}
       onSignOut={signOut}
     >
       {content}

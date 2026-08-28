@@ -16,6 +16,10 @@ interface NavItem { k: PageKey; l: string; i: string; n?: number }
 interface NavSection { g: string | null; items: NavItem[] }
 
 function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number | null): NavSection[] {
+  if (infra === 'blowsome') {
+    // Nav VIP minimale : l'accueil cockpit. Les pages internes arrivent ensuite.
+    return [{ g: null, items: [{ k: 'hub', l: 'Accueil VIP', i: 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z' }] }]
+  }
   const cloud = infra === 'cloud'
   const dev: NavItem = cloud
     ? { k: 'cloud', l: 'Mes appareils', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined }
@@ -74,12 +78,12 @@ const TITLES: Record<PageKey, string[]> = {
 
 export default function Shell({
   theme, infra, setInfra, page, setPage,
-  userName, orgName, role, balance, phoneCount, videoCount, onSignOut, children,
+  userName, orgName, role, balance, phoneCount, videoCount, canBlowsome, onSignOut, children,
 }: {
   theme: Theme; infra: InfraKey; setInfra: (k: InfraKey) => void
   page: PageKey; setPage: (p: PageKey) => void
   userName: string; orgName: string; role: string; balance: number | null
-  phoneCount: number | null; videoCount: number | null
+  phoneCount: number | null; videoCount: number | null; canBlowsome: boolean
   onSignOut: () => void; children: ReactNode
 }) {
   const [navOpen, setNavOpen] = useState(true)
@@ -158,7 +162,7 @@ export default function Shell({
               background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)',
               animation: 'aIn 0.2s cubic-bezier(0.16,1,0.3,1) both',
             }}>
-              {Object.values(INFRAS).map(o => {
+              {Object.values(INFRAS).filter(o => o.k !== 'blowsome' || canBlowsome).map(o => {
                 const on = infra === o.k
                 return (
                   <button key={o.k} onClick={() => { setInfra(o.k); setInfraOpen(false); setPage('hub') }}
