@@ -11,6 +11,7 @@ import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, postReelToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
+import { generateCaption } from '@/lib/ai'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null; ig_status: string | null; last_post_at: string | null; account_state: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; duration: number | null; notes: string | null }
@@ -54,6 +55,16 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [runItems, setRunItems] = useState<RunItem[]>([])
   const [logs, setLogs] = useState<string[]>([])
   const [picker, setPicker] = useState<PickerKind | null>(null)
+  const [genning, setGenning] = useState(false)
+
+  async function genCaption() {
+    if (genning) return
+    setGenning(true)
+    const txt = await generateCaption(conns.groq, videos.find(v => vidSel.has(v.id))?.title)
+    if (txt) setCaption(txt)
+    else setCaption(c => c || 'Impossible de générer (clé Groq manquante dans les Réglages).')
+    setGenning(false)
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -267,7 +278,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       {step === 3 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 10 }}>
           <Panel theme={theme}>
-            <PanelHead title="Légende" right={<Btn theme={theme} sm tone="primary" icon="M9.9 15.5A2 2 0 0 0 8.5 14L2.4 12.5a.5.5 0 0 1 0-1L8.5 10A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0L14.1 8.5A2 2 0 0 0 15.5 9.9l6.1 1.6a.5.5 0 0 1 0 1L15.5 14a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" label="Générer par IA" />} />
+            <PanelHead title="Légende" right={<Btn theme={theme} sm tone="primary" disabled={genning} icon="M9.9 15.5A2 2 0 0 0 8.5 14L2.4 12.5a.5.5 0 0 1 0-1L8.5 10A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0L14.1 8.5A2 2 0 0 0 15.5 9.9l6.1 1.6a.5.5 0 0 1 0 1L15.5 14a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" label={genning ? 'Génération…' : 'Générer par IA'} onClick={genCaption} />} />
             <div style={{ padding: 13 }}>
               <textarea value={caption} onChange={e => setCaption(e.target.value)} placeholder="Écris une légende (facultatif)…" rows={6}
                 style={{ width: '100%', minHeight: 124, resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', color: '#D4D4D8', fontSize: 12.5, lineHeight: 1.65, fontFamily: 'inherit', outline: 'none' }} />

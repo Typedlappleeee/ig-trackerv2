@@ -164,7 +164,7 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
                         <span style={{ fontSize: 12, color: '#D4D4D8' }}>{r.why}</span>
                         <span style={{ fontSize: 11, color: '#52525B' }}>→ {r.fix}</span>
                       </span>
-                      <Btn theme={theme} sm tone="primary" label="Corriger" />
+                      <Btn theme={theme} sm tone="primary" label="Corriger" onClick={() => onNavigate?.('warmup')} />
                     </div>
                   )
                 })}

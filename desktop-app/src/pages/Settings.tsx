@@ -252,6 +252,18 @@ function OrgTab({ theme, org, balance, canManage }: {
   theme: Theme; org: OrgState; balance: number | null; canManage: boolean
 }) {
   const { currentOrg, role } = org
+  const [confirmDel, setConfirmDel] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+
+  async function deleteOrg() {
+    if (!currentOrg) return
+    setDeleting(true); setNote(null)
+    const { error } = await supabase.from('organizations').delete().eq('id', currentOrg.id)
+    setDeleting(false)
+    if (error) { setNote(`Échec : ${error.message}`); return }
+    org.switchOrg(null)
+  }
   if (!currentOrg) {
     return (
       <Panel theme={theme}>
@@ -294,11 +306,17 @@ function OrgTab({ theme, org, balance, canManage }: {
           <Panel theme={theme}>
             <PanelHead title="Zone sensible" />
             <Field label="Transférer la propriété" hint="Un autre owner reprend l’organisation">
-              <Btn label="Transférer" theme={theme} sm tone="quiet" />
+              <Btn label="Transférer" theme={theme} sm tone="quiet" onClick={() => setNote('Le transfert de propriété se fait depuis la console d’administration — change le rôle d’un membre en « owner » dans l’onglet Membres.')} />
             </Field>
             <Field label="Supprimer l’organisation" hint="Irréversible">
-              <Btn label="Supprimer" theme={theme} sm tone="danger" />
+              {confirmDel
+                ? <span style={{ display: 'flex', gap: 6 }}>
+                    <Btn label={deleting ? 'Suppression…' : 'Confirmer'} theme={theme} sm tone="danger" disabled={deleting} onClick={deleteOrg} />
+                    <Btn label="Annuler" theme={theme} sm tone="quiet" onClick={() => setConfirmDel(false)} />
+                  </span>
+                : <Btn label="Supprimer" theme={theme} sm tone="danger" onClick={() => setConfirmDel(true)} />}
             </Field>
+            {note && <div style={{ padding: '10px 16px', fontSize: 11.5, color: '#FBBF24', lineHeight: 1.5 }}>{note}</div>}
           </Panel>
         </div>
       )}
@@ -318,6 +336,48 @@ async function removeMember(id: string, reload: () => void) {
   reload()
 }
 
+// Invitation : ajoute un utilisateur EXISTANT (compte ScaleFlow) à l'org par email.
+function InviteBox({ theme, orgId, onReload }: { theme: Theme; orgId: string; onReload: () => void }) {
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
+
+  async function invite() {
+    const e = email.trim().toLowerCase()
+    if (!e) return
+    setBusy(true); setMsg(null)
+    try {
+      const { data: prof } = await supabase.from('profiles').select('id').ilike('email', e).maybeSingle()
+      if (!prof?.id) { setMsg({ ok: false, t: "Aucun compte ScaleFlow avec cet email. La personne doit d'abord créer son compte." }); setBusy(false); return }
+      const { data: existing } = await supabase.from('organization_members').select('id').eq('org_id', orgId).eq('user_id', prof.id).maybeSingle()
+      if (existing) { setMsg({ ok: false, t: 'Cette personne est déjà membre.' }); setBusy(false); return }
+      const { error } = await supabase.from('organization_members').insert({ org_id: orgId, user_id: prof.id, role: 'member' })
+      if (error) { setMsg({ ok: false, t: `Échec : ${error.message}` }); setBusy(false); return }
+      setMsg({ ok: true, t: `${e} a été ajouté comme membre.` }); setEmail(''); onReload()
+    } catch (err) { setMsg({ ok: false, t: err instanceof Error ? err.message : 'Échec.' }) }
+    setBusy(false)
+  }
+
+  return (
+    <Panel theme={theme} style={{ marginBottom: 12 }}>
+      <PanelHead title="Inviter dans l’organisation" sub="Ajoute un membre par son email de compte ScaleFlow" />
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '15px 16px', flexWrap: 'wrap' }}>
+        <span style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#71717A' }}>Adresse e-mail</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 11px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <span style={{ display: 'flex', color: '#52525B' }}><Icon d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z|M22 6l-10 7L2 6" size={13} /></span>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="prenom@agence.fr"
+              onKeyDown={e => { if (e.key === 'Enter') invite() }}
+              style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#F4F4F6', fontSize: 12 }} />
+          </span>
+        </span>
+        <Btn label={busy ? 'Ajout…' : 'Envoyer l’invitation'} theme={theme} tone="primary" disabled={busy} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={invite} />
+      </div>
+      {msg && <div style={{ padding: '0 16px 14px', fontSize: 11.5, color: msg.ok ? '#34D399' : '#FBBF24', lineHeight: 1.5 }}>{msg.t}</div>}
+    </Panel>
+  )
+}
+
 function MembersTab({ theme, org, members, canManage, currentUserId, onReload }: {
   theme: Theme; org: OrgState; members: MemberRow[] | null; canManage: boolean; currentUserId: string; onReload: () => void
 }) {
@@ -333,20 +393,8 @@ function MembersTab({ theme, org, members, canManage, currentUserId, onReload }:
   const list = members ?? []
   return (
     <>
-      {canManage && (
-        <Panel theme={theme} style={{ marginBottom: 12 }}>
-          <PanelHead title="Inviter dans l’organisation" sub="La personne reçoit un lien par e-mail" />
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '15px 16px', flexWrap: 'wrap' }}>
-            <span style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#71717A' }}>Adresse e-mail</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 11px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <span style={{ display: 'flex', color: '#52525B' }}><Icon d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z|M22 6l-10 7L2 6" size={13} /></span>
-                <span style={{ flex: 1, fontSize: 12, color: '#52525B' }}>prenom@agence.fr</span>
-              </span>
-            </span>
-            <Btn label="Envoyer l’invitation" theme={theme} tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" />
-          </div>
-        </Panel>
+      {canManage && org.currentOrg && (
+        <InviteBox theme={theme} orgId={org.currentOrg.id} onReload={onReload} />
       )}
 
       <Panel theme={theme}>
@@ -438,6 +486,7 @@ function BillingTab({ theme, org, balance, canManage }: {
 }) {
   const { currentOrg } = org
   const planLabel = currentOrg ? 'Organisation' : 'Espace personnel'
+  const [note, setNote] = useState(false)
   return (
     <>
       <div style={{
@@ -457,10 +506,15 @@ function BillingTab({ theme, org, balance, canManage }: {
         </span>
         {canManage && (
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 7 }}>
-            <Btn label="Gérer" theme={theme} sm tone="primary" />
+            <Btn label="Gérer" theme={theme} sm tone="primary" onClick={() => setNote(true)} />
           </span>
         )}
       </div>
+      {note && (
+        <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 9, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 11.5, color: '#E4E4E7', lineHeight: 1.55 }}>
+          L’achat de crédits et la gestion de l’abonnement se font sur l’espace web ScaleFlow (paiement sécurisé). Les crédits achetés sont partagés avec l’app de bureau instantanément.
+        </div>
+      )}
 
       <Panel theme={theme}>
         <PanelHead title="Solde" sub={balance === null ? undefined : `≈ ${fmtNumber(Math.floor(balance / 2))} publications restantes`} />

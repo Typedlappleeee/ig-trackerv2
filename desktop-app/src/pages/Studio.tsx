@@ -40,6 +40,7 @@ export default function Studio({ theme, infra, user, org }: {
   const [src, setSrc] = useState<Set<string>>(new Set())
   const [uploading, setUploading] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [genNote, setGenNote] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const { thumbFor } = useBankThumbs(videos)
 
@@ -168,8 +169,10 @@ export default function Studio({ theme, infra, user, org }: {
                 <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: k === 'Coût' ? '#34D399' : '#E4E4E7' }}>{v}</span>
               </div>
             ))}
-            <Btn theme={theme} tone="primary" disabled={nSrc === 0} icon="M5 3l14 9-14 9z" label={nSrc === 0 ? 'Choisis des sources' : 'Générer'} />
-            <div style={{ fontSize: 10.5, color: '#52525B', textAlign: 'center' }}>La génération serveur sera branchée prochainement.</div>
+            <Btn theme={theme} tone="primary" disabled={nSrc === 0} icon="M5 3l14 9-14 9z" label={nSrc === 0 ? 'Choisis des sources' : 'Générer'} onClick={() => setGenNote(true)} />
+            <div style={{ fontSize: 10.5, color: genNote ? '#FBBF24' : '#52525B', textAlign: 'center', lineHeight: 1.5 }}>
+              {genNote ? `${nSrc} source(s) prêtes · le moteur de génération serveur (${T.t}) arrive très bientôt — rien n'est débité en attendant.` : 'La génération serveur sera branchée prochainement.'}
+            </div>
           </div>
         </Panel>
       </div>
