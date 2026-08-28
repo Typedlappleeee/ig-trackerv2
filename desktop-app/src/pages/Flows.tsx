@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PageHead } from '@/lib/ui'
+import { Btn, Chip, Icon, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import Automation from './Automation'
 
-// Catalogue des automatisations (fidèle à _autoFlows()/_flows() du ZIP).
 interface Flow { k: string; t: string; d: string; p: string; n: number; tone: string; reco?: boolean; beta?: boolean; ok: boolean; i: string }
 const FLOWS: Flow[] = [
   { k: 'reels', t: 'Publier un Reel', d: "Ouvre l'app, sélectionne la vidéo, écrit la légende et publie.", p: 'Instagram', n: 12, tone: '6,182,212', reco: true, ok: true, i: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
@@ -22,9 +21,7 @@ const FLOWS: Flow[] = [
 ]
 
 const LS_FAVS = 'sf-flow-favs'
-function readFavs(): string[] {
-  try { const v = JSON.parse(localStorage.getItem(LS_FAVS) ?? ''); return Array.isArray(v) ? v : ['reels'] } catch { return ['reels'] }
-}
+function readFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(LS_FAVS) ?? ''); return Array.isArray(v) ? v : ['reels'] } catch { return ['reels'] } }
 const PLATFORMS = ['Tous', 'Instagram', 'TikTok', 'Threads']
 type Tab = 'catalog' | 'sched'
 
@@ -41,47 +38,87 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
     try { localStorage.setItem(LS_FAVS, JSON.stringify(next)) } catch { /* ignore */ }
     return next
   })
+  const ql = q.trim().toLowerCase()
+  const match = (f: Flow) => (plat === 'Tous' || f.p === plat) && (!ql || f.t.toLowerCase().includes(ql) || f.d.toLowerCase().includes(ql))
 
   const reco = FLOWS.filter(f => f.reco)
-  const ql = q.trim().toLowerCase()
-  const grid = useMemo(() => FLOWS.filter(f => !f.reco
-    && (plat === 'Tous' || f.p === plat)
-    && (!ql || f.t.toLowerCase().includes(ql) || f.d.toLowerCase().includes(ql))
-  ), [plat, ql])
+  const rest = FLOWS.filter(f => !f.reco).filter(match)
+  const favList = rest.filter(f => favs.includes(f.k))
+  const others = rest.filter(f => !favs.includes(f.k))
 
   const seg = (on: boolean): CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 14px', border: 'none', borderRadius: 6, cursor: 'pointer',
-    background: on ? `rgba(${theme.tone},0.16)` : 'transparent', color: on ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 700, transition: 'all .14s ease',
+    background: on ? `rgba(${theme.tone},0.16)` : 'transparent', color: on ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 700,
   })
 
   const Star = ({ k, big }: { k: string; big?: boolean }) => {
     const on = favs.includes(k)
     return (
       <button onClick={e => { e.stopPropagation(); toggleFav(k) }} title={on ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', width: big ? 26 : 24, height: big ? 26 : 24, borderRadius: 6, cursor: 'pointer', flexShrink: 0, border: 'none',
-        background: on ? 'rgba(245,158,11,0.13)' : 'transparent', color: on ? '#FBBF24' : '#3F3F46', transition: 'all .16s ease',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', width: big ? 26 : 22, height: big ? 26 : 22, borderRadius: 6, cursor: 'pointer', flexShrink: 0, border: 'none',
+        background: on ? 'rgba(245,158,11,0.13)' : 'transparent', color: on ? '#FBBF24' : '#3F3F46',
       }}>
-        <svg viewBox="0 0 24 24" width={big ? 14 : 13} height={big ? 14 : 13} fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" />
-        </svg>
+        <svg viewBox="0 0 24 24" width={big ? 14 : 13} height={big ? 14 : 13} fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
       </button>
     )
   }
-  const IconBtn = ({ d, title, on, onClick }: { d: string; title: string; on?: boolean; onClick?: () => void }) => (
-    <button onClick={onClick} title={title} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', color: '#71717A' }}
-      onMouseEnter={e => { e.currentTarget.style.color = '#E4E4E7'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)' }}
-      onMouseLeave={e => { e.currentTarget.style.color = '#71717A'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)' }}>
-      <Icon d={d} size={13} />
-    </button>
+  const IconBtn = ({ d, title, onClick, disabled }: { d: string; title: string; onClick?: (e: any) => void; disabled?: boolean }) => (
+    <button onClick={onClick} title={title} disabled={disabled} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', color: '#71717A', opacity: disabled ? 0.4 : 1 }}><Icon d={d} size={13} /></button>
+  )
+
+  // Carte de flux, deux tailles (fidèle au ZIP : big = ligne, small = colonne).
+  const card = (f: Flow, big?: boolean): ReactNode => (
+    <div key={f.k} onClick={() => f.ok && onLaunch?.(f.k)} style={{
+      position: 'relative', display: 'flex', flexDirection: big ? 'row' : 'column', alignItems: big ? 'center' : 'stretch', gap: big ? 15 : 11,
+      padding: big ? 17 : 15, borderRadius: 10, cursor: f.ok ? 'pointer' : 'default',
+      background: big ? `linear-gradient(120deg, rgba(${f.tone},0.09), ${theme.cloud ? 'rgba(14,22,27,0.9)' : 'rgba(16,16,21,0.9)'})` : theme.panelBg,
+      border: '1px solid ' + (big ? `rgba(${f.tone},0.3)` : f.ok ? theme.panelEdge : 'rgba(245,158,11,0.18)'),
+      transition: 'all .16s ease', boxSizing: 'border-box',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = `rgba(${f.tone},0.5)`; e.currentTarget.style.transform = 'translateY(-1px)' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = big ? `rgba(${f.tone},0.3)` : f.ok ? theme.panelEdge : 'rgba(245,158,11,0.18)'; e.currentTarget.style.transform = 'none' }}>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: big ? 40 : 30, height: big ? 40 : 30, borderRadius: big ? 11 : 8, flexShrink: 0, background: `rgba(${f.tone},0.14)`, border: `1px solid rgba(${f.tone},0.26)`, color: `rgb(${f.tone})` }}><Icon d={f.i} size={big ? 18 : 15} /></span>
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: big ? 4 : 7 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: big ? 14.5 : 13, fontWeight: 700, color: '#F4F4F6' }}>{f.t}</span>
+          {f.beta && <Chip text="Beta" tone="warn" />}
+        </span>
+        <span style={{ fontSize: big ? 12 : 11.5, lineHeight: 1.55, color: '#71717A' }}>{f.d}</span>
+        {!big && <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', paddingTop: 9, borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 10.5, fontWeight: 700, color: '#52525B' }}>{f.p}<span style={{ opacity: 0.4 }}>·</span>{f.n} étapes</span>}
+      </span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+        {big && <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, marginRight: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{f.p}</span>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#3F3F46' }}>{f.n} étapes</span>
+        </span>}
+        <Star k={f.k} big={big} />
+        <IconBtn d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" title="Programmer" onClick={(e) => { e.stopPropagation() }} disabled={!f.ok} />
+        {big
+          ? <Btn theme={theme} sm tone="primary" icon="M5 3l14 9-14 9z" label="Lancer" disabled={!f.ok} onClick={() => onLaunch?.(f.k)} />
+          : <IconBtn d="M5 3l14 9-14 9z" title="Lancer" onClick={(e) => { e.stopPropagation(); if (f.ok) onLaunch?.(f.k) }} disabled={!f.ok} />}
+      </span>
+    </div>
+  )
+
+  const section = (label: string, items: Flow[], hint?: string): ReactNode => items.length === 0 ? null : (
+    <div key={label} style={{ marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
+        {label === 'Recommandés' && <span style={{ color: '#FBBF24', display: 'flex', alignSelf: 'center' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={13} /></span>}
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: label === 'Recommandés' ? '#FBBF24' : '#52525B' }}>{label}</span>
+        {hint && <span style={{ fontSize: 11, color: '#3F3F46' }}>{hint}</span>}
+        <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#3F3F46' }}>{items.length}</span>
+      </div>
+      {label === 'Recommandés'
+        ? <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{items.map(f => card(f, true))}</div>
+        : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(272px,1fr))', gap: 10 }}>{items.map(f => card(f))}</div>}
+    </div>
   )
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead title="Automatisation"
-        sub="Flux exécutés par ton agent, en natif. Marque tes favoris, lance à la demande ou programme-les."
+      <PageHead title="Automatisation" sub="Flux exécutés par ton agent, en natif. Marque tes favoris, lance à la demande ou programme-les."
         actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Créer un flux" />} />
 
-      {/* Onglets Catalogue / Planifié */}
       <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, marginBottom: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
         {([['catalog', 'Catalogue', FLOWS.length], ['sched', 'Planifié', 3]] as [Tab, string, number][]).map(([k, l, n]) => (
           <button key={k} onClick={() => setTab(k)} style={seg(tab === k)}>{l}<span style={{ opacity: 0.55, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{n}</span></button>
@@ -92,35 +129,9 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
         <Automation theme={theme} infra={infra} user={user} org={org} embedded />
       ) : (
         <>
-          {/* Recommandés */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 10px' }}>
-            <span style={{ color: '#FBBF24', display: 'flex' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={14} /></span>
-            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#FBBF24' }}>Recommandés</span>
-            <span style={{ fontSize: 11.5, color: '#52525B' }}>les deux flux que 90 % des agences utilisent</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
-            {reco.map(f => (
-              <Panel key={f.k} theme={theme} style={{ border: `1px solid rgba(${f.tone},0.28)` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 16px' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: `rgba(${f.tone},0.12)`, border: `1px solid rgba(${f.tone},0.26)`, color: `rgb(${f.tone})` }}><Icon d={f.i} size={17} /></span>
-                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#F4F4F6' }}>{f.t}</span>
-                    <span style={{ fontSize: 12, lineHeight: 1.5, color: '#71717A' }}>{f.d}</span>
-                  </span>
-                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0, marginRight: 4 }}>
-                    <span style={{ fontSize: 11.5, color: '#A1A1AA' }}>{f.p}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#52525B' }}>{f.n} étapes</span>
-                  </span>
-                  <Star k={f.k} big />
-                  <IconBtn d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" title="Programmer" />
-                  <Btn theme={theme} sm tone="primary" icon="M5 3l14 9-14 9z" label="Lancer" onClick={() => onLaunch?.(f.k)} />
-                </div>
-              </Panel>
-            ))}
-          </div>
+          {section('Recommandés', reco, 'les deux flux que 90 % des agences utilisent')}
 
-          {/* Recherche + filtres plateforme */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 11px', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, background: 'rgba(255,255,255,0.02)', minWidth: 220 }}>
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#52525B" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.35-4.35" /></svg>
               <input value={q} onChange={e => setQ(e.target.value)} placeholder="Chercher un flux…" style={{ flex: 1, border: 'none', background: 'transparent', color: '#E4E4E7', fontSize: 12, outline: 'none' }} />
@@ -130,39 +141,9 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0 10px' }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#3F3F46' }}>Tous les flux</span>
-            <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#3F3F46' }}>{grid.length}</span>
-          </div>
-
-          {/* Grille */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 10 }}>
-            {grid.map(f => (
-              <Panel key={f.k} theme={theme} style={{ opacity: f.ok ? 1 : 0.6 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '15px 15px 0' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: `rgba(${f.tone},0.12)`, border: `1px solid rgba(${f.tone},0.26)`, color: `rgb(${f.tone})` }}><Icon d={f.i} size={16} /></span>
-                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6' }}>{f.t}</span>
-                      {f.beta && <Chip text="Bientôt" tone="mute" />}
-                    </span>
-                    <span style={{ fontSize: 11.5, lineHeight: 1.5, color: '#71717A' }}>{f.d}</span>
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 15px' }}>
-                  <span style={{ fontSize: 11, color: '#A1A1AA' }}>{f.p}</span>
-                  <span style={{ color: '#3F3F46' }}>·</span>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#52525B' }}>{f.n} étapes</span>
-                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 5 }}>
-                    <Star k={f.k} />
-                    <IconBtn d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" title="Programmer" />
-                    <IconBtn d="M5 3l14 9-14 9z" title="Lancer" onClick={() => f.ok && onLaunch?.(f.k)} />
-                  </span>
-                </div>
-              </Panel>
-            ))}
-            {grid.length === 0 && <div style={{ gridColumn: '1/-1', padding: '40px 15px', textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun flux ne correspond.</div>}
-          </div>
+          {section('Favoris', favList)}
+          {section('Tous les flux', others)}
+          {favList.length === 0 && others.length === 0 && <div style={{ padding: '40px 15px', textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun flux ne correspond.</div>}
         </>
       )}
     </div>
