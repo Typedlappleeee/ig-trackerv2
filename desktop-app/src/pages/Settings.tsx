@@ -167,7 +167,7 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
           {tab === 'account' && <AccountTab theme={theme} user={user} displayName={displayName} onSignOut={onSignOut}
             nameInput={nameInput} setNameInput={setNameInput} savingName={savingName} saveName={saveName} notice={notice} onNavigate={onNavigate} />}
           {tab === 'org' && <OrgTab theme={theme} org={org} balance={balance} canManage={canManage} />}
-          {tab === 'members' && <MembersTab theme={theme} org={org} members={members} canManage={canManage} currentUserId={user.id} />}
+          {tab === 'members' && <MembersTab theme={theme} org={org} members={members} canManage={canManage} currentUserId={user.id} onReload={loadMembers} />}
           {tab === 'billing' && <BillingTab theme={theme} org={org} balance={balance} canManage={canManage} />}
           {tab === 'infra' && <InfraTab theme={theme} />}
           {tab === 'notif' && <NotifTab theme={theme} email={user.email ?? null} />}
@@ -307,8 +307,19 @@ function OrgTab({ theme, org, balance, canManage }: {
 }
 
 // ══════════ MEMBRES & RÔLES ══════════
-function MembersTab({ theme, org, members, canManage, currentUserId }: {
-  theme: Theme; org: OrgState; members: MemberRow[] | null; canManage: boolean; currentUserId: string
+async function cycleMemberRole(id: string, cur: OrgRole, reload: () => void) {
+  const order: OrgRole[] = ['admin', 'member', 'viewer']
+  const next = order[(order.indexOf(cur) + 1) % order.length]
+  await supabase.from('organization_members').update({ role: next }).eq('id', id)
+  reload()
+}
+async function removeMember(id: string, reload: () => void) {
+  await supabase.from('organization_members').delete().eq('id', id)
+  reload()
+}
+
+function MembersTab({ theme, org, members, canManage, currentUserId, onReload }: {
+  theme: Theme; org: OrgState; members: MemberRow[] | null; canManage: boolean; currentUserId: string; onReload: () => void
 }) {
   if (!org.currentOrg) {
     return (
@@ -374,8 +385,8 @@ function MembersTab({ theme, org, members, canManage, currentUserId }: {
                       <span style={{ fontSize: 11, color: '#3F3F46' }}>c’est toi</span>
                     ) : canManage && m.role !== 'owner' ? (
                       <>
-                        <Btn label="Changer le rôle" theme={theme} sm tone="quiet" icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
-                        <Btn label="Retirer" theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" />
+                        <Btn label="Changer le rôle" theme={theme} sm tone="quiet" icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" onClick={() => cycleMemberRole(m.id, m.role, onReload)} />
+                        <Btn label="Retirer" theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => removeMember(m.id, onReload)} />
                       </>
                     ) : null}
                   </span>
