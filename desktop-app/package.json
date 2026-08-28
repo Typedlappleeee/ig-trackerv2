@@ -15,6 +15,8 @@
     "dist": "vite build && electron-builder"
   },
   "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^31.3.1",
     "electron-builder": "^24.13.3",
@@ -24,11 +26,30 @@
   "build": {
     "appId": "com.scaleflow.desktop",
     "productName": "ScaleFlow",
-    "directories": { "output": "release" },
-    "files": ["dist/**/*", "electron/**/*"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
     "icon": "build/icon.png",
     "publish": null,
-    "win": { "target": ["nsis"], "icon": "build/icon.png", "artifactName": "ScaleFlow-Setup-${version}.${ext}" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "ScaleFlow-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }

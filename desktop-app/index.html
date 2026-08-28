@@ -1,6 +1,39 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8">
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>ScaleFlow</title>
-<style>html,body{margin:0;height:100%;background:#07060B}</style>
-<script>location.replace('./login.dc.html')</script>
-</head><body></body></html>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  html,body{margin:0;padding:0;background:#0B0B0F;height:100%;overflow:hidden;}
+  body{font-family:'Manrope',system-ui,sans-serif;color:#F4F4F6;-webkit-font-smoothing:antialiased;}
+  #root{height:100%;}
+  button,input{font-family:inherit;}
+  ::selection{background:rgba(139,92,246,0.35);}
+  *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.14) transparent;}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.11);border-radius:99px;border:3px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2);border:3px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-track{background:transparent}
+  @keyframes aIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes aPulse{0%,100%{opacity:1}50%{opacity:.32}}
+  @keyframes aSpin{to{transform:rotate(360deg)}}
+  @keyframes aBeat{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+  @keyframes aPop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+  [data-rows]>*{animation:aIn .34s cubic-bezier(0.16,1,0.3,1) both}
+  [data-rows]>*:nth-child(1){animation-delay:.01s}[data-rows]>*:nth-child(2){animation-delay:.03s}
+  [data-rows]>*:nth-child(3){animation-delay:.05s}[data-rows]>*:nth-child(4){animation-delay:.07s}
+  [data-rows]>*:nth-child(5){animation-delay:.09s}[data-rows]>*:nth-child(6){animation-delay:.11s}
+  [data-rows]>*:nth-child(7){animation-delay:.13s}[data-rows]>*:nth-child(8){animation-delay:.15s}
+  [data-rows]>*:nth-child(n+9){animation-delay:.17s}
+  @media (prefers-reduced-motion: reduce){[data-rows]>*{animation:none}}
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>
