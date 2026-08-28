@@ -66,6 +66,13 @@ export default function Proxies({ theme, infra, user, org }: {
   const [adding, setAdding] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
+  // Le test réel d'un SOCKS5/HTTP ne peut pas se faire depuis le navigateur (pas de
+  // routage per-requête). Il s'effectue côté serveur au moment de la rotation d'IP,
+  // avant chaque boot de téléphone. On l'explique honnêtement plutôt que simuler.
+  function testInfo() {
+    setNotice("Le test de connectivité d'un proxy s'effectue automatiquement côté serveur au moment de l'assignation (rotation d'IP avant chaque boot). Assure-toi juste du format host:port — SOCKS5 recommandé.")
+  }
+
   async function doDelete(id: string) {
     await supabase.from('cloud_proxies').delete().eq('id', id)
     setRows(r => r.filter(x => x.id !== id))
@@ -147,7 +154,7 @@ export default function Proxies({ theme, infra, user, org }: {
         title="Proxies"
         sub="SOCKS5 recommandé. Crée des groupes, teste les IP — l'assignation se fait ensuite depuis les réglages de l'appareil."
         actions={<>
-          <Btn theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label="Vérifier" />
+          <Btn theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label="Vérifier" onClick={testInfo} />
           <Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Ajouter" onClick={() => setAddOpen(true)} />
         </>}
       />
@@ -176,8 +183,8 @@ export default function Proxies({ theme, infra, user, org }: {
             sub={sel.size ? `${sel.size} sur ${rows.length} sélectionnés` : 'Coche des lignes pour tester en lot'}
             right={<>
               <Btn theme={theme} sm tone="primary" disabled={!sel.size} icon="M2 12h4l3 8 4-16 3 8h6"
-                label={sel.size ? `Tester la sélection · ${sel.size}` : 'Tester la sélection'} />
-              <Btn theme={theme} sm tone="quiet" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label="Tout tester" />
+                label={sel.size ? `Tester la sélection · ${sel.size}` : 'Tester la sélection'} onClick={testInfo} />
+              <Btn theme={theme} sm tone="quiet" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label="Tout tester" onClick={testInfo} />
             </>}
           />
 
@@ -235,7 +242,7 @@ export default function Proxies({ theme, infra, user, org }: {
                     }}>libre</span>
                   </span>
                   <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 3 }}>
-                    <Btn theme={theme} sm tone="quiet" label="Tester" />
+                    <Btn theme={theme} sm tone="quiet" label="Tester" onClick={testInfo} />
                     <Btn theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" label="Supprimer" onClick={() => doDelete(r.id)} />
                   </span>
                 </div>
