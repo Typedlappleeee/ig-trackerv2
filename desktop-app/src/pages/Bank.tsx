@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -20,6 +20,7 @@ interface ContentItem {
   used_count: number | null     // nb de publications
   notes: string | null
   tags: string[] | null
+  description?: string | null   // légende propre au média (pré-remplit le post)
   created_at: string
 }
 
@@ -72,8 +73,8 @@ function TileCheck({ on }: { on: boolean }) {
 
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
-function Tile({ item, type, thumb, media, on, theme, onToggle }: {
-  item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: () => void
+function Tile({ item, type, thumb, media, on, theme, onToggle, onDragStart }: {
+  item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: () => void; onDragStart?: (e: React.DragEvent) => void
 }) {
   const h = hueFor(item.id)
   const fresh = (item.used_count ?? 0) === 0
@@ -85,9 +86,12 @@ function Tile({ item, type, thumb, media, on, theme, onToggle }: {
   return (
     <button
       onClick={onToggle}
+      draggable
+      onDragStart={onDragStart}
+      title="Glisse vers un dossier pour ranger"
       style={{
         position: 'relative', aspectRatio: type === 'image' ? '4 / 5' : '9 / 16', borderRadius: 9, padding: 0,
-        cursor: 'pointer', overflow: 'hidden', transition: 'all .14s ease',
+        cursor: 'grab', overflow: 'hidden', transition: 'all .14s ease',
         border: `1.5px solid ${on ? theme.accentBtnEdge : 'rgba(255,255,255,0.07)'}`,
         background: `linear-gradient(160deg, rgba(${h},0.17), rgba(${h},0.035))`,
       }}
@@ -215,6 +219,66 @@ export default function Bank({ theme, infra, user, org }: {
     ]
   }, [typed, folderNames])
 
+  // ── Import RÉEL (upload → bucket content → insert content_bank) ──────────────
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState<string | null>(null)
+  const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
+  const IMG = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
+
+  async function importFiles(files: FileList | File[]) {
+    const list = Array.from(files)
+    if (list.length === 0) return
+    let done = 0
+    for (const file of list) {
+      setUploading(`${file.name} (${++done}/${list.length})`)
+      try {
+        let ext = (file.name.split('.').pop() ?? '').toLowerCase()
+        if (!ext) ext = file.type.startsWith('image') ? 'jpg' : 'mp4'
+        const id = crypto.randomUUID()
+        const storagePath = `videos/${scopeFolder}/${id}.${ext}`
+        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
+        if (up.error) { setNotice(`Échec upload ${file.name} : ${up.error.message}`); continue }
+        const dest = (folder !== 'Tous' && folder !== 'Jamais publiées') ? folder : null
+        await supabase.from('content_bank').insert({
+          user_id: user.id, org_id: currentOrg?.id ?? null,
+          title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: null,
+          file_url: null, folder: dest, duration: null, tags: [], notes: null, used_count: 0,
+        })
+      } catch (e) { setNotice(`Échec ${file.name} : ${e instanceof Error ? e.message : ''}`) }
+    }
+    setUploading(null)
+    setNotice(`${list.length} fichier(s) importé(s).`)
+    load()
+  }
+
+  // ── Glisser-déposer un média (ou la sélection) dans un dossier ───────────────
+  const [dragOver, setDragOver] = useState<string | null>(null)
+  async function dropOnFolder(target: string, draggedId: string) {
+    const dest = (target === 'Tous' || target === 'Jamais publiées') ? null : target
+    if (dest === null) return
+    const ids = sel.has(draggedId) ? [...sel] : [draggedId]
+    const { error: err } = await supabase.from('content_bank').update({ folder: dest }).in('id', ids)
+    setNotice(err ? `Échec : ${err.message}` : `${ids.length} média(s) déplacé(s) vers « ${dest} ».`)
+    if (!err) { setSel(new Set()); load() }
+  }
+
+  // ── Description (légende propre au média, pré-remplit le post) ────────────────
+  const [descItem, setDescItem] = useState<ContentItem | null>(null)
+  const [descVal, setDescVal] = useState('')
+  const [savingDesc, setSavingDesc] = useState(false)
+  function openDesc() {
+    const one = items.find(i => sel.has(i.id)); if (!one) return
+    setDescItem(one); setDescVal((one as any).description ?? '')
+  }
+  async function saveDesc() {
+    if (!descItem) return
+    setSavingDesc(true)
+    const { error: err } = await supabase.from('content_bank').update({ description: descVal }).eq('id', descItem.id)
+    setSavingDesc(false)
+    setNotice(err ? `Échec : ${err.message}` : 'Description enregistrée.')
+    if (!err) { setDescItem(null); load() }
+  }
+
   // ── Déplacer (réel) + Remixer (renvoi) ──────────────────────────────────────
   const [moveOpen, setMoveOpen] = useState(false)
   const [moving, setMoving] = useState(false)
@@ -312,7 +376,7 @@ export default function Bank({ theme, infra, user, org }: {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Btn label="Sync Drive" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
-          <Btn label="Importer" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" />
+          <Btn label={uploading ? uploading : "Importer"} theme={theme} tone="primary" icon="M12 5v14|M5 12h14" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
         </div>
       </div>
 
@@ -336,14 +400,17 @@ export default function Bank({ theme, infra, user, org }: {
                 <button
                   key={f.n}
                   onClick={() => setFolder(f.n)}
+                  onDragOver={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setDragOver(f.n) } }}
+                  onDragLeave={() => setDragOver(d => d === f.n ? null : d)}
+                  onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDragOver(null); if (id) dropOnFolder(f.n, id) }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 13px',
                     border: 'none', cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
-                    borderLeft: `2px solid ${on ? theme.accentBtnEdge : 'transparent'}`,
-                    background: on ? `rgba(${theme.tone},0.07)` : 'transparent', transition: 'all .14s ease',
+                    borderLeft: `2px solid ${dragOver === f.n ? theme.accent : on ? theme.accentBtnEdge : 'transparent'}`,
+                    background: dragOver === f.n ? `rgba(${theme.tone},0.16)` : on ? `rgba(${theme.tone},0.07)` : 'transparent', transition: 'all .14s ease',
                   }}
                   onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.025)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = on ? `rgba(${theme.tone},0.07)` : 'transparent' }}
+                  onMouseLeave={e => { if (dragOver !== f.n) e.currentTarget.style.background = on ? `rgba(${theme.tone},0.07)` : 'transparent' }}
                 >
                   <span style={{ display: 'flex', color: f.special ? '#34D399' : on ? theme.accentSoft : '#52525B' }}>
                     <Icon d={f.special ? 'M12 2v20|M2 12h20' : 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z'} size={13} />
@@ -417,7 +484,7 @@ export default function Bank({ theme, infra, user, org }: {
               icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
               title="Importe tes vidéos"
               text="Ta banque est vide. Importe des vidéos et des images pour les réutiliser dans tes posts et tes stories."
-              action={<Btn label="Importer" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" />}
+              action={<Btn label={uploading ? uploading : "Importer"} theme={theme} tone="primary" icon="M12 5v14|M5 12h14" disabled={!!uploading} onClick={() => fileRef.current?.click()} />}
             />
           ) : shown.length === 0 ? (
             <Empty
@@ -435,6 +502,7 @@ export default function Bank({ theme, infra, user, org }: {
                 <Tile
                   key={i.id} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={() => toggle(i.id)}
+                  onDragStart={e => e.dataTransfer.setData('text/plain', i.id)}
                 />
               ))}
             </div>
@@ -457,6 +525,7 @@ export default function Bank({ theme, infra, user, org }: {
           </span>
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" />
+          {sel.size === 1 && <Btn label="Description" theme={theme} sm icon="M4 7V4h16v3|M9 20h6|M12 4v16" onClick={openDesc} />}
           <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => setNotice('Remix : ouvre le Studio vidéo (Production) pour générer des variantes de tes vidéos.')} />
           <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setMoveOpen(true)} />
           <span style={{ marginLeft: 'auto' }}>
@@ -486,6 +555,24 @@ export default function Bank({ theme, infra, user, org }: {
               <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="Nouveau dossier…" style={{ flex: 1, height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Input fichier caché (import réel) */}
+      <input ref={fileRef} type="file" accept="video/*,image/*" multiple style={{ display: 'none' }}
+        onChange={e => { if (e.target.files) importFiles(e.target.files); e.target.value = '' }} />
+
+      {/* Description (légende du média pour le posting) */}
+      {descItem && (
+        <Modal theme={theme} title="Description du média" sub={descItem.title} icon="M4 7V4h16v3|M9 20h6|M12 4v16"
+          onClose={() => setDescItem(null)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setDescItem(null)} />
+            <Btn theme={theme} tone="primary" label={savingDesc ? 'Enregistrement…' : 'Enregistrer'} disabled={savingDesc} onClick={saveDesc} />
+          </>}>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#71717A', lineHeight: 1.5 }}>Cette description pré-remplira la légende quand tu publieras ce média.</p>
+          <textarea value={descVal} onChange={e => setDescVal(e.target.value)} rows={6} placeholder="Écris la légende / description…"
+            style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
         </Modal>
       )}
     </div>
