@@ -5,7 +5,12 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Chip, Icon, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs } from '@/lib/data'
-import BankPicker from '@/components/BankPicker'
+import BankPicker, { type PickerResult } from '@/components/BankPicker'
+import { useConnections } from '@/lib/connections'
+import {
+  resolveSourceBytes, saveOutputToBank,
+  runSpoof, runRemixVariant, runMontage, runOverlay, runCaption, runSubtitles,
+} from '@/lib/studioTools'
 
 // Studio vidéo : hub des outils (gratuits) + wizard par outil (fidèle à _studio()).
 // La génération n'est pas encore branchée (outils serveur) — le wizard prépare tout.
@@ -18,15 +23,6 @@ const TOOLS: Tool[] = [
   { k: 'spoof', t: 'Spoof', d: "Anti-empreinte : réécrit device, GPS, EXIF et micro-varie l'image. Rend chaque vidéo unique pour l'algo.", tone: '167,139,250', tag: 'anti-détection', i: 'M12 22s8-4.5 8-11a8 8 0 1 0-16 0c0 6.5 8 11 8 11z|M9 12l2 2 4-4' },
   { k: 'subs', t: 'Sous-titres', d: 'Sous-titres automatiques (Groq Whisper), incrustés mot par mot.', tone: '6,182,212', tag: 'Whisper', i: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z|M7 9h10|M7 13h6' },
 ]
-const SETTINGS: Record<string, [string, string][]> = {
-  overlay: [['Photo à incruster', 'à choisir'], ['Position', 'Libre (glisser)'], ['Taille', 'Ajustable'], ['Durée', 'Toute la vidéo'], ['Rendu', 'Serveur']],
-  montage: [['Découpe', 'Début / fin'], ['Ordre des clips', 'Manuel'], ['Transition', 'Coupe franche'], ['Rendu', 'Serveur']],
-  mixer: [['Légende / hook', 'POV : tu découvres ça'], ['Position', 'Haut'], ['Fond', 'Noir'], ['Rendu', 'Serveur']],
-  remix: [['Luminosité', '±6 %'], ['Contraste', '±4 %'], ['Zoom', '±3 %'], ['Vitesse', '0,95–1,05×'], ['Recadrage', '±2 %']],
-  spoof: [['Device', 'iPhone 15 Pro'], ['GPS', '34.05, -118.2'], ['EXIF', 'nettoyé'], ['Empreinte fichier', 'unique'], ['Piste audio', '±1 %']],
-  subs: [['Langue', 'Auto'], ['Position', 'Centre'], ['Style du mot fort', 'Fond plein'], ['Taille', '32 px']],
-}
-
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
 const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
@@ -39,14 +35,29 @@ export default function Studio({ theme, infra, user, org }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState
 }) {
   const { currentOrg } = org
+  const conns = useConnections(user, org)
   const [tool, setTool] = useState<string | null>(null)
   const [videos, setVideos] = useState<Video[]>([])
   const [src, setSrc] = useState<Set<string>>(new Set())
   const [uploading, setUploading] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [genNote, setGenNote] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const { thumbFor } = useBankThumbs(videos)
+
+  // ── Paramètres par outil ──
+  const [copies, setCopies] = useState(3)          // spoof / remix : nb de variantes/source
+  const [caption, setCaption] = useState('')       // mixer
+  const [capPos, setCapPos] = useState<'top' | 'center' | 'bottom'>('bottom')
+  const [trimStart, setTrimStart] = useState(0)    // montage
+  const [trimEnd, setTrimEnd] = useState('')       // montage (vide = jusqu'à la fin)
+  const [overlayImg, setOverlayImg] = useState<{ storage_path: string | null; file_url: string | null; title: string } | null>(null)
+  const [imgPicker, setImgPicker] = useState(false)
+
+  // ── État d'exécution ──
+  const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [logs, setLogs] = useState<string[]>([])
+  const [results, setResults] = useState<{ title: string; url: string }[]>([])
 
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
@@ -82,6 +93,70 @@ export default function Studio({ theme, infra, user, org }: {
     await load()
   }
 
+  const push = (m: string) => setLogs(l => [...l.slice(-200), m])
+
+  // Résout la photo d'incrustation (pour l'outil overlay).
+  async function overlayBytes(): Promise<{ data: Uint8Array; ext: string } | null> {
+    if (!overlayImg) return null
+    const ext = ((overlayImg.storage_path ?? overlayImg.file_url ?? 'png').split('.').pop() ?? 'png').toLowerCase()
+    const data = await resolveSourceBytes(overlayImg)
+    return { data, ext }
+  }
+
+  // ── Lancement du traitement réel (ffmpeg.wasm) ──
+  async function generate() {
+    if (running) return
+    const chosen = videos.filter(v => src.has(v.id) && isVid(v))
+    if (chosen.length === 0) { push('⚠ Sélectionne au moins une vidéo source.'); return }
+    if (tool === 'overlay' && !overlayImg) { push('⚠ Choisis d’abord une photo à incruster.'); return }
+    if (tool === 'mixer' && !caption.trim()) { push('⚠ Écris une légende à incruster.'); return }
+    if (tool === 'subs' && !conns.groq) { push('⚠ Clé Groq manquante (Réglages) pour la transcription.'); return }
+
+    setRunning(true); setLogs([]); setResults([]); setProgress(0)
+    const hooks = { onProgress: setProgress, onLog: (_m: string) => {} }
+    const ov = tool === 'overlay' ? await overlayBytes() : null
+    try {
+      for (const v of chosen) {
+        push(`— ${v.title} —`)
+        setProgress(0)
+        const bytes = await resolveSourceBytes(v)
+        const outs: { title: string; data: Uint8Array }[] = []
+        if (tool === 'spoof' || tool === 'remix') {
+          const n = Math.max(1, Math.min(24, copies))
+          for (let i = 0; i < n; i++) {
+            push(`  · variante ${i + 1}/${n}…`)
+            const seed = Math.random() * 1000
+            const data = tool === 'spoof' ? await runSpoof(bytes, seed, hooks) : await runRemixVariant(bytes, seed, hooks)
+            outs.push({ title: `${v.title} · ${tool} ${i + 1}`, data })
+          }
+        } else if (tool === 'montage') {
+          push('  · découpe…')
+          const end = trimEnd.trim() ? Number(trimEnd) : null
+          outs.push({ title: `${v.title} · montage`, data: await runMontage(bytes, trimStart, isFinite(end as number) ? end : null, hooks) })
+        } else if (tool === 'overlay' && ov) {
+          push('  · incrustation…')
+          outs.push({ title: `${v.title} · incrust`, data: await runOverlay(bytes, ov.data, ov.ext, { x: '(main_w-overlay_w)/2', y: '(main_h-overlay_h)/2', scale: 0.4, from: 0, to: null }, hooks) })
+        } else if (tool === 'mixer') {
+          push('  · légende…')
+          outs.push({ title: `${v.title} · mixer`, data: await runCaption(bytes, caption, capPos, hooks) })
+        } else if (tool === 'subs') {
+          outs.push({ title: `${v.title} · sous-titres`, data: await runSubtitles(bytes, conns.groq, { onProgress: setProgress, onLog: push }) })
+        }
+        // Sauvegarde banque + lien de téléchargement.
+        for (const o of outs) {
+          await saveOutputToBank(user.id, currentOrg?.id ?? null, o.data, o.title)
+          const url = URL.createObjectURL(new Blob([o.data as BlobPart], { type: 'video/mp4' }))
+          setResults(r => [...r, { title: o.title, url }])
+        }
+      }
+      push('✔ Terminé — sorties enregistrées dans la banque.')
+      load()
+    } catch (e) {
+      push(`❌ ${e instanceof Error ? e.message : 'Échec du traitement'}`)
+    }
+    setRunning(false); setProgress(0)
+  }
+
   // ── Hub ──
   if (!tool) {
     return (
@@ -89,7 +164,7 @@ export default function Studio({ theme, infra, user, org }: {
         <PageHead title="Studio vidéo" sub="Une vidéo source, tous tes outils VIP — incrustation, montage, mixer, remix, spoof, sous-titres. Tout est gratuit, aucun crédit consommé." />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
           {TOOLS.map(t => (
-            <button key={t.k} onClick={() => { setTool(t.k); setSrc(new Set()) }} style={{
+            <button key={t.k} onClick={() => { setTool(t.k); setSrc(new Set()); setResults([]); setLogs([]); setOverlayImg(null) }} style={{
               display: 'flex', flexDirection: 'column', gap: 12, padding: 18, borderRadius: 10, background: '#101015', textAlign: 'left',
               border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', transition: 'all .18s ease', boxSizing: 'border-box',
             }}
@@ -112,9 +187,10 @@ export default function Studio({ theme, infra, user, org }: {
 
   // ── Wizard d'un outil ──
   const T = TOOLS.find(x => x.k === tool)!
-  const settings = SETTINGS[tool] ?? []
   const nSrc = src.size
-  const output = tool === 'remix' ? `${nSrc * 24} variantes` : `${nSrc} fichier${nSrc > 1 ? 's' : ''}`
+  const per = (tool === 'spoof' || tool === 'remix') ? copies : 1
+  const output = `${nSrc * per} fichier${nSrc * per > 1 ? 's' : ''}`
+  const numInp: React.CSSProperties = { width: 80, height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none', textAlign: 'right' }
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
@@ -153,30 +229,86 @@ export default function Studio({ theme, infra, user, org }: {
           </Panel>
           <Panel theme={theme}>
             <PanelHead title="Réglages" />
-            {settings.map(([k, v], i) => (
-              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 15px', borderBottom: i < settings.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none' }}>
-                <span style={{ flex: 1, fontSize: 12, color: '#A1A1AA' }}>{k}</span>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 700, color: `rgb(${T.tone})` }}>{v}</span>
-              </div>
-            ))}
+            <div style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {(tool === 'spoof' || tool === 'remix') && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Variantes par vidéo</span>
+                  <input type="number" min={1} max={24} value={copies} onChange={e => setCopies(Number(e.target.value))} style={numInp} />
+                </label>
+              )}
+              {tool === 'montage' && (
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Début (s)</span>
+                    <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(Number(e.target.value))} style={numInp} />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Fin (s, vide = fin)</span>
+                    <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={numInp} />
+                  </label>
+                </>
+              )}
+              {tool === 'mixer' && (
+                <>
+                  <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={2} placeholder="Ta légende à incruster…"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit' }} />
+                  <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    {(['top', 'center', 'bottom'] as const).map(p => (
+                      <button key={p} onClick={() => setCapPos(p)} style={{ flex: 1, height: 30, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capPos === p ? theme.accentBtn : 'transparent', color: capPos === p ? '#fff' : '#A1A1AA' }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {tool === 'overlay' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <Btn theme={theme} sm tone="primary" icon="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" label={overlayImg ? 'Changer la photo' : 'Choisir une photo'} onClick={() => setImgPicker(true)} />
+                  {overlayImg && <Chip text={overlayImg.title} tone="violet" />}
+                  <span style={{ width: '100%', fontSize: 11, color: '#52525B' }}>La photo est incrustée au centre (40 % de la largeur). Positionnement fin à venir.</span>
+                </div>
+              )}
+              {tool === 'subs' && (
+                <span style={{ fontSize: 12, color: conns.groq ? '#A1A1AA' : '#FBBF24', lineHeight: 1.55 }}>
+                  {conns.groq ? 'Transcription automatique via Groq Whisper, puis incrustation mot-groupe par mot-groupe. Langue auto.' : 'Aucune clé Groq détectée — configure-la dans les Réglages de l’app pour activer les sous-titres.'}
+                </span>
+              )}
+            </div>
           </Panel>
         </div>
 
         <Panel theme={theme}>
           <PanelHead title="Sortie" />
           <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 11 }}>
-            <div style={{ aspectRatio: '9 / 15', borderRadius: 9, background: `linear-gradient(160deg, rgba(${T.tone},0.15), rgba(${T.tone},0.03))`, border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 26, fontWeight: 700, color: `rgb(${T.tone})`, letterSpacing: '-0.03em' }}>{tool === 'remix' ? '×24' : T.tag}</span>
-            </div>
             {([['Vidéos sources', String(nSrc)], ['Sortie', output], ['Coût', 'Gratuit']] as [string, string][]).map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                 <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: k === 'Coût' ? '#34D399' : '#E4E4E7' }}>{v}</span>
               </div>
             ))}
-            <Btn theme={theme} tone="primary" disabled={nSrc === 0} icon="M5 3l14 9-14 9z" label={nSrc === 0 ? 'Choisis des sources' : 'Générer'} onClick={() => setGenNote(true)} />
-            <div style={{ fontSize: 10.5, color: genNote ? '#FBBF24' : '#52525B', textAlign: 'center', lineHeight: 1.5 }}>
-              {genNote ? `${nSrc} source(s) prêtes · le moteur de génération serveur (${T.t}) arrive très bientôt — rien n'est débité en attendant.` : 'La génération serveur sera branchée prochainement.'}
-            </div>
+
+            {running && (
+              <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: theme.accentBtn, transition: 'width .2s ease' }} />
+              </div>
+            )}
+
+            <Btn theme={theme} tone="primary" disabled={nSrc === 0 || running} icon="M5 3l14 9-14 9z"
+              label={running ? `Traitement… ${Math.round(progress * 100)}%` : nSrc === 0 ? 'Choisis des sources' : 'Générer'} onClick={generate} />
+            <div style={{ fontSize: 10.5, color: '#52525B', textAlign: 'center', lineHeight: 1.5 }}>Traitement local (ffmpeg) — le premier lancement charge le moteur (~30 Mo).</div>
+
+            {logs.length > 0 && (
+              <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', maxHeight: 140, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>
+            )}
+
+            {results.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#34D399' }}>{results.length} sortie(s) · enregistrées dans la banque</span>
+                {results.map((r, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                    <a href={r.url} download={`${r.title}.mp4`} style={{ fontSize: 11, fontWeight: 700, color: theme.accentText, textDecoration: 'none' }}>Télécharger</a>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </Panel>
       </div>
@@ -185,6 +317,18 @@ export default function Studio({ theme, infra, user, org }: {
         <BankPicker theme={theme} user={user} org={org} kind="videos" multi initialIds={[...src]}
           title="Choisir des vidéos sources" onClose={() => setPickerOpen(false)}
           onApply={r => { if (r.kind === 'videos') setSrc(new Set(r.ids)) }} />
+      )}
+
+      {imgPicker && (
+        <BankPicker theme={theme} user={user} org={org} kind="images" multi={false}
+          title="Choisir une photo à incruster" onClose={() => setImgPicker(false)}
+          onApply={(r: PickerResult) => {
+            if (r.kind !== 'images' || r.ids.length === 0) return
+            const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+            scope(supabase.from('content_bank').select('title,storage_path,file_url')).in('id', [r.ids[0]]).then(({ data }: any) => {
+              const v = (data ?? [])[0]; if (v) setOverlayImg(v)
+            })
+          }} />
       )}
     </div>
   )
