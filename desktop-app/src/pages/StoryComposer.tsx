@@ -130,18 +130,24 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     const imgOrder = imgMode === 'random' ? shuffle(usableImgs) : usableImgs
     const sts = stickerTexts.map(s => s.trim()).filter(Boolean)
 
-    let i = 0
-    for (const p of targets) {
-      if (R.isCancelled()) { push('⏹ Annulé.'); break }
-      const img = imgOrder[i % imgOrder.length]
-      const st = sts.length === 0 ? 'Voir plus' : stMode === 'random' ? sts[Math.floor(Math.random() * sts.length)] : sts[i % sts.length]
-      i++
+    // Sans proxy rotatif → tous les comptes en parallèle ; avec → en série.
+    const jobs = targets.map((p, k) => ({
+      p, img: imgOrder[k % imgOrder.length],
+      st: sts.length === 0 ? 'Voir plus' : stMode === 'random' ? sts[Math.floor(Math.random() * sts.length)] : sts[k % sts.length],
+    }))
+    const concurrency = rot ? 1 : jobs.length
+    push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${jobs.length} compte(s) en parallèle.`)
+    const postOne = async ({ p, img, st }: (typeof jobs)[number]) => {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— @${p.ig_username ?? p.geelark_id} · ${img.title} —`)
       const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl: resByImg.get(img.id)!, linkUrl: links[p.id], linkText: st, rotationUrls: rot }, push)
       if (!r.ok) run.markFailed()
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
+    }
+    for (let b = 0; b < jobs.length; b += concurrency) {
+      if (R.isCancelled()) { push('⏹ Annulé.'); break }
+      await Promise.all(jobs.slice(b, b + concurrency).map(postOne))
     }
     R.finish()
     const { refunded } = await run.settle()

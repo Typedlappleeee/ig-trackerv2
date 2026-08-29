@@ -87,10 +87,11 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     const resourceUrl = await geelarkUploadVideo(bearer, url, push)
     if (!resourceUrl) { push('❌ Envoi vidéo échoué.'); run.abort(); await run.settle(); setRunning(false); return }
     const R = startRun('cross', `${targets.length} compte × ${platList.length} plateforme${platList.length > 1 ? 's' : ''}`, targets.length * platList.length)
-    for (const p of targets) {
-      if (R.isCancelled()) { push('⏹ Annulé.'); break }
+    const concurrency = rot ? 1 : targets.length   // sans proxy rotatif → comptes en parallèle
+    push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${targets.length} compte(s) en parallèle.`)
+    const doPhone = async (p: typeof targets[number]) => {
       for (const pl of platList) {
-        if (R.isCancelled()) break
+        if (R.isCancelled()) return
         const key = `${p.id}:${pl}`
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: 'running' } : it))
         push(`— ${phoneLabel(p)} · ${pl} —`)
@@ -99,6 +100,10 @@ export default function CrossComposer({ theme, user, org, onBack }: {
         R.tick(r.ok)
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
       }
+    }
+    for (let b = 0; b < targets.length; b += concurrency) {
+      if (R.isCancelled()) { push('⏹ Annulé.'); break }
+      await Promise.all(targets.slice(b, b + concurrency).map(doPhone))
     }
     R.finish()
     const { refunded } = await run.settle()

@@ -163,22 +163,31 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     if (resourceByVid.size === 0) { push('❌ Aucune vidéo hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
 
     // 3) Poste : chaque téléphone reçoit SA vidéo assignée.
+    //    Sans proxy rotatif → tous les téléphones EN PARALLÈLE (rapide).
+    //    Avec proxy rotatif → en série (1 IP à la fois, l'IP change avant chaque tel).
     const usedVidIds = new Set<string>()
-    let i = 0
-    for (const p of targets) {
-      if (R.isCancelled()) { push('⏹ Annulé — arrêt après le compte en cours.'); break }
-      const v = assignment[i]
-      const cap = caps.length === 0 ? '' : capMode === 'random' ? caps[Math.floor(Math.random() * caps.length)] : caps[i % caps.length]
-      i++
+    const jobs = targets.map((p, k) => ({
+      p, v: assignment[k],
+      cap: caps.length === 0 ? '' : capMode === 'random' ? caps[Math.floor(Math.random() * caps.length)] : caps[k % caps.length],
+    }))
+    const concurrency = rot ? 1 : jobs.length
+    push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${jobs.length} téléphone(s) en parallèle.`)
+
+    const postOne = async ({ p, v, cap }: (typeof jobs)[number]) => {
       const ru = resourceByVid.get(v.id)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
-      if (!ru) { run.markFailed(); R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); continue }
+      if (!ru) { run.markFailed(); R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
       usedVidIds.add(v.id)
       push(`— @${p.ig_username ?? p.geelark_id} · ${v.title}${cap ? ' · légende' : ''} —`)
       const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial)
       if (!r.ok) run.markFailed()
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
+    }
+
+    for (let b = 0; b < jobs.length; b += concurrency) {
+      if (R.isCancelled()) { push('⏹ Annulé.'); break }
+      await Promise.all(jobs.slice(b, b + concurrency).map(postOne))
     }
     R.finish()
     setRunId(null)
