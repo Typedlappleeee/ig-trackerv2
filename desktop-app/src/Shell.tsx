@@ -64,8 +64,9 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       // données (GeeLark vs ScaleFlow Cloud), scopées par la présence de geelark_id.
       g: 'Analyse', items: [
         { k: 'insights' as PageKey, l: 'Performances', i: 'M3 3v18h18|M7 15l4-6 4 3 5-8' },
-        { k: 'health' as PageKey, l: 'Santé des comptes', i: 'M12 21s-8-4.5-8-11a5 5 0 0 1 8-3 5 5 0 0 1 8 3c0 6.5-8 11-8 11z|M9 12h2l1-2 1 4 1-2h2' },
-        // Connexions IG est introduite en bannière en haut de Performances/Santé (pas un onglet dédié).
+        // « Santé des comptes » retirée : score heuristique (pas de vraie donnée santé)
+        // → il signalait des comptes « bannis » sur des appareils sans compte réel.
+        // Les vraies stats passent par Performances (données Meta officielles).
         // Activité n'est PAS répétée ici en GeeLark (déjà dans Pilotage) ; en Cloud elle vit ici.
         ...(cloud ? [{ k: 'activity' as PageKey, l: 'Activité', i: 'M22 12h-4l-3 9L9 3l-3 9H2' }] : []),
       ],

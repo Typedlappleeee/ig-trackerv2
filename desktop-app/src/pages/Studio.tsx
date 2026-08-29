@@ -51,7 +51,8 @@ export default function Studio({ theme, infra, user, org }: {
   const [capPos, setCapPos] = useState<'top' | 'center' | 'bottom'>('bottom')
   const [trimStart, setTrimStart] = useState(0)    // montage
   const [trimEnd, setTrimEnd] = useState('')       // montage (vide = jusqu'à la fin)
-  const [overlayImg, setOverlayImg] = useState<{ storage_path: string | null; file_url: string | null; title: string } | null>(null)
+  const [overlayImgs, setOverlayImgs] = useState<{ id: string; storage_path: string | null; file_url: string | null; title: string }[]>([])
+  const [ovMode, setOvMode] = useState<'seq' | 'random'>('seq')
   const [imgPicker, setImgPicker] = useState(false)
 
   // ── État d'exécution ──
@@ -96,12 +97,14 @@ export default function Studio({ theme, infra, user, org }: {
 
   const push = (m: string) => setLogs(l => [...l.slice(-200), m])
 
-  // Résout la photo d'incrustation (pour l'outil overlay).
-  async function overlayBytes(): Promise<{ data: Uint8Array; ext: string } | null> {
-    if (!overlayImg) return null
-    const ext = ((overlayImg.storage_path ?? overlayImg.file_url ?? 'png').split('.').pop() ?? 'png').toLowerCase()
-    const data = await resolveSourceBytes(overlayImg)
-    return { data, ext }
+  // Résout toutes les photos d'incrustation (pool) en octets.
+  async function overlayAll(): Promise<{ data: Uint8Array; ext: string }[]> {
+    const out: { data: Uint8Array; ext: string }[] = []
+    for (const im of overlayImgs) {
+      const ext = ((im.storage_path ?? im.file_url ?? 'png').split('.').pop() ?? 'png').toLowerCase()
+      out.push({ data: await resolveSourceBytes(im), ext })
+    }
+    return out
   }
 
   // ── Lancement du traitement réel (ffmpeg.wasm) ──
@@ -109,7 +112,7 @@ export default function Studio({ theme, infra, user, org }: {
     if (running) return
     const chosen = videos.filter(v => src.has(v.id) && isVid(v))
     if (chosen.length === 0) { push('⚠ Sélectionne au moins une vidéo source.'); return }
-    if (tool === 'overlay' && !overlayImg) { push('⚠ Choisis d’abord une photo à incruster.'); return }
+    if (tool === 'overlay' && overlayImgs.length === 0) { push('⚠ Choisis d’abord une ou des photos à incruster.'); return }
     if (tool === 'mixer' && !caption.trim()) { push('⚠ Écris une légende à incruster.'); return }
     if (tool === 'subs' && !conns.groq) { push('⚠ Clé Groq manquante (Réglages) pour la transcription.'); return }
 
@@ -117,7 +120,8 @@ export default function Studio({ theme, infra, user, org }: {
     const hooks = { onProgress: setProgress, onLog: (_m: string) => {} }
     try {
       if (!isFfmpegReady()) { push('⏳ Chargement du moteur vidéo (~30 Mo, une seule fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
-      const ov = tool === 'overlay' ? await overlayBytes() : null
+      const ovs = tool === 'overlay' ? await overlayAll() : []
+      let vIdx = 0
       for (const v of chosen) {
         push(`— ${v.title} —`)
         setProgress(0)
@@ -135,7 +139,8 @@ export default function Studio({ theme, infra, user, org }: {
           push('  · découpe…')
           const end = trimEnd.trim() ? Number(trimEnd) : null
           outs.push({ title: `${v.title} · montage`, data: await runMontage(bytes, trimStart, isFinite(end as number) ? end : null, hooks) })
-        } else if (tool === 'overlay' && ov) {
+        } else if (tool === 'overlay' && ovs.length > 0) {
+          const ov = ovMode === 'random' ? ovs[Math.floor(Math.random() * ovs.length)] : ovs[vIdx % ovs.length]
           push('  · incrustation…')
           outs.push({ title: `${v.title} · incrust`, data: await runOverlay(bytes, ov.data, ov.ext, { widthPx: 420, from: 0, to: null }, hooks) })
         } else if (tool === 'mixer') {
@@ -150,6 +155,7 @@ export default function Studio({ theme, infra, user, org }: {
           const url = URL.createObjectURL(new Blob([o.data as BlobPart], { type: 'video/mp4' }))
           setResults(r => [...r, { title: o.title, url }])
         }
+        vIdx++
       }
       push('✔ Terminé — sorties enregistrées dans la banque.')
       load()
@@ -166,7 +172,7 @@ export default function Studio({ theme, infra, user, org }: {
         <PageHead title="Studio vidéo" sub="Une vidéo source, tous tes outils VIP — incrustation, montage, mixer, remix, spoof, sous-titres. Tout est gratuit, aucun crédit consommé." />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
           {TOOLS.map(t => (
-            <button key={t.k} onClick={() => { setTool(t.k); setSrc(new Set()); setResults([]); setLogs([]); setOverlayImg(null) }} style={{
+            <button key={t.k} onClick={() => { setTool(t.k); setSrc(new Set()); setResults([]); setLogs([]); setOverlayImgs([]) }} style={{
               display: 'flex', flexDirection: 'column', gap: 12, padding: 18, borderRadius: 10, background: '#101015', textAlign: 'left',
               border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', transition: 'all .18s ease', boxSizing: 'border-box',
             }}
@@ -262,10 +268,17 @@ export default function Studio({ theme, infra, user, org }: {
                 </>
               )}
               {tool === 'overlay' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <Btn theme={theme} sm tone="primary" icon="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" label={overlayImg ? 'Changer la photo' : 'Choisir une photo'} onClick={() => setImgPicker(true)} />
-                  {overlayImg && <Chip text={overlayImg.title} tone="violet" />}
-                  <span style={{ width: '100%', fontSize: 11, color: '#52525B' }}>La photo est incrustée au centre (40 % de la largeur). Positionnement fin à venir.</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <Btn theme={theme} sm tone="primary" icon="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" label={overlayImgs.length ? `${overlayImgs.length} photo(s)` : 'Choisir des photos'} onClick={() => setImgPicker(true)} />
+                  {overlayImgs.map(im => <Chip key={im.id} text={im.title} tone="violet" />)}
+                  {overlayImgs.length > 1 && (
+                    <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', marginLeft: 'auto' }}>
+                      {(['seq', 'random'] as const).map(mm => (
+                        <button key={mm} onClick={() => setOvMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: ovMode === mm ? theme.accentBtn : 'transparent', color: ovMode === mm ? '#fff' : '#71717A' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                      ))}
+                    </span>
+                  )}
+                  <span style={{ width: '100%', fontSize: 11, color: '#52525B' }}>Photo incrustée au centre. Plusieurs photos → réparties entre les vidéos (séquentiel/aléatoire).</span>
                 </div>
               )}
               {tool === 'subs' && (
@@ -322,13 +335,13 @@ export default function Studio({ theme, infra, user, org }: {
       )}
 
       {imgPicker && (
-        <BankPicker theme={theme} user={user} org={org} kind="images" multi={false}
-          title="Choisir une photo à incruster" onClose={() => setImgPicker(false)}
+        <BankPicker theme={theme} user={user} org={org} kind="images" multi initialIds={overlayImgs.map(i => i.id)}
+          title="Choisir des photos à incruster" onClose={() => setImgPicker(false)}
           onApply={(r: PickerResult) => {
-            if (r.kind !== 'images' || r.ids.length === 0) return
+            if (r.kind !== 'images' || r.ids.length === 0) { setOverlayImgs([]); return }
             const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-            scope(supabase.from('content_bank').select('title,storage_path,file_url')).in('id', [r.ids[0]]).then(({ data }: any) => {
-              const v = (data ?? [])[0]; if (v) setOverlayImg(v)
+            scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', r.ids).then(({ data }: any) => {
+              setOverlayImgs((data ?? []) as any[])
             })
           }} />
       )}
