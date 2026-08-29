@@ -43,25 +43,28 @@ export interface RunOpts {
 }
 
 // Exécute une commande ffmpeg sur l'entrée et renvoie le fichier de sortie (Uint8Array).
+// exec() renvoie le code de sortie (0 = ok) — on lève une erreur avec les derniers
+// logs ffmpeg si ça échoue, pour un diagnostic clair à l'écran.
 export async function runFfmpeg(o: RunOpts): Promise<Uint8Array> {
   const ff = await getFFmpeg()
   const inName = o.inputName ?? 'input.mp4'
   const outName = o.outName ?? 'output.mp4'
   progressCb = o.onProgress ?? null
-  const logHandler = o.onLog ? ({ message }: { message: string }) => o.onLog!(message) : null
-  if (logHandler) ff.on('log', logHandler)
+  const ring: string[] = []
+  const logHandler = ({ message }: { message: string }) => { ring.push(message); if (ring.length > 60) ring.shift(); o.onLog?.(message) }
+  ff.on('log', logHandler)
   try {
     await ff.writeFile(inName, await toU8(o.input))
     for (const ex of o.extra ?? []) await ff.writeFile(ex.name, await toU8(ex.data))
-    await ff.exec(['-i', inName, ...o.args, outName])
+    const code = await ff.exec(['-i', inName, ...o.args, outName])
+    if (code !== 0) throw new Error(`ffmpeg (code ${code})\n${ring.slice(-10).join('\n')}`)
     const data = await ff.readFile(outName)
     const u8 = data instanceof Uint8Array ? data : new TextEncoder().encode(String(data))
-    // Nettoyage FS (best-effort).
     try { await ff.deleteFile(inName); await ff.deleteFile(outName); for (const ex of o.extra ?? []) await ff.deleteFile(ex.name) } catch { /* noop */ }
     return u8
   } finally {
     progressCb = null
-    if (logHandler) ff.off('log', logHandler)
+    ff.off('log', logHandler)
   }
 }
 

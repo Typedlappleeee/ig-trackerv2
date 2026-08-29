@@ -32,27 +32,27 @@ export async function saveOutputToBank(userId: string, orgId: string | null, byt
   return storagePath
 }
 
-const H264 = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart']
+// Encodage h264/aac rapide (wasm). '-c:a aac' est ignoré s'il n'y a pas d'audio.
+const H264 = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart']
+// Garantit des dimensions paires (libx264 yuv420p l'exige).
+const EVEN = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
 
 type Hooks = { onProgress?: (r: number) => void; onLog?: (m: string) => void }
 
 // ── Spoof : micro-variations + nettoyage métadonnées → unique pour l'algo ──────
+// Pas de changement de vitesse (éviterait un désync A/V sur vidéos sans piste audio).
 export function spoofFilter(seed: number): string {
-  const rnd = (min: number, max: number) => min + ((Math.sin(seed * 999.1) + 1) / 2) * (max - min)
-  const b = (rnd(-0.04, 0.04)).toFixed(3)
-  const c = (rnd(0.97, 1.04)).toFixed(3)
-  const s = (rnd(0.97, 1.05)).toFixed(3)
-  const z = (rnd(1.02, 1.05)).toFixed(3)
-  return `eq=brightness=${b}:contrast=${c}:saturation=${s},scale=iw*${z}:ih*${z},crop=iw/${z}:ih/${z}`
+  const rnd = (mul: number, min: number, max: number) => min + ((Math.sin(seed * mul) + 1) / 2) * (max - min)
+  const b = rnd(999.1, -0.04, 0.04).toFixed(3)
+  const c = rnd(733.3, 0.97, 1.04).toFixed(3)
+  const s = rnd(431.7, 0.97, 1.05).toFixed(3)
+  const z = rnd(197.5, 1.02, 1.05).toFixed(3)
+  return `eq=brightness=${b}:contrast=${c}:saturation=${s},scale=iw*${z}:ih*${z},crop=iw/${z}:ih/${z},${EVEN}`
 }
 export async function runSpoof(input: Uint8Array, seed: number, h?: Hooks): Promise<Uint8Array> {
-  const speed = (0.97 + ((Math.sin(seed * 13.7) + 1) / 2) * 0.06).toFixed(3)
   return runFfmpeg({
-    input, args: [
-      '-vf', `${spoofFilter(seed)},setpts=${(1 / Number(speed)).toFixed(4)}*PTS`,
-      '-filter:a', `atempo=${speed}`,
-      '-map_metadata', '-1', ...H264,
-    ], onProgress: h?.onProgress, onLog: h?.onLog,
+    input, args: ['-vf', spoofFilter(seed), '-map_metadata', '-1', ...H264],
+    onProgress: h?.onProgress, onLog: h?.onLog,
   })
 }
 
@@ -69,10 +69,10 @@ export async function runMontage(input: Uint8Array, start: number, end: number |
   return runFfmpeg({ input, args, onProgress: h?.onProgress, onLog: h?.onLog })
 }
 
-// ── Incrustation photo : overlay d'une image sur la vidéo (position/taille/durée) ─
-export async function runOverlay(input: Uint8Array, image: Uint8Array, imageExt: string, opts: { x: string; y: string; scale: number; from: number; to: number | null }, h?: Hooks): Promise<Uint8Array> {
+// ── Incrustation photo : overlay d'une image (largeur fixe) centrée sur la vidéo ─
+export async function runOverlay(input: Uint8Array, image: Uint8Array, imageExt: string, opts: { widthPx: number; from: number; to: number | null }, h?: Hooks): Promise<Uint8Array> {
   const enable = opts.to != null ? `:enable='between(t,${opts.from},${opts.to})'` : (opts.from > 0 ? `:enable='gte(t,${opts.from})'` : '')
-  const filter = `[1:v]scale=iw*${opts.scale}:-1[ov];[0:v][ov]overlay=${opts.x}:${opts.y}${enable}[v]`
+  const filter = `[1:v]scale=${Math.round(opts.widthPx)}:-1[ov];[0:v][ov]overlay=(W-w)/2:(H-h)/2${enable},${EVEN}[v]`
   return runFfmpeg({
     input, inputName: 'in.mp4',
     extra: [{ name: `ov.${imageExt}`, data: image }],
@@ -81,11 +81,11 @@ export async function runOverlay(input: Uint8Array, image: Uint8Array, imageExt:
   })
 }
 
-// ── Mixer : incruste une légende (texte) rendue en PNG (canvas) sur la vidéo ───
+// ── Mixer : incruste une légende (PNG canvas 1080px) sur la vidéo ──────────────
 export async function runCaption(input: Uint8Array, text: string, pos: 'top' | 'center' | 'bottom', h?: Hooks): Promise<Uint8Array> {
   const png = await textToPng(text, 1080)
-  const y = pos === 'top' ? 'H*0.08' : pos === 'center' ? '(H-h)/2' : 'H*0.82'
-  const filter = `[1:v]scale=W*0.9:-1[t];[0:v][t]overlay=(W-w)/2:${y}[v]`.replace(/W/g, 'main_w').replace(/H/g, 'main_h')
+  const y = pos === 'top' ? 'H*0.06' : pos === 'center' ? '(H-h)/2' : 'H-h-H*0.06'
+  const filter = `[0:v][1:v]overlay=(W-w)/2:${y},${EVEN}[v]`
   return runFfmpeg({
     input, inputName: 'in.mp4',
     extra: [{ name: 'cap.png', data: png }],
@@ -102,24 +102,22 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
   const segments = await transcribeGroq(groqKey, new Blob([audio as BlobPart], { type: 'audio/mpeg' }))
   if (segments.length === 0) throw new Error('Transcription vide')
   h?.onLog?.(`🖊 ${segments.length} segments — incrustation…`)
-  // Un PNG par segment, overlay activé entre ses timecodes.
+  // Un PNG (1080px) par segment, overlay activé entre ses timecodes. Chaîne d'overlays.
   const extra: { name: string; data: Uint8Array }[] = []
-  const overlays: string[] = []
-  let chain = '[0:v]'
+  let chain = ''
+  let cursor = '[0:v]'
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]
-    const png = await textToPng(seg.text, 1080, true)
-    const name = `s${i}.png`
-    extra.push({ name, data: png })
-    overlays.push(`[${i + 1}:v]scale=main_w*0.9:-1[t${i}]`)
-    chain += `[t${i}]overlay=(main_w-overlay_w)/2:main_h*0.8:enable='between(t,${seg.start.toFixed(2)},${seg.end.toFixed(2)})'`
-    chain += (i < segments.length - 1) ? `[v${i}];[v${i}]` : '[v]'
+    extra.push({ name: `s${i}.png`, data: await textToPng(seg.text, 1080, true) })
+    const out = i === segments.length - 1 ? '[vv]' : `[v${i}]`
+    chain += `${cursor}[${i + 1}:v]overlay=(W-w)/2:H-h-H*0.08:enable='between(t,${seg.start.toFixed(2)},${seg.end.toFixed(2)})'${out};`
+    cursor = `[v${i}]`
   }
+  chain += `[vv]${EVEN}[v]`
   const inputs = extra.flatMap(e => ['-i', e.name])
-  const filter = overlays.join(';') + ';' + chain
   return runFfmpeg({
     input, inputName: 'in.mp4', extra,
-    args: [...inputs, '-filter_complex', filter, '-map', '[v]', '-map', '0:a?', ...H264],
+    args: [...inputs, '-filter_complex', chain, '-map', '[v]', '-map', '0:a?', ...H264],
     onProgress: h?.onProgress, onLog: h?.onLog,
   })
 }

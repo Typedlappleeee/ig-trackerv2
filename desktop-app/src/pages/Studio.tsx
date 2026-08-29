@@ -135,7 +135,7 @@ export default function Studio({ theme, infra, user, org }: {
           outs.push({ title: `${v.title} · montage`, data: await runMontage(bytes, trimStart, isFinite(end as number) ? end : null, hooks) })
         } else if (tool === 'overlay' && ov) {
           push('  · incrustation…')
-          outs.push({ title: `${v.title} · incrust`, data: await runOverlay(bytes, ov.data, ov.ext, { x: '(main_w-overlay_w)/2', y: '(main_h-overlay_h)/2', scale: 0.4, from: 0, to: null }, hooks) })
+          outs.push({ title: `${v.title} · incrust`, data: await runOverlay(bytes, ov.data, ov.ext, { widthPx: 420, from: 0, to: null }, hooks) })
         } else if (tool === 'mixer') {
           push('  · légende…')
           outs.push({ title: `${v.title} · mixer`, data: await runCaption(bytes, caption, capPos, hooks) })
