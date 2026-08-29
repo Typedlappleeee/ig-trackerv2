@@ -42,7 +42,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
       const { data } = await scope(supabase.from('caption_bank').select('id,title,content')).order('created_at', { ascending: false })
       setCaps((data ?? []) as Cap[])
     } else {
-      const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,thumbnail_path,notes')).order('created_at', { ascending: false })
+      const { data } = await scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false })
       const all = ((data ?? []) as Media[]).filter(m => !(SENTINELS.includes(m.notes ?? '') && !m.storage_path && !m.file_url))
       const typed = kind === 'images' ? all.filter(isImg) : all.filter(m => !isImg(m))
       setMedia(typed.length > 0 ? typed : all)

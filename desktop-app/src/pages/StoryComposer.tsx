@@ -51,7 +51,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, mRes] = await Promise.all([
       scope(supabase.from('phones').select('id,ig_username,phone_name,status,group_name,geelark_id')).not('geelark_id', 'is', null).order('phone_name'),
-      scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,thumbnail_path,notes')).order('created_at', { ascending: false }),
+      scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }),
     ])
     const ph = (phRes.data ?? []) as Phone[]
     setPhones(ph)

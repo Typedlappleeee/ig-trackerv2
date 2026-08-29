@@ -45,7 +45,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, vRes] = await Promise.all([
       scope(supabase.from('phones').select('id,ig_username,phone_name,status,geelark_id')).not('geelark_id', 'is', null).order('phone_name'),
-      scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,thumbnail_path,notes')).order('created_at', { ascending: false }),
+      scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }),
     ])
     setPhones((phRes.data ?? []) as Phone[])
     setVideos(((vRes.data ?? []) as Video[]).filter(v => !(SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url)))

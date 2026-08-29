@@ -46,7 +46,7 @@ export default function Studio({ theme, infra, user, org }: {
 
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_url,thumbnail_path,notes')).order('created_at', { ascending: false })
+    const { data } = await scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false })
     setVideos(((data ?? []) as Video[]).filter(v => !(SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url)))
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
