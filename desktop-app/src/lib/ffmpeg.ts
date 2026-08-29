@@ -54,8 +54,10 @@ export async function runFfmpeg(o: RunOpts): Promise<Uint8Array> {
   const logHandler = ({ message }: { message: string }) => { ring.push(message); if (ring.length > 60) ring.shift(); o.onLog?.(message) }
   ff.on('log', logHandler)
   try {
-    await ff.writeFile(inName, await toU8(o.input))
-    for (const ex of o.extra ?? []) await ff.writeFile(ex.name, await toU8(ex.data))
+    // .slice() = copie : writeFile TRANSFERE (détache) le buffer passé. Sans copie,
+    // réutiliser la même source (ex. N variantes de spoof) planterait sur "ArrayBuffer detached".
+    await ff.writeFile(inName, (await toU8(o.input)).slice())
+    for (const ex of o.extra ?? []) await ff.writeFile(ex.name, (await toU8(ex.data)).slice())
     const code = await ff.exec(['-i', inName, ...o.args, outName])
     if (code !== 0) throw new Error(`ffmpeg (code ${code})\n${ring.slice(-10).join('\n')}`)
     const data = await ff.readFile(outName)

@@ -5,7 +5,9 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const src = resolve(root, 'node_modules/@ffmpeg/core/dist/umd')
+// Cœur ESM (export default createFFmpegCore) — requis car @ffmpeg/ffmpeg crée un
+// worker de type "module" qui fait `(await import(coreURL)).default`.
+const src = resolve(root, 'node_modules/@ffmpeg/core/dist/esm')
 const dst = resolve(root, 'public/ffmpeg')
 mkdirSync(dst, { recursive: true })
 for (const f of ['ffmpeg-core.js', 'ffmpeg-core.wasm']) {

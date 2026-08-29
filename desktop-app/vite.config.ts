@@ -10,5 +10,9 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  // @ffmpeg/ffmpeg crée son worker via `new Worker(new URL('./worker.js', import.meta.url))` :
+  // exclu de l'optimizer pour que le plugin worker de Vite le résolve correctement (sinon 404 en dev).
+  optimizeDeps: { exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'] },
+  worker: { format: 'es' },
   server: { port: 5273 },
 })
