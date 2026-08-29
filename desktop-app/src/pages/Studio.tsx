@@ -11,16 +11,20 @@ import BankPicker from '@/components/BankPicker'
 // La génération n'est pas encore branchée (outils serveur) — le wizard prépare tout.
 interface Tool { k: string; t: string; d: string; tone: string; tag: string; i: string }
 const TOOLS: Tool[] = [
+  { k: 'overlay', t: 'Incrustation photo/vidéo', d: 'Mets une vidéo, choisis une photo et place-la où tu veux, le temps que tu veux.', tone: '99,102,241', tag: 'photo', i: 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' },
+  { k: 'montage', t: 'Montage', d: 'Assemble et découpe tes vidéos : coupe, ordre, transitions simples.', tone: '245,158,11', tag: 'découpe', i: 'M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z|M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6z|M20 4L8.12 15.88|M14.47 14.48L20 20|M8.12 8.12L12 12' },
+  { k: 'mixer', t: 'Mixer', d: 'Ajoute une légende / un montage par-dessus ta vidéo, rendu côté serveur.', tone: '236,72,153', tag: 'overlay', i: 'M4 21v-7|M4 10V3|M12 21v-9|M12 8V3|M20 21v-5|M20 12V3|M1 14h6|M9 8h6|M17 16h6' },
   { k: 'remix', t: 'Remix', d: 'Une vidéo devient des dizaines de variantes uniques : luminosité, zoom, vitesse, recadrage.', tone: '139,92,246', tag: '×24 variantes', i: 'M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6' },
-  { k: 'spoof', t: 'Spoof', d: "Réécrit device, GPS et EXIF, micro-varie l'image. Invisible aux filtres de doublons.", tone: '167,139,250', tag: 'anti-détection', i: 'M12 22s8-4.5 8-11a8 8 0 1 0-16 0c0 6.5 8 11 8 11z|M9 12l2 2 4-4' },
-  { k: 'subs', t: 'Sous-titres', d: 'Transcription IA et incrustation stylée, mot par mot.', tone: '6,182,212', tag: 'Whisper', i: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z|M7 9h10|M7 13h6' },
-  { k: 'mixer', t: 'Mixer', d: 'Incruste un hook accrocheur sur la vidéo, rendu côté serveur.', tone: '236,72,153', tag: 'overlay', i: 'M4 21v-7|M4 10V3|M12 21v-9|M12 8V3|M20 21v-5|M20 12V3|M1 14h6|M9 8h6|M17 16h6' },
+  { k: 'spoof', t: 'Spoof', d: "Anti-empreinte : réécrit device, GPS, EXIF et micro-varie l'image. Rend chaque vidéo unique pour l'algo.", tone: '167,139,250', tag: 'anti-détection', i: 'M12 22s8-4.5 8-11a8 8 0 1 0-16 0c0 6.5 8 11 8 11z|M9 12l2 2 4-4' },
+  { k: 'subs', t: 'Sous-titres', d: 'Sous-titres automatiques (Groq Whisper), incrustés mot par mot.', tone: '6,182,212', tag: 'Whisper', i: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z|M7 9h10|M7 13h6' },
 ]
 const SETTINGS: Record<string, [string, string][]> = {
+  overlay: [['Photo à incruster', 'à choisir'], ['Position', 'Libre (glisser)'], ['Taille', 'Ajustable'], ['Durée', 'Toute la vidéo'], ['Rendu', 'Serveur']],
+  montage: [['Découpe', 'Début / fin'], ['Ordre des clips', 'Manuel'], ['Transition', 'Coupe franche'], ['Rendu', 'Serveur']],
+  mixer: [['Légende / hook', 'POV : tu découvres ça'], ['Position', 'Haut'], ['Fond', 'Noir'], ['Rendu', 'Serveur']],
   remix: [['Luminosité', '±6 %'], ['Contraste', '±4 %'], ['Zoom', '±3 %'], ['Vitesse', '0,95–1,05×'], ['Recadrage', '±2 %']],
   spoof: [['Device', 'iPhone 15 Pro'], ['GPS', '34.05, -118.2'], ['EXIF', 'nettoyé'], ['Empreinte fichier', 'unique'], ['Piste audio', '±1 %']],
   subs: [['Langue', 'Auto'], ['Position', 'Centre'], ['Style du mot fort', 'Fond plein'], ['Taille', '32 px']],
-  mixer: [['Hook', 'POV : tu découvres ça'], ['Position', 'Haut'], ['Fond', 'Noir'], ['Rendu', 'Serveur']],
 }
 
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
@@ -82,7 +86,7 @@ export default function Studio({ theme, infra, user, org }: {
   if (!tool) {
     return (
       <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-        <PageHead title="Studio vidéo" sub="Une vidéo source, quatre outils, des dizaines de variantes uniques. Tout est gratuit — aucun crédit consommé." />
+        <PageHead title="Studio vidéo" sub="Une vidéo source, tous tes outils VIP — incrustation, montage, mixer, remix, spoof, sous-titres. Tout est gratuit, aucun crédit consommé." />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
           {TOOLS.map(t => (
             <button key={t.k} onClick={() => { setTool(t.k); setSrc(new Set()) }} style={{
