@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { OrgState } from './data'
+import { IS_WEB } from './platform'
 
 export interface ProxyRotationConfig { enabled: boolean; urls: string[]; names?: string[] }
 export interface RotationProxy { url: string; label: string }
@@ -81,6 +82,11 @@ export async function saveProxyRotation(orgId: string | null, userId: string, cf
 // Test d'un proxy : appelle sa Change-IP URL (desktop = direct, pas de CORS).
 export async function testRotationUrl(url: string): Promise<{ ok: boolean; detail?: string }> {
   try {
+    if (IS_WEB) {
+      const res = await fetch(`/api/rotate?url=${encodeURIComponent(url.trim())}`, { signal: AbortSignal.timeout(16000) })
+      const j = await res.json().catch(() => ({ ok: res.ok })) as { ok?: boolean; error?: string; reason?: string }
+      return j.ok ? { ok: true } : { ok: false, detail: j.error || j.reason || `HTTP ${res.status}` }
+    }
     const res = await fetch(url.trim(), { signal: AbortSignal.timeout(15000) })
     return res.ok ? { ok: true } : { ok: false, detail: `HTTP ${res.status}` }
   } catch (e) { return { ok: false, detail: e instanceof Error ? e.message : 'injoignable' } }

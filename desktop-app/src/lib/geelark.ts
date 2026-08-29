@@ -7,6 +7,7 @@
 
 import storyFlowDef from './geelarkStoryFlow.json'
 import loginFlowDef from './geelarkLoginFlow.json'
+import { IS_WEB } from './platform'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -20,6 +21,16 @@ export interface GeelarkPhone {
 }
 
 async function geelarkFetch(path: string, body: unknown, bearer: string): Promise<Record<string, unknown>> {
+  // WEB : relais serverless (bypass CORS). Electron : appel direct.
+  if (IS_WEB) {
+    const res = await fetch('/api/geelark', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'POST', url: `${BASE}${path}`, headers: { Authorization: `Bearer ${bearer}` }, body: body ?? {} }),
+    })
+    const j = await res.json() as { ok: boolean; error?: string; data?: unknown }
+    if (!j.ok) throw new Error(j.error || 'GeeLark (relais) : échec')
+    return (j.data ?? {}) as Record<string, unknown>
+  }
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
@@ -72,9 +83,13 @@ export async function rotateProxyIp(url: string, log?: (m: string) => void): Pro
   const clean = (url ?? '').trim()
   if (!/^https?:\/\//i.test(clean)) return false
   try {
-    const res = await fetch(clean, { method: 'GET' })
-    log?.(res.ok ? '🔄 Rotation IP : nouvelle IP demandée ✓' : `⚠ Rotation IP : réponse ${res.status}`)
-    return res.ok
+    // WEB : relais /api/rotate (CORS + certificats auto-signés gérés côté serveur).
+    const res = IS_WEB
+      ? await fetch(`/api/rotate?url=${encodeURIComponent(clean)}`)
+      : await fetch(clean, { method: 'GET' })
+    const ok = IS_WEB ? (await res.json().then((j: any) => !!j.ok).catch(() => res.ok)) : res.ok
+    log?.(ok ? '🔄 Rotation IP : nouvelle IP demandée ✓' : `⚠ Rotation IP : réponse ${res.status}`)
+    return ok
   } catch { log?.('⚠ Rotation IP : proxy injoignable — on continue'); return false }
 }
 export async function rotateAllProxies(urls: string[], log?: (m: string) => void): Promise<void> {
@@ -287,6 +302,20 @@ export async function editProfileOnPhone(
 }
 
 // ── Publication de Reels (Mass Posting) ──────────────────────────────────────
+// WEB : l'upload (getUrl + PUT présigné OSS) est CORS-bloqué côté navigateur →
+// on délègue au relais /api/geelark-upload qui télécharge le média et le PUT côté serveur.
+async function uploadViaProxy(fileUrl: string, bearer: string, fileType: string, log: (m: string) => void): Promise<string | null> {
+  try {
+    const res = await fetch('/api/geelark-upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signedUrl: fileUrl, bearer, fileType }),
+    })
+    const j = await res.json() as { ok: boolean; token?: string; error?: string }
+    if (j.ok && j.token) { log('   ✅ Média hébergé (relais).'); return j.token }
+    log(`   ⚠ upload (relais) : ${j.error ?? 'échec'}`); return null
+  } catch (e) { log(`   ⚠ upload (relais) échoué : ${e instanceof Error ? e.message : String(e)}`); return null }
+}
+
 // Héberge une vidéo chez GeeLark : /upload/getUrl → PUT des octets → resourceUrl.
 // Les templates RPA n'acceptent QUE des URL hébergées par GeeLark, pas une URL
 // externe. Les vidéos DOIVENT être uploadées en fileType 'mp4' (les templates IG/
@@ -296,6 +325,7 @@ export async function geelarkUploadVideo(
 ): Promise<string | null> {
   try {
     log('⬆️ Envoi de la vidéo vers GeeLark…')
+    if (IS_WEB) return await uploadViaProxy(fileUrl, bearer, 'mp4', log)
     const res = await geelarkFetch('/upload/getUrl', { fileType: 'mp4' }, bearer)
     if (Number(res['code']) !== 0) { log(`   ⚠ upload/getUrl : ${res['msg'] ?? res['code']}`); return null }
     const d = res['data'] as { uploadUrl?: string; resourceUrl?: string } | undefined
@@ -347,6 +377,7 @@ export async function geelarkUploadImage(bearer: string, fileUrl: string, log: (
   try {
     const ext = (fileUrl.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'jpg').toLowerCase()
     log('⬆️ Envoi de l\'image vers GeeLark…')
+    if (IS_WEB) return await uploadViaProxy(fileUrl, bearer, ext, log)
     const res = await geelarkFetch('/upload/getUrl', { fileType: ext }, bearer)
     if (Number(res['code']) !== 0) { log(`   ⚠ upload/getUrl : ${res['msg'] ?? res['code']}`); return null }
     const d = res['data'] as { uploadUrl?: string; resourceUrl?: string } | undefined
