@@ -134,32 +134,37 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     if (isCreditError(run)) { push(`❌ Crédits insuffisants : ${run.error} (il faut ${cost} crédits).`); setRunItems([]); setRunning(false); return }
     push(`💳 ${cost} crédits débités (${CREDIT_COSTS.mass_posting}/compte).`)
 
-    // Héberge chaque vidéo choisie UNE fois (cache par id), puis répartit en round-robin.
+    // 1) Répartition D'ABORD : UNE vidéo par compte (séquentielle ou aléatoire).
+    const shuffle = <T,>(a: T[]): T[] => { const b = [...a]; for (let k = b.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1));[b[k], b[j]] = [b[j], b[k]] } return b }
+    const order = vidMode === 'random' ? shuffle(chosenVids) : chosenVids
+    const assignment = targets.map((_, i) => order[i % order.length])   // vidéo assignée à chaque téléphone
+    const caps = captions.map(c => c.trim()).filter(Boolean)
+
+    // 2) Héberge SEULEMENT les vidéos réellement assignées (distinctes) — pas toute la sélection.
+    const distinct = [...new Map(assignment.map(v => [v.id, v])).values()]
+    push(`⬆ Hébergement de ${distinct.length} vidéo(s) (1 par compte)…`)
     const resourceByVid = new Map<string, string>()
-    for (const v of chosenVids) {
+    for (const v of distinct) {
       const url = await resolveVideoUrl(v)
-      if (!url) { push(`⚠ ${v.title} : URL introuvable, ignorée.`); continue }
+      if (!url) { push(`⚠ ${v.title} : URL introuvable.`); continue }
       const ru = await geelarkUploadVideo(bearer, url, push)
       if (ru) resourceByVid.set(v.id, ru)
     }
-    const usable = chosenVids.filter(v => resourceByVid.has(v.id))
-    if (usable.length === 0) { push('❌ Aucune vidéo hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
+    if (resourceByVid.size === 0) { push('❌ Aucune vidéo hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
 
-    // Répartition vidéo → compte (séquentielle ou aléatoire) figée à l'avance.
-    const shuffle = <T,>(a: T[]): T[] => { const b = [...a]; for (let k = b.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1));[b[k], b[j]] = [b[j], b[k]] } return b }
-    const vidOrder = vidMode === 'random' ? shuffle(usable) : usable
-    const caps = captions.map(c => c.trim()).filter(Boolean)
+    // 3) Poste : chaque téléphone reçoit SA vidéo assignée.
     const usedVidIds = new Set<string>()
-
     let i = 0
     for (const p of targets) {
-      const v = vidOrder[i % vidOrder.length]
+      const v = assignment[i]
       const cap = caps.length === 0 ? '' : capMode === 'random' ? caps[Math.floor(Math.random() * caps.length)] : caps[i % caps.length]
       i++
-      usedVidIds.add(v.id)
+      const ru = resourceByVid.get(v.id)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
+      if (!ru) { run.markFailed(); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); continue }
+      usedVidIds.add(v.id)
       push(`— @${p.ig_username ?? p.geelark_id} · ${v.title}${cap ? ' · légende' : ''} —`)
-      const r = await postReelToPhone(bearer, p.geelark_id!, resourceByVid.get(v.id)!, cap, push, rot, reelsTrial)
+      const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial)
       if (!r.ok) run.markFailed()
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
@@ -169,7 +174,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     // Usage unique : retire de la banque les vidéos réellement utilisées.
     if (autoRemove && usedVidIds.size > 0) {
       const ids = [...usedVidIds]
-      const objs = usable.filter(v => usedVidIds.has(v.id)).map(v => v.storage_path).filter(Boolean) as string[]
+      const objs = distinct.filter(v => usedVidIds.has(v.id)).map(v => v.storage_path).filter(Boolean) as string[]
       try {
         await supabase.from('content_bank').delete().in('id', ids)
         if (objs.length) await supabase.storage.from('content').remove(objs)
