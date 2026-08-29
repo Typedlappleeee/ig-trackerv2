@@ -65,6 +65,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [picker, setPicker] = useState<PickerKind | null>(null)
   const [genning, setGenning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
+  const [rotationOn, setRotationOn] = useState(false)              // proxy rotatif activé (Paramètres)
+  const [simulPhones, setSimulPhones] = useState<'all' | number>('all')  // téléphones simultanés
+
+  useEffect(() => {
+    loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => setRotationOn(c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim()))))
+  }, [currentOrg?.id, user.id])
 
   const setCaptionAt = (i: number, v: string) => setCaptions(c => c.map((x, k) => k === i ? v : x))
   const addCaption = (v = '') => setCaptions(c => [...c, v])
@@ -170,8 +176,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       p, v: assignment[k],
       cap: caps.length === 0 ? '' : capMode === 'random' ? caps[Math.floor(Math.random() * caps.length)] : caps[k % caps.length],
     }))
-    const concurrency = rot ? 1 : jobs.length
-    push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${jobs.length} téléphone(s) en parallèle.`)
+    const concurrency = rot ? 1 : (simulPhones === 'all' ? jobs.length : Math.max(1, Number(simulPhones)))
+    push(rot ? '🔁 Envoi en série (proxy rotatif).' : concurrency >= jobs.length ? `⚡ ${jobs.length} téléphone(s) en parallèle.` : `⚡ Par lots de ${concurrency} téléphone(s).`)
 
     const postOne = async ({ p, v, cap }: (typeof jobs)[number]) => {
       const ru = resourceByVid.get(v.id)
@@ -377,6 +383,29 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 10 }}>
           <Panel theme={theme}>
             <PanelHead title="Comportement du run" />
+            {/* Proxy rotatif (état global, réglé dans Paramètres) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Proxy rotatif</span>
+                <span style={{ fontSize: 11, color: '#52525B' }}>{rotationOn ? "IP changée avant chaque téléphone → envoi en série" : 'Réglé dans Paramètres → Proxy & rotation'}</span>
+              </span>
+              <Chip text={rotationOn ? 'Activé' : 'Désactivé'} tone={rotationOn ? 'ok' : 'mute'} />
+            </div>
+            {/* Téléphones simultanés (ignoré si proxy rotatif → série) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.04)', opacity: rotationOn ? 0.5 : 1 }}>
+              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Téléphones simultanés</span>
+                <span style={{ fontSize: 11, color: '#52525B' }}>{rotationOn ? 'Forcé à 1 (proxy rotatif)' : 'Combien postent en même temps'}</span>
+              </span>
+              <select value={rotationOn ? '1' : String(simulPhones)} disabled={rotationOn}
+                onChange={e => setSimulPhones(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                style={{ height: 30, padding: '0 8px', borderRadius: 8, cursor: rotationOn ? 'default' : 'pointer', border: '1px solid rgba(255,255,255,0.09)', background: '#101015', color: '#E4E4E7', fontSize: 11.5, fontWeight: 700, outline: 'none' }}>
+                {rotationOn ? <option value="1" style={{ background: '#16161C' }}>1 (série)</option> : <>
+                  <option value="all" style={{ background: '#16161C' }}>Tous</option>
+                  {[1, 2, 3, 5, 10].map(n => <option key={n} value={n} style={{ background: '#16161C' }}>{n}</option>)}
+                </>}
+              </select>
+            </div>
             {/* Répartition vidéo → compte */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
+import ProxyRotationPanel from '@/components/ProxyRotationPanel'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty } from '@/lib/ui'
 import { supabase, type OrgRole } from '@/lib/supabase'
 import { fetchBalance, fetchOrgBalance, fmtNumber, type OrgState } from '@/lib/data'
 
 // ── Sections (portées de _settings() du prototype v10) ───────────────────────────
-type Tab = 'account' | 'org' | 'members' | 'billing' | 'infra' | 'notif' | 'security'
+type Tab = 'account' | 'org' | 'members' | 'billing' | 'proxy' | 'infra' | 'notif' | 'security'
 // On ne garde que les sections RÉELLES. Les onglets placeholder (Infrastructure /
 // Notifications / Sécurité, tous « à venir ») sont retirés : pas de config proxy à
 // gérer côté desktop (tout passe par GeeLark / la config web).
@@ -16,6 +17,7 @@ const SECTIONS: { k: Tab; l: string; i: string }[] = [
   { k: 'org', l: 'Organisation', i: 'M3 21h18|M5 21V7l8-4v18|M19 21V11l-6-4' },
   { k: 'members', l: 'Membres & rôles', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M22 21v-2a4 4 0 0 0-3-3.9|M16 3.1a4 4 0 0 1 0 7.8' },
   { k: 'billing', l: 'Abonnement & crédits', i: 'M2 8h20v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z|M2 8l2-4h16l2 4|M12 12v4' },
+  { k: 'proxy', l: 'Proxy & rotation', i: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
 ]
 
 // ── Rôles ────────────────────────────────────────────────────────────────────────
@@ -169,6 +171,7 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
           {tab === 'org' && <OrgTab theme={theme} org={org} balance={balance} canManage={canManage} />}
           {tab === 'members' && <MembersTab theme={theme} org={org} members={members} canManage={canManage} currentUserId={user.id} onReload={loadMembers} />}
           {tab === 'billing' && <BillingTab theme={theme} org={org} balance={balance} canManage={canManage} />}
+          {tab === 'proxy' && <ProxyRotationPanel theme={theme} user={user} org={org} />}
           {tab === 'infra' && <InfraTab theme={theme} />}
           {tab === 'notif' && <NotifTab theme={theme} email={user.email ?? null} />}
           {tab === 'security' && <SecurityTab theme={theme} />}
