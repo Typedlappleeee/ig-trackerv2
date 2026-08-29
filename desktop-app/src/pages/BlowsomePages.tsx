@@ -11,6 +11,10 @@ import {
 } from '@/lib/iremotech'
 import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
+import { useConnections } from '@/lib/connections'
+import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
+import { resolveSourceBytes, saveOutputToBank, runSpoof } from '@/lib/studioTools'
+import { generateCaption } from '@/lib/ai'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
 const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
@@ -227,29 +231,87 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
 // ── Contenu auto ──────────────────────────────────────────────────────────────
 export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgState; onNavigate?: (p: string) => void }) {
   const { currentOrg } = org
+  const conns = useConnections(user, org)
   const [count, setCount] = useState<number | null>(null)
-  const [note, setNote] = useState(false)
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { count: c } = await scope(supabase.from('content_bank').select('id', { count: 'exact', head: true }))
     setCount(c ?? 0)
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
+
+  // ── Générateur auto : sources banque → N variantes uniques (spoof) + légende IA ──
+  const [picker, setPicker] = useState(false)
+  const [sources, setSources] = useState<{ id: string; title: string; storage_path: string | null; file_url: string | null }[]>([])
+  const [variants, setVariants] = useState(3)
+  const [withCap, setWithCap] = useState(true)
+  const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [logs, setLogs] = useState<string[]>([])
+  const [made, setMade] = useState(0)
+  const push = (m: string) => setLogs(l => [...l.slice(-160), m])
+
+  async function applyPicker(r: PickerResult) {
+    if (r.kind !== 'videos' || r.ids.length === 0) return
+    const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', r.ids)
+    setSources((data ?? []) as any[])
+  }
+
+  async function generate() {
+    if (running || sources.length === 0) return
+    setRunning(true); setLogs([]); setMade(0); setProgress(0)
+    try {
+      if (!isFfmpegReady()) { push('⏳ Chargement du moteur (~30 Mo, une fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
+      let done = 0
+      for (const v of sources) {
+        push(`— ${v.title} —`)
+        const bytes = await resolveSourceBytes(v)
+        let caption: string | null = null
+        if (withCap && conns.groq) { caption = await generateCaption(conns.groq, v.title); if (caption) push('  ✍ légende IA générée') }
+        for (let i = 0; i < Math.max(1, Math.min(12, variants)); i++) {
+          setProgress(0)
+          push(`  · variante ${i + 1}/${variants}…`)
+          const out = await runSpoof(bytes, Math.random() * 1000, { onProgress: setProgress, onLog: () => {} })
+          await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`)
+          done++; setMade(done)
+        }
+      }
+      push(`✔ ${done} variantes générées — dans la banque.`)
+      load()
+    } catch (e) { push(`❌ ${e instanceof Error ? e.message : 'Échec'}`) }
+    setRunning(false); setProgress(0)
+  }
+
   const shortcuts = [
-    { t: 'Ouvrir le Studio', d: 'Remix, spoof, sous-titres, mixer — génère des variantes uniques.', go: 'blowTools' },
+    { t: 'Ouvrir le Studio', d: 'Contrôle fin : remix, spoof, sous-titres, mixer, incrustation, montage.', go: 'blowTools' },
     { t: 'Voir la banque', d: 'Tout ton contenu VIP, prêt à publier.', go: 'bank' },
     { t: 'Publier maintenant', d: 'Envoie une vidéo sur tes comptes en un parcours guidé.', go: 'publish' },
   ]
+
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <Head title="Auto-contenu" sub="Génère des vidéos + légendes prêtes à poster, en pilote automatique." right={<BlowBtn label="Générer" onClick={() => setNote(true)} />} />
-      {note && <Card style={{ padding: '12px 16px', marginBottom: 12 }}><span style={{ fontSize: 12, color: GOLD, lineHeight: 1.5 }}>Le moteur de génération auto Blowsome (variantes + captions en pilote) arrive très bientôt — ta banque ({count ?? 0} médias) est déjà prête à l'alimenter. En attendant, utilise le Studio pour créer tes variantes.</span></Card>}
-      <Card style={{ padding: 22, marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <span style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: INK }}>{count === null ? '…' : count}</span>
-          <span style={{ fontSize: 12.5, color: MUTED }}>médias dans ta banque, prêts à alimenter la génération</span>
+      <Head title="Auto-contenu" sub="Choisis des vidéos, l'IA génère des variantes uniques prêtes à poster (+ légendes)."
+        right={<BlowBtn label={running ? `Génération… ${Math.round(progress * 100)}%` : 'Générer'} onClick={generate} />} />
+
+      <Card style={{ padding: 20, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <BlowBtn ghost label={sources.length ? `${sources.length} vidéo(s) source` : 'Choisir des vidéos'} onClick={() => setPicker(true)} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+            Variantes / vidéo
+            <input type="number" min={1} max={12} value={variants} onChange={e => setVariants(Number(e.target.value))}
+              style={{ width: 64, height: 32, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', textAlign: 'right' }} />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
+            <span onClick={() => setWithCap(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: withCap ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: withCap ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+            Légende IA {conns.groq ? '' : '(clé Groq requise)'}
+          </label>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: GOLD }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias en banque`}</span>
         </div>
+        {running && <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 14 }}><div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: GRAD, transition: 'width .2s ease' }} /></div>}
+        {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 150, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
       </Card>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
         {shortcuts.map(s => (
           <button key={s.t} onClick={() => onNavigate?.(s.go)} style={{ textAlign: 'left', cursor: 'pointer', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.12)', boxShadow: '0 20px 50px -30px rgba(168,85,247,0.5)', transition: 'border-color .16s ease' }}
@@ -260,6 +322,11 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           </button>
         ))}
       </div>
+
+      {picker && (
+        <BankPicker theme={BLOW_THEME} user={user} org={org} kind="videos" multi title="Choisir des vidéos à décliner"
+          onClose={() => setPicker(false)} onApply={applyPicker} />
+      )}
     </div>
   )
 }
