@@ -206,7 +206,8 @@ export default function StoryComposer({ theme, user, org, onBack }: {
 
           {/* Texte du sticker */}
           <Panel theme={theme}>
-            <PanelHead title="Texte du sticker lien" sub="ce qui s'affiche sur le sticker" />
+            <PanelHead title="Texte du sticker lien" sub="ce qui s'affiche sur le sticker"
+              right={<Btn theme={theme} sm tone="quiet" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Depuis la banque" onClick={() => setPicker('captions')} />} />
             <div style={{ padding: 13 }}>
               <input value={linkText} onChange={e => setLinkText(e.target.value)} placeholder="Voir plus" style={{ ...inputStyle, height: 34, fontSize: 12.5 }} />
             </div>
@@ -232,10 +233,14 @@ export default function StoryComposer({ theme, user, org, onBack }: {
       </div>
 
       {picker && (
-        <BankPicker theme={theme} user={user} org={org} kind="images" multi={false}
-          initialIds={imageId ? [imageId] : []} title="Choisir une image"
+        <BankPicker theme={theme} user={user} org={org} kind={picker} multi={false}
+          initialIds={picker === 'images' && imageId ? [imageId] : []}
+          title={picker === 'captions' ? 'Choisir un texte de sticker' : 'Choisir une image'}
           onClose={() => setPicker(null)}
-          onApply={r => { if (r.kind === 'images') setImageId(r.ids[0] ?? null) }} />
+          onApply={r => {
+            if (r.kind === 'images') setImageId(r.ids[0] ?? null)
+            else if (r.kind === 'captions') setLinkText(r.text)
+          }} />
       )}
     </div>
   )
