@@ -7,6 +7,7 @@ import type { OrgState } from '@/lib/data'
 import { scopeInfra, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { warmupAccountNative, editProfileOnPhone, loginInstagramOnPhone } from '@/lib/geelark'
+import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null; group_name: string | null }
 function dotKind(status: string): string { return status === 'warming' ? 'warmup' : status }
@@ -71,7 +72,8 @@ export default function Warmup({ theme, infra, user, org }: {
     // Nb de vidéos parcourues dérivé de la durée (≈2/min, plafonné à 100).
     const browseVideo = Math.max(1, Math.min(100, Math.round(dur * 2)))
     const pushLog = (m: string) => setLogs(l => [...l.slice(-200), m])
-    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
+    await loadProxyRotation(currentOrg?.id ?? null, user.id)
+    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
 
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
@@ -108,7 +110,8 @@ export default function Warmup({ theme, infra, user, org }: {
     setRunning(true); setLogs([])
     setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as RunPhase })))
     const push = (m: string) => setLogs(l => [...l.slice(-200), m])
-    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
+    await loadProxyRotation(currentOrg?.id ?? null, user.id)
+    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— ${phoneLabel(p)} —`)

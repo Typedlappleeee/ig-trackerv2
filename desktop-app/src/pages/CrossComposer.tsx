@@ -9,6 +9,7 @@ import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, crossPostToPhone, CROSS_PLATFORMS, type CrossPlatform } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
+import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import BankPicker from '@/components/BankPicker'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null }
@@ -74,7 +75,8 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     setRunning(true); setLogs([])
     setRunItems(targets.flatMap(p => platList.map(pl => ({ id: `${p.id}:${pl}`, name: `${phoneLabel(p)} · ${pl}`, phase: 'pending' as Phase }))))
     const push = (m: string) => setLogs(l => [...l.slice(-300), m])
-    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
+    await loadProxyRotation(currentOrg?.id ?? null, user.id)
+    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
     const ownerId = currentOrg?.owner_id ?? user.id
     const run = await startCreditRun(ownerId, CREDIT_COSTS.mass_posting, targets.length * platList.length)
     if (isCreditError(run)) { push(`❌ Crédits insuffisants (il faut ${cost}).`); setRunItems([]); setRunning(false); return }

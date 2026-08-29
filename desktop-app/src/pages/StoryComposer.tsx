@@ -10,6 +10,7 @@ import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { geelarkUploadImage, postStoryToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
+import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null }
 interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
@@ -100,7 +101,8 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     setRunning(true); setLogs([])
     setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-250), m])
-    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
+    await loadProxyRotation(currentOrg?.id ?? null, user.id)
+    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
 
     // Débit d'avance (1 crédit/compte pour une story), remboursement des échecs.
     const ownerId = currentOrg?.owner_id ?? user.id

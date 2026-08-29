@@ -13,6 +13,7 @@ import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { generateCaption } from '@/lib/ai'
 import { startRun, cancelRun } from '@/lib/runStore'
+import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null; ig_status: string | null; last_post_at: string | null; account_state: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; duration: number | null; notes: string | null }
@@ -129,7 +130,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     setRunning(true); setLogs([])
     setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-300), m])
-    const rot = conns.proxy ? conns.proxy.split(/[\n,]/).map(s => s.trim()).filter(Boolean) : undefined
+    await loadProxyRotation(currentOrg?.id ?? null, user.id)
+    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
+    if (rot) push(`🔁 Rotation d'IP proxy activée (${rot.length} proxy) — IP changée avant chaque téléphone.`)
 
     const ownerId = currentOrg?.owner_id ?? user.id
     const run = await startCreditRun(ownerId, CREDIT_COSTS.mass_posting, targets.length)
