@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
@@ -34,6 +34,10 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   const [sel, setSel] = useState<string[]>(initialIds)
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [drag, setDrag] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const IMG = IMG_EXT
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -66,6 +70,41 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
     ? (cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id])
     : (cur[0] === id ? [] : [id]))
 
+  // Import depuis le PC (multi-fichiers + glisser-déposer) → bucket content → banque.
+  async function importFiles(files: FileList | File[]) {
+    const list = Array.from(files).filter(f => {
+      const ext = (f.name.split('.').pop() ?? '').toLowerCase()
+      if (kind === 'images') return IMG.includes(ext) || f.type.startsWith('image')
+      if (kind === 'videos') return !IMG.includes(ext)
+      return true
+    })
+    if (list.length === 0) return
+    const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
+    const newIds: string[] = []
+    let done = 0
+    for (const file of list) {
+      setUploading(`${file.name} (${++done}/${list.length})`)
+      try {
+        let ext = (file.name.split('.').pop() ?? '').toLowerCase()
+        if (!ext) ext = file.type.startsWith('image') ? 'jpg' : 'mp4'
+        const id = crypto.randomUUID()
+        const storagePath = `videos/${scopeFolder}/${id}.${ext}`
+        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
+        if (up.error) continue
+        const ins = await supabase.from('content_bank').insert({
+          user_id: user.id, org_id: currentOrg?.id ?? null,
+          title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath,
+          file_url: null, folder: null, duration: null, tags: [], notes: null, used_count: 0,
+        }).select('id').single()
+        if (ins.data?.id) newIds.push(ins.data.id as string)
+      } catch { /* ignore */ }
+    }
+    setUploading(null)
+    await load()
+    // Auto-sélection des nouveaux imports.
+    setSel(cur => multi ? [...cur, ...newIds] : (newIds[0] ? [newIds[0]] : cur))
+  }
+
   const word = kind === 'captions' ? 'légende' : kind === 'images' ? 'image' : 'vidéo'
   const n = sel.length
   const cta = n ? `Utiliser ${n} ${word}${n > 1 ? 's' : ''}` : 'Valider'
@@ -93,11 +132,22 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   return (
     <Modal theme={theme} title={title ?? 'Choisir dans la banque'} icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
       onClose={onClose} footer={footer} width={620}>
-      <div style={{ padding: '12px 15px 4px' }}>
+      <div style={{ display: 'flex', gap: 8, padding: '12px 15px 4px', alignItems: 'center' }}>
         <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…"
-          style={{ width: '100%', boxSizing: 'border-box', height: 34, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8', fontSize: 12.5, outline: 'none' }} />
+          style={{ flex: 1, boxSizing: 'border-box', height: 34, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8', fontSize: 12.5, outline: 'none' }} />
+        {kind !== 'captions' && <>
+          <Btn theme={theme} sm tone="quiet" icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" label={uploading ? 'Import…' : 'Mon PC'} disabled={!!uploading} onClick={() => fileRef.current?.click()} />
+          <input ref={fileRef} type="file" multiple accept={kind === 'images' ? 'image/*' : 'video/*'} style={{ display: 'none' }}
+            onChange={e => { if (e.target.files) importFiles(e.target.files); e.target.value = '' }} />
+        </>}
       </div>
-      <div style={{ padding: 15, maxHeight: 380, overflowY: 'auto' }}>
+      <div
+        onDragOver={kind !== 'captions' ? (e) => { e.preventDefault(); setDrag(true) } : undefined}
+        onDragLeave={() => setDrag(false)}
+        onDrop={kind !== 'captions' ? (e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files?.length) importFiles(e.dataTransfer.files) } : undefined}
+        style={{ position: 'relative', padding: 15, maxHeight: 380, overflowY: 'auto', outline: drag ? `2px dashed rgba(${theme.tone},0.6)` : 'none', outlineOffset: -6, borderRadius: 8 }}>
+        {drag && <div style={{ position: 'absolute', inset: 6, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: `rgba(${theme.tone},0.12)`, color: theme.accentText, fontSize: 13, fontWeight: 700, pointerEvents: 'none' }}>Dépose tes fichiers ici</div>}
+        {uploading && <div style={{ marginBottom: 10, fontSize: 11.5, color: theme.accentText }}>Import en cours : {uploading}</div>}
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div>
         ) : kind === 'captions' ? (
@@ -118,7 +168,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
             </div>
           )
         ) : (
-          filteredMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun contenu dans la banque.</div> : (
+          filteredMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>Aucun contenu dans la banque.<br />Glisse-dépose tes fichiers ici ou clique « Mon PC ».</div> : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 9 }}>
               {filteredMedia.map((m, i) => {
                 const on = sel.includes(m.id); const prev = thumbFor(m); const h = HUES[i % 6]; const img = isImg(m)

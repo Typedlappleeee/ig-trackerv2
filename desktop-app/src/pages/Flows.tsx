@@ -231,7 +231,7 @@ export default function Flows({ theme, infra, user, org, onLaunch }: {
       )}
 
       {createOpen && (
-        <CreateTaskModal theme={theme} user={user} org={org} mode="recurring"
+        <CreateTaskModal theme={theme} user={user} org={org} infra={infra} mode="recurring"
           onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); setTab('sched') }} />
       )}
     </div>

@@ -4,7 +4,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
-import { phoneLabel, phoneSub } from '@/lib/data'
+import { phoneLabel, phoneSub, scopeInfra } from '@/lib/data'
+import type { InfraKey } from '@/lib/theme'
 import { Modal, Btn, Chip } from '@/lib/ui'
 import BankPicker, { type PickerKind, type PickerResult } from './BankPicker'
 
@@ -21,8 +22,8 @@ interface MediaRec { id: string; title: string; storage_path: string | null; fil
 
 function storyLinkKey(p: Phone): string { return `sf-story-link-${p.geelark_id ?? p.id}` }
 
-export default function CreateTaskModal({ theme, user, org, mode, onClose, onCreated }: {
-  theme: Theme; user: User; org: OrgState; mode: TaskMode; onClose: () => void; onCreated: () => void
+export default function CreateTaskModal({ theme, user, org, mode, infra, onClose, onCreated }: {
+  theme: Theme; user: User; org: OrgState; mode: TaskMode; infra: InfraKey; onClose: () => void; onCreated: () => void
 }) {
   const { currentOrg } = org
   const [name, setName] = useState('')
@@ -43,10 +44,11 @@ export default function CreateTaskModal({ theme, user, org, mode, onClose, onCre
 
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('phones').select('id,geelark_id,phone_name,ig_username,group_name'))
-      .not('geelark_id', 'is', null).order('phone_name')
+    let q = scope(supabase.from('phones').select('id,geelark_id,phone_name,ig_username,group_name'))
+    q = scopeInfra(q, infra)
+    const { data } = await q.order('phone_name')
     setPhones((data ?? []) as Phone[])
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, infra])
   useEffect(() => { load() }, [load])
 
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -161,7 +163,7 @@ export default function CreateTaskModal({ theme, user, org, mode, onClose, onCre
             </select>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
-            {shownPhones.length === 0 ? <span style={{ fontSize: 12, color: '#52525B' }}>Aucun appareil GeeLark.</span> : shownPhones.map(p => {
+            {shownPhones.length === 0 ? <span style={{ fontSize: 12, color: '#52525B' }}>{infra === 'cloud' ? 'Aucun appareil ScaleFlow Cloud.' : 'Aucun appareil GeeLark.'}</span> : shownPhones.map(p => {
               const on = sel.has(p.id)
               return (
                 <button key={p.id} onClick={() => toggle(p.id)} style={{

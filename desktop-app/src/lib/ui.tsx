@@ -160,11 +160,11 @@ export function Modal({ title, sub, icon, theme, onClose, footer, width, childre
 }) {
   return (
     <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 28,
+      position: 'fixed', inset: 0, zIndex: 90, display: 'flex', justifyContent: 'center', padding: 28, overflowY: 'auto',
       background: 'rgba(4,6,8,0.72)', backdropFilter: 'blur(6px)', animation: 'aFade .16s ease both',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        display: 'flex', flexDirection: 'column', width: width ?? 560, maxWidth: '100%', maxHeight: '86vh', borderRadius: 13, overflow: 'hidden',
+        display: 'flex', flexDirection: 'column', width: width ?? 560, maxWidth: '100%', maxHeight: 'calc(100vh - 56px)', margin: 'auto', borderRadius: 13, overflow: 'hidden',
         background: '#131318', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 32px 80px -22px rgba(0,0,0,0.8)',
         animation: 'aPop .22s cubic-bezier(0.16,1,0.3,1) both',
       }}>

@@ -313,7 +313,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
       )}
 
       {createMode && (
-        <CreateTaskModal theme={theme} user={user} org={org} mode={createMode}
+        <CreateTaskModal theme={theme} user={user} org={org} infra={infra} mode={createMode}
           onClose={() => setCreateMode(null)}
           onCreated={() => { setCreateMode(null); setTab(createMode === 'schedule' ? 'sched' : 'rec'); load() }} />
       )}

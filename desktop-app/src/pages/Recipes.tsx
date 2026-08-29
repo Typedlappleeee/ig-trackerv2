@@ -169,7 +169,7 @@ export default function Recipes({ theme, infra, user, org }: {
       )}
 
       {createOpen && (
-        <CreateTaskModal theme={theme} user={user} org={org} mode="recurring"
+        <CreateTaskModal theme={theme} user={user} org={org} infra={infra} mode="recurring"
           onClose={() => setCreateOpen(false)} onCreated={() => { setCreateOpen(false); load() }} />
       )}
 
