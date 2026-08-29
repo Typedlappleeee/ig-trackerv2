@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -59,23 +60,26 @@ type TabKey = 'video' | 'image' | 'caption'
 interface Caption { id: string; title: string | null; content: string; used_count: number | null; created_at: string }
 type SortKey = 'recent' | 'name' | 'used'
 
-// ── Case à cocher de vignette (portée du prototype _tile) ──────────────────────
-function TileCheck({ on }: { on: boolean }) {
+// ── Case à cocher de vignette (portée du prototype _tile) — cliquable ──────────
+function TileCheck({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
-    <span style={{
-      position: 'absolute', top: 6, right: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      width: 17, height: 17, borderRadius: 5,
-      background: on ? '#7C3AED' : 'rgba(11,11,15,0.72)',
-      border: on ? 'none' : '1px solid rgba(255,255,255,0.16)',
-      color: '#fff', fontSize: 9, fontWeight: 900,
-    }}>{on ? '✓' : ''}</span>
+    <span
+      onClick={e => { e.stopPropagation(); onToggle() }}
+      title="Sélectionner"
+      style={{
+        position: 'absolute', top: 6, right: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 20, height: 20, borderRadius: 6, cursor: 'pointer', zIndex: 3,
+        background: on ? '#7C3AED' : 'rgba(11,11,15,0.72)',
+        border: on ? 'none' : '1px solid rgba(255,255,255,0.22)',
+        color: '#fff', fontSize: 10, fontWeight: 900,
+      }}>{on ? '✓' : ''}</span>
   )
 }
 
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
-function Tile({ item, type, thumb, media, on, theme, onToggle, onDragStart, onContextMenu, onDoubleClick }: {
-  item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void; onDoubleClick?: () => void
+function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu }: {
+  item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: () => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
 }) {
   const h = hueFor(item.id)
   const fresh = (item.used_count ?? 0) === 0
@@ -86,15 +90,14 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onDragStart, onCo
   }
   return (
     <button
-      onClick={onToggle}
-      onDoubleClick={onDoubleClick}
+      onClick={onOpen}
       onContextMenu={onContextMenu}
       draggable
       onDragStart={onDragStart}
-      title="Double-clic pour lire · clic droit pour les actions"
+      title="Clic pour lire · clic droit pour les actions · carré pour sélectionner"
       style={{
         position: 'relative', aspectRatio: type === 'image' ? '4 / 5' : '9 / 16', borderRadius: 9, padding: 0,
-        cursor: 'grab', overflow: 'hidden', transition: 'all .14s ease',
+        cursor: 'pointer', overflow: 'hidden', transition: 'all .14s ease',
         border: `1.5px solid ${on ? theme.accentBtnEdge : 'rgba(255,255,255,0.07)'}`,
         background: `linear-gradient(160deg, rgba(${h},0.17), rgba(${h},0.035))`,
       }}
@@ -108,7 +111,7 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onDragStart, onCo
               : <img src={media} alt="" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)
           : <span style={placeholder} />}
 
-      <TileCheck on={on} />
+      <TileCheck on={on} onToggle={onToggle} />
 
       {fresh && (
         <span style={{
@@ -637,7 +640,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   key={i.id} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={() => toggle(i.id)}
                   onDragStart={e => e.dataTransfer.setData('text/plain', i.id)}
-                  onDoubleClick={() => openPlayer(i)}
+                  onOpen={() => openPlayer(i)}
                   onContextMenu={e => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, item: i }) }}
                 />
               ))}
@@ -708,8 +711,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         </Modal>
       )}
 
-      {/* Menu contextuel (clic droit sur une vignette) */}
-      {ctx && (
+      {/* Menu contextuel (clic droit sur une vignette) — portal pour échapper au transform de page */}
+      {ctx && createPortal(
         <>
           <div onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
           <div style={{ position: 'fixed', top: Math.min(ctx.y, window.innerHeight - 230), left: Math.min(ctx.x, window.innerWidth - 190), zIndex: 61, width: 180, borderRadius: 10, overflow: 'hidden', background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)' }}>
@@ -729,11 +732,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               <span style={{ display: 'flex' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={14} /></span>Supprimer
             </button>
           </div>
-        </>
+        </>,
+        document.body,
       )}
 
-      {/* Menu contextuel dossier (clic droit) */}
-      {folderCtx && (
+      {/* Menu contextuel dossier (clic droit) — portal aussi */}
+      {folderCtx && createPortal(
         <>
           <div onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
           <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 110), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 10, overflow: 'hidden', background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)' }}>
@@ -746,7 +750,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               <span style={{ display: 'flex' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={14} /></span>Supprimer le dossier
             </button>
           </div>
-        </>
+        </>,
+        document.body,
       )}
 
       {renameFolderOf && (

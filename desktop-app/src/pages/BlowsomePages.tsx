@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -199,7 +200,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
           onSaveSequence={(steps) => { setLive(null); setPendingSteps(steps) }} />
       )}
 
-      {pendingSteps && (
+      {pendingSteps && createPortal(
         <div onClick={() => setPendingSteps(null)} style={{ position: 'fixed', inset: 0, zIndex: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4,3,8,0.78)', backdropFilter: 'blur(6px)' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: 380, maxWidth: '92vw', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.14)' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: INK, marginBottom: 4 }}>Enregistrer la séquence</div>
@@ -211,7 +212,8 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
               <button style={{ ...btn, background: GOLD, color: '#1a1206', border: 'none' }} onClick={saveRecorded}>Enregistrer</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {picker && (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { IrtDevice, IrtAction, SeqStep } from '@/lib/iremotech'
 import { openLiveStream, sendAction, snapshot } from '@/lib/iremotech'
 
@@ -107,7 +108,7 @@ export default function LiveDevice({ apiKey, device, onClose, onSaveSequence }: 
 
   const btn: React.CSSProperties = { height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: BORDER, color: INK }
 
-  return (
+  return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'rgba(4,3,8,0.78)', backdropFilter: 'blur(6px)' }}>
       <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 16, maxWidth: '100%', maxHeight: '92vh' }}>
         {/* Écran live */}
@@ -157,6 +158,7 @@ export default function LiveDevice({ apiKey, device, onClose, onSaveSequence }: 
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -1,6 +1,7 @@
 // Fabriques d'éléments portées à l'identique du prototype ScaleFlow.dc.html.
 // _icon / _statusDot / _chip / _btn / _panel / _panelHead / _pageHead / _kpi / _empty
 import type { CSSProperties, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { Theme } from './theme'
 
 // ── _icon ──────────────────────────────────────────────────────────────────────
@@ -158,7 +159,9 @@ export function Modal({ title, sub, icon, theme, onClose, footer, width, childre
   title: string; sub?: string; icon?: string; theme: Theme; onClose: () => void
   footer?: ReactNode; width?: number; children: ReactNode
 }) {
-  return (
+  // Portal vers <body> : une modale doit être relative à l'écran, pas au conteneur
+  // de page (qui a un transform d'animation → il piégeait le position:fixed).
+  return createPortal(
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 90, display: 'flex', justifyContent: 'center', padding: 28, overflowY: 'auto',
       background: 'rgba(4,6,8,0.72)', backdropFilter: 'blur(6px)', animation: 'aFade .16s ease both',
@@ -181,7 +184,8 @@ export function Modal({ title, sub, icon, theme, onClose, footer, width, childre
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 18 }}>{children}</div>
         {footer && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '13px 18px', borderTop: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
