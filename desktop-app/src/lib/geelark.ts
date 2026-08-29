@@ -404,16 +404,18 @@ export async function postReelToPhone(
   caption: string,
   log: (m: string) => void,
   rotationUrls?: string[],
+  trial?: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log, rotationUrls)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
-    log('🎬 Création de la tâche de publication Reels…')
+    log(trial ? '🎬 Création de la tâche Reels (essai · non-abonnés)…' : '🎬 Création de la tâche de publication Reels…')
     const res = await geelarkFetch('/rpa/task/instagramPubReels', {
       id: phoneId,
       scheduleAt: Math.floor(Date.now() / 1000) + 5,
       description: caption ?? '',
       video: [videoResourceUrl],
+      ...(trial ? { shareType: 2 } : {}),
     }, bearer)
     if (Number(res['code']) !== 0) return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
