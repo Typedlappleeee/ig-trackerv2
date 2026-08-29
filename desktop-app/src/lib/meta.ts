@@ -7,8 +7,19 @@ import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { OrgState } from './data'
+import { IS_WEB } from './platform'
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
+
+// Electron → appel Graph direct ; WEB → relais /api/meta (CORS). Renvoie le JSON.
+async function graphFetch(url: string): Promise<any> {
+  if (IS_WEB) {
+    const res = await fetch('/api/meta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
+    const j = await res.json() as { ok: boolean; data?: any; error?: string }
+    return j.ok ? j.data : { error: { message: j.error || 'relais Meta : échec' } }
+  }
+  return (await fetch(url)).json()
+}
 const SCOPES = ['instagram_basic', 'instagram_manage_insights', 'pages_show_list', 'pages_read_engagement', 'business_management'].join(',')
 
 export interface MetaConfig { appId: string; redirectUri: string; loading: boolean }
@@ -92,16 +103,14 @@ export async function syncMetaInsights(
     try {
       log(`— @${c.ig_username ?? c.ig_user_id} —`)
       // Abonnés + nb de médias.
-      const infoRes = await fetch(`${GRAPH}/${c.ig_user_id}?fields=followers_count,media_count&access_token=${encodeURIComponent(c.page_access_token)}`)
-      const info = await infoRes.json()
+      const info = await graphFetch(`${GRAPH}/${c.ig_user_id}?fields=followers_count,media_count&access_token=${encodeURIComponent(c.page_access_token)}`)
       if (info.error) throw new Error(info.error.message)
       const followers = Number(info.followers_count ?? 0)
 
       // Vues + insights PAR MÉDIA (Reels) → table media_insights (classement + courbe).
       let totalViews = 0
       try {
-        const mediaRes = await fetch(`${GRAPH}/${c.ig_user_id}/media?fields=id,caption,media_type,thumbnail_url,permalink,timestamp,like_count,comments_count,insights.metric(views,reach)&limit=50&access_token=${encodeURIComponent(c.page_access_token)}`)
-        const media = await mediaRes.json()
+        const media = await graphFetch(`${GRAPH}/${c.ig_user_id}/media?fields=id,caption,media_type,thumbnail_url,permalink,timestamp,like_count,comments_count,insights.metric(views,reach)&limit=50&access_token=${encodeURIComponent(c.page_access_token)}`)
         const rows: any[] = []
         for (const m of (media.data ?? [])) {
           const views = Number(m?.insights?.data?.find((x: any) => x.metric === 'views')?.values?.[0]?.value ?? 0)

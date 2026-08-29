@@ -6,8 +6,18 @@ import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { OrgState } from './data'
+import { IS_WEB } from './platform'
 
 const BASE = 'https://api.iremotech.com/v1'
+
+// WEB : relais /api/iremotech (op-based). Renvoie { ok, data, dataUrl }.
+async function irtProxy(op: string, apiKey: string, payload: Record<string, unknown> = {}): Promise<any> {
+  const res = await fetch('/api/iremotech', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ op, apiKey, ...payload }),
+  })
+  return res.json()
+}
 const WS_BASE = 'wss://api.iremotech.com/v1'
 
 export interface IrtDevice { public_id: string; name?: string; model?: string; status?: string; [k: string]: unknown }
@@ -80,17 +90,20 @@ async function get<T>(key: string, path: string): Promise<T> {
 }
 
 export async function listDevices(key: string): Promise<IrtDevice[]> {
-  const d = await get<{ devices?: IrtDevice[] } | IrtDevice[]>(key, 'devices')
-  return Array.isArray(d) ? d : (Array.isArray((d as any).devices) ? (d as any).devices : [])
+  const d = IS_WEB
+    ? (await irtProxy('devices', key)).data
+    : await get<{ devices?: IrtDevice[] } | IrtDevice[]>(key, 'devices')
+  return Array.isArray(d) ? d : (Array.isArray((d as any)?.devices) ? (d as any).devices : [])
 }
 export async function fetchUsage(key: string): Promise<IrtUsage | null> {
-  try { return await get<IrtUsage>(key, 'usage') } catch { return null }
+  try { return IS_WEB ? (await irtProxy('usage', key)).data : await get<IrtUsage>(key, 'usage') } catch { return null }
 }
 
 // Capture d'écran → data URL JPEG.
 export async function snapshot(key: string, deviceId: string): Promise<string | null> {
   await slot()
   try {
+    if (IS_WEB) { const j = await irtProxy('snapshot', key, { deviceId }); return j.ok && j.dataUrl ? j.dataUrl : null }
     const res = await fetch(`${BASE}/devices/${encodeURIComponent(deviceId)}/snapshot`, { headers: { Authorization: `Bearer ${key}` } })
     if (!res.ok) return null
     const buf = await res.arrayBuffer()
@@ -104,6 +117,7 @@ export async function snapshot(key: string, deviceId: string): Promise<string | 
 export async function sendAction(key: string, deviceId: string, action: IrtAction): Promise<boolean> {
   await slot()
   try {
+    if (IS_WEB) { const j = await irtProxy('action', key, { deviceId, body: action }); return !!j.ok }
     const res = await fetch(`${BASE}/devices/${encodeURIComponent(deviceId)}/actions`, {
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(action),
@@ -115,6 +129,7 @@ export async function sendAction(key: string, deviceId: string, action: IrtActio
 // Upload d'un média (URL signée Supabase) → octets bruts sur l'iPhone.
 export async function uploadMedia(key: string, deviceId: string, mediaUrl: string, filename = 'video.mp4'): Promise<boolean> {
   try {
+    if (IS_WEB) { const j = await irtProxy('media', key, { deviceId, mediaUrl, filename }); return !!j.ok }
     const dl = await fetch(mediaUrl)
     if (!dl.ok) return false
     const bytes = await dl.arrayBuffer()
