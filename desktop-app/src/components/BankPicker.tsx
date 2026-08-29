@@ -14,7 +14,7 @@ export type PickerResult =
   | { kind: 'videos' | 'images'; ids: string[] }
   | { kind: 'captions'; text: string; texts: string[] }
 
-interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
+interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null; folder: string | null }
 interface Cap { id: string; title: string | null; content: string }
 
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
@@ -33,6 +33,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   const [caps, setCaps] = useState<Cap[]>([])
   const [sel, setSel] = useState<string[]>(initialIds)
   const [q, setQ] = useState('')
+  const [folder, setFolder] = useState<string>('Tous')
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
@@ -57,10 +58,15 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
 
   const { thumbFor } = useBankThumbs(media)
 
+  const folders = useMemo(() => {
+    const s = new Set<string>(); media.forEach(m => { if (m.folder) s.add(m.folder) }); return [...s].sort((a, b) => a.localeCompare(b))
+  }, [media])
   const filteredMedia = useMemo(() => {
     const s = q.trim().toLowerCase()
-    return s ? media.filter(m => (m.title ?? '').toLowerCase().includes(s)) : media
-  }, [media, q])
+    return media
+      .filter(m => folder === 'Tous' || m.folder === folder)
+      .filter(m => !s || (m.title ?? '').toLowerCase().includes(s))
+  }, [media, q, folder])
   const filteredCaps = useMemo(() => {
     const s = q.trim().toLowerCase()
     return s ? caps.filter(c => (c.title ?? '').toLowerCase().includes(s) || c.content.toLowerCase().includes(s)) : caps
@@ -141,6 +147,28 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
             onChange={e => { if (e.target.files) importFiles(e.target.files); e.target.value = '' }} />
         </>}
       </div>
+
+      {kind !== 'captions' && (folders.length > 0 || multi) && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '2px 15px 8px' }}>
+          {folders.length > 0 && ['Tous', ...folders].map(f => {
+            const on = folder === f
+            return (
+              <button key={f} onClick={() => setFolder(f)} style={{
+                height: 26, padding: '0 10px', borderRadius: 99, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                background: on ? `rgba(${theme.tone},0.16)` : 'rgba(255,255,255,0.03)',
+                border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.08)'), color: on ? theme.accentText : '#A1A1AA',
+              }}>{f === 'Tous' ? 'Tous' : `📁 ${f}`}</button>
+            )
+          })}
+          {multi && filteredMedia.length > 0 && (
+            <button onClick={() => setSel(cur => [...new Set([...cur, ...filteredMedia.map(m => m.id)])])} style={{
+              marginLeft: 'auto', height: 26, padding: '0 11px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+              background: theme.accentBtn, border: 'none', color: '#fff',
+            }}>{folder === 'Tous' ? `Tout ajouter (${filteredMedia.length})` : `Ajouter le dossier (${filteredMedia.length})`}</button>
+          )}
+        </div>
+      )}
+
       <div
         onDragOver={kind !== 'captions' ? (e) => { e.preventDefault(); setDrag(true) } : undefined}
         onDragLeave={() => setDrag(false)}

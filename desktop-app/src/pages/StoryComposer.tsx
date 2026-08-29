@@ -181,11 +181,11 @@ export default function StoryComposer({ theme, user, org, onBack }: {
           <Panel theme={theme}>
             <PanelHead title="Image de la story" sub={chosen ? chosen.title : 'choisis une image de la banque'}
               right={<Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPicker('images')} />} />
-            {images.length === 0 ? (
-              <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucune image dans la banque.</div>
+            {!chosen ? (
+              <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>Aucune image choisie.<br />Clique <b style={{ color: theme.accentText }}>Ouvrir la banque</b>.</div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 13, maxHeight: 240, overflowY: 'auto' }}>
-                {images.map((m, i) => {
+                {images.filter(m => imageId === m.id).map((m, i) => {
                   const on = imageId === m.id
                   const hue = ['139,92,246', '6,182,212', '236,72,153', '16,185,129', '245,158,11'][i % 5]
                   const prev = thumbFor(m)

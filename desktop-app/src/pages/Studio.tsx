@@ -209,9 +209,9 @@ export default function Studio({ theme, infra, user, org }: {
               <input ref={fileRef} type="file" accept="video/*,image/*" multiple style={{ display: 'none' }}
                 onChange={e => { if (e.target.files) importFromPC(e.target.files); e.target.value = '' }} />
             </>} />
-            {videos.length === 0 ? <div style={{ padding: 28, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucune vidéo dans la banque. Clique « Mon PC » pour en importer.</div> : (
+            {nSrc === 0 ? <div style={{ padding: 28, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>Aucune vidéo choisie.<br />Clique « Banque » ou « Mon PC ».</div> : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 13, maxHeight: 300, overflowY: 'auto' }}>
-                {videos.map((v) => {
+                {videos.filter(v => src.has(v.id)).map((v) => {
                   const on = src.has(v.id); const prev = thumbFor(v); const vid = isVid(v)
                   return (
                     <button key={v.id} onClick={() => toggleSrc(v.id)} title={v.title} style={{

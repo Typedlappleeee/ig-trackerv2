@@ -250,9 +250,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             <Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPicker('videos')} />
             <Chip text={`${nVid} sélectionnée${nVid > 1 ? 's' : ''}`} tone={nVid ? 'violet' : 'mute'} />
           </>} />
-          {videos.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucune vidéo dans la banque.</div> : (
+          {nVid === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>Aucune vidéo choisie.<br />Clique <b style={{ color: theme.accentText }}>Ouvrir la banque</b> pour en sélectionner.</div> : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(84px,1fr))', gap: 8, padding: 13, maxHeight: 420, overflowY: 'auto' }}>
-              {videos.map((v, i) => {
+              {videos.filter(v => vidSel.has(v.id)).map((v, i) => {
                 const on = vidSel.has(v.id); const h = HUES[i % 6]
                 const prev = thumbFor(v); const vid = isVideo(v)
                 return (
