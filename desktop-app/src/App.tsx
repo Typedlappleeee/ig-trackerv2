@@ -80,7 +80,8 @@ function AppInner({ user }: { user: User }) {
   // Garde-fou : si l'accès Blowsome n'est pas (ou plus) accordé, on ne reste jamais
   // sur cette infra VIP — retour GeeLark. (Même logique de porte que le web.)
   useEffect(() => {
-    if (infra === 'blowsome' && !license.loading && !license.blowsome) setInfra('geelark')
+    // Cloud ET Blowsome sont réservés au rôle Blowsome : sans lui → retour GeeLark.
+    if ((infra === 'blowsome' || infra === 'cloud') && !license.loading && !license.blowsome) setInfra('geelark')
   }, [infra, license.loading, license.blowsome])
 
   async function signOut() {

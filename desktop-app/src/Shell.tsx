@@ -189,7 +189,7 @@ export default function Shell({
               background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)',
               animation: 'aIn 0.2s cubic-bezier(0.16,1,0.3,1) both',
             }}>
-              {Object.values(INFRAS).filter(o => o.k !== 'blowsome' || canBlowsome).map(o => {
+              {Object.values(INFRAS).filter(o => (o.k !== 'blowsome' && o.k !== 'cloud') || canBlowsome).map(o => {
                 const on = infra === o.k
                 return (
                   <button key={o.k} onClick={() => { setInfra(o.k); setInfraOpen(false); setPage('hub') }}
