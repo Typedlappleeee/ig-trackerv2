@@ -22,6 +22,7 @@ import Connections from '@/pages/Connections'
 import Automation from '@/pages/Automation'
 import Flows from '@/pages/Flows'
 import Settings from '@/pages/Settings'
+import RunWidget from '@/components/RunWidget'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 
 // Spécifications des écrans encore en placeholder (gabarit PageHead + état vide).
@@ -149,6 +150,7 @@ function AppInner({ user }: { user: User }) {
       onSignOut={signOut}
     >
       {content}
+      <RunWidget theme={theme} />
     </Shell>
   )
 }

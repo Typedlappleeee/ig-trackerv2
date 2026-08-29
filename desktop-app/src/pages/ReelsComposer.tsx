@@ -12,6 +12,7 @@ import { geelarkUploadVideo, postReelToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { generateCaption } from '@/lib/ai'
+import { startRun, cancelRun } from '@/lib/runStore'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null; ig_status: string | null; last_post_at: string | null; account_state: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; duration: number | null; notes: string | null }
@@ -62,6 +63,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [logs, setLogs] = useState<string[]>([])
   const [picker, setPicker] = useState<PickerKind | null>(null)
   const [genning, setGenning] = useState(false)
+  const [runId, setRunId] = useState<string | null>(null)
 
   const setCaptionAt = (i: number, v: string) => setCaptions(c => c.map((x, k) => k === i ? v : x))
   const addCaption = (v = '') => setCaptions(c => [...c, v])
@@ -134,6 +136,10 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     if (isCreditError(run)) { push(`❌ Crédits insuffisants : ${run.error} (il faut ${cost} crédits).`); setRunItems([]); setRunning(false); return }
     push(`💳 ${cost} crédits débités (${CREDIT_COSTS.mass_posting}/compte).`)
 
+    // Suivi global (widget flottant + annulation), survit à la navigation.
+    const R = startRun('reels', `${targets.length} compte${targets.length > 1 ? 's' : ''}`, targets.length)
+    setRunId(R.id)
+
     // 1) Répartition D'ABORD : UNE vidéo par compte (séquentielle ou aléatoire).
     const shuffle = <T,>(a: T[]): T[] => { const b = [...a]; for (let k = b.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1));[b[k], b[j]] = [b[j], b[k]] } return b }
     const order = vidMode === 'random' ? shuffle(chosenVids) : chosenVids
@@ -145,6 +151,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     push(`⬆ Hébergement de ${distinct.length} vidéo(s) (1 par compte)…`)
     const resourceByVid = new Map<string, string>()
     for (const v of distinct) {
+      if (R.isCancelled()) break
       const url = await resolveVideoUrl(v)
       if (!url) { push(`⚠ ${v.title} : URL introuvable.`); continue }
       const ru = await geelarkUploadVideo(bearer, url, push)
@@ -156,18 +163,22 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     const usedVidIds = new Set<string>()
     let i = 0
     for (const p of targets) {
+      if (R.isCancelled()) { push('⏹ Annulé — arrêt après le compte en cours.'); break }
       const v = assignment[i]
       const cap = caps.length === 0 ? '' : capMode === 'random' ? caps[Math.floor(Math.random() * caps.length)] : caps[i % caps.length]
       i++
       const ru = resourceByVid.get(v.id)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
-      if (!ru) { run.markFailed(); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); continue }
+      if (!ru) { run.markFailed(); R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); continue }
       usedVidIds.add(v.id)
       push(`— @${p.ig_username ?? p.geelark_id} · ${v.title}${cap ? ' · légende' : ''} —`)
       const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial)
       if (!r.ok) run.markFailed()
+      R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
+    R.finish()
+    setRunId(null)
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)
 
@@ -397,7 +408,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
           {runItems.length > 0 && (
             <div style={{ gridColumn: '1/-1' }}>
               <Panel theme={theme}>
-                <PanelHead title="Publication en direct" sub={`${runItems.filter(r => r.phase === 'done').length}/${runItems.length} terminés`} />
+                <PanelHead title="Publication en direct" sub={`${runItems.filter(r => r.phase === 'done').length}/${runItems.length} terminés`}
+                  right={runId ? <Btn theme={theme} sm tone="danger" icon="M6 6h12v12H6z" label="Annuler" onClick={() => cancelRun(runId)} /> : undefined} />
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '11px 15px' }}>
                   {runItems.map(it => {
                     const c = it.phase === 'done' ? 'ok' : it.phase === 'failed' ? 'bad' : it.phase === 'running' ? 'warn' : 'mute'

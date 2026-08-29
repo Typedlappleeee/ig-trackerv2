@@ -8,6 +8,7 @@ import { phoneLabel, phoneSub, useBankThumbs } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, crossPostToPhone, CROSS_PLATFORMS, type CrossPlatform } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
+import { startRun } from '@/lib/runStore'
 import BankPicker from '@/components/BankPicker'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null }
@@ -83,16 +84,21 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     if (!url) { push('❌ Vidéo introuvable.'); run.abort(); await run.settle(); setRunning(false); return }
     const resourceUrl = await geelarkUploadVideo(bearer, url, push)
     if (!resourceUrl) { push('❌ Envoi vidéo échoué.'); run.abort(); await run.settle(); setRunning(false); return }
+    const R = startRun('cross', `${targets.length} compte × ${platList.length} plateforme${platList.length > 1 ? 's' : ''}`, targets.length * platList.length)
     for (const p of targets) {
+      if (R.isCancelled()) { push('⏹ Annulé.'); break }
       for (const pl of platList) {
+        if (R.isCancelled()) break
         const key = `${p.id}:${pl}`
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: 'running' } : it))
         push(`— ${phoneLabel(p)} · ${pl} —`)
         const r = await crossPostToPhone(bearer, p.geelark_id!, pl, { mediaResourceUrl: resourceUrl, caption, rotationUrls: rot }, push)
         if (!r.ok) run.markFailed()
+        R.tick(r.ok)
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
       }
     }
+    R.finish()
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés.`)
     push('✔ Cross-posting terminé.'); setRunning(false)

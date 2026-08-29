@@ -9,6 +9,7 @@ import { useConnections } from '@/lib/connections'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { geelarkUploadImage, postStoryToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
+import { startRun } from '@/lib/runStore'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null }
 interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
@@ -109,6 +110,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
       setRunItems([]); setRunning(false); return
     }
     push(`💳 ${CREDIT_COSTS.story * targets.length} crédits débités (${CREDIT_COSTS.story}/compte).`)
+    const R = startRun('story', `${targets.length} compte${targets.length > 1 ? 's' : ''}`, targets.length)
 
     // Héberge chaque image du pool UNE fois.
     push(`🔗 Préparation de ${chosenImgs.length} image(s)…`)
@@ -128,6 +130,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
 
     let i = 0
     for (const p of targets) {
+      if (R.isCancelled()) { push('⏹ Annulé.'); break }
       const img = imgOrder[i % imgOrder.length]
       const st = sts.length === 0 ? 'Voir plus' : stMode === 'random' ? sts[Math.floor(Math.random() * sts.length)] : sts[i % sts.length]
       i++
@@ -135,8 +138,10 @@ export default function StoryComposer({ theme, user, org, onBack }: {
       push(`— @${p.ig_username ?? p.geelark_id} · ${img.title} —`)
       const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl: resByImg.get(img.id)!, linkUrl: links[p.id], linkText: st, rotationUrls: rot }, push)
       if (!r.ok) run.markFailed()
+      R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
+    R.finish()
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)
     push('✔ Stories terminées.')

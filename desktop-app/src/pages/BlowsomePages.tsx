@@ -15,6 +15,7 @@ import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
 import { resolveSourceBytes, saveOutputToBank, runSpoof } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
+import { startRun } from '@/lib/runStore'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
 const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
@@ -125,10 +126,12 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
       else videoUrl = runVid.file_url ?? undefined
     }
     push(`▶ « ${runSeq.name} » sur ${runSel.size} iPhone(s)…`)
+    const R = startRun('farm', `${runSeq.name} · ${runSel.size} iPhone(s)`, runSeq.steps.length)
     await replaySequence(irt.key, [...runSel], runSeq.steps, { videoUrl, videoName, caption: runCaption }, {
-      onStep: (i, t) => push(`· étape ${i + 1}/${t}`), log: push,
+      onStep: (i, t) => { R.tick(true); push(`· étape ${i + 1}/${t}`) }, log: push, shouldStop: () => R.isCancelled(),
     })
-    push('✔ Terminé.')
+    R.finish()
+    push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.')
     setRunning(false)
   }
 
@@ -261,25 +264,30 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   async function generate() {
     if (running || sources.length === 0) return
     setRunning(true); setLogs([]); setMade(0); setProgress(0)
+    const per = Math.max(1, Math.min(12, variants))
+    const R = startRun('auto', `${sources.length} vidéo${sources.length > 1 ? 's' : ''} × ${per}`, sources.length * per)
     try {
       if (!isFfmpegReady()) { push('⏳ Chargement du moteur (~30 Mo, une fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
       let done = 0
       for (const v of sources) {
+        if (R.isCancelled()) { push('⏹ Annulé.'); break }
         push(`— ${v.title} —`)
         const bytes = await resolveSourceBytes(v)
         let caption: string | null = null
         if (withCap && conns.groq) { caption = await generateCaption(conns.groq, v.title); if (caption) push('  ✍ légende IA générée') }
-        for (let i = 0; i < Math.max(1, Math.min(12, variants)); i++) {
+        for (let i = 0; i < per; i++) {
+          if (R.isCancelled()) break
           setProgress(0)
-          push(`  · variante ${i + 1}/${variants}…`)
+          push(`  · variante ${i + 1}/${per}…`)
           const out = await runSpoof(bytes, Math.random() * 1000, { onProgress: setProgress, onLog: () => {} })
           await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`)
-          done++; setMade(done)
+          done++; setMade(done); R.tick(true)
         }
       }
-      push(`✔ ${done} variantes générées — dans la banque.`)
+      push(R.isCancelled() ? '⏹ Arrêté.' : `✔ ${done} variantes générées — dans la banque.`)
+      R.finish()
       load()
-    } catch (e) { push(`❌ ${e instanceof Error ? e.message : 'Échec'}`) }
+    } catch (e) { push(`❌ ${e instanceof Error ? e.message : 'Échec'}`); R.finish('error') }
     setRunning(false); setProgress(0)
   }
 

@@ -12,6 +12,7 @@ import {
   runSpoof, runRemixVariant, runMontage, runOverlay, runCaption, runSubtitles,
 } from '@/lib/studioTools'
 import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
+import { startRun } from '@/lib/runStore'
 
 // Studio vidéo : hub des outils (gratuits) + wizard par outil (fidèle à _studio()).
 // La génération n'est pas encore branchée (outils serveur) — le wizard prépare tout.
@@ -118,11 +119,14 @@ export default function Studio({ theme, infra, user, org }: {
 
     setRunning(true); setLogs([]); setResults([]); setProgress(0)
     const hooks = { onProgress: setProgress, onLog: (_m: string) => {} }
+    const perOut = (tool === 'spoof' || tool === 'remix') ? Math.max(1, Math.min(24, copies)) : 1
+    const R = startRun('studio', `${T.t} · ${chosen.length} vidéo${chosen.length > 1 ? 's' : ''}`, chosen.length * perOut)
     try {
       if (!isFfmpegReady()) { push('⏳ Chargement du moteur vidéo (~30 Mo, une seule fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
       const ovs = tool === 'overlay' ? await overlayAll() : []
       let vIdx = 0
       for (const v of chosen) {
+        if (R.isCancelled()) { push('⏹ Annulé.'); break }
         push(`— ${v.title} —`)
         setProgress(0)
         const bytes = await resolveSourceBytes(v)
@@ -130,6 +134,7 @@ export default function Studio({ theme, infra, user, org }: {
         if (tool === 'spoof' || tool === 'remix') {
           const n = Math.max(1, Math.min(24, copies))
           for (let i = 0; i < n; i++) {
+            if (R.isCancelled()) break
             push(`  · variante ${i + 1}/${n}…`)
             const seed = Math.random() * 1000
             const data = tool === 'spoof' ? await runSpoof(bytes, seed, hooks) : await runRemixVariant(bytes, seed, hooks)
@@ -154,13 +159,16 @@ export default function Studio({ theme, infra, user, org }: {
           await saveOutputToBank(user.id, currentOrg?.id ?? null, o.data, o.title)
           const url = URL.createObjectURL(new Blob([o.data as BlobPart], { type: 'video/mp4' }))
           setResults(r => [...r, { title: o.title, url }])
+          R.tick(true)
         }
         vIdx++
       }
-      push('✔ Terminé — sorties enregistrées dans la banque.')
+      push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé — sorties enregistrées dans la banque.')
+      R.finish()
       load()
     } catch (e) {
       push(`❌ ${e instanceof Error ? e.message : 'Échec du traitement'}`)
+      R.finish('error')
     }
     setRunning(false); setProgress(0)
   }
