@@ -11,6 +11,7 @@ import {
   resolveSourceBytes, saveOutputToBank,
   runSpoof, runRemixVariant, runMontage, runOverlay, runCaption, runSubtitles,
 } from '@/lib/studioTools'
+import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
 
 // Studio vidéo : hub des outils (gratuits) + wizard par outil (fidèle à _studio()).
 // La génération n'est pas encore branchée (outils serveur) — le wizard prépare tout.
@@ -114,8 +115,9 @@ export default function Studio({ theme, infra, user, org }: {
 
     setRunning(true); setLogs([]); setResults([]); setProgress(0)
     const hooks = { onProgress: setProgress, onLog: (_m: string) => {} }
-    const ov = tool === 'overlay' ? await overlayBytes() : null
     try {
+      if (!isFfmpegReady()) { push('⏳ Chargement du moteur vidéo (~30 Mo, une seule fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
+      const ov = tool === 'overlay' ? await overlayBytes() : null
       for (const v of chosen) {
         push(`— ${v.title} —`)
         setProgress(0)
