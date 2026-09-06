@@ -801,10 +801,14 @@ export function Bank({ user }: BankProps) {
     if (!newName || newName === oldName) return
     // Rename all items in the folder
     await scopeQ(supabase.from('content_bank').update({ folder: newName }).eq('folder', oldName))
-    // Also rename the sentinel row (title = folder name, folder = folder name) — handles both regular and Drive sentinels
-    await scopeQ(supabase.from('content_bank')
-      .update({ title: newName, folder: newName })
-      .in('notes', ['__sf_folder__', '__sf_drive_folder__']).eq('folder', oldName))
+    // Renomme la sentinelle (title = folder = nom). On matche par folder ET par title
+    // (d'anciennes sentinelles ont folder = NULL) pour ne jamais laisser d'orphelin.
+    const renSentinel = (col: 'folder' | 'title') =>
+      scopeQ(supabase.from('content_bank')
+        .update({ title: newName, folder: newName })
+        .in('notes', ['__sf_folder__', '__sf_drive_folder__']).eq(col, oldName))
+    await renSentinel('folder')
+    await renSentinel('title')
     setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === oldName ? { ...i, folder: newName as unknown as string } : i))
     setEmptyFolders(prev => prev.map(f => f === oldName ? newName : f))
     if (selectedFolder === oldName) setSelectedFolder(newName)
@@ -825,17 +829,29 @@ export function Bank({ user }: BankProps) {
       await qu
       setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
     }
-    // Delete the sentinel row for this folder from Supabase (handles both regular and Drive sentinels)
-    await scopeQ(supabase.from('content_bank').delete().in('notes', ['__sf_folder__', '__sf_drive_folder__']).eq('folder', name))
+    // Supprime la/les sentinelle(s) de CE dossier. Le nom affiché vient du `title`
+    // de la sentinelle, mais on supprimait par `folder` → d'anciennes sentinelles
+    // (folder = NULL, title seul) n'étaient JAMAIS matchées → le dossier revenait
+    // après refresh. On supprime donc par title ET par folder, et on capture l'erreur
+    // (RLS/permission peut bloquer silencieusement).
+    const delSentinel = (col: 'folder' | 'title') =>
+      scopeQ(supabase.from('content_bank').delete()
+        .in('notes', ['__sf_folder__', '__sf_drive_folder__']).eq(col, name))
+    const { error: se1 } = await delSentinel('folder')
+    const { error: se2 } = await delSentinel('title')
+    if (se1 || se2) { setError(tr('Suppression du dossier échouée : ', 'Folder deletion failed: ') + (se1 || se2)!.message); return }
     setEmptyFolders(prev => prev.filter(f => f !== name))
     if (selectedFolder === name) setSelectedFolder(null)
     setFolderModal(null)
+    // Re-synchronise depuis la DB → reflète l'état RÉEL (fini le faux « supprimé » local).
+    await load()
   }
 
   async function mergeFolderTo(fromFolder: string, toFolder: string | null) {
     await scopeQ(supabase.from('content_bank').update({ folder: toFolder }).eq('folder', fromFolder))
-    // Delete sentinel of the merged folder (handles both regular and Drive sentinels)
+    // Supprime la sentinelle du dossier fusionné — par folder ET par title (sentinelles legacy folder=NULL).
     await scopeQ(supabase.from('content_bank').delete().in('notes', ['__sf_folder__', '__sf_drive_folder__']).eq('folder', fromFolder))
+    await scopeQ(supabase.from('content_bank').delete().in('notes', ['__sf_folder__', '__sf_drive_folder__']).eq('title', fromFolder))
     setItems(prev => prev.map(i => (i as unknown as {folder?:string}).folder === fromFolder ? { ...i, folder: toFolder as unknown as string } : i))
     setEmptyFolders(prev => prev.filter(f => f !== fromFolder))
     if (selectedFolder === fromFolder) setSelectedFolder(toFolder)
