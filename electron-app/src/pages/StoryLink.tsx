@@ -4,7 +4,7 @@ import { loadLastGroup, saveLastGroup } from '@/lib/uiPrefs'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessPhoneGroup } from '@/lib/permissions'
-import { fetchAllPhones, postInstagramStoryRpa, stopPhone, fetchPhoneProxies, type GeelarkPhone } from '@/lib/geelark'
+import { fetchAllPhones, postInstagramStory, postInstagramStoryRpa, stopPhone, fetchPhoneProxies, type GeelarkPhone } from '@/lib/geelark'
 import { startRun, updateRun, endRun, setRunPhase, proxyConflicts, type PhaseStatus } from '@/lib/activeRuns'
 import { resolveRotationUrls, useProxyRotation, getProxyRotation } from '@/lib/proxyRotation'
 import { ProxyPicker } from '@/components/ProxyPicker'
@@ -600,19 +600,28 @@ export default function StoryLink({ user }: { user: User }) {
           addLog(asgn.phoneId, tr('🧪 Test — image + lien assignés (aucune publication)', '🧪 Test — image + link assigned (no publication)'))
           setStatus(asgn.phoneId, 'ok'); phoneOutcome.set(asgn.phoneId, { ok: true }); return 1
         }
-        // Story via RPA GeeLark (import auto du flow + exécution native). Pas de
-        // retry : re-poster risquerait un double post si GeeLark rapporte un faux échec.
-        const res = await postInstagramStoryRpa(
-          bearer, asgn.phoneId,
-          {
-            imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined,
-            rotationUrls,
-            addToHighlights: addToHl,
-            createHighlight:    addToHl && hlMode === 'create'   ? hlName.trim() : '',
-            addToHighlightName: addToHl && hlMode === 'existing' ? hlName.trim() : '',
-          },
-          m => addLog(asgn.phoneId, m),
-        )
+        // Moteur story : par défaut le flow ADB « ancien » (ouvre la caméra story via
+        // le deep link instagram://story-camera + matchers de repli) — bien plus robuste
+        // quand Instagram change son UI (le flow RPA n'ouvrait « même plus » la story).
+        // On garde le flow RPA UNIQUEMENT pour l'ajout aux Highlights (seul à le gérer).
+        // Pas de retry : re-poster risquerait un double si GeeLark rapporte un faux échec.
+        const res = addToHl
+          ? await postInstagramStoryRpa(
+              bearer, asgn.phoneId,
+              {
+                imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined,
+                rotationUrls,
+                addToHighlights: addToHl,
+                createHighlight:    addToHl && hlMode === 'create'   ? hlName.trim() : '',
+                addToHighlightName: addToHl && hlMode === 'existing' ? hlName.trim() : '',
+              },
+              m => addLog(asgn.phoneId, m),
+            )
+          : await postInstagramStory(
+              bearer, asgn.phoneId,
+              { imageUrl: asgn.photo.url, linkUrl: asgn.link, linkText: asgn.text || undefined, rotationUrls },
+              m => addLog(asgn.phoneId, m),
+            )
         if (res.ok) { setStatus(asgn.phoneId, 'ok'); phoneOutcome.set(asgn.phoneId, { ok: true }); return 1 }
         else { setStatus(asgn.phoneId, 'error'); phoneOutcome.set(asgn.phoneId, { ok: false, error: res.error || tr('Échec', 'Failed') }); addLog(asgn.phoneId, `❌ ${res.error ?? tr('La publication de la story a échoué', 'The story publication failed')}`); return 0 }
       } catch (e) {
