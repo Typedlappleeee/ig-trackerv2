@@ -13,7 +13,7 @@ import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
-import { resolveSourceBytes, saveOutputToBank, runSpoof } from '@/lib/studioTools'
+import { resolveSourceBytes, saveOutputToBank, runSpoof, runCaption, GPS_CITIES, gpsFor, type SpoofIntensity, type CaptionPos } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 
@@ -23,6 +23,8 @@ const GOLD = '#E9C46A'
 const INK = '#ECE9F5'
 const MUTED = '#A79FBD'
 const SERIF = "'Space Grotesk',sans-serif"
+const selStyle: CSSProperties = { height: 32, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', cursor: 'pointer' }
+const optStyle: CSSProperties = { background: '#17111F' }
 
 function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   return <div style={{ borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.12)', boxShadow: '0 20px 50px -30px rgba(168,85,247,0.5)', ...style }}>{children}</div>
@@ -236,10 +238,13 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const { currentOrg } = org
   const conns = useConnections(user, org)
   const [count, setCount] = useState<number | null>(null)
+  const [folders, setFolders] = useState<string[]>([])
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { count: c } = await scope(supabase.from('content_bank').select('id', { count: 'exact', head: true }))
     setCount(c ?? 0)
+    const { data: fd } = await scope(supabase.from('content_bank').select('folder'))
+    setFolders([...new Set(((fd ?? []) as { folder: string | null }[]).map(r => r.folder).filter((f): f is string => !!f))].sort())
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
 
@@ -247,6 +252,17 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [picker, setPicker] = useState(false)
   const [sources, setSources] = useState<{ id: string; title: string; storage_path: string | null; file_url: string | null }[]>([])
   const [variants, setVariants] = useState(3)
+  // Anti-détection : intensité du spoof + localisation GPS (métadonnées mp4).
+  const [intensity, setIntensity] = useState<SpoofIntensity>('normal')
+  const [gpsCity, setGpsCity] = useState('none')
+  // Légende IA incrustée : placement preset (bas) ou manuel (x/y en %).
+  const [capManual, setCapManual] = useState(false)
+  const [capPos, setCapPos] = useState<'top' | 'center' | 'bottom'>('bottom')
+  const [capX, setCapX] = useState(50)
+  const [capY, setCapY] = useState(85)
+  const [burnCap, setBurnCap] = useState(false)  // incruster la légende dans la vidéo ?
+  // Dossier de destination des sorties (banque).
+  const [destFolder, setDestFolder] = useState('')
   const [withCap, setWithCap] = useState(true)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -279,8 +295,16 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           if (R.isCancelled()) break
           setProgress(0)
           push(`  · variante ${i + 1}/${per}…`)
-          const out = await runSpoof(bytes, Math.random() * 1000, { onProgress: setProgress, onLog: () => {} })
-          await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`)
+          const hooks = { onProgress: setProgress, onLog: () => {} }
+          const sOpts = { intensity, gps: gpsFor(gpsCity) }
+          let out = await runSpoof(bytes, Math.random() * 1000, hooks, sOpts)
+          // Incrustation de la légende IA dans la vidéo (si activé et légende disponible).
+          if (burnCap && caption) {
+            push('  · incrustation légende…')
+            const pos: CaptionPos = capManual ? { x: capX, y: capY } : capPos
+            out = await runCaption(out, caption, pos, hooks)
+          }
+          await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
           done++; setMade(done); R.tick(true)
         }
       }
@@ -316,6 +340,64 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           </label>
           <span style={{ marginLeft: 'auto', fontSize: 12, color: GOLD }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias en banque`}</span>
         </div>
+
+        {/* Anti-détection + destination */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(216,180,254,0.1)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+            Anti-détection
+            <select value={intensity} onChange={e => setIntensity(e.target.value as SpoofIntensity)} style={selStyle}>
+              <option value="subtle" style={optStyle}>Subtile</option>
+              <option value="normal" style={optStyle}>Normale</option>
+              <option value="strong" style={optStyle}>Forte</option>
+            </select>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+            Localisation GPS
+            <select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={selStyle}>
+              {GPS_CITIES.map(c => <option key={c.k} value={c.k} style={optStyle}>{c.label}</option>)}
+            </select>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+            Dossier destination
+            <select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}>
+              <option value="" style={optStyle}>Racine (aucun)</option>
+              {folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {/* Légende incrustée : placement */}
+        {withCap && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
+              <span onClick={() => setBurnCap(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: burnCap ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: burnCap ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+              Incruster la légende sur la vidéo
+            </label>
+            {burnCap && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
+                <span onClick={() => setCapManual(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: capManual ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: capManual ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+                Placement manuel
+              </label>
+            )}
+            {burnCap && !capManual && (
+              <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
+                {(['top', 'center', 'bottom'] as const).map(p => (
+                  <button key={p} onClick={() => setCapPos(p)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capPos === p ? '#A855F7' : 'transparent', color: capPos === p ? '#fff' : MUTED }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
+                ))}
+              </span>
+            )}
+            {burnCap && capManual && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
+                  X <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ width: 110, accentColor: '#A855F7' }} /><span style={{ width: 34, color: INK }}>{capX}%</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
+                  Y <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ width: 110, accentColor: '#A855F7' }} /><span style={{ width: 34, color: INK }}>{capY}%</span>
+                </label>
+              </span>
+            )}
+          </div>
+        )}
         {running && <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 14 }}><div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: GRAD, transition: 'width .2s ease' }} /></div>}
         {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 150, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
       </Card>

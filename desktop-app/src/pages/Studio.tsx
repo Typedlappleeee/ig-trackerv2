@@ -8,7 +8,7 @@ import { useBankThumbs } from '@/lib/data'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import {
-  resolveSourceBytes, saveOutputToBank,
+  resolveSourceBytes, saveOutputToBank, GPS_CITIES, gpsFor,
   runSpoof, runRemixVariant, runMontage, runOverlay, runCaption, runSubtitles,
 } from '@/lib/studioTools'
 import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
@@ -25,7 +25,8 @@ const TOOLS: Tool[] = [
   { k: 'spoof', t: 'Spoof', d: "Anti-empreinte : réécrit device, GPS, EXIF et micro-varie l'image. Rend chaque vidéo unique pour l'algo.", tone: '167,139,250', tag: 'anti-détection', i: 'M12 22s8-4.5 8-11a8 8 0 1 0-16 0c0 6.5 8 11 8 11z|M9 12l2 2 4-4' },
   { k: 'subs', t: 'Sous-titres', d: 'Sous-titres automatiques (Groq Whisper), incrustés mot par mot.', tone: '6,182,212', tag: 'Whisper', i: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z|M7 9h10|M7 13h6' },
 ]
-interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
+interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null; folder: string | null }
+
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
 const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 function isVid(v: Video): boolean {
@@ -55,6 +56,15 @@ export default function Studio({ theme, infra, user, org }: {
   const [overlayImgs, setOverlayImgs] = useState<{ id: string; storage_path: string | null; file_url: string | null; title: string }[]>([])
   const [ovMode, setOvMode] = useState<'seq' | 'random'>('seq')
   const [imgPicker, setImgPicker] = useState(false)
+  // Anti-détect (spoof/remix) : intensité + localisation GPS écrite dans les métadonnées.
+  const [intensity, setIntensity] = useState<'subtle' | 'normal' | 'strong'>('normal')
+  const [gpsCity, setGpsCity] = useState('none')
+  // Mixer : placement manuel de la légende (sinon preset top/center/bottom).
+  const [capManual, setCapManual] = useState(false)
+  const [capX, setCapX] = useState(50)   // % largeur
+  const [capY, setCapY] = useState(85)   // % hauteur
+  // Dossier de destination des sorties (banque).
+  const [destFolder, setDestFolder] = useState<string>('')
 
   // ── État d'exécution ──
   const [running, setRunning] = useState(false)
@@ -137,7 +147,8 @@ export default function Studio({ theme, infra, user, org }: {
             if (R.isCancelled()) break
             push(`  · variante ${i + 1}/${n}…`)
             const seed = Math.random() * 1000
-            const data = tool === 'spoof' ? await runSpoof(bytes, seed, hooks) : await runRemixVariant(bytes, seed, hooks)
+            const sOpts = { intensity, gps: gpsFor(gpsCity) }
+            const data = tool === 'spoof' ? await runSpoof(bytes, seed, hooks, sOpts) : await runRemixVariant(bytes, seed, hooks, sOpts)
             outs.push({ title: `${v.title} · ${tool} ${i + 1}`, data })
           }
         } else if (tool === 'montage') {
@@ -150,13 +161,13 @@ export default function Studio({ theme, infra, user, org }: {
           outs.push({ title: `${v.title} · incrust`, data: await runOverlay(bytes, ov.data, ov.ext, { widthPx: 420, from: 0, to: null }, hooks) })
         } else if (tool === 'mixer') {
           push('  · légende…')
-          outs.push({ title: `${v.title} · mixer`, data: await runCaption(bytes, caption, capPos, hooks) })
+          outs.push({ title: `${v.title} · mixer`, data: await runCaption(bytes, caption, capManual ? { x: capX, y: capY } : capPos, hooks) })
         } else if (tool === 'subs') {
           outs.push({ title: `${v.title} · sous-titres`, data: await runSubtitles(bytes, conns.groq, { onProgress: setProgress, onLog: push }) })
         }
         // Sauvegarde banque + lien de téléchargement.
         for (const o of outs) {
-          await saveOutputToBank(user.id, currentOrg?.id ?? null, o.data, o.title)
+          await saveOutputToBank(user.id, currentOrg?.id ?? null, o.data, o.title, 'mp4', destFolder || null)
           const url = URL.createObjectURL(new Blob([o.data as BlobPart], { type: 'video/mp4' }))
           setResults(r => [...r, { title: o.title, url }])
           R.tick(true)
@@ -204,6 +215,8 @@ export default function Studio({ theme, infra, user, org }: {
   // ── Wizard d'un outil ──
   const T = TOOLS.find(x => x.k === tool)!
   const nSrc = src.size
+  // Dossiers existants (banque) pour le sélecteur de destination des sorties.
+  const folders = [...new Set(videos.map(v => v.folder).filter((f): f is string => !!f))].sort()
   const per = (tool === 'spoof' || tool === 'remix') ? copies : 1
   const output = `${nSrc * per} fichier${nSrc * per > 1 ? 's' : ''}`
   const numInp: React.CSSProperties = { width: 80, height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none', textAlign: 'right' }
@@ -247,10 +260,26 @@ export default function Studio({ theme, infra, user, org }: {
             <PanelHead title="Réglages" />
             <div style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {(tool === 'spoof' || tool === 'remix') && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Variantes par vidéo</span>
-                  <input type="number" min={1} max={24} value={copies} onChange={e => setCopies(Number(e.target.value))} style={numInp} />
-                </label>
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Variantes par vidéo</span>
+                    <input type="number" min={1} max={24} value={copies} onChange={e => setCopies(Number(e.target.value))} style={numInp} />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Intensité anti-détection</span>
+                    <select value={intensity} onChange={e => setIntensity(e.target.value as any)} style={{ ...numInp, width: 130, textAlign: 'left', cursor: 'pointer' }}>
+                      <option value="subtle" style={{ background: '#16161C' }}>Subtile</option>
+                      <option value="normal" style={{ background: '#16161C' }}>Normale</option>
+                      <option value="strong" style={{ background: '#16161C' }}>Forte</option>
+                    </select>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Localisation GPS</span>
+                    <select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={{ ...numInp, width: 150, textAlign: 'left', cursor: 'pointer' }}>
+                      {GPS_CITIES.map(c => <option key={c.k} value={c.k} style={{ background: '#16161C' }}>{c.label}</option>)}
+                    </select>
+                  </label>
+                </>
               )}
               {tool === 'montage' && (
                 <>
@@ -268,11 +297,31 @@ export default function Studio({ theme, infra, user, org }: {
                 <>
                   <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={2} placeholder="Ta légende à incruster…"
                     style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit' }} />
-                  <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    {(['top', 'center', 'bottom'] as const).map(p => (
-                      <button key={p} onClick={() => setCapPos(p)} style={{ flex: 1, height: 30, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capPos === p ? theme.accentBtn : 'transparent', color: capPos === p ? '#fff' : '#A1A1AA' }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
-                    ))}
-                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#A1A1AA', cursor: 'pointer' }}>
+                    <span onClick={() => setCapManual(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: capManual ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: capManual ? theme.accentBtn : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+                    Placement manuel
+                  </label>
+                  {!capManual ? (
+                    <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      {(['top', 'center', 'bottom'] as const).map(p => (
+                        <button key={p} onClick={() => setCapPos(p)} style={{ flex: 1, height: 30, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capPos === p ? theme.accentBtn : 'transparent', color: capPos === p ? '#fff' : '#A1A1AA' }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#A1A1AA' }}>
+                        <span style={{ width: 78 }}>Horizontal</span>
+                        <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ flex: 1, accentColor: `rgb(${T.tone})` }} />
+                        <span style={{ width: 38, textAlign: 'right', color: '#E4E4E7' }}>{capX}%</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#A1A1AA' }}>
+                        <span style={{ width: 78 }}>Vertical</span>
+                        <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ flex: 1, accentColor: `rgb(${T.tone})` }} />
+                        <span style={{ width: 38, textAlign: 'right', color: '#E4E4E7' }}>{capY}%</span>
+                      </label>
+                      <span style={{ fontSize: 10.5, color: '#52525B' }}>0 % = haut/gauche · 100 % = bas/droite. La légende est centrée sur ce point.</span>
+                    </div>
+                  )}
                 </>
               )}
               {tool === 'overlay' && (
@@ -306,6 +355,14 @@ export default function Studio({ theme, infra, user, org }: {
                 <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: k === 'Coût' ? '#34D399' : '#E4E4E7' }}>{v}</span>
               </div>
             ))}
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+              <span style={{ color: '#71717A' }}>Dossier de destination</span>
+              <select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={{ marginLeft: 'auto', height: 30, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12, outline: 'none', cursor: 'pointer', maxWidth: 150 }}>
+                <option value="" style={{ background: '#16161C' }}>Racine (aucun)</option>
+                {folders.map(f => <option key={f} value={f} style={{ background: '#16161C' }}>{f}</option>)}
+              </select>
+            </label>
 
             {running && (
               <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
