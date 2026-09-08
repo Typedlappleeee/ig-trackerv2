@@ -2607,6 +2607,12 @@ async function _loginInstagramAccountInner(
         return { ok: false, error: 'Code 2FA refusé — toujours sur l\'écran 2FA' }
       }
       // Any other screen (home, onboarding, permissions…) = success
+      // Laisse ~30 s à Instagram pour FINIR d'établir la session (échanges réseau
+      // post-2FA, écrans « Enregistrer les infos »/permissions). Avant, on rendait
+      // la main tout de suite → le téléphone s'éteignait trop tôt après la saisie du
+      // code A2F et la connexion n'était pas finalisée.
+      log('✅ Code A2F validé — finalisation de la connexion (30 s)…')
+      await sleep(30000)
       log('✅ Connexion réussie (vérification en deux étapes) !')
       return { ok: true }
     }
