@@ -486,109 +486,89 @@ export function BlowAutoContent({ user }: { user: User }) {
             style={{ ...inp, resize: 'vertical', minHeight: 120, fontFamily: 'inherit', lineHeight: 1.6 }} />
 
           <SectionLabel style={{ marginTop: 18 }}>{tr('4 · Options', '4 · Options')}</SectionLabel>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 12 }}>
-            <input type="checkbox" checked={useTranscript} onChange={e => setUseTranscript(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16 }} />
-            <span style={{ fontSize: 13, color: INK }}>{tr('Transcrire l\'audio (Whisper) pour une caption fidèle à ce qui est dit', 'Transcribe audio (Whisper) for a caption true to what\'s said')}</span>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 10 }}>
-            <input type="checkbox" checked={burnText} onChange={e => setBurnText(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16 }} />
-            <span style={{ fontSize: 13, color: INK }}>{tr('Écrire la caption SUR la vidéo (hook POV à l\'écran)', 'Write the caption ON the video (POV hook on screen)')}</span>
-          </label>
-          {burnText && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, paddingLeft: 25 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Format', 'Style')}</span>
-                {(['snapchat', 'outline'] as const).map(s => (
-                  <button key={s} onClick={() => setCaptionStyle(s)} className="blow-tap"
-                    style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
-                      border: `1px solid ${captionStyle === s ? 'rgba(168,85,247,0.6)' : HAIR}`, background: captionStyle === s ? 'rgba(168,85,247,0.18)' : 'transparent', color: captionStyle === s ? '#E9D5FF' : MUTED }}>
-                    {s === 'snapchat' ? tr('Bande Snapchat', 'Snapchat bar') : tr('Contour', 'Outline')}
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Position', 'Position')}</span>
-                {(['top', 'middle', 'bottom'] as const).map(p => (
-                  <button key={p} onClick={() => setTextPos(p)} className="blow-tap"
-                    style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
-                      border: `1px solid ${textPos === p ? 'rgba(168,85,247,0.6)' : HAIR}`, background: textPos === p ? 'rgba(168,85,247,0.18)' : 'transparent', color: textPos === p ? '#E9D5FF' : MUTED }}>
-                    {p === 'top' ? tr('Haut', 'Top') : p === 'middle' ? tr('Milieu', 'Middle') : tr('Bas', 'Bottom')}
-                  </button>
-                ))}
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
-                <input type="checkbox" checked={poolStrict} onChange={e => setPoolStrict(e.target.checked)} style={{ accentColor: '#A855F7', width: 15, height: 15 }} />
-                <span style={{ fontSize: 12.5, color: INK }}>{tr('Utiliser mes captions telles quelles (pool, sans IA)', 'Use my captions as-is (pool, no AI)')}</span>
-              </label>
-            </div>
-          )}
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', marginBottom: 12 }}>
-            <input type="checkbox" checked={spoof} onChange={e => setSpoof(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16, marginTop: 2 }} />
-            <span style={{ fontSize: 13, color: INK }}>
-              {tr('🛡 Rendre chaque variante « 100% neuve » (anti-détection IG)', '🛡 Make each variant “100% new” (IG anti-detection)')}
-              <span style={{ display: 'block', fontSize: 11, color: MUTED, marginTop: 2 }}>
-                {tr('Vitesse x1→1.3, teinte, grain, zoom + nouvelles métadonnées (appareil/GPS/date) + ré-encodage.', 'Speed x1→1.3, hue, grain, zoom + fresh metadata (device/GPS/date) + re-encode.')}
-              </span>
-            </span>
-          </label>
 
-          {/* Timing : coupe + micro-vitesse (via l'étape serveur ci-dessus) */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 8 }}>
-            <input type="checkbox" checked={useTrim} onChange={e => setUseTrim(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16 }} />
-            <span style={{ fontSize: 13, color: INK }}>{tr('Couper la vidéo (début / fin)', 'Trim the video (start / end)')}</span>
-          </label>
-          {useTrim && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, paddingLeft: 25 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
-                <input type="checkbox" checked={trimRandom} onChange={e => setTrimRandom(e.target.checked)} style={{ accentColor: '#A855F7', width: 15, height: 15 }} />
-                <span style={{ fontSize: 12.5, color: INK }}>{tr('Aléatoire — coupe le début d\'une durée au hasard', 'Random — trim the start by a random amount')}</span>
-              </label>
-              {trimRandom ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Entre', 'Between')}</span>
-                  <input type="number" min={0} step={0.1} value={trimRandMin} onChange={e => setTrimRandMin(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
-                  <span style={{ fontSize: 12.5, color: MUTED }}>{tr('et', 'and')}</span>
-                  <input type="number" min={0} step={0.1} value={trimRandMax} onChange={e => setTrimRandMax(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
-                  <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('secondes (par vidéo)', 'seconds (per video)')}</span>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Début', 'Start')}</span>
-                  <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
-                  <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Fin (vide = fin)', 'End (blank = end)')}</span>
-                  <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={{ ...inp, width: 72, textAlign: 'center' }} />
-                  <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('secondes', 'seconds')}</span>
-                </div>
-              )}
-            </div>
-          )}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 8 }}>
-            <input type="checkbox" checked={useSpeed} onChange={e => setUseSpeed(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16 }} />
-            <span style={{ fontSize: 13, color: INK }}>{tr('Micro-vitesse aléatoire (par vidéo)', 'Random micro-speed (per video)')}</span>
-          </label>
-          {useSpeed && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingLeft: 25, flexWrap: 'wrap' }}>
-              <input type="number" min={0.9} max={1.35} step={0.01} value={speedMin} onChange={e => setSpeedMin(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
-              <span style={{ fontSize: 12.5, color: MUTED }}>→</span>
-              <input type="number" min={0.9} max={1.35} step={0.01} value={speedMax} onChange={e => setSpeedMax(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
-              <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('× (ex : 0,98 → 1,02)', '× (e.g. 0.98 → 1.02)')}</span>
-            </div>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Sous-entendu', 'Innuendo')}</span>
-            {(['soft', 'medium'] as const).map(v => (
-              <button key={v} onClick={() => setSpice(v)} className="blow-tap"
-                style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
-                  border: `1px solid ${spice === v ? 'rgba(168,85,247,0.6)' : HAIR}`, background: spice === v ? 'rgba(168,85,247,0.18)' : 'transparent', color: spice === v ? '#E9D5FF' : MUTED }}>
-                {v === 'soft' ? tr('Soft', 'Soft') : tr('Medium', 'Medium')}
-              </button>
-            ))}
-            <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('(taquin/ambigu, jamais explicite)', '(teasing/ambiguous, never explicit)')}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Nombre de vidéos', 'Number of videos')}</span>
-            <input type="number" min={1} max={50} value={count} onChange={e => setCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} style={{ ...inp, width: 76, textAlign: 'center' }} />
-          </div>
+          {/* ── Légende ─────────────────────────────────────────────── */}
+          <OptGroup title={tr('Légende', 'Caption')}>
+            <Switch on={burnText} onChange={setBurnText}
+              label={tr('Écrire la caption sur la vidéo', 'Burn the caption on the video')}
+              sub={tr('Hook POV affiché à l\'écran', 'POV hook shown on screen')} />
+            {burnText && (
+              <div style={insetStyle}>
+                <Field label={tr('Format', 'Style')}>
+                  <Seg value={captionStyle} onChange={setCaptionStyle} options={[
+                    { v: 'snapchat', label: tr('Bande Snapchat', 'Snapchat bar') },
+                    { v: 'outline', label: tr('Contour', 'Outline') }]} />
+                </Field>
+                <Field label={tr('Position', 'Position')}>
+                  <Seg value={textPos} onChange={setTextPos} options={[
+                    { v: 'top', label: tr('Haut', 'Top') },
+                    { v: 'middle', label: tr('Milieu', 'Middle') },
+                    { v: 'bottom', label: tr('Bas', 'Bottom') }]} />
+                </Field>
+                <Switch small on={poolStrict} onChange={setPoolStrict}
+                  label={tr('Utiliser mes captions telles quelles (sans IA)', 'Use my captions as-is (no AI)')} />
+              </div>
+            )}
+            <Switch on={useTranscript} onChange={setUseTranscript}
+              label={tr('Transcrire l\'audio (Whisper)', 'Transcribe audio (Whisper)')}
+              sub={tr('Caption fidèle à ce qui est dit', 'Caption true to what\'s said')} />
+            <Field label={tr('Sous-entendu', 'Innuendo')}>
+              <Seg value={spice} onChange={setSpice} options={[
+                { v: 'soft', label: 'Soft' }, { v: 'medium', label: 'Medium' }]} />
+              <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('taquin, jamais explicite', 'teasing, never explicit')}</span>
+            </Field>
+          </OptGroup>
+
+          {/* ── Anti-détection & montage ────────────────────────────── */}
+          <OptGroup title={tr('Anti-détection & montage', 'Anti-detection & editing')}>
+            <Switch on={spoof} onChange={setSpoof}
+              label={tr('Rendre chaque variante « 100% neuve »', 'Make each variant “100% new”')}
+              sub={tr('Teinte, grain, zoom + métadonnées (appareil/GPS/date) + ré-encodage', 'Hue, grain, zoom + metadata (device/GPS/date) + re-encode')} />
+            <Switch on={useTrim} onChange={setUseTrim}
+              label={tr('Couper la vidéo', 'Trim the video')}
+              sub={tr('Retire un morceau au début — unique par vidéo', 'Trims a slice off the start — unique per video')} />
+            {useTrim && (
+              <div style={insetStyle}>
+                <Seg value={trimRandom ? 'rand' : 'fixed'} onChange={v => setTrimRandom(v === 'rand')} options={[
+                  { v: 'rand', label: tr('Aléatoire', 'Random') }, { v: 'fixed', label: tr('Fixe', 'Fixed') }]} />
+                {trimRandom ? (
+                  <Field label={tr('Entre', 'Between')}>
+                    <input type="number" min={0} step={0.1} value={trimRandMin} onChange={e => setTrimRandMin(e.target.value)} style={numInp} />
+                    <span style={{ fontSize: 12.5, color: MUTED }}>→</span>
+                    <input type="number" min={0} step={0.1} value={trimRandMax} onChange={e => setTrimRandMax(e.target.value)} style={numInp} />
+                    <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('s (par vidéo)', 's (per video)')}</span>
+                  </Field>
+                ) : (
+                  <Field label={tr('Début / Fin', 'Start / End')}>
+                    <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={numInp} />
+                    <span style={{ fontSize: 12.5, color: MUTED }}>→</span>
+                    <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder={tr('fin', 'end')} style={numInp} />
+                    <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('secondes', 'seconds')}</span>
+                  </Field>
+                )}
+              </div>
+            )}
+            <Switch on={useSpeed} onChange={setUseSpeed}
+              label={tr('Micro-vitesse aléatoire', 'Random micro-speed')}
+              sub={tr('Vitesse légèrement différente par vidéo', 'Slightly different speed per video')} />
+            {useSpeed && (
+              <div style={insetStyle}>
+                <Field label={tr('Vitesse', 'Speed')}>
+                  <input type="number" min={0.9} max={1.35} step={0.01} value={speedMin} onChange={e => setSpeedMin(e.target.value)} style={numInp} />
+                  <span style={{ fontSize: 12.5, color: MUTED }}>→</span>
+                  <input type="number" min={0.9} max={1.35} step={0.01} value={speedMax} onChange={e => setSpeedMax(e.target.value)} style={numInp} />
+                  <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('× (ex : 0,98 → 1,02)', '× (e.g. 0.98 → 1.02)')}</span>
+                </Field>
+              </div>
+            )}
+          </OptGroup>
+
+          {/* ── Sortie ──────────────────────────────────────────────── */}
+          <OptGroup title={tr('Sortie', 'Output')}>
+            <Field label={tr('Nombre de vidéos', 'Number of videos')}>
+              <input type="number" min={1} max={50} value={count} onChange={e => setCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} style={{ ...numInp, width: 84 }} />
+            </Field>
+          </OptGroup>
 
           {conns.anthropic ? null : (
             <p style={{ fontSize: 11.5, color: GOLD, margin: '14px 0 0' }}>{tr('⚠ Clé Anthropic manquante (Réglages) — les captions retomberont sur tes exemples.', '⚠ Anthropic key missing (Settings) — captions will fall back to your examples.')}</p>
@@ -726,8 +706,69 @@ const inp: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', fontSize: 13, padding: '10px 12px', borderRadius: 11,
   border: `1px solid ${HAIR}`, background: 'rgba(0,0,0,0.28)', color: INK, outline: 'none',
 }
+// Petit champ numérique compact.
+const numInp: React.CSSProperties = {
+  width: 68, textAlign: 'center', boxSizing: 'border-box', fontSize: 13, padding: '8px 8px', borderRadius: 10,
+  border: `1px solid ${HAIR}`, background: 'rgba(0,0,0,0.28)', color: INK, outline: 'none',
+}
+// Contenu inséré sous un Switch, aligné sous son libellé.
+const insetStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 11, marginLeft: 49, marginTop: 2 }
+
 function SectionLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: MUTED, margin: '0 0 9px', ...style }}>{children}</p>
+}
+
+const ACCENT_GRAD = 'linear-gradient(100deg,#A855F7,#6366F1)'
+
+// Panneau de groupe d'options (titre + contenu).
+function OptGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ borderRadius: 14, border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.015)', padding: 16, marginBottom: 12 }}>
+      <p style={{ margin: '0 0 13px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: '#C9A9F0' }}>{title}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>{children}</div>
+    </div>
+  )
+}
+
+// Interrupteur (pill) avec libellé + sous-texte optionnel.
+function Switch({ on, onChange, label, sub, small }: { on: boolean; onChange: (v: boolean) => void; label: React.ReactNode; sub?: React.ReactNode; small?: boolean }) {
+  const w = small ? 34 : 38, h = small ? 20 : 22, d = small ? 16 : 18
+  return (
+    <div onClick={() => onChange(!on)} className="blow-tap" style={{ display: 'flex', alignItems: 'flex-start', gap: 11, cursor: 'pointer' }}>
+      <span style={{ flexShrink: 0, marginTop: 1, display: 'inline-flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: w, height: h, padding: 2, borderRadius: 99, background: on ? ACCENT_GRAD : 'rgba(255,255,255,0.13)', transition: 'background .15s ease' }}>
+        <span style={{ width: d, height: d, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.45)' }} />
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ fontSize: small ? 12.5 : 13, fontWeight: 600, color: INK }}>{label}</span>
+        {sub && <span style={{ display: 'block', fontSize: 11, color: MUTED, marginTop: 2, lineHeight: 1.45 }}>{sub}</span>}
+      </span>
+    </div>
+  )
+}
+
+// Contrôle segmenté générique.
+function Seg<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[] }) {
+  return (
+    <div style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 10, background: 'rgba(0,0,0,0.28)', border: `1px solid ${HAIR}` }}>
+      {options.map(o => (
+        <button key={o.v} onClick={() => onChange(o.v)} className="blow-tap"
+          style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 12px', borderRadius: 7, cursor: 'pointer', border: 'none',
+            background: value === o.v ? ACCENT_GRAD : 'transparent', color: value === o.v ? '#fff' : MUTED }}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Ligne libellé + contrôle.
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 12, color: MUTED, minWidth: 70 }}>{label}</span>
+      {children}
+    </div>
+  )
 }
 
 export default BlowAutoContent
