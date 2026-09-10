@@ -77,13 +77,15 @@ function luminance(hex) {
   return (0.2126 * r + 0.7152 * g + 0.4152 * b)
 }
 
-async function renderTextLayer(caption, family, fontPath, fontSize, color) {
-  const fontDesc = family ? `${family} ${fontSize}` : `Sans Bold ${fontSize}`
+async function renderTextLayer(caption, family, fontPath, fontSize, color, opts = {}) {
+  const weight = opts.weight || 'bold'
+  const useFont = opts.useFontFile !== false   // snapchat : police système normale (pas la bold bundlée)
+  const fontDesc = useFont && family ? `${family} ${fontSize}` : `Sans ${fontSize}`
   return sharp({
     text: {
-      text: `<span weight="bold" foreground="${color}">${escapePango(caption)}</span>`,
+      text: `<span weight="${weight}" foreground="${color}">${escapePango(caption)}</span>`,
       font: fontDesc,
-      ...(fontPath ? { fontfile: fontPath } : {}),
+      ...(useFont && fontPath ? { fontfile: fontPath } : {}),
       rgba: true,
       align: 'centre',
       width: TEXT_MAX_W,
@@ -92,7 +94,13 @@ async function renderTextLayer(caption, family, fontPath, fontSize, color) {
   }).png().toBuffer({ resolveWithObject: true })
 }
 
-async function buildCaptionOverlay(caption, fontSize, fontColor, fontPath, family) {
+async function buildCaptionOverlay(caption, fontSize, fontColor, fontPath, family, captionStyle = 'outline') {
+  // Style Snapchat : texte blanc en police système NORMALE (pas grasse), SANS contour
+  // — la bande grise derrière assure le contraste. Rendu fidèle au style « story ».
+  if (captionStyle === 'snapchat') {
+    const fill = await renderTextLayer(caption, family, fontPath, fontSize, fontColor, { weight: 'normal', useFontFile: false })
+    return { buf: fill.data, w: fill.info.width, h: fill.info.height }
+  }
   const outlineColor = luminance(fontColor) > 0.55 ? '#000000' : '#ffffff'
   const fill    = await renderTextLayer(caption, family, fontPath, fontSize, fontColor)
   const outline = await renderTextLayer(caption, family, fontPath, fontSize, outlineColor)
@@ -129,13 +137,14 @@ function buildAssFile(caption, fontSize, fontColor, position, custom, captionSty
   const marginV     = position === 'top' ? 150 : position === 'center' || position === 'middle' ? 0 : 300
   const posTag      = custom ? `{\\pos(${Math.round(custom.x * 1080)},${Math.round(custom.y * 1920)})}` : ''
   const safeCaption = posTag + String(caption).replace(/[\r\n]+/g, '\\N')
-  // Style « Snapchat » : BorderStyle=3 (boîte opaque) + BackColour = bande noire
-  // translucide (&H80 ≈ 50 %). Sinon contour classique (BorderStyle=1).
+  // Style « Snapchat » : BorderStyle=3 (boîte) + BackColour = bande GRISE translucide,
+  // police NORMALE (Bold=0), sans contour. Sinon contour classique (BorderStyle=1, gras).
   const snap        = captionStyle === 'snapchat'
   const borderStyle = snap ? 3 : 1
-  const backColour  = snap ? '&H80000000' : '&H80000000'
-  const outline     = snap ? 14 : 2   // BorderStyle=3 : Outline = marge de la boîte
+  const backColour  = snap ? '&H73555555' : '&H80000000'   // &HAABBGGRR — gris 0x555555, ~45 %
+  const outline     = snap ? 16 : 2   // BorderStyle=3 : Outline = marge de la boîte
   const shadow      = snap ? 0 : 1
+  const bold        = snap ? 0 : -1
 
   return (
     '[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 0\n\n' +
@@ -144,7 +153,7 @@ function buildAssFile(caption, fontSize, fontColor, position, custom, captionSty
     'Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, ' +
     'Alignment, MarginL, MarginR, MarginV, Encoding\n' +
     `Style: Default,Arial,${fontSize},${assColor},&H000000FF,${outColor},${backColour},` +
-    `-1,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},${alignment},60,60,${marginV},1\n\n` +
+    `${bold},0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},${alignment},60,60,${marginV},1\n\n` +
     '[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n' +
     `Dialogue: 0,0:00:00.00,9:59:59.00,Default,,0,0,0,,${safeCaption}\n`
   )
@@ -413,7 +422,7 @@ module.exports = async (req, res) => {
       })()
       const family = fontPath ? fontFamilyName(fs.readFileSync(fontPath)) : null
       const { buf: overlayBuf, w: ovW, h: ovH } =
-        await buildCaptionOverlay(String(caption), Number(fontSize), String(fontColor), fontPath, family)
+        await buildCaptionOverlay(String(caption), Number(fontSize), String(fontColor), fontPath, family, captionStyle)
 
       if (!overlayBuf || !overlayBuf.length) throw new Error('sharp returned empty buffer')
       fs.writeFileSync(overlayPath, overlayBuf)
@@ -441,11 +450,12 @@ module.exports = async (req, res) => {
       // texte (au lieu du simple contour). On dessine un drawbox pleine largeur à la
       // bande verticale du texte, puis on incruste le PNG texte par-dessus.
       const snap = captionStyle === 'snapchat'
-      const bandPad = Math.round(ovH * 0.30)
+      // Bande grise translucide (rendu Snapchat) sur toute la largeur, marge confortable.
+      const bandPad = Math.round(ovH * 0.55)
       const bandY = Math.max(0, oy - bandPad)
       const bandH = Math.min(VH - bandY, ovH + bandPad * 2)
       const bgChain = snap
-        ? `pad=${VW}:${VH}:-1:-1:color=black,setsar=1,drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=black@0.48:t=fill[bg]`
+        ? `pad=${VW}:${VH}:-1:-1:color=black,setsar=1,drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=0x555555@0.45:t=fill[bg]`
         : `pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg]`
       const filterComplex =
         `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,` +

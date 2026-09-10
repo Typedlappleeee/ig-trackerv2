@@ -1105,7 +1105,17 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
          '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
          '/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf',
          '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf']
-  const fontFile = fontCandidates.find(f => existsSync(f)) ?? null
+  // Police régulière (rendu Snapchat, pas grasse).
+  const regularFontCandidates = process.platform === 'win32'
+    ? ['C:\\Windows\\Fonts\\arial.ttf', 'C:\\Windows\\Fonts\\segoeui.ttf']
+    : process.platform === 'darwin'
+      ? ['/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial.ttf']
+      : ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+         '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+         '/usr/share/fonts/truetype/freefont/FreeSans.ttf']
+  const boldFontFile = fontCandidates.find(f => existsSync(f)) ?? null
+  const regularFontFile = regularFontCandidates.find(f => existsSync(f)) ?? boldFontFile
+  const fontFile = opts.captionStyle === 'snapchat' ? regularFontFile : boldFontFile
 
   function escText(t: string): string {
     return t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:')
@@ -1180,11 +1190,11 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
     return `drawtext=${dtParts.join(':')}`
   })
 
-  // Bande pleine largeur (snapchat) couvrant la zone du texte.
-  const bandPad = Math.round(fs * 0.5)
+  // Bande grise translucide pleine largeur (rendu Snapchat) couvrant la zone du texte.
+  const bandPad = Math.round(fs * 0.7)
   const bandY = Math.max(0, startY - bandPad)
   const bandH = Math.min(VH - bandY, totalH + bandPad * 2)
-  const bandFilter = snap ? [`drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=black@0.48:t=fill`] : []
+  const bandFilter = snap ? [`drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=0x555555@0.45:t=fill`] : []
 
   const vf = [
     `scale=${VW}:${VH}:force_original_aspect_ratio=decrease`,
