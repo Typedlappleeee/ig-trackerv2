@@ -844,7 +844,7 @@ export function Bank({ user }: BankProps) {
     if (selectedFolder === name) setSelectedFolder(null)
     setFolderModal(null)
     // Re-synchronise depuis la DB → reflète l'état RÉEL (fini le faux « supprimé » local).
-    await load()
+    await loadItems()
   }
 
   async function mergeFolderTo(fromFolder: string, toFolder: string | null) {
