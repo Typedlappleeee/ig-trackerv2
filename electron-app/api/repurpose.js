@@ -133,6 +133,7 @@ async function handleSpoof(req, res) {
     sourceUrl, storagePath, userId, bucket = 'content',
     preset = 'iphone17pro', gpsCity = 'newyork', customDate,
     adjustments = {}, supabaseToken, supabaseAnonKey,
+    trimStart, trimEnd,   // coupe optionnelle (s) — appliquée en amont du spoof
   } = req.body ?? {}
 
   if (!sourceUrl && !storagePath) return res.status(400).json({ ok: false, error: 'Missing source' })
@@ -220,7 +221,14 @@ async function handleSpoof(req, res) {
     const bframes     = [0, 1, 2][Math.floor(Math.random() * 3)]
     const encoderNoise = (Math.random() * 0.002).toFixed(4)          // imperceptible
 
-    const ffArgs = ['-nostdin', '-threads', '0', '-i', inputPath]
+    // Coupe optionnelle : options d'ENTRÉE (-ss avant -i = seek rapide et précis),
+    // -t durée (sans ambiguïté -to/-ss selon la version de ffmpeg).
+    const tStart = Math.max(0, Number(trimStart) || 0)
+    const tEnd   = Number(trimEnd)
+    const trimIn = []
+    if (tStart > 0) trimIn.push('-ss', String(tStart))
+    if (Number.isFinite(tEnd) && tEnd > tStart) trimIn.push('-t', String(tEnd - tStart))
+    const ffArgs = ['-nostdin', '-threads', '0', ...trimIn, '-i', inputPath]
 
     // Container-level (moov-level) metadata — branché selon la plateforme.
     if (isAndroid) {

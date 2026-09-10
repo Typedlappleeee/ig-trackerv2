@@ -22,6 +22,8 @@ interface Recipe {
   useTranscript: boolean
   burnText?: boolean     // écrire la caption sur la vidéo
   textPos?: 'top' | 'middle' | 'bottom'
+  captionStyle?: 'outline' | 'snapchat'   // format du texte incrusté
+  poolStrict?: boolean   // utiliser les captions du pool telles quelles (pas d'IA)
   spice?: 'soft' | 'medium'   // intensité du sous-entendu (contenu suggestif)
   spoof?: boolean        // rendre chaque variante « 100% neuve » (anti-détection IG)
 }
@@ -63,8 +65,17 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [useTranscript, setUseTranscript] = useState(true)
   const [burnText, setBurnText] = useState(true)
   const [textPos, setTextPos] = useState<'top' | 'middle' | 'bottom'>('bottom')
+  const [captionStyle, setCaptionStyle] = useState<'outline' | 'snapchat'>('snapchat')
+  const [poolStrict, setPoolStrict] = useState(false)   // utiliser le pool tel quel (pas d'IA)
   const [spice, setSpice] = useState<'soft' | 'medium'>('soft')
   const [spoof, setSpoof] = useState(true)   // « 100% neuve » : transforme + casse la signature
+  // Timing : coupe (début/fin) et/ou micro-vitesse (0,98–1,02×) — via l'étape spoof serveur.
+  const [useTrim, setUseTrim] = useState(false)
+  const [trimStart, setTrimStart] = useState('0')
+  const [trimEnd, setTrimEnd] = useState('')
+  const [useSpeed, setUseSpeed] = useState(false)
+  const [speedMin, setSpeedMin] = useState('0.98')
+  const [speedMax, setSpeedMax] = useState('1.02')
 
   const [jobs, setJobs] = useState<GenJob[]>([])
   const [running, setRunning] = useState(false)
@@ -91,14 +102,14 @@ export function BlowAutoContent({ user }: { user: User }) {
   const allTags = useMemo(() => Array.from(new Set(items.flatMap(i => i.tags ?? []).filter(Boolean))).sort(), [items])
   const poolFor = (t: string) => items.filter(i => (i.tags ?? []).includes(t))
 
-  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setBurnText(true); setTextPos('bottom'); setSpice('soft'); setSpoof(true) }
+  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setBurnText(true); setTextPos('bottom'); setCaptionStyle('snapchat'); setPoolStrict(false); setSpice('soft'); setSpoof(true) }
   function loadRecipe(r: Recipe) {
     setEditingId(r.id); setName(r.name); setTag(r.tag); setCount(r.count); setStyle(r.style)
-    setUseTranscript(r.useTranscript); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'bottom'); setSpice(r.spice ?? 'soft'); setSpoof(r.spoof ?? true)
+    setUseTranscript(r.useTranscript); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'bottom'); setCaptionStyle(r.captionStyle ?? 'snapchat'); setPoolStrict(r.poolStrict ?? false); setSpice(r.spice ?? 'soft'); setSpoof(r.spoof ?? true)
   }
   function persistRecipe() {
     if (!name.trim() || !tag) return
-    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, burnText, textPos, spice, spoof }
+    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, burnText, textPos, captionStyle, poolStrict, spice, spoof }
     const next = editingId ? recipes.map(x => x.id === editingId ? r : x) : [...recipes, r]
     setRecipes(next); saveRecipes(next); setEditingId(r.id)
   }
@@ -216,9 +227,11 @@ export function BlowAutoContent({ user }: { user: User }) {
         const haveExamples = styleLines.length > 0
         const baseLine = haveExamples ? styleLines[i % styleLines.length] : ''  // rotation
         const roll = Math.random()
-        // ~15 % verbatim · ~30 % variante légère · ~55 % hook frais réactif à la vidéo.
+        // Pool STRICT : on utilise les phrases du pool TELLES QUELLES (rotation), sans IA.
         const strategy: 'verbatim' | 'variation' | 'fresh' =
-          !haveExamples ? 'fresh' : roll < 0.15 ? 'verbatim' : roll < 0.45 ? 'variation' : 'fresh'
+          poolStrict && haveExamples ? 'verbatim'
+          // ~15 % verbatim · ~30 % variante légère · ~55 % hook frais réactif à la vidéo.
+          : !haveExamples ? 'fresh' : roll < 0.15 ? 'verbatim' : roll < 0.45 ? 'variation' : 'fresh'
 
         if (strategy === 'verbatim') {
           caption = baseLine
@@ -292,7 +305,7 @@ export function BlowAutoContent({ user }: { user: User }) {
         if (burnText && caption) {
           setJob(i, { status: 'overlay' })
           if (!window.electronAPI?.runFfmpegMixOverlay) throw new Error(tr('Incrustation indisponible (rebuild desktop ?)', 'Overlay unavailable (rebuild desktop?)'))
-          const ov = await window.electronAPI.runFfmpegMixOverlay({ sourcePath: mediaRef, caption, position: textPos, fontSize: 54, fontColor: '#FFFFFF' })
+          const ov = await window.electronAPI.runFfmpegMixOverlay({ sourcePath: mediaRef, caption, position: textPos, fontSize: 54, fontColor: '#FFFFFF', captionStyle })
           if (!ov?.ok || !ov.outputPath) throw new Error(`${tr('Incrustation échouée', 'Overlay failed')} : ${ov?.error ?? '?'}`)
           finalRef = ov.storagePath ? ((await getSignedUrl(ov.storagePath)) ?? ov.outputPath) : ov.outputPath
         }
@@ -307,23 +320,36 @@ export function BlowAutoContent({ user }: { user: User }) {
         // métadonnées (appareil/GPS/date) + ré-encodage → casse l'empreinte IG. On
         // spoofe le fichier DÉJÀ uploadé (URL signée) et on garde la miniature d'origine
         // (même visuel). Best-effort : si le spoof échoue on garde la version overlay.
-        if (spoof) {
+        // On lance l'étape serveur si spoof OU coupe OU vitesse est demandé.
+        if (spoof || useTrim || useSpeed) {
           setJob(i, { status: 'spoof', caption })
           try {
             const sUrl = await getSignedUrl(storagePath)
             const { data: { session } } = await supabase.auth.getSession()
+            // Ajustements : si spoof OFF mais coupe/vitesse ON → pas de transformation
+            // visuelle (adjustments neutres), on ne fait que couper / changer la vitesse.
+            const adj = spoof ? randomAdjustments() : ({} as Record<string, number>)
+            if (useSpeed) {
+              const lo = Math.max(0.9, Number(speedMin) || 0.98)
+              const hi = Math.min(1.35, Number(speedMax) || 1.02)
+              adj.speed = randF(Math.min(lo, hi), Math.max(lo, hi))
+            }
+            const tS = useTrim ? Math.max(0, Number(trimStart) || 0) : undefined
+            const tEraw = useTrim && trimEnd.trim() ? Number(trimEnd) : NaN
+            const tE = Number.isFinite(tEraw) ? tEraw : undefined
             const rr = await fetch('/api/repurpose', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 mode: 'spoof', sourceUrl: sUrl, userId: user.id,
-                preset: 'random', gpsCity: 'random',
+                preset: spoof ? 'random' : 'iphone17pro', gpsCity: spoof ? 'random' : 'newyork',
                 customDate: randDate30().replace(/-/g, ':'),
-                adjustments: randomAdjustments(),
+                adjustments: adj,
+                trimStart: tS, trimEnd: tE,
                 supabaseToken: session?.access_token, supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
               }),
             }).then(r => r.json()).catch(() => ({ ok: false }))
             if (rr?.ok && rr.storagePath) storagePath = rr.storagePath
-          } catch { /* spoof best-effort : on garde le fichier overlay */ }
+          } catch { /* best-effort : on garde le fichier overlay */ }
         }
 
         const baseTag = sourceMode === 'bank' ? tag : (name.trim() || 'autocontent')
@@ -453,15 +479,31 @@ export function BlowAutoContent({ user }: { user: User }) {
             <span style={{ fontSize: 13, color: INK }}>{tr('Écrire la caption SUR la vidéo (hook POV à l\'écran)', 'Write the caption ON the video (POV hook on screen)')}</span>
           </label>
           {burnText && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingLeft: 25 }}>
-              <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Position', 'Position')}</span>
-              {(['top', 'middle', 'bottom'] as const).map(p => (
-                <button key={p} onClick={() => setTextPos(p)} className="blow-tap"
-                  style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
-                    border: `1px solid ${textPos === p ? 'rgba(168,85,247,0.6)' : HAIR}`, background: textPos === p ? 'rgba(168,85,247,0.18)' : 'transparent', color: textPos === p ? '#E9D5FF' : MUTED }}>
-                  {p === 'top' ? tr('Haut', 'Top') : p === 'middle' ? tr('Milieu', 'Middle') : tr('Bas', 'Bottom')}
-                </button>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, paddingLeft: 25 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Format', 'Style')}</span>
+                {(['snapchat', 'outline'] as const).map(s => (
+                  <button key={s} onClick={() => setCaptionStyle(s)} className="blow-tap"
+                    style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+                      border: `1px solid ${captionStyle === s ? 'rgba(168,85,247,0.6)' : HAIR}`, background: captionStyle === s ? 'rgba(168,85,247,0.18)' : 'transparent', color: captionStyle === s ? '#E9D5FF' : MUTED }}>
+                    {s === 'snapchat' ? tr('Bande Snapchat', 'Snapchat bar') : tr('Contour', 'Outline')}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Position', 'Position')}</span>
+                {(['top', 'middle', 'bottom'] as const).map(p => (
+                  <button key={p} onClick={() => setTextPos(p)} className="blow-tap"
+                    style={{ fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+                      border: `1px solid ${textPos === p ? 'rgba(168,85,247,0.6)' : HAIR}`, background: textPos === p ? 'rgba(168,85,247,0.18)' : 'transparent', color: textPos === p ? '#E9D5FF' : MUTED }}>
+                    {p === 'top' ? tr('Haut', 'Top') : p === 'middle' ? tr('Milieu', 'Middle') : tr('Bas', 'Bottom')}
+                  </button>
+                ))}
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+                <input type="checkbox" checked={poolStrict} onChange={e => setPoolStrict(e.target.checked)} style={{ accentColor: '#A855F7', width: 15, height: 15 }} />
+                <span style={{ fontSize: 12.5, color: INK }}>{tr('Utiliser mes captions telles quelles (pool, sans IA)', 'Use my captions as-is (pool, no AI)')}</span>
+              </label>
             </div>
           )}
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer', marginBottom: 12 }}>
@@ -473,6 +515,33 @@ export function BlowAutoContent({ user }: { user: User }) {
               </span>
             </span>
           </label>
+
+          {/* Timing : coupe + micro-vitesse (via l'étape serveur ci-dessus) */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 8 }}>
+            <input type="checkbox" checked={useTrim} onChange={e => setUseTrim(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16 }} />
+            <span style={{ fontSize: 13, color: INK }}>{tr('Couper la vidéo (début / fin)', 'Trim the video (start / end)')}</span>
+          </label>
+          {useTrim && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingLeft: 25, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Début', 'Start')}</span>
+              <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
+              <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Fin (vide = fin)', 'End (blank = end)')}</span>
+              <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={{ ...inp, width: 72, textAlign: 'center' }} />
+              <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('secondes', 'seconds')}</span>
+            </div>
+          )}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 8 }}>
+            <input type="checkbox" checked={useSpeed} onChange={e => setUseSpeed(e.target.checked)} style={{ accentColor: '#A855F7', width: 16, height: 16 }} />
+            <span style={{ fontSize: 13, color: INK }}>{tr('Micro-vitesse aléatoire (par vidéo)', 'Random micro-speed (per video)')}</span>
+          </label>
+          {useSpeed && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingLeft: 25, flexWrap: 'wrap' }}>
+              <input type="number" min={0.9} max={1.35} step={0.01} value={speedMin} onChange={e => setSpeedMin(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
+              <span style={{ fontSize: 12.5, color: MUTED }}>→</span>
+              <input type="number" min={0.9} max={1.35} step={0.01} value={speedMax} onChange={e => setSpeedMax(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
+              <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('× (ex : 0,98 → 1,02)', '× (e.g. 0.98 → 1.02)')}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Sous-entendu', 'Innuendo')}</span>
             {(['soft', 'medium'] as const).map(v => (

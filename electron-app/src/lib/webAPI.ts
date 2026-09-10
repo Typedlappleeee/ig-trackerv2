@@ -442,7 +442,7 @@ export function buildWebAPI() {
     },
 
     // ── Mixer — burn caption text onto video (web: Vercel /api/mix-overlay) ──────
-    async runFfmpegMixOverlay(opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom' | 'custom'; fontSize: number; fontColor: string; posX?: number; posY?: number; gpsSpoof?: boolean; gpsCity?: string; preset?: string; dateDays?: number; audioStoragePath?: string }) {
+    async runFfmpegMixOverlay(opts: { sourcePath: string; caption: string; position: 'top' | 'middle' | 'bottom' | 'custom'; fontSize: number; fontColor: string; posX?: number; posY?: number; gpsSpoof?: boolean; gpsCity?: string; preset?: string; dateDays?: number; audioStoragePath?: string; captionStyle?: 'outline' | 'snapchat' }) {
       try {
         // Pass user's auth token so the server can upload to Supabase as the user
         const { data: { session } } = await (await import('@/lib/supabase')).supabase.auth.getSession()
@@ -455,6 +455,7 @@ export function buildWebAPI() {
             position:         opts.position,
             fontSize:         opts.fontSize,
             fontColor:        opts.fontColor,
+            captionStyle:     opts.captionStyle,
             posX:             opts.posX,
             posY:             opts.posY,
             gpsSpoof:         opts.gpsSpoof,

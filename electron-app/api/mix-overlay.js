@@ -118,7 +118,7 @@ async function buildCaptionOverlay(caption, fontSize, fontColor, fontPath, famil
   return { buf, w: canvasW, h: canvasH }
 }
 
-function buildAssFile(caption, fontSize, fontColor, position, custom) {
+function buildAssFile(caption, fontSize, fontColor, position, custom, captionStyle = 'outline') {
   const h = String(fontColor).replace('#', '').padEnd(6, '0')
   const r = h.slice(0, 2), g = h.slice(2, 4), b = h.slice(4, 6)
   const assColor    = `&H00${b}${g}${r}`.toUpperCase()
@@ -129,6 +129,13 @@ function buildAssFile(caption, fontSize, fontColor, position, custom) {
   const marginV     = position === 'top' ? 150 : position === 'center' || position === 'middle' ? 0 : 300
   const posTag      = custom ? `{\\pos(${Math.round(custom.x * 1080)},${Math.round(custom.y * 1920)})}` : ''
   const safeCaption = posTag + String(caption).replace(/[\r\n]+/g, '\\N')
+  // Style « Snapchat » : BorderStyle=3 (boîte opaque) + BackColour = bande noire
+  // translucide (&H80 ≈ 50 %). Sinon contour classique (BorderStyle=1).
+  const snap        = captionStyle === 'snapchat'
+  const borderStyle = snap ? 3 : 1
+  const backColour  = snap ? '&H80000000' : '&H80000000'
+  const outline     = snap ? 14 : 2   // BorderStyle=3 : Outline = marge de la boîte
+  const shadow      = snap ? 0 : 1
 
   return (
     '[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 0\n\n' +
@@ -136,8 +143,8 @@ function buildAssFile(caption, fontSize, fontColor, position, custom) {
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, ' +
     'Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, ' +
     'Alignment, MarginL, MarginR, MarginV, Encoding\n' +
-    `Style: Default,Arial,${fontSize},${assColor},&H000000FF,${outColor},&H80000000,` +
-    `-1,0,0,0,100,100,0,0,1,2,1,${alignment},60,60,${marginV},1\n\n` +
+    `Style: Default,Arial,${fontSize},${assColor},&H000000FF,${outColor},${backColour},` +
+    `-1,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},${alignment},60,60,${marginV},1\n\n` +
     '[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n' +
     `Dialogue: 0,0:00:00.00,9:59:59.00,Default,,0,0,0,,${safeCaption}\n`
   )
@@ -323,6 +330,7 @@ module.exports = async (req, res) => {
     position  = 'bottom',
     fontSize  = 52,
     fontColor = '#ffffff',
+    captionStyle = 'outline',   // 'outline' (contour) | 'snapchat' (bande noire pleine largeur)
     // Placement libre (fractions 0..1 du CENTRE du texte) quand position==='custom'.
     posX, posY,
     // Spoof intégré : nettoie toujours les métadonnées ; si gpsSpoof, injecte
@@ -429,10 +437,19 @@ module.exports = async (req, res) => {
       if (hasAudio) inputs.push('-stream_loop', '-1', '-i', audioPath)
       const audioMap = hasAudio ? ['-map', '2:a:0', '-shortest'] : ['-map', '0:a?']
 
+      // Style « Snapchat » : bande noire translucide sur TOUTE la largeur, derrière le
+      // texte (au lieu du simple contour). On dessine un drawbox pleine largeur à la
+      // bande verticale du texte, puis on incruste le PNG texte par-dessus.
+      const snap = captionStyle === 'snapchat'
+      const bandPad = Math.round(ovH * 0.30)
+      const bandY = Math.max(0, oy - bandPad)
+      const bandH = Math.min(VH - bandY, ovH + bandPad * 2)
+      const bgChain = snap
+        ? `pad=${VW}:${VH}:-1:-1:color=black,setsar=1,drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=black@0.48:t=fill[bg]`
+        : `pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg]`
       const filterComplex =
         `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,` +
-        `pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg];` +
-        `[bg][1:v]overlay=${ox}:${oy}[vout]`
+        `${bgChain};[bg][1:v]overlay=${ox}:${oy}[vout]`
 
       ffArgs = [
         '-nostdin', '-threads', '0',
@@ -443,7 +460,7 @@ module.exports = async (req, res) => {
       ]
     } catch (_sharpErr) {
       // Fallback: burn caption via ASS subtitle — works without Pango system libs
-      fs.writeFileSync(assPath, buildAssFile(String(caption), Number(fontSize), String(fontColor), position, isCustom ? { x: Number(posX), y: Number(posY) } : null))
+      fs.writeFileSync(assPath, buildAssFile(String(caption), Number(fontSize), String(fontColor), position, isCustom ? { x: Number(posX), y: Number(posY) } : null, captionStyle))
 
       // ffmpeg subtitles filter path: escape colons/backslashes for the filter option
       const safeAssPath = assPath.replace(/\\/g, '/').replace(/:/g, '\\:')

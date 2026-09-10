@@ -1071,6 +1071,7 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
   preset?:    string   // appareil (iphone… / android…), 'random' par défaut
   dateDays?:  number   // date de prise de vue aléatoire dans les N derniers jours
   audioPath?: string   // URL signée d'un MP3 (remplace la piste d'origine)
+  captionStyle?: 'outline' | 'snapchat'   // bande noire pleine largeur (snapchat) ou contour
 }) => {
   const ffmpegBin = getFfmpegBin()
   const dir = path.join(os.tmpdir(), 'ig-tracker-mixer')
@@ -1160,8 +1161,10 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
     ? `${Math.round(Number(opts.posX) * VW)}-(text_w/2)`
     : `(w-text_w)/2`
 
-  // Contour plus fin (style caption propre) — l'ancien 0.07 faisait un liseré épais.
-  const borderPx = Math.max(2, Math.round(fs * 0.045))
+  // Style « Snapchat » : bande noire translucide pleine largeur derrière le texte,
+  // texte blanc sans gros contour. Sinon contour fin classique (style caption propre).
+  const snap = opts.captionStyle === 'snapchat'
+  const borderPx = snap ? 0 : Math.max(2, Math.round(fs * 0.045))
 
   const dtFilters = lines.map((line, i) => {
     const y = startY + i * lineH
@@ -1172,16 +1175,22 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
       `y=${y}`,
       `fontsize=${fs}`,
       `fontcolor=${opts.fontColor}`,
-      `borderw=${borderPx}`, `bordercolor=black@1.0`,
-      `shadowx=2:shadowy=2:shadowcolor=black@0.8`,
     )
+    if (!snap) dtParts.push(`borderw=${borderPx}`, `bordercolor=black@1.0`, `shadowx=2:shadowy=2:shadowcolor=black@0.8`)
     return `drawtext=${dtParts.join(':')}`
   })
+
+  // Bande pleine largeur (snapchat) couvrant la zone du texte.
+  const bandPad = Math.round(fs * 0.5)
+  const bandY = Math.max(0, startY - bandPad)
+  const bandH = Math.min(VH - bandY, totalH + bandPad * 2)
+  const bandFilter = snap ? [`drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=black@0.48:t=fill`] : []
 
   const vf = [
     `scale=${VW}:${VH}:force_original_aspect_ratio=decrease`,
     `pad=${VW}:${VH}:-1:-1:color=black`,
     `setsar=1`,
+    ...bandFilter,
     ...dtFilters,
   ].join(',')
 
