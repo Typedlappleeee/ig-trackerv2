@@ -105,6 +105,59 @@ export async function runRemixVariant(input: Uint8Array, seed: number, h?: Hooks
   return runSpoof(input, seed * 7.3 + 1.1, h, opts)
 }
 
+// ── Variante Auto-contenu : coupe + vitesse + spoof + légende en UNE passe ────
+// Combine timing (trim début/fin), micro-vitesse (0,98–1,02×), spoof (image + GPS
+// + métadonnées effacées) et légende incrustée (style outline ou snapchat).
+export interface AutoVariantOpts {
+  seed: number
+  intensity?: SpoofIntensity
+  gps?: { lat: number; lon: number } | null
+  trimStart?: number | null            // s (null/0 = début)
+  trimEnd?: number | null              // s (null = fin)
+  speed?: number | null                // ex. 0.99 (null/1 = inchangé)
+  caption?: { text: string; pos: CaptionPos; style: CaptionStyle } | null
+}
+export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: Hooks): Promise<Uint8Array> {
+  const intensity = o.intensity ?? 'normal'
+  const speed = o.speed && Math.abs(o.speed - 1) > 1e-3 ? o.speed : null
+  // Trim en options de sortie (comme runMontage) → garde l'audio et la vidéo synchros.
+  const pre: string[] = []
+  if (o.trimStart && o.trimStart > 0) pre.push('-ss', String(o.trimStart))
+  if (o.trimEnd != null && o.trimEnd > (o.trimStart ?? 0)) pre.push('-to', String(o.trimEnd))
+  // Chaîne vidéo : spoof (+ accélération éventuelle via setpts).
+  let vchain = spoofFilter(o.seed, intensity)
+  if (speed) vchain += `,setpts=PTS/${speed.toFixed(4)}`
+  // Métadonnées : effacées, puis GPS réécrit si demandé.
+  const meta: string[] = ['-map_metadata', '-1']
+  if (o.gps) { const loc = iso6709(o.gps.lat, o.gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
+  // Audio : atempo pour rester synchro quand on change la vitesse.
+  const aFilter: string[] = speed ? ['-af', `atempo=${speed.toFixed(4)}`] : []
+
+  if (!o.caption || !o.caption.text.trim()) {
+    return runFfmpeg({
+      input, inputName: 'in.mp4',
+      args: [...pre, '-vf', `${vchain},${EVEN}`, ...meta, ...aFilter, ...H264],
+      onProgress: h?.onProgress, onLog: h?.onLog,
+    })
+  }
+  // Légende incrustée → filter_complex (2e entrée = PNG texte).
+  const png = await textToPng(o.caption.text, 1080, false, o.caption.style)
+  const pos = o.caption.pos
+  let x = '(W-w)/2', y: string
+  if (typeof pos === 'object') { x = `(W*${(pos.x / 100).toFixed(4)})-(w/2)`; y = `(H*${(pos.y / 100).toFixed(4)})-(h/2)` }
+  else y = pos === 'top' ? 'H*0.08' : pos === 'center' ? '(H-h)/2' : 'H-h-H*0.12'
+  if (o.caption.style === 'snapchat') x = '0'   // bande pleine largeur → collée aux bords
+  const fc = `[0:v]${vchain}[vb];[vb][1:v]overlay=${x}:${y},${EVEN}[v]`
+  // `pre` (trim -ss/-to) placé APRÈS les entrées → option de sortie (comme runMontage) ;
+  // sinon il s'appliquerait par erreur comme option d'entrée du PNG (2e -i).
+  return runFfmpeg({
+    input, inputName: 'in.mp4',
+    extra: [{ name: 'cap.png', data: png }],
+    args: ['-i', 'cap.png', '-filter_complex', fc, '-map', '[v]', '-map', '0:a?', ...pre, ...aFilter, ...meta, ...H264],
+    onProgress: h?.onProgress, onLog: h?.onLog,
+  })
+}
+
 // ── Montage : coupe (début/fin) → mp4 ré-encodé ───────────────────────────────
 export async function runMontage(input: Uint8Array, start: number, end: number | null, h?: Hooks): Promise<Uint8Array> {
   const args = ['-ss', String(Math.max(0, start))]
@@ -175,12 +228,15 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
 }
 
 // ── Texte → PNG transparent via canvas (pas besoin de police côté ffmpeg) ──────
-export async function textToPng(text: string, width: number, subtitle = false): Promise<Uint8Array> {
+// style 'outline' : texte blanc contour noir (par défaut). 'snapchat' : bande noire
+// translucide pleine largeur + texte blanc centré (rendu story/Snapchat).
+export type CaptionStyle = 'outline' | 'snapchat'
+export async function textToPng(text: string, width: number, subtitle = false, style: CaptionStyle = 'outline'): Promise<Uint8Array> {
   const pad = Math.round(width * 0.04)
-  const fontSize = subtitle ? Math.round(width * 0.045) : Math.round(width * 0.058)
+  const fontSize = subtitle ? Math.round(width * 0.045) : Math.round(width * 0.052)
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
-  ctx.font = `800 ${fontSize}px system-ui, Arial, sans-serif`
+  ctx.font = `700 ${fontSize}px system-ui, Arial, sans-serif`
   // Découpe en lignes.
   const maxW = width - pad * 2
   const words = text.split(/\s+/)
@@ -191,18 +247,26 @@ export async function textToPng(text: string, width: number, subtitle = false): 
     if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w } else cur = t
   }
   if (cur) lines.push(cur)
-  const lineH = Math.round(fontSize * 1.3)
+  const lineH = Math.round(fontSize * 1.32)
   const height = lines.length * lineH + pad * 2
   canvas.width = width; canvas.height = height
-  ctx.font = `800 ${fontSize}px system-ui, Arial, sans-serif`
+  ctx.font = `700 ${fontSize}px system-ui, Arial, sans-serif`
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  lines.forEach((ln, i) => {
-    const cy = pad + i * lineH + lineH / 2
-    // Contour noir + remplissage blanc (lisible sur toute vidéo).
-    ctx.lineWidth = Math.round(fontSize * 0.16); ctx.strokeStyle = 'rgba(0,0,0,0.9)'
-    ctx.strokeText(ln, width / 2, cy)
-    ctx.fillStyle = '#fff'; ctx.fillText(ln, width / 2, cy)
-  })
+  if (style === 'snapchat') {
+    // Bande noire translucide sur toute la largeur, texte blanc centré, sans contour.
+    ctx.fillStyle = 'rgba(0,0,0,0.48)'
+    ctx.fillRect(0, 0, width, height)
+    ctx.fillStyle = '#fff'
+    lines.forEach((ln, i) => ctx.fillText(ln, width / 2, pad + i * lineH + lineH / 2))
+  } else {
+    lines.forEach((ln, i) => {
+      const cy = pad + i * lineH + lineH / 2
+      // Contour noir + remplissage blanc (lisible sur toute vidéo).
+      ctx.lineWidth = Math.round(fontSize * 0.16); ctx.strokeStyle = 'rgba(0,0,0,0.9)'
+      ctx.strokeText(ln, width / 2, cy)
+      ctx.fillStyle = '#fff'; ctx.fillText(ln, width / 2, cy)
+    })
+  }
   const blob: Blob = await new Promise(res => canvas.toBlob(b => res(b!), 'image/png'))
   return new Uint8Array(await blob.arrayBuffer())
 }

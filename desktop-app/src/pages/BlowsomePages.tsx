@@ -13,7 +13,7 @@ import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
-import { resolveSourceBytes, saveOutputToBank, runSpoof, runCaption, GPS_CITIES, gpsFor, type SpoofIntensity, type CaptionPos } from '@/lib/studioTools'
+import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 
@@ -25,6 +25,7 @@ const MUTED = '#A79FBD'
 const SERIF = "'Space Grotesk',sans-serif"
 const selStyle: CSSProperties = { height: 32, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', cursor: 'pointer' }
 const optStyle: CSSProperties = { background: '#17111F' }
+const numInp: CSSProperties = { width: 62, height: 30, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', textAlign: 'right' }
 
 function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   return <div style={{ borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.12)', boxShadow: '0 20px 50px -30px rgba(168,85,247,0.5)', ...style }}>{children}</div>
@@ -255,15 +256,25 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   // Anti-détection : intensité du spoof + localisation GPS (métadonnées mp4).
   const [intensity, setIntensity] = useState<SpoofIntensity>('normal')
   const [gpsCity, setGpsCity] = useState('none')
-  // Légende IA incrustée : placement preset (bas) ou manuel (x/y en %).
+  // Légendes : pool (une par ligne) distribué seq/aléatoire, format + placement.
+  const [burnCap, setBurnCap] = useState(false)  // incruster une légende ?
+  const [capPool, setCapPool] = useState('')     // pool de légendes (1 par ligne)
+  const [capMode, setCapMode] = useState<'seq' | 'random'>('random')
+  const [capStyle, setCapStyle] = useState<CaptionStyle>('snapchat')
+  const [withCap, setWithCap] = useState(false)  // compléter le pool par une légende IA
   const [capManual, setCapManual] = useState(false)
   const [capPos, setCapPos] = useState<'top' | 'center' | 'bottom'>('bottom')
   const [capX, setCapX] = useState(50)
-  const [capY, setCapY] = useState(85)
-  const [burnCap, setBurnCap] = useState(false)  // incruster la légende dans la vidéo ?
+  const [capY, setCapY] = useState(60)
+  // Timing : coupe (début/fin) et/ou micro-vitesse aléatoire (0,98–1,02×).
+  const [useTrim, setUseTrim] = useState(false)
+  const [trimStart, setTrimStart] = useState('0')
+  const [trimEnd, setTrimEnd] = useState('')
+  const [useSpeed, setUseSpeed] = useState(false)
+  const [speedMin, setSpeedMin] = useState('0.98')
+  const [speedMax, setSpeedMax] = useState('1.02')
   // Dossier de destination des sorties (banque).
   const [destFolder, setDestFolder] = useState('')
-  const [withCap, setWithCap] = useState(true)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [logs, setLogs] = useState<string[]>([])
@@ -282,6 +293,12 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     setRunning(true); setLogs([]); setMade(0); setProgress(0)
     const per = Math.max(1, Math.min(12, variants))
     const R = startRun('auto', `${sources.length} vidéo${sources.length > 1 ? 's' : ''} × ${per}`, sources.length * per)
+    // Pool de légendes (une par ligne, vides ignorées).
+    const pool = capPool.split('\n').map(s => s.trim()).filter(Boolean)
+    const sMin = Math.max(0.5, Number(speedMin) || 0.98)
+    const sMax = Math.min(2, Number(speedMax) || 1.02)
+    const tStart = Number(trimStart) || 0
+    const tEnd = trimEnd.trim() ? Number(trimEnd) : null
     try {
       if (!isFfmpegReady()) { push('⏳ Chargement du moteur (~30 Mo, une fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
       let done = 0
@@ -289,21 +306,30 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         if (R.isCancelled()) { push('⏹ Annulé.'); break }
         push(`— ${v.title} —`)
         const bytes = await resolveSourceBytes(v)
-        let caption: string | null = null
-        if (withCap && conns.groq) { caption = await generateCaption(conns.groq, v.title); if (caption) push('  ✍ légende IA générée') }
+        // Légende IA : complète le pool si activé (une seule génération / vidéo).
+        let aiCap: string | null = null
+        if (burnCap && withCap && conns.groq) { aiCap = await generateCaption(conns.groq, v.title); if (aiCap) push('  ✍ légende IA générée') }
         for (let i = 0; i < per; i++) {
           if (R.isCancelled()) break
           setProgress(0)
           push(`  · variante ${i + 1}/${per}…`)
           const hooks = { onProgress: setProgress, onLog: () => {} }
-          const sOpts = { intensity, gps: gpsFor(gpsCity) }
-          let out = await runSpoof(bytes, Math.random() * 1000, hooks, sOpts)
-          // Incrustation de la légende IA dans la vidéo (si activé et légende disponible).
-          if (burnCap && caption) {
-            push('  · incrustation légende…')
-            const pos: CaptionPos = capManual ? { x: capX, y: capY } : capPos
-            out = await runCaption(out, caption, pos, hooks)
+          // Choix de la légende : pool (seq/aléatoire) sinon IA.
+          let capText: string | null = null
+          if (burnCap) {
+            if (pool.length) capText = capMode === 'random' ? pool[Math.floor(Math.random() * pool.length)] : pool[i % pool.length]
+            else if (aiCap) capText = aiCap
           }
+          const pos: CaptionPos = capManual ? { x: capX, y: capY } : capPos
+          const speed = useSpeed ? sMin + Math.random() * Math.max(0, sMax - sMin) : null
+          const out = await runAutoVariant(bytes, {
+            seed: Math.random() * 1000,
+            intensity, gps: gpsFor(gpsCity),
+            trimStart: useTrim ? tStart : null,
+            trimEnd: useTrim ? tEnd : null,
+            speed,
+            caption: capText ? { text: capText, pos, style: capStyle } : null,
+          }, hooks)
           await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
           done++; setMade(done); R.tick(true)
         }
@@ -323,7 +349,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <Head title="Auto-contenu" sub="Choisis des vidéos, l'IA génère des variantes uniques prêtes à poster (+ légendes)."
+      <Head title="Auto-contenu" sub="Choisis des vidéos → X variantes uniques : légende (pool + style Snapchat), coupe, micro-vitesse, spoof + GPS."
         right={<BlowBtn label={running ? `Génération… ${Math.round(progress * 100)}%` : 'Générer'} onClick={generate} />} />
 
       <Card style={{ padding: 20, marginBottom: 12 }}>
@@ -335,8 +361,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
               style={{ width: 64, height: 32, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', textAlign: 'right' }} />
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
-            <span onClick={() => setWithCap(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: withCap ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: withCap ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
-            Légende IA {conns.groq ? '' : '(clé Groq requise)'}
+            <span onClick={() => setBurnCap(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: burnCap ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: burnCap ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+            Légende incrustée
           </label>
           <span style={{ marginLeft: 'auto', fontSize: 12, color: GOLD }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias en banque`}</span>
         </div>
@@ -366,36 +392,74 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           </label>
         </div>
 
-        {/* Légende incrustée : placement */}
-        {withCap && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 12 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
-              <span onClick={() => setBurnCap(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: burnCap ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: burnCap ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
-              Incruster la légende sur la vidéo
-            </label>
-            {burnCap && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
+        {/* Timing : coupe et/ou micro-vitesse */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
+            <span onClick={() => setUseTrim(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: useTrim ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: useTrim ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+            Couper
+          </label>
+          {useTrim && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
+              début <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={numInp} /> s
+              fin <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={numInp} /> s
+            </span>
+          )}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
+            <span onClick={() => setUseSpeed(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: useSpeed ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: useSpeed ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+            Vitesse aléatoire
+          </label>
+          {useSpeed && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
+              <input type="number" min={0.5} max={2} step={0.01} value={speedMin} onChange={e => setSpeedMin(e.target.value)} style={numInp} /> ×
+              <span style={{ opacity: 0.5 }}>→</span>
+              <input type="number" min={0.5} max={2} step={0.01} value={speedMax} onChange={e => setSpeedMax(e.target.value)} style={numInp} /> ×
+            </span>
+          )}
+        </div>
+
+        {/* Légendes : pool + format + placement */}
+        {burnCap && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(216,180,254,0.1)' }}>
+            <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne… (distribuées entre les variantes)\nEx : Il a vraiment osé m\'aborder comme ça ???'}
+              style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
+                {(['snapchat', 'outline'] as const).map(s => (
+                  <button key={s} onClick={() => setCapStyle(s)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capStyle === s ? '#A855F7' : 'transparent', color: capStyle === s ? '#fff' : MUTED }}>{s === 'snapchat' ? 'Style Snapchat' : 'Contour'}</button>
+                ))}
+              </span>
+              <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
+                {(['seq', 'random'] as const).map(m => (
+                  <button key={m} onClick={() => setCapMode(m)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capMode === m ? '#A855F7' : 'transparent', color: capMode === m ? '#fff' : MUTED }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                ))}
+              </span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED, cursor: conns.groq ? 'pointer' : 'not-allowed', opacity: conns.groq ? 1 : 0.5 }}>
+                <span onClick={() => conns.groq && setWithCap(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: withCap ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: withCap ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+                Compléter par l'IA {conns.groq ? '' : '(clé Groq requise)'}
+              </label>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED, cursor: 'pointer' }}>
                 <span onClick={() => setCapManual(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: capManual ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: capManual ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
                 Placement manuel
               </label>
-            )}
-            {burnCap && !capManual && (
-              <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
-                {(['top', 'center', 'bottom'] as const).map(p => (
-                  <button key={p} onClick={() => setCapPos(p)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capPos === p ? '#A855F7' : 'transparent', color: capPos === p ? '#fff' : MUTED }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
-                ))}
-              </span>
-            )}
-            {burnCap && capManual && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
-                  X <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ width: 110, accentColor: '#A855F7' }} /><span style={{ width: 34, color: INK }}>{capX}%</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
-                  Y <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ width: 110, accentColor: '#A855F7' }} /><span style={{ width: 34, color: INK }}>{capY}%</span>
-                </label>
-              </span>
-            )}
+              {!capManual ? (
+                <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
+                  {(['top', 'center', 'bottom'] as const).map(p => (
+                    <button key={p} onClick={() => setCapPos(p)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capPos === p ? '#A855F7' : 'transparent', color: capPos === p ? '#fff' : MUTED }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
+                  ))}
+                </span>
+              ) : (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
+                    X <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ width: 100, accentColor: '#A855F7' }} /><span style={{ width: 34, color: INK }}>{capX}%</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
+                    Y <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ width: 100, accentColor: '#A855F7' }} /><span style={{ width: 34, color: INK }}>{capY}%</span>
+                  </label>
+                </span>
+              )}
+            </div>
           </div>
         )}
         {running && <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 14 }}><div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: GRAD, transition: 'width .2s ease' }} /></div>}
