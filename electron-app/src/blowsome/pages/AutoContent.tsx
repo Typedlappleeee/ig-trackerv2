@@ -73,6 +73,10 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [useTrim, setUseTrim] = useState(false)
   const [trimStart, setTrimStart] = useState('0')
   const [trimEnd, setTrimEnd] = useState('')
+  // Coupe aléatoire : retire une durée tirée au hasard [min,max] s au DÉBUT de chaque vidéo.
+  const [trimRandom, setTrimRandom] = useState(true)
+  const [trimRandMin, setTrimRandMin] = useState('0.2')
+  const [trimRandMax, setTrimRandMax] = useState('3')
   const [useSpeed, setUseSpeed] = useState(false)
   const [speedMin, setSpeedMin] = useState('0.98')
   const [speedMax, setSpeedMax] = useState('1.02')
@@ -334,9 +338,21 @@ export function BlowAutoContent({ user }: { user: User }) {
               const hi = Math.min(1.35, Number(speedMax) || 1.02)
               adj.speed = randF(Math.min(lo, hi), Math.max(lo, hi))
             }
-            const tS = useTrim ? Math.max(0, Number(trimStart) || 0) : undefined
-            const tEraw = useTrim && trimEnd.trim() ? Number(trimEnd) : NaN
-            const tE = Number.isFinite(tEraw) ? tEraw : undefined
+            // Coupe : aléatoire (retire [min,max] s au début, unique par vidéo) OU fixe.
+            let tS: number | undefined
+            let tE: number | undefined
+            if (useTrim) {
+              if (trimRandom) {
+                const lo = Math.max(0, Number(trimRandMin) || 0.2)
+                const hi = Math.max(lo, Number(trimRandMax) || 3)
+                tS = randF(lo, hi, 2)   // début coupé d'une durée aléatoire
+                tE = undefined          // jusqu'à la fin
+              } else {
+                tS = Math.max(0, Number(trimStart) || 0)
+                const tEraw = trimEnd.trim() ? Number(trimEnd) : NaN
+                tE = Number.isFinite(tEraw) ? tEraw : undefined
+              }
+            }
             const rr = await fetch('/api/repurpose', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -522,12 +538,28 @@ export function BlowAutoContent({ user }: { user: User }) {
             <span style={{ fontSize: 13, color: INK }}>{tr('Couper la vidéo (début / fin)', 'Trim the video (start / end)')}</span>
           </label>
           {useTrim && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingLeft: 25, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Début', 'Start')}</span>
-              <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
-              <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Fin (vide = fin)', 'End (blank = end)')}</span>
-              <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={{ ...inp, width: 72, textAlign: 'center' }} />
-              <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('secondes', 'seconds')}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, paddingLeft: 25 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+                <input type="checkbox" checked={trimRandom} onChange={e => setTrimRandom(e.target.checked)} style={{ accentColor: '#A855F7', width: 15, height: 15 }} />
+                <span style={{ fontSize: 12.5, color: INK }}>{tr('Aléatoire — coupe le début d\'une durée au hasard', 'Random — trim the start by a random amount')}</span>
+              </label>
+              {trimRandom ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Entre', 'Between')}</span>
+                  <input type="number" min={0} step={0.1} value={trimRandMin} onChange={e => setTrimRandMin(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
+                  <span style={{ fontSize: 12.5, color: MUTED }}>{tr('et', 'and')}</span>
+                  <input type="number" min={0} step={0.1} value={trimRandMax} onChange={e => setTrimRandMax(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
+                  <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('secondes (par vidéo)', 'seconds (per video)')}</span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Début', 'Start')}</span>
+                  <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={{ ...inp, width: 72, textAlign: 'center' }} />
+                  <span style={{ fontSize: 12.5, color: MUTED }}>{tr('Fin (vide = fin)', 'End (blank = end)')}</span>
+                  <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={{ ...inp, width: 72, textAlign: 'center' }} />
+                  <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('secondes', 'seconds')}</span>
+                </div>
+              )}
             </div>
           )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 8 }}>
