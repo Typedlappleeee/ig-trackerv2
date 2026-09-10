@@ -133,7 +133,7 @@ async function handleSpoof(req, res) {
     sourceUrl, storagePath, userId, bucket = 'content',
     preset = 'iphone17pro', gpsCity = 'newyork', customDate,
     adjustments = {}, supabaseToken, supabaseAnonKey,
-    trimStart, trimEnd,   // coupe optionnelle (s) — appliquée en amont du spoof
+    trimStart, trimEnd, trimEndCut,   // coupe optionnelle (s) — appliquée en amont du spoof
   } = req.body ?? {}
 
   if (!sourceUrl && !storagePath) return res.status(400).json({ ok: false, error: 'Missing source' })
@@ -223,11 +223,28 @@ async function handleSpoof(req, res) {
 
     // Coupe optionnelle : options d'ENTRÉE (-ss avant -i = seek rapide et précis),
     // -t durée (sans ambiguïté -to/-ss selon la version de ffmpeg).
-    const tStart = Math.max(0, Number(trimStart) || 0)
-    const tEnd   = Number(trimEnd)
+    //  - trimStart   : secondes retirées au DÉBUT.
+    //  - trimEnd      : fin ABSOLUE (mode fixe).
+    //  - trimEndCut   : secondes retirées à la FIN (mode aléatoire) → nécessite la durée.
+    const tStart   = Math.max(0, Number(trimStart) || 0)
+    const tEndAbs  = Number(trimEnd)
+    const tEndCut  = Math.max(0, Number(trimEndCut) || 0)
+    let tEnd = Number.isFinite(tEndAbs) && tEndAbs > 0 ? tEndAbs : NaN
+    // Coupe de fin relative → on sonde la durée réelle (parse le stderr de ffmpeg).
+    if (!Number.isFinite(tEnd) && tEndCut > 0) {
+      try {
+        const probe = await execFileAsync(ffmpegPath, ['-i', inputPath], { timeout: 60000 }).catch(e => e)
+        const m = /Duration:\s*(\d+):(\d+):(\d+\.?\d*)/.exec(probe?.stderr ?? '')
+        if (m) {
+          const dur = (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3])
+          const end = dur - tEndCut
+          if (end > tStart + 0.3) tEnd = end   // garde au moins ~0,3 s de vidéo
+        }
+      } catch { /* durée introuvable → pas de coupe de fin */ }
+    }
     const trimIn = []
     if (tStart > 0) trimIn.push('-ss', String(tStart))
-    if (Number.isFinite(tEnd) && tEnd > tStart) trimIn.push('-t', String(tEnd - tStart))
+    if (Number.isFinite(tEnd) && tEnd > tStart) trimIn.push('-t', String((tEnd - tStart).toFixed(3)))
     const ffArgs = ['-nostdin', '-threads', '0', ...trimIn, '-i', inputPath]
 
     // Container-level (moov-level) metadata — branché selon la plateforme.

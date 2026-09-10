@@ -338,15 +338,17 @@ export function BlowAutoContent({ user }: { user: User }) {
               const hi = Math.min(1.35, Number(speedMax) || 1.02)
               adj.speed = randF(Math.min(lo, hi), Math.max(lo, hi))
             }
-            // Coupe : aléatoire (retire [min,max] s au début, unique par vidéo) OU fixe.
+            // Coupe : aléatoire (retire [min,max] s au DÉBUT ET à la FIN, unique par
+            // vidéo) OU fixe (début / fin absolue).
             let tS: number | undefined
             let tE: number | undefined
+            let tEndCut: number | undefined
             if (useTrim) {
               if (trimRandom) {
                 const lo = Math.max(0, Number(trimRandMin) || 0.2)
                 const hi = Math.max(lo, Number(trimRandMax) || 3)
-                tS = randF(lo, hi, 2)   // début coupé d'une durée aléatoire
-                tE = undefined          // jusqu'à la fin
+                tS = randF(lo, hi, 2)        // début coupé d'une durée aléatoire
+                tEndCut = randF(lo, hi, 2)   // fin coupée d'une durée aléatoire (résolue serveur)
               } else {
                 tS = Math.max(0, Number(trimStart) || 0)
                 const tEraw = trimEnd.trim() ? Number(trimEnd) : NaN
@@ -360,7 +362,7 @@ export function BlowAutoContent({ user }: { user: User }) {
                 preset: spoof ? 'random' : 'iphone17pro', gpsCity: spoof ? 'random' : 'newyork',
                 customDate: randDate30().replace(/-/g, ':'),
                 adjustments: adj,
-                trimStart: tS, trimEnd: tE,
+                trimStart: tS, trimEnd: tE, trimEndCut,
                 supabaseToken: session?.access_token, supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
               }),
             }).then(r => r.json()).catch(() => ({ ok: false }))
@@ -526,7 +528,7 @@ export function BlowAutoContent({ user }: { user: User }) {
               sub={tr('Teinte, grain, zoom + métadonnées (appareil/GPS/date) + ré-encodage', 'Hue, grain, zoom + metadata (device/GPS/date) + re-encode')} />
             <Switch on={useTrim} onChange={setUseTrim}
               label={tr('Couper la vidéo', 'Trim the video')}
-              sub={tr('Retire un morceau au début — unique par vidéo', 'Trims a slice off the start — unique per video')} />
+              sub={tr('Retire un morceau au début ET à la fin — unique par vidéo', 'Trims a slice off the start AND the end — unique per video')} />
             {useTrim && (
               <div style={insetStyle}>
                 <Seg value={trimRandom ? 'rand' : 'fixed'} onChange={v => setTrimRandom(v === 'rand')} options={[
@@ -536,7 +538,7 @@ export function BlowAutoContent({ user }: { user: User }) {
                     <input type="number" min={0} step={0.1} value={trimRandMin} onChange={e => setTrimRandMin(e.target.value)} style={numInp} />
                     <span style={{ fontSize: 12.5, color: MUTED }}>→</span>
                     <input type="number" min={0} step={0.1} value={trimRandMax} onChange={e => setTrimRandMax(e.target.value)} style={numInp} />
-                    <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('s (par vidéo)', 's (per video)')}</span>
+                    <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('s — de chaque côté', 's — on each side')}</span>
                   </Field>
                 ) : (
                   <Field label={tr('Début / Fin', 'Start / End')}>
