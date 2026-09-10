@@ -2788,7 +2788,7 @@ export async function warmupInstagramViaRpa(
 // instagramPubReels : cover perso, tags IA, synchro audio tendance, et sa
 // propre gestion des popups. paramMap {Caption, Video[], SameURL, SameVolume,
 // AcousticVolume, AITags, Cover[]}.
-const REELS_FLOW_VERSION = '2'
+const REELS_FLOW_VERSION = '3'
 const _reelsFlowIdCache = new Map<string, Promise<string | null>>()
 function reelsFlowLsKey(bearer: string): string { return `sf-reels-flowid:${bearer.slice(-14)}` }
 function reelsFlowVerKey(bearer: string): string { return `sf-reels-flowver:${bearer.slice(-14)}` }
@@ -2827,7 +2827,7 @@ export interface ReelsPostParams {
   sameVolume?:    number
   acousticVolume?: number
   aiTags?:        boolean
-  reelsTrial?:    boolean    // "reels d'essai" (native shareType:2) — non géré par le flow custom
+  reelsTrial?:    boolean    // "reels d'essai" : coche le toggle « Trial » (partage non-abonnés) via le flow custom
 }
 
 // Publie un Reel. Par défaut, utilise le flow RPA custom (cover / tags IA / audio
@@ -2837,14 +2837,13 @@ export interface ReelsPostParams {
 // appelants gardent leur logique anti-double/retry inchangée. Ne throw jamais :
 // réseau perdu → {} (interprété "unknown" par classifyTaskRes → pas de retry).
 export async function postReelsTask(bearer: string, p: ReelsPostParams): Promise<Record<string, unknown>> {
+  // Repli native : /rpa/task/instagramPubReels NE supporte PAS le "reels d'essai"
+  // (aucun paramètre shareType dans l'API GeeLark — vérifié sur la doc officielle).
+  // Le repli publie donc un Reel normal ; l'essai n'est possible que via le flow custom.
   const native = () => geelarkFetch('POST', '/rpa/task/instagramPubReels', {
     id: p.phoneId, scheduleAt: p.scheduleAt, description: p.description ?? '',
-    video: p.video, ...(p.reelsTrial ? { shareType: 2 } : {}),
+    video: p.video,
   }, bearer).catch(() => ({} as Record<string, unknown>))
-
-  // "Reels d'essai" (shareType:2) n'existe pas dans le flow custom → on garde la
-  // native qui, elle, le supporte.
-  if (p.reelsTrial) return native()
 
   let flowId: string | null = null
   try { flowId = await ensureReelsFlowId(bearer) } catch { flowId = null }
@@ -2857,6 +2856,8 @@ export async function postReelsTask(bearer: string, p: ReelsPostParams): Promise
     ...(p.sameVolume != null ? { SameVolume: p.sameVolume } : {}),
     ...(p.acousticVolume != null ? { AcousticVolume: p.acousticVolume } : {}),
     AITags:  !!p.aiTags,
+    // "Reels d'essai" : coche le toggle « Trial » sur l'écran de partage (flow custom).
+    ...(p.reelsTrial ? { Trial: true } : {}),
     Cover:   p.cover ?? [],
   }
   const addFlow = (fid: string) => geelarkFetch('POST', '/task/rpa/add', {

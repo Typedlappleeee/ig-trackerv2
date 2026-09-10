@@ -58,6 +58,14 @@
       },
       {
         "createFrom": "",
+        "id": "1df750e4-e23b-4e85-925e-c8f17c5ccc0b",
+        "isNotRequired": true,
+        "key": "Trial",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "createFrom": "",
         "id": "8a67d7cf-b98f-4af6-8f2f-06064be8ebf3",
         "isNotRequired": true,
         "key": "Cover",
@@ -3207,6 +3215,232 @@
         "id": "dc2ff9c2-62f4-4852-a5d6-b86dcc433505",
         "name": "点击元素",
         "type": "click"
+      },
+      {
+        "config": {
+          "apposition": "and",
+          "children": [
+            {
+              "config": {
+                "_a": 200,
+                "_b": 300,
+                "direction": "bottom",
+                "distanceMax": "450",
+                "distanceMin": "300",
+                "position": [
+                  260,
+                  "500"
+                ],
+                "randomDistance": 0,
+                "randomWheelSleepTime": [
+                  200,
+                  300
+                ],
+                "simulate": true
+              },
+              "id": "3aa51e1d-1f83-45cd-a2e1-86e2d13d1076",
+              "name": "滑动页面",
+              "type": "scrollPage"
+            },
+            {
+              "config": {
+                "timeoutMax": 1500,
+                "timeoutMin": 800,
+                "timeoutType": "randomInterval"
+              },
+              "id": "b7f644d9-0af7-4159-bc88-834fdc2c47c5",
+              "name": "等待时间",
+              "type": "waitTime"
+            },
+            {
+              "config": {
+                "filterCollection": [
+                  [
+                    {
+                      "content": "Trial",
+                      "filterType": "contain",
+                      "type": "text"
+                    }
+                  ]
+                ],
+                "hiddenChildren": true,
+                "searchTime": 3000,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "type": "centerY",
+                "variable": "trialLabelY"
+              },
+              "id": "6f8f51a3-2611-4f1f-af8d-e8b35f38a07d",
+              "name": "获取元素数据",
+              "type": "getEle"
+            },
+            {
+              "config": {
+                "children": [
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "filterCollection": [
+                              [
+                                {
+                                  "content": "com.instagram.android:id/toggle",
+                                  "filterType": "equal",
+                                  "type": "id"
+                                }
+                              ]
+                            ],
+                            "hiddenChildren": true,
+                            "searchTime": 3000,
+                            "serial": "${times}",
+                            "serialType": "fixedValue",
+                            "variable": "toggle"
+                          },
+                          "id": "903c7364-9dcb-4a08-befb-18b9f635adc4",
+                          "name": "等待元素出现",
+                          "type": "waitEle"
+                        },
+                        {
+                          "config": {
+                            "saveItemName": "toggle",
+                            "type": "centerY",
+                            "variable": "toggleCenterY"
+                          },
+                          "id": "0419fd88-f108-4dd1-b1c9-2f19c855639d",
+                          "name": "获取元素数据",
+                          "type": "getEle"
+                        },
+                        {
+                          "config": {
+                            "saveItemName": "toggle",
+                            "type": "selected",
+                            "variable": "toggleSelected"
+                          },
+                          "id": "823be13e-d6c9-4297-867f-ffabda01d1ee",
+                          "name": "获取元素数据",
+                          "type": "getEle"
+                        },
+                        {
+                          "config": {
+                            "operationStr": "${toggleCenterY} - ${trialLabelY}",
+                            "variable": "diff"
+                          },
+                          "id": "1ab4584d-909f-4a56-a3c9-1e11ae8f34b1",
+                          "name": "数学运算",
+                          "type": "mathOperation"
+                        },
+                        {
+                          "config": {
+                            "children": [
+                              {
+                                "config": {
+                                  "children": [
+                                    {
+                                      "config": {
+                                        "randomDistance": 0,
+                                        "saveItemName": "toggle",
+                                        "useOffset": false
+                                      },
+                                      "id": "6ec2b868-ded0-486a-ae55-3460f6aea0d2",
+                                      "name": "点击元素",
+                                      "type": "click"
+                                    },
+                                    {
+                                      "config": {
+                                        "operationStr": "1",
+                                        "variable": "hasBreak"
+                                      },
+                                      "id": "4f53badb-1fbc-4165-8cf2-8d17f8fe5547",
+                                      "name": "数学运算",
+                                      "type": "mathOperation"
+                                    }
+                                  ],
+                                  "conditionV3": [
+                                    [
+                                      {
+                                        "probability": 50,
+                                        "relation": "notExist",
+                                        "useVariable": "toggleSelected"
+                                      },
+                                      {
+                                        "probability": 50,
+                                        "relation": "less",
+                                        "result": "50",
+                                        "useVariable": "diff"
+                                      }
+                                    ]
+                                  ]
+                                },
+                                "id": "11aeaa40-f670-4df4-b703-a2422d1e3b2f",
+                                "name": "IF条件",
+                                "type": "ifElse"
+                              },
+                              {
+                                "config": {},
+                                "id": "d1e257ec-b54d-4042-afcc-6bd185cbcb62",
+                                "name": "退出循环",
+                                "type": "breakLoop"
+                              }
+                            ],
+                            "conditionV3": [
+                              [
+                                {
+                                  "probability": 50,
+                                  "relation": "moreEqual",
+                                  "result": "${trialLabelY}",
+                                  "useVariable": "toggleCenterY"
+                                }
+                              ]
+                            ]
+                          },
+                          "id": "5b289e10-39ee-47af-888c-bbb0bc86a522",
+                          "name": "IF条件",
+                          "type": "ifElse"
+                        }
+                      ],
+                      "serialType": "fixedValue",
+                      "times": "6",
+                      "variableIndex": "times"
+                    },
+                    "enabled": true,
+                    "id": "f61f0806-16db-4f8d-abc4-591824700673",
+                    "name": "For循环次数",
+                    "type": "forTimes"
+                  }
+                ],
+                "conditionV3": [
+                  [
+                    {
+                      "probability": 50,
+                      "relation": "exist",
+                      "useVariable": "trialLabelY"
+                    }
+                  ]
+                ]
+              },
+              "id": "5da35c3d-fefb-4daa-9046-530a9a2c6e45",
+              "name": "IF条件",
+              "type": "ifElse"
+            },
+            {
+              "config": {},
+              "id": "30021db2-ee9d-4391-9649-e876edbdbe8a",
+              "name": "页面截图",
+              "type": "screenshotPage"
+            }
+          ],
+          "conditionList": [
+            {
+              "probability": 50,
+              "relation": "exist",
+              "useVariable": "Trial"
+            }
+          ]
+        },
+        "id": "5879eed0-4358-41d0-be7f-299ef23666e3",
+        "name": "IF条件",
+        "type": "ifElse"
       },
       {
         "config": {

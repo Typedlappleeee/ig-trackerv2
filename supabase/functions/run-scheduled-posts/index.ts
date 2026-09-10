@@ -1038,7 +1038,10 @@ Deno.serve(async (req) => {
           scheduleAt:  baseTs + i * delayMin * 60,
           description: (videos[videoIdx]?.desc?.trim() || post.caption),
           video:       [resolvedTokens[videoIdx]],
-          ...(useTrialReels ? { shareType: 2 } : {}),
+          // NB : /rpa/task/instagramPubReels ne supporte PAS le "reels d'essai"
+          // (aucun paramètre shareType côté GeeLark) → posté en Reel normal.
+          // Le vrai toggle « Trial » n'existe que dans le flow custom client
+          // (postReelsTask). TODO : porter le flow ici pour l'essai programmé.
         })
         const taskId = res.data?.id ?? res.data?.taskId ?? null
         if (res.code === 0) {
