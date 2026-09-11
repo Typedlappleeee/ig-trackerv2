@@ -213,8 +213,9 @@ export function BlowAutoContent({ user }: { user: User }) {
         // Pool STRICT : on utilise les phrases du pool TELLES QUELLES (rotation), sans IA.
         const strategy: 'verbatim' | 'variation' | 'fresh' =
           poolStrict && haveExamples ? 'verbatim'
-          // ~15 % verbatim · ~30 % variante légère · ~55 % hook frais réactif à la vidéo.
-          : !haveExamples ? 'fresh' : roll < 0.10 ? 'verbatim' : roll < 0.28 ? 'variation' : 'fresh'
+          // On COLLE aux exemples : ~50 % tes phrases telles quelles · ~40 % variante
+          // très légère · ~10 % seulement de hook « frais » (dans le même ton).
+          : !haveExamples ? 'fresh' : roll < 0.50 ? 'verbatim' : roll < 0.90 ? 'variation' : 'fresh'
 
         if (strategy === 'verbatim') {
           caption = baseLine
@@ -774,7 +775,7 @@ const inp: React.CSSProperties = {
 function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: string; h: number } {
   const W = 1080
   const padX = Math.round(W * 0.05)                                   // marge horizontale (retour à la ligne)
-  const fontSize = Math.round(W * (style === 'snapchat' ? 0.046 : 0.055))
+  const fontSize = Math.round(W * (style === 'snapchat' ? 0.039 : 0.055))
   // Bande fine qui « épouse » le texte (comme Snapchat) — plus le pavé n'est trop haut.
   const vpad = Math.round(fontSize * (style === 'snapchat' ? 0.24 : 0.16))
   const lineH = Math.round(fontSize * (style === 'snapchat' ? 1.05 : 1.16))   // ~ line height 1x
