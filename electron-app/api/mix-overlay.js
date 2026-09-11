@@ -162,7 +162,7 @@ function buildAssFile(caption, fontSize, fontColor, position, custom, captionSty
   // police NORMALE (Bold=0), sans contour. Sinon contour classique (BorderStyle=1, gras).
   const snap        = captionStyle === 'snapchat'
   const borderStyle = snap ? 3 : 1
-  const backColour  = snap ? '&H73555555' : '&H80000000'   // &HAABBGGRR — gris 0x555555, ~45 %
+  const backColour  = snap ? '&H2E757575' : '&H80000000'   // &HAABBGGRR — gris 0x757575, ~82 %
   const outline     = snap ? 16 : 2   // BorderStyle=3 : Outline = marge de la boîte
   const shadow      = snap ? 0 : 1
   const bold        = snap ? 0 : -1
@@ -493,7 +493,7 @@ module.exports = async (req, res) => {
       const bandPad = snap ? Math.round(fSize * 0.7) : 0
       const bandY = Math.max(0, startY - bandPad)
       const bandH = Math.min(VH - bandY, totalH + bandPad * 2)
-      const band = snap ? `,drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=0x555555@0.45:t=fill` : ''
+      const band = snap ? `,drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=0x757575@0.82:t=fill` : ''
 
       const dtOpts = [
         `fontfile='${escFilter(fontPath)}'`,

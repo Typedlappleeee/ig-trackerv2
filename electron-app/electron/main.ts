@@ -1194,7 +1194,7 @@ ipcMain.handle('run-ffmpeg-mix-overlay', async (_event, opts: {
   const bandPad = Math.round(fs * 0.7)
   const bandY = Math.max(0, startY - bandPad)
   const bandH = Math.min(VH - bandY, totalH + bandPad * 2)
-  const bandFilter = snap ? [`drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=0x555555@0.45:t=fill`] : []
+  const bandFilter = snap ? [`drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=0x757575@0.82:t=fill`] : []
 
   const vf = [
     `scale=${VW}:${VH}:force_original_aspect_ratio=decrease`,

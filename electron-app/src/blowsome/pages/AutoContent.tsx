@@ -774,12 +774,13 @@ const inp: React.CSSProperties = {
 function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: string; h: number } {
   const W = 1080
   const padX = Math.round(W * 0.05)                                   // marge horizontale (retour à la ligne)
-  const fontSize = Math.round(W * (style === 'snapchat' ? 0.05 : 0.055))
+  const fontSize = Math.round(W * (style === 'snapchat' ? 0.052 : 0.055))
   // Bande fine qui « épouse » le texte (comme Snapchat) — plus le pavé n'est trop haut.
   const vpad = Math.round(fontSize * (style === 'snapchat' ? 0.24 : 0.16))
-  const lineH = Math.round(fontSize * 1.16)
+  const lineH = Math.round(fontSize * (style === 'snapchat' ? 1.05 : 1.16))   // ~ line height 1x
   const weight = style === 'snapchat' ? '500' : '800'
-  const fontStack = `${weight} ${fontSize}px "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif`
+  // Police Helvetica (fallbacks proches) + fond gris #757575 (spec utilisateur).
+  const fontStack = `${weight} ${fontSize}px Helvetica, "Helvetica Neue", Arial, sans-serif`
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
   ctx.font = fontStack
@@ -799,7 +800,7 @@ function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: s
   ctx.font = fontStack
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
   if (style === 'snapchat') {
-    ctx.fillStyle = 'rgba(80,80,80,0.5)'; ctx.fillRect(0, 0, W, height)
+    ctx.fillStyle = 'rgba(117,117,117,0.82)'; ctx.fillRect(0, 0, W, height)   // #757575
     ctx.fillStyle = '#fff'
     lines.forEach((ln, i) => ctx.fillText(ln, W / 2, vpad + i * lineH + lineH / 2))
   } else {
