@@ -774,7 +774,7 @@ const inp: React.CSSProperties = {
 function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: string; h: number } {
   const W = 1080
   const padX = Math.round(W * 0.05)                                   // marge horizontale (retour à la ligne)
-  const fontSize = Math.round(W * (style === 'snapchat' ? 0.052 : 0.055))
+  const fontSize = Math.round(W * (style === 'snapchat' ? 0.046 : 0.055))
   // Bande fine qui « épouse » le texte (comme Snapchat) — plus le pavé n'est trop haut.
   const vpad = Math.round(fontSize * (style === 'snapchat' ? 0.24 : 0.16))
   const lineH = Math.round(fontSize * (style === 'snapchat' ? 1.05 : 1.16))   // ~ line height 1x
@@ -800,7 +800,7 @@ function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: s
   ctx.font = fontStack
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
   if (style === 'snapchat') {
-    ctx.fillStyle = 'rgba(117,117,117,0.82)'; ctx.fillRect(0, 0, W, height)   // #757575
+    ctx.fillStyle = 'rgba(117,117,117,0.58)'; ctx.fillRect(0, 0, W, height)   // #757575 translucide
     ctx.fillStyle = '#fff'
     lines.forEach((ln, i) => ctx.fillText(ln, W / 2, vpad + i * lineH + lineH / 2))
   } else {
