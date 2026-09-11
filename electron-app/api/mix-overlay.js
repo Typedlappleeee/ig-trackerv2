@@ -126,6 +126,27 @@ async function buildCaptionOverlay(caption, fontSize, fontColor, fontPath, famil
   return { buf, w: canvasW, h: canvasH }
 }
 
+// Échappe un CHEMIN pour l'option drawtext (fontfile/textfile) dans un filtergraph.
+function escFilter(p) {
+  return String(p).replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'")
+}
+
+// Découpe une légende en lignes ≤ maxChars (respecte les retours à la ligne existants).
+function wrapCaption(text, maxChars) {
+  const out = []
+  for (const seg of String(text).split(/\r?\n/)) {
+    const words = seg.split(' ')
+    let cur = ''
+    for (const w of words) {
+      if (!w) continue
+      if (cur.length + w.length + (cur ? 1 : 0) > maxChars && cur) { out.push(cur); cur = w }
+      else cur = cur ? `${cur} ${w}` : w
+    }
+    if (cur) out.push(cur)
+  }
+  return out.length ? out : ['']
+}
+
 function buildAssFile(caption, fontSize, fontColor, position, custom, captionStyle = 'outline') {
   const h = String(fontColor).replace('#', '').padEnd(6, '0')
   const r = h.slice(0, 2), g = h.slice(2, 4), b = h.slice(4, 6)
@@ -359,6 +380,7 @@ module.exports = async (req, res) => {
   const inputPath   = path.join(tmpDir, `mix_in_${ts}.mp4`)
   const overlayPath = path.join(tmpDir, `mix_ov_${ts}.png`)
   const assPath     = path.join(tmpDir, `mix_as_${ts}.ass`)
+  const capTxtPath  = path.join(tmpDir, `mix_cap_${ts}.txt`)
   const audioPath   = path.join(tmpDir, `mix_au_${ts}.mp3`)
   const outPath     = path.join(tmpDir, `mix_out_${ts}.mov`)
 
@@ -412,54 +434,59 @@ module.exports = async (req, res) => {
     }
 
     // ── Build caption overlay ─────────────────────────────────────────────────
-    // Primary: sharp Pango text → PNG overlay composited via ffmpeg overlay filter.
-    // Fallback: if Pango/sharp fails → ASS subtitle file → ffmpeg subtitles filter.
+    // Primary: ffmpeg drawtext + textfile avec la police FOURNIE (api/fonts) — 100 %
+    // fiable sur Vercel : aucune dépendance à Pango/fontconfig/sharp-text ni à une
+    // police système (causes du « texte absent / chelou »). textfile = aucun
+    // échappement du contenu (apostrophes, virgules, accents, « guillemets »… OK).
+    // Fallback: ASS subtitle si drawtext échoue.
     let ffArgs
     try {
-      const fontPath = (() => {
-        const p = path.join(__dirname, 'fonts', 'font-bold.ttf')
-        return fs.existsSync(p) ? p : null
-      })()
-      const family = fontPath ? fontFamilyName(fs.readFileSync(fontPath)) : null
-      const { buf: overlayBuf, w: ovW, h: ovH } =
-        await buildCaptionOverlay(String(caption), Number(fontSize), String(fontColor), fontPath, family, captionStyle)
-
-      if (!overlayBuf || !overlayBuf.length) throw new Error('sharp returned empty buffer')
-      fs.writeFileSync(overlayPath, overlayBuf)
-
-      const clampI = (v, lo, hi) => Math.min(Math.max(v, lo), hi)
-      const ox = isCustom
-        ? clampI(Math.round(Number(posX) * VW - ovW / 2), 0, VW - ovW)
-        : Math.round((VW - ovW) / 2)
-      // Petit jitter vertical (±35 px) → la hauteur varie « un peu mais très peu »
-      // d'une vidéo à l'autre (jamais pixel-identique, reste au même endroit).
-      const jitterY = Math.round((Math.random() - 0.5) * 70)
-      const oy = isCustom
-        ? clampI(Math.round(Number(posY) * VH - ovH / 2), 0, VH - ovH)
-        : position === 'top' ? 150 + jitterY
-        : (position === 'center' || position === 'middle') ? Math.round((VH - ovH) / 2) + jitterY
-        // Bas REMONTÉ (~82 % de la hauteur, pas collé au bord) — cf. 3e capture.
-        : clampI(VH - ovH - 300 + jitterY, 60, VH - ovH - 60)
-
-      // 0 = vidéo, 1 = overlay png, (2 = audio mp3 si présent)
-      const inputs = ['-i', inputPath, '-i', overlayPath]
-      if (hasAudio) inputs.push('-stream_loop', '-1', '-i', audioPath)
-      const audioMap = hasAudio ? ['-map', '2:a:0', '-shortest'] : ['-map', '0:a?']
-
-      // Style « Snapchat » : bande noire translucide sur TOUTE la largeur, derrière le
-      // texte (au lieu du simple contour). On dessine un drawbox pleine largeur à la
-      // bande verticale du texte, puis on incruste le PNG texte par-dessus.
+      const fontPath = path.join(__dirname, 'fonts', 'font-bold.ttf')
+      if (!fs.existsSync(fontPath)) throw new Error('bundled font missing')
       const snap = captionStyle === 'snapchat'
-      // Bande grise translucide (rendu Snapchat) sur toute la largeur, marge confortable.
-      const bandPad = Math.round(ovH * 0.55)
-      const bandY = Math.max(0, oy - bandPad)
-      const bandH = Math.min(VH - bandY, ovH + bandPad * 2)
-      const bgChain = snap
-        ? `pad=${VW}:${VH}:-1:-1:color=black,setsar=1,drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=0x555555@0.45:t=fill[bg]`
-        : `pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg]`
+      const fSize = Number(fontSize) || 52
+      // Découpe en lignes (≈ 90 % de la largeur) et écrit le texte brut sur disque.
+      const charW = fSize * 0.55
+      const maxChars = Math.max(10, Math.floor(VW * 0.9 / charW))
+      const lines = wrapCaption(String(caption), maxChars)
+      fs.writeFileSync(capTxtPath, lines.join('\n'), 'utf8')
+
+      const lineH = Math.round(fSize * 1.42)
+      const totalH = lines.length * lineH
+      const jitterY = Math.round((Math.random() - 0.5) * 70)
+      const startY = isCustom
+        ? Math.round(Number(posY) * VH - totalH / 2)
+        : position === 'top' ? 150 + jitterY
+        : (position === 'center' || position === 'middle') ? Math.round((VH - totalH) / 2) + jitterY
+        // Bas remonté (~82 %), pas collé au bord.
+        : Math.min(Math.max(VH - totalH - 300 + jitterY, 60), VH - totalH - 60)
+      const xExpr = isCustom ? `${Math.round(Number(posX) * VW)}-(text_w/2)` : '(w-text_w)/2'
+      const fColor = String(fontColor || '#ffffff').replace('#', '0x')
+
+      // Bande grise translucide pleine largeur derrière le texte (style Snapchat).
+      const bandPad = snap ? Math.round(fSize * 0.7) : 0
+      const bandY = Math.max(0, startY - bandPad)
+      const bandH = Math.min(VH - bandY, totalH + bandPad * 2)
+      const band = snap ? `,drawbox=x=0:y=${bandY}:w=${VW}:h=${bandH}:color=0x555555@0.45:t=fill` : ''
+
+      const dtOpts = [
+        `fontfile='${escFilter(fontPath)}'`,
+        `textfile='${escFilter(capTxtPath)}'`,
+        `x=${xExpr}`, `y=${startY}`,
+        `fontsize=${fSize}`, `fontcolor=${fColor}`,
+        `line_spacing=${Math.round(fSize * 0.28)}`,
+      ]
+      // Style « contour » : liseré + ombre (le style snapchat s'appuie sur la bande).
+      if (!snap) dtOpts.push(`borderw=${Math.max(2, Math.round(fSize * 0.05))}`, 'bordercolor=black@0.9', 'shadowx=2', 'shadowy=2', 'shadowcolor=black@0.7')
+      const dt = `drawtext=${dtOpts.join(':')}`
+
+      const inputs = ['-i', inputPath]
+      if (hasAudio) inputs.push('-stream_loop', '-1', '-i', audioPath)
+      const audioMap = hasAudio ? ['-map', '1:a:0', '-shortest'] : ['-map', '0:a?']
+
       const filterComplex =
         `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,` +
-        `${bgChain};[bg][1:v]overlay=${ox}:${oy}[vout]`
+        `pad=${VW}:${VH}:-1:-1:color=black,setsar=1${band},${dt}[vout]`
 
       ffArgs = [
         '-nostdin', '-threads', '0',
@@ -468,7 +495,7 @@ module.exports = async (req, res) => {
         '-map', '[vout]', ...audioMap,
         ...buildTail(),
       ]
-    } catch (_sharpErr) {
+    } catch (_drawtextErr) {
       // Fallback: burn caption via ASS subtitle — works without Pango system libs
       fs.writeFileSync(assPath, buildAssFile(String(caption), Number(fontSize), String(fontColor), position, isCustom ? { x: Number(posX), y: Number(posY) } : null, captionStyle))
 
@@ -519,6 +546,7 @@ module.exports = async (req, res) => {
     fs.rmSync(inputPath,   { force: true })
     fs.rmSync(overlayPath, { force: true })
     fs.rmSync(assPath,     { force: true })
+    fs.rmSync(capTxtPath,  { force: true })
     fs.rmSync(audioPath,   { force: true })
     fs.rmSync(outPath,     { force: true })
   }
