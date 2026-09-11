@@ -2,9 +2,10 @@
 // Pipeline mains-libres : pioche des clips de la banque (par tag) → recadre 9:16 +
 // variante unique → caption IA (transcription audio Whisper + frames + TON style) →
 // renvoie en banque (description = caption) → le scheduler/posting peut poster.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { User } from '@supabase/supabase-js'
-import { supabase, fetchAllRows, type ContentItem } from '@/lib/supabase'
+import { supabase, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { useTr } from '@/lib/i18n'
@@ -16,7 +17,7 @@ import { useBlowCSS, BlowCard, BlowButton, BlowBadge, BlowEmpty, BlowPageHeader,
 interface Recipe {
   id: string
   name: string
-  tag: string
+  tag?: string           // legacy (ancien mode « par tag », plus utilisé)
   count: number
   style: string          // exemples de captions (texte, une fois)
   useTranscript: boolean
@@ -48,18 +49,16 @@ export function BlowAutoContent({ user }: { user: User }) {
   const { currentOrg } = useOrg()
   const conns = useConnections(user)
 
-  const [items, setItems] = useState<ContentItem[]>([])
-  const [loading, setLoading] = useState(true)
   const [recipes, setRecipes] = useState<Recipe[]>(() => loadRecipes())
   const [editingId, setEditingId] = useState<string | null>(null)
 
   // Formulaire (recette en cours d'édition ou nouvelle)
   const [name, setName] = useState('')
-  const [sourceMode, setSourceMode] = useState<'bank' | 'pick' | 'upload'>('bank')
+  const [sourceMode, setSourceMode] = useState<'pick' | 'upload'>('pick')
   const [uploads, setUploads] = useState<File[]>([])
   const [pickedItems, setPickedItems] = useState<ContentItem[]>([])
   const [showPicker, setShowPicker] = useState(false)
-  const [tag, setTag] = useState('')
+  const [showCapPicker, setShowCapPicker] = useState(false)   // picker de captions (banque)
   const [count, setCount] = useState(10)
   const [style, setStyle] = useState('')
   const [useTranscript, setUseTranscript] = useState(true)
@@ -87,33 +86,14 @@ export function BlowAutoContent({ user }: { user: User }) {
   const isWeb = typeof window !== 'undefined' && (window as unknown as { __IS_WEB?: boolean }).__IS_WEB === true
   const hasNative = !isWeb && !!window.electronAPI
 
-  // ── Charge la banque (scopée org/perso) ────────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      setLoading(true)
-      try {
-        const rows = await fetchAllRows<ContentItem>((from, to) => {
-          let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).range(from, to)
-          q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-          return q
-        })
-        setItems(rows.filter(i => i.notes !== '__sf_folder__' && (i.storage_path || i.file_url)))
-      } catch { /* ignore */ }
-      setLoading(false)
-    })()
-  }, [currentOrg, user.id])
-
-  const allTags = useMemo(() => Array.from(new Set(items.flatMap(i => i.tags ?? []).filter(Boolean))).sort(), [items])
-  const poolFor = (t: string) => items.filter(i => (i.tags ?? []).includes(t))
-
-  function resetForm() { setEditingId(null); setName(''); setTag(''); setCount(10); setStyle(''); setUseTranscript(true); setBurnText(true); setTextPos('bottom'); setCaptionStyle('snapchat'); setPoolStrict(false); setSpice('soft'); setSpoof(true) }
+  function resetForm() { setEditingId(null); setName(''); setCount(10); setStyle(''); setUseTranscript(true); setBurnText(true); setTextPos('bottom'); setCaptionStyle('snapchat'); setPoolStrict(false); setSpice('soft'); setSpoof(true) }
   function loadRecipe(r: Recipe) {
-    setEditingId(r.id); setName(r.name); setTag(r.tag); setCount(r.count); setStyle(r.style)
+    setEditingId(r.id); setName(r.name); setCount(r.count); setStyle(r.style)
     setUseTranscript(r.useTranscript); setBurnText(r.burnText ?? true); setTextPos(r.textPos ?? 'bottom'); setCaptionStyle(r.captionStyle ?? 'snapchat'); setPoolStrict(r.poolStrict ?? false); setSpice(r.spice ?? 'soft'); setSpoof(r.spoof ?? true)
   }
   function persistRecipe() {
-    if (!name.trim() || !tag) return
-    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), tag, count, style, useTranscript, burnText, textPos, captionStyle, poolStrict, spice, spoof }
+    if (!name.trim()) return
+    const r: Recipe = { id: editingId ?? newId(), name: name.trim(), count, style, useTranscript, burnText, textPos, captionStyle, poolStrict, spice, spoof }
     const next = editingId ? recipes.map(x => x.id === editingId ? r : x) : [...recipes, r]
     setRecipes(next); saveRecipes(next); setEditingId(r.id)
   }
@@ -164,9 +144,7 @@ export function BlowAutoContent({ user }: { user: User }) {
     const srcList: Array<{ title: string; item?: ContentItem; file?: File }> =
       sourceMode === 'upload'
         ? uploads.map(f => ({ title: f.name, file: f }))
-        : sourceMode === 'pick'
-          ? pickedItems.map(it => ({ title: it.title, item: it }))
-          : [...poolFor(tag)].sort(() => Math.random() - 0.5).map(it => ({ title: it.title, item: it }))
+        : pickedItems.map(it => ({ title: it.title, item: it }))
     if (srcList.length === 0) return
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
     const styleLines = style.split('\n').map(s => s.trim()).filter(Boolean)
@@ -366,7 +344,7 @@ export function BlowAutoContent({ user }: { user: User }) {
                 preset: spoof ? 'random' : 'iphone17pro', gpsCity: spoof ? 'random' : 'newyork',
                 customDate: randDate30().replace(/-/g, ':'),
                 adjustments: adj,
-                trimStart: tS, trimEnd: tE, trimEndCut,
+                trimStart: tS, trimEnd: tE, trimEndCut: tEndCut,
                 supabaseToken: session?.access_token, supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
               }),
             }).then(r => r.json()).catch(() => ({ ok: false }))
@@ -374,7 +352,7 @@ export function BlowAutoContent({ user }: { user: User }) {
           } catch { /* best-effort : on garde le fichier overlay */ }
         }
 
-        const baseTag = sourceMode === 'bank' ? tag : (name.trim() || 'autocontent')
+        const baseTag = name.trim() || 'autocontent'
         const title = `${src.title || baseTag} · auto ${i + 1}`
         const { error } = await supabase.from('content_bank').insert({
           user_id: user.id, org_id: currentOrg?.id ?? null,
@@ -396,9 +374,7 @@ export function BlowAutoContent({ user }: { user: User }) {
   const doneCount = jobs.filter(j => j.status === 'done').length
   const errCount = jobs.filter(j => j.status === 'error').length
   const canGenerate = !running && count > 0 && (
-    sourceMode === 'bank' ? (!!tag && poolFor(tag).length > 0)
-      : sourceMode === 'pick' ? pickedItems.length > 0
-        : uploads.length > 0)
+    sourceMode === 'pick' ? pickedItems.length > 0 : uploads.length > 0)
 
   return (
     <>
@@ -422,30 +398,15 @@ export function BlowAutoContent({ user }: { user: User }) {
 
           <SectionLabel style={{ marginTop: 18 }}>{tr('2 · Clips source', '2 · Source clips')}</SectionLabel>
           <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-            {(['bank', 'pick', 'upload'] as const).map(m => (
+            {(['pick', 'upload'] as const).map(m => (
               <button key={m} onClick={() => setSourceMode(m)} className="blow-tap"
                 style={{ fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 9, cursor: 'pointer',
                   border: `1px solid ${sourceMode === m ? 'rgba(168,85,247,0.6)' : HAIR}`, background: sourceMode === m ? 'rgba(168,85,247,0.18)' : 'transparent', color: sourceMode === m ? '#E9D5FF' : MUTED }}>
-                {m === 'bank' ? tr('Par tag', 'By tag') : m === 'pick' ? tr('Choisir dans la banque', 'Pick from bank') : tr('Mes vidéos (upload)', 'My videos (upload)')}
+                {m === 'pick' ? tr('Choisir dans la banque', 'Pick from bank') : tr('Mes vidéos (upload)', 'My videos (upload)')}
               </button>
             ))}
           </div>
-          {sourceMode === 'bank' ? (
-            allTags.length === 0
-              ? <p style={{ fontSize: 12.5, color: MUTED, margin: '2px 0 0' }}>{tr('Aucun tag dans la banque. Tague tes clips, ou passe en « Mes vidéos ».', 'No tags in the bank. Tag your clips, or switch to "My videos".')}</p>
-              : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {allTags.map(t => {
-                    const on = tag === t
-                    return (
-                      <button key={t} onClick={() => setTag(t)} className="blow-tap"
-                        style={{ fontSize: 12, fontWeight: 700, padding: '5px 11px', borderRadius: 999, cursor: 'pointer',
-                          border: `1px solid ${on ? 'rgba(168,85,247,0.6)' : HAIR}`, background: on ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.03)', color: on ? '#E9D5FF' : MUTED }}>
-                        #{t} <span style={{ opacity: 0.6 }}>· {poolFor(t).length}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-          ) : sourceMode === 'pick' ? (
+          {sourceMode === 'pick' ? (
             <div>
               <button onClick={() => setShowPicker(true)} className="blow-tap"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 11, cursor: 'pointer', border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.03)', color: INK, fontSize: 13, fontWeight: 700 }}>
@@ -486,10 +447,30 @@ export function BlowAutoContent({ user }: { user: User }) {
             </div>
           )}
 
-          <SectionLabel style={{ marginTop: 18 }}>{tr('3 · Ton style de caption (colle 5-10 exemples qui ont marché — texte, une fois)', '3 · Your caption style (paste 5-10 winning examples — text, once)')}</SectionLabel>
-          <textarea value={style} onChange={e => setStyle(e.target.value)} rows={6}
-            placeholder={tr('Un hook par ligne (vague, réaction)…\nElle faisait quoi là ?\nElle est sérieuse là ?\nPOV : ta coloc est un peu spéciale', 'One hook per line (vague, reaction)…\nWhat was she even doing?\nIs she serious right now?\nPOV: your roommate is a little special')}
-            style={{ ...inp, resize: 'vertical', minHeight: 120, fontFamily: 'inherit', lineHeight: 1.6 }} />
+          <SectionLabel style={{ marginTop: 18 }}>{tr('3 · Tes captions (une par ligne)', '3 · Your captions (one per line)')}</SectionLabel>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => setShowCapPicker(true)} className="blow-tap"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 13px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${HAIR}`, background: 'rgba(255,255,255,0.03)', color: INK, fontSize: 12.5, fontWeight: 700 }}>
+              <Ico d={ICON.folder} size={14} /> {tr('Choisir dans la banque', 'Pick from bank')}
+            </button>
+            {style.trim() && (
+              <button onClick={() => setStyle('')} className="blow-tap"
+                style={{ padding: '8px 13px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${HAIR}`, background: 'transparent', color: MUTED, fontSize: 12.5, fontWeight: 700 }}>
+                {tr('Vider', 'Clear')}
+              </button>
+            )}
+          </div>
+          <textarea value={style} onChange={e => setStyle(e.target.value)} rows={5}
+            placeholder={tr('Une phrase par ligne (vague, réaction)…\nSérieux là ?\nLe truc de fou !\nJ\'y crois pas', 'One line per row (vague, reaction)…\nAre you serious?\nThis is insane!\nI can\'t believe it')}
+            style={{ ...inp, resize: 'vertical', minHeight: 110, fontFamily: 'inherit', lineHeight: 1.6 }} />
+          {/* Mode « juste mes captions » (pas d'IA) */}
+          <div style={{ marginTop: 12 }}>
+            <Switch on={poolStrict} onChange={setPoolStrict}
+              label={tr('Utiliser UNIQUEMENT mes captions (pas d\'IA)', 'Use ONLY my captions (no AI)')}
+              sub={poolStrict
+                ? tr('Tes phrases sont réparties telles quelles entre les vidéos.', 'Your lines are distributed as-is across the videos.')
+                : tr('L\'IA s\'inspire de tes phrases pour en générer d\'autres dans le même ton.', 'The AI draws on your lines to generate more in the same tone.')} />
+          </div>
 
           <SectionLabel style={{ marginTop: 18 }}>{tr('4 · Options', '4 · Options')}</SectionLabel>
 
@@ -511,8 +492,6 @@ export function BlowAutoContent({ user }: { user: User }) {
                     { v: 'middle', label: tr('Milieu', 'Middle') },
                     { v: 'bottom', label: tr('Bas', 'Bottom') }]} />
                 </Field>
-                <Switch small on={poolStrict} onChange={setPoolStrict}
-                  label={tr('Utiliser mes captions telles quelles (sans IA)', 'Use my captions as-is (no AI)')} />
               </div>
             )}
             <Switch on={useTranscript} onChange={setUseTranscript}
@@ -584,7 +563,7 @@ export function BlowAutoContent({ user }: { user: User }) {
             <BlowButton onClick={generate} style={{ opacity: canGenerate ? 1 : 0.5, pointerEvents: canGenerate ? 'auto' : 'none' }}>
               <Ico d={ICON.bolt} size={15} /> {running ? tr('Génération…', 'Generating…') : tr(`Générer ${count}`, `Generate ${count}`)}
             </BlowButton>
-            <BlowButton variant="ghost" onClick={persistRecipe} style={{ opacity: name.trim() && tag ? 1 : 0.5, pointerEvents: name.trim() && tag ? 'auto' : 'none' }}>
+            <BlowButton variant="ghost" onClick={persistRecipe} style={{ opacity: name.trim() ? 1 : 0.5, pointerEvents: name.trim() ? 'auto' : 'none' }}>
               <Ico d={ICON.spark} size={14} /> {editingId ? tr('Mettre à jour la recette', 'Update recipe') : tr('Sauver la recette', 'Save recipe')}
             </BlowButton>
             {editingId && <BlowButton variant="ghost" onClick={resetForm}>{tr('Nouvelle', 'New')}</BlowButton>}
@@ -604,7 +583,7 @@ export function BlowAutoContent({ user }: { user: User }) {
                       onClick={() => loadRecipe(r)}>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: MUTED }}>#{r.tag} · {r.count}× · {r.spice ?? 'soft'}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: 11, color: MUTED }}>{r.count}× · {r.captionStyle === 'snapchat' ? tr('Snapchat', 'Snapchat') : tr('Contour', 'Outline')} · {r.spice ?? 'soft'}</p>
                       </div>
                       <button onClick={e => { e.stopPropagation(); deleteRecipe(r.id) }} style={{ background: 'none', border: 'none', color: '#F87171', cursor: 'pointer', fontSize: 15, padding: 4 }}>×</button>
                     </div>
@@ -615,7 +594,7 @@ export function BlowAutoContent({ user }: { user: User }) {
           <BlowCard style={{ padding: 18 }}>
             <SectionLabel>{tr('Progression', 'Progress')}</SectionLabel>
             {jobs.length === 0
-              ? <BlowEmpty title={tr('Rien encore', 'Nothing yet')} hint={tr('Choisis un tag, colle ton style, lance.', 'Pick a tag, paste your style, run.')} icon="✦" />
+              ? <BlowEmpty title={tr('Rien encore', 'Nothing yet')} hint={tr('Choisis tes vidéos, colle ton style, lance.', 'Pick your videos, paste your style, run.')} icon="✦" />
               : <>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                     <BlowBadge tone="ok">{doneCount} {tr('prêtes', 'ready')}</BlowBadge>
@@ -656,7 +635,81 @@ export function BlowAutoContent({ user }: { user: User }) {
           onClose={() => setShowPicker(false)}
         />
       )}
+
+      {showCapPicker && (
+        <CaptionBankPicker user={user} currentOrg={currentOrg}
+          onClose={() => setShowCapPicker(false)}
+          onSelect={texts => {
+            if (texts.length) setStyle(prev => {
+              const existing = prev.split('\n').map(s => s.trim()).filter(Boolean)
+              const merged = [...existing, ...texts.map(t => t.trim()).filter(Boolean)]
+              return Array.from(new Set(merged)).join('\n')
+            })
+            setShowCapPicker(false)
+          }} />
+      )}
     </>
+  )
+}
+
+// ── Picker de captions (banque caption_bank) — style Blowsome ────────────────────
+function CaptionBankPicker({ user, currentOrg, onSelect, onClose }: {
+  user: User; currentOrg: { id: string } | null
+  onSelect: (texts: string[]) => void; onClose: () => void
+}) {
+  const tr = useTr()
+  const [items, setItems] = useState<{ id: string; title: string; content: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    setLoading(true)
+    const base = supabase.from('caption_bank').select('id,title,content').order('created_at', { ascending: false })
+    const q = currentOrg ? base.eq('org_id', currentOrg.id) : base.eq('user_id', user.id).is('org_id', null)
+    q.then(({ data }) => { setItems((data ?? []) as any[]); setLoading(false) })
+  }, [currentOrg?.id, user.id])
+  const filtered = items.filter(it => {
+    if (!search.trim()) return true
+    const s = search.toLowerCase()
+    return (it.title ?? '').toLowerCase().includes(s) || (it.content ?? '').toLowerCase().includes(s)
+  })
+  const toggle = (id: string) => setSelected(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  return createPortal(
+    <div onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9600, background: 'rgba(6,6,8,0.92)', backdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: 'calc(100vh - 80px)', background: '#120C19', border: '1px solid rgba(216,180,254,0.16)', borderRadius: 16, display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${HAIR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: INK }}>{tr('Choisir des captions', 'Pick captions')}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: '12px 20px' }}>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr('Rechercher…', 'Search…')}
+            style={{ ...inp, padding: '9px 12px' }} />
+        </div>
+        <div className="blow-scroll" style={{ flex: 1, overflowY: 'auto', padding: '0 20px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {loading ? <p style={{ fontSize: 12.5, color: MUTED }}>{tr('Chargement…', 'Loading…')}</p>
+            : filtered.length === 0 ? <p style={{ fontSize: 12.5, color: MUTED }}>{tr('Aucune caption dans la banque.', 'No captions in the bank.')}</p>
+            : filtered.map(it => {
+              const on = selected.has(it.id)
+              return (
+                <button key={it.id} onClick={() => toggle(it.id)} className="blow-tap"
+                  style={{ textAlign: 'left', padding: '9px 11px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${on ? 'rgba(168,85,247,0.6)' : HAIR}`, background: on ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.02)' }}>
+                  {it.title && <div style={{ fontSize: 11, fontWeight: 700, color: on ? '#E9D5FF' : MUTED, marginBottom: 2 }}>{it.title}</div>}
+                  <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.45 }}>{it.content}</div>
+                </button>
+              )
+            })}
+        </div>
+        <div style={{ padding: '14px 20px', borderTop: `1px solid ${HAIR}`, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <BlowButton variant="ghost" onClick={onClose}>{tr('Annuler', 'Cancel')}</BlowButton>
+          <BlowButton onClick={() => onSelect(items.filter(it => selected.has(it.id)).map(it => it.content).filter(Boolean))}
+            style={{ opacity: selected.size ? 1 : 0.5, pointerEvents: selected.size ? 'auto' : 'none' }}>
+            {tr(`Ajouter ${selected.size || ''}`.trim(), `Add ${selected.size || ''}`.trim())}
+          </BlowButton>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -686,25 +739,25 @@ function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages:
   return [
     tr('Tu écris UNE phrase courte à afficher SUR une vidéo (texte à l\'écran, style story/Snapchat). Réponds UNIQUEMENT par cette phrase, rien d\'autre.',
        'Write ONE short line to display ON a video (on-screen text, story/Snapchat style). Reply with ONLY that line, nothing else.'),
-    hasImages
-      ? tr('REGARDE ATTENTIVEMENT les images fournies : identifie ce qui se passe VRAIMENT dans CETTE vidéo (le lieu, l\'action, l\'attitude, le détail qui accroche) et réagis à ÇA.',
-           'LOOK CAREFULLY at the provided frames: identify what actually happens in THIS video (place, action, attitude, the catchy detail) and react to THAT.')
-      : tr('Réagis à la situation de la vidéo.', 'React to the situation in the video.'),
-    transcript
-      ? tr('ÉCOUTE aussi ce qui est DIT (transcription plus bas) : ta phrase doit coller À LA FOIS à ce qu\'on VOIT et à ce qui se DIT.',
-           'Also USE what is SAID (transcript below): your line must fit BOTH what is seen AND what is said.')
+    // IMPORTANT : hooks VAGUES et GÉNÉRAUX (l\'IA lit mal le détail des vidéos → ne PAS
+    // décrire précisément). Des réactions passe-partout qui marchent sur presque tout.
+    tr('Écris une RÉACTION VAGUE et GÉNÉRALE, du genre : « Sérieux là ? », « Le truc de fou ! », « J\'y crois pas », « Nan mais allô ? », « C\'est quoi ce délire », « Trop c\'est trop ». Une phrase qui marche sur PRESQUE N\'IMPORTE QUELLE vidéo.',
+       'Write a VAGUE, GENERAL reaction, like: "Are you serious?", "This is insane!", "I can\'t believe it", "No way", "What is this", "Too much". A line that works on ALMOST ANY video.'),
+    tr('NE DÉCRIS PAS de détails précis (lieu, objet, action, vêtement…) : tu risques de te tromper. Reste sur l\'ÉMOTION / la vibe générale, jamais sur un fait précis.',
+       'Do NOT describe specific details (place, object, action, clothing…): you might get them wrong. Stick to the EMOTION / general vibe, never a specific fact.'),
+    hasImages || transcript
+      ? tr('Sers-toi des images / de ce qui est dit UNIQUEMENT pour choisir la bonne émotion (surprise, amusement, choc, agacement…), pas pour décrire.',
+           'Use the frames / what is said ONLY to pick the right emotion (surprise, amusement, shock, annoyance…), not to describe.')
       : '',
-    tr('La phrase doit être SPÉCIFIQUE à cette vidéo (un détail réel qu\'on voit ou entend) — JAMAIS une phrase générique passe-partout. Chaque vidéo = une phrase différente et pertinente.',
-       'The line must be SPECIFIC to this video (a real detail seen or heard) — NEVER a generic catch-all. Each video = a different, relevant line.'),
-    tr('TON & FORMAT : reproduis le STYLE de MES exemples ci-dessous (structure, longueur, ponctuation, angle). S\'ils commencent par « POV : … », fais pareil ; sinon adapte-toi à leur forme. Imite le TON, pas leur sujet.',
-       'TONE & FORMAT: reproduce the STYLE of MY examples below (structure, length, punctuation, angle). If they start with "POV: …", do the same; otherwise match their shape. Copy the TONE, not their subject.'),
+    tr('TON & FORMAT : reproduis le STYLE de MES exemples ci-dessous (structure, longueur, ponctuation). Reste dans leur registre.',
+       'TONE & FORMAT: reproduce the STYLE of MY examples below (structure, length, punctuation). Stay in their register.'),
     examples,
     spiceLine,
-    transcript ? tr('Ce qui est DIT dans la vidéo :', 'What is SAID in the video:') + `\n"""${transcript.slice(0, 800)}"""` : '',
-    tr('Contraintes : EN FRANÇAIS, UNE seule phrase COMPLÈTE et naturelle (≈ 4 à 10 mots) qui a du sens. Au plus 1 emoji en fin si ça colle (sinon aucun). Jamais « hmm ». PAS de hashtags, PAS de guillemets autour de la phrase.',
-       'Constraints: ONE COMPLETE, natural sentence (≈ 4 to 10 words) that makes sense. At most 1 emoji at the end if it fits (otherwise none). Never "hmm". NO hashtags, NO quotes around the line.'),
-    tr(`Varie la formulation (ne recycle pas toujours la même tournure). Oriente la réaction vers : ${angle}.`,
-       `Vary the wording (don't always reuse the same phrasing). Angle the reaction toward: ${angle}.`),
+    transcript ? tr('Ce qui est DIT (juste pour l\'ambiance) :', 'What is SAID (just for the mood):') + `\n"""${transcript.slice(0, 500)}"""` : '',
+    tr('Contraintes : EN FRANÇAIS, UNE phrase COURTE et naturelle (≈ 2 à 7 mots), qui a du sens. Au plus 1 emoji en fin si ça colle. Jamais « hmm ». PAS de hashtags, PAS de guillemets autour.',
+       'Constraints: ONE SHORT, natural line (≈ 2 to 7 words), that makes sense. At most 1 emoji at the end if it fits. Never "hmm". NO hashtags, NO quotes around it.'),
+    tr(`Varie la formulation (ne recycle pas toujours la même tournure). Penche vers : ${angle}.`,
+       `Vary the wording (don't always reuse the same phrasing). Lean toward: ${angle}.`),
     tr('Écris la phrase maintenant.', 'Write the line now.'),
   ].filter(Boolean).join('\n\n')
 }
