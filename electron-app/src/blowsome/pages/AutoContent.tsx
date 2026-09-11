@@ -74,8 +74,10 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [trimEnd, setTrimEnd] = useState('')
   // Coupe aléatoire : retire une durée tirée au hasard [min,max] s au DÉBUT de chaque vidéo.
   const [trimRandom, setTrimRandom] = useState(true)
-  const [trimRandMin, setTrimRandMin] = useState('0.1')
-  const [trimRandMax, setTrimRandMax] = useState('1')
+  const [trimRandMin, setTrimRandMin] = useState('0.1')   // début : min
+  const [trimRandMax, setTrimRandMax] = useState('1.5')   // début : max
+  const [trimEndMin, setTrimEndMin] = useState('0.1')     // fin : min
+  const [trimEndMax, setTrimEndMax] = useState('0.3')     // fin : max
   const [useSpeed, setUseSpeed] = useState(false)
   const [speedMin, setSpeedMin] = useState('0.98')
   const [speedMax, setSpeedMax] = useState('1.02')
@@ -328,10 +330,12 @@ export function BlowAutoContent({ user }: { user: User }) {
             let tEndCut: number | undefined
             if (useTrim) {
               if (trimRandom) {
-                const lo = Math.max(0, Number(trimRandMin) || 0.1)
-                const hi = Math.max(lo, Number(trimRandMax) || 1)
-                tS = randF(lo, hi, 2)        // début coupé d'une durée aléatoire
-                tEndCut = randF(lo, hi, 2)   // fin coupée d'une durée aléatoire (résolue serveur)
+                const sLo = Math.max(0, Number(trimRandMin) || 0.1)
+                const sHi = Math.max(sLo, Number(trimRandMax) || 1.5)
+                const eLo = Math.max(0, Number(trimEndMin) || 0.1)
+                const eHi = Math.max(eLo, Number(trimEndMax) || 0.3)
+                tS = randF(sLo, sHi, 2)        // début coupé d'une durée aléatoire
+                tEndCut = randF(eLo, eHi, 2)   // fin coupée d'une durée aléatoire (résolue serveur)
               } else {
                 tS = Math.max(0, Number(trimStart) || 0)
                 const tEraw = trimEnd.trim() ? Number(trimEnd) : NaN
@@ -518,12 +522,20 @@ export function BlowAutoContent({ user }: { user: User }) {
                 <Seg value={trimRandom ? 'rand' : 'fixed'} onChange={v => setTrimRandom(v === 'rand')} options={[
                   { v: 'rand', label: tr('Aléatoire', 'Random') }, { v: 'fixed', label: tr('Fixe', 'Fixed') }]} />
                 {trimRandom ? (
-                  <Field label={tr('Entre', 'Between')}>
-                    <input type="number" min={0} step={0.1} value={trimRandMin} onChange={e => setTrimRandMin(e.target.value)} style={numInp} />
-                    <span style={{ fontSize: 12.5, color: MUTED }}>→</span>
-                    <input type="number" min={0} step={0.1} value={trimRandMax} onChange={e => setTrimRandMax(e.target.value)} style={numInp} />
-                    <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('s — de chaque côté', 's — on each side')}</span>
-                  </Field>
+                  <>
+                    <Field label={tr('Début', 'Start')}>
+                      <input type="number" min={0} step={0.1} value={trimRandMin} onChange={e => setTrimRandMin(e.target.value)} style={numInp} />
+                      <span style={{ fontSize: 12.5, color: MUTED }}>→</span>
+                      <input type="number" min={0} step={0.1} value={trimRandMax} onChange={e => setTrimRandMax(e.target.value)} style={numInp} />
+                      <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('s (aléatoire)', 's (random)')}</span>
+                    </Field>
+                    <Field label={tr('Fin', 'End')}>
+                      <input type="number" min={0} step={0.1} value={trimEndMin} onChange={e => setTrimEndMin(e.target.value)} style={numInp} />
+                      <span style={{ fontSize: 12.5, color: MUTED }}>→</span>
+                      <input type="number" min={0} step={0.1} value={trimEndMax} onChange={e => setTrimEndMax(e.target.value)} style={numInp} />
+                      <span style={{ fontSize: 11, color: 'rgba(236,233,245,0.4)' }}>{tr('s (aléatoire)', 's (random)')}</span>
+                    </Field>
+                  </>
                 ) : (
                   <Field label={tr('Début / Fin', 'Start / End')}>
                     <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={numInp} />
