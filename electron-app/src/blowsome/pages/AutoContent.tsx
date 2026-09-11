@@ -74,8 +74,8 @@ export function BlowAutoContent({ user }: { user: User }) {
   const [trimEnd, setTrimEnd] = useState('')
   // Coupe aléatoire : retire une durée tirée au hasard [min,max] s au DÉBUT de chaque vidéo.
   const [trimRandom, setTrimRandom] = useState(true)
-  const [trimRandMin, setTrimRandMin] = useState('0.2')
-  const [trimRandMax, setTrimRandMax] = useState('3')
+  const [trimRandMin, setTrimRandMin] = useState('0.1')
+  const [trimRandMax, setTrimRandMax] = useState('1')
   const [useSpeed, setUseSpeed] = useState(false)
   const [speedMin, setSpeedMin] = useState('0.98')
   const [speedMax, setSpeedMax] = useState('1.02')
@@ -327,8 +327,8 @@ export function BlowAutoContent({ user }: { user: User }) {
             let tEndCut: number | undefined
             if (useTrim) {
               if (trimRandom) {
-                const lo = Math.max(0, Number(trimRandMin) || 0.2)
-                const hi = Math.max(lo, Number(trimRandMax) || 3)
+                const lo = Math.max(0, Number(trimRandMin) || 0.1)
+                const hi = Math.max(lo, Number(trimRandMax) || 1)
                 tS = randF(lo, hi, 2)        // début coupé d'une durée aléatoire
                 tEndCut = randF(lo, hi, 2)   // fin coupée d'une durée aléatoire (résolue serveur)
               } else {
