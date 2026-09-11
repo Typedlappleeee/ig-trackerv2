@@ -172,10 +172,11 @@ export function BlowAutoContent({ user }: { user: User }) {
     const styleLines = style.split('\n').map(s => s.trim()).filter(Boolean)
 
     // Nettoyage d'une phrase (partagé caption + variantes anti-doublon).
+    // On GARDE un éventuel emoji (le rendu navigateur les affiche) mais on retire
+    // hashtags/guillemets/« hmm ». Emojis limités à 1 en aval (prompt).
     const cleanCap = (raw: string): string => raw
       .replace(/#[^\s#]+/g, '')
       .replace(/["«»]/g, '')
-      .replace(/\p{Extended_Pictographic}/gu, '')
       .replace(/\bh+m+\b/gi, '')
       .split(/[\n]/)[0].replace(/\s+/g, ' ').trim()
       .replace(/^['’"]+|['’"]+$/g, '').trim()
@@ -235,7 +236,7 @@ export function BlowAutoContent({ user }: { user: User }) {
         const strategy: 'verbatim' | 'variation' | 'fresh' =
           poolStrict && haveExamples ? 'verbatim'
           // ~15 % verbatim · ~30 % variante légère · ~55 % hook frais réactif à la vidéo.
-          : !haveExamples ? 'fresh' : roll < 0.15 ? 'verbatim' : roll < 0.45 ? 'variation' : 'fresh'
+          : !haveExamples ? 'fresh' : roll < 0.10 ? 'verbatim' : roll < 0.28 ? 'variation' : 'fresh'
 
         if (strategy === 'verbatim') {
           caption = baseLine
@@ -258,7 +259,7 @@ export function BlowAutoContent({ user }: { user: User }) {
             let images: Array<{ type: 'image'; source: { type: 'base64'; media_type: 'image/jpeg'; data: string } }> = []
             if (window.electronAPI.extractFrames) {
               const fr = await window.electronAPI.extractFrames({ filePath: mediaRef, endTime: 10, fps: 0.7 })
-              const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 6) : []
+              const frames = (fr?.ok && fr.frames) ? fr.frames.slice(0, 8) : []
               images = frames.map(f => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data } }))
             }
             gotFrames = images.length
@@ -675,35 +676,36 @@ function buildVariationPrompt(baseLine: string, styleLines: string[], tr: (fr: s
   ].filter(Boolean).join('\n\n')
 }
 
-function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', hasSpeech: boolean, angle: string, tr: (fr: string, en: string) => string): string {
+function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages: boolean, spice: 'soft' | 'medium', _hasSpeech: boolean, angle: string, tr: (fr: string, en: string) => string): string {
   const examples = styleLines.length ? styleLines.map(l => `- ${l}`).join('\n') : tr('(aucun exemple fourni)', '(no example provided)')
   const spiceLine = spice === 'medium'
     ? tr('Touche taquine & suggestive ASSUMÉE mais IMPLICITE (double sens, sous-entendu) — jamais explicite, jamais vulgaire, aucun mot cru ni allusion au corps. Le sous-entendu vient de la vidéo, le texte reste ambigu (« elle sait ce qu\'elle fait », « zéro limite », « trop à l\'aise »).',
          'A clearly teasing & suggestive but IMPLICIT touch (double meaning) — never explicit, never vulgar, no crude words or body references. The innuendo comes from the video; the text stays ambiguous ("she knows what she\'s doing", "zero limits", "too comfortable").')
     : tr('Légère touche taquine/ambiguë, TRÈS soft. Jamais explicite, jamais vulgaire, aucun mot cru. Le sous-entendu vient de la vidéo, pas du texte.',
          'A light teasing/ambiguous touch, VERY soft. Never explicit, never vulgar, no crude words. The innuendo comes from the video, not the text.')
-  // Format PAR DÉFAUT = « POV : ta coloc … ». Exception « je » UNIQUEMENT si le mec
-  // (voix masculine) parle dans la vidéo → on retranscrit SA réaction en « je ».
-  const perspective = hasSpeech
-    ? tr('FORMAT : par DÉFAUT commence par « POV : ta coloc … » et décris SON comportement à ELLE. EXCEPTION : si la transcription ci-dessous est clairement LE MEC (voix masculine) qui parle/réagit, alors écris plutôt à la 1re personne « je » ce qu\'IL dit/ressent (SANS « POV : ta coloc », SANS « ma coloc »). Pour juger le genre : accords masculins en français (« je suis choqué », « t\'es sérieuse »), un gars qui commente sa coloc. Si c\'est la fille qui parle, ou si c\'est pas clair → « POV : ta coloc … ». Ex « je » : « Je peux plus la calculer », « T\'es sérieuse là ? », « J\'hallucine ».',
-         'FORMAT: by DEFAULT start with "POV: your roommate …" and describe HER behavior. EXCEPTION: if the transcript below is clearly THE GUY (male voice) speaking/reacting, then instead write in the 1st person "I" what HE says/feels (NO "POV: your roommate", NO "my roommate"). To judge gender: French masculine agreement, a guy commenting on his roommate. If it\'s the girl speaking, or unclear → "POV: your roommate …". "I" examples: "I can\'t deal with her anymore", "Are you serious right now?", "I\'m losing it".')
-    : tr('FORMAT : « POV : ta coloc [comportement à ELLE] » — TOUJOURS. Commence par « POV : ta coloc … ». N\'utilise PAS « je » ni « ma coloc ». Ex : « POV : ta coloc connaît pas la gêne », « POV : ta coloc a zéro limite ».',
-         'FORMAT: "POV: your roommate [HER behavior]" — ALWAYS. Start with "POV: your roommate …". Do NOT use "I" or "my roommate". E.g. "POV: your roommate has no shame", "POV: your roommate has zero limits".')
   return [
-    tr('Tu écris UN hook POV COURT à afficher SUR une vidéo (texte à l\'écran). Réponds UNIQUEMENT par le hook, rien d\'autre.', 'Write ONE SHORT POV hook to display ON a video (on-screen text). Reply with ONLY the hook, nothing else.'),
-    tr('REGARDE ATTENTIVEMENT les images (et écoute la transcription si fournie), puis réagis à CE QU\'ELLE FAIT dans CETTE vidéo précise. Le hook doit avoir un RAPPORT clair avec la vidéo — chaque vidéo = un hook DIFFÉRENT et pertinent, jamais un hook générique passe-partout.',
-       'LOOK CAREFULLY at the images (and read the transcript if provided), then react to WHAT SHE DOES in THIS specific video. The hook must clearly RELATE to the video — each video = a DIFFERENT, relevant hook, never a generic catch-all.'),
-    perspective,
-    tr('RÈGLE : le narrateur est le mec qui filme, il RÉAGIT à sa coloc (une fille). La fille n\'agit JAMAIS envers le spectateur (interdit : « te remercie », « elle te… »). Contre-exemple à NE PAS produire : « POV : ta coloc te remercie à sa manière ».',
-       'RULE: the narrator is the guy filming, REACTING to his female roommate (a girl). The girl NEVER acts toward the viewer (forbidden: "thanks you", "she ... you"). Counter-example NOT to produce: "POV: your roommate thanks you in her way".'),
-    spiceLine,
-    tr('Règles STRICTES : UNE phrase COMPLÈTE et qui a du SENS (jamais coupée), courte (≈ 4 à 9 mots). Le hook doit être PERTINENT pour cette vidéo (réagir à ce qu\'elle fait / l\'ambiance) — surtout PAS un hook générique. Reste taquin et implicite, pas explicite ni vulgaire. AUCUN emoji. Jamais « hmm ». PAS de hashtags, PAS de guillemets.',
-       'STRICT rules: ONE COMPLETE sentence that MAKES SENSE (never cut off), short (≈ 4 to 9 words). The hook must be RELEVANT to this video (react to what she does / the mood) — definitely NOT a generic hook. Keep it teasing and implicit, not explicit or vulgar. NO emoji. Never "hmm". NO hashtags, NO quotes.'),
-    tr('Imite le TON de MES hooks (pas leur sujet) :', 'Match the TONE of MY hooks (not their subject):'),
+    tr('Tu écris UNE phrase courte à afficher SUR une vidéo (texte à l\'écran, style story/Snapchat). Réponds UNIQUEMENT par cette phrase, rien d\'autre.',
+       'Write ONE short line to display ON a video (on-screen text, story/Snapchat style). Reply with ONLY that line, nothing else.'),
+    hasImages
+      ? tr('REGARDE ATTENTIVEMENT les images fournies : identifie ce qui se passe VRAIMENT dans CETTE vidéo (le lieu, l\'action, l\'attitude, le détail qui accroche) et réagis à ÇA.',
+           'LOOK CAREFULLY at the provided frames: identify what actually happens in THIS video (place, action, attitude, the catchy detail) and react to THAT.')
+      : tr('Réagis à la situation de la vidéo.', 'React to the situation in the video.'),
+    transcript
+      ? tr('ÉCOUTE aussi ce qui est DIT (transcription plus bas) : ta phrase doit coller À LA FOIS à ce qu\'on VOIT et à ce qui se DIT.',
+           'Also USE what is SAID (transcript below): your line must fit BOTH what is seen AND what is said.')
+      : '',
+    tr('La phrase doit être SPÉCIFIQUE à cette vidéo (un détail réel qu\'on voit ou entend) — JAMAIS une phrase générique passe-partout. Chaque vidéo = une phrase différente et pertinente.',
+       'The line must be SPECIFIC to this video (a real detail seen or heard) — NEVER a generic catch-all. Each video = a different, relevant line.'),
+    tr('TON & FORMAT : reproduis le STYLE de MES exemples ci-dessous (structure, longueur, ponctuation, angle). S\'ils commencent par « POV : … », fais pareil ; sinon adapte-toi à leur forme. Imite le TON, pas leur sujet.',
+       'TONE & FORMAT: reproduce the STYLE of MY examples below (structure, length, punctuation, angle). If they start with "POV: …", do the same; otherwise match their shape. Copy the TONE, not their subject.'),
     examples,
-    transcript ? tr('Ce qui est DIT dans la vidéo (sers-t\'en pour coller à la situation) :', 'What is SAID in the video (use it to fit the situation):') + `\n"""${transcript.slice(0, 700)}"""` : '',
-    tr(`VARIE la formulation : ne réutilise PAS « sait ce qu'elle fait » ni deux fois la même tournure. Oriente la réaction de CE hook vers : ${angle}.`, `VARY the wording: do NOT reuse "knows what she's doing" or the same phrasing twice. Angle THIS hook's reaction toward: ${angle}.`),
-    tr('Écris le hook vague et taquin dans le format imposé.', 'Write the vague, teasing hook in the required format.'),
+    spiceLine,
+    transcript ? tr('Ce qui est DIT dans la vidéo :', 'What is SAID in the video:') + `\n"""${transcript.slice(0, 800)}"""` : '',
+    tr('Contraintes : EN FRANÇAIS, UNE seule phrase COMPLÈTE et naturelle (≈ 4 à 10 mots) qui a du sens. Au plus 1 emoji en fin si ça colle (sinon aucun). Jamais « hmm ». PAS de hashtags, PAS de guillemets autour de la phrase.',
+       'Constraints: ONE COMPLETE, natural sentence (≈ 4 to 10 words) that makes sense. At most 1 emoji at the end if it fits (otherwise none). Never "hmm". NO hashtags, NO quotes around the line.'),
+    tr(`Varie la formulation (ne recycle pas toujours la même tournure). Oriente la réaction vers : ${angle}.`,
+       `Vary the wording (don't always reuse the same phrasing). Angle the reaction toward: ${angle}.`),
+    tr('Écris la phrase maintenant.', 'Write the line now.'),
   ].filter(Boolean).join('\n\n')
 }
 
@@ -718,15 +720,18 @@ const inp: React.CSSProperties = {
 // contour noir. Renvoie { png (base64 sans préfixe), h }.
 function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: string; h: number } {
   const W = 1080
-  const pad = Math.round(W * 0.045)
+  const padX = Math.round(W * 0.05)                                   // marge horizontale (retour à la ligne)
   const fontSize = Math.round(W * (style === 'snapchat' ? 0.05 : 0.055))
+  // Bande fine qui « épouse » le texte (comme Snapchat) — plus le pavé n'est trop haut.
+  const vpad = Math.round(fontSize * (style === 'snapchat' ? 0.24 : 0.16))
+  const lineH = Math.round(fontSize * 1.16)
   const weight = style === 'snapchat' ? '500' : '800'
   const fontStack = `${weight} ${fontSize}px "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif`
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
   ctx.font = fontStack
   // Découpe en lignes (≤ 90 % de la largeur).
-  const maxW = W - pad * 2
+  const maxW = W - padX * 2
   const words = text.split(/\s+/).filter(Boolean)
   const lines: string[] = []
   let cur = ''
@@ -736,18 +741,17 @@ function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: s
   }
   if (cur) lines.push(cur)
   if (lines.length === 0) lines.push(text)
-  const lineH = Math.round(fontSize * 1.34)
-  const height = lines.length * lineH + pad * 2
+  const height = lines.length * lineH + vpad * 2
   canvas.width = W; canvas.height = height
   ctx.font = fontStack
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
   if (style === 'snapchat') {
-    ctx.fillStyle = 'rgba(85,85,85,0.5)'; ctx.fillRect(0, 0, W, height)
+    ctx.fillStyle = 'rgba(80,80,80,0.5)'; ctx.fillRect(0, 0, W, height)
     ctx.fillStyle = '#fff'
-    lines.forEach((ln, i) => ctx.fillText(ln, W / 2, pad + i * lineH + lineH / 2))
+    lines.forEach((ln, i) => ctx.fillText(ln, W / 2, vpad + i * lineH + lineH / 2))
   } else {
     lines.forEach((ln, i) => {
-      const cy = pad + i * lineH + lineH / 2
+      const cy = vpad + i * lineH + lineH / 2
       ctx.lineWidth = Math.round(fontSize * 0.16); ctx.strokeStyle = 'rgba(0,0,0,0.92)'
       ctx.strokeText(ln, W / 2, cy)
       ctx.fillStyle = '#fff'; ctx.fillText(ln, W / 2, cy)
