@@ -800,7 +800,7 @@ function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: s
   ctx.font = fontStack
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
   if (style === 'snapchat') {
-    ctx.fillStyle = 'rgba(117,117,117,0.58)'; ctx.fillRect(0, 0, W, height)   // #757575 translucide
+    ctx.fillStyle = 'rgba(117,117,117,0.38)'; ctx.fillRect(0, 0, W, height)   // #757575 translucide
     ctx.fillStyle = '#fff'
     lines.forEach((ln, i) => ctx.fillText(ln, W / 2, vpad + i * lineH + lineH / 2))
   } else {
