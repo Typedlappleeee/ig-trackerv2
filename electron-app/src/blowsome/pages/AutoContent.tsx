@@ -126,16 +126,16 @@ export function BlowAutoContent({ user }: { user: User }) {
   }
 
   // ── Génération ─────────────────────────────────────────────────────────────
-  // Réglages aléatoires PAR vidéo pour le spoof (mêmes leviers que l'onglet Spoof) :
-  // vitesse x1→1.3, teinte, grain, zoom… → casse l'empreinte audio+visuelle côté IG.
-  // Pas de miroir ici (le texte incrusté serait inversé).
+  // Spoof visuel : UNIQUEMENT le zoom/recadrage (pas de contraste/teinte/grain/etc.).
+  // La vitesse est gérée à part via le toggle « Micro-vitesse ». Les métadonnées
+  // (appareil/GPS/date) + le bruit imperceptible serveur assurent l'unicité binaire.
   const randI = (a: number, b: number) => Math.floor(Math.random() * (b - a + 1)) + a
   const randF = (a: number, b: number, d = 3) => +(Math.random() * (b - a) + a).toFixed(d)
   const randomAdjustments = () => ({
-    brightness: randI(-12, 12), saturation: randI(-15, 15), contrast: randI(-12, 12),
-    gamma: randF(0.90, 1.10), hue: randI(-15, 15), noise: randI(5, 14),
-    sharpen: randF(0, 0.6, 2), zoomPct: randI(3, 9), panX: randI(-25, 25), panY: randI(-25, 25),
-    speed: randF(1.0, 1.3), vignette: Math.random() < 0.35, flipH: false,
+    brightness: 0, saturation: 0, contrast: 0,
+    gamma: 1, hue: 0, noise: 0,
+    sharpen: 0, zoomPct: randI(3, 9), panX: randI(-25, 25), panY: randI(-25, 25),
+    speed: 1, vignette: false, flipH: false,
   })
   const randDate30 = () => new Date(Date.now() - randI(0, 30) * 86400000).toISOString().slice(0, 10)
 
@@ -775,12 +775,11 @@ const inp: React.CSSProperties = {
 function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: string; h: number } {
   const W = 1080
   const padX = Math.round(W * 0.05)                                   // marge horizontale (retour à la ligne)
-  const fontSize = Math.round(W * (style === 'snapchat' ? 0.039 : 0.055))
+  const fontSize = Math.round(W * (style === 'snapchat' ? 0.041 : 0.055))
   // Bande fine qui « épouse » le texte (comme Snapchat) — plus le pavé n'est trop haut.
-  const vpad = Math.round(fontSize * (style === 'snapchat' ? 0.24 : 0.16))
+  const vpad = Math.round(fontSize * (style === 'snapchat' ? 0.30 : 0.16))
   const lineH = Math.round(fontSize * (style === 'snapchat' ? 1.05 : 1.16))   // ~ line height 1x
-  const weight = style === 'snapchat' ? '500' : '800'
-  // Police Helvetica (fallbacks proches) + fond gris #757575 (spec utilisateur).
+  const weight = style === 'snapchat' ? '400' : '800'   // Helvetica régulier (comme l'exemple)
   const fontStack = `${weight} ${fontSize}px Helvetica, "Helvetica Neue", Arial, sans-serif`
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
@@ -801,7 +800,7 @@ function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: s
   ctx.font = fontStack
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
   if (style === 'snapchat') {
-    ctx.fillStyle = 'rgba(117,117,117,0.38)'; ctx.fillRect(0, 0, W, height)   // #757575 translucide
+    ctx.fillStyle = 'rgba(48,48,48,0.5)'; ctx.fillRect(0, 0, W, height)   // gris foncé translucide (style story)
     ctx.fillStyle = '#fff'
     lines.forEach((ln, i) => ctx.fillText(ln, W / 2, vpad + i * lineH + lineH / 2))
   } else {
