@@ -361,6 +361,7 @@ module.exports = async (req, res) => {
     fontSize  = 52,
     fontColor = '#ffffff',
     captionStyle = 'outline',   // 'outline' (contour) | 'snapchat' (bande noire pleine largeur)
+    captionPng, captionH,       // PNG de légende pré-rendu (base64, 1080px de large) + sa hauteur
     // Placement libre (fractions 0..1 du CENTRE du texte) quand position==='custom'.
     posX, posY,
     // Spoof intégré : nettoie toujours les métadonnées ; si gpsSpoof, injecte
@@ -434,12 +435,37 @@ module.exports = async (req, res) => {
     }
 
     // ── Build caption overlay ─────────────────────────────────────────────────
-    // Primary: ffmpeg drawtext + textfile avec la police FOURNIE (api/fonts) — 100 %
-    // fiable sur Vercel : aucune dépendance à Pango/fontconfig/sharp-text ni à une
-    // police système (causes du « texte absent / chelou »). textfile = aucun
-    // échappement du contenu (apostrophes, virgules, accents, « guillemets »… OK).
-    // Fallback: ASS subtitle si drawtext échoue.
+    // MEILLEUR chemin : le CLIENT (navigateur) a déjà rendu la légende en PNG
+    // (vraies polices, emojis) → le serveur se contente de l'incruster avec le
+    // filtre `overlay` (cœur ffmpeg, TOUJOURS présent). Indispensable sur Vercel
+    // où le binaire ffmpeg-static N'A PAS drawtext ni libass (subtitles).
+    const clampI = (v, lo, hi) => Math.min(Math.max(v, lo), hi)
     let ffArgs
+    if (captionPng) {
+      const pngBuf = Buffer.from(String(captionPng), 'base64')
+      fs.writeFileSync(overlayPath, pngBuf)
+      let ovH = Number(captionH) || 0
+      if (!ovH) { try { ovH = (await sharp(pngBuf).metadata()).height || 220 } catch { ovH = 220 } }
+      const jitterY = Math.round((Math.random() - 0.5) * 70)
+      const oy = isCustom
+        ? clampI(Math.round(Number(posY) * VH - ovH / 2), 0, VH - ovH)
+        : position === 'top' ? 150 + jitterY
+        : (position === 'center' || position === 'middle') ? Math.round((VH - ovH) / 2) + jitterY
+        : clampI(VH - ovH - 300 + jitterY, 60, VH - ovH - 60)
+      const inputs = ['-i', inputPath, '-i', overlayPath]
+      if (hasAudio) inputs.push('-stream_loop', '-1', '-i', audioPath)
+      const audioMap = hasAudio ? ['-map', '2:a:0', '-shortest'] : ['-map', '0:a?']
+      // PNG plein 1080 de large → overlay à x=0 ; seul y dépend de la position.
+      const filterComplex =
+        `[0:v]scale=${VW}:${VH}:force_original_aspect_ratio=decrease,` +
+        `pad=${VW}:${VH}:-1:-1:color=black,setsar=1[bg];[bg][1:v]overlay=0:${oy}[vout]`
+      ffArgs = [
+        '-nostdin', '-threads', '0', ...inputs,
+        '-filter_complex', filterComplex, '-map', '[vout]', ...audioMap, ...buildTail(),
+      ]
+    } else {
+    // Repli (appelants sans PNG) : drawtext + textfile, puis ASS. NB : indisponible
+    // sur Vercel (ffmpeg sans drawtext/libass) — sert surtout au desktop.
     try {
       const fontPath = path.join(__dirname, 'fonts', 'font-bold.ttf')
       if (!fs.existsSync(fontPath)) throw new Error('bundled font missing')
@@ -517,6 +543,7 @@ module.exports = async (req, res) => {
         '-map', '[vout]', ...audioMap,
         ...buildTail(),
       ]
+    }
     }
 
     try {

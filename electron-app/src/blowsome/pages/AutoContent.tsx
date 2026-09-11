@@ -309,7 +309,10 @@ export function BlowAutoContent({ user }: { user: User }) {
         if (burnText && caption) {
           setJob(i, { status: 'overlay' })
           if (!window.electronAPI?.runFfmpegMixOverlay) throw new Error(tr('Incrustation indisponible (rebuild desktop ?)', 'Overlay unavailable (rebuild desktop?)'))
-          const ov = await window.electronAPI.runFfmpegMixOverlay({ sourcePath: mediaRef, caption, position: textPos, fontSize: 54, fontColor: '#FFFFFF', captionStyle })
+          // La légende est rendue en PNG CÔTÉ NAVIGATEUR (vraies polices + emojis) →
+          // le serveur se contente de l'incruster (ffmpeg Vercel n'a pas drawtext).
+          const cap = renderCaptionPng(caption, captionStyle)
+          const ov = await window.electronAPI.runFfmpegMixOverlay({ sourcePath: mediaRef, caption, position: textPos, fontSize: 54, fontColor: '#FFFFFF', captionStyle, captionPng: cap.png, captionH: cap.h })
           if (!ov?.ok || !ov.outputPath) throw new Error(`${tr('Incrustation échouée', 'Overlay failed')} : ${ov?.error ?? '?'}`)
           finalRef = ov.storagePath ? ((await getSignedUrl(ov.storagePath)) ?? ov.outputPath) : ov.outputPath
         }
@@ -707,6 +710,50 @@ function buildCaptionPrompt(styleLines: string[], transcript: string, hasImages:
 const inp: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', fontSize: 13, padding: '10px 12px', borderRadius: 11,
   border: `1px solid ${HAIR}`, background: 'rgba(0,0,0,0.28)', color: INK, outline: 'none',
+}
+
+// Rend la légende en PNG (canvas navigateur) — largeur 1080 fixe (= vidéo de sortie),
+// pour que le serveur l'incruste tel quel avec le filtre `overlay`. Style « snapchat » :
+// bande grise pleine largeur + texte blanc police normale. « outline » : texte blanc
+// contour noir. Renvoie { png (base64 sans préfixe), h }.
+function renderCaptionPng(text: string, style: 'outline' | 'snapchat'): { png: string; h: number } {
+  const W = 1080
+  const pad = Math.round(W * 0.045)
+  const fontSize = Math.round(W * (style === 'snapchat' ? 0.05 : 0.055))
+  const weight = style === 'snapchat' ? '500' : '800'
+  const fontStack = `${weight} ${fontSize}px "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif`
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')!
+  ctx.font = fontStack
+  // Découpe en lignes (≤ 90 % de la largeur).
+  const maxW = W - pad * 2
+  const words = text.split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let cur = ''
+  for (const w of words) {
+    const t = cur ? cur + ' ' + w : w
+    if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w } else cur = t
+  }
+  if (cur) lines.push(cur)
+  if (lines.length === 0) lines.push(text)
+  const lineH = Math.round(fontSize * 1.34)
+  const height = lines.length * lineH + pad * 2
+  canvas.width = W; canvas.height = height
+  ctx.font = fontStack
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  if (style === 'snapchat') {
+    ctx.fillStyle = 'rgba(85,85,85,0.5)'; ctx.fillRect(0, 0, W, height)
+    ctx.fillStyle = '#fff'
+    lines.forEach((ln, i) => ctx.fillText(ln, W / 2, pad + i * lineH + lineH / 2))
+  } else {
+    lines.forEach((ln, i) => {
+      const cy = pad + i * lineH + lineH / 2
+      ctx.lineWidth = Math.round(fontSize * 0.16); ctx.strokeStyle = 'rgba(0,0,0,0.92)'
+      ctx.strokeText(ln, W / 2, cy)
+      ctx.fillStyle = '#fff'; ctx.fillText(ln, W / 2, cy)
+    })
+  }
+  return { png: canvas.toDataURL('image/png').split(',')[1] ?? '', h: height }
 }
 // Petit champ numérique compact.
 const numInp: React.CSSProperties = {
