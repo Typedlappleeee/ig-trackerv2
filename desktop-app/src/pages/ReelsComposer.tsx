@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -55,11 +55,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [balance, setBalance] = useState<number | null>(null)
 
   // Options de run (fonctionnelles).
-  const [vidMode, setVidMode] = useState<'seq' | 'random'>('seq')  // répartition vidéo → compte
+  const [vidMode, setVidMode] = useState<'seq' | 'random'>('random')  // répartition vidéo → compte (aléatoire par défaut)
   const [autoRemove, setAutoRemove] = useState(true)               // usage unique
   const [reelsTrial, setReelsTrial] = useState(false)              // essai Reels
-  const [coverPicker, setCoverPicker] = useState(false)            // sélecteur de miniature
-  const [cover, setCover] = useState<{ id: string; title: string; storage_path: string | null; file_url: string | null } | null>(null)
+  // Miniature (couverture) PAR vidéo : covers[videoId] = image de couverture.
+  const [coverPickerFor, setCoverPickerFor] = useState<string | null>(null)
+  const [covers, setCovers] = useState<Record<string, { id: string; title: string; storage_path: string | null; file_url: string | null }>>({})
 
   const [running, setRunning] = useState(false)
   const [runItems, setRunItems] = useState<RunItem[]>([])
@@ -74,7 +75,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   useEffect(() => {
     loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => {
       const ok = c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim()))
-      setRotationConfigured(ok); setRotationOn(ok)   // par défaut : ON si configuré
+      setRotationConfigured(ok); setRotationOn(false)   // par défaut : OFF (activable si configuré)
     })
   }, [currentOrg?.id, user.id])
 
@@ -175,13 +176,14 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     }
     if (resourceByVid.size === 0) { push('❌ Aucune vidéo hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
 
-    // 2b) Miniature/couverture optionnelle → hébergée UNE fois pour tout le run.
-    let coverRU: string | undefined
-    if (cover) {
-      const cUrl = cover.storage_path
-        ? (await supabase.storage.from('content').createSignedUrl(cover.storage_path, 3600)).data?.signedUrl
-        : cover.file_url
-      if (cUrl) { coverRU = (await geelarkUploadImage(bearer, cUrl, push)) ?? undefined; if (coverRU) push('🖼 Miniature hébergée.') }
+    // 2b) Miniatures PAR vidéo → chacune hébergée une fois.
+    const coverByVid = new Map<string, string>()
+    for (const v of distinct) {
+      const cv = covers[v.id]; if (!cv) continue
+      const cUrl = cv.storage_path
+        ? (await supabase.storage.from('content').createSignedUrl(cv.storage_path, 3600)).data?.signedUrl
+        : cv.file_url
+      if (cUrl) { const cru = await geelarkUploadImage(bearer, cUrl, push); if (cru) { coverByVid.set(v.id, cru); push(`🖼 Miniature hébergée (${v.title}).`) } }
     }
 
     // 3) Poste : chaque téléphone reçoit SA vidéo assignée.
@@ -201,7 +203,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       if (!ru) { run.markFailed(); R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
       usedVidIds.add(v.id)
       push(`— @${p.ig_username ?? p.geelark_id} · ${v.title}${cap ? ' · légende' : ''} —`)
-      const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverRU)
+      const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id))
       if (!r.ok) run.markFailed()
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
@@ -344,6 +346,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                       ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
                     <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? theme.accentBtn : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                    {/* Miniature par vidéo — clic pour choisir/changer (n'active pas le toggle). */}
+                    <span role="button" title={covers[v.id] ? `Miniature : ${covers[v.id].title}` : 'Choisir une miniature'}
+                      onClick={e => { e.stopPropagation(); setCoverPickerFor(v.id) }}
+                      style={{ position: 'absolute', bottom: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, background: covers[v.id] ? theme.accentBtn : 'rgba(11,11,15,0.72)', border: covers[v.id] ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer' }}>
+                      <Icon d="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" size={11} />
+                    </span>
                     {fmtDur(v.duration) && <span style={{ position: 'absolute', bottom: 5, left: 6, fontFamily: "'JetBrains Mono',monospace", fontSize: 8.5, color: 'rgba(255,255,255,0.7)' }}>{fmtDur(v.duration)}</span>}
                   </button>
                 )
@@ -442,14 +450,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             <RunToggle label="Usage unique des vidéos" hint="Retire de la banque les vidéos utilisées" on={autoRemove} onToggle={() => setAutoRemove(v => !v)} theme={theme} border />
             {/* Essai Reels */}
             <RunToggle label="Essai Reels" hint="Publie en mode essai (visible non-abonnés)" on={reelsTrial} onToggle={() => setReelsTrial(v => !v)} theme={theme} border />
-            {/* Miniature / couverture */}
+            {/* Miniatures par vidéo (définies à l'étape Vidéos) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 15px' }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Miniature (couverture)</span>
-                <span style={{ fontSize: 11, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cover ? cover.title : 'Image de couverture du Reel — optionnel'}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Miniatures (couverture)</span>
+                <span style={{ fontSize: 11, color: '#52525B' }}>{Object.keys(covers).length > 0 ? `${Object.keys(covers).length} vidéo(s) avec miniature — modifiable à l’étape Vidéos` : 'Optionnel — choisis une miniature par vidéo à l’étape Vidéos (icône 🖼)'}</span>
               </span>
-              {cover && <button onClick={() => setCover(null)} style={{ height: 28, padding: '0 10px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#A1A1AA', fontSize: 11, fontWeight: 700 }}>Retirer</button>}
-              <Btn theme={theme} sm tone="quiet" icon="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" label={cover ? 'Changer' : 'Choisir'} onClick={() => setCoverPicker(true)} />
             </div>
           </Panel>
           <Panel theme={theme}>
@@ -508,16 +514,17 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
           }} />
       )}
 
-      {coverPicker && (
+      {coverPickerFor && (
         <BankPicker theme={theme} user={user} org={org} kind="images" title="Choisir une miniature"
-          onClose={() => setCoverPicker(false)}
+          onClose={() => setCoverPickerFor(null)}
           onApply={r => {
-            if (r.kind === 'images' && r.ids[0]) {
+            const forId = coverPickerFor
+            if (forId && r.kind === 'images' && r.ids[0]) {
               const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
               scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).eq('id', r.ids[0]).maybeSingle()
-                .then(({ data }: any) => { if (data) setCover(data) })
+                .then(({ data }: any) => { if (data) setCovers(prev => ({ ...prev, [forId]: data })) })
             }
-            setCoverPicker(false)
+            setCoverPickerFor(null)
           }} />
       )}
     </div>
