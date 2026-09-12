@@ -25,6 +25,22 @@ const MUTED = '#A79FBD'
 const SERIF = "'Space Grotesk',sans-serif"
 const selStyle: CSSProperties = { height: 32, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', cursor: 'pointer' }
 const optStyle: CSSProperties = { background: '#17111F' }
+
+// Durée d'une vidéo (secondes) depuis ses octets — via un <video> caché (rapide, natif).
+function videoDurationFromBytes(bytes: Uint8Array): Promise<number> {
+  return new Promise(resolve => {
+    try {
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'video/mp4' }))
+      const v = document.createElement('video')
+      v.preload = 'metadata'; v.muted = true
+      const done = (d: number) => { try { URL.revokeObjectURL(url) } catch { /* noop */ } resolve(d) }
+      v.onloadedmetadata = () => done(isFinite(v.duration) ? v.duration : 0)
+      v.onerror = () => done(0)
+      setTimeout(() => done(isFinite(v.duration) ? v.duration : 0), 8000)
+      v.src = url
+    } catch { resolve(0) }
+  })
+}
 const numInp: CSSProperties = { width: 62, height: 30, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', textAlign: 'right' }
 
 function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
@@ -268,8 +284,14 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [capY, setCapY] = useState(60)
   // Timing : coupe (début/fin) et/ou micro-vitesse aléatoire (0,98–1,02×).
   const [useTrim, setUseTrim] = useState(false)
+  const [trimRandom, setTrimRandom] = useState(true)         // coupe aléatoire (par vidéo)
+  const [trimRandMin, setTrimRandMin] = useState('0.1')      // début : min
+  const [trimRandMax, setTrimRandMax] = useState('1.5')      // début : max
+  const [trimEndMin, setTrimEndMin] = useState('0.1')        // fin : min
+  const [trimEndMax, setTrimEndMax] = useState('0.3')        // fin : max
   const [trimStart, setTrimStart] = useState('0')
   const [trimEnd, setTrimEnd] = useState('')
+  const [showCapPicker, setShowCapPicker] = useState(false)  // picker captions (banque)
   const [useSpeed, setUseSpeed] = useState(false)
   const [speedMin, setSpeedMin] = useState('0.98')
   const [speedMax, setSpeedMax] = useState('1.02')
@@ -301,11 +323,17 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     const tEnd = trimEnd.trim() ? Number(trimEnd) : null
     try {
       if (!isFfmpegReady()) { push('⏳ Chargement du moteur (~30 Mo, une fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
+      // Plages de coupe aléatoire (début / fin), tirées par vidéo.
+      const rand = (lo: number, hi: number) => lo + Math.random() * Math.max(0, hi - lo)
+      const sLo = Math.max(0, Number(trimRandMin) || 0.1), sHi = Math.max(sLo, Number(trimRandMax) || 1.5)
+      const eLo = Math.max(0, Number(trimEndMin) || 0.1), eHi = Math.max(eLo, Number(trimEndMax) || 0.3)
       let done = 0
       for (const v of sources) {
         if (R.isCancelled()) { push('⏹ Annulé.'); break }
         push(`— ${v.title} —`)
         const bytes = await resolveSourceBytes(v)
+        // Durée réelle (pour la coupe de fin aléatoire) — lue une fois par vidéo.
+        const dur = (useTrim && trimRandom) ? await videoDurationFromBytes(bytes) : 0
         // Légende IA : complète le pool si activé (une seule génération / vidéo).
         let aiCap: string | null = null
         if (burnCap && withCap && conns.groq) { aiCap = await generateCaption(conns.groq, v.title); if (aiCap) push('  ✍ légende IA générée') }
@@ -322,11 +350,20 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           }
           const pos: CaptionPos = capManual ? { x: capX, y: capY } : capPos
           const speed = useSpeed ? sMin + Math.random() * Math.max(0, sMax - sMin) : null
+          // Coupe : aléatoire (début + fin, unique par variante) OU fixe (début/fin).
+          let vStart: number | null = null, vEnd: number | null = null
+          if (useTrim) {
+            if (trimRandom) {
+              vStart = +rand(sLo, sHi).toFixed(2)
+              const end = dur > 0 ? dur - rand(eLo, eHi) : 0
+              vEnd = end > vStart + 0.3 ? +end.toFixed(2) : null
+            } else { vStart = tStart; vEnd = tEnd }
+          }
           const out = await runAutoVariant(bytes, {
             seed: Math.random() * 1000,
             intensity, gps: gpsFor(gpsCity),
-            trimStart: useTrim ? tStart : null,
-            trimEnd: useTrim ? tEnd : null,
+            trimStart: vStart,
+            trimEnd: vEnd,
             speed,
             caption: capText ? { text: capText, pos, style: capStyle } : null,
           }, hooks)
@@ -399,9 +436,23 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             Couper
           </label>
           {useTrim && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
-              début <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={numInp} /> s
-              fin <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={numInp} /> s
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED, flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
+                {(['rand', 'fixed'] as const).map(m => (
+                  <button key={m} onClick={() => setTrimRandom(m === 'rand')} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: (trimRandom ? 'rand' : 'fixed') === m ? '#A855F7' : 'transparent', color: (trimRandom ? 'rand' : 'fixed') === m ? '#fff' : MUTED }}>{m === 'rand' ? 'Aléatoire' : 'Fixe'}</button>
+                ))}
+              </span>
+              {trimRandom ? (
+                <>
+                  début <input type="number" min={0} step={0.1} value={trimRandMin} onChange={e => setTrimRandMin(e.target.value)} style={numInp} />→<input type="number" min={0} step={0.1} value={trimRandMax} onChange={e => setTrimRandMax(e.target.value)} style={numInp} />
+                  fin <input type="number" min={0} step={0.1} value={trimEndMin} onChange={e => setTrimEndMin(e.target.value)} style={numInp} />→<input type="number" min={0} step={0.1} value={trimEndMax} onChange={e => setTrimEndMax(e.target.value)} style={numInp} /> s
+                </>
+              ) : (
+                <>
+                  début <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={numInp} /> s
+                  fin <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={numInp} /> s
+                </>
+              )}
             </span>
           )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
@@ -420,6 +471,12 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         {/* Légendes : pool + format + placement */}
         {burnCap && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(216,180,254,0.1)' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'rgba(255,255,255,0.03)', color: INK, fontSize: 12, fontWeight: 700 }}>📁 Choisir dans la banque</button>
+              {capPool.trim() && (
+                <button onClick={() => setCapPool('')} style={{ padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: MUTED, fontSize: 12, fontWeight: 700 }}>Vider</button>
+              )}
+            </div>
             <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne… (distribuées entre les variantes)\nEx : Il a vraiment osé m\'aborder comme ça ???'}
               style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
@@ -481,7 +538,74 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         <BankPicker theme={BLOW_THEME} user={user} org={org} kind="videos" multi title="Choisir des vidéos à décliner"
           onClose={() => setPicker(false)} onApply={applyPicker} />
       )}
+
+      {showCapPicker && (
+        <CaptionBankPicker user={user} org={org}
+          onClose={() => setShowCapPicker(false)}
+          onSelect={texts => {
+            if (texts.length) setCapPool(prev => {
+              const cur = prev.split('\n').map(s => s.trim()).filter(Boolean)
+              return Array.from(new Set([...cur, ...texts.map(t => t.trim()).filter(Boolean)])).join('\n')
+            })
+            setShowCapPicker(false)
+          }} />
+      )}
     </div>
+  )
+}
+
+// ── Picker de captions (banque caption_bank) — style Blowsome ────────────────────
+function CaptionBankPicker({ user, org, onSelect, onClose }: {
+  user: User; org: OrgState; onSelect: (texts: string[]) => void; onClose: () => void
+}) {
+  const { currentOrg } = org
+  const [items, setItems] = useState<{ id: string; title: string; content: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    setLoading(true)
+    const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    scope(supabase.from('caption_bank').select('id,title,content').order('created_at', { ascending: false }))
+      .then(({ data }: any) => { setItems((data ?? []) as any[]); setLoading(false) })
+  }, [currentOrg?.id, user.id])
+  const filtered = items.filter(it => !search.trim() || (it.title ?? '').toLowerCase().includes(search.toLowerCase()) || (it.content ?? '').toLowerCase().includes(search.toLowerCase()))
+  const toggle = (id: string) => setSelected(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  return createPortal(
+    <div onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9600, background: 'rgba(6,6,8,0.92)', backdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: 'calc(100vh - 80px)', background: '#120C19', border: '1px solid rgba(216,180,254,0.16)', borderRadius: 16, display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(216,180,254,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: INK }}>Choisir des captions</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 20 }}>×</button>
+        </div>
+        <div style={{ padding: '12px 20px' }}>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…"
+            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 13, outline: 'none' }} />
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {loading ? <p style={{ fontSize: 12.5, color: MUTED }}>Chargement…</p>
+            : filtered.length === 0 ? <p style={{ fontSize: 12.5, color: MUTED }}>Aucune caption dans la banque.</p>
+            : filtered.map(it => {
+              const on = selected.has(it.id)
+              return (
+                <button key={it.id} onClick={() => toggle(it.id)} style={{ textAlign: 'left', padding: '9px 11px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${on ? 'rgba(168,85,247,0.6)' : 'rgba(216,180,254,0.12)'}`, background: on ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.02)' }}>
+                  {it.title && <div style={{ fontSize: 11, fontWeight: 700, color: on ? '#E9D5FF' : MUTED, marginBottom: 2 }}>{it.title}</div>}
+                  <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.45 }}>{it.content}</div>
+                </button>
+              )
+            })}
+        </div>
+        <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(216,180,254,0.12)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: INK, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>Annuler</button>
+          <button onClick={() => onSelect(items.filter(it => selected.has(it.id)).map(it => it.content).filter(Boolean))}
+            style={{ padding: '9px 16px', borderRadius: 10, border: 'none', background: GRAD, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, opacity: selected.size ? 1 : 0.5, pointerEvents: selected.size ? 'auto' : 'none' }}>
+            Ajouter {selected.size || ''}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
