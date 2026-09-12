@@ -298,6 +298,28 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // ── Suppression (média unitaire ou sélection) + nettoyage du storage ─────────
   const [confirmDel, setConfirmDel] = useState<string[] | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // Télécharge les médias sélectionnés sur le PC (URL signée → blob → <a download>).
+  async function downloadMedia(ids: string[]) {
+    if (ids.length === 0) return
+    for (const id of ids) {
+      const it = items.find(x => x.id === id); if (!it) continue
+      let url: string | null = null
+      if (it.storage_path) url = (await supabase.storage.from('content').createSignedUrl(it.storage_path, 3600)).data?.signedUrl ?? null
+      if (!url) url = it.file_url
+      if (!url) continue
+      try {
+        const blob = await (await fetch(url)).blob()
+        const ext = ((it.storage_path ?? it.file_url ?? '').split('?')[0].split('.').pop() || (inferType(it) === 'image' ? 'jpg' : 'mp4')).toLowerCase()
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = `${(it.title || 'media').replace(/[^\w.-]+/g, '_')}.${ext}`
+        document.body.appendChild(a); a.click(); a.remove()
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000)
+      } catch { /* ignore */ }
+      if (ids.length > 1) await new Promise(r => setTimeout(r, 350))   // évite le blocage multi-download
+    }
+  }
+
   async function deleteMedia(ids: string[]) {
     if (ids.length === 0) return
     setDeleting(true)
@@ -667,6 +689,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           {sel.size === 1 && <Btn label="Description" theme={theme} sm icon="M4 7V4h16v3|M9 20h6|M12 4v16" onClick={openDesc} />}
           <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => onNavigate?.('studio')} />
           <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setMoveOpen(true)} />
+          <Btn label="Télécharger" theme={theme} sm icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" onClick={() => downloadMedia([...sel])} />
           <Btn label="Supprimer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />
           <span style={{ marginLeft: 'auto' }}>
             <Btn label="Désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
@@ -721,6 +744,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               { l: 'Renommer', d: 'M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z', fn: () => openRename(ctx.item) },
               { l: 'Description', d: 'M4 7V4h16v3|M9 20h6|M12 4v16', fn: () => { setDescItem(ctx.item); setDescVal((ctx.item as any).description ?? '') } },
               { l: 'Déplacer', d: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z', fn: () => { setSel(new Set([ctx.item.id])); setMoveOpen(true) } },
+              { l: 'Télécharger', d: 'M12 3v12|M7 10l5 5 5-5|M4 21h16', fn: () => downloadMedia([ctx.item.id]) },
             ].map(o => (
               <button key={o.l} onClick={() => { o.fn(); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', background: 'transparent', color: '#D4D4D8', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
