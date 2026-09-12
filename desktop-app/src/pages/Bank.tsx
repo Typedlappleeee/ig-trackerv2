@@ -674,7 +674,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {/* Barre d'actions groupées (sticky) */}
       {sel.size > 0 && (
         <div style={{
-          position: 'sticky', bottom: 14, marginTop: 14, display: 'flex',
+          position: 'sticky', bottom: 14, marginTop: 14, zIndex: 40, display: 'flex',
           alignItems: 'center', gap: 10, padding: '9px 10px 9px 14px', borderRadius: 10,
           background: '#16161C', border: `1px solid rgba(${theme.tone},0.3)`,
           boxShadow: '0 18px 44px -16px rgba(0,0,0,0.9)', flexWrap: 'wrap',
