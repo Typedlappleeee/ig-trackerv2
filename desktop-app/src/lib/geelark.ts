@@ -7,6 +7,7 @@
 
 import storyFlowDef from './geelarkStoryFlow.json'
 import loginFlowDef from './geelarkLoginFlow.json'
+import reelsFlowDef from './geelarkReelsFlow.json'
 import { IS_WEB } from './platform'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
@@ -371,6 +372,34 @@ async function ensureStoryFlowId(bearer: string, log: (m: string) => void): Prom
   return p
 }
 
+// ── Reels via flow RPA custom (nécessaire pour la MINIATURE/couverture) ──────
+// Le natif instagramPubReels ne gère pas la cover ; on importe un flow custom
+// (mis en cache) et on le lance avec un paramMap { Caption, Video, Cover }.
+const REELS_FLOW_VERSION = 'v10'
+const _reelsFlowCache = new Map<string, Promise<string | null>>()
+function reelsFlowLsKey(b: string) { return `sf-reels-flowid:${b.slice(-14)}` }
+function reelsFlowVerKey(b: string) { return `sf-reels-flowver:${b.slice(-14)}` }
+async function ensureReelsFlowId(bearer: string, log: (m: string) => void): Promise<string | null> {
+  const cached = _reelsFlowCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, ver: string | null = null
+    try { stored = localStorage.getItem(reelsFlowLsKey(bearer)); ver = localStorage.getItem(reelsFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && ver === REELS_FLOW_VERSION) return stored
+    log(stored ? '🔄 Mise à jour du flow « Reels »…' : '📥 Import du flow « Reels » dans GeeLark…')
+    try {
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(reelsFlowDef) }, bearer)
+      if (Number(res['code']) !== 0) { log(`⚠ Import flow Reels : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(reelsFlowLsKey(bearer), id); localStorage.setItem(reelsFlowVerKey(bearer), REELS_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log(`⚠ Import flow Reels : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _reelsFlowCache.set(bearer, p)
+  p.then(v => { if (!v) _reelsFlowCache.delete(bearer) }).catch(() => _reelsFlowCache.delete(bearer))
+  return p
+}
+
 // Héberge une IMAGE chez GeeLark (garde l'extension réelle — les images, contrairement
 // aux vidéos, ne sont pas forcées en mp4). Renvoie le resourceUrl hébergé.
 export async function geelarkUploadImage(bearer: string, fileUrl: string, log: (m: string) => void): Promise<string | null> {
@@ -436,10 +465,33 @@ export async function postReelToPhone(
   log: (m: string) => void,
   rotationUrls?: string[],
   trial?: boolean,
+  coverResourceUrl?: string,   // miniature/couverture (URL GeeLark) — via flow custom
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log, rotationUrls)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+
+    // Avec une MINIATURE → flow RPA custom (le natif ne gère pas la cover).
+    if (coverResourceUrl) {
+      const flowId = await ensureReelsFlowId(bearer, log).catch(() => null)
+      if (flowId) {
+        log('🎬 Création de la tâche Reels (avec miniature)…')
+        const res = await geelarkFetch('/task/rpa/add', {
+          id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'Reels Scaleflow',
+          paramMap: { Caption: caption ?? '', Video: [videoResourceUrl], Cover: [coverResourceUrl] },
+        }, bearer)
+        if (Number(res['code']) === 0) {
+          const d = res['data'] as Record<string, unknown> | undefined
+          const taskId = (d?.['taskId'] ?? d?.['id']) as string | undefined
+          if (taskId) { log('   Tâche créée — publication en cours…'); return await pollRpaTask(bearer, taskId, log, 20 * 60_000) }
+        }
+        log(`   ⚠ Miniature indisponible (${res['msg'] ?? res['code']}) — publication sans miniature.`)
+      } else {
+        log('   ⚠ Flow miniature indisponible — publication sans miniature.')
+      }
+    }
+
+    // Natif (sans miniature) OU repli si le flow a échoué.
     log(trial ? '🎬 Création de la tâche Reels (essai · non-abonnés)…' : '🎬 Création de la tâche de publication Reels…')
     const res = await geelarkFetch('/rpa/task/instagramPubReels', {
       id: phoneId,

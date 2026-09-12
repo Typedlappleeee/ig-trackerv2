@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
@@ -42,6 +42,46 @@ function videoDurationFromBytes(bytes: Uint8Array): Promise<number> {
   })
 }
 const numInp: CSSProperties = { width: 62, height: 30, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', textAlign: 'right' }
+
+// ── Composants d'options réutilisables (Auto-contenu) ────────────────────────
+function Grp({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div style={{ borderRadius: 14, border: '1px solid rgba(216,180,254,0.1)', background: 'rgba(255,255,255,0.015)', padding: 15, marginTop: 12 }}>
+      <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: '#C9A9F0' }}>{title}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>
+    </div>
+  )
+}
+function Sw({ on, onChange, label, sub, disabled }: { on: boolean; onChange: (v: boolean) => void; label: ReactNode; sub?: ReactNode; disabled?: boolean }) {
+  return (
+    <div onClick={() => !disabled && onChange(!on)} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}>
+      <span style={{ flexShrink: 0, marginTop: 1, display: 'inline-flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 38, height: 22, padding: 2, borderRadius: 99, background: on ? GRAD : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+        <span style={{ width: 18, height: 18, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.45)' }} />
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>{label}</span>
+        {sub && <span style={{ display: 'block', fontSize: 11, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>{sub}</span>}
+      </span>
+    </div>
+  )
+}
+function Seg<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[] }) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 9, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(216,180,254,0.14)' }}>
+      {options.map(o => (
+        <button key={o.v} onClick={() => onChange(o.v)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: value === o.v ? GRAD : 'transparent', color: value === o.v ? '#fff' : MUTED }}>{o.label}</button>
+      ))}
+    </span>
+  )
+}
+function Fld({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 12, color: MUTED, minWidth: 96 }}>{label}</span>
+      {children}
+    </div>
+  )
+}
 
 function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   return <div style={{ borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.12)', boxShadow: '0 20px 50px -30px rgba(168,85,247,0.5)', ...style }}>{children}</div>
@@ -292,6 +332,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [trimStart, setTrimStart] = useState('0')
   const [trimEnd, setTrimEnd] = useState('')
   const [showCapPicker, setShowCapPicker] = useState(false)  // picker captions (banque)
+  const [uploading, setUploading] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [useSpeed, setUseSpeed] = useState(false)
   const [speedMin, setSpeedMin] = useState('0.98')
   const [speedMax, setSpeedMax] = useState('1.02')
@@ -308,6 +350,30 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', r.ids)
     setSources((data ?? []) as any[])
+  }
+
+  // Import « Mon PC » : upload vers le bucket content + content_bank, puis ajout aux sources.
+  async function importFromPC(files: FileList | File[]) {
+    const list = Array.from(files).filter(f => f.type.startsWith('video')); if (list.length === 0) return
+    const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
+    const added: { id: string; title: string; storage_path: string | null; file_url: string | null }[] = []
+    let done = 0
+    for (const file of list) {
+      setUploading(`${file.name} (${++done}/${list.length})`)
+      try {
+        const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase()
+        const id = crypto.randomUUID()
+        const storagePath = `videos/${scopeFolder}/${id}.${ext}`
+        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
+        if (up.error) continue
+        const title = file.name.replace(/\.[a-z0-9]+$/i, '')
+        const ins = await supabase.from('content_bank').insert({ user_id: user.id, org_id: currentOrg?.id ?? null, title, storage_path: storagePath, file_url: null, folder: destFolder || null, tags: [], notes: null, used_count: 0 }).select('id').single()
+        added.push({ id: (ins.data as any)?.id ?? id, title, storage_path: storagePath, file_url: null })
+      } catch { /* ignore */ }
+    }
+    setUploading(null)
+    if (added.length) setSources(prev => [...prev, ...added])
+    load()
   }
 
   async function generate() {
@@ -389,136 +455,72 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
       <Head title="Auto-contenu" sub="Choisis des vidéos → X variantes uniques : légende (pool + style Snapchat), coupe, micro-vitesse, spoof + GPS."
         right={<BlowBtn label={running ? `Génération… ${Math.round(progress * 100)}%` : 'Générer'} onClick={generate} />} />
 
-      <Card style={{ padding: 20, marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <BlowBtn ghost label={sources.length ? `${sources.length} vidéo(s) source` : 'Choisir des vidéos'} onClick={() => setPicker(true)} />
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
-            Variantes / vidéo
-            <input type="number" min={1} max={12} value={variants} onChange={e => setVariants(Number(e.target.value))}
-              style={{ width: 64, height: 32, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', textAlign: 'right' }} />
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
-            <span onClick={() => setBurnCap(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: burnCap ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: burnCap ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
-            Légende incrustée
-          </label>
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: GOLD }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias en banque`}</span>
-        </div>
+      <Card style={{ padding: 18, marginBottom: 12 }}>
+        {/* Source */}
+        <Grp title="Source">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <BlowBtn ghost label={sources.length ? `${sources.length} vidéo(s)` : 'Choisir dans la banque'} onClick={() => setPicker(true)} />
+            <button onClick={() => fileRef.current?.click()} disabled={!!uploading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 11, cursor: uploading ? 'default' : 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.2)', color: '#D8B4FE', fontSize: 13, fontWeight: 700, opacity: uploading ? 0.6 : 1 }}>⬆ Mon PC</button>
+            <input ref={fileRef} type="file" accept="video/*" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files) importFromPC(e.target.files); e.target.value = '' }} />
+            {uploading && <span style={{ fontSize: 11, color: GOLD }}>Envoi : {uploading}</span>}
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
+          </div>
+          <Fld label="Variantes / vidéo"><input type="number" min={1} max={12} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
+          <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
+        </Grp>
 
-        {/* Anti-détection + destination */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(216,180,254,0.1)' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
-            Anti-détection
-            <select value={intensity} onChange={e => setIntensity(e.target.value as SpoofIntensity)} style={selStyle}>
-              <option value="subtle" style={optStyle}>Subtile</option>
-              <option value="normal" style={optStyle}>Normale</option>
-              <option value="strong" style={optStyle}>Forte</option>
-            </select>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
-            Localisation GPS
-            <select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={selStyle}>
-              {GPS_CITIES.map(c => <option key={c.k} value={c.k} style={optStyle}>{c.label}</option>)}
-            </select>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
-            Dossier destination
-            <select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}>
-              <option value="" style={optStyle}>Racine (aucun)</option>
-              {folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}
-            </select>
-          </label>
-        </div>
+        {/* Légende */}
+        <Grp title="Légende">
+          <Sw on={burnCap} onChange={setBurnCap} label="Incruster une légende sur la vidéo" sub="Texte gravé sur chaque variante (style Snapchat ou contour)" />
+          {burnCap && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginLeft: 49 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'rgba(255,255,255,0.03)', color: INK, fontSize: 12, fontWeight: 700 }}>📁 Choisir dans la banque</button>
+                {capPool.trim() && <button onClick={() => setCapPool('')} style={{ padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: MUTED, fontSize: 12, fontWeight: 700 }}>Vider</button>}
+              </div>
+              <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne (distribuées entre les variantes)…\nEx : Sérieux là ?'} style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
+              <Fld label="Format"><Seg value={capStyle} onChange={setCapStyle} options={[{ v: 'snapchat', label: 'Snapchat' }, { v: 'outline', label: 'Contour' }]} /></Fld>
+              <Fld label="Distribution"><Seg value={capMode} onChange={setCapMode} options={[{ v: 'seq', label: 'Séquentiel' }, { v: 'random', label: 'Aléatoire' }]} /></Fld>
+              <Fld label="Position">
+                {!capManual ? <Seg value={capPos} onChange={setCapPos} options={[{ v: 'top', label: 'Haut' }, { v: 'center', label: 'Centre' }, { v: 'bottom', label: 'Bas' }]} />
+                  : <span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>X <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ width: 90, accentColor: '#A855F7' }} /><span style={{ width: 30, color: INK }}>{capX}%</span></label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>Y <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ width: 90, accentColor: '#A855F7' }} /><span style={{ width: 30, color: INK }}>{capY}%</span></label>
+                  </span>}
+              </Fld>
+              <Sw on={capManual} onChange={setCapManual} label="Placement manuel" />
+              <Sw on={withCap} onChange={setWithCap} disabled={!conns.groq} label={`Compléter par l'IA${conns.groq ? '' : ' (clé Groq requise)'}`} sub="Génère une légende si le pool est vide" />
+            </div>
+          )}
+        </Grp>
 
-        {/* Timing : coupe et/ou micro-vitesse */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
-            <span onClick={() => setUseTrim(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: useTrim ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: useTrim ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
-            Couper
-          </label>
+        {/* Anti-détection & montage */}
+        <Grp title="Anti-détection & montage">
+          <Fld label="Anti-détection"><Seg value={intensity} onChange={setIntensity} options={[{ v: 'subtle', label: 'Subtile' }, { v: 'normal', label: 'Normale' }, { v: 'strong', label: 'Forte' }]} /></Fld>
+          <Fld label="Localisation GPS"><select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={selStyle}>{GPS_CITIES.map(c => <option key={c.k} value={c.k} style={optStyle}>{c.label}</option>)}</select></Fld>
+          <Sw on={useTrim} onChange={setUseTrim} label="Couper la vidéo" sub="Retire un bout au début ET à la fin (unique par variante)" />
           {useTrim && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED, flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
-                {(['rand', 'fixed'] as const).map(m => (
-                  <button key={m} onClick={() => setTrimRandom(m === 'rand')} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: (trimRandom ? 'rand' : 'fixed') === m ? '#A855F7' : 'transparent', color: (trimRandom ? 'rand' : 'fixed') === m ? '#fff' : MUTED }}>{m === 'rand' ? 'Aléatoire' : 'Fixe'}</button>
-                ))}
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginLeft: 49 }}>
+              <Seg value={trimRandom ? 'rand' : 'fixed'} onChange={v => setTrimRandom(v === 'rand')} options={[{ v: 'rand', label: 'Aléatoire' }, { v: 'fixed', label: 'Fixe' }]} />
               {trimRandom ? (
-                <>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED, flexWrap: 'wrap' }}>
                   début <input type="number" min={0} step={0.1} value={trimRandMin} onChange={e => setTrimRandMin(e.target.value)} style={numInp} />→<input type="number" min={0} step={0.1} value={trimRandMax} onChange={e => setTrimRandMax(e.target.value)} style={numInp} />
                   fin <input type="number" min={0} step={0.1} value={trimEndMin} onChange={e => setTrimEndMin(e.target.value)} style={numInp} />→<input type="number" min={0} step={0.1} value={trimEndMax} onChange={e => setTrimEndMax(e.target.value)} style={numInp} /> s
-                </>
+                </span>
               ) : (
-                <>
-                  début <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={numInp} /> s
-                  fin <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={numInp} /> s
-                </>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
+                  début <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(e.target.value)} style={numInp} /> fin <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={numInp} /> s
+                </span>
               )}
-            </span>
+            </div>
           )}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
-            <span onClick={() => setUseSpeed(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: useSpeed ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: useSpeed ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
-            Vitesse aléatoire
-          </label>
+          <Sw on={useSpeed} onChange={setUseSpeed} label="Micro-vitesse aléatoire" sub="Vitesse légèrement différente par variante" />
           {useSpeed && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
-              <input type="number" min={0.5} max={2} step={0.01} value={speedMin} onChange={e => setSpeedMin(e.target.value)} style={numInp} /> ×
-              <span style={{ opacity: 0.5 }}>→</span>
-              <input type="number" min={0.5} max={2} step={0.01} value={speedMax} onChange={e => setSpeedMax(e.target.value)} style={numInp} /> ×
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED, marginLeft: 49 }}>
+              <input type="number" min={0.5} max={2} step={0.01} value={speedMin} onChange={e => setSpeedMin(e.target.value)} style={numInp} /> × → <input type="number" min={0.5} max={2} step={0.01} value={speedMax} onChange={e => setSpeedMax(e.target.value)} style={numInp} /> ×
             </span>
           )}
-        </div>
-
-        {/* Légendes : pool + format + placement */}
-        {burnCap && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(216,180,254,0.1)' }}>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'rgba(255,255,255,0.03)', color: INK, fontSize: 12, fontWeight: 700 }}>📁 Choisir dans la banque</button>
-              {capPool.trim() && (
-                <button onClick={() => setCapPool('')} style={{ padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: MUTED, fontSize: 12, fontWeight: 700 }}>Vider</button>
-              )}
-            </div>
-            <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne… (distribuées entre les variantes)\nEx : Il a vraiment osé m\'aborder comme ça ???'}
-              style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
-                {(['snapchat', 'outline'] as const).map(s => (
-                  <button key={s} onClick={() => setCapStyle(s)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capStyle === s ? '#A855F7' : 'transparent', color: capStyle === s ? '#fff' : MUTED }}>{s === 'snapchat' ? 'Style Snapchat' : 'Contour'}</button>
-                ))}
-              </span>
-              <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
-                {(['seq', 'random'] as const).map(m => (
-                  <button key={m} onClick={() => setCapMode(m)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capMode === m ? '#A855F7' : 'transparent', color: capMode === m ? '#fff' : MUTED }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
-                ))}
-              </span>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED, cursor: conns.groq ? 'pointer' : 'not-allowed', opacity: conns.groq ? 1 : 0.5 }}>
-                <span onClick={() => conns.groq && setWithCap(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: withCap ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: withCap ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
-                Compléter par l'IA {conns.groq ? '' : '(clé Groq requise)'}
-              </label>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED, cursor: 'pointer' }}>
-                <span onClick={() => setCapManual(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: capManual ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: capManual ? '#A855F7' : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
-                Placement manuel
-              </label>
-              {!capManual ? (
-                <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.14)' }}>
-                  {(['top', 'center', 'bottom'] as const).map(p => (
-                    <button key={p} onClick={() => setCapPos(p)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capPos === p ? '#A855F7' : 'transparent', color: capPos === p ? '#fff' : MUTED }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
-                  ))}
-                </span>
-              ) : (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
-                    X <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ width: 100, accentColor: '#A855F7' }} /><span style={{ width: 34, color: INK }}>{capX}%</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: MUTED }}>
-                    Y <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ width: 100, accentColor: '#A855F7' }} /><span style={{ width: 34, color: INK }}>{capY}%</span>
-                  </label>
-                </span>
-              )}
-            </div>
-          </div>
-        )}
+        </Grp>
         {running && <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 14 }}><div className="blow-prog" style={{ height: '100%', width: `${Math.round(progress * 100)}%`, backgroundImage: 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1,#EC4899)', transition: 'width .2s ease' }} /></div>}
         {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 150, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
       </Card>

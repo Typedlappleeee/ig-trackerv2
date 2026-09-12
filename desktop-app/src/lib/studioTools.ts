@@ -146,7 +146,9 @@ export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: 
   if (typeof pos === 'object') { x = `(W*${(pos.x / 100).toFixed(4)})-(w/2)`; y = `(H*${(pos.y / 100).toFixed(4)})-(h/2)` }
   else y = pos === 'top' ? 'H*0.08' : pos === 'center' ? '(H-h)/2' : 'H-h-H*0.12'
   if (o.caption.style === 'snapchat') x = '0'   // bande pleine largeur → collée aux bords
-  const fc = `[0:v]${vchain}[vb];[vb][1:v]overlay=${x}:${y},${EVEN}[v]`
+  // On met la vidéo à 1080 de large (= largeur du PNG) AVANT l'overlay, sinon la
+  // légende est décalée/surdimensionnée sur les vidéos qui ne font pas 1080 px.
+  const fc = `[0:v]${vchain},scale=1080:-2[vb];[vb][1:v]overlay=${x}:${y},${EVEN}[v]`
   // `pre` (trim -ss/-to) placé APRÈS les entrées → option de sortie (comme runMontage) ;
   // sinon il s'appliquerait par erreur comme option d'entrée du PNG (2e -i).
   return runFfmpeg({
@@ -233,7 +235,7 @@ export type CaptionStyle = 'outline' | 'snapchat'
 export async function textToPng(text: string, width: number, subtitle = false, style: CaptionStyle = 'outline'): Promise<Uint8Array> {
   const snap = style === 'snapchat'
   const padX = Math.round(width * (snap ? 0.05 : 0.04))
-  const fontSize = subtitle ? Math.round(width * 0.045) : Math.round(width * (snap ? 0.041 : 0.052))
+  const fontSize = subtitle ? Math.round(width * 0.045) : Math.round(width * (snap ? 0.034 : 0.052))
   // Snapchat : Helvetica RÉGULIER ; sinon Arial gras (contour).
   const font = snap
     ? `400 ${fontSize}px Helvetica, "Helvetica Neue", Arial, sans-serif`
