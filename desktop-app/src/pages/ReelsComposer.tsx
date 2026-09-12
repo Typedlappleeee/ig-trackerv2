@@ -65,11 +65,15 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [picker, setPicker] = useState<PickerKind | null>(null)
   const [genning, setGenning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
-  const [rotationOn, setRotationOn] = useState(false)              // proxy rotatif activé (Paramètres)
+  const [rotationConfigured, setRotationConfigured] = useState(false) // proxy rotatif dispo (Paramètres)
+  const [rotationOn, setRotationOn] = useState(false)                 // activé POUR CE RUN (togglable)
   const [simulPhones, setSimulPhones] = useState<'all' | number>('all')  // téléphones simultanés
 
   useEffect(() => {
-    loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => setRotationOn(c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim()))))
+    loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => {
+      const ok = c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim()))
+      setRotationConfigured(ok); setRotationOn(ok)   // par défaut : ON si configuré
+    })
   }, [currentOrg?.id, user.id])
 
   const setCaptionAt = (i: number, v: string) => setCaptions(c => c.map((x, k) => k === i ? v : x))
@@ -137,7 +141,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-300), m])
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
-    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
+    // Proxy rotatif utilisé seulement si CONFIGURÉ et ACTIVÉ pour ce run.
+    const rotU = resolveRotationUrls(); const rot = (rotationOn && rotU.length) ? rotU : undefined
     if (rot) push(`🔁 Rotation d'IP proxy activée (${rot.length} proxy) — IP changée avant chaque téléphone.`)
 
     const ownerId = currentOrg?.owner_id ?? user.id
@@ -383,13 +388,17 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 10 }}>
           <Panel theme={theme}>
             <PanelHead title="Comportement du run" />
-            {/* Proxy rotatif (état global, réglé dans Paramètres) */}
+            {/* Proxy rotatif — togglable pour CE run (si configuré dans Paramètres) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Proxy rotatif</span>
-                <span style={{ fontSize: 11, color: '#52525B' }}>{rotationOn ? "IP changée avant chaque téléphone → envoi en série" : 'Réglé dans Paramètres → Proxy & rotation'}</span>
+                <span style={{ fontSize: 11, color: '#52525B' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque téléphone → envoi en série' : 'Désactivé pour ce run → envoi en parallèle'}</span>
               </span>
-              <Chip text={rotationOn ? 'Activé' : 'Désactivé'} tone={rotationOn ? 'ok' : 'mute'} />
+              <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
+                title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 40, height: 23, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+                <span style={{ width: 19, height: 19, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+              </span>
             </div>
             {/* Téléphones simultanés (ignoré si proxy rotatif → série) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.04)', opacity: rotationOn ? 0.5 : 1 }}>
