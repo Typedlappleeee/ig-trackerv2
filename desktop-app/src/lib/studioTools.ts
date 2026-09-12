@@ -50,14 +50,13 @@ function intensityRanges(i: SpoofIntensity) {
   if (i === 'strong') return { b: 0.07, c: [0.94, 1.07], s: [0.93, 1.08], z: [1.03, 1.08] } as const
   return { b: 0.04, c: [0.97, 1.04], s: [0.97, 1.05], z: [1.02, 1.05] } as const
 }
+// Spoof visuel = UNIQUEMENT le zoom/recadrage (pas de brightness/contrast/saturation).
+// L'unicité vient du zoom + des métadonnées effacées/réécrites (voir runSpoof).
 export function spoofFilter(seed: number, intensity: SpoofIntensity = 'normal'): string {
   const r = intensityRanges(intensity)
   const rnd = (mul: number, min: number, max: number) => min + ((Math.sin(seed * mul) + 1) / 2) * (max - min)
-  const b = rnd(999.1, -r.b, r.b).toFixed(3)
-  const c = rnd(733.3, r.c[0], r.c[1]).toFixed(3)
-  const s = rnd(431.7, r.s[0], r.s[1]).toFixed(3)
   const z = rnd(197.5, r.z[0], r.z[1]).toFixed(3)
-  return `eq=brightness=${b}:contrast=${c}:saturation=${s},scale=iw*${z}:ih*${z},crop=iw/${z}:ih/${z},${EVEN}`
+  return `scale=iw*${z}:ih*${z},crop=iw/${z}:ih/${z},${EVEN}`
 }
 // Localisations GPS proposées (écrites dans les métadonnées mp4 par le spoof).
 // Source unique partagée par Studio et Auto-contenu.
@@ -232,13 +231,18 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
 // translucide pleine largeur + texte blanc centré (rendu story/Snapchat).
 export type CaptionStyle = 'outline' | 'snapchat'
 export async function textToPng(text: string, width: number, subtitle = false, style: CaptionStyle = 'outline'): Promise<Uint8Array> {
-  const pad = Math.round(width * 0.04)
-  const fontSize = subtitle ? Math.round(width * 0.045) : Math.round(width * 0.052)
+  const snap = style === 'snapchat'
+  const padX = Math.round(width * (snap ? 0.05 : 0.04))
+  const fontSize = subtitle ? Math.round(width * 0.045) : Math.round(width * (snap ? 0.041 : 0.052))
+  // Snapchat : Helvetica RÉGULIER ; sinon Arial gras (contour).
+  const font = snap
+    ? `400 ${fontSize}px Helvetica, "Helvetica Neue", Arial, sans-serif`
+    : `700 ${fontSize}px system-ui, Arial, sans-serif`
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
-  ctx.font = `700 ${fontSize}px system-ui, Arial, sans-serif`
+  ctx.font = font
   // Découpe en lignes.
-  const maxW = width - pad * 2
+  const maxW = width - padX * 2
   const words = text.split(/\s+/)
   const lines: string[] = []
   let cur = ''
@@ -247,20 +251,21 @@ export async function textToPng(text: string, width: number, subtitle = false, s
     if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w } else cur = t
   }
   if (cur) lines.push(cur)
-  const lineH = Math.round(fontSize * 1.32)
-  const height = lines.length * lineH + pad * 2
+  const vpad = Math.round(fontSize * (snap ? 0.30 : 0.4))
+  const lineH = Math.round(fontSize * (snap ? 1.05 : 1.32))
+  const height = lines.length * lineH + vpad * 2
   canvas.width = width; canvas.height = height
-  ctx.font = `700 ${fontSize}px system-ui, Arial, sans-serif`
+  ctx.font = font
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  if (style === 'snapchat') {
-    // Bande noire translucide sur toute la largeur, texte blanc centré, sans contour.
-    ctx.fillStyle = 'rgba(0,0,0,0.48)'
+  if (snap) {
+    // Bande gris foncé translucide (#303030 ~50 %) pleine largeur, texte blanc centré.
+    ctx.fillStyle = 'rgba(48,48,48,0.5)'
     ctx.fillRect(0, 0, width, height)
     ctx.fillStyle = '#fff'
-    lines.forEach((ln, i) => ctx.fillText(ln, width / 2, pad + i * lineH + lineH / 2))
+    lines.forEach((ln, i) => ctx.fillText(ln, width / 2, vpad + i * lineH + lineH / 2))
   } else {
     lines.forEach((ln, i) => {
-      const cy = pad + i * lineH + lineH / 2
+      const cy = vpad + i * lineH + lineH / 2
       // Contour noir + remplissage blanc (lisible sur toute vidéo).
       ctx.lineWidth = Math.round(fontSize * 0.16); ctx.strokeStyle = 'rgba(0,0,0,0.9)'
       ctx.strokeText(ln, width / 2, cy)
