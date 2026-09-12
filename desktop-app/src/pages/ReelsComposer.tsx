@@ -8,7 +8,7 @@ import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
-import { geelarkUploadVideo, postReelToPhone } from '@/lib/geelark'
+import { geelarkUploadVideo, geelarkUploadImage, postReelToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { generateCaption } from '@/lib/ai'
@@ -58,6 +58,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [vidMode, setVidMode] = useState<'seq' | 'random'>('seq')  // répartition vidéo → compte
   const [autoRemove, setAutoRemove] = useState(true)               // usage unique
   const [reelsTrial, setReelsTrial] = useState(false)              // essai Reels
+  const [coverPicker, setCoverPicker] = useState(false)            // sélecteur de miniature
+  const [cover, setCover] = useState<{ id: string; title: string; storage_path: string | null; file_url: string | null } | null>(null)
 
   const [running, setRunning] = useState(false)
   const [runItems, setRunItems] = useState<RunItem[]>([])
@@ -173,6 +175,15 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     }
     if (resourceByVid.size === 0) { push('❌ Aucune vidéo hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
 
+    // 2b) Miniature/couverture optionnelle → hébergée UNE fois pour tout le run.
+    let coverRU: string | undefined
+    if (cover) {
+      const cUrl = cover.storage_path
+        ? (await supabase.storage.from('content').createSignedUrl(cover.storage_path, 3600)).data?.signedUrl
+        : cover.file_url
+      if (cUrl) { coverRU = (await geelarkUploadImage(bearer, cUrl, push)) ?? undefined; if (coverRU) push('🖼 Miniature hébergée.') }
+    }
+
     // 3) Poste : chaque téléphone reçoit SA vidéo assignée.
     //    Sans proxy rotatif → tous les téléphones EN PARALLÈLE (rapide).
     //    Avec proxy rotatif → en série (1 IP à la fois, l'IP change avant chaque tel).
@@ -190,7 +201,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       if (!ru) { run.markFailed(); R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
       usedVidIds.add(v.id)
       push(`— @${p.ig_username ?? p.geelark_id} · ${v.title}${cap ? ' · légende' : ''} —`)
-      const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial)
+      const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverRU)
       if (!r.ok) run.markFailed()
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
@@ -430,7 +441,16 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             {/* Usage unique */}
             <RunToggle label="Usage unique des vidéos" hint="Retire de la banque les vidéos utilisées" on={autoRemove} onToggle={() => setAutoRemove(v => !v)} theme={theme} border />
             {/* Essai Reels */}
-            <RunToggle label="Essai Reels" hint="Publie en mode essai (visible non-abonnés)" on={reelsTrial} onToggle={() => setReelsTrial(v => !v)} theme={theme} />
+            <RunToggle label="Essai Reels" hint="Publie en mode essai (visible non-abonnés)" on={reelsTrial} onToggle={() => setReelsTrial(v => !v)} theme={theme} border />
+            {/* Miniature / couverture */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 15px' }}>
+              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Miniature (couverture)</span>
+                <span style={{ fontSize: 11, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cover ? cover.title : 'Image de couverture du Reel — optionnel'}</span>
+              </span>
+              {cover && <button onClick={() => setCover(null)} style={{ height: 28, padding: '0 10px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#A1A1AA', fontSize: 11, fontWeight: 700 }}>Retirer</button>}
+              <Btn theme={theme} sm tone="quiet" icon="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" label={cover ? 'Changer' : 'Choisir'} onClick={() => setCoverPicker(true)} />
+            </div>
           </Panel>
           <Panel theme={theme}>
             <PanelHead title="Récapitulatif" />
@@ -485,6 +505,19 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
           onApply={r => {
             if (r.kind === 'captions') setCaptions(cur => { const base = cur.filter(c => c.trim()); return [...base, ...r.texts.filter(t => !base.includes(t))] })
             else setVidSel(new Set(r.ids))
+          }} />
+      )}
+
+      {coverPicker && (
+        <BankPicker theme={theme} user={user} org={org} kind="images" title="Choisir une miniature"
+          onClose={() => setCoverPicker(false)}
+          onApply={r => {
+            if (r.kind === 'images' && r.ids[0]) {
+              const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+              scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).eq('id', r.ids[0]).maybeSingle()
+                .then(({ data }: any) => { if (data) setCover(data) })
+            }
+            setCoverPicker(false)
           }} />
       )}
     </div>
