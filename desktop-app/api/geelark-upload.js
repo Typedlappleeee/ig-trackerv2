@@ -8,7 +8,43 @@
 // de `module.exports = handler` (sinon le handler écrase la config → timeout 10s
 // → « A server error occurred » sur les gros .mov).
 
-const { assertAllowedMediaUrl, fetchMediaFollow } = require('./_ssrf')
+// ── Garde SSRF INLINE (pas de require('./_ssrf') : Vercel ne bundle pas les
+//    fichiers _préfixés → « Cannot find module » → FUNCTION_INVOCATION_FAILED).
+const net = require('net')
+function hostIsPrivate(hostRaw) {
+  const h = String(hostRaw || '').toLowerCase().replace(/^\[|\]$/g, '')
+  if (!h || h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localhost')) return true
+  if (net.isIP(h)) {
+    if (/^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) || /^0\./.test(h)) return true
+    const m = h.match(/^172\.(\d+)\./); if (m && +m[1] >= 16 && +m[1] <= 31) return true
+    if (h === '::1' || h === '::' || /^f[cd]/.test(h) || /^fe80/.test(h) || /^::ffff:/.test(h)) return true
+  }
+  return false
+}
+function assertAllowedMediaUrl(raw) {
+  let u; try { u = new URL(String(raw)) } catch { throw new Error('URL média invalide') }
+  if (u.protocol !== 'https:') throw new Error('URL média : https requis')
+  const host = u.hostname.toLowerCase()
+  if (hostIsPrivate(host)) throw new Error('hôte non autorisé')
+  const envUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  let envHost = ''; try { if (envUrl) envHost = new URL(envUrl).hostname.toLowerCase() } catch { /* ignore */ }
+  if (!(host === envHost || /\.supabase\.(co|in)$/.test(host))) throw new Error('source média non autorisée (doit être un fichier de la banque)')
+  return String(raw)
+}
+async function fetchMediaFollow(rawUrl, { maxHops = 5, timeoutMs = 30000, doFetch } = {}) {
+  const fetcher = doFetch || ((u, init) => fetch(u, init))
+  let url = assertAllowedMediaUrl(rawUrl)
+  for (let hop = 0; hop <= maxHops; hop++) {
+    const resp = await fetcher(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) })
+    if (resp.status >= 300 && resp.status < 400) {
+      const loc = resp.headers.get('location'); if (!loc) return resp
+      let next; try { next = new URL(loc, url).toString() } catch { throw new Error('redirection média invalide') }
+      url = assertAllowedMediaUrl(next); continue
+    }
+    return resp
+  }
+  throw new Error('trop de redirections média')
+}
 
 // Require PARESSEUX de supabase-js : le chemin web (signedUrl) n'en a pas besoin.
 // Le charger au top plantait le bundle serverless sur Vercel → FUNCTION_INVOCATION_FAILED.
