@@ -3,6 +3,7 @@
 import { supabase } from './supabase'
 import { runFfmpeg, fetchInput } from './ffmpeg'
 import { transcribeGroq, type Segment } from './subtitles'
+import piexif from 'piexifjs'
 
 export interface SourceRef { id?: string; title: string; storage_path?: string | null; file_url?: string | null }
 
@@ -22,7 +23,8 @@ export async function saveOutputToBank(userId: string, orgId: string | null, byt
   const scopeFolder = orgId ? `orgs/${orgId}` : `users/${userId}`
   const id = crypto.randomUUID()
   const storagePath = `videos/${scopeFolder}/${id}.${ext}`
-  const blob = new Blob([bytes as BlobPart], { type: ext === 'mp4' ? 'video/mp4' : 'application/octet-stream' })
+  const mime = ext === 'mp4' ? 'video/mp4' : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'application/octet-stream'
+  const blob = new Blob([bytes as BlobPart], { type: mime })
   const up = await supabase.storage.from('content').upload(storagePath, blob, { contentType: blob.type, upsert: false })
   if (up.error) return null
   await supabase.from('content_bank').insert({
@@ -218,6 +220,56 @@ export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: 
     args: ['-i', 'cap.png', '-filter_complex', fc, '-map', '[v]', '-map', '0:a?', ...pre, ...aFilter, ...meta, ...H264],
     onProgress: h?.onProgress, onLog: h?.onLog,
   })
+}
+
+// ── Spoof IMAGE : micro zoom/recadrage + ré-encodage JPEG → sortie .jpg ────────
+// 100 % client (canvas, pas de ffmpeg). Le ré-encodage JPEG efface TOUT l'EXIF
+// d'origine (anti-empreinte) ; on réécrit ensuite un device/GPS EXIF si demandé.
+// Chaque seed → zoom + qualité légèrement différents ⇒ hash de fichier unique.
+export interface ImageSpoofOpts { seed: number; intensity?: SpoofIntensity; gps?: { lat: number; lon: number } | null; device?: string | null }
+
+function dataUrlToBytes(u: string): Uint8Array {
+  const bin = atob(u.slice(u.indexOf(',') + 1))
+  const arr = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+  return arr
+}
+// Construit un bloc EXIF (fabricant/modèle + GPS) prêt pour piexif.insert. null si rien à écrire.
+function buildImageExif(deviceKey?: string | null, gps?: { lat: number; lon: number } | null): string | null {
+  const zeroth: Record<number, unknown> = {}
+  const d = deviceKey && deviceKey !== 'none' ? SPOOF_DEVICES.find(x => x.k === deviceKey) : null
+  if (d && d.make) {
+    zeroth[piexif.ImageIFD.Make] = d.make
+    zeroth[piexif.ImageIFD.Model] = d.model
+    if (d.software) zeroth[piexif.ImageIFD.Software] = d.software
+  }
+  const gpsIfd: Record<number, unknown> = {}
+  if (gps) {
+    gpsIfd[piexif.GPSIFD.GPSLatitudeRef] = gps.lat >= 0 ? 'N' : 'S'
+    gpsIfd[piexif.GPSIFD.GPSLatitude] = piexif.GPSHelper.degToDmsRational(Math.abs(gps.lat))
+    gpsIfd[piexif.GPSIFD.GPSLongitudeRef] = gps.lon >= 0 ? 'E' : 'W'
+    gpsIfd[piexif.GPSIFD.GPSLongitude] = piexif.GPSHelper.degToDmsRational(Math.abs(gps.lon))
+  }
+  if (!Object.keys(zeroth).length && !Object.keys(gpsIfd).length) return null
+  return piexif.dump({ '0th': zeroth, 'Exif': {}, 'GPS': gpsIfd, '1st': {}, thumbnail: null })
+}
+export async function runImageSpoof(input: Uint8Array, o: ImageSpoofOpts): Promise<Uint8Array> {
+  const r = intensityRanges(o.intensity ?? 'normal')
+  const rnd = (mul: number, min: number, max: number) => min + ((Math.sin(o.seed * mul) + 1) / 2) * (max - min)
+  const z = rnd(197.5, r.z[0], r.z[1])
+  const bmp = await createImageBitmap(new Blob([input as BlobPart]))
+  const W = bmp.width, H = bmp.height
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H
+  const ctx = canvas.getContext('2d')!
+  // Fenêtre centrée 1/z de la source, étirée au format d'origine (zoom/recadrage léger).
+  const cw = W / z, ch = H / z
+  ctx.drawImage(bmp, (W - cw) / 2, (H - ch) / 2, cw, ch, 0, 0, W, H)
+  bmp.close?.()
+  const q = +(0.90 + ((Math.sin(o.seed * 13.7) + 1) / 2) * 0.06).toFixed(3)  // 0.90–0.96 (jitter → hash différent)
+  let dataUrl = canvas.toDataURL('image/jpeg', q)  // ré-encodage = EXIF d'origine effacé
+  const exif = buildImageExif(o.device, o.gps)
+  if (exif) { try { dataUrl = piexif.insert(exif, dataUrl) } catch { /* on garde le jpg sans EXIF si l'insert échoue */ } }
+  return dataUrlToBytes(dataUrl)
 }
 
 // ── Montage : coupe (début/fin) → mp4 ré-encodé ───────────────────────────────

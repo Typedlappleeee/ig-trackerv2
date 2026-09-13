@@ -8,8 +8,8 @@ import { useBankThumbs } from '@/lib/data'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import {
-  resolveSourceBytes, saveOutputToBank, GPS_CITIES, gpsFor,
-  runSpoof, runRemixVariant, runMontage, runOverlay, runCaption, runSubtitles,
+  resolveSourceBytes, saveOutputToBank, GPS_CITIES, gpsFor, SPOOF_DEVICES,
+  runSpoof, runRemixVariant, runMontage, runOverlay, runCaption, runSubtitles, runImageSpoof,
 } from '@/lib/studioTools'
 import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
 import { startRun } from '@/lib/runStore'
@@ -23,6 +23,7 @@ const TOOLS: Tool[] = [
   { k: 'mixer', t: 'Mixer', d: 'Ajoute une légende / un montage par-dessus ta vidéo, rendu côté serveur.', tone: '236,72,153', tag: 'overlay', i: 'M4 21v-7|M4 10V3|M12 21v-9|M12 8V3|M20 21v-5|M20 12V3|M1 14h6|M9 8h6|M17 16h6' },
   { k: 'remix', t: 'Remix', d: 'Une vidéo devient des dizaines de variantes uniques : luminosité, zoom, vitesse, recadrage.', tone: '139,92,246', tag: '×24 variantes', i: 'M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6' },
   { k: 'spoof', t: 'Spoof', d: "Anti-empreinte : réécrit device, GPS, EXIF et micro-varie l'image. Rend chaque vidéo unique pour l'algo.", tone: '167,139,250', tag: 'anti-détection', i: 'M12 22s8-4.5 8-11a8 8 0 1 0-16 0c0 6.5 8 11 8 11z|M9 12l2 2 4-4' },
+  { k: 'imgspoof', t: 'Spoof image', d: 'Photos → variantes uniques en .jpg : micro-zoom, EXIF effacé puis device/GPS réécrits. Anti-doublon pour l’algo.', tone: '52,211,153', tag: 'photo · .jpg', i: 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' },
   { k: 'subs', t: 'Sous-titres', d: 'Sous-titres automatiques (Groq Whisper), incrustés mot par mot.', tone: '6,182,212', tag: 'Whisper', i: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z|M7 9h10|M7 13h6' },
 ]
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null; folder: string | null }
@@ -59,6 +60,7 @@ export default function Studio({ theme, infra, user, org }: {
   // Anti-détect (spoof/remix) : intensité + localisation GPS écrite dans les métadonnées.
   const [intensity, setIntensity] = useState<'subtle' | 'normal' | 'strong'>('normal')
   const [gpsCity, setGpsCity] = useState('none')
+  const [device, setDevice] = useState('none')   // appareil spoofé (EXIF/métadonnées make/model)
   // Mixer : placement manuel de la légende (sinon preset top/center/bottom).
   const [capManual, setCapManual] = useState(false)
   const [capX, setCapX] = useState(50)   // % largeur
@@ -70,7 +72,7 @@ export default function Studio({ theme, infra, user, org }: {
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [logs, setLogs] = useState<string[]>([])
-  const [results, setResults] = useState<{ title: string; url: string }[]>([])
+  const [results, setResults] = useState<{ title: string; url: string; ext?: string }[]>([])
 
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
@@ -121,18 +123,19 @@ export default function Studio({ theme, infra, user, org }: {
   // ── Lancement du traitement réel (ffmpeg.wasm) ──
   async function generate() {
     if (running) return
-    const chosen = videos.filter(v => src.has(v.id) && isVid(v))
-    if (chosen.length === 0) { push('⚠ Sélectionne au moins une vidéo source.'); return }
+    const isImgTool = tool === 'imgspoof'
+    const chosen = videos.filter(v => src.has(v.id) && (isImgTool ? !isVid(v) : isVid(v)))
+    if (chosen.length === 0) { push(isImgTool ? '⚠ Sélectionne au moins une photo source.' : '⚠ Sélectionne au moins une vidéo source.'); return }
     if (tool === 'overlay' && overlayImgs.length === 0) { push('⚠ Choisis d’abord une ou des photos à incruster.'); return }
     if (tool === 'mixer' && !caption.trim()) { push('⚠ Écris une légende à incruster.'); return }
     if (tool === 'subs' && !conns.groq) { push('⚠ Clé Groq manquante (Réglages) pour la transcription.'); return }
 
     setRunning(true); setLogs([]); setResults([]); setProgress(0)
     const hooks = { onProgress: setProgress, onLog: (_m: string) => {} }
-    const perOut = (tool === 'spoof' || tool === 'remix') ? Math.max(1, Math.min(24, copies)) : 1
-    const R = startRun('studio', `${T.t} · ${chosen.length} vidéo${chosen.length > 1 ? 's' : ''}`, chosen.length * perOut)
+    const perOut = (tool === 'spoof' || tool === 'remix' || isImgTool) ? Math.max(1, Math.min(24, copies)) : 1
+    const R = startRun('studio', `${T.t} · ${chosen.length} ${isImgTool ? 'photo' : 'vidéo'}${chosen.length > 1 ? 's' : ''}`, chosen.length * perOut)
     try {
-      if (!isFfmpegReady()) { push('⏳ Chargement du moteur vidéo (~30 Mo, une seule fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
+      if (!isImgTool && !isFfmpegReady()) { push('⏳ Chargement du moteur vidéo (~30 Mo, une seule fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
       const ovs = tool === 'overlay' ? await overlayAll() : []
       let vIdx = 0
       for (const v of chosen) {
@@ -140,14 +143,23 @@ export default function Studio({ theme, infra, user, org }: {
         push(`— ${v.title} —`)
         setProgress(0)
         const bytes = await resolveSourceBytes(v)
-        const outs: { title: string; data: Uint8Array }[] = []
-        if (tool === 'spoof' || tool === 'remix') {
+        const outs: { title: string; data: Uint8Array; ext?: string }[] = []
+        if (tool === 'imgspoof') {
+          const n = Math.max(1, Math.min(24, copies))
+          for (let i = 0; i < n; i++) {
+            if (R.isCancelled()) break
+            push(`  · variante ${i + 1}/${n}…`)
+            const data = await runImageSpoof(bytes, { seed: Math.random() * 1000, intensity, gps: gpsFor(gpsCity), device })
+            outs.push({ title: `${v.title} · img ${i + 1}`, data, ext: 'jpg' })
+            setProgress((i + 1) / n)
+          }
+        } else if (tool === 'spoof' || tool === 'remix') {
           const n = Math.max(1, Math.min(24, copies))
           for (let i = 0; i < n; i++) {
             if (R.isCancelled()) break
             push(`  · variante ${i + 1}/${n}…`)
             const seed = Math.random() * 1000
-            const sOpts = { intensity, gps: gpsFor(gpsCity) }
+            const sOpts = { intensity, gps: gpsFor(gpsCity), device }
             const data = tool === 'spoof' ? await runSpoof(bytes, seed, hooks, sOpts) : await runRemixVariant(bytes, seed, hooks, sOpts)
             outs.push({ title: `${v.title} · ${tool} ${i + 1}`, data })
           }
@@ -167,9 +179,10 @@ export default function Studio({ theme, infra, user, org }: {
         }
         // Sauvegarde banque + lien de téléchargement.
         for (const o of outs) {
-          await saveOutputToBank(user.id, currentOrg?.id ?? null, o.data, o.title, 'mp4', destFolder || null)
-          const url = URL.createObjectURL(new Blob([o.data as BlobPart], { type: 'video/mp4' }))
-          setResults(r => [...r, { title: o.title, url }])
+          const ext = o.ext ?? 'mp4'
+          await saveOutputToBank(user.id, currentOrg?.id ?? null, o.data, o.title, ext, destFolder || null)
+          const url = URL.createObjectURL(new Blob([o.data as BlobPart], { type: ext === 'jpg' ? 'image/jpeg' : 'video/mp4' }))
+          setResults(r => [...r, { title: o.title, url, ext }])
           R.tick(true)
         }
         vIdx++
@@ -214,10 +227,12 @@ export default function Studio({ theme, infra, user, org }: {
 
   // ── Wizard d'un outil ──
   const T = TOOLS.find(x => x.k === tool)!
+  const isImgTool = tool === 'imgspoof'
+  const hasSpoofOpts = tool === 'spoof' || tool === 'remix' || isImgTool
   const nSrc = src.size
   // Dossiers existants (banque) pour le sélecteur de destination des sorties.
   const folders = [...new Set(videos.map(v => v.folder).filter((f): f is string => !!f))].sort()
-  const per = (tool === 'spoof' || tool === 'remix') ? copies : 1
+  const per = hasSpoofOpts ? copies : 1
   const output = `${nSrc * per} fichier${nSrc * per > 1 ? 's' : ''}`
   const numInp: React.CSSProperties = { width: 80, height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none', textAlign: 'right' }
 
@@ -230,13 +245,13 @@ export default function Studio({ theme, infra, user, org }: {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Panel theme={theme}>
-            <PanelHead title="Vidéos sources" sub={uploading ? `Import : ${uploading}` : `${nSrc} sélectionnée${nSrc > 1 ? 's' : ''}`} right={<>
+            <PanelHead title={isImgTool ? 'Photos sources' : 'Vidéos sources'} sub={uploading ? `Import : ${uploading}` : `${nSrc} sélectionnée${nSrc > 1 ? 's' : ''}`} right={<>
               <Btn theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Banque" onClick={() => setPickerOpen(true)} />
               <Btn theme={theme} sm tone="quiet" icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" label="Mon PC" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
               <input ref={fileRef} type="file" accept="video/*,image/*" multiple style={{ display: 'none' }}
                 onChange={e => { if (e.target.files) importFromPC(e.target.files); e.target.value = '' }} />
             </>} />
-            {nSrc === 0 ? <div style={{ padding: 28, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>Aucune vidéo choisie.<br />Clique « Banque » ou « Mon PC ».</div> : (
+            {nSrc === 0 ? <div style={{ padding: 28, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>{isImgTool ? 'Aucune photo choisie.' : 'Aucune vidéo choisie.'}<br />Clique « Banque » ou « Mon PC ».</div> : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 13, maxHeight: 300, overflowY: 'auto' }}>
                 {videos.filter(v => src.has(v.id)).map((v) => {
                   const on = src.has(v.id); const prev = thumbFor(v); const vid = isVid(v)
@@ -259,10 +274,10 @@ export default function Studio({ theme, infra, user, org }: {
           <Panel theme={theme}>
             <PanelHead title="Réglages" />
             <div style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {(tool === 'spoof' || tool === 'remix') && (
+              {hasSpoofOpts && (
                 <>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Variantes par vidéo</span>
+                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>{isImgTool ? 'Variantes par photo' : 'Variantes par vidéo'}</span>
                     <input type="number" min={1} max={24} value={copies} onChange={e => setCopies(Number(e.target.value))} style={numInp} />
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -277,6 +292,12 @@ export default function Studio({ theme, infra, user, org }: {
                     <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Localisation GPS</span>
                     <select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={{ ...numInp, width: 150, textAlign: 'left', cursor: 'pointer' }}>
                       {GPS_CITIES.map(c => <option key={c.k} value={c.k} style={{ background: '#16161C' }}>{c.label}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Appareil (spoof)</span>
+                    <select value={device} onChange={e => setDevice(e.target.value)} style={{ ...numInp, width: 150, textAlign: 'left', cursor: 'pointer' }}>
+                      {SPOOF_DEVICES.map(d => <option key={d.k} value={d.k} style={{ background: '#16161C' }}>{d.label}</option>)}
                     </select>
                   </label>
                 </>
@@ -350,7 +371,7 @@ export default function Studio({ theme, infra, user, org }: {
         <Panel theme={theme}>
           <PanelHead title="Sortie" />
           <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 11 }}>
-            {([['Vidéos sources', String(nSrc)], ['Sortie', output], ['Coût', 'Gratuit']] as [string, string][]).map(([k, v]) => (
+            {([[isImgTool ? 'Photos sources' : 'Vidéos sources', String(nSrc)], ['Sortie', output], ['Coût', 'Gratuit']] as [string, string][]).map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                 <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: k === 'Coût' ? '#34D399' : '#E4E4E7' }}>{v}</span>
               </div>
@@ -372,7 +393,7 @@ export default function Studio({ theme, infra, user, org }: {
 
             <Btn theme={theme} tone="primary" disabled={nSrc === 0 || running} icon="M5 3l14 9-14 9z"
               label={running ? `Traitement… ${Math.round(progress * 100)}%` : nSrc === 0 ? 'Choisis des sources' : 'Générer'} onClick={generate} />
-            <div style={{ fontSize: 10.5, color: '#52525B', textAlign: 'center', lineHeight: 1.5 }}>Traitement local (ffmpeg) — le premier lancement charge le moteur (~30 Mo).</div>
+            <div style={{ fontSize: 10.5, color: '#52525B', textAlign: 'center', lineHeight: 1.5 }}>{isImgTool ? 'Traitement local instantané (aucun moteur à charger).' : 'Traitement local (ffmpeg) — le premier lancement charge le moteur (~30 Mo).'}</div>
 
             {logs.length > 0 && (
               <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', maxHeight: 140, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>
@@ -384,7 +405,7 @@ export default function Studio({ theme, infra, user, org }: {
                 {results.map((r, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
-                    <a href={r.url} download={`${r.title}.mp4`} style={{ fontSize: 11, fontWeight: 700, color: theme.accentText, textDecoration: 'none' }}>Télécharger</a>
+                    <a href={r.url} download={`${r.title}.${r.ext ?? 'mp4'}`} style={{ fontSize: 11, fontWeight: 700, color: theme.accentText, textDecoration: 'none' }}>Télécharger</a>
                   </div>
                 ))}
               </div>
@@ -394,9 +415,9 @@ export default function Studio({ theme, infra, user, org }: {
       </div>
 
       {pickerOpen && (
-        <BankPicker theme={theme} user={user} org={org} kind="videos" multi initialIds={[...src]}
-          title="Choisir des vidéos sources" onClose={() => setPickerOpen(false)}
-          onApply={r => { if (r.kind === 'videos') setSrc(new Set(r.ids)) }} />
+        <BankPicker theme={theme} user={user} org={org} kind={isImgTool ? 'images' : 'videos'} multi initialIds={[...src]}
+          title={isImgTool ? 'Choisir des photos sources' : 'Choisir des vidéos sources'} onClose={() => setPickerOpen(false)}
+          onApply={r => { if ((isImgTool && r.kind === 'images') || (!isImgTool && r.kind === 'videos')) setSrc(new Set(r.ids)) }} />
       )}
 
       {imgPicker && (
