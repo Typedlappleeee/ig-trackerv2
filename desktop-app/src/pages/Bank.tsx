@@ -605,7 +605,17 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               ))}
             </Seg>
 
-            <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#52525B' }}>
+            {tab !== 'caption' && shown.length > 0 && (() => {
+              const allSel = shown.every(m => sel.has(m.id))
+              return (
+                <button onClick={() => setSel(allSel ? new Set() : new Set(shown.map(m => m.id)))}
+                  style={{ marginLeft: 'auto', height: 28, padding: '0 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${allSel ? theme.selEdge : 'rgba(255,255,255,0.09)'}`, background: allSel ? `rgba(${theme.tone},0.14)` : 'rgba(255,255,255,0.03)', color: allSel ? theme.accentText : '#D4D4D8', fontSize: 11.5, fontWeight: 700 }}>
+                  {allSel ? 'Tout désélectionner' : `Tout sélectionner (${shown.length})`}
+                </button>
+              )
+            })()}
+
+            <span style={{ marginLeft: (tab !== 'caption' && shown.length > 0) ? 12 : 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#52525B' }}>
               {loading ? el : sel.size ? `${sel.size} sélectionnée${sel.size > 1 ? 's' : ''}` : `${folder} · ${shown.length} affichée${shown.length > 1 ? 's' : ''}`}
             </span>
           </div>
