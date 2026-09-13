@@ -14,10 +14,10 @@ function launchTiles(infra: InfraKey): { id: string; label: string; hint: string
     { id: 'studio', label: 'Remixer une vidéo', hint: 'gratuit', icon: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z', tone: '236,72,153', page: 'studio' },
     { id: 'reci', label: 'Rejouer une séquence', hint: 'séquences prêtes', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6', tone: '16,185,129', page: 'recipes' },
   ] : [
-    { id: 'reels', label: 'Publier un Reel', hint: 'comptes prêts', icon: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z', tone: '139,92,246', page: 'phones' },
-    { id: 'story', label: 'Publier une Story', hint: 'lien par compte', icon: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1', tone: '6,182,212', page: 'flows' },
+    { id: 'reels', label: 'Publier un Reel', hint: 'comptes prêts', icon: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z', tone: '139,92,246', page: 'publish' },
+    { id: 'story', label: 'Publier une Story', hint: 'lien par compte', icon: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1', tone: '6,182,212', page: 'publish' },
     { id: 'studio', label: 'Remixer une vidéo', hint: 'gratuit', icon: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z', tone: '236,72,153', page: 'studio' },
-    { id: 'warm', label: 'Chauffer des comptes', hint: 'warmup', icon: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z', tone: '245,158,11', page: 'flows' },
+    { id: 'warm', label: 'Chauffer des comptes', hint: 'warmup', icon: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z', tone: '245,158,11', page: 'warmup' },
   ]
 }
 
