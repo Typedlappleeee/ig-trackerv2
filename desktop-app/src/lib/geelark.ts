@@ -311,7 +311,17 @@ async function uploadViaProxy(fileUrl: string, bearer: string, fileType: string,
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ signedUrl: fileUrl, bearer, fileType }),
     })
-    const j = await res.json() as { ok: boolean; token?: string; error?: string }
+    // La réponse peut être une page d'erreur Vercel (non-JSON) — on lit le texte
+    // d'abord pour remonter le VRAI message (statut + cause) au lieu de « Unexpected token ».
+    const text = await res.text()
+    let j: { ok?: boolean; token?: string; error?: string }
+    try { j = JSON.parse(text) as typeof j }
+    catch {
+      const snippet = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
+      const hint = res.status === 504 ? ' (timeout serveur — vidéo trop lourde/lente)' : res.status >= 500 ? ' (erreur/crash fonction serverless)' : ''
+      log(`   ⚠ upload (relais) : HTTP ${res.status}${hint} — ${snippet}`)
+      return null
+    }
     if (j.ok && j.token) { log('   ✅ Média hébergé (relais).'); return j.token }
     log(`   ⚠ upload (relais) : ${j.error ?? 'échec'}`); return null
   } catch (e) { log(`   ⚠ upload (relais) échoué : ${e instanceof Error ? e.message : String(e)}`); return null }
