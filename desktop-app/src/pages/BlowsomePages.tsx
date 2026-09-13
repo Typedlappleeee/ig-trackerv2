@@ -13,7 +13,7 @@ import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
-import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
+import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 
@@ -312,6 +312,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   // Anti-détection : intensité du spoof + localisation GPS (métadonnées mp4).
   const [intensity, setIntensity] = useState<SpoofIntensity>('normal')
   const [gpsCity, setGpsCity] = useState('none')
+  const [device, setDevice] = useState('none')   // appareil spoofé (fabricant/modèle mp4)
   // Légendes : pool (une par ligne) distribué seq/aléatoire, format + placement.
   const [burnCap, setBurnCap] = useState(false)  // incruster une légende ?
   const [capPool, setCapPool] = useState('')     // pool de légendes (1 par ligne)
@@ -441,7 +442,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           }
           const out = await runAutoVariant(bytes, {
             seed: Math.random() * 1000,
-            intensity, gps: gpsFor(gpsCity),
+            intensity, gps: gpsFor(gpsCity), device,
             trimStart: vStart,
             trimEnd: vEnd,
             speed,
@@ -542,6 +543,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         <Grp title="Anti-détection & montage">
           <Fld label="Anti-détection"><Seg value={intensity} onChange={setIntensity} options={[{ v: 'subtle', label: 'Subtile' }, { v: 'normal', label: 'Normale' }, { v: 'strong', label: 'Forte' }]} /></Fld>
           <Fld label="Localisation GPS"><select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={selStyle}>{GPS_CITIES.map(c => <option key={c.k} value={c.k} style={optStyle}>{c.label}</option>)}</select></Fld>
+          <Fld label="Appareil (spoof)"><select value={device} onChange={e => setDevice(e.target.value)} style={selStyle}>{SPOOF_DEVICES.map(d => <option key={d.k} value={d.k} style={optStyle}>{d.label}</option>)}</select></Fld>
           <Sw on={useTrim} onChange={setUseTrim} label="Couper la vidéo" sub="Retire un bout au début ET à la fin (unique par variante)" />
           {useTrim && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginLeft: 49 }}>

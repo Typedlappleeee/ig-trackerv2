@@ -42,7 +42,7 @@ type Hooks = { onProgress?: (r: number) => void; onLog?: (m: string) => void }
 // ── Spoof : micro-variations + nettoyage métadonnées → unique pour l'algo ──────
 // Pas de changement de vitesse (éviterait un désync A/V sur vidéos sans piste audio).
 export type SpoofIntensity = 'subtle' | 'normal' | 'strong'
-export interface SpoofOpts { gps?: { lat: number; lon: number } | null; intensity?: SpoofIntensity }
+export interface SpoofOpts { gps?: { lat: number; lon: number } | null; intensity?: SpoofIntensity; device?: string | null }
 
 // Amplitude des micro-variations selon l'intensité choisie.
 function intensityRanges(i: SpoofIntensity) {
@@ -63,6 +63,7 @@ export function spoofFilter(seed: number, intensity: SpoofIntensity = 'normal'):
 export interface GpsCity { k: string; label: string; lat: number; lon: number }
 export const GPS_CITIES: GpsCity[] = [
   { k: 'none', label: 'Aucune (par défaut)', lat: 0, lon: 0 },
+  { k: 'france', label: '🇫🇷 France (aléatoire)', lat: 46.6, lon: 2.2 },
   { k: 'paris', label: 'Paris', lat: 48.8566, lon: 2.3522 },
   { k: 'lyon', label: 'Lyon', lat: 45.7640, lon: 4.8357 },
   { k: 'marseille', label: 'Marseille', lat: 43.2965, lon: 5.3698 },
@@ -76,10 +77,67 @@ export const GPS_CITIES: GpsCity[] = [
   { k: 'losangeles', label: 'Los Angeles', lat: 34.0522, lon: -118.2437 },
   { k: 'dubai', label: 'Dubaï', lat: 25.2048, lon: 55.2708 },
 ]
+// Grandes villes FR pour la localisation « France (aléatoire) » : chaque variante
+// reçoit une position différente (jitter léger pour ne pas répéter la coordonnée exacte).
+const FRANCE_CITIES: { lat: number; lon: number }[] = [
+  { lat: 48.8566, lon: 2.3522 },   // Paris
+  { lat: 45.7640, lon: 4.8357 },   // Lyon
+  { lat: 43.2965, lon: 5.3698 },   // Marseille
+  { lat: 44.8378, lon: -0.5792 },  // Bordeaux
+  { lat: 50.6292, lon: 3.0573 },   // Lille
+  { lat: 43.6047, lon: 1.4442 },   // Toulouse
+  { lat: 43.7102, lon: 7.2620 },   // Nice
+  { lat: 47.2184, lon: -1.5536 },  // Nantes
+  { lat: 48.5734, lon: 7.7521 },   // Strasbourg
+  { lat: 43.6108, lon: 3.8767 },   // Montpellier
+  { lat: 47.3220, lon: 5.0415 },   // Dijon
+  { lat: 48.1173, lon: -1.6778 },  // Rennes
+]
+// Position FR aléatoire (ville + léger décalage ~±0.03° ≈ quelques km).
+export function randomFranceGps(): { lat: number; lon: number } {
+  const c = FRANCE_CITIES[Math.floor(Math.random() * FRANCE_CITIES.length)]
+  const j = () => (Math.random() - 0.5) * 0.06
+  return { lat: +(c.lat + j()).toFixed(4), lon: +(c.lon + j()).toFixed(4) }
+}
 // Résout une clé de ville en coordonnées GPS pour runSpoof (null si « none »).
+// 'france' → une position française aléatoire (différente à chaque appel).
 export function gpsFor(key: string): { lat: number; lon: number } | null {
+  if (key === 'france') return randomFranceGps()
   const c = GPS_CITIES.find(x => x.k === key)
   return !c || c.k === 'none' ? null : { lat: c.lat, lon: c.lon }
+}
+
+// Appareils proposés pour le spoof : on réécrit les métadonnées « fabricant/modèle »
+// du mp4 pour faire passer la vidéo pour une capture native (iPhone, etc.), au lieu
+// de simplement les effacer. Apple encode ces infos sous com.apple.quicktime.*.
+export interface SpoofDevice { k: string; label: string; apple: boolean; make: string; model: string; software: string }
+export const SPOOF_DEVICES: SpoofDevice[] = [
+  { k: 'none', label: 'Aucun (métadonnées effacées)', apple: false, make: '', model: '', software: '' },
+  { k: 'iphone15pro', label: 'iPhone 15 Pro', apple: true, make: 'Apple', model: 'iPhone 15 Pro', software: '17.4.1' },
+  { k: 'iphone15', label: 'iPhone 15', apple: true, make: 'Apple', model: 'iPhone 15', software: '17.3' },
+  { k: 'iphone14pro', label: 'iPhone 14 Pro', apple: true, make: 'Apple', model: 'iPhone 14 Pro', software: '17.2' },
+  { k: 'iphone14', label: 'iPhone 14', apple: true, make: 'Apple', model: 'iPhone 14', software: '16.6' },
+  { k: 'iphone13', label: 'iPhone 13', apple: true, make: 'Apple', model: 'iPhone 13', software: '16.5' },
+  { k: 'iphone12', label: 'iPhone 12', apple: true, make: 'Apple', model: 'iPhone 12', software: '16.3' },
+  { k: 'iphone11', label: 'iPhone 11', apple: true, make: 'Apple', model: 'iPhone 11', software: '15.7' },
+  { k: 'iphonese', label: 'iPhone SE', apple: true, make: 'Apple', model: 'iPhone SE', software: '16.5' },
+  { k: 's23', label: 'Samsung Galaxy S23', apple: false, make: 'samsung', model: 'SM-S911B', software: '' },
+  { k: 's22', label: 'Samsung Galaxy S22', apple: false, make: 'samsung', model: 'SM-S901B', software: '' },
+  { k: 'pixel8', label: 'Google Pixel 8', apple: false, make: 'Google', model: 'Pixel 8', software: '' },
+]
+// Args ffmpeg -metadata pour écrire fabricant/modèle. [] si « none » (on garde alors
+// juste -map_metadata -1 = métadonnées effacées).
+export function deviceMetaArgs(key: string | null | undefined): string[] {
+  if (!key || key === 'none') return []
+  const d = SPOOF_DEVICES.find(x => x.k === key)
+  if (!d || !d.make) return []
+  const out = ['-metadata', `make=${d.make}`, '-metadata', `model=${d.model}`]
+  if (d.apple) {
+    out.push('-metadata', `com.apple.quicktime.make=${d.make}`)
+    out.push('-metadata', `com.apple.quicktime.model=${d.model}`)
+    if (d.software) out.push('-metadata', `com.apple.quicktime.software=${d.software}`)
+  }
+  return out
 }
 
 // Localisation GPS au format ISO 6709 (mp4 `location` metadata) — ex. +48.8566+002.3522/
@@ -93,6 +151,7 @@ export async function runSpoof(input: Uint8Array, seed: number, h?: Hooks, opts?
   // puis on (ré)écrit une localisation GPS choisie si demandée.
   const meta: string[] = ['-map_metadata', '-1']
   if (opts?.gps) { const loc = iso6709(opts.gps.lat, opts.gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
+  meta.push(...deviceMetaArgs(opts?.device))
   return runFfmpeg({
     input, args: ['-vf', spoofFilter(seed, intensity), ...meta, ...H264],
     onProgress: h?.onProgress, onLog: h?.onLog,
@@ -111,6 +170,7 @@ export interface AutoVariantOpts {
   seed: number
   intensity?: SpoofIntensity
   gps?: { lat: number; lon: number } | null
+  device?: string | null               // clé SPOOF_DEVICES (fabricant/modèle mp4)
   trimStart?: number | null            // s (null/0 = début)
   trimEnd?: number | null              // s (null = fin)
   speed?: number | null                // ex. 0.99 (null/1 = inchangé)
@@ -129,6 +189,7 @@ export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: 
   // Métadonnées : effacées, puis GPS réécrit si demandé.
   const meta: string[] = ['-map_metadata', '-1']
   if (o.gps) { const loc = iso6709(o.gps.lat, o.gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
+  meta.push(...deviceMetaArgs(o.device))
   // Audio : atempo pour rester synchro quand on change la vitesse.
   const aFilter: string[] = speed ? ['-af', `atempo=${speed.toFixed(4)}`] : []
 
@@ -253,7 +314,7 @@ export async function textToPng(text: string, width: number, subtitle = false, s
     if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w } else cur = t
   }
   if (cur) lines.push(cur)
-  const vpad = Math.round(fontSize * (snap ? 0.30 : 0.4))
+  const vpad = Math.round(fontSize * (snap ? 0.42 : 0.4))
   const lineH = Math.round(fontSize * (snap ? 1.05 : 1.32))
   const height = lines.length * lineH + vpad * 2
   canvas.width = width; canvas.height = height
