@@ -339,6 +339,20 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [speedMax, setSpeedMax] = useState('1.02')
   // Dossier de destination des sorties (banque).
   const [destFolder, setDestFolder] = useState('')
+  // Aperçu : URL signée par vidéo source (pour voir la vidéo + la caption dessus).
+  const [previews, setPreviews] = useState<Record<string, string>>({})
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const out: Record<string, string> = {}
+      for (const s of sources.slice(0, 8)) {
+        if (s.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(s.storage_path, 3600); if (data?.signedUrl) out[s.id] = data.signedUrl }
+        else if (s.file_url) out[s.id] = s.file_url
+      }
+      if (alive) setPreviews(out)
+    })()
+    return () => { alive = false }
+  }, [sources])
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [logs, setLogs] = useState<string[]>([])
@@ -468,6 +482,33 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           <Fld label="Variantes / vidéo"><input type="number" min={1} max={12} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
           <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
         </Grp>
+
+        {/* Aperçu : voir la/les vidéo(s) + la caption dessus (clic pour lire) */}
+        {sources.length > 0 && (
+          <Grp title="Aperçu">
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {sources.slice(0, 8).map(s => {
+                const url = previews[s.id]
+                const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
+                const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
+                return (
+                  <div key={s.id} title={s.title} onClick={e => { const v = e.currentTarget.querySelector('video'); if (v) { v.paused ? v.play() : v.pause() } }}
+                    style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 10, overflow: 'hidden', background: '#0d0913', border: '1px solid rgba(216,180,254,0.14)', cursor: url ? 'pointer' : 'default' }}>
+                    {url
+                      ? <video src={url + '#t=0.3'} muted playsInline loop preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
+                    {capPrev && (
+                      <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+                        <span style={{ display: 'inline-block', maxWidth: '100%', textAlign: 'center', color: '#fff', fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: capStyle === 'outline' ? 700 : 400, fontSize: 8.5, lineHeight: 1.25, padding: capStyle === 'snapchat' ? '2px 4px' : '0 3px', width: capStyle === 'snapchat' ? '100%' : 'auto', background: capStyle === 'snapchat' ? 'rgba(48,48,48,0.5)' : 'transparent', textShadow: capStyle === 'outline' ? '0 0 2px #000,0 0 2px #000' : 'none', boxSizing: 'border-box' }}>{capPrev}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {sources.length > 8 && <div style={{ alignSelf: 'center', fontSize: 11, color: MUTED }}>+{sources.length - 8}</div>}
+            </div>
+          </Grp>
+        )}
 
         {/* Légende */}
         <Grp title="Légende">
