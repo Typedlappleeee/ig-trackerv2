@@ -8,10 +8,12 @@
 // de `module.exports = handler` (sinon le handler écrase la config → timeout 10s
 // → « A server error occurred » sur les gros .mov).
 
-const { createClient } = require('@supabase/supabase-js')
 const { assertAllowedMediaUrl, fetchMediaFollow } = require('./_ssrf')
 
+// Require PARESSEUX de supabase-js : le chemin web (signedUrl) n'en a pas besoin.
+// Le charger au top plantait le bundle serverless sur Vercel → FUNCTION_INVOCATION_FAILED.
 function getSupabaseAdmin() {
+  const { createClient } = require('@supabase/supabase-js')
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) throw new Error('Supabase env vars missing')
