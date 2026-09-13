@@ -492,10 +492,13 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
                 const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
                 return (
-                  <div key={s.id} title={s.title} onClick={e => { const v = e.currentTarget.querySelector('video'); if (v) { v.paused ? v.play() : v.pause() } }}
+                  <div key={s.id} title={s.title} onClick={e => {
+                    const v = e.currentTarget.querySelector('video'); if (!v) return
+                    if (v.paused) { e.currentTarget.parentElement?.querySelectorAll('video').forEach(o => { if (o !== v) o.pause() }); v.muted = false; v.play() } else v.pause()
+                  }}
                     style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 10, overflow: 'hidden', background: '#0d0913', border: '1px solid rgba(216,180,254,0.14)', cursor: url ? 'pointer' : 'default' }}>
                     {url
-                      ? <video src={url + '#t=0.3'} muted playsInline loop preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <video src={url + '#t=0.3'} playsInline loop preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
                     {capPrev && (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
