@@ -1,7 +1,7 @@
 // Relais Graph API Meta (web) — contourne le CORS pour lire les insights IG.
 // POST { url } où url commence par https://graph.facebook.com/ (token dans la query,
 // posé par le client). On ne fait que relayer, aucun secret serveur.
-module.exports = async (req, res) => {
+export default async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
   let body = {}
   try { body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {}) } catch { body = {} }

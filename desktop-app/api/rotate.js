@@ -15,9 +15,9 @@
 // C'est sûr : on ne fait qu'un GET pour déclencher une rotation, aucune donnée
 // sensible n'est lue dans la réponse.
 
-const https = require('https')
-const http  = require('http')
-const { hostIsPrivate } = require('./_ssrf')
+import https from 'node:https'
+import http from 'node:http'
+import { hostIsPrivate } from './_ssrf.js'
 
 
 // GET bas niveau via le module Node http/https. `insecure` désactive la
@@ -51,7 +51,7 @@ function isCertError(code) {
   return typeof code === 'string' && /CERT|SELF_SIGNED|UNABLE_TO_VERIFY|TLS|SSL|ALTNAME|DEPTH_ZERO/i.test(code)
 }
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   const url = (req.query && req.query.url) || ''
   if (!url || !/^https?:\/\//i.test(url)) {
     res.status(400).json({ ok: false, error: 'url manquante ou invalide' })
@@ -89,5 +89,5 @@ module.exports = async (req, res) => {
   res.status(r.ok ? 200 : 502).json({ ok: r.ok, status: r.status, body: r.body })
 }
 
-// Config APRÈS le handler (sinon `module.exports = handler` l'écrase → timeout 10s).
-module.exports.config = { maxDuration: 15 }
+// maxDuration défini dans vercel.json (clé functions).
+export const config = { maxDuration: 15 }

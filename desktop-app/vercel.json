@@ -6,6 +6,9 @@
     "api/geelark-upload.js": { "maxDuration": 60 },
     "api/groq.mjs": { "maxDuration": 60 },
     "api/iremotech.js": { "maxDuration": 60 },
+    "api/iremotech-stream.js": { "maxDuration": 60 },
+    "api/meta-callback.js": { "maxDuration": 15 },
+    "api/rotate.js": { "maxDuration": 15 },
     "api/geelark.js": { "maxDuration": 30 }
   },
   "rewrites": [

@@ -6,7 +6,7 @@
 // On n'autorise donc QUE l'hôte de stockage Supabase du projet, et on bloque les
 // IP privées / metadata / services internes (anti-exfiltration).
 
-const net = require('net')
+import net from 'node:net'
 
 function hostIsPrivate(hostRaw) {
   const h = String(hostRaw || '').toLowerCase().replace(/^\[|\]$/g, '')
@@ -97,4 +97,4 @@ function isOwnStoragePath(p) {
   return /^videos\/(users|orgs)\/[^/]+\//.test(s) && !s.includes('..')
 }
 
-module.exports = { assertAllowedMediaUrl, hostIsPrivate, safeMediaFetchOpts, fetchMediaFollow, isOwnStoragePath }
+export { assertAllowedMediaUrl, hostIsPrivate, safeMediaFetchOpts, fetchMediaFollow, isOwnStoragePath }

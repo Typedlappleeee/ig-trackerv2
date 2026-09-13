@@ -12,7 +12,7 @@
 // `state` est le user_id (+ éventuellement :org_id) passé par l'app desktop.
 
 
-const { createClient } = require('@supabase/supabase-js')
+import { createClient } from '@supabase/supabase-js'
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
 
@@ -34,7 +34,7 @@ function page(title, body) {
   </div></body>`
 }
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   const appId = process.env.META_APP_ID
   const appSecret = process.env.META_APP_SECRET
   const redirectUri = process.env.META_REDIRECT_URI
@@ -103,5 +103,5 @@ module.exports = async (req, res) => {
   }
 }
 
-// Config APRÈS le handler (sinon `module.exports = handler` l'écrase → timeout 10s).
-module.exports.config = { maxDuration: 15 }
+// maxDuration défini dans vercel.json (clé functions).
+export const config = { maxDuration: 15 }

@@ -10,14 +10,14 @@
 // on télécharge le fichier de la banque Supabase (garde anti-SSRF) puis on POST
 // les octets bruts sur /devices/{id}/media.
 
-const { fetchMediaFollow } = require('./_ssrf')
+import { fetchMediaFollow } from './_ssrf.js'
 
 
 const BASE = (process.env.IREMOTECH_API_BASE || 'https://api.iremotech.com/v1').replace(/\/$/, '')
 
 async function jsonOr(res) { try { return await res.json() } catch { return null } }
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   if (req.method === 'GET') return res.status(200).json({ ok: true, base: BASE })
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
 
@@ -82,5 +82,5 @@ module.exports = async (req, res) => {
   }
 }
 
-// Config APRÈS le handler (sinon `module.exports = handler` l'écrase → timeout 10s).
-module.exports.config = { maxDuration: 60 }
+// maxDuration défini dans vercel.json (clé functions).
+export const config = { maxDuration: 60 }

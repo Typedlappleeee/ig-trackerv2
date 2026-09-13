@@ -1,7 +1,7 @@
 // Proxy GéeLark API calls from the browser (bypasses CORS).
 // JavaScript (not TypeScript) — Vercel TS compile was failing for this project.
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   try {
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, error: 'Method not allowed' })

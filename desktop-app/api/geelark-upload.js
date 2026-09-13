@@ -6,12 +6,13 @@
 // Vercel Hobby max = 60s (default is 10s — videos need more time). Défini via la
 // clé `functions` de vercel.json (voir bas de fichier).
 //
-// CommonJS : ce dossier a un api/package.json { "type": "commonjs" } qui neutralise
-// le "type": "module" racine (sinon `require`/`module.exports` plantent au chargement
-// → FUNCTION_INVOCATION_FAILED sur TOUTES les fonctions CJS).
+// ESM : le package.json racine a "type": "module", donc les fonctions doivent être
+// écrites en ESM (import/export default). Écrites en CommonJS (module.exports/require),
+// elles plantaient au chargement → FUNCTION_INVOCATION_FAILED sur TOUTES les fonctions.
+import net from 'node:net'
+import { createClient } from '@supabase/supabase-js'
 
-// ── Garde SSRF INLINE (autonome, aucun require de module local).
-const net = require('net')
+// ── Garde SSRF INLINE (autonome, aucun import de module local).
 function hostIsPrivate(hostRaw) {
   const h = String(hostRaw || '').toLowerCase().replace(/^\[|\]$/g, '')
   if (!h || h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localhost')) return true
@@ -47,10 +48,9 @@ async function fetchMediaFollow(rawUrl, { maxHops = 5, timeoutMs = 30000, doFetc
   throw new Error('trop de redirections média')
 }
 
-// Require PARESSEUX de supabase-js : le chemin web (signedUrl) n'en a pas besoin.
-// Le charger au top plantait le bundle serverless sur Vercel → FUNCTION_INVOCATION_FAILED.
+// Client admin Supabase — utilisé UNIQUEMENT par le chemin storagePath (clé
+// service-role). Le chemin web (signedUrl) ne l'appelle jamais.
 function getSupabaseAdmin() {
-  const { createClient } = require('@supabase/supabase-js')
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) throw new Error('Supabase env vars missing')
@@ -99,7 +99,7 @@ async function fetchRetry(label, url, init = {}, { tries = 3, timeoutMs = 25000 
   throw e
 }
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   try {
     if (req.method === 'GET') {
       return res.status(200).json({ ok: true })

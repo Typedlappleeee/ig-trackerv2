@@ -17,7 +17,7 @@ const BASE = (process.env.IREMOTECH_API_BASE || 'https://api.iremotech.com/v1').
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
 
   const { deviceId, apiKey, minIntervalMs } = req.body ?? {}
@@ -75,5 +75,5 @@ module.exports = async (req, res) => {
   }
 }
 
-// Config APRÈS le handler (sinon `module.exports = handler` l'écrase → timeout 10s).
-module.exports.config = { maxDuration: 60 }
+// maxDuration défini dans vercel.json (clé functions).
+export const config = { maxDuration: 60 }
