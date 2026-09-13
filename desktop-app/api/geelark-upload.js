@@ -3,13 +3,14 @@
 //       or POST { storagePath, bucket, bearer }    — Supabase service role key required
 // Returns: { ok, token } or { ok: false, error }
 
-// Vercel Hobby max = 60s (default is 10s — videos need more time).
-// NB : le `module.exports.config` est posé EN FIN de fichier, APRÈS l'affectation
-// de `module.exports = handler` (sinon le handler écrase la config → timeout 10s
-// → « A server error occurred » sur les gros .mov).
+// Vercel Hobby max = 60s (default is 10s — videos need more time). Défini via la
+// clé `functions` de vercel.json (voir bas de fichier).
+//
+// CommonJS : ce dossier a un api/package.json { "type": "commonjs" } qui neutralise
+// le "type": "module" racine (sinon `require`/`module.exports` plantent au chargement
+// → FUNCTION_INVOCATION_FAILED sur TOUTES les fonctions CJS).
 
-// ── Garde SSRF INLINE (pas de require('./_ssrf') : Vercel ne bundle pas les
-//    fichiers _préfixés → « Cannot find module » → FUNCTION_INVOCATION_FAILED).
+// ── Garde SSRF INLINE (autonome, aucun require de module local).
 const net = require('net')
 function hostIsPrivate(hostRaw) {
   const h = String(hostRaw || '').toLowerCase().replace(/^\[|\]$/g, '')
@@ -208,6 +209,6 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok: false, error: `${SV}[SV-E000] ${msg}` })
   }
 }
-
-// ⚠️ APRÈS l'affectation du handler, sinon la config est écrasée.
-module.exports.config = { maxDuration: 60 }
+// maxDuration (60s) est défini dans vercel.json (clé functions "api/geelark-upload.js").
+// On n'exporte PAS `config` ici : cumuler `functions` (vercel.json) + `config` (fichier)
+// peut être rejeté par Vercel.
