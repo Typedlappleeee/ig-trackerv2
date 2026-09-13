@@ -12,7 +12,6 @@
 
 const { fetchMediaFollow } = require('./_ssrf')
 
-module.exports.config = { maxDuration: 60 }
 
 const BASE = (process.env.IREMOTECH_API_BASE || 'https://api.iremotech.com/v1').replace(/\/$/, '')
 
@@ -82,3 +81,6 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok: false, error: (e && e.message) ? e.message : String(e) })
   }
 }
+
+// Config APRÈS le handler (sinon `module.exports = handler` l'écrase → timeout 10s).
+module.exports.config = { maxDuration: 60 }

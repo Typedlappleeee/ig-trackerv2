@@ -19,7 +19,6 @@ const https = require('https')
 const http  = require('http')
 const { hostIsPrivate } = require('./_ssrf')
 
-module.exports.config = { maxDuration: 15 }
 
 // GET bas niveau via le module Node http/https. `insecure` désactive la
 // vérification du certificat (uniquement pour https). Résout toujours (jamais de
@@ -89,3 +88,6 @@ module.exports = async (req, res) => {
   }
   res.status(r.ok ? 200 : 502).json({ ok: r.ok, status: r.status, body: r.body })
 }
+
+// Config APRÈS le handler (sinon `module.exports = handler` l'écrase → timeout 10s).
+module.exports.config = { maxDuration: 15 }

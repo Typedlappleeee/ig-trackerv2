@@ -12,7 +12,6 @@
 //
 // La clé API reste côté serveur (envoyée dans le corps POST, jamais dans l'URL).
 
-module.exports.config = { maxDuration: 60 }
 
 const BASE = (process.env.IREMOTECH_API_BASE || 'https://api.iremotech.com/v1').replace(/\/$/, '')
 
@@ -75,3 +74,6 @@ module.exports = async (req, res) => {
     if (!closed) { send({ t: 'end' }); try { res.end() } catch { /* ignore */ } }
   }
 }
+
+// Config APRÈS le handler (sinon `module.exports = handler` l'écrase → timeout 10s).
+module.exports.config = { maxDuration: 60 }

@@ -11,7 +11,6 @@
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 // `state` est le user_id (+ éventuellement :org_id) passé par l'app desktop.
 
-module.exports.config = { maxDuration: 15 }
 
 const { createClient } = require('@supabase/supabase-js')
 
@@ -103,3 +102,6 @@ module.exports = async (req, res) => {
     return res.status(200).send(page('Échec de la connexion', String(e?.message || e)))
   }
 }
+
+// Config APRÈS le handler (sinon `module.exports = handler` l'écrase → timeout 10s).
+module.exports.config = { maxDuration: 15 }
