@@ -24,6 +24,7 @@ import Flows from '@/pages/Flows'
 import Settings from '@/pages/Settings'
 import RunWidget from '@/components/RunWidget'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
+import Landing from '@/pages/Landing'
 
 // Spécifications des écrans encore en placeholder (gabarit PageHead + état vide).
 const SPECS: Partial<Record<PageKey, PlaceholderSpec>> = {
@@ -57,14 +58,15 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      const u = data.session?.user ?? null
-      if (!u) { location.replace('./login.dc.html'); return }
-      setUser(u)
+      // Pas connecté → on affiche la devanture commerciale (Landing), pas un renvoi
+      // direct vers le login. Depuis la Landing, les CTA mènent à login.dc.html.
+      setUser(data.session?.user ?? null)
       setChecking(false)
     })
   }, [])
 
-  if (checking || !user) return <Loader />
+  if (checking) return <Loader />
+  if (!user) return <Landing />
   return <AppInner user={user} />
 }
 
