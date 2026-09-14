@@ -24,7 +24,7 @@ import Flows from '@/pages/Flows'
 import Settings from '@/pages/Settings'
 import RunWidget from '@/components/RunWidget'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
-import Landing from '@/pages/Landing'
+import { SiteLanding } from '@/pages/SiteLanding'
 
 // Spécifications des écrans encore en placeholder (gabarit PageHead + état vide).
 const SPECS: Partial<Record<PageKey, PlaceholderSpec>> = {
@@ -66,7 +66,9 @@ export default function App() {
   }, [])
 
   if (checking) return <Loader />
-  if (!user) return <Landing />
+  // Pas connecté → l'ancienne devanture commerciale (page publique scaleflow.company).
+  // Le CTA « Commencer » mène au login.
+  if (!user) return <SiteLanding onStudio={() => window.location.assign('./login.dc.html')} />
   return <AppInner user={user} />
 }
 
