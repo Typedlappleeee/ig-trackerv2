@@ -61,11 +61,11 @@ interface Caption { id: string; title: string | null; content: string; used_coun
 type SortKey = 'recent' | 'name' | 'used'
 
 // ── Case à cocher de vignette (portée du prototype _tile) — cliquable ──────────
-function TileCheck({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+function TileCheck({ on, onToggle }: { on: boolean; onToggle: (e: React.MouseEvent) => void }) {
   return (
     <span
-      onClick={e => { e.stopPropagation(); onToggle() }}
-      title="Sélectionner"
+      onClick={e => { e.stopPropagation(); onToggle(e) }}
+      title="Sélectionner · Maj+clic pour sélectionner un intervalle"
       style={{
         position: 'absolute', top: 6, right: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: 20, height: 20, borderRadius: 6, cursor: 'pointer', zIndex: 3,
@@ -79,7 +79,7 @@ function TileCheck({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
 function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu }: {
-  item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: () => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
+  item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: (e: React.MouseEvent) => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
 }) {
   const h = hueFor(item.id)
   const fresh = (item.used_count ?? 0) === 0
@@ -298,26 +298,66 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // ── Suppression (média unitaire ou sélection) + nettoyage du storage ─────────
   const [confirmDel, setConfirmDel] = useState<string[] | null>(null)
   const [deleting, setDeleting] = useState(false)
-  // Télécharge les médias sélectionnés sur le PC (URL signée → blob → <a download>).
+  // Télécharge les médias sélectionnés. 1 seul → fichier direct ; plusieurs → un ZIP.
+  // Les VIDÉOS sortent en .mov (les images gardent leur extension réelle).
+  async function urlForItem(it: ContentItem): Promise<string | null> {
+    if (it.storage_path) {
+      const u = (await supabase.storage.from('content').createSignedUrl(it.storage_path, 3600)).data?.signedUrl
+      if (u) return u
+    }
+    return it.file_url ?? null
+  }
+  // Nom de fichier : vidéos → .mov, images → extension réelle. `taken` évite les doublons.
+  function fileNameFor(it: ContentItem, taken: Set<string>): string {
+    const isImg = inferType(it) === 'image'
+    const realExt = ((it.storage_path ?? it.file_url ?? '').split('?')[0].split('.').pop() || (isImg ? 'jpg' : 'mp4')).toLowerCase()
+    const ext = isImg ? realExt : 'mov'
+    const base = (it.title || 'media').replace(/[^\w.-]+/g, '_')
+    let name = `${base}.${ext}`; let n = 2
+    while (taken.has(name)) name = `${base}_${n++}.${ext}`
+    taken.add(name); return name
+  }
   async function downloadMedia(ids: string[]) {
     if (ids.length === 0) return
-    for (const id of ids) {
-      const it = items.find(x => x.id === id); if (!it) continue
-      let url: string | null = null
-      if (it.storage_path) url = (await supabase.storage.from('content').createSignedUrl(it.storage_path, 3600)).data?.signedUrl ?? null
-      if (!url) url = it.file_url
-      if (!url) continue
+    const targets = ids.map(id => items.find(x => x.id === id)).filter((x): x is ContentItem => !!x)
+    if (targets.length === 0) return
+
+    // Un seul média → téléchargement direct.
+    if (targets.length === 1) {
+      const it = targets[0]
+      const url = await urlForItem(it); if (!url) return
       try {
         const blob = await (await fetch(url)).blob()
-        const ext = ((it.storage_path ?? it.file_url ?? '').split('?')[0].split('.').pop() || (inferType(it) === 'image' ? 'jpg' : 'mp4')).toLowerCase()
         const a = document.createElement('a')
         a.href = URL.createObjectURL(blob)
-        a.download = `${(it.title || 'media').replace(/[^\w.-]+/g, '_')}.${ext}`
+        a.download = fileNameFor(it, new Set())
         document.body.appendChild(a); a.click(); a.remove()
         setTimeout(() => URL.revokeObjectURL(a.href), 10000)
-      } catch { /* ignore */ }
-      if (ids.length > 1) await new Promise(r => setTimeout(r, 350))   // évite le blocage multi-download
+      } catch { setNotice('Échec du téléchargement.') }
+      return
     }
+
+    // Plusieurs médias → un seul fichier .zip.
+    try {
+      setNotice(`Préparation du ZIP (${targets.length})…`)
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      const taken = new Set<string>()
+      let ok = 0
+      for (const it of targets) {
+        const url = await urlForItem(it); if (!url) continue
+        try { const blob = await (await fetch(url)).blob(); zip.file(fileNameFor(it, taken), blob); ok++ }
+        catch { /* ignore ce fichier */ }
+      }
+      if (ok === 0) { setNotice('Aucun fichier n’a pu être récupéré.'); return }
+      const out = await zip.generateAsync({ type: 'blob' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(out)
+      a.download = `scaleflow-medias-${new Date().toISOString().slice(0, 10)}.zip`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(a.href), 15000)
+      setNotice(`ZIP téléchargé — ${ok} fichier(s).`)
+    } catch (e) { setNotice(`Échec du ZIP : ${e instanceof Error ? e.message : ''}`) }
   }
 
   async function deleteMedia(ids: string[]) {
@@ -452,11 +492,23 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     return a
   }, [typed, folder, ql, sort])
 
-  const toggle = (id: string) => setSel(prev => {
-    const n = new Set(prev)
-    if (n.has(id)) n.delete(id); else n.add(id)
-    return n
-  })
+  // Ancre du dernier clic (index dans `shown`) pour la sélection par intervalle (Maj+clic).
+  const lastIdxRef = useRef<number | null>(null)
+  // Clic simple = bascule 1 vignette. Maj+clic = sélectionne TOUT l'intervalle entre
+  // l'ancre (dernière vignette cliquée) et celle-ci (comme sur la plupart des SaaS).
+  const toggleAt = (idx: number, id: string, shift: boolean) => {
+    setSel(prev => {
+      const n = new Set(prev)
+      if (shift && lastIdxRef.current !== null) {
+        const lo = Math.min(lastIdxRef.current, idx), hi = Math.max(lastIdxRef.current, idx)
+        for (let k = lo; k <= hi; k++) { const it = shown[k]; if (it) n.add(it.id) }
+      } else {
+        if (n.has(id)) n.delete(id); else n.add(id)
+      }
+      return n
+    })
+    lastIdxRef.current = idx
+  }
 
   const isCloud = infra === 'cloud'
   const TABS: { k: TabKey; l: string; n: number }[] = [
@@ -667,10 +719,10 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(112px,132px))',
               gap: 9, padding: 13,
             }}>
-              {shown.map(i => (
+              {shown.map((i, idx) => (
                 <Tile
                   key={i.id} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)}
-                  on={sel.has(i.id)} theme={theme} onToggle={() => toggle(i.id)}
+                  on={sel.has(i.id)} theme={theme} onToggle={(e) => toggleAt(idx, i.id, e.shiftKey)}
                   onDragStart={e => e.dataTransfer.setData('text/plain', i.id)}
                   onOpen={() => openPlayer(i)}
                   onContextMenu={e => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, item: i }) }}
