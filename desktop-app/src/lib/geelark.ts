@@ -110,16 +110,51 @@ export async function rotateAllProxies(urls: string[], log?: (m: string) => void
   await sleep(ROTATION_SETTLE_MS)
 }
 
+// Extrait la vraie raison d'échec d'un /phone/start (msg global + détails par tel).
+function startFailReason(startRes: Record<string, unknown>): string {
+  const data = (startRes['data'] as Record<string, unknown>) ?? {}
+  const details = (data['failDetails'] ?? data['failList'] ?? data['details']) as Array<Record<string, unknown>> | undefined
+  const d0 = Array.isArray(details) ? details[0] : undefined
+  const raw = String(d0?.['msg'] ?? d0?.['message'] ?? startRes['msg'] ?? startRes['message'] ?? `code ${startRes['code']}`)
+  // Traduit les causes GeeLark fréquentes en message clair.
+  if (/concurren|simultan|running.*limit|limit.*running|max.*phone|quota/i.test(raw)) {
+    return 'limite de téléphones simultanés GeeLark atteinte — baisse « Téléphones simultanés » ou attends que d\'autres finissent'
+  }
+  return raw
+}
+
+// Tente de démarrer un téléphone (avec 1 relance sur échec transitoire). Renvoie la
+// raison réelle en cas d'échec (au lieu d'un générique « non démarré »).
+async function tryStartPhone(bearer: string, phoneId: string, log: (m: string) => void): Promise<{ ok: boolean; reason?: string }> {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const startRes = await geelarkFetch('/phone/start', { ids: [phoneId] }, bearer)
+    const code = Number(startRes['code'] ?? -1)
+    const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
+    const failed = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
+    if (code === 0 || success > 0) return { ok: true }
+    if (failed > 0 || code !== 0) {
+      const reason = startFailReason(startRes)
+      if (attempt < 2) { log(`  ↻ Démarrage refusé (${reason}) — nouvelle tentative dans 10 s…`); await sleep(10000); continue }
+      log(`  ❌ Démarrage impossible : ${reason}`)
+      return { ok: false, reason }
+    }
+    return { ok: true }
+  }
+  return { ok: true }
+}
+
 // Démarre un téléphone et attend qu'il soit en marche (status=0), max 120 s.
 // rotationUrls : si fourni, on rote l'IP AVANT le boot (le tel démarre sur la nouvelle IP).
-async function ensurePhoneRunning(bearer: string, phoneId: string, log: (m: string) => void, rotationUrls?: string[]): Promise<boolean> {
-  if (rotationUrls && rotationUrls.length) await rotateAllProxies(rotationUrls, log)
-  log('📱 Démarrage du téléphone…')
-  const startRes = await geelarkFetch('/phone/start', { ids: [phoneId] }, bearer)
-  const code = Number(startRes['code'] ?? -1)
-  const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
-  const failed = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
-  if (code !== 0 && success === 0 && failed > 0) { log('❌ Impossible de démarrer le téléphone'); return false }
+// Renvoie { ok, reason? } — reason = vraie cause GeeLark si le démarrage échoue.
+async function ensurePhoneRunning(bearer: string, phoneId: string, log: (m: string) => void, rotationUrls?: string[], skipStart?: boolean): Promise<{ ok: boolean; reason?: string }> {
+  // skipStart : le lot a déjà été démarré en UN SEUL appel /phone/start groupé
+  // (évite 12 /phone/start simultanés que GeeLark refuse en partie). On attend juste.
+  if (!skipStart) {
+    if (rotationUrls && rotationUrls.length) await rotateAllProxies(rotationUrls, log)
+    log('📱 Démarrage du téléphone…')
+    const started = await tryStartPhone(bearer, phoneId, log)
+    if (!started.ok) return started
+  }
 
   log('⏳ Attente du démarrage (max 120 s)…')
   for (let i = 0; i < 24; i++) {
@@ -127,11 +162,11 @@ async function ensurePhoneRunning(bearer: string, phoneId: string, log: (m: stri
     try {
       const phones = await fetchAllPhones(bearer)
       const st = Number(phones.find(x => x.id === phoneId)?.status ?? -1)
-      if (st === 0) { log('  ✅ Téléphone démarré'); return true }
+      if (st === 0) { log('  ✅ Téléphone démarré'); return { ok: true } }
     } catch { /* ignore polling errors */ }
   }
   log('  ⚠️ Démarrage non confirmé — on poursuit quand même')
-  return true
+  return { ok: true }
 }
 
 // Sonde une tâche RPA jusqu'à complétion. Statuts GeeLark : 3=Done, 4=Failed, 7/8=annulé/erreur.
@@ -164,7 +199,7 @@ export async function warmupAccountNative(
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log, config.rotationUrls)
-    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
     const browseVideo = Math.max(1, Math.min(100, Math.round(config.browseVideo)))
     log(`🔥 Création de la tâche de warmup (${browseVideo} vidéos${config.keyword ? `, mot-clé « ${config.keyword} »` : ''})…`)
     const res = await geelarkFetch('/rpa/task/instagramWarmup', {
@@ -222,7 +257,7 @@ export async function loginInstagramOnPhone(
     const flowId = await ensureLoginFlowId(bearer, log)
     if (!flowId) return { ok: false, error: 'Flow login indisponible' }
     const ready = await ensurePhoneRunning(bearer, phoneId, log, creds.rotationUrls)
-    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
     log('🔐 Connexion via RPA…')
     const paramMap = { User: creds.email, Password: creds.password, Key: (creds.totp ?? '').replace(/[\s=]/g, '').toUpperCase() }
     const res = await geelarkFetch('/task/rpa/add', { id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 3, name: 'Login Scaleflow', paramMap }, bearer)
@@ -261,7 +296,7 @@ export async function crossPostToPhone(
   const cfg = CROSS_PLATFORMS.find(p => p.key === platform)!
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log, opts.rotationUrls)
-    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
     let endpoint = cfg.endpoint
     let mediaField: 'video' | 'images' = 'video'
     if (platform === 'threads' && opts.isImage) { endpoint = '/rpa/task/threadsImage'; mediaField = 'images' }
@@ -290,7 +325,7 @@ export async function editProfileOnPhone(
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
-    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
     log('✏️ Création de la tâche d\'édition de profil…')
     const res = await geelarkFetch('/rpa/task/instagramEdit', {
       id: phoneId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'ScaleFlow profile edit',
@@ -453,7 +488,7 @@ export async function postStoryToPhone(
     const flowId = await ensureStoryFlowId(bearer, log)
     if (!flowId) return { ok: false, error: 'Flow story indisponible' }
     const ready = await ensurePhoneRunning(bearer, phoneId, log, opts.rotationUrls)
-    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
     log('📸 Lancement de la story…')
     const paramMap = {
       Media: [opts.imageResourceUrl],
@@ -488,10 +523,11 @@ export async function postReelToPhone(
   rotationUrls?: string[],
   trial?: boolean,
   coverResourceUrl?: string,   // miniature/couverture (URL GeeLark) — via flow custom
+  skipStart?: boolean,         // le lot a déjà été démarré en groupe → ne pas re-start
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log, rotationUrls)
-    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    const ready = await ensurePhoneRunning(bearer, phoneId, log, rotationUrls, skipStart)
+    if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
 
     // Une MINIATURE ou un Reel d'ESSAI (« Trial ») → flow RPA custom : le natif
     // instagramPubReels ne gère NI la cover NI le toggle Trial (aucun paramètre côté

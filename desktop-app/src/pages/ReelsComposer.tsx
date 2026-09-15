@@ -8,7 +8,7 @@ import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
-import { geelarkUploadVideo, geelarkUploadImage, postReelToPhone } from '@/lib/geelark'
+import { geelarkUploadVideo, geelarkUploadImage, postReelToPhone, startPhones } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { generateCaption } from '@/lib/ai'
@@ -199,12 +199,15 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     const concurrency = rot ? 1 : (simulPhones === 'all' ? jobs.length : Math.max(1, Number(simulPhones)))
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : concurrency >= jobs.length ? `⚡ ${jobs.length} téléphone(s) en parallèle.` : `⚡ Par lots de ${concurrency} téléphone(s).`)
 
-    const postOne = async ({ p, v, cap }: (typeof jobs)[number]) => {
+    // Sans proxy rotatif, on démarre le lot en UN SEUL appel /phone/start groupé
+    // (comme l'ancienne app) au lieu de N démarrages simultanés que GeeLark refuse
+    // en partie → chaque post saute alors son démarrage individuel (skipStart).
+    const postOne = async ({ p, v, cap }: (typeof jobs)[number], skipStart: boolean) => {
       const ru = resourceByVid.get(v.id)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       if (!ru) { run.markFailed(); R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
       push(`— @${p.ig_username ?? p.geelark_id} · ${v.title}${cap ? ' · légende' : ''} —`)
-      const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id))
+      const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id), skipStart)
       if (r.ok) postedVidIds.add(v.id); else run.markFailed()
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
@@ -212,7 +215,22 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
     for (let b = 0; b < jobs.length; b += concurrency) {
       if (R.isCancelled()) { push('⏹ Annulé.'); break }
-      await Promise.all(jobs.slice(b, b + concurrency).map(postOne))
+      const batch = jobs.slice(b, b + concurrency)
+      // Sans proxy rotatif : démarrage GROUPÉ du lot en UN appel /phone/start (comme
+      // l'ancienne app) au lieu de N démarrages simultanés que GeeLark refuse en partie.
+      // → chaque post saute son démarrage individuel (skipStart). Si le groupé plante,
+      // on retombe sur le démarrage par téléphone.
+      let batchSkip = false
+      if (!rot) {
+        const ids = [...new Set(batch.map(j => j.p.geelark_id).filter((x): x is string => !!x))]
+        push(`📱 Démarrage groupé de ${ids.length} téléphone(s)…`)
+        try {
+          const n = await startPhones(bearer, ids)
+          batchSkip = true
+          if (n < ids.length) push(`  ⚠ ${ids.length - n} téléphone(s) non démarré(s) — limite GeeLark de téléphones simultanés ? Baisse « Téléphones simultanés ».`)
+        } catch (e) { push(`  ⚠ Démarrage groupé : ${e instanceof Error ? e.message : 'échec'} — chaque tel démarrera seul.`) }
+      }
+      await Promise.all(batch.map(j => postOne(j, batchSkip)))
     }
     R.finish()
     setRunId(null)
