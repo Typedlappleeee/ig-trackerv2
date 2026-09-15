@@ -8,6 +8,7 @@
 import storyFlowDef from './geelarkStoryFlow.json'
 import loginFlowDef from './geelarkLoginFlow.json'
 import reelsFlowDef from './geelarkReelsFlow.json'
+import trialFlowDef from './geelarkTrialFlow.json'
 import { IS_WEB } from './platform'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
@@ -457,6 +458,35 @@ async function ensureReelsFlowId(bearer: string, log: (m: string) => void): Prom
   return p
 }
 
+// ── Reels d'ESSAI (« Trial ») via flow RPA dédié ─────────────────────────────
+// Flow propre et testé (fourni) : upload vidéo → partage vers Instagram → légende →
+// SI Trial=true, scroll + clic sur le toggle « Trial » + « Close » → Share.
+// paramMap : { Video: [resourceUrl], Caption, Trial: true }.
+const TRIAL_FLOW_VERSION = 'v1'
+const _trialFlowCache = new Map<string, Promise<string | null>>()
+function trialFlowLsKey(b: string) { return `sf-trial-flowid:${b.slice(-14)}` }
+function trialFlowVerKey(b: string) { return `sf-trial-flowver:${b.slice(-14)}` }
+async function ensureTrialFlowId(bearer: string, log: (m: string) => void): Promise<string | null> {
+  const cached = _trialFlowCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, ver: string | null = null
+    try { stored = localStorage.getItem(trialFlowLsKey(bearer)); ver = localStorage.getItem(trialFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && ver === TRIAL_FLOW_VERSION) return stored
+    log(stored ? '🔄 Mise à jour du flow « Trial »…' : '📥 Import du flow « Trial » dans GeeLark…')
+    try {
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(trialFlowDef) }, bearer)
+      if (Number(res['code']) !== 0) { log(`⚠ Import flow Trial : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(trialFlowLsKey(bearer), id); localStorage.setItem(trialFlowVerKey(bearer), TRIAL_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log(`⚠ Import flow Trial : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _trialFlowCache.set(bearer, p)
+  p.then(v => { if (!v) _trialFlowCache.delete(bearer) }).catch(() => _trialFlowCache.delete(bearer))
+  return p
+}
+
 // Héberge une IMAGE chez GeeLark (garde l'extension réelle — les images, contrairement
 // aux vidéos, ne sont pas forcées en mp4). Renvoie le resourceUrl hébergé.
 export async function geelarkUploadImage(bearer: string, fileUrl: string, log: (m: string) => void): Promise<string | null> {
@@ -529,28 +559,44 @@ export async function postReelToPhone(
     const ready = await ensurePhoneRunning(bearer, phoneId, log, rotationUrls, skipStart)
     if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
 
-    // Une MINIATURE ou un Reel d'ESSAI (« Trial ») → flow RPA custom : le natif
-    // instagramPubReels ne gère NI la cover NI le toggle Trial (aucun paramètre côté
-    // API GeeLark — vérifié dans leur doc). Le flow custom coche le toggle « Trial ».
-    if (coverResourceUrl || trial) {
-      const flowId = await ensureReelsFlowId(bearer, log).catch(() => null)
+    // Reel d'ESSAI (« Trial ») → flow RPA dédié (propre et testé) : upload → partage →
+    // légende → coche le toggle « Trial » si demandé → Share. paramMap { Video, Caption, Trial }.
+    if (trial) {
+      const flowId = await ensureTrialFlowId(bearer, log).catch(() => null)
       if (flowId) {
-        log(trial ? '🎬 Création de la tâche Reels (essai · non-abonnés)…' : '🎬 Création de la tâche Reels (avec miniature)…')
-        const paramMap: Record<string, unknown> = { Caption: caption ?? '', Video: [videoResourceUrl] }
-        if (coverResourceUrl) paramMap.Cover = [coverResourceUrl]
-        if (trial) paramMap.Trial = true
+        log('🎬 Création de la tâche Reels (essai · non-abonnés)…')
         const res = await geelarkFetch('/task/rpa/add', {
-          id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'Reels Scaleflow',
-          paramMap,
+          id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'Reels Trial Scaleflow',
+          paramMap: { Video: [videoResourceUrl], Caption: caption ?? '', Trial: true },
         }, bearer)
         if (Number(res['code']) === 0) {
           const d = res['data'] as Record<string, unknown> | undefined
           const taskId = (d?.['taskId'] ?? d?.['id']) as string | undefined
           if (taskId) { log('   Tâche créée — publication en cours…'); return await pollRpaTask(bearer, taskId, log, 20 * 60_000) }
         }
-        log(`   ⚠ Flow custom indisponible (${res['msg'] ?? res['code']}) — repli publication simple.`)
+        log(`   ⚠ Flow Trial indisponible (${res['msg'] ?? res['code']}) — repli publication simple.`)
       } else {
-        log('   ⚠ Flow custom indisponible — repli publication simple.')
+        log('   ⚠ Flow Trial indisponible — repli publication simple.')
+      }
+    }
+
+    // Une MINIATURE (sans essai) → flow RPA custom (le natif ne gère pas la cover).
+    if (coverResourceUrl && !trial) {
+      const flowId = await ensureReelsFlowId(bearer, log).catch(() => null)
+      if (flowId) {
+        log('🎬 Création de la tâche Reels (avec miniature)…')
+        const res = await geelarkFetch('/task/rpa/add', {
+          id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'Reels Scaleflow',
+          paramMap: { Caption: caption ?? '', Video: [videoResourceUrl], Cover: [coverResourceUrl] },
+        }, bearer)
+        if (Number(res['code']) === 0) {
+          const d = res['data'] as Record<string, unknown> | undefined
+          const taskId = (d?.['taskId'] ?? d?.['id']) as string | undefined
+          if (taskId) { log('   Tâche créée — publication en cours…'); return await pollRpaTask(bearer, taskId, log, 20 * 60_000) }
+        }
+        log(`   ⚠ Flow miniature indisponible (${res['msg'] ?? res['code']}) — repli publication simple.`)
+      } else {
+        log('   ⚠ Flow miniature indisponible — repli publication simple.')
       }
     }
 
