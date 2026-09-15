@@ -295,6 +295,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     load()
   }
 
+  // Glisser-déposer de fichiers depuis le PC → import direct dans la banque.
+  const [dragFiles, setDragFiles] = useState(false)
+
   // ── Suppression (média unitaire ou sélection) + nettoyage du storage ─────────
   const [confirmDel, setConfirmDel] = useState<string[] | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -551,8 +554,31 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     )
   }
 
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+
   return (
-    <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
+    <div style={{ position: 'relative', animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}
+      onDragOver={e => { if (hasFiles(e)) { e.preventDefault(); if (!dragFiles) setDragFiles(true) } }}
+      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragFiles(false) }}
+      onDrop={e => {
+        if (!hasFiles(e)) return
+        e.preventDefault(); setDragFiles(false)
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video') || f.type.startsWith('image'))
+        if (files.length) importFiles(files)
+        else setNotice('Dépose des vidéos ou des images.')
+      }}>
+      {dragFiles && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 14, border: `2px dashed rgba(${theme.tone},0.7)`, background: 'rgba(11,11,15,0.82)', pointerEvents: 'none',
+        }}>
+          <div style={{ textAlign: 'center', color: '#F4F4F6' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, color: theme.accentText }}><Icon d="M12 3v12|M7 10l5 5 5-5|M4 21h16" size={34} /></div>
+            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 17, fontWeight: 700 }}>Dépose pour importer</div>
+            <div style={{ fontSize: 12.5, color: '#A1A1AA', marginTop: 4 }}>Vidéos et images{folder !== 'Tous' && folder !== 'Jamais publiées' ? ` → dossier « ${folder} »` : ''}</div>
+          </div>
+        </div>
+      )}
       {/* En-tête */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
