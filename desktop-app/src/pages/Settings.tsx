@@ -17,6 +17,7 @@ const SECTIONS: { k: Tab; l: string; i: string }[] = [
   { k: 'org', l: 'Organisation', i: 'M3 21h18|M5 21V7l8-4v18|M19 21V11l-6-4' },
   { k: 'members', l: 'Membres & rôles', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M22 21v-2a4 4 0 0 0-3-3.9|M16 3.1a4 4 0 0 1 0 7.8' },
   { k: 'billing', l: 'Abonnement & crédits', i: 'M2 8h20v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z|M2 8l2-4h16l2 4|M12 12v4' },
+  { k: 'infra', l: 'Connexions & clés', i: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71|M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' },
   { k: 'proxy', l: 'Proxy & rotation', i: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
 ]
 
@@ -172,7 +173,7 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
           {tab === 'members' && <MembersTab theme={theme} org={org} members={members} canManage={canManage} currentUserId={user.id} onReload={loadMembers} />}
           {tab === 'billing' && <BillingTab theme={theme} org={org} balance={balance} canManage={canManage} />}
           {tab === 'proxy' && <ProxyRotationPanel theme={theme} user={user} org={org} />}
-          {tab === 'infra' && <InfraTab theme={theme} />}
+          {tab === 'infra' && <InfraTab theme={theme} user={user} org={org} canManage={canManage} />}
           {tab === 'notif' && <NotifTab theme={theme} email={user.email ?? null} />}
           {tab === 'security' && <SecurityTab theme={theme} />}
         </div>
@@ -535,23 +536,90 @@ function BillingTab({ theme, org, balance, canManage }: {
 }
 
 // ══════════ INFRASTRUCTURE (visuel-only) ══════════
-function InfraTab({ theme }: { theme: Theme }) {
+// Connexions & clés : enregistre le token GeeLark + la clé Groq dans org_config
+// (org) ou app_config (perso). C'est CE qui alimente useConnections() partout.
+function InfraTab({ theme, user, org, canManage }: { theme: Theme; user: User; org: OrgState; canManage: boolean }) {
+  const { currentOrg } = org
+  const [bearer, setBearer] = useState('')
+  const [groq, setGroq] = useState('')
+  const [showBearer, setShowBearer] = useState(false)
+  const [showGroq, setShowGroq] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const readOnly = !!currentOrg && !canManage
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    const q = currentOrg
+      ? supabase.from('org_config').select('bearer_token, groq_api_key').eq('org_id', currentOrg.id).maybeSingle()
+      : supabase.from('app_config').select('bearer_token, groq_api_key').eq('user_id', user.id).maybeSingle()
+    q.then(({ data }) => {
+      if (!alive) return
+      const d = data as { bearer_token?: string; groq_api_key?: string } | null
+      setBearer(d?.bearer_token ?? ''); setGroq(d?.groq_api_key ?? ''); setLoading(false)
+    })
+    return () => { alive = false }
+  }, [currentOrg?.id, user.id])
+
+  async function save() {
+    setSaving(true); setMsg(null)
+    try {
+      const err = currentOrg
+        ? (await supabase.from('org_config').upsert({ org_id: currentOrg.id, bearer_token: bearer.trim(), groq_api_key: groq.trim() }, { onConflict: 'org_id' })).error
+        : (await supabase.from('app_config').upsert({ user_id: user.id, bearer_token: bearer.trim(), groq_api_key: groq.trim() }, { onConflict: 'user_id' })).error
+      if (err) throw new Error(err.message)
+      setMsg('Enregistré ✓ — recharge la page pour l’appliquer partout.')
+    } catch (e) { setMsg(`Échec : ${e instanceof Error ? e.message : 'erreur'}`) }
+    setSaving(false)
+  }
+
+  const inp: CSSProperties = {
+    width: '100%', boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8,
+    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+    color: '#F4F4F6', fontSize: 12.5, fontFamily: "'JetBrains Mono',monospace", outline: 'none',
+  }
+  const eye = (on: boolean, set: (v: boolean) => void) => (
+    <button onClick={() => set(!on)} style={{ flexShrink: 0, height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#A1A1AA', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{on ? 'Cacher' : 'Voir'}</button>
+  )
+
   return (
-    <>
-      <Panel theme={theme}>
-        <PanelHead title="Agent ScaleFlow Cloud" right={<Chip text="Bientôt" tone="mute" />} sub="Configuration à venir" />
-        <Field label="URL de l’agent"><ReadValue value={DASH} /></Field>
-        <Field label="Token" hint="Généré à l’installation"><ReadValue mono value="••••••••" /></Field>
-        <Field label="Boot automatique" hint="Démarre les appareils avant une tâche"><Toggle theme={theme} on={true} /></Field>
-      </Panel>
-      <div style={{ marginTop: 12 }}>
-        <Panel theme={theme}>
-          <PanelHead title="GeeLark" right={<Chip text="Secondaire" tone="mute" />} sub="Conservé pour tes appareils loués" />
-          <Field label="Bearer token"><ReadValue mono value="••••••••" /></Field>
-          <Field label="Garder GeeLark actif"><Toggle theme={theme} on={true} /></Field>
-        </Panel>
+    <Panel theme={theme}>
+      <PanelHead title="Connexions & clés"
+        sub={currentOrg ? `Partagées par l’organisation « ${currentOrg.name} »` : 'Ton espace perso'}
+        right={<Chip text={currentOrg ? 'Org' : 'Perso'} tone="violet" />} />
+      <div style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {loading ? <span style={{ fontSize: 12.5, color: '#71717A' }}>Chargement…</span> : (
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Token GeeLark (Bearer)</span>
+              <span style={{ fontSize: 11, color: '#71717A' }}>Indispensable pour piloter les téléphones et publier. Depuis GeeLark → OpenAPI.</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={bearer} onChange={e => setBearer(e.target.value)} type={showBearer ? 'text' : 'password'} placeholder="Bearer token GeeLark…" style={inp} disabled={readOnly} spellCheck={false} autoComplete="off" />
+                {eye(showBearer, setShowBearer)}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Clé API Groq</span>
+              <span style={{ fontSize: 11, color: '#71717A' }}>Pour les légendes IA et les sous-titres (Whisper). Optionnelle.</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={groq} onChange={e => setGroq(e.target.value)} type={showGroq ? 'text' : 'password'} placeholder="gsk_…" style={inp} disabled={readOnly} spellCheck={false} autoComplete="off" />
+                {eye(showGroq, setShowGroq)}
+              </div>
+            </div>
+            {readOnly
+              ? <span style={{ fontSize: 12, color: '#FBBF24' }}>Seuls owner/admin de l’organisation peuvent modifier ces clés.</span>
+              : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={save} />
+                  {msg && <span style={{ fontSize: 12, color: msg.startsWith('Échec') ? '#F87171' : '#34D399' }}>{msg}</span>}
+                </div>
+              )}
+          </>
+        )}
       </div>
-    </>
+    </Panel>
   )
 }
 
