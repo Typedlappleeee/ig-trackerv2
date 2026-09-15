@@ -189,7 +189,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     // 3) Poste : chaque téléphone reçoit SA vidéo assignée.
     //    Sans proxy rotatif → tous les téléphones EN PARALLÈLE (rapide).
     //    Avec proxy rotatif → en série (1 IP à la fois, l'IP change avant chaque tel).
-    const usedVidIds = new Set<string>()
+    // Vidéos RÉELLEMENT publiées (post OK sur ≥ 1 téléphone) → seules celles-ci
+    // sont retirées en « usage unique ». Une vidéo dont le post échoue est CONSERVÉE.
+    const postedVidIds = new Set<string>()
     const jobs = targets.map((p, k) => ({
       p, v: assignment[k],
       cap: caps.length === 0 ? '' : capMode === 'random' ? caps[Math.floor(Math.random() * caps.length)] : caps[k % caps.length],
@@ -201,10 +203,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       const ru = resourceByVid.get(v.id)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       if (!ru) { run.markFailed(); R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
-      usedVidIds.add(v.id)
       push(`— @${p.ig_username ?? p.geelark_id} · ${v.title}${cap ? ' · légende' : ''} —`)
       const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id))
-      if (!r.ok) run.markFailed()
+      if (r.ok) postedVidIds.add(v.id); else run.markFailed()
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
@@ -218,14 +219,24 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)
 
-    // Usage unique : retire de la banque les vidéos réellement utilisées.
-    if (autoRemove && usedVidIds.size > 0) {
-      const ids = [...usedVidIds]
-      const objs = distinct.filter(v => usedVidIds.has(v.id)).map(v => v.storage_path).filter(Boolean) as string[]
+    // Usage unique : retire de la banque UNIQUEMENT les vidéos réellement publiées
+    // (les échecs restent dans la banque pour pouvoir relancer).
+    if (autoRemove && postedVidIds.size > 0) {
+      const ids = [...postedVidIds]
+      const objs = distinct.filter(v => postedVidIds.has(v.id)).map(v => v.storage_path).filter(Boolean) as string[]
       try {
         await supabase.from('content_bank').delete().in('id', ids)
         if (objs.length) await supabase.storage.from('content').remove(objs)
         push(`🗑 ${ids.length} vidéo(s) retirée(s) de la banque (usage unique).`)
+      } catch { push('⚠ Retrait des vidéos (usage unique) échoué — à faire manuellement.') }
+    } else if (!autoRemove && postedVidIds.size > 0) {
+      // Usage unique désactivé → on garde les vidéos mais on incrémente leur compteur
+      // de publications (pour « Jamais publiées » / tri « Moins publiées » dans la banque).
+      try {
+        const ids = [...postedVidIds]
+        const { data: rows } = await supabase.from('content_bank').select('id,used_count').in('id', ids)
+        await Promise.all((rows ?? []).map((r: { id: string; used_count: number | null }) =>
+          supabase.from('content_bank').update({ used_count: (r.used_count ?? 0) + 1 }).eq('id', r.id)))
       } catch { /* best-effort */ }
     }
     push('✔ Publication terminée.')
