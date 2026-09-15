@@ -132,7 +132,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'connections'
         ? <Connections theme={theme} infra={infra} user={user} org={org} />
         : page === 'flows'
-        ? <Flows theme={theme} infra={infra} user={user} org={org} onLaunch={() => setPage('publish')} />
+        ? <Flows theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'automation'
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
         : page === 'settings'
