@@ -383,9 +383,12 @@ async function ensureStoryFlowId(bearer: string, log: (m: string) => void): Prom
 }
 
 // ── Reels via flow RPA custom (nécessaire pour la MINIATURE/couverture) ──────
-// Le natif instagramPubReels ne gère pas la cover ; on importe un flow custom
-// (mis en cache) et on le lance avec un paramMap { Caption, Video, Cover }.
-const REELS_FLOW_VERSION = 'v10'
+// Le natif instagramPubReels ne gère pas la cover NI les Reels d'essai (« Trial ») ;
+// on importe un flow custom (mis en cache) et on le lance avec un paramMap
+// { Caption, Video, Cover, Trial }. Le flow coche le toggle « Trial » de l'écran final
+// en s'ancrant sur le TEXTE « Trial » (robuste à la position, même si la légende scrolle).
+// v11 : ajout du bloc Trial → bump de version pour forcer la ré-import du flow.
+const REELS_FLOW_VERSION = 'v11'
 const _reelsFlowCache = new Map<string, Promise<string | null>>()
 function reelsFlowLsKey(b: string) { return `sf-reels-flowid:${b.slice(-14)}` }
 function reelsFlowVerKey(b: string) { return `sf-reels-flowver:${b.slice(-14)}` }
@@ -481,34 +484,38 @@ export async function postReelToPhone(
     const ready = await ensurePhoneRunning(bearer, phoneId, log, rotationUrls)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
 
-    // Avec une MINIATURE → flow RPA custom (le natif ne gère pas la cover).
-    if (coverResourceUrl) {
+    // Une MINIATURE ou un Reel d'ESSAI (« Trial ») → flow RPA custom : le natif
+    // instagramPubReels ne gère NI la cover NI le toggle Trial (aucun paramètre côté
+    // API GeeLark — vérifié dans leur doc). Le flow custom coche le toggle « Trial ».
+    if (coverResourceUrl || trial) {
       const flowId = await ensureReelsFlowId(bearer, log).catch(() => null)
       if (flowId) {
-        log('🎬 Création de la tâche Reels (avec miniature)…')
+        log(trial ? '🎬 Création de la tâche Reels (essai · non-abonnés)…' : '🎬 Création de la tâche Reels (avec miniature)…')
+        const paramMap: Record<string, unknown> = { Caption: caption ?? '', Video: [videoResourceUrl] }
+        if (coverResourceUrl) paramMap.Cover = [coverResourceUrl]
+        if (trial) paramMap.Trial = true
         const res = await geelarkFetch('/task/rpa/add', {
           id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'Reels Scaleflow',
-          paramMap: { Caption: caption ?? '', Video: [videoResourceUrl], Cover: [coverResourceUrl] },
+          paramMap,
         }, bearer)
         if (Number(res['code']) === 0) {
           const d = res['data'] as Record<string, unknown> | undefined
           const taskId = (d?.['taskId'] ?? d?.['id']) as string | undefined
           if (taskId) { log('   Tâche créée — publication en cours…'); return await pollRpaTask(bearer, taskId, log, 20 * 60_000) }
         }
-        log(`   ⚠ Miniature indisponible (${res['msg'] ?? res['code']}) — publication sans miniature.`)
+        log(`   ⚠ Flow custom indisponible (${res['msg'] ?? res['code']}) — repli publication simple.`)
       } else {
-        log('   ⚠ Flow miniature indisponible — publication sans miniature.')
+        log('   ⚠ Flow custom indisponible — repli publication simple.')
       }
     }
 
-    // Natif (sans miniature) OU repli si le flow a échoué.
-    log(trial ? '🎬 Création de la tâche Reels (essai · non-abonnés)…' : '🎬 Création de la tâche de publication Reels…')
+    // Natif (sans miniature ni essai) OU repli si le flow a échoué.
+    log('🎬 Création de la tâche de publication Reels…')
     const res = await geelarkFetch('/rpa/task/instagramPubReels', {
       id: phoneId,
       scheduleAt: Math.floor(Date.now() / 1000) + 5,
       description: caption ?? '',
       video: [videoResourceUrl],
-      ...(trial ? { shareType: 2 } : {}),
     }, bearer)
     if (Number(res['code']) !== 0) return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
