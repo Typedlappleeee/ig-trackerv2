@@ -347,23 +347,19 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     try {
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
-      // Récupération EN PARALLÈLE (6 à la fois) — c'était le téléchargement séquentiel
-      // qui rendait le ZIP lent. On garde l'ordre via un tableau indexé.
-      const CONC = 6
-      const blobs: (Blob | null)[] = new Array(targets.length).fill(null)
-      let next = 0, fetched = 0
-      const worker = async () => {
-        for (;;) {
-          const my = next++
-          if (my >= targets.length) break
-          try {
-            const url = await urlForItem(targets[my])
-            if (url) { const resp = await fetch(url); if (resp.ok) blobs[my] = await resp.blob() }
-          } catch { /* on ignore ce fichier */ }
-          setNotice(`ZIP : récupération ${++fetched}/${targets.length}…`)
-        }
-      }
-      await Promise.all(Array.from({ length: Math.min(CONC, targets.length) }, worker))
+      // Récupération de TOUS les médias EN PARALLÈLE (le réseau HTTP/2 multiplexe).
+      // Ordre préservé par tableau indexé ; progression au fil des arrivées.
+      let fetched = 0
+      const blobs = await Promise.all(targets.map(async (it) => {
+        try {
+          const url = await urlForItem(it)
+          if (!url) return null
+          const resp = await fetch(url)
+          if (!resp.ok) return null
+          return await resp.blob()
+        } catch { return null }
+        finally { setNotice(`ZIP : récupération ${++fetched}/${targets.length}…`) }
+      }))
       // Ajout au ZIP dans l'ordre (dédup des noms, séquentiel → pas de race).
       const taken = new Set<string>()
       let ok = 0
