@@ -347,17 +347,27 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     try {
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
+      // Récupération EN PARALLÈLE (6 à la fois) — c'était le téléchargement séquentiel
+      // qui rendait le ZIP lent. On garde l'ordre via un tableau indexé.
+      const CONC = 6
+      const blobs: (Blob | null)[] = new Array(targets.length).fill(null)
+      let next = 0, fetched = 0
+      const worker = async () => {
+        for (;;) {
+          const my = next++
+          if (my >= targets.length) break
+          try {
+            const url = await urlForItem(targets[my])
+            if (url) { const resp = await fetch(url); if (resp.ok) blobs[my] = await resp.blob() }
+          } catch { /* on ignore ce fichier */ }
+          setNotice(`ZIP : récupération ${++fetched}/${targets.length}…`)
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(CONC, targets.length) }, worker))
+      // Ajout au ZIP dans l'ordre (dédup des noms, séquentiel → pas de race).
       const taken = new Set<string>()
       let ok = 0
-      for (const it of targets) {
-        setNotice(`ZIP : récupération ${ok + 1}/${targets.length}…`)
-        const url = await urlForItem(it); if (!url) continue
-        try {
-          const resp = await fetch(url); if (!resp.ok) continue
-          zip.file(fileNameFor(it, taken), await resp.blob())
-          ok++
-        } catch { /* on ignore ce fichier */ }
-      }
+      targets.forEach((it, i) => { const b = blobs[i]; if (b) { zip.file(fileNameFor(it, taken), b); ok++ } })
       if (ok === 0) { setNotice('Aucun fichier récupéré (réseau/CORS ?).'); return }
       setNotice(`ZIP : assemblage de ${ok} fichier(s)…`)
       const out = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, m => setNotice(`ZIP : ${Math.round(m.percent)}%…`))
