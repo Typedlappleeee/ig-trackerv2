@@ -7,12 +7,6 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Panel, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 
-// File System Access API (Chrome/Edge) — types minimaux pour l'écriture streaming du ZIP.
-type FSWritable = { write: (chunk: unknown) => Promise<void> | void; close: () => Promise<void> }
-type FSHandle = { createWritable: () => Promise<FSWritable>; remove?: () => Promise<void> }
-// StreamHelper jszip (sous-ensemble utilisé).
-type ZipStream = { on: (e: 'data' | 'error' | 'end', cb: (x?: unknown) => void) => ZipStream; pause: () => ZipStream; resume: () => ZipStream }
-
 // ── Type ContentItem (sous-ensemble RÉEL de la table `content_bank`, aligné sur
 //    electron-app/src/lib/supabase.ts). Lecture seule pour cette passe. ──────────
 interface ContentItem {
@@ -343,23 +337,10 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       return
     }
 
-    // Plusieurs médias → un seul .zip.
+    // Plusieurs médias → un seul .zip. Approche SIMPLE et fiable partout : on
+    // récupère chaque fichier, on assemble un ZIP en STORE (pas de compression —
+    // les vidéos le sont déjà, donc rapide et léger), puis téléchargement direct.
     const zipName = `scaleflow-medias-${new Date().toISOString().slice(0, 10)}.zip`
-
-    // Chrome/Edge : on demande TOUT DE SUITE où enregistrer (tant qu'on est encore
-    // dans le geste utilisateur), puis on écrit le ZIP EN STREAMING sur le disque —
-    // aucune copie géante en mémoire (c'est ça qui plantait sur « beaucoup de vidéos »).
-    const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FSHandle> }).showSaveFilePicker
-    let handle: FSHandle | null = null
-    if (picker) {
-      try {
-        handle = await picker({ suggestedName: zipName, types: [{ description: 'Archive ZIP', accept: { 'application/zip': ['.zip'] } }] })
-      } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') return  // annulé par l'utilisateur
-        handle = null  // pas supporté / refusé → repli mémoire
-      }
-    }
-
     try {
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
@@ -370,39 +351,19 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         const url = await urlForItem(it); if (!url) continue
         try {
           const resp = await fetch(url); if (!resp.ok) continue
-          zip.file(fileNameFor(it, taken), new Uint8Array(await resp.arrayBuffer()))
+          zip.file(fileNameFor(it, taken), await resp.blob())
           ok++
         } catch { /* on ignore ce fichier */ }
       }
-      if (ok === 0) { setNotice('Aucun fichier récupéré (réseau/CORS ?).'); try { await handle?.remove?.() } catch { /* ignore */ } return }
-
-      if (handle) {
-        // Écriture streaming (STORE = pas de compression, vidéos déjà compressées) avec
-        // contre-pression : on met le flux en pause tant que le disque n'a pas écrit.
-        const writable = await handle.createWritable()
-        setNotice(`ZIP : écriture sur le disque… (${ok} fichiers)`)
-        const stream = zip.generateInternalStream({ type: 'uint8array', compression: 'STORE', streamFiles: true }) as unknown as ZipStream
-        await new Promise<void>((resolve, reject) => {
-          stream.on('data', (chunk?: unknown) => {
-            stream.pause()
-            Promise.resolve(writable.write(chunk)).then(() => stream.resume(), reject)
-          })
-          stream.on('error', (err?: unknown) => reject(err instanceof Error ? err : new Error(String(err))))
-          stream.on('end', () => resolve())
-          stream.resume()
-        })
-        await writable.close()
-        setNotice(`ZIP enregistré — ${ok} fichier(s).`)
-      } else {
-        // Repli (Firefox/Safari) : ZIP en mémoire puis <a download>.
-        const out = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, m => setNotice(`ZIP : compression ${Math.round(m.percent)}%…`))
-        const a = document.createElement('a')
-        a.href = URL.createObjectURL(out)
-        a.download = zipName
-        document.body.appendChild(a); a.click(); a.remove()
-        setTimeout(() => URL.revokeObjectURL(a.href), 15000)
-        setNotice(`ZIP téléchargé — ${ok} fichier(s).`)
-      }
+      if (ok === 0) { setNotice('Aucun fichier récupéré (réseau/CORS ?).'); return }
+      setNotice(`ZIP : assemblage de ${ok} fichier(s)…`)
+      const out = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, m => setNotice(`ZIP : ${Math.round(m.percent)}%…`))
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(out)
+      a.download = zipName
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(a.href), 20000)
+      setNotice(`ZIP téléchargé — ${ok} fichier(s).`)
     } catch (e) { setNotice(`Échec du ZIP : ${e instanceof Error ? e.message : String(e)}`) }
   }
 
