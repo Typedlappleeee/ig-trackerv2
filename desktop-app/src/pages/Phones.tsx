@@ -24,6 +24,7 @@ interface Phone {
   last_post_at: string | null
   account_state: string | null
   geelark_id: string | null
+  link: string | null
 }
 
 // La santé est dérivée honnêtement dans src/lib/health.ts (partagé avec l'écran Santé).
@@ -83,6 +84,8 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsPhone, setSettingsPhone] = useState<Phone | null>(null)
   const [groupModal, setGroupModal] = useState(false)
+  const [confirmDel, setConfirmDel] = useState<string[] | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const conns = useConnections(user, org)
   const bearer = conns.bearer
   const [syncing, setSyncing] = useState(false)
@@ -96,7 +99,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
       : null
     let query = supabase
       .from('phones')
-      .select('id,phone_name,ig_username,ig_status,group_name,status,total_views,pp_url,last_post_at,account_state,geelark_id')
+      .select('id,phone_name,ig_username,ig_status,group_name,status,total_views,pp_url,last_post_at,account_state,geelark_id,link')
       .order('phone_name')
     query = currentOrg
       ? query.eq('org_id', currentOrg.id)
@@ -148,6 +151,17 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
     }
     setSyncing(false)
   }, [syncing, bearer, user.id, currentOrg, load])
+
+  // Retire des téléphones de ScaleFlow (ligne DB). N'agit PAS sur GeeLark : le tel
+  // reste chez GeeLark, il disparaît juste de l'app (re-synchro possible ensuite).
+  async function deletePhones(ids: string[]) {
+    if (ids.length === 0) return
+    setDeleting(true)
+    const { error: err } = await supabase.from('phones').delete().in('id', ids)
+    setDeleting(false); setConfirmDel(null)
+    if (err) { setError(`Suppression échouée : ${err.message}`); return }
+    setSel(new Set()); load()
+  }
 
   // Rows enrichies d'un score de santé dérivé (déterministe).
   const rows = useMemo(() => phones.map(p => ({ ...p, health: deriveHealth(p) })), [phones])
@@ -406,6 +420,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
           <Btn label="Publier" theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
           <Btn label="Chauffer" theme={theme} sm icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" onClick={() => onNavigate?.('warmup')} />
           <Btn label="Groupe" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setGroupModal(true)} />
+          {!isCloud && <Btn label="Retirer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />}
           <span style={{ marginLeft: 'auto' }}>
             <Btn label="Tout désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
           </span>
@@ -442,6 +457,19 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
           onSaved={() => { setSettingsPhone(null); load() }} />
       )}
 
+      {confirmDel && (
+        <Modal theme={theme} title={`Retirer ${confirmDel.length} téléphone(s) ?`}
+          icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClose={() => setConfirmDel(null)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDel(null)} />
+            <Btn theme={theme} tone="danger" label={deleting ? 'Suppression…' : 'Retirer'} disabled={deleting} onClick={() => deletePhones(confirmDel)} />
+          </>}>
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+            Ces téléphones sont retirés de <b>ScaleFlow</b> uniquement. Ils <b>restent dans ton compte GeeLark</b> — un « Sync GeeLark » les ferait réapparaître. Les @comptes/liens associés dans l'app seront perdus.
+          </p>
+        </Modal>
+      )}
+
       {groupModal && (
         <GroupAssign theme={theme} count={sel.size} groups={groups.filter(g => g !== 'Tous')}
           onClose={() => setGroupModal(false)}
@@ -461,18 +489,25 @@ function PhoneSettings({ theme, phone, groups, onClose, onSaved }: {
 }) {
   const [username, setUsername] = useState(phone.ig_username ?? '')
   const [grp, setGrp] = useState(phone.group_name ?? '')
-  const [cta, setCta] = useState<string>(() => { try { return localStorage.getItem(ctaKey(phone)) ?? '' } catch { return '' } })
+  // Lien CTA : source de vérité = colonne DB `phones.link` (persiste entre appareils
+  // et membres) ; localStorage n'est qu'un miroir pour le pré-remplissage de l'onglet Story.
+  const [cta, setCta] = useState<string>(() => {
+    if (phone.link) return phone.link
+    try { return localStorage.getItem(ctaKey(phone)) ?? '' } catch { return '' }
+  })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   async function save() {
     setSaving(true); setErr(null)
+    const link = cta.trim() || null
     const { error } = await supabase.from('phones').update({
       ig_username: username.trim() || null,
       group_name: grp.trim() || null,
+      link,
     }).eq('id', phone.id)
     if (error) { setErr(error.message); setSaving(false); return }
-    try { const v = cta.trim(); if (v) localStorage.setItem(ctaKey(phone), v); else localStorage.removeItem(ctaKey(phone)) } catch { /* ignore */ }
+    try { if (link) localStorage.setItem(ctaKey(phone), link); else localStorage.removeItem(ctaKey(phone)) } catch { /* ignore */ }
     setSaving(false); onSaved()
   }
 
