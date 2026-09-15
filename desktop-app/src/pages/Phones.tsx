@@ -7,6 +7,8 @@ import { Btn, Empty, Icon, Kpi, Panel, StatusDot, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
+import { fetchAllPhones, geelarkStatusLabel } from '@/lib/geelark'
+import { useConnections } from '@/lib/connections'
 
 // ── Type Phone (sous-ensemble réel de la table `phones`, aligné sur
 //    electron-app/src/lib/supabase.ts). Lecture seule pour cette passe. ──────────
@@ -81,6 +83,9 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsPhone, setSettingsPhone] = useState<Phone | null>(null)
   const [groupModal, setGroupModal] = useState(false)
+  const conns = useConnections(user, org)
+  const bearer = conns.bearer
+  const [syncing, setSyncing] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -105,6 +110,44 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
   }, [currentOrg?.id, user.id, role, perms, infra])
 
   useEffect(() => { load() }, [load])
+
+  // VRAIE synchro GeeLark : récupère la liste chez GeeLark, SUPPRIME les téléphones
+  // absents (supprimés côté GeeLark), puis upsert (RPC qui préserve ig_username/liens).
+  const syncFromGeelark = useCallback(async () => {
+    if (syncing) return
+    if (!bearer) { setError('Token GeeLark manquant — configure-le dans les Réglages de l’app web.'); return }
+    setSyncing(true); setError(null)
+    try {
+      const items = await fetchAllPhones(bearer)
+      const rows = items.map(p => ({
+        user_id: user.id,
+        org_id: currentOrg?.id ?? null,
+        geelark_id: p.id,
+        serial_no: p.serialNo ?? null,
+        phone_name: p.serialName ?? p.name ?? p.serialNo ?? p.id ?? 'Phone inconnu',
+        group_name: p.group?.name ?? p.groupName ?? null,
+        status: geelarkStatusLabel(p.status),
+        remark: p.remark ?? null,
+        synced_at: new Date().toISOString(),
+      }))
+      const currentIds = new Set(rows.map(r => r.geelark_id))
+      // Prune : supprime les téléphones GeeLark locaux absents de GeeLark.
+      let existQ = supabase.from('phones').select('id,geelark_id').not('geelark_id', 'is', null)
+      existQ = currentOrg ? existQ.eq('org_id', currentOrg.id) : existQ.eq('user_id', user.id).is('org_id', null)
+      const { data: existing } = await existQ
+      const toDelete = (existing ?? []).filter((p: { id: string; geelark_id: string | null }) => p.geelark_id && !currentIds.has(p.geelark_id))
+      if (toDelete.length > 0) await supabase.from('phones').delete().in('id', toDelete.map((p: { id: string }) => p.id))
+      // Upsert via RPC (préserve les champs utilisateur : ig_username, liens…).
+      if (rows.length > 0) {
+        const { error: rpcErr } = await supabase.rpc('sync_geelark_phones', { p_rows: rows, p_org_id: currentOrg?.id ?? null })
+        if (rpcErr) throw new Error(rpcErr.message)
+      }
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur de synchronisation GeeLark.')
+    }
+    setSyncing(false)
+  }, [syncing, bearer, user.id, currentOrg, load])
 
   // Rows enrichies d'un score de santé dérivé (déterministe).
   const rows = useMemo(() => phones.map(p => ({ ...p, health: deriveHealth(p) })), [phones])
@@ -170,7 +213,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {isCloud
             ? <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
-            : <Btn label="Sync GeeLark" theme={theme} tone="primary" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />}
+            : <Btn label={syncing ? 'Synchro…' : 'Sync GeeLark'} theme={theme} tone="primary" disabled={syncing} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={syncFromGeelark} />}
         </div>
       </div>
 
@@ -270,7 +313,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
             text={isCloud
               ? 'Aucun appareil pour le moment. Crée ton premier appareil cloud pour commencer.'
               : 'Aucun téléphone pour le moment. Connecte GeeLark et synchronise pour importer tes cloud phones.'}
-            action={<Btn label={isCloud ? 'Créer un appareil' : 'Sync GeeLark'} theme={theme} tone="primary" onClick={isCloud ? undefined : load} />}
+            action={<Btn label={isCloud ? 'Créer un appareil' : (syncing ? 'Synchro…' : 'Sync GeeLark')} theme={theme} tone="primary" disabled={!isCloud && syncing} onClick={isCloud ? undefined : syncFromGeelark} />}
           />
         ) : shown.length === 0 ? (
           <Empty

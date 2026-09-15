@@ -18,7 +18,16 @@ export interface GeelarkPhone {
   id: string
   serialName?: string | null
   name?: string | null
+  serialNo?: string | null
+  groupName?: string | null
+  group?: { name?: string | null } | null
+  remark?: string | null
   status: number // 0=running, 1=stopped, 2=starting, 3=stopping
+}
+
+// Statut GeeLark (nombre) → libellé lisible ('online'/'offline').
+export function geelarkStatusLabel(status: number): string {
+  return (status === 0 || status === 2) ? 'online' : 'offline'
 }
 
 async function geelarkFetch(path: string, body: unknown, bearer: string): Promise<Record<string, unknown>> {
