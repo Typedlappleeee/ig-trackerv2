@@ -462,7 +462,9 @@ async function ensureReelsFlowId(bearer: string, log: (m: string) => void): Prom
 // Flow propre et testé (fourni) : upload vidéo → partage vers Instagram → légende →
 // SI Trial=true, scroll + clic sur le toggle « Trial » + « Close » → Share.
 // paramMap : { Video: [resourceUrl], Caption, Trial: true }.
-const TRIAL_FLOW_VERSION = 'v1'
+// v2 : garde-fou « Trial absent » → throwException (post annulé + remboursé) au lieu
+// de publier un Reel normal quand le compte n'est pas éligible aux Reels d'essai.
+const TRIAL_FLOW_VERSION = 'v2'
 const _trialFlowCache = new Map<string, Promise<string | null>>()
 function trialFlowLsKey(b: string) { return `sf-trial-flowid:${b.slice(-14)}` }
 function trialFlowVerKey(b: string) { return `sf-trial-flowver:${b.slice(-14)}` }
@@ -600,7 +602,18 @@ export async function postReelToPhone(
         if (Number(res['code']) === 0) {
           const d = res['data'] as Record<string, unknown> | undefined
           const taskId = (d?.['taskId'] ?? d?.['id']) as string | undefined
-          if (taskId) { log('   Tâche créée — publication en cours…'); return await pollRpaTask(bearer, taskId, log, 20 * 60_000) }
+          if (taskId) {
+            log('   Tâche créée — publication en cours…')
+            const r = await pollRpaTask(bearer, taskId, log, 20 * 60_000)
+            // Le flow jette « TRIAL_UNAVAILABLE » si le toggle « Trial » n'apparaît pas
+            // (compte non éligible) → post NON publié → on remonte un message clair
+            // (échec → crédit remboursé par la phase settle).
+            if (!r.ok && /TRIAL_UNAVAILABLE/i.test(r.error ?? '')) {
+              log('   ⛔ Reel d\'essai indisponible sur ce compte — post annulé.')
+              return { ok: false, error: 'Reel d\'essai indisponible sur ce compte — post annulé (crédit remboursé)' }
+            }
+            return r
+          }
         }
         log(`   ⚠ Flow Trial indisponible (${res['msg'] ?? res['code']}) — repli publication simple.`)
       } else {
