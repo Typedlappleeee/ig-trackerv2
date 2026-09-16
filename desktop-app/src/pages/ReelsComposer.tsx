@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
-import { geelarkUploadVideo, geelarkUploadImage, postReelToPhone, startPhones } from '@/lib/geelark'
+import { geelarkUploadVideo, geelarkUploadImageData, postReelToPhone, startPhones } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { generateCaption } from '@/lib/ai'
@@ -58,9 +58,10 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [vidMode, setVidMode] = useState<'seq' | 'random'>('random')  // répartition vidéo → compte (aléatoire par défaut)
   const [autoRemove, setAutoRemove] = useState(true)               // usage unique
   const [reelsTrial, setReelsTrial] = useState(false)              // essai Reels
-  // Miniature (couverture) PAR vidéo : covers[videoId] = image de couverture.
-  const [coverPickerFor, setCoverPickerFor] = useState<string | null>(null)
-  const [covers, setCovers] = useState<Record<string, { id: string; title: string; storage_path: string | null; file_url: string | null }>>({})
+  // Miniature (couverture) PAR vidéo = une FRAME de la vidéo, capturée avant de poster.
+  // covers[videoId] = data URL JPEG de la frame choisie.
+  const [coverPickerFor, setCoverPickerFor] = useState<{ id: string; url: string } | null>(null)
+  const [covers, setCovers] = useState<Record<string, string>>({})
 
   const [running, setRunning] = useState(false)
   const [runItems, setRunItems] = useState<RunItem[]>([])
@@ -176,14 +177,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     }
     if (resourceByVid.size === 0) { push('❌ Aucune vidéo hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
 
-    // 2b) Miniatures PAR vidéo → chacune hébergée une fois.
+    // 2b) Miniatures PAR vidéo (frame capturée) → chacune hébergée une fois via base64.
     const coverByVid = new Map<string, string>()
     for (const v of distinct) {
-      const cv = covers[v.id]; if (!cv) continue
-      const cUrl = cv.storage_path
-        ? (await supabase.storage.from('content').createSignedUrl(cv.storage_path, 3600)).data?.signedUrl
-        : cv.file_url
-      if (cUrl) { const cru = await geelarkUploadImage(bearer, cUrl, push); if (cru) { coverByVid.set(v.id, cru); push(`🖼 Miniature hébergée (${v.title}).`) } }
+      const dataUrl = covers[v.id]; if (!dataUrl) continue
+      const b64 = dataUrl.split(',')[1] || ''
+      if (b64) { const cru = await geelarkUploadImageData(bearer, b64, push); if (cru) { coverByVid.set(v.id, cru); push(`🖼 Miniature hébergée (${v.title}).`) } }
     }
 
     // 3) Poste : chaque téléphone reçoit SA vidéo assignée.
@@ -375,11 +374,11 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                       ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
                     <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? theme.accentBtn : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
-                    {/* Miniature par vidéo — clic pour choisir/changer (n'active pas le toggle). */}
-                    <span role="button" title={covers[v.id] ? `Miniature : ${covers[v.id].title}` : 'Choisir une miniature'}
-                      onClick={e => { e.stopPropagation(); setCoverPickerFor(v.id) }}
-                      style={{ position: 'absolute', bottom: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, background: covers[v.id] ? theme.accentBtn : 'rgba(11,11,15,0.72)', border: covers[v.id] ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer' }}>
-                      <Icon d="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" size={11} />
+                    {/* Miniature par vidéo = une FRAME de la vidéo. Clic → sélecteur d'image (n'active pas le toggle). */}
+                    <span role="button" title={covers[v.id] ? 'Miniature choisie — cliquer pour changer' : 'Choisir la miniature (image de la vidéo)'}
+                      onClick={async e => { e.stopPropagation(); const url = await resolveVideoUrl(v); setCoverPickerFor({ id: v.id, url: url ?? '' }) }}
+                      style={{ position: 'absolute', bottom: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, overflow: 'hidden', backgroundColor: covers[v.id] ? theme.accentBtn : 'rgba(11,11,15,0.72)', backgroundImage: covers[v.id] ? `url(${covers[v.id]})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', border: covers[v.id] ? `1px solid ${theme.accentBtnEdge}` : '1px solid rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer' }}>
+                      {!covers[v.id] && <Icon d="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" size={11} />}
                     </span>
                     {fmtDur(v.duration) && <span style={{ position: 'absolute', bottom: 5, left: 6, fontFamily: "'JetBrains Mono',monospace", fontSize: 8.5, color: 'rgba(255,255,255,0.7)' }}>{fmtDur(v.duration)}</span>}
                   </button>
@@ -544,17 +543,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       )}
 
       {coverPickerFor && (
-        <BankPicker theme={theme} user={user} org={org} kind="images" title="Choisir une miniature"
+        <CoverFramePicker theme={theme} videoUrl={coverPickerFor.url}
           onClose={() => setCoverPickerFor(null)}
-          onApply={r => {
-            const forId = coverPickerFor
-            if (forId && r.kind === 'images' && r.ids[0]) {
-              const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-              scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).eq('id', r.ids[0]).maybeSingle()
-                .then(({ data }: any) => { if (data) setCovers(prev => ({ ...prev, [forId]: data })) })
-            }
-            setCoverPickerFor(null)
-          }} />
+          onPick={(dataUrl) => { const id = coverPickerFor.id; setCovers(prev => ({ ...prev, [id]: dataUrl })); setCoverPickerFor(null) }} />
       )}
     </div>
   )
@@ -572,5 +563,62 @@ function RunToggle({ label, hint, on, onToggle, theme, border }: { label: string
         <span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} />
       </span>
     </div>
+  )
+}
+
+// Sélecteur de miniature = une FRAME de la vidéo. On charge la vidéo en blob (même
+// origine → pas de canvas « tainted »), on scrube au curseur, puis on capture l'image
+// courante dans un canvas → JPEG (data URL) renvoyé comme couverture.
+function CoverFramePicker({ theme, videoUrl, onClose, onPick }: {
+  theme: Theme; videoUrl: string; onClose: () => void; onPick: (dataUrl: string) => void
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [src, setSrc] = useState<string | null>(null)
+  const [dur, setDur] = useState(0)
+  const [t, setT] = useState(0)
+  const [err, setErr] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    if (!videoUrl) { setErr('Vidéo indisponible.'); return }
+    let obj: string | null = null, alive = true
+    fetch(videoUrl).then(r => r.blob()).then(b => { if (!alive) return; obj = URL.createObjectURL(b); setSrc(obj) })
+      .catch(() => { if (alive) setErr('Impossible de charger la vidéo.') })
+    return () => { alive = false; if (obj) URL.revokeObjectURL(obj) }
+  }, [videoUrl])
+
+  const seek = (nt: number) => { setT(nt); const v = videoRef.current; if (v) v.currentTime = nt }
+  const capture = () => {
+    const v = videoRef.current; if (!v) return
+    try {
+      const c = document.createElement('canvas')
+      c.width = v.videoWidth || 720; c.height = v.videoHeight || 1280
+      const ctx = c.getContext('2d'); if (!ctx) return
+      ctx.drawImage(v, 0, 0, c.width, c.height)
+      onPick(c.toDataURL('image/jpeg', 0.9))
+    } catch { setErr('Capture impossible (vidéo protégée).') }
+  }
+
+  return (
+    <Modal theme={theme} title="Choisir la miniature" sub="Déplace le curseur sur l'image de la vidéo à utiliser en couverture"
+      icon="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" onClose={onClose} width={420}
+      footer={<>
+        <Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} />
+        <Btn theme={theme} tone="primary" label="Utiliser cette image" disabled={!ready} onClick={capture} />
+      </>}>
+      {err ? <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: '#F87171' }}>{err}</div>
+        : !src ? <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: '#71717A' }}>Chargement de la vidéo…</div>
+        : (
+          <div>
+            <video ref={videoRef} src={src} preload="metadata" playsInline muted
+              onLoadedMetadata={e => { setDur(e.currentTarget.duration || 0); setReady(true) }}
+              style={{ width: '100%', maxHeight: 360, borderRadius: 10, background: '#000', objectFit: 'contain' }} />
+            <input type="range" min={0} max={dur || 0} step={0.05} value={t}
+              onChange={e => seek(Number(e.target.value))}
+              style={{ width: '100%', marginTop: 12, accentColor: `rgb(${theme.tone})`, cursor: 'pointer' }} />
+            <div style={{ textAlign: 'center', fontSize: 11.5, color: '#71717A', fontFamily: "'JetBrains Mono',monospace" }}>{t.toFixed(1)}s / {dur.toFixed(1)}s</div>
+          </div>
+        )}
+    </Modal>
   )
 }

@@ -506,6 +506,34 @@ export async function geelarkUploadImage(bearer: string, fileUrl: string, log: (
   } catch (e) { log(`   ⚠ upload image échoué : ${e instanceof Error ? e.message : String(e)}`); return null }
 }
 
+// Héberge chez GeeLark une image fournie EN BASE64 (JPEG) — ex. une frame de la vidéo
+// capturée côté navigateur comme miniature. `base64` = sans le préfixe data:.
+export async function geelarkUploadImageData(bearer: string, base64: string, log: (m: string) => void): Promise<string | null> {
+  try {
+    log('⬆️ Envoi de la miniature vers GeeLark…')
+    if (IS_WEB) {
+      const res = await fetch('/api/geelark-upload', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataBase64: base64, bearer, fileType: 'jpg' }),
+      })
+      const text = await res.text()
+      let j: { ok?: boolean; token?: string; error?: string }
+      try { j = JSON.parse(text) as typeof j } catch { log(`   ⚠ miniature (relais) : HTTP ${res.status}`); return null }
+      if (j.ok && j.token) { log('   ✅ Miniature hébergée.'); return j.token }
+      log(`   ⚠ miniature (relais) : ${j.error ?? 'échec'}`); return null
+    }
+    const res = await geelarkFetch('/upload/getUrl', { fileType: 'jpg' }, bearer)
+    if (Number(res['code']) !== 0) { log(`   ⚠ upload/getUrl : ${res['msg'] ?? res['code']}`); return null }
+    const d = res['data'] as { uploadUrl?: string; resourceUrl?: string } | undefined
+    if (!d?.uploadUrl || !d?.resourceUrl) { log('   ⚠ pas d\'URL d\'upload'); return null }
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+    const put = await fetch(d.uploadUrl, { method: 'PUT', body: bytes })
+    if (!put.ok) { log(`   ⚠ envoi miniature : HTTP ${put.status}`); return null }
+    log('   ✅ Miniature hébergée.')
+    return d.resourceUrl
+  } catch (e) { log(`   ⚠ upload miniature échoué : ${e instanceof Error ? e.message : String(e)}`); return null }
+}
+
 // Publie une Story sur UN téléphone : import flow (si besoin) → démarre → tâche RPA
 // story (image + lien sticker propre au compte + texte) → suit → éteint (anti-coût).
 export async function postStoryToPhone(
