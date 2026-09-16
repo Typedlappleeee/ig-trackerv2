@@ -201,13 +201,14 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     // Sans proxy rotatif, on démarre le lot en UN SEUL appel /phone/start groupé
     // (comme l'ancienne app) au lieu de N démarrages simultanés que GeeLark refuse
     // en partie → chaque post saute alors son démarrage individuel (skipStart).
+    let okN = 0, errN = 0
     const postOne = async ({ p, v, cap }: (typeof jobs)[number], skipStart: boolean) => {
       const ru = resourceByVid.get(v.id)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
-      if (!ru) { run.markFailed(); R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
+      if (!ru) { run.markFailed(); errN++; R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
       push(`— @${p.ig_username ?? p.geelark_id} · ${v.title}${cap ? ' · légende' : ''} —`)
       const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id), skipStart)
-      if (r.ok) postedVidIds.add(v.id); else run.markFailed()
+      if (r.ok) { postedVidIds.add(v.id); okN++ } else { run.markFailed(); errN++ }
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
@@ -232,6 +233,13 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       await Promise.all(batch.map(j => postOne(j, batchSkip)))
     }
     R.finish()
+    // Historique (page Activité) + compteur : on enregistre TOUJOURS le run.
+    if (jobs.length > 0) {
+      supabase.from('post_runs').insert({
+        user_id: user.id, org_id: currentOrg?.id ?? null,
+        type: 'mass_posting', ok_count: okN, err_count: errN, total: jobs.length,
+      }).then(() => {}, () => {})
+    }
     setRunId(null)
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)

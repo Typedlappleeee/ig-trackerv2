@@ -137,11 +137,12 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     }))
     const concurrency = rot ? 1 : jobs.length
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${jobs.length} compte(s) en parallèle.`)
+    let okN = 0, errN = 0
     const postOne = async ({ p, img, st }: (typeof jobs)[number]) => {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— @${p.ig_username ?? p.geelark_id} · ${img.title} —`)
       const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl: resByImg.get(img.id)!, linkUrl: links[p.id], linkText: st, rotationUrls: rot }, push)
-      if (!r.ok) run.markFailed()
+      if (r.ok) okN++; else { run.markFailed(); errN++ }
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
@@ -150,6 +151,12 @@ export default function StoryComposer({ theme, user, org, onBack }: {
       await Promise.all(jobs.slice(b, b + concurrency).map(postOne))
     }
     R.finish()
+    if (jobs.length > 0) {
+      supabase.from('post_runs').insert({
+        user_id: user.id, org_id: currentOrg?.id ?? null,
+        type: 'story', ok_count: okN, err_count: errN, total: jobs.length,
+      }).then(() => {}, () => {})
+    }
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)
     push('✔ Stories terminées.')

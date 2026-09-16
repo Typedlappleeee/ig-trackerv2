@@ -89,6 +89,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     const R = startRun('cross', `${targets.length} compte × ${platList.length} plateforme${platList.length > 1 ? 's' : ''}`, targets.length * platList.length)
     const concurrency = rot ? 1 : targets.length   // sans proxy rotatif → comptes en parallèle
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${targets.length} compte(s) en parallèle.`)
+    let okN = 0, errN = 0
     const doPhone = async (p: typeof targets[number]) => {
       for (const pl of platList) {
         if (R.isCancelled()) return
@@ -96,7 +97,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: 'running' } : it))
         push(`— ${phoneLabel(p)} · ${pl} —`)
         const r = await crossPostToPhone(bearer, p.geelark_id!, pl, { mediaResourceUrl: resourceUrl, caption, rotationUrls: rot }, push)
-        if (!r.ok) run.markFailed()
+        if (r.ok) okN++; else { run.markFailed(); errN++ }
         R.tick(r.ok)
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
       }
@@ -106,6 +107,13 @@ export default function CrossComposer({ theme, user, org, onBack }: {
       await Promise.all(targets.slice(b, b + concurrency).map(doPhone))
     }
     R.finish()
+    const totalCross = targets.length * platList.length
+    if (totalCross > 0) {
+      supabase.from('post_runs').insert({
+        user_id: user.id, org_id: currentOrg?.id ?? null,
+        type: 'mass_posting', ok_count: okN, err_count: errN, total: totalCross,
+      }).then(() => {}, () => {})
+    }
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés.`)
     push('✔ Cross-posting terminé.'); setRunning(false)

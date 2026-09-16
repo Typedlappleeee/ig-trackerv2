@@ -133,6 +133,19 @@ export default function Activity({ theme, infra, user, org }: {
 
   useEffect(() => { load() }, [load])
 
+  // Rafraîchissement live : dès qu'un run est enregistré (post_runs) ou qu'un post
+  // programmé passe done/failed (scheduled_posts), on recharge. + repli au refocus.
+  useEffect(() => {
+    const ch = supabase.channel('activity-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_runs' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_posts' }, () => load())
+      .subscribe()
+    const onFocus = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onFocus)
+    window.addEventListener('focus', onFocus)
+    return () => { supabase.removeChannel(ch); document.removeEventListener('visibilitychange', onFocus); window.removeEventListener('focus', onFocus) }
+  }, [load])
+
   const filters: { k: Filter; l: string; n: number }[] = useMemo(() => [
     { k: 'all', l: 'Tout', n: runs.length },
     { k: 'ok', l: 'Réussis', n: runs.filter(r => r.total > 0 && r.ok === r.total).length },
