@@ -10,6 +10,7 @@ import { geelarkUploadVideo, crossPostToPhone, CROSS_PLATFORMS, type CrossPlatfo
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
+import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
 import BankPicker from '@/components/BankPicker'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null }
@@ -104,7 +105,11 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     }
     for (let b = 0; b < targets.length; b += concurrency) {
       if (R.isCancelled()) { push('⏹ Annulé.'); break }
-      await Promise.all(targets.slice(b, b + concurrency).map(doPhone))
+      const batch = targets.slice(b, b + concurrency)
+      const batchIds = [...new Set(batch.map(p => p.geelark_id).filter((x): x is string => !!x))]
+      await registerPhoneWatch(batchIds, { orgId: currentOrg?.id ?? null, userId: user.id, stopAt: new Date(Date.now() + 30 * 60_000) })
+      await Promise.all(batch.map(doPhone))
+      await unregisterPhoneWatch(batchIds)
     }
     R.finish()
     const totalCross = targets.length * platList.length

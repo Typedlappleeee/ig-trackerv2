@@ -11,6 +11,7 @@ import { geelarkUploadImage, postStoryToPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
+import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null }
 interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
@@ -148,7 +149,11 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     }
     for (let b = 0; b < jobs.length; b += concurrency) {
       if (R.isCancelled()) { push('⏹ Annulé.'); break }
-      await Promise.all(jobs.slice(b, b + concurrency).map(postOne))
+      const batch = jobs.slice(b, b + concurrency)
+      const batchIds = [...new Set(batch.map(j => j.p.geelark_id).filter((x): x is string => !!x))]
+      await registerPhoneWatch(batchIds, { orgId: currentOrg?.id ?? null, userId: user.id, stopAt: new Date(Date.now() + 30 * 60_000) })
+      await Promise.all(batch.map(postOne))
+      await unregisterPhoneWatch(batchIds)
     }
     R.finish()
     if (jobs.length > 0) {

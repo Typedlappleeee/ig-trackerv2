@@ -14,6 +14,7 @@ import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { generateCaption } from '@/lib/ai'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
+import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null; ig_status: string | null; last_post_at: string | null; account_state: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; duration: number | null; notes: string | null }
@@ -216,21 +217,26 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     for (let b = 0; b < jobs.length; b += concurrency) {
       if (R.isCancelled()) { push('⏹ Annulé.'); break }
       const batch = jobs.slice(b, b + concurrency)
+      const batchIds = [...new Set(batch.map(j => j.p.geelark_id).filter((x): x is string => !!x))]
+      // Filet anti-coût : si l'onglet se ferme en plein run, le watchdog serveur éteint
+      // ces téléphones après stop_at (30 min) — sinon ils restent allumés indéfiniment.
+      await registerPhoneWatch(batchIds, { orgId: currentOrg?.id ?? null, userId: user.id, stopAt: new Date(Date.now() + 30 * 60_000) })
       // Sans proxy rotatif : démarrage GROUPÉ du lot en UN appel /phone/start (comme
       // l'ancienne app) au lieu de N démarrages simultanés que GeeLark refuse en partie.
       // → chaque post saute son démarrage individuel (skipStart). Si le groupé plante,
       // on retombe sur le démarrage par téléphone.
       let batchSkip = false
       if (!rot) {
-        const ids = [...new Set(batch.map(j => j.p.geelark_id).filter((x): x is string => !!x))]
-        push(`📱 Démarrage groupé de ${ids.length} téléphone(s)…`)
+        push(`📱 Démarrage groupé de ${batchIds.length} téléphone(s)…`)
         try {
-          const n = await startPhones(bearer, ids)
+          const n = await startPhones(bearer, batchIds)
           batchSkip = true
-          if (n < ids.length) push(`  ⚠ ${ids.length - n} téléphone(s) non démarré(s) — limite GeeLark de téléphones simultanés ? Baisse « Téléphones simultanés ».`)
+          if (n < batchIds.length) push(`  ⚠ ${batchIds.length - n} téléphone(s) non démarré(s) — limite GeeLark de téléphones simultanés ? Baisse « Téléphones simultanés ».`)
         } catch (e) { push(`  ⚠ Démarrage groupé : ${e instanceof Error ? e.message : 'échec'} — chaque tel démarrera seul.`) }
       }
       await Promise.all(batch.map(j => postOne(j, batchSkip)))
+      // Lot terminé (tels déjà éteints par postReelToPhone) → on retire du watchdog.
+      await unregisterPhoneWatch(batchIds)
     }
     R.finish()
     // Historique (page Activité) + compteur : on enregistre TOUJOURS le run.
