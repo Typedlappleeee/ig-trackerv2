@@ -7,6 +7,9 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Panel, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 
+// File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
+type FSHandle = { createWritable: () => Promise<WritableStream> }
+
 // ── Type ContentItem (sous-ensemble RÉEL de la table `content_bank`, aligné sur
 //    electron-app/src/lib/supabase.ts). Lecture seule pour cette passe. ──────────
 interface ContentItem {
@@ -340,36 +343,67 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       return
     }
 
-    // Plusieurs médias → un seul .zip. Approche SIMPLE et fiable partout : on
-    // récupère chaque fichier, on assemble un ZIP en STORE (pas de compression —
-    // les vidéos le sont déjà, donc rapide et léger), puis téléchargement direct.
+    // Plusieurs médias → un seul .zip.
     const zipName = `scaleflow-medias-${new Date().toISOString().slice(0, 10)}.zip`
+
+    // Chrome/Edge : ÉCRITURE STREAMING sur le disque (client-zip → pipeTo). Chaque
+    // vidéo est téléchargée puis écrite au fil de l'eau — RIEN n'est gardé en mémoire,
+    // donc ça marche pour des CENTAINES de vidéos (le blob en mémoire plantait avant).
+    const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FSHandle> }).showSaveFilePicker
+    if (picker) {
+      let handle: FSHandle | null = null
+      try { handle = await picker({ suggestedName: zipName, types: [{ description: 'Archive ZIP', accept: { 'application/zip': ['.zip'] } }] }) }
+      catch (e) { if (e instanceof DOMException && e.name === 'AbortError') return; handle = null }
+      if (handle) {
+        try {
+          const { downloadZip } = await import('client-zip')
+          const taken = new Set<string>()
+          let done = 0, ok = 0
+          async function* gen() {
+            for (const it of targets) {
+              setNotice(`ZIP : ${++done}/${targets.length}…`)
+              const url = await urlForItem(it); if (!url) continue
+              let resp: Response
+              try { resp = await fetch(url) } catch { continue }
+              if (!resp.ok || !resp.body) continue
+              ok++
+              yield { name: fileNameFor(it, taken), input: resp }
+            }
+          }
+          const zipResp = downloadZip(gen())
+          const writable = await handle.createWritable()
+          await zipResp.body!.pipeTo(writable as unknown as WritableStream)
+          setNotice(ok > 0 ? `ZIP enregistré — ${ok} fichier(s).` : 'Aucun fichier récupéré (réseau/CORS ?).')
+        } catch (e) { setNotice(`Échec du ZIP : ${e instanceof Error ? e.message : String(e)}`) }
+        return
+      }
+    }
+
+    // Repli (Firefox/Safari, pas de File System Access) : ZIP en mémoire (STORE),
+    // récupération à concurrence limitée. Convient aux lots modérés.
     try {
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
-      // Récupération de TOUS les médias EN PARALLÈLE (le réseau HTTP/2 multiplexe).
-      // Ordre préservé par tableau indexé ; progression au fil des arrivées.
-      let fetched = 0
-      const blobs = await Promise.all(targets.map(async (it) => {
-        try {
-          const url = await urlForItem(it)
-          if (!url) return null
-          const resp = await fetch(url)
-          if (!resp.ok) return null
-          return await resp.blob()
-        } catch { return null }
-        finally { setNotice(`ZIP : récupération ${++fetched}/${targets.length}…`) }
-      }))
-      // Ajout au ZIP dans l'ordre (dédup des noms, séquentiel → pas de race).
       const taken = new Set<string>()
-      let ok = 0
-      targets.forEach((it, i) => { const b = blobs[i]; if (b) { zip.file(fileNameFor(it, taken), b); ok++ } })
+      const CONC = 12
+      let next = 0, ok = 0, done = 0
+      const worker = async () => {
+        for (;;) {
+          const my = next++; if (my >= targets.length) break
+          const it = targets[my]
+          try {
+            const url = await urlForItem(it)
+            if (url) { const resp = await fetch(url); if (resp.ok) { zip.file(fileNameFor(it, taken), await resp.blob()); ok++ } }
+          } catch { /* ignore */ }
+          setNotice(`ZIP : récupération ${++done}/${targets.length}…`)
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(CONC, targets.length) }, worker))
       if (ok === 0) { setNotice('Aucun fichier récupéré (réseau/CORS ?).'); return }
       setNotice(`ZIP : assemblage de ${ok} fichier(s)…`)
       const out = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, m => setNotice(`ZIP : ${Math.round(m.percent)}%…`))
       const a = document.createElement('a')
-      a.href = URL.createObjectURL(out)
-      a.download = zipName
+      a.href = URL.createObjectURL(out); a.download = zipName
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(a.href), 20000)
       setNotice(`ZIP téléchargé — ${ok} fichier(s).`)
