@@ -100,7 +100,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     if (!ready) return
     const targets = selected.filter(p => p.geelark_id)
     setRunning(true); setLogs([])
-    setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as Phase })))
+    setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-250), m])
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
     const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
@@ -141,7 +141,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     let okN = 0, errN = 0
     const postOne = async ({ p, img, st }: (typeof jobs)[number]) => {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
-      push(`— @${p.ig_username ?? p.geelark_id} · ${img.title} —`)
+      push(`— ${phoneLabel(p)} · ${img.title} —`)
       const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl: resByImg.get(img.id)!, linkUrl: links[p.id], linkText: st, rotationUrls: rot }, push)
       if (r.ok) okN++; else { run.markFailed(); errN++ }
       R.tick(r.ok)

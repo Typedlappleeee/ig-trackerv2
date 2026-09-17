@@ -143,7 +143,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     const chosenVids = videos.filter(v => vidSel.has(v.id))
     if (targets.length === 0 || chosenVids.length === 0) return
     setRunning(true); setLogs([])
-    setRunItems(targets.map(p => ({ id: p.id, name: p.ig_username ?? p.geelark_id ?? p.id, phase: 'pending' as Phase })))
+    setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-300), m])
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
     // Proxy rotatif utilisé seulement si CONFIGURÉ et ACTIVÉ pour ce run.
@@ -207,7 +207,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       const ru = resourceByVid.get(v.id)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       if (!ru) { run.markFailed(); errN++; R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
-      push(`— @${p.ig_username ?? p.geelark_id} · ${v.title}${cap ? ' · légende' : ''} —`)
+      push(`— ${phoneLabel(p)} · ${v.title}${cap ? ' · légende' : ''} —`)
       const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id), skipStart)
       if (r.ok) { postedVidIds.add(v.id); okN++ } else { run.markFailed(); errN++ }
       R.tick(r.ok)
