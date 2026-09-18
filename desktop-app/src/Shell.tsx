@@ -11,6 +11,7 @@ export type PageKey =
   | 'studio'
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools'
+  | 'scheduled'
   | 'admin'
   | 'settings'
 
@@ -50,11 +51,12 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       ],
     },
     {
-      // « Automatisation » retirée pour le moment (à la demande).
+      // « Automatisation » retirée ; « Programmé » liste les posts planifiés (GeeLark).
       g: 'Diffusion', items: cloud ? [
         { k: 'recipes', l: 'Mes séquences', i: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6' },
       ] : [
         { k: 'publish', l: 'Publication', i: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
+        { k: 'scheduled', l: 'Programmé', i: 'M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z' },
         { k: 'warmup', l: 'Warmup', i: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z' },
       ],
     },
@@ -93,6 +95,7 @@ const TITLES: Record<PageKey, string[]> = {
   blowParc: ['Blowsome', 'Phone Farm'],
   blowContent: ['Blowsome', 'Auto-contenu'],
   blowTools: ['Blowsome', 'Outils VIP'],
+  scheduled: ['Diffusion', 'Programmé'],
   admin: ['Admin', 'Licences'],
   settings: ['Réglages'],
 }

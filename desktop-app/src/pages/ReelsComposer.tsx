@@ -15,6 +15,7 @@ import { generateCaption } from '@/lib/ai'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
+import { recordGeelarkSchedule } from '@/lib/scheduling'
 
 // Valeur datetime-local (fuseau LOCAL) décalée de `plusMin` minutes par rapport à maintenant.
 function schedLocalValue(plusMin: number): string {
@@ -213,18 +214,20 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     if (scheduledUnix) {
       push(`🗓 Programmation pour le ${new Date(scheduledUnix * 1000).toLocaleString('fr-FR')} (GeeLark, PC éteint)…`)
       let okN = 0, errN = 0
+      const schedTaskIds: string[] = []; const schedPhones: { geelark_id: string; name: string }[] = []
       for (const { p, v, cap } of jobs) {
         const ru = resourceByVid.get(v.id)
         if (!ru) { run.markFailed(); errN++; setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); continue }
         const r = await scheduleReelOnPhone(bearer, p.geelark_id!, ru, cap, scheduledUnix, push, reelsTrial, coverByVid.get(v.id))
-        if (r.ok) { okN++; postedVidIds.add(v.id) } else { run.markFailed(); errN++ }
+        if (r.ok) { okN++; postedVidIds.add(v.id); if (r.taskId) schedTaskIds.push(r.taskId); schedPhones.push({ geelark_id: p.geelark_id!, name: phoneLabel(p) }) } else { run.markFailed(); errN++ }
         setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.ok ? 'programmé ✓' : r.error } : it))
       }
       R.finish(); setRunId(null)
       const { refunded } = await run.settle()
       if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (échecs de programmation).`)
+      if (okN > 0) await recordGeelarkSchedule({ userId: user.id, orgId: currentOrg?.id ?? null, ownerId, type: 'mass_posting', scheduledAtUnix: scheduledUnix, phones: schedPhones, taskIds: schedTaskIds, caption: caps[0], trial: reelsTrial, platform: 'instagram', creditsTotal: okN * CREDIT_COSTS.mass_posting })
       // Usage unique : NE PAS supprimer les vidéos ici — elles seront postées plus tard.
-      push(okN > 0 ? `✅ ${okN} post(s) programmé(s) sur GeeLark. Ils partiront tout seuls, PC éteint. (Visibles/annulables dans les « Task Logs » GeeLark.)` : '❌ Aucune programmation créée.')
+      push(okN > 0 ? `✅ ${okN} post(s) programmé(s). Visibles dans « Programmé ». Ils partiront tout seuls, PC éteint.` : '❌ Aucune programmation créée.')
       setRunning(false); load()
       return
     }

@@ -77,6 +77,30 @@ export async function startPhones(bearer: string, ids: string[]): Promise<number
   return Number.isFinite(success) ? success : ids.length
 }
 
+// Annule une tâche RPA GeeLark (programmée ou en attente). /rpa/task/cancel { id }.
+export async function cancelGeelarkTask(bearer: string, taskId: string): Promise<boolean> {
+  try {
+    const res = await geelarkFetch('/rpa/task/cancel', { id: taskId }, bearer)
+    return Number(res['code']) === 0
+  } catch { return false }
+}
+
+// Statut de plusieurs tâches d'un coup. /rpa/task/batchQuery { ids } (max 100).
+// Renvoie une map taskId → status GeeLark (0=en attente/planifié, 2=en cours, 3=fini, 4=échec…).
+export async function batchQueryTasks(bearer: string, ids: string[]): Promise<Record<string, number>> {
+  const out: Record<string, number> = {}
+  try {
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100)
+      const res = await geelarkFetch('/rpa/task/batchQuery', { ids: chunk }, bearer)
+      const d = (res['data'] ?? res) as Record<string, unknown>
+      const list = ((d['items'] ?? d['list'] ?? d['tasks'] ?? d['records'] ?? []) as Array<Record<string, unknown>>)
+      for (const it of list) { const id = String(it['id'] ?? it['taskId'] ?? ''); if (id) out[id] = Number(it['status']) }
+    }
+  } catch { /* best-effort */ }
+  return out
+}
+
 export async function stopPhones(bearer: string, ids: string[]): Promise<number> {
   if (ids.length === 0) return 0
   const res = await geelarkFetch('/phone/stop', { ids }, bearer)

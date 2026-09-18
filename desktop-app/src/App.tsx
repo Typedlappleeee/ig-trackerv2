@@ -25,6 +25,7 @@ import RunWidget from '@/components/RunWidget'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 import { SiteLanding } from '@/pages/SiteLanding'
 import Admin from '@/pages/Admin'
+import Scheduled from '@/pages/Scheduled'
 
 // Spécifications des écrans encore en placeholder (gabarit PageHead + état vide).
 const SPECS: Partial<Record<PageKey, PlaceholderSpec>> = {
@@ -129,6 +130,8 @@ function AppInner({ user }: { user: User }) {
         ? <Studio theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'blowContent'
         ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
+        : page === 'scheduled'
+        ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
         : page === 'insights'
         ? <Placeholder theme={theme} spec={SPECS.insights!} />
         : page === 'connections'

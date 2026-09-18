@@ -8,6 +8,7 @@ import { phoneLabel, phoneSub, useBankThumbs } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, crossPostToPhone, scheduleCrossOnPhone, CROSS_PLATFORMS, type CrossPlatform } from '@/lib/geelark'
 import ScheduleModal from '@/components/ScheduleModal'
+import { recordGeelarkSchedule } from '@/lib/scheduling'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
@@ -94,17 +95,20 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     if (scheduledUnix) {
       push(`🗓 Programmation pour le ${new Date(scheduledUnix * 1000).toLocaleString('fr-FR')} (GeeLark, PC éteint)…`)
       let sok = 0, serr = 0
+      const schedTaskIds: string[] = []; const schedPhones: { geelark_id: string; name: string }[] = []
       for (const p of targets) {
+        schedPhones.push({ geelark_id: p.geelark_id!, name: phoneLabel(p) })
         for (const pl of platList) {
           const r = await scheduleCrossOnPhone(bearer, p.geelark_id!, pl, { mediaResourceUrl: resourceUrl, caption }, scheduledUnix, push)
-          if (r.ok) sok++; else { run.markFailed(); serr++ }
+          if (r.ok) { sok++; if (r.taskId) schedTaskIds.push(r.taskId) } else { run.markFailed(); serr++ }
           setRunItems(items => items.map(it => it.id === `${p.id}:${pl}` ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.ok ? 'programmé ✓' : r.error } : it))
         }
       }
       R.finish()
       const { refunded } = await run.settle()
       if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (échecs).`)
-      push(sok > 0 ? `✅ ${sok} post(s) programmé(s) sur GeeLark (PC éteint).` : '❌ Aucune programmation créée.')
+      if (sok > 0) await recordGeelarkSchedule({ userId: user.id, orgId: currentOrg?.id ?? null, ownerId, type: 'cross', scheduledAtUnix: scheduledUnix, phones: schedPhones, taskIds: schedTaskIds, caption, platform: platList.join(', '), creditsTotal: sok * CREDIT_COSTS.mass_posting })
+      push(sok > 0 ? `✅ ${sok} post(s) programmé(s). Visibles dans « Programmé ». Ils partiront tout seuls, PC éteint.` : '❌ Aucune programmation créée.')
       setRunning(false)
       return
     }

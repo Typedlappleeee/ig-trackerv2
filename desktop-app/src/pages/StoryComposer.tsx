@@ -9,6 +9,7 @@ import { useConnections } from '@/lib/connections'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { geelarkUploadImage, postStoryToPhone, scheduleStoryOnPhone } from '@/lib/geelark'
 import ScheduleModal from '@/components/ScheduleModal'
+import { recordGeelarkSchedule } from '@/lib/scheduling'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
@@ -142,15 +143,17 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     if (scheduledUnix) {
       push(`🗓 Programmation pour le ${new Date(scheduledUnix * 1000).toLocaleString('fr-FR')} (GeeLark, PC éteint)…`)
       let sok = 0, serr = 0
+      const schedTaskIds: string[] = []; const schedPhones: { geelark_id: string; name: string }[] = []
       for (const { p, img, st } of jobs) {
         const r = await scheduleStoryOnPhone(bearer, p.geelark_id!, { imageResourceUrl: resByImg.get(img.id)!, linkUrl: links[p.id], linkText: st }, scheduledUnix, push)
-        if (r.ok) sok++; else { run.markFailed(); serr++ }
+        if (r.ok) { sok++; if (r.taskId) schedTaskIds.push(r.taskId); schedPhones.push({ geelark_id: p.geelark_id!, name: phoneLabel(p) }) } else { run.markFailed(); serr++ }
         setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.ok ? 'programmée ✓' : r.error } : it))
       }
       R.finish()
       const { refunded } = await run.settle()
       if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (échecs).`)
-      push(sok > 0 ? `✅ ${sok} story(s) programmée(s) sur GeeLark (PC éteint).` : '❌ Aucune programmation créée.')
+      if (sok > 0) await recordGeelarkSchedule({ userId: user.id, orgId: currentOrg?.id ?? null, ownerId, type: 'story', scheduledAtUnix: scheduledUnix, phones: schedPhones, taskIds: schedTaskIds, platform: 'instagram', creditsTotal: sok * CREDIT_COSTS.story })
+      push(sok > 0 ? `✅ ${sok} story(s) programmée(s). Visibles dans « Programmé ». Elles partiront tout seules, PC éteint.` : '❌ Aucune programmation créée.')
       setRunning(false)
       return
     }
