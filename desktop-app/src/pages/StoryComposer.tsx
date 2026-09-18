@@ -157,10 +157,11 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     }
     R.finish()
     if (jobs.length > 0) {
-      supabase.from('post_runs').insert({
+      const { error: prErr } = await supabase.from('post_runs').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
         type: 'story', ok_count: okN, err_count: errN, total: jobs.length,
-      }).then(() => {}, () => {})
+      })
+      if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr.message}`)
     }
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)

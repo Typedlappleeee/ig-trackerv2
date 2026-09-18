@@ -8,13 +8,21 @@ import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
-import { geelarkUploadVideo, geelarkUploadImageData, postReelToPhone, startPhones } from '@/lib/geelark'
+import { geelarkUploadVideo, geelarkUploadImageData, postReelToPhone, scheduleReelOnPhone, startPhones } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import { generateCaption } from '@/lib/ai'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
+
+// Valeur datetime-local (fuseau LOCAL) décalée de `plusMin` minutes par rapport à maintenant.
+function schedLocalValue(plusMin: number): string {
+  const d = new Date(Date.now() + plusMin * 60_000)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+const defaultSchedVal = () => schedLocalValue(60)   // par défaut : dans 1h
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null; ig_status: string | null; last_post_at: string | null; account_state: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; duration: number | null; notes: string | null }
@@ -59,6 +67,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [vidMode, setVidMode] = useState<'seq' | 'random'>('random')  // répartition vidéo → compte (aléatoire par défaut)
   const [autoRemove, setAutoRemove] = useState(true)               // usage unique
   const [reelsTrial, setReelsTrial] = useState(false)              // essai Reels
+  const [schedOpen, setSchedOpen] = useState(false)                // modale de programmation
+  const [schedVal, setSchedVal] = useState('')                     // valeur datetime-local
   // Miniature (couverture) PAR vidéo = une FRAME de la vidéo, capturée avant de poster.
   // covers[videoId] = data URL JPEG de la frame choisie.
   const [coverPickerFor, setCoverPickerFor] = useState<{ id: string; url: string } | null>(null)
@@ -137,7 +147,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     return v.file_url ?? null
   }
 
-  async function launch() {
+  async function launch(scheduledUnix?: number) {
     if (!canLaunch) return
     const targets = phones.filter(p => sel.has(p.id) && p.geelark_id)
     const chosenVids = videos.filter(v => vidSel.has(v.id))
@@ -196,6 +206,29 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       p, v: assignment[k],
       cap: caps.length === 0 ? '' : capMode === 'random' ? caps[Math.floor(Math.random() * caps.length)] : caps[k % caps.length],
     }))
+
+    // ── PROGRAMMATION (PC éteint) : on crée les tâches RPA GeeLark avec un scheduleAt
+    // FUTUR. GeeLark démarre les téléphones et poste à l'heure prévue, dans son cloud —
+    // pas besoin de serveur ni de PC allumé. On ne boote/poll/éteint donc rien ici.
+    if (scheduledUnix) {
+      push(`🗓 Programmation pour le ${new Date(scheduledUnix * 1000).toLocaleString('fr-FR')} (GeeLark, PC éteint)…`)
+      let okN = 0, errN = 0
+      for (const { p, v, cap } of jobs) {
+        const ru = resourceByVid.get(v.id)
+        if (!ru) { run.markFailed(); errN++; setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); continue }
+        const r = await scheduleReelOnPhone(bearer, p.geelark_id!, ru, cap, scheduledUnix, push, reelsTrial, coverByVid.get(v.id))
+        if (r.ok) { okN++; postedVidIds.add(v.id) } else { run.markFailed(); errN++ }
+        setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.ok ? 'programmé ✓' : r.error } : it))
+      }
+      R.finish(); setRunId(null)
+      const { refunded } = await run.settle()
+      if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (échecs de programmation).`)
+      // Usage unique : NE PAS supprimer les vidéos ici — elles seront postées plus tard.
+      push(okN > 0 ? `✅ ${okN} post(s) programmé(s) sur GeeLark. Ils partiront tout seuls, PC éteint. (Visibles/annulables dans les « Task Logs » GeeLark.)` : '❌ Aucune programmation créée.')
+      setRunning(false); load()
+      return
+    }
+
     const concurrency = rot ? 1 : (simulPhones === 'all' ? jobs.length : Math.max(1, Number(simulPhones)))
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : concurrency >= jobs.length ? `⚡ ${jobs.length} téléphone(s) en parallèle.` : `⚡ Par lots de ${concurrency} téléphone(s).`)
 
@@ -239,12 +272,14 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       await unregisterPhoneWatch(batchIds)
     }
     R.finish()
-    // Historique (page Activité) + compteur : on enregistre TOUJOURS le run.
+    // Historique (page Activité) + compteur : on enregistre TOUJOURS le run. On AWAIT
+    // et on log l'échec éventuel (avant, fire-and-forget → des runs manquaient en silence).
     if (jobs.length > 0) {
-      supabase.from('post_runs').insert({
+      const { error: prErr } = await supabase.from('post_runs').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
         type: 'mass_posting', ok_count: okN, err_count: errN, total: jobs.length,
-      }).then(() => {}, () => {})
+      })
+      if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr.message}`)
     }
     setRunId(null)
     const { refunded } = await run.settle()
@@ -516,9 +551,11 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                   {balance !== null && <span style={{ fontSize: 10.5, color: '#52525B' }}>solde après : {Math.max(0, balance - cost).toLocaleString('fr-FR')}</span>}
                 </span>
               </div>
-              <div style={{ marginTop: 6 }}>
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <Btn theme={theme} tone="primary" disabled={!canLaunch} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z"
-                  label={running ? 'Publication…' : nSel === 0 ? 'Sélectionne des comptes' : nVid === 0 ? 'Choisis une vidéo' : `Lancer sur ${nSel} comptes`} onClick={launch} />
+                  label={running ? 'Publication…' : nSel === 0 ? 'Sélectionne des comptes' : nVid === 0 ? 'Choisis une vidéo' : `Lancer sur ${nSel} comptes`} onClick={() => launch()} />
+                <Btn theme={theme} tone="quiet" disabled={!canLaunch} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
+                  label="Programmer (PC éteint)" onClick={() => { setSchedVal(defaultSchedVal()); setSchedOpen(true) }} />
               </div>
             </div>
           </Panel>
@@ -560,6 +597,32 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
         <CoverFramePicker theme={theme} videoUrl={coverPickerFor.url}
           onClose={() => setCoverPickerFor(null)}
           onPick={(dataUrl) => { const id = coverPickerFor.id; setCovers(prev => ({ ...prev, [id]: dataUrl })); setCoverPickerFor(null) }} />
+      )}
+
+      {schedOpen && (
+        <Modal theme={theme} title="Programmer la publication" sub="GeeLark postera à l'heure choisie, dans son cloud — PC et ScaleFlow éteints."
+          icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" onClose={() => setSchedOpen(false)} width={430}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setSchedOpen(false)} />
+            <Btn theme={theme} tone="primary" label={`Programmer sur ${nSel} compte${nSel > 1 ? 's' : ''}`} disabled={!schedVal}
+              onClick={() => {
+                const ms = new Date(schedVal).getTime()
+                if (!isFinite(ms) || ms < Date.now() + 60_000) { alert('Choisis une heure future (au moins +1 min).'); return }
+                if (ms > Date.now() + 29 * 86_400_000) { alert('Max ~29 jours : les vidéos hébergées chez GeeLark expirent après 30 jours.'); return }
+                setSchedOpen(false); launch(Math.floor(ms / 1000))
+              }} />
+          </>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <label style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A' }}>Date et heure</label>
+            <input type="datetime-local" value={schedVal} min={schedLocalValue(1)} max={schedLocalValue(29 * 24 * 60)}
+              onChange={e => setSchedVal(e.target.value)}
+              style={{ height: 40, padding: '0 12px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.12)', color: '#F4F4F6', fontSize: 13, outline: 'none', colorScheme: 'dark' }} />
+            <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.6, color: '#71717A' }}>
+              La tâche est créée <b>maintenant</b> sur GeeLark (vidéos hébergées + crédits débités) et s'exécutera <b>toute seule</b> à l'heure prévue. Tu peux la voir/annuler dans les <b>Task Logs</b> de GeeLark. Max ~29 jours (au-delà, l'hébergement vidéo GeeLark expire).
+              {reelsTrial ? ' Mode essai activé.' : ''}
+            </p>
+          </div>
+        </Modal>
       )}
     </div>
   )

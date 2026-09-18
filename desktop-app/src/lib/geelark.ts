@@ -574,6 +574,60 @@ export async function postStoryToPhone(
 // Publie un Reel sur UN téléphone : démarre → tâche native instagramPubReels →
 // suit jusqu'au bout → éteint (anti-coût). `videoResourceUrl` doit être une URL
 // hébergée par GeeLark (voir geelarkUploadVideo). Best-effort, ne throw jamais.
+// Programme un Reel sur GeeLark pour une heure FUTURE : on crée juste la tâche RPA
+// avec un scheduleAt futur. GeeLark démarre le téléphone et exécute la tâche dans le
+// cloud À L'HEURE PRÉVUE, même PC/onglet fermés (aucun boot/poll/stop côté client).
+// Renvoie le taskId pour suivi éventuel. trial → flow Trial ; cover → flow miniature ;
+// sinon natif instagramPubReels.
+export async function scheduleReelOnPhone(
+  bearer: string,
+  phoneId: string,
+  videoResourceUrl: string,
+  caption: string,
+  scheduleAtUnix: number,
+  log: (m: string) => void,
+  trial?: boolean,
+  coverResourceUrl?: string,
+): Promise<{ ok: boolean; taskId?: string; error?: string }> {
+  const taskIdOf = (res: Record<string, unknown>): string | undefined => {
+    const d = res['data'] as Record<string, unknown> | undefined
+    return (d?.['taskId'] ?? d?.['id']) as string | undefined
+  }
+  try {
+    if (trial) {
+      const flowId = await ensureTrialFlowId(bearer, log).catch(() => null)
+      if (flowId) {
+        const res = await geelarkFetch('/task/rpa/add', {
+          id: phoneId, flowId, scheduleAt: scheduleAtUnix, name: 'Reels Trial Scaleflow (programmé)',
+          paramMap: { Video: [videoResourceUrl], Caption: caption ?? '', Trial: true },
+        }, bearer)
+        const taskId = taskIdOf(res)
+        if (Number(res['code']) === 0 && taskId) return { ok: true, taskId }
+        return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
+      }
+    }
+    if (coverResourceUrl && !trial) {
+      const flowId = await ensureReelsFlowId(bearer, log).catch(() => null)
+      if (flowId) {
+        const res = await geelarkFetch('/task/rpa/add', {
+          id: phoneId, flowId, scheduleAt: scheduleAtUnix, name: 'Reels Scaleflow (programmé)',
+          paramMap: { Caption: caption ?? '', Video: [videoResourceUrl], Cover: [coverResourceUrl] },
+        }, bearer)
+        const taskId = taskIdOf(res)
+        if (Number(res['code']) === 0 && taskId) return { ok: true, taskId }
+      }
+    }
+    const res = await geelarkFetch('/rpa/task/instagramPubReels', {
+      id: phoneId, scheduleAt: scheduleAtUnix, description: caption ?? '', video: [videoResourceUrl],
+    }, bearer)
+    const taskId = taskIdOf(res)
+    if (Number(res['code']) === 0 && taskId) return { ok: true, taskId }
+    return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
+  }
+}
+
 export async function postReelToPhone(
   bearer: string,
   phoneId: string,

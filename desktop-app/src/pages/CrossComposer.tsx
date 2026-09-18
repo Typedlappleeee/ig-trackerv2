@@ -114,10 +114,11 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     R.finish()
     const totalCross = targets.length * platList.length
     if (totalCross > 0) {
-      supabase.from('post_runs').insert({
+      const { error: prErr } = await supabase.from('post_runs').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
         type: 'mass_posting', ok_count: okN, err_count: errN, total: totalCross,
-      }).then(() => {}, () => {})
+      })
+      if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr.message}`)
     }
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés.`)
