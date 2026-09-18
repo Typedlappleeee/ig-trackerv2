@@ -26,6 +26,26 @@ async function checkLicense(userId: string, orgId: string | null): Promise<Omit<
   try { authEmail = (await supabase.auth.getUser()).data.user?.email ?? '' } catch { /* hors ligne */ }
   if (HARDCODED_SUPER_ADMINS.includes(authEmail)) return { isSuperAdmin: true, blowsome: true, valid: true, expired: false }
 
+  // SOURCE AUTORITAIRE : RPC SECURITY DEFINER `my_license` — lit la licence de
+  // l'appelant côté serveur (auth.uid()), en contournant la RLS de lecture. Sans
+  // ça, si la policy `lk_owner_select` n'est pas déployée, un compte AVEC licence
+  // valide était renvoyé sur l'écran d'activation. Fallback direct si non déployée.
+  try {
+    const { data, error } = await supabase.rpc('my_license')
+    if (!error && data) {
+      const r = data as { valid?: boolean; expired?: boolean; blowsome?: boolean; super?: boolean; own?: boolean; plan?: string; authless?: boolean }
+      // Session pas encore prête côté serveur → on ne verrouille pas (fail-open).
+      if (r.authless) return FAIL_OPEN
+      // Top-up mensuel best-effort pour les détenteurs de clé PERSO (pas les membres
+      // d'org : leurs crédits vont au propriétaire). Idempotent par mois côté RPC.
+      if (r.valid && r.own && r.plan && !r.super) {
+        try { const { maybeGrantMonthlyCredits } = await import('./credits'); void maybeGrantMonthlyCredits(userId, r.plan) } catch { /* ignore */ }
+      }
+      return { isSuperAdmin: !!r.super, blowsome: !!r.blowsome, valid: !!r.valid, expired: !!r.expired }
+    }
+    // error PGRST202 (RPC pas déployée) ou autre → on tombe sur le fallback direct.
+  } catch { /* fallback direct */ }
+
   try {
     const { data: profile, error: profErr } = await supabase
       .from('profiles').select('is_super_admin, email').eq('id', userId).maybeSingle()
@@ -70,12 +90,27 @@ async function checkLicense(userId: string, orgId: string | null): Promise<Omit<
 }
 
 // Active une clé pour le compte (RPC SECURITY DEFINER : claim atomique côté serveur).
+// Priorité à `claim_license_key(p_key)` qui se base sur auth.uid() → plus de
+// « Non autorisé » par mismatch d'id. Fallback vers l'ancienne RPC si non déployée.
 export async function activateKey(key: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  const k = key.trim()
+  type RpcRes = { ok?: boolean; error?: string; plan?: string } | null
   try {
-    const { data, error } = await supabase.rpc('activate_license_key', { p_key: key.trim(), p_user_id: userId })
-    if (error) return { ok: false, error: error.message }
-    const res = data as { ok?: boolean; error?: string } | null
+    let res: RpcRes = null
+    const claim = await supabase.rpc('claim_license_key', { p_key: k })
+    if (claim.error && /PGRST202|not find|schema cache/i.test(claim.error.message)) {
+      // RPC pas déployée → ancienne signature (p_key, p_user_id).
+      const legacy = await supabase.rpc('activate_license_key', { p_key: k, p_user_id: userId })
+      if (legacy.error) return { ok: false, error: legacy.error.message }
+      res = legacy.data as RpcRes
+    } else if (claim.error) {
+      return { ok: false, error: claim.error.message }
+    } else {
+      res = claim.data as RpcRes
+    }
     if (!res?.ok) return { ok: false, error: res?.error ?? 'Clé invalide ou déjà utilisée.' }
+    // Crédits mensuels du plan (best-effort ; idempotent par mois calendaire).
+    try { const { maybeGrantMonthlyCredits } = await import('./credits'); await maybeGrantMonthlyCredits(userId, res.plan ?? 'standard') } catch { /* ignore */ }
     return { ok: true }
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau.' } }
 }

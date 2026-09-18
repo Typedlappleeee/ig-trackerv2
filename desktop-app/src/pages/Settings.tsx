@@ -107,6 +107,10 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
 
   // ── Solde de crédits réel (org ou perso) ────────────────────────────────────────
   const [balance, setBalance] = useState<number | null>(null)
+  const reloadBalance = useCallback(async () => {
+    const b = currentOrg ? await fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : await fetchBalance(user.id)
+    setBalance(b)
+  }, [currentOrg?.id, currentOrg?.owner_id, user.id])
   useEffect(() => {
     let alive = true
     const p = currentOrg ? fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : fetchBalance(user.id)
@@ -171,7 +175,7 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
             nameInput={nameInput} setNameInput={setNameInput} savingName={savingName} saveName={saveName} notice={notice} onNavigate={onNavigate} />}
           {tab === 'org' && <OrgTab theme={theme} org={org} balance={balance} canManage={canManage} />}
           {tab === 'members' && <MembersTab theme={theme} org={org} members={members} canManage={canManage} currentUserId={user.id} onReload={loadMembers} />}
-          {tab === 'billing' && <BillingTab theme={theme} org={org} balance={balance} canManage={canManage} />}
+          {tab === 'billing' && <BillingTab theme={theme} user={user} org={org} balance={balance} canManage={canManage} onRedeemed={reloadBalance} />}
           {tab === 'proxy' && <ProxyRotationPanel theme={theme} user={user} org={org} />}
           {tab === 'infra' && <InfraTab theme={theme} user={user} org={org} canManage={canManage} />}
           {tab === 'notif' && <NotifTab theme={theme} email={user.email ?? null} />}
@@ -485,12 +489,27 @@ function MembersTab({ theme, org, members, canManage, currentUserId, onReload }:
 }
 
 // ══════════ ABONNEMENT & CRÉDITS ══════════
-function BillingTab({ theme, org, balance, canManage }: {
-  theme: Theme; org: OrgState; balance: number | null; canManage: boolean
+function BillingTab({ theme, user, org, balance, canManage, onRedeemed }: {
+  theme: Theme; user: User; org: OrgState; balance: number | null; canManage: boolean; onRedeemed: () => void
 }) {
   const { currentOrg } = org
   const planLabel = currentOrg ? 'Organisation' : 'Espace personnel'
   const [note, setNote] = useState(false)
+  // ── Utiliser un code de crédits ──
+  const [code, setCode] = useState('')
+  const [redeeming, setRedeeming] = useState(false)
+  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  async function redeem() {
+    const c = code.trim()
+    if (!c || redeeming) return
+    setRedeeming(true); setRedeemMsg(null)
+    const { redeemCreditCode, redeemCreditCodeForOrg } = await import('@/lib/credits')
+    const res = currentOrg ? await redeemCreditCodeForOrg(c, currentOrg.id) : await redeemCreditCode(c, user.id)
+    setRedeeming(false)
+    if (!res.ok) { setRedeemMsg({ ok: false, text: res.error ?? 'Code invalide ou déjà utilisé.' }); return }
+    setRedeemMsg({ ok: true, text: `+${res.amount ?? 0} crédits ajoutés.` })
+    setCode(''); onRedeemed()
+  }
   return (
     <>
       <div style={{
@@ -529,6 +548,22 @@ function BillingTab({ theme, org, balance, canManage }: {
           <div style={{ marginTop: 10, fontSize: 11.5, color: '#71717A' }}>
             Publication : 2 crédits / appareil · Story : 1 crédit / appareil · Tâches automatiques : 50 crédits / jour.
           </div>
+        </div>
+      </Panel>
+
+      <Panel theme={theme}>
+        <PanelHead title="Utiliser un code de crédits" sub={currentOrg ? 'Crédité sur le solde de l’organisation.' : 'Crédité sur ton solde personnel.'} />
+        <div style={{ padding: '15px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input value={code} onChange={e => { setCode(e.target.value.toUpperCase()); setRedeemMsg(null) }}
+              onKeyDown={e => { if (e.key === 'Enter') redeem() }}
+              placeholder="CR-XXXX-XXXX" spellCheck={false} autoComplete="off"
+              style={{ flex: 1, minWidth: 180, height: 38, padding: '0 12px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#F4F4F6', fontSize: 13, fontFamily: "'JetBrains Mono',monospace", letterSpacing: '0.04em', outline: 'none' }} />
+            <Btn theme={theme} tone="primary" label={redeeming ? 'Validation…' : 'Valider le code'} disabled={redeeming || !code.trim()} onClick={redeem} />
+          </div>
+          {redeemMsg && (
+            <div style={{ fontSize: 12, fontWeight: 600, color: redeemMsg.ok ? '#34D399' : '#FCA5A5' }}>{redeemMsg.text}</div>
+          )}
         </div>
       </Panel>
     </>
