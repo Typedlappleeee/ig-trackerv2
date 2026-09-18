@@ -6,12 +6,13 @@ import { supabase } from './supabase'
 
 export const CREDIT_COSTS = { posting: 2, mass_posting: 2, story: 1 } as const
 
-// Crédits mensuels par plan (alignés sur electron-app). 'business' = 'organisation'.
+// Crédits mensuels par plan (grille officielle ScaleFlow). 'business' = 'organisation'.
+// Standard 49,99$ → 2 500 · Pro 99,99$ → 5 500 · Organisation 149,99$ → 11 000.
 export const PLAN_MONTHLY_CREDITS: Record<string, number> = {
-  standard: 3750,
-  pro: 11250,
-  organisation: 22500,
-  business: 22500,
+  standard: 2500,
+  pro: 5500,
+  organisation: 11000,
+  business: 11000,
 }
 
 // Octroi des crédits mensuels du plan (idempotent par mois calendaire côté RPC).
