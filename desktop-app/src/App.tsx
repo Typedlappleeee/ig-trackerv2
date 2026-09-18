@@ -17,7 +17,6 @@ import Recipes from '@/pages/Recipes'
 import Publish from '@/pages/Publish'
 import Warmup from '@/pages/Warmup'
 import Studio from '@/pages/Studio'
-import Insights from '@/pages/Insights'
 import Connections from '@/pages/Connections'
 import Automation from '@/pages/Automation'
 import Flows from '@/pages/Flows'
@@ -40,7 +39,7 @@ const SPECS: Partial<Record<PageKey, PlaceholderSpec>> = {
   automation: { title: 'Automatisation', sub: 'Programmer et automatiser tes publications.', icon: 'M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z', emptyTitle: 'À brancher', emptyText: 'Le calendrier et les tâches automatiques seront ajoutés ensuite.' },
   warmup: { title: 'Warmup', sub: 'Chauffer tes comptes pour réduire les blocages.', icon: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z', emptyTitle: 'À brancher', emptyText: 'Le warmup des comptes sera ajouté ensuite.' },
   studio: { title: 'Studio vidéo', sub: 'Remixer et transformer tes vidéos.', icon: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z', emptyTitle: 'À brancher', emptyText: 'Les outils vidéo (remix, spoof, sous-titres) seront ajoutés ensuite.' },
-  insights: { title: 'Performances', sub: 'Tes vues, ta croissance et tes tendances.', icon: 'M3 3v18h18|M7 15l4-6 4 3 5-8', emptyTitle: 'À brancher', emptyText: 'Les graphiques de performance seront ajoutés ensuite.' },
+  insights: { title: 'Performances', sub: 'Tes vues, ta croissance et tes tendances.', icon: 'M3 3v18h18|M7 15l4-6 4 3 5-8', emptyTitle: 'En développement', emptyText: 'Cette section arrive bientôt — on la rebranche après les stats Meta officielles.' },
   health: { title: 'Santé des comptes', sub: 'Le risque par compte : âge, cadence, blocages.', icon: 'M12 21s-8-4.5-8-11a5 5 0 0 1 8-3 5 5 0 0 1 8 3c0 6.5-8 11-8 11z|M9 12h2l1-2 1 4 1-2h2', emptyTitle: 'À brancher', emptyText: 'Le score de santé par compte sera ajouté ensuite.' },
   settings: { title: 'Réglages', sub: 'Ton compte, ton organisation et tes préférences.', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V15z', emptyTitle: 'À brancher', emptyText: 'Les réglages du compte et de l’organisation seront ajoutés ensuite.' },
 }
@@ -106,7 +105,7 @@ function AppInner({ user }: { user: User }) {
       : page === 'blowTools' ? <Studio theme={theme} infra={infra} user={user} org={org} />
       : page === 'publish' ? <Publish theme={theme} infra={infra} user={user} org={org} />
       : page === 'bank' ? <Bank theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
-      : page === 'insights' ? <Insights theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
+      : page === 'insights' ? <Placeholder theme={theme} spec={SPECS.insights!} />
       : <BlowsomeHome user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />)
     : page === 'hub'
     ? <Home theme={theme} infra={infra} user={user} data={data} loading={loading} reload={reload} onNavigate={setPage} />
@@ -127,9 +126,11 @@ function AppInner({ user }: { user: User }) {
         : page === 'warmup'
         ? <Warmup theme={theme} infra={infra} user={user} org={org} />
         : page === 'studio'
-        ? <Studio theme={theme} infra={infra} user={user} org={org} />
+        ? <Studio theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
+        : page === 'blowContent'
+        ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'insights'
-        ? <Insights theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
+        ? <Placeholder theme={theme} spec={SPECS.insights!} />
         : page === 'connections'
         ? <Connections theme={theme} infra={infra} user={user} org={org} />
         : page === 'flows'

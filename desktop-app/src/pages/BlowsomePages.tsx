@@ -311,6 +311,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [variants, setVariants] = useState(3)
   // Anti-détection : intensité du spoof + localisation GPS (métadonnées mp4).
   const [intensity, setIntensity] = useState<SpoofIntensity>('normal')
+  const [tendance, setTendance] = useState(false)   // preset « tendance » : vitesse marquée + spoof fort
   const [gpsCity, setGpsCity] = useState('none')
   const [device, setDevice] = useState('none')   // appareil spoofé (fabricant/modèle mp4)
   // Légendes : pool (une par ligne) distribué seq/aléatoire, format + placement.
@@ -430,7 +431,10 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             else if (aiCap) capText = aiCap
           }
           const pos: CaptionPos = capManual ? { x: capX, y: capY } : capPos
-          const speed = useSpeed ? sMin + Math.random() * Math.max(0, sMax - sMin) : null
+          // Mode Tendance : micro-vitesse plus marquée (0,94–1,06×) + spoof renforcé →
+          // chaque variante « suit la tendance » tout en restant unique pour l'algo.
+          const speed = tendance ? +(0.94 + Math.random() * 0.12).toFixed(3)
+            : useSpeed ? sMin + Math.random() * Math.max(0, sMax - sMin) : null
           // Coupe : aléatoire (début + fin, unique par variante) OU fixe (début/fin).
           let vStart: number | null = null, vEnd: number | null = null
           if (useTrim) {
@@ -442,7 +446,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           }
           const out = await runAutoVariant(bytes, {
             seed: Math.random() * 1000,
-            intensity, gps: gpsFor(gpsCity), device,
+            intensity: tendance ? 'strong' : intensity, gps: gpsFor(gpsCity), device,
             trimStart: vStart,
             trimEnd: vEnd,
             speed,
@@ -541,7 +545,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
 
         {/* Anti-détection & montage */}
         <Grp title="Anti-détection & montage">
-          <Fld label="Anti-détection"><Seg value={intensity} onChange={setIntensity} options={[{ v: 'subtle', label: 'Subtile' }, { v: 'normal', label: 'Normale' }, { v: 'strong', label: 'Forte' }]} /></Fld>
+          <Sw on={tendance} onChange={setTendance} label="🔥 Mode Tendance" sub="Micro-vitesse marquée (0,94–1,06×) + spoof renforcé → variantes « tendance » & uniques" />
+          {!tendance && <Fld label="Anti-détection"><Seg value={intensity} onChange={setIntensity} options={[{ v: 'subtle', label: 'Subtile' }, { v: 'normal', label: 'Normale' }, { v: 'strong', label: 'Forte' }]} /></Fld>}
           <Fld label="Localisation GPS"><select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={selStyle}>{GPS_CITIES.map(c => <option key={c.k} value={c.k} style={optStyle}>{c.label}</option>)}</select></Fld>
           <Fld label="Appareil (spoof)"><select value={device} onChange={e => setDevice(e.target.value)} style={selStyle}>{SPOOF_DEVICES.map(d => <option key={d.k} value={d.k} style={optStyle}>{d.label}</option>)}</select></Fld>
           <Sw on={useTrim} onChange={setUseTrim} label="Couper la vidéo" sub="Retire un bout au début ET à la fin (unique par variante)" />

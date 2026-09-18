@@ -35,8 +35,8 @@ function isVid(v: Video): boolean {
   return !IMG_EXT.includes(ext)
 }
 
-export default function Studio({ theme, infra, user, org }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState
+export default function Studio({ theme, infra, user, org, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
 }) {
   const { currentOrg } = org
   const conns = useConnections(user, org)
@@ -202,6 +202,21 @@ export default function Studio({ theme, infra, user, org }: {
     return (
       <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
         <PageHead title="Studio vidéo" sub="Une vidéo source, tous tes outils VIP — incrustation, montage, mixer, remix, spoof, sous-titres. Tout est gratuit, aucun crédit consommé." />
+        {onNavigate && (
+          <button onClick={() => onNavigate('blowContent')} style={{
+            display: 'flex', alignItems: 'center', gap: 15, width: '100%', padding: 18, marginBottom: 12, borderRadius: 12, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
+            background: 'linear-gradient(120deg, rgba(52,211,153,0.14), rgba(139,92,246,0.1))', border: '1px solid rgba(52,211,153,0.3)', transition: 'all .18s ease',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.6)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.3)'; e.currentTarget.style.transform = 'none' }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: 'rgba(52,211,153,0.16)', border: '1px solid rgba(52,211,153,0.3)', color: '#34D399' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={19} /></span>
+            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F6' }}>Auto-contenu</span><Chip text="Recommandé" tone="ok" /></span>
+              <span style={{ fontSize: 12, lineHeight: 1.55, color: '#9C99AA' }}>Une source → X variantes uniques en un clic : légende (pool + style), coupe, micro-vitesse, mode Tendance et spoof (device/GPS).</span>
+            </span>
+            <span style={{ display: 'flex', color: '#34D399' }}><Icon d="M9 18l6-6-6-6" size={17} /></span>
+          </button>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
           {TOOLS.map(t => (
             <button key={t.k} onClick={() => { setTool(t.k); setSrc(new Set()); setResults([]); setLogs([]); setOverlayImgs([]) }} style={{

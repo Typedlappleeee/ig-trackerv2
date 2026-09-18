@@ -50,12 +50,11 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       ],
     },
     {
+      // « Automatisation » retirée pour le moment (à la demande).
       g: 'Diffusion', items: cloud ? [
-        { k: 'flows', l: 'Automatisation', i: 'M12 8V4H8|M4 4h16v16H4z|M9 16h6' },
         { k: 'recipes', l: 'Mes séquences', i: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6' },
       ] : [
         { k: 'publish', l: 'Publication', i: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
-        { k: 'automation', l: 'Automatisation', i: 'M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z' },
         { k: 'warmup', l: 'Warmup', i: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z' },
       ],
     },
