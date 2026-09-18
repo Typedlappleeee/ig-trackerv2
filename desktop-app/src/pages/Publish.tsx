@@ -21,33 +21,39 @@ export default function Publish({ theme, infra, user, org }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState
 }) {
   const [mode, setMode] = useState<string | null>(null)
+  // Cross-posting réservé aux admins (owner/admin de l'organisation).
+  const isAdmin = org.role === 'owner' || org.role === 'admin'
 
   if (mode === 'reels') return <ReelsComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
   if (mode === 'story') return <StoryComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
-  if (mode === 'cross') return <CrossComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
+  if (mode === 'cross' && isAdmin) return <CrossComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Publication" sub="Choisis un format. Les comptes et le contenu se règlent à l'étape suivante." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
-        {FORMATS.map(f => (
-          <button key={f.id} disabled={!f.ready} onClick={f.id === 'reels' ? () => setMode('reels') : f.id === 'story' ? () => setMode('story') : f.id === 'cross' ? () => setMode('cross') : undefined} style={{
+        {FORMATS.map(f => {
+          const adminOnly = f.id === 'cross' && !isAdmin
+          const locked = !f.ready || adminOnly
+          return (
+          <button key={f.id} disabled={locked} onClick={locked ? undefined : f.id === 'reels' ? () => setMode('reels') : f.id === 'story' ? () => setMode('story') : f.id === 'cross' ? () => setMode('cross') : undefined} style={{
             display: 'flex', flexDirection: 'column', gap: 12, padding: 18, borderRadius: 10, background: '#101015',
-            border: '1px solid rgba(255,255,255,0.06)', cursor: f.ready ? 'pointer' : 'not-allowed', opacity: f.ready ? 1 : 0.5,
+            border: '1px solid rgba(255,255,255,0.06)', cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.5 : 1,
             textAlign: 'left', transition: 'all .18s ease', boxSizing: 'border-box',
           }}
-            onMouseEnter={e => { if (!f.ready) return; e.currentTarget.style.borderColor = `rgba(${f.tone},0.4)`; e.currentTarget.style.background = '#13131A' }}
+            onMouseEnter={e => { if (locked) return; e.currentTarget.style.borderColor = `rgba(${f.tone},0.4)`; e.currentTarget.style.background = '#13131A' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.background = '#101015' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, background: `rgba(${f.tone},0.12)`, border: `1px solid rgba(${f.tone},0.24)`, color: `rgb(${f.tone})` }}>
                 <Icon d={f.icon} size={16} />
               </span>
               <span style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F6' }}>{f.t}</span>
-              <span style={{ marginLeft: 'auto' }}><Chip text={f.ready ? f.cost : 'Bientôt'} tone="mute" /></span>
+              <span style={{ marginLeft: 'auto' }}><Chip text={adminOnly ? 'Admin' : f.ready ? f.cost : 'Bientôt'} tone={adminOnly ? 'violet' : 'mute'} /></span>
             </span>
-            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>{f.d}</span>
+            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>{adminOnly ? 'Réservé aux administrateurs de l’organisation.' : f.d}</span>
           </button>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
