@@ -26,6 +26,7 @@ import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 import { SiteLanding } from '@/pages/SiteLanding'
 import Admin from '@/pages/Admin'
 import Scheduled from '@/pages/Scheduled'
+import LicenseGate from '@/pages/LicenseGate'
 
 // Spécifications des écrans encore en placeholder (gabarit PageHead + état vide).
 const SPECS: Partial<Record<PageKey, PlaceholderSpec>> = {
@@ -94,6 +95,13 @@ function AppInner({ user }: { user: User }) {
     await supabase.auth.signOut()
     localStorage.removeItem('sb-fvmkmkspfksscgqyvysl-auth-token')
     location.replace('./login.dc.html')
+  }
+
+  // Porte de licence : connecté mais sans licence valide → écran d'activation, pas
+  // d'accès à l'app (comme l'ancien web). On attend la fin du check pour ne pas
+  // afficher la porte pendant le chargement. Fail-open géré dans checkLicense.
+  if (!license.loading && !license.valid) {
+    return <LicenseGate user={user} expired={license.expired} onActivated={() => window.location.reload()} onSignOut={signOut} />
   }
 
   const userName = firstNameFrom(data?.displayName ?? null, user.email)

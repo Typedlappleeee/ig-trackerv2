@@ -3,56 +3,86 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { OrgState } from './data'
 
-// Licence — sous-ensemble RÉEL porté de electron-app/src/lib/license.ts.
-// On ne retient ici que ce dont l'app desktop a besoin pour le moment : l'add-on
-// `blowsome` (accès à l'infra VIP) et `isSuperAdmin`. MÊME logique de portes que le web.
+// Licence — porté de electron-app/src/lib/license.ts.
+// `valid` = le compte a le droit d'utiliser l'app (clé active non expirée, OU membre
+// d'une org dont l'owner a une clé, OU superadmin). Sans ça → écran d'activation.
 export interface License {
   isSuperAdmin: boolean
   blowsome: boolean
+  valid: boolean
+  expired: boolean   // avait une clé mais elle a expiré (≠ n'a jamais eu de clé)
   loading: boolean
 }
 
 const HARDCODED_SUPER_ADMINS = ['tintin.aunea@gmail.com']
 
-async function checkLicense(userId: string, orgId: string | null): Promise<{ isSuperAdmin: boolean; blowsome: boolean }> {
-  // Le superadmin a TOUJOURS Blowsome, même base injoignable (email pris de la session).
+// Sécurité DISPONIBILITÉ : si la BASE est injoignable (500, réseau, cache schéma), on
+// n'enferme PAS tout le monde dehors → on considère l'accès valide (fail-open). Le
+// verrouillage licence ne doit jamais transformer une panne Supabase en panne totale.
+const FAIL_OPEN: Omit<License, 'loading'> = { isSuperAdmin: false, blowsome: false, valid: true, expired: false }
+
+async function checkLicense(userId: string, orgId: string | null): Promise<Omit<License, 'loading'>> {
   let authEmail = ''
   try { authEmail = (await supabase.auth.getUser()).data.user?.email ?? '' } catch { /* hors ligne */ }
-  if (HARDCODED_SUPER_ADMINS.includes(authEmail)) return { isSuperAdmin: true, blowsome: true }
+  if (HARDCODED_SUPER_ADMINS.includes(authEmail)) return { isSuperAdmin: true, blowsome: true, valid: true, expired: false }
 
   try {
-    const { data: profile, error } = await supabase
+    const { data: profile, error: profErr } = await supabase
       .from('profiles').select('is_super_admin, email').eq('id', userId).maybeSingle()
-    if (error) return { isSuperAdmin: false, blowsome: false } // fail-closed pour Blowsome
-    const isSuperAdmin = !!(profile as any)?.is_super_admin
-      || HARDCODED_SUPER_ADMINS.includes((profile as any)?.email ?? '')
-    if (isSuperAdmin) return { isSuperAdmin: true, blowsome: true }
+    if (profErr) return FAIL_OPEN
+    const isSuperAdmin = !!(profile as any)?.is_super_admin || HARDCODED_SUPER_ADMINS.includes((profile as any)?.email ?? '')
+    if (isSuperAdmin) return { isSuperAdmin: true, blowsome: true, valid: true, expired: false }
 
-    let blowsome = false
-    // Add-on hérité de l'orga (l'OWNER a Blowsome) — RPC SECURITY DEFINER best-effort.
+    // Accès hérité de l'organisation (l'OWNER a une clé) — best-effort via RPC.
+    let orgValid = false, orgBlowsome = false
     if (orgId) {
-      try {
-        const { data: rpcBlow } = await supabase.rpc('org_owner_blowsome', { p_org: orgId })
-        if (rpcBlow === true) blowsome = true
-      } catch { /* RPC absente */ }
+      try { const { data } = await supabase.rpc('org_owner_plan', { p_org: orgId }); if (data) orgValid = true } catch { /* RPC absente */ }
+      try { const { data } = await supabase.rpc('org_owner_blowsome', { p_org: orgId }); if (data === true) { orgBlowsome = true; orgValid = true } } catch { /* ignore */ }
     }
-    // Clé de licence personnelle avec l'add-on blowsome.
-    if (!blowsome) {
-      try {
-        const { data: keys } = await supabase
-          .from('license_keys').select('blowsome, is_active').eq('user_id', userId).eq('is_active', true)
-        if (Array.isArray(keys) && keys.some((k: any) => k?.blowsome === true)) blowsome = true
-      } catch { /* colonne/table absente */ }
+
+    // Clés PERSO actives. La colonne blowsome peut manquer → on retente sans.
+    let res = await supabase.from('license_keys').select('expires_at, blowsome, is_active').eq('user_id', userId).eq('is_active', true)
+    if (res.error && /blowsome/.test(res.error.message)) {
+      res = await supabase.from('license_keys').select('expires_at, is_active').eq('user_id', userId).eq('is_active', true) as typeof res
     }
-    return { isSuperAdmin: false, blowsome }
+    if (res.error) return FAIL_OPEN
+    const ownKeys = (res.data ?? []) as { expires_at: string | null; blowsome?: boolean }[]
+    const now = Date.now()
+    const validKeys = ownKeys.filter(k => !k.expires_at || new Date(k.expires_at).getTime() > now)
+
+    if (validKeys.length > 0) {
+      const blowsome = validKeys.some(k => k.blowsome === true) || orgBlowsome
+      return { isSuperAdmin: false, blowsome, valid: true, expired: false }
+    }
+    if (ownKeys.length > 0) {
+      // Avait des clés mais toutes expirées → invalide (sauf si l'org couvre encore).
+      if (orgValid) return { isSuperAdmin: false, blowsome: orgBlowsome, valid: true, expired: false }
+      return { isSuperAdmin: false, blowsome: false, valid: false, expired: true }
+    }
+    // Aucune clé perso : accès via org, sinon → écran d'activation.
+    if (orgValid) return { isSuperAdmin: false, blowsome: orgBlowsome, valid: true, expired: false }
+    // Distingue « clé expirée/désactivée » de « jamais eu de clé ».
+    const { data: anyKey } = await supabase.from('license_keys').select('expires_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    return { isSuperAdmin: false, blowsome: false, valid: false, expired: !!anyKey }
   } catch {
-    return { isSuperAdmin: false, blowsome: false }
+    return FAIL_OPEN
   }
+}
+
+// Active une clé pour le compte (RPC SECURITY DEFINER : claim atomique côté serveur).
+export async function activateKey(key: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc('activate_license_key', { p_key: key.trim(), p_user_id: userId })
+    if (error) return { ok: false, error: error.message }
+    const res = data as { ok?: boolean; error?: string } | null
+    if (!res?.ok) return { ok: false, error: res?.error ?? 'Clé invalide ou déjà utilisée.' }
+    return { ok: true }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau.' } }
 }
 
 export function useLicense(user: User, org: OrgState): License {
   const { currentOrg } = org
-  const [lic, setLic] = useState<License>({ isSuperAdmin: false, blowsome: false, loading: true })
+  const [lic, setLic] = useState<License>({ isSuperAdmin: false, blowsome: false, valid: true, expired: false, loading: true })
   useEffect(() => {
     let cancelled = false
     setLic(l => ({ ...l, loading: true }))
