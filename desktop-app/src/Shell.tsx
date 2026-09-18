@@ -11,6 +11,7 @@ export type PageKey =
   | 'studio'
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools'
+  | 'admin'
   | 'settings'
 
 interface NavItem { k: PageKey; l: string; i: string; n?: number }
@@ -93,18 +94,19 @@ const TITLES: Record<PageKey, string[]> = {
   blowParc: ['Blowsome', 'Phone Farm'],
   blowContent: ['Blowsome', 'Auto-contenu'],
   blowTools: ['Blowsome', 'Outils VIP'],
+  admin: ['Admin', 'Licences'],
   settings: ['Réglages'],
 }
 
 export default function Shell({
   theme, infra, setInfra, page, setPage,
-  userName, orgName, role, balance, phoneCount, videoCount, canBlowsome,
+  userName, orgName, role, balance, phoneCount, videoCount, canBlowsome, isAdmin,
   orgs, currentOrgId, onSwitchOrg, onSignOut, children,
 }: {
   theme: Theme; infra: InfraKey; setInfra: (k: InfraKey) => void
   page: PageKey; setPage: (p: PageKey) => void
   userName: string; orgName: string; role: string; balance: number | null
-  phoneCount: number | null; videoCount: number | null; canBlowsome: boolean
+  phoneCount: number | null; videoCount: number | null; canBlowsome: boolean; isAdmin?: boolean
   orgs: { id: string; name: string }[]; currentOrgId: string | null; onSwitchOrg: (id: string | null) => void
   onSignOut: () => void; children: ReactNode
 }) {
@@ -128,7 +130,10 @@ export default function Shell({
   }, [])
 
   // Compteurs de nav = vrais counts (téléphones, banque) ; null tant que non chargés.
-  const NAV = navFor(infra, phoneCount, videoCount)
+  const NAV = [
+    ...navFor(infra, phoneCount, videoCount),
+    ...(isAdmin ? [{ g: 'Admin', items: [{ k: 'admin' as PageKey, l: 'Admin · Licences', i: 'M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z' }] }] : []),
+  ]
 
   const path = TITLES[page] ?? ['Accueil']
   const navW = navOpen ? 212 : 56

@@ -25,6 +25,7 @@ import Settings from '@/pages/Settings'
 import RunWidget from '@/components/RunWidget'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 import { SiteLanding } from '@/pages/SiteLanding'
+import Admin from '@/pages/Admin'
 
 // Spécifications des écrans encore en placeholder (gabarit PageHead + état vide).
 const SPECS: Partial<Record<PageKey, PlaceholderSpec>> = {
@@ -135,6 +136,8 @@ function AppInner({ user }: { user: User }) {
         ? <Flows theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'automation'
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
+        : page === 'admin'
+        ? (license.isSuperAdmin ? <Admin theme={theme} user={user} /> : <Home theme={theme} infra={infra} user={user} data={data} loading={loading} reload={reload} onNavigate={setPage} />)
         : page === 'settings'
         ? <Settings theme={theme} user={user} org={org} onSignOut={signOut} onNavigate={(p) => setPage(p as PageKey)} />
         : <Placeholder theme={theme} spec={SPECS[page] ?? SPECS.settings!} />
@@ -148,6 +151,7 @@ function AppInner({ user }: { user: User }) {
       phoneCount={data?.phoneCount ?? null}
       videoCount={data?.videoCount ?? null}
       canBlowsome={license.blowsome}
+      isAdmin={license.isSuperAdmin}
       orgs={org.myOrgs.map(o => ({ id: o.org.id, name: o.org.name }))}
       currentOrgId={org.currentOrg?.id ?? null}
       onSwitchOrg={org.switchOrg}
