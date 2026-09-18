@@ -413,26 +413,52 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   async function deleteMedia(ids: string[]) {
     if (ids.length === 0) return
     setDeleting(true)
-    const idSet = new Set(ids)
-    const targets = items.filter(i => idSet.has(i.id))
-    const objs = targets.flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
-    // IMPORTANT : on supprime PAR LOTS. Un seul .in('id', [600 ids]) encode tous les
-    // ids dans l'URL (~22 Ko) → dépasse la limite de longueur d'URL → la requête
-    // échoue et RIEN n'est supprimé. Idem pour storage.remove (limite de chemins).
     const chunk = <T,>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
-    // 1) Fichiers du bucket (best-effort) par lots de 100.
-    for (const part of chunk(objs, 100)) {
+    const idSet = new Set(ids)
+    const objsFallback = items.filter(i => idSet.has(i.id)).flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
+
+    let deleted = 0; let firstErr: string | null = null; let rpcMissing = false
+    const bucketPaths: string[] = []
+    // Voie fiable : RPC SECURITY DEFINER — supprime ce que l'appelant a le DROIT de
+    // supprimer et renvoie le VRAI nombre. Par lots (URL/payload limités).
+    for (const part of chunk(ids, 200)) {
+      const { data, error } = await supabase.rpc('delete_bank_items', { p_ids: part })
+      if (error) {
+        if (/PGRST202|not find|schema cache/i.test(error.message)) { rpcMissing = true; break }
+        if (!firstErr) firstErr = error.message
+        continue
+      }
+      const r = data as { deleted?: number; paths?: string[] } | null
+      deleted += r?.deleted ?? 0
+      if (Array.isArray(r?.paths)) bucketPaths.push(...(r!.paths as string[]))
+    }
+
+    // Fallback (RPC pas déployée) : DELETE direct par lots, avec .select() pour
+    // connaître le VRAI nombre supprimé (0 = bloqué par la RLS → message honnête).
+    if (rpcMissing) {
+      deleted = 0; firstErr = null
+      for (const part of chunk(ids, 100)) {
+        const { data, error } = await supabase.from('content_bank').delete().in('id', part).select('id')
+        if (error) { if (!firstErr) firstErr = error.message } else { deleted += (data?.length ?? 0) }
+      }
+      bucketPaths.push(...objsFallback)
+    }
+
+    // Purge des fichiers du bucket par lots (best-effort).
+    for (const part of chunk(bucketPaths, 100)) {
       try { if (part.length) await supabase.storage.from('content').remove(part) } catch { /* best-effort */ }
     }
-    // 2) Lignes content_bank par lots de 100 — on additionne les vraies erreurs.
-    let deleted = 0; let firstErr: string | null = null
-    for (const part of chunk(ids, 100)) {
-      const { error } = await supabase.from('content_bank').delete().in('id', part)
-      if (error) { if (!firstErr) firstErr = error.message } else { deleted += part.length }
-    }
+
     setDeleting(false); setConfirmDel(null)
-    if (firstErr && deleted === 0) { setNotice(`Échec de la suppression : ${firstErr}`); return }
-    setNotice(firstErr ? `${deleted}/${ids.length} média(s) supprimé(s) — certains ont échoué (${firstErr}).` : `${deleted} média(s) supprimé(s).`)
+    if (deleted === 0) {
+      setNotice(firstErr
+        ? `Échec de la suppression : ${firstErr}`
+        : "Aucun média supprimé — ils appartiennent à un autre compte ou à une organisation où tu n'es pas admin. Connecte-toi avec le compte propriétaire, ou passe admin de l'orga.")
+      setSel(new Set()); load(); return
+    }
+    setNotice(deleted < ids.length
+      ? `${deleted}/${ids.length} média(s) supprimé(s) — les autres ne t'appartiennent pas (autre compte/orga).`
+      : `${deleted} média(s) supprimé(s).`)
     setSel(new Set()); load()
   }
 
@@ -465,10 +491,21 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     setFolderMenu(null); if (folder === oldName) setFolder(n); load()
   }
   async function deleteFolder(name: string) {
-    // Dégroupe les médias (folder → null) puis supprime la ligne sentinelle du dossier.
-    await scopeQ(supabase.from('content_bank').update({ folder: null }).eq('folder', name).not('notes', 'in', '("__sf_folder__","__sf_drive_folder__")'))
-    await scopeQ(supabase.from('content_bank').delete().eq('folder', name).in('notes', ['__sf_folder__', '__sf_drive_folder__']))
-    setFolderMenu(null); if (folder === name) setFolder('Tous'); load()
+    // Dégroupe les médias (folder → null). Nécessite le droit d'update sur ces lignes.
+    const { error: upErr } = await scopeQ(supabase.from('content_bank').update({ folder: null }).eq('folder', name).not('notes', 'in', '("__sf_folder__","__sf_drive_folder__")'))
+    // Supprime la/les ligne(s) sentinelle(s) du dossier via la RPC fiable (RLS-proof),
+    // fallback DELETE direct si la RPC n'est pas déployée.
+    const { data: sentinels } = await scopeQ(supabase.from('content_bank').select('id').eq('folder', name).in('notes', ['__sf_folder__', '__sf_drive_folder__']))
+    const sentIds = ((sentinels ?? []) as { id: string }[]).map(r => r.id)
+    if (sentIds.length) {
+      const { error } = await supabase.rpc('delete_bank_items', { p_ids: sentIds })
+      if (error && /PGRST202|not find|schema cache/i.test(error.message)) {
+        await scopeQ(supabase.from('content_bank').delete().in('id', sentIds))
+      }
+    }
+    setFolderMenu(null); if (folder === name) setFolder('Tous')
+    if (upErr) setNotice(`Le dossier n'a pas pu être vidé : ${upErr.message} — ces médias appartiennent peut-être à un autre compte.`)
+    load()
   }
 
   // ── Lecteur vidéo (double-clic) + menu contextuel (clic droit) ───────────────
