@@ -7,7 +7,8 @@ import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
-import { geelarkUploadImage, postStoryToPhone } from '@/lib/geelark'
+import { geelarkUploadImage, postStoryToPhone, scheduleStoryOnPhone } from '@/lib/geelark'
+import ScheduleModal from '@/components/ScheduleModal'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
@@ -87,6 +88,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
   const chosenImgs = images.filter(m => imageIds.includes(m.id))
   const nLinked = selected.filter(p => (links[p.id] ?? '').trim()).length
   const ready = nSel > 0 && chosenImgs.length > 0 && nLinked === nSel && !!bearer && !running
+  const [schedOpen, setSchedOpen] = useState(false)
 
   async function resolveUrl(m: Media): Promise<string | null> {
     if (m.storage_path) {
@@ -96,7 +98,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     return m.file_url ?? m.thumbnail_url ?? null
   }
 
-  async function launch() {
+  async function launch(scheduledUnix?: number) {
     if (!ready) return
     const targets = selected.filter(p => p.geelark_id)
     setRunning(true); setLogs([])
@@ -136,6 +138,23 @@ export default function StoryComposer({ theme, user, org, onBack }: {
       p, img: imgOrder[k % imgOrder.length],
       st: sts.length === 0 ? 'Voir plus' : stMode === 'random' ? sts[Math.floor(Math.random() * sts.length)] : sts[k % sts.length],
     }))
+    // Programmation (PC éteint) : tâches GeeLark avec scheduleAt futur (cf. Reels).
+    if (scheduledUnix) {
+      push(`🗓 Programmation pour le ${new Date(scheduledUnix * 1000).toLocaleString('fr-FR')} (GeeLark, PC éteint)…`)
+      let sok = 0, serr = 0
+      for (const { p, img, st } of jobs) {
+        const r = await scheduleStoryOnPhone(bearer, p.geelark_id!, { imageResourceUrl: resByImg.get(img.id)!, linkUrl: links[p.id], linkText: st }, scheduledUnix, push)
+        if (r.ok) sok++; else { run.markFailed(); serr++ }
+        setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.ok ? 'programmée ✓' : r.error } : it))
+      }
+      R.finish()
+      const { refunded } = await run.settle()
+      if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (échecs).`)
+      push(sok > 0 ? `✅ ${sok} story(s) programmée(s) sur GeeLark (PC éteint).` : '❌ Aucune programmation créée.')
+      setRunning(false)
+      return
+    }
+
     const concurrency = rot ? 1 : jobs.length
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${jobs.length} compte(s) en parallèle.`)
     let okN = 0, errN = 0
@@ -178,8 +197,10 @@ export default function StoryComposer({ theme, user, org, onBack }: {
         sub="Une image et un sticker lien propre à chaque compte. 1 crédit par compte."
         actions={<>
           <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
+          <Btn theme={theme} tone="quiet" disabled={!ready} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
+            label="Programmer" onClick={() => setSchedOpen(true)} />
           <Btn theme={theme} tone="primary" disabled={!ready} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z"
-            label={running ? 'Publication…' : ready ? `Publier sur ${nSel}` : 'Publier'} onClick={launch} />
+            label={running ? 'Publication…' : ready ? `Publier sur ${nSel}` : 'Publier'} onClick={() => launch()} />
         </>}
       />
 
@@ -308,6 +329,11 @@ export default function StoryComposer({ theme, user, org, onBack }: {
             if (r.kind === 'images') setImageIds(r.ids)
             else if (r.kind === 'captions') setStickerTexts(cur => { const base = cur.filter(s => s.trim()); return [...base, ...r.texts.filter(t => !base.includes(t))] })
           }} />
+      )}
+
+      {schedOpen && (
+        <ScheduleModal theme={theme} count={nSel} kind="la story" onClose={() => setSchedOpen(false)}
+          onSchedule={(unix) => { setSchedOpen(false); launch(unix) }} />
       )}
     </div>
   )

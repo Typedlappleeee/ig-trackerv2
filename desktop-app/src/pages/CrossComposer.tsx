@@ -6,7 +6,8 @@ import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { phoneLabel, phoneSub, useBankThumbs } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
-import { geelarkUploadVideo, crossPostToPhone, CROSS_PLATFORMS, type CrossPlatform } from '@/lib/geelark'
+import { geelarkUploadVideo, crossPostToPhone, scheduleCrossOnPhone, CROSS_PLATFORMS, type CrossPlatform } from '@/lib/geelark'
+import ScheduleModal from '@/components/ScheduleModal'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
@@ -63,13 +64,14 @@ export default function CrossComposer({ theme, user, org, onBack }: {
   const chosen = videos.find(v => v.id === videoId) ?? null
   const cost = nSel * plats.size * CREDIT_COSTS.mass_posting
   const ready = nSel > 0 && !!chosen && plats.size > 0 && !!bearer && !running
+  const [schedOpen, setSchedOpen] = useState(false)
 
   async function resolveUrl(v: Video): Promise<string | null> {
     if (v.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600); if (data?.signedUrl) return data.signedUrl }
     return v.file_url ?? null
   }
 
-  async function launch() {
+  async function launch(scheduledUnix?: number) {
     if (!ready || !chosen) return
     const targets = phones.filter(p => sel.has(p.id) && p.geelark_id)
     const platList = [...plats]
@@ -88,6 +90,25 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     const resourceUrl = await geelarkUploadVideo(bearer, url, push)
     if (!resourceUrl) { push('❌ Envoi vidéo échoué.'); run.abort(); await run.settle(); setRunning(false); return }
     const R = startRun('cross', `${targets.length} compte × ${platList.length} plateforme${platList.length > 1 ? 's' : ''}`, targets.length * platList.length)
+    // Programmation (PC éteint) : tâches GeeLark avec scheduleAt futur (cf. Reels).
+    if (scheduledUnix) {
+      push(`🗓 Programmation pour le ${new Date(scheduledUnix * 1000).toLocaleString('fr-FR')} (GeeLark, PC éteint)…`)
+      let sok = 0, serr = 0
+      for (const p of targets) {
+        for (const pl of platList) {
+          const r = await scheduleCrossOnPhone(bearer, p.geelark_id!, pl, { mediaResourceUrl: resourceUrl, caption }, scheduledUnix, push)
+          if (r.ok) sok++; else { run.markFailed(); serr++ }
+          setRunItems(items => items.map(it => it.id === `${p.id}:${pl}` ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.ok ? 'programmé ✓' : r.error } : it))
+        }
+      }
+      R.finish()
+      const { refunded } = await run.settle()
+      if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (échecs).`)
+      push(sok > 0 ? `✅ ${sok} post(s) programmé(s) sur GeeLark (PC éteint).` : '❌ Aucune programmation créée.')
+      setRunning(false)
+      return
+    }
+
     const concurrency = rot ? 1 : targets.length   // sans proxy rotatif → comptes en parallèle
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${targets.length} compte(s) en parallèle.`)
     let okN = 0, errN = 0
@@ -130,7 +151,8 @@ export default function CrossComposer({ theme, user, org, onBack }: {
       <PageHead title="Cross-posting" sub="Une vidéo sur plusieurs réseaux (TikTok, Threads, Facebook, Shorts, X, Reddit, Pinterest)."
         actions={<>
           <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
-          <Btn theme={theme} tone="primary" disabled={!ready} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" label={running ? 'Publication…' : ready ? `Publier (${cost} cr.)` : 'Publier'} onClick={launch} />
+          <Btn theme={theme} tone="quiet" disabled={!ready} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" label="Programmer" onClick={() => setSchedOpen(true)} />
+          <Btn theme={theme} tone="primary" disabled={!ready} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" label={running ? 'Publication…' : ready ? `Publier (${cost} cr.)` : 'Publier'} onClick={() => launch()} />
         </>} />
       {!bearer && !conns.loading && <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 12, color: '#FBBF24' }}>Connecte ton token GeeLark (Réglages app web) pour publier.</div>}
 
@@ -213,6 +235,11 @@ export default function CrossComposer({ theme, user, org, onBack }: {
           initialIds={videoId ? [videoId] : []} title="Choisir une vidéo"
           onClose={() => setPickerOpen(false)}
           onApply={r => { if (r.kind === 'videos') setVideoId(r.ids[0] ?? null) }} />
+      )}
+
+      {schedOpen && (
+        <ScheduleModal theme={theme} count={nSel} kind="le cross-post" onClose={() => setSchedOpen(false)}
+          onSchedule={(unix) => { setSchedOpen(false); launch(unix) }} />
       )}
     </div>
   )

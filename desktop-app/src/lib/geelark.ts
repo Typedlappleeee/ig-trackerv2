@@ -318,6 +318,28 @@ export async function crossPostToPhone(
   }
 }
 
+// Programme un cross-post pour une heure FUTURE (tâche GeeLark, PC éteint — cf.
+// scheduleReelOnPhone). Aucun boot/poll/stop : GeeLark exécute à l'heure prévue.
+export async function scheduleCrossOnPhone(
+  bearer: string, phoneId: string, platform: CrossPlatform,
+  opts: { mediaResourceUrl: string; isImage?: boolean; caption?: string },
+  scheduleAtUnix: number, _log: (m: string) => void,
+): Promise<{ ok: boolean; taskId?: string; error?: string }> {
+  const cfg = CROSS_PLATFORMS.find(p => p.key === platform)!
+  try {
+    let endpoint = cfg.endpoint
+    let mediaField: 'video' | 'images' = 'video'
+    if (platform === 'threads' && opts.isImage) { endpoint = '/rpa/task/threadsImage'; mediaField = 'images' }
+    const res = await geelarkFetch(endpoint, {
+      id: phoneId, scheduleAt: scheduleAtUnix,
+      title: (opts.caption ?? '').slice(0, 500), [mediaField]: [opts.mediaResourceUrl], name: `ScaleFlow ${cfg.label} (programmé)`.slice(0, 128),
+    }, bearer)
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string | undefined
+    if (Number(res['code']) === 0 && taskId) return { ok: true, taskId }
+    return { ok: false, error: `GeeLark (${cfg.label}) : ${res['msg'] ?? res['code']}` }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' } }
+}
+
 // Édition de profil Instagram native (instagramEdit) sur UN téléphone.
 export async function editProfileOnPhone(
   bearer: string, phoneId: string,
@@ -569,6 +591,29 @@ export async function postStoryToPhone(
   } finally {
     try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
   }
+}
+
+// Programme une story pour une heure FUTURE (tâche GeeLark, PC éteint — cf.
+// scheduleReelOnPhone). Aucun boot/poll/stop : GeeLark exécute à l'heure prévue.
+export async function scheduleStoryOnPhone(
+  bearer: string, phoneId: string,
+  opts: { imageResourceUrl: string; linkUrl: string; linkText?: string },
+  scheduleAtUnix: number, log: (m: string) => void,
+): Promise<{ ok: boolean; taskId?: string; error?: string }> {
+  try {
+    const flowId = await ensureStoryFlowId(bearer, log)
+    if (!flowId) return { ok: false, error: 'Flow story indisponible' }
+    const paramMap = {
+      Media: [opts.imageResourceUrl], Link: opts.linkUrl ?? '', NameLink: opts.linkText ?? '',
+      AddtoHighlights: false, CreateHighlights: '', AddtoHighlightName: '',
+    }
+    const res = await geelarkFetch('/task/rpa/add', {
+      id: phoneId, flowId, scheduleAt: scheduleAtUnix, name: 'Story Scaleflow (programmé)', paramMap,
+    }, bearer)
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string | undefined
+    if (Number(res['code']) === 0 && taskId) return { ok: true, taskId }
+    return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' } }
 }
 
 // Publie un Reel sur UN téléphone : démarre → tâche native instagramPubReels →
