@@ -17,12 +17,13 @@ const FORMATS: Format[] = [
   { id: 'cross', t: 'Cross-posting', d: 'Facebook, Shorts, X, Threads, Reddit et Pinterest en une fois.', cost: '2 crédits / compte', tone: '99,102,241', ready: true, icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
 ]
 
-export default function Publish({ theme, infra, user, org }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState
+export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; isSuperAdmin: boolean
 }) {
   const [mode, setMode] = useState<string | null>(null)
-  // Cross-posting réservé aux admins (owner/admin de l'organisation).
-  const isAdmin = org.role === 'owner' || org.role === 'admin'
+  // Cross-posting réservé au superadmin (pas à tout le monde — chaque owner d'orga
+  // ne doit PAS y avoir accès automatiquement).
+  const isAdmin = isSuperAdmin
 
   if (mode === 'reels') return <ReelsComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
   if (mode === 'story') return <StoryComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
@@ -50,7 +51,7 @@ export default function Publish({ theme, infra, user, org }: {
               <span style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F6' }}>{f.t}</span>
               <span style={{ marginLeft: 'auto' }}><Chip text={adminOnly ? 'Admin' : f.ready ? f.cost : 'Bientôt'} tone={adminOnly ? 'violet' : 'mute'} /></span>
             </span>
-            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>{adminOnly ? 'Réservé aux administrateurs de l’organisation.' : f.d}</span>
+            <span style={{ fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>{adminOnly ? 'Réservé au superadmin.' : f.d}</span>
           </button>
           )
         })}

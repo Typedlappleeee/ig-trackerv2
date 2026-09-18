@@ -6,6 +6,7 @@ import { Btn, Chip, Icon, Panel, PageHead, Kpi, Empty, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 
 // ── Un « run » unifié (post_runs directs + scheduled_posts exécutés) ────────────
+interface AccountResult { name: string; ok: boolean; error?: string }
 interface RunItem {
   id: string
   ok: number
@@ -14,6 +15,7 @@ interface RunItem {
   meta: string
   ts: number       // pour tri
   when: string     // libellé relatif
+  accounts?: AccountResult[]   // détail par compte (qui a posté, qui a échoué)
 }
 
 function asArray(v: unknown): any[] {
@@ -84,7 +86,7 @@ export default function Activity({ theme, infra, user, org }: {
     setError(null)
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [prRes, spRes] = await Promise.all([
-      scope(supabase.from('post_runs').select('id,type,ok_count,err_count,total,created_at'))
+      scope(supabase.from('post_runs').select('id,type,ok_count,err_count,total,created_at,details'))
         .order('created_at', { ascending: false }).limit(100),
       scope(supabase.from('scheduled_posts').select('*'))
         .in('status', ['done', 'failed']).order('executed_at', { ascending: false }).limit(100),
@@ -92,24 +94,36 @@ export default function Activity({ theme, infra, user, org }: {
     if (prRes.error && spRes.error) { setError('Impossible de charger ton activité.'); setLoading(false); return }
 
     const items: (RunItem & { type: string })[] = []
-    for (const r of ((prRes.data ?? []) as PostRun[])) {
+    for (const r of ((prRes.data ?? []) as (PostRun & { details?: unknown })[])) {
       const total = r.total ?? 0
       const ok = r.ok_count ?? 0
+      const accounts = asArray(r.details)
+        .map((d: any) => ({ name: String(d?.name ?? '—'), ok: !!d?.ok, error: d?.error ? String(d.error) : undefined }))
       items.push({
         id: 'run-' + r.id, type: r.type, ok, total,
         title: `${total} compte${total > 1 ? 's' : ''}`,
         meta: runMeta(r.type), ts: new Date(r.created_at).getTime(), when: relLabel(r.created_at),
+        accounts: accounts.length ? accounts : undefined,
       })
     }
     for (const p of ((spRes.data ?? []) as ScheduledPost[])) {
-      const total = asArray(p.phones).length
+      const phoneArr = asArray(p.phones)
+      const total = phoneArr.length
       const ok = p.status === 'done' ? total : 0
       const ref = p.executed_at ?? p.created_at
       const label = p.caption?.trim() || (p.type === 'story' ? 'Story' : 'Publication')
+      // Détail par compte depuis result.details si présent, sinon depuis la liste des
+      // comptes (tous OK si done, tous en échec si failed).
+      const resDetails = asArray((p.result as any)?.details)
+      const nameOf = (ph: any): string => typeof ph === 'string' ? ph : String(ph?.name ?? ph?.phone_name ?? ph?.ig_username ?? ph?.geelark_id ?? '—')
+      const accounts: AccountResult[] = resDetails.length
+        ? resDetails.map((d: any) => ({ name: String(d?.name ?? '—'), ok: !!d?.ok, error: d?.error ? String(d.error) : undefined }))
+        : phoneArr.map(ph => ({ name: nameOf(ph), ok: p.status === 'done', error: p.status === 'done' ? undefined : 'non publié' }))
       items.push({
         id: 'sched-' + p.id, type: p.type ?? 'reels', ok, total,
         title: `${total} compte${total > 1 ? 's' : ''} · ${label}`,
         meta: schedMeta(p), ts: new Date(ref).getTime(), when: relLabel(ref),
+        accounts: accounts.length ? accounts : undefined,
       })
     }
     items.sort((a, b) => b.ts - a.ts)
@@ -227,9 +241,8 @@ export default function Activity({ theme, infra, user, org }: {
               </span>
               <span style={{ fontSize: 11, color: '#52525B', minWidth: 84, textAlign: 'right', flexShrink: 0 }}>{r.when}</span>
               <span style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                {ok
-                  ? <Btn theme={theme} sm tone="quiet" icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6" label="Détails" onClick={() => setDetail(r)} />
-                  : <Btn theme={theme} sm icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={`Relancer ${r.total - r.ok}`} onClick={() => relancer(r)} />}
+                <Btn theme={theme} sm tone="quiet" icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6" label="Détails" onClick={() => setDetail(r)} />
+                {!ok && <Btn theme={theme} sm icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={`Relancer ${r.total - r.ok}`} onClick={() => relancer(r)} />}
               </span>
             </div>
           )
@@ -248,6 +261,26 @@ export default function Activity({ theme, infra, user, org }: {
             <div style={{ marginTop: 4 }}>
               <Chip text={detail.ok === detail.total ? 'Tous publiés' : `${detail.total - detail.ok} échec(s)`} tone={detail.ok === detail.total ? 'ok' : 'warn'} />
             </div>
+
+            {/* Détail par compte : qui a posté, qui a échoué (et pourquoi). */}
+            {detail.accounts && detail.accounts.length > 0 && (
+              <div style={{ marginTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 8 }}>
+                  Détail par compte
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                  {[...detail.accounts].sort((a, b) => Number(a.ok) - Number(b.ok)).map((a, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', borderRadius: 8, background: a.ok ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.08)', border: `1px solid ${a.ok ? 'rgba(16,185,129,0.18)' : 'rgba(245,158,11,0.22)'}` }}>
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 5, flexShrink: 0, color: a.ok ? '#34D399' : '#FBBF24', background: a.ok ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.14)' }}>
+                        <Icon d={a.ok ? 'M20 6L9 17l-5-5' : 'M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'} size={11} />
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: '#E4E4E7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+                      {!a.ok && <span style={{ fontSize: 10.5, color: '#FBBF24', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.error || 'échec'}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       )}

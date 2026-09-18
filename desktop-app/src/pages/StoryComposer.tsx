@@ -161,11 +161,13 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     const concurrency = rot ? 1 : jobs.length
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${jobs.length} compte(s) en parallèle.`)
     let okN = 0, errN = 0
+    const results = new Map<string, { name: string; ok: boolean; error?: string }>()
     const postOne = async ({ p, img, st }: (typeof jobs)[number]) => {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— ${phoneLabel(p)} · ${img.title} —`)
       const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl: resByImg.get(img.id)!, linkUrl: links[p.id], linkText: st, rotationUrls: rot }, push)
       if (r.ok) okN++; else { run.markFailed(); errN++ }
+      results.set(p.id, { name: phoneLabel(p), ok: r.ok, error: r.ok ? undefined : r.error })
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
@@ -182,6 +184,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
       const { error: prErr } = await supabase.from('post_runs').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
         type: 'story', ok_count: okN, err_count: errN, total: jobs.length,
+        details: [...results.values()],
       })
       if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr.message}`)
     }

@@ -263,6 +263,27 @@ function OrgTab({ theme, org, balance, canManage }: {
   const [confirmDel, setConfirmDel] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [note, setNote] = useState<string | null>(null)
+  // Création d'organisation.
+  const [orgName, setOrgName] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  async function createOrg() {
+    const name = orgName.trim()
+    if (!name || creating) return
+    setCreating(true); setNote(null)
+    const { data, error } = await supabase.rpc('create_org', { p_name: name })
+    setCreating(false)
+    if (error) {
+      const msg = /org_limit_reached/.test(error.message) ? 'Tu possèdes déjà une organisation.'
+        : /name_required/.test(error.message) ? 'Nom requis.'
+        : error.message
+      setNote(`Échec : ${msg}`); return
+    }
+    // L'owner est ajouté comme membre par trigger. On bascule dessus et on recharge
+    // pour rafraîchir la liste des orgs (useOrg ne réexpose pas de reload).
+    if (typeof data === 'string') { localStorage.setItem('ig-tracker-current-org', data) }
+    window.location.reload()
+  }
 
   async function deleteOrg() {
     if (!currentOrg) return
@@ -276,13 +297,30 @@ function OrgTab({ theme, org, balance, canManage }: {
     return (
       <Panel theme={theme}>
         <PanelHead title="Organisation" />
-        <div style={{ padding: '10px 16px 16px' }}>
+        <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ display: 'flex', color: theme.accentText }}><Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={16} /></span>
             <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>Espace personnel</span>
               <span style={{ fontSize: 11.5, color: '#71717A' }}>Tu travailles hors organisation. Tes appareils et ton contenu sont privés.</span>
             </span>
+          </div>
+
+          {/* Créer son organisation : l'owner devient le « chef » — ses crédits sont
+              partagés, et toute dépense d'un membre débite le solde du chef. */}
+          <div style={{ padding: '14px', borderRadius: 10, background: `rgba(${theme.tone},0.06)`, border: `1px solid rgba(${theme.tone},0.2)` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6', marginBottom: 4 }}>Créer une organisation</div>
+            <div style={{ fontSize: 11.5, color: '#A1A1AA', lineHeight: 1.55, marginBottom: 10 }}>
+              Invite des membres et pilote leurs comptes. Les crédits sont ceux du chef d’orga (toi) : chaque publication d’un membre débite <b>ton</b> solde.
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input value={orgName} onChange={e => { setOrgName(e.target.value); setNote(null) }}
+                onKeyDown={e => { if (e.key === 'Enter') createOrg() }}
+                placeholder="Nom de ton organisation" maxLength={60} spellCheck={false}
+                style={{ flex: 1, minWidth: 180, height: 38, padding: '0 12px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#F4F4F6', fontSize: 13, outline: 'none' }} />
+              <Btn theme={theme} tone="primary" label={creating ? 'Création…' : 'Créer'} disabled={creating || !orgName.trim()} onClick={createOrg} />
+            </div>
+            {note && <div style={{ marginTop: 8, fontSize: 11.5, color: '#FCA5A5' }}>{note}</div>}
           </div>
         </div>
       </Panel>

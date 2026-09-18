@@ -116,6 +116,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     const concurrency = rot ? 1 : targets.length   // sans proxy rotatif → comptes en parallèle
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${targets.length} compte(s) en parallèle.`)
     let okN = 0, errN = 0
+    const results = new Map<string, { name: string; ok: boolean; error?: string }>()
     const doPhone = async (p: typeof targets[number]) => {
       for (const pl of platList) {
         if (R.isCancelled()) return
@@ -124,6 +125,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
         push(`— ${phoneLabel(p)} · ${pl} —`)
         const r = await crossPostToPhone(bearer, p.geelark_id!, pl, { mediaResourceUrl: resourceUrl, caption, rotationUrls: rot }, push)
         if (r.ok) okN++; else { run.markFailed(); errN++ }
+        results.set(key, { name: `${phoneLabel(p)} · ${pl}`, ok: r.ok, error: r.ok ? undefined : r.error })
         R.tick(r.ok)
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
       }
@@ -142,6 +144,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
       const { error: prErr } = await supabase.from('post_runs').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
         type: 'mass_posting', ok_count: okN, err_count: errN, total: totalCross,
+        details: [...results.values()],
       })
       if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr.message}`)
     }

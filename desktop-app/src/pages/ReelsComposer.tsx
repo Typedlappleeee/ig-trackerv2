@@ -239,13 +239,16 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     // (comme l'ancienne app) au lieu de N démarrages simultanés que GeeLark refuse
     // en partie → chaque post saute alors son démarrage individuel (skipStart).
     let okN = 0, errN = 0
+    // Détail par compte pour l'historique (page Activité) : qui a posté, qui a échoué.
+    const results = new Map<string, { name: string; ok: boolean; error?: string }>()
     const postOne = async ({ p, v, cap }: (typeof jobs)[number], skipStart: boolean) => {
       const ru = resourceByVid.get(v.id)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
-      if (!ru) { run.markFailed(); errN++; R.tick(false); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
+      if (!ru) { run.markFailed(); errN++; R.tick(false); results.set(p.id, { name: phoneLabel(p), ok: false, error: 'vidéo non hébergée' }); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
       push(`— ${phoneLabel(p)} · ${v.title}${cap ? ' · légende' : ''} —`)
       const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id), skipStart)
       if (r.ok) { postedVidIds.add(v.id); okN++ } else { run.markFailed(); errN++ }
+      results.set(p.id, { name: phoneLabel(p), ok: r.ok, error: r.ok ? undefined : r.error })
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
@@ -281,6 +284,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       const { error: prErr } = await supabase.from('post_runs').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
         type: 'mass_posting', ok_count: okN, err_count: errN, total: jobs.length,
+        details: [...results.values()],
       })
       if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr.message}`)
     }
