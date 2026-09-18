@@ -6,6 +6,11 @@ import { supabase } from './supabase'
 
 export const CREDIT_COSTS = { posting: 2, mass_posting: 2, story: 1 } as const
 
+// Signale à l'UI (Shell, Home, Réglages) que le solde a changé → rafraîchissement live.
+export function notifyCreditsChanged() {
+  try { window.dispatchEvent(new Event('sf-credits-changed')) } catch { /* SSR/tests */ }
+}
+
 // Crédits mensuels par plan (grille officielle ScaleFlow). 'business' = 'organisation'.
 // Standard 49,99$ → 2 500 · Pro 99,99$ → 5 500 · Organisation 149,99$ → 11 000.
 export const PLAN_MONTHLY_CREDITS: Record<string, number> = {
@@ -31,7 +36,9 @@ export async function redeemCreditCode(code: string, userId: string): Promise<{ 
   try {
     const { data, error } = await supabase.rpc('redeem_credit_code', { p_code: code.toUpperCase().replace(/\s/g, ''), p_user_id: userId })
     if (error) return { ok: false, error: error.message }
-    return (data as any) ?? { ok: false, error: 'Erreur inconnue' }
+    const res = (data as any) ?? { ok: false, error: 'Erreur inconnue' }
+    if (res.ok) notifyCreditsChanged()
+    return res
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
 }
 
@@ -40,7 +47,9 @@ export async function redeemCreditCodeForOrg(code: string, orgId: string): Promi
   try {
     const { data, error } = await supabase.rpc('redeem_credit_code_for_org', { p_code: code.toUpperCase().replace(/\s/g, ''), p_org_id: orgId })
     if (error) return { ok: false, error: error.message }
-    return (data as any) ?? { ok: false, error: 'Erreur inconnue' }
+    const res = (data as any) ?? { ok: false, error: 'Erreur inconnue' }
+    if (res.ok) notifyCreditsChanged()
+    return res
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
 }
 
@@ -49,7 +58,9 @@ export async function deductCredits(userId: string, amount: number): Promise<{ o
   try {
     const { data, error } = await supabase.rpc('deduct_user_credits', { p_user_id: userId, p_amount: amount })
     if (error) return { ok: false, error: error.message }
-    return (data as any) ?? { ok: false, error: 'Erreur inconnue' }
+    const res = (data as any) ?? { ok: false, error: 'Erreur inconnue' }
+    if (res.ok) notifyCreditsChanged()
+    return res
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
@@ -59,6 +70,7 @@ export async function refundCredits(userId: string, amount: number): Promise<boo
   if (amount <= 0) return true
   try {
     const { error } = await supabase.rpc('refund_user_credits', { p_user_id: userId, p_amount: amount })
+    if (!error) notifyCreditsChanged()
     return !error
   } catch { return false }
 }

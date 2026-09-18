@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
-import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
+import { useBankThumbs, phoneLabel, phoneSub, fetchBalance, fetchOrgBalance } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, geelarkUploadImageData, postReelToPhone, scheduleReelOnPhone, startPhones } from '@/lib/geelark'
@@ -107,16 +107,16 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const load = useCallback(async () => {
     setLoading(true)
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const [phRes, vRes, balRes] = await Promise.all([
+    const [phRes, vRes, bal] = await Promise.all([
       scope(supabase.from('phones').select('id,ig_username,phone_name,status,group_name,geelark_id,ig_status,last_post_at,account_state')).not('geelark_id', 'is', null).order('phone_name'),
       scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }),
-      currentOrg ? supabase.rpc('get_org_credit_balance', { p_org_id: currentOrg.id }) : supabase.from('user_credits').select('balance').eq('user_id', user.id).maybeSingle(),
+      // Solde fiable (RPC SECURITY DEFINER côté perso → contourne la RLS de user_credits).
+      currentOrg ? fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : fetchBalance(user.id),
     ])
     setPhones((phRes.data ?? []) as Phone[])
     const all = ((vRes.data ?? []) as Video[]).filter(v => !(SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url))
     const vids = all.filter(isVideo)
     setVideos(vids.length > 0 ? vids : all)
-    const bal = currentOrg ? (typeof (balRes as any).data === 'number' ? (balRes as any).data : null) : ((balRes as any).data?.balance ?? null)
     setBalance(typeof bal === 'number' ? bal : null)
     setLoading(false)
   }, [currentOrg?.id, user.id])

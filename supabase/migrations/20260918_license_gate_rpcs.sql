@@ -180,5 +180,22 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.claim_license_key(text) TO authenticated;
 
+-- ── 3. my_credit_balance() : solde perso fiable (bypass RLS) ───────
+-- La lecture directe de `user_credits` dépend de la policy `users_read_own_credits`.
+-- Si elle n'est pas déployée, le solde perso s'affiche à 0 alors que les crédits
+-- SONT bien débités/ajoutés (redeem/deduct sont SECURITY DEFINER). Cette RPC lit
+-- le solde de l'appelant côté serveur → affichage fiable.
+CREATE OR REPLACE FUNCTION public.my_credit_balance()
+RETURNS numeric LANGUAGE plpgsql SECURITY DEFINER STABLE
+SET search_path = public AS $$
+DECLARE v_bal numeric(12,2);
+BEGIN
+  IF auth.uid() IS NULL THEN RETURN 0; END IF;
+  SELECT balance INTO v_bal FROM public.user_credits WHERE user_id = auth.uid();
+  RETURN COALESCE(v_bal, 0);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.my_credit_balance() TO authenticated;
+
 -- Recharge le cache PostgREST pour exposer les nouvelles fonctions.
 NOTIFY pgrst, 'reload schema';

@@ -22,6 +22,12 @@ const EMPTY_PERMS: PermOverrides = {}
 
 // ── Solde crédits (porté de electron-app/src/lib/credits.ts) ────────────────────
 export async function fetchBalance(userId: string): Promise<number> {
+  // Voie fiable : RPC SECURITY DEFINER (contourne la RLS de lecture de user_credits ;
+  // sans elle, le solde perso s'affichait à 0 alors que les crédits sont bien à jour).
+  try {
+    const { data, error } = await supabase.rpc('my_credit_balance')
+    if (!error && typeof data === 'number') return data
+  } catch { /* RPC pas déployée → lecture directe */ }
   try {
     const { data } = await supabase.from('user_credits').select('balance').eq('user_id', userId).maybeSingle()
     return data?.balance ?? 0
@@ -186,6 +192,18 @@ export function useHubData(user: User, org: OrgState, infra: InfraKey) {
   }, [currentOrg?.id, currentOrg?.owner_id, user.id, role, perms, infra])
 
   useEffect(() => { if (!orgLoading) load() }, [load, orgLoading])
+
+  // Rafraîchissement LIVE du solde après un post/story/code (event global) — sans
+  // recharger tout le hub. Sinon la barre affichait un solde figé → « les crédits
+  // ne bougent pas » alors qu'ils sont bien débités/ajoutés en base.
+  useEffect(() => {
+    const onChange = async () => {
+      const b = currentOrg ? await fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : await fetchBalance(user.id)
+      setData(d => d ? { ...d, balance: b } : d)
+    }
+    window.addEventListener('sf-credits-changed', onChange)
+    return () => window.removeEventListener('sf-credits-changed', onChange)
+  }, [currentOrg?.id, currentOrg?.owner_id, user.id])
 
   return { data, loading: loading || orgLoading, reload: load }
 }
