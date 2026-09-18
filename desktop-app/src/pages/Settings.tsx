@@ -172,7 +172,7 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
         {menu}
         <div style={{ minWidth: 0 }}>
           {tab === 'account' && <AccountTab theme={theme} user={user} displayName={displayName} onSignOut={onSignOut}
-            nameInput={nameInput} setNameInput={setNameInput} savingName={savingName} saveName={saveName} notice={notice} onNavigate={onNavigate} />}
+            nameInput={nameInput} setNameInput={setNameInput} savingName={savingName} saveName={saveName} notice={notice} />}
           {tab === 'org' && <OrgTab theme={theme} org={org} balance={balance} canManage={canManage} />}
           {tab === 'members' && <MembersTab theme={theme} org={org} members={members} canManage={canManage} currentUserId={user.id} onReload={loadMembers} />}
           {tab === 'billing' && <BillingTab theme={theme} user={user} org={org} balance={balance} canManage={canManage} onRedeemed={reloadBalance} />}
@@ -187,9 +187,9 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
 }
 
 // ══════════ PROFIL — c'est ici la déconnexion officielle ══════════
-function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInput, savingName, saveName, notice, onNavigate }: {
+function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInput, savingName, saveName, notice }: {
   theme: Theme; user: User; displayName: string | null; onSignOut: () => void
-  nameInput: string; setNameInput: (v: string) => void; savingName: boolean; saveName: () => void; notice: string | null; onNavigate?: (p: string) => void
+  nameInput: string; setNameInput: (v: string) => void; savingName: boolean; saveName: () => void; notice: string | null
 }) {
   const initial = initialsFrom(displayName, user.email ?? null)
   return (
@@ -225,22 +225,6 @@ function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInp
       {notice && (
         <div style={{ marginTop: 12, padding: '9px 13px', borderRadius: 8, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 12, color: '#E4E4E7' }}>{notice}</div>
       )}
-
-      {/* CTA : connecte tes comptes pour tes stats officielles */}
-      <div style={{ marginTop: 12 }}>
-        <Panel theme={theme} style={{ background: `linear-gradient(120deg, rgba(${theme.tone},0.1), ${theme.panelBg})`, border: `1px solid rgba(${theme.tone},0.28)` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 16px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: `rgba(${theme.tone},0.14)`, border: `1px solid rgba(${theme.tone},0.3)`, color: theme.accentText }}>
-              <Icon d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1" size={17} />
-            </span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#F4F4F6' }}>Connecte tes comptes Instagram</div>
-              <div style={{ fontSize: 12, color: '#71717A', marginTop: 2 }}>Vues, abonnés et engagement officiels dans Performances — via l'API Meta.</div>
-            </span>
-            <Btn label="Connexions" theme={theme} tone="primary" icon="M5 3l14 9-14 9z" onClick={() => onNavigate?.('connections')} />
-          </div>
-        </Panel>
-      </div>
 
       <div style={{ marginTop: 12 }}>
         <Panel theme={theme}>

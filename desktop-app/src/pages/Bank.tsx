@@ -413,13 +413,27 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   async function deleteMedia(ids: string[]) {
     if (ids.length === 0) return
     setDeleting(true)
-    const targets = items.filter(i => ids.includes(i.id))
+    const idSet = new Set(ids)
+    const targets = items.filter(i => idSet.has(i.id))
     const objs = targets.flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
-    try { if (objs.length) await supabase.storage.from('content').remove(objs) } catch { /* best-effort */ }
-    const { error: err } = await supabase.from('content_bank').delete().in('id', ids)
+    // IMPORTANT : on supprime PAR LOTS. Un seul .in('id', [600 ids]) encode tous les
+    // ids dans l'URL (~22 Ko) → dépasse la limite de longueur d'URL → la requête
+    // échoue et RIEN n'est supprimé. Idem pour storage.remove (limite de chemins).
+    const chunk = <T,>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
+    // 1) Fichiers du bucket (best-effort) par lots de 100.
+    for (const part of chunk(objs, 100)) {
+      try { if (part.length) await supabase.storage.from('content').remove(part) } catch { /* best-effort */ }
+    }
+    // 2) Lignes content_bank par lots de 100 — on additionne les vraies erreurs.
+    let deleted = 0; let firstErr: string | null = null
+    for (const part of chunk(ids, 100)) {
+      const { error } = await supabase.from('content_bank').delete().in('id', part)
+      if (error) { if (!firstErr) firstErr = error.message } else { deleted += part.length }
+    }
     setDeleting(false); setConfirmDel(null)
-    if (err) { setNotice(`Échec de la suppression : ${err.message}`); return }
-    setNotice(`${ids.length} média(s) supprimé(s).`); setSel(new Set()); load()
+    if (firstErr && deleted === 0) { setNotice(`Échec de la suppression : ${firstErr}`); return }
+    setNotice(firstErr ? `${deleted}/${ids.length} média(s) supprimé(s) — certains ont échoué (${firstErr}).` : `${deleted} média(s) supprimé(s).`)
+    setSel(new Set()); load()
   }
 
   // ── Renommer un média + éditer les tags ──────────────────────────────────────
@@ -443,6 +457,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [folderCtx, setFolderCtx] = useState<{ x: number; y: number; name: string } | null>(null)
   const [renameFolderOf, setRenameFolderOf] = useState<string | null>(null)
   const [renameFolderVal, setRenameFolderVal] = useState('')
+  const [confirmDelFolder, setConfirmDelFolder] = useState<string | null>(null)
   const scopeQ = (qq: any) => currentOrg ? qq.eq('org_id', currentOrg.id) : qq.eq('user_id', user.id).is('org_id', null)
   async function renameFolder(oldName: string, newName: string) {
     const n = newName.trim(); if (!n || n === oldName) { setFolderMenu(null); return }
@@ -904,13 +919,22 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" size={14} /></span>Renommer
             </button>
-            <button onClick={() => { deleteFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
+            <button onClick={() => { setConfirmDelFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ display: 'flex' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={14} /></span>Supprimer le dossier
             </button>
           </div>
         </>,
         document.body,
+      )}
+
+      {confirmDelFolder && (
+        <Modal theme={theme} title="Supprimer ce dossier ?" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClose={() => setConfirmDelFolder(null)}
+          footer={<><Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDelFolder(null)} /><Btn theme={theme} tone="danger" label="Supprimer le dossier" onClick={() => { deleteFolder(confirmDelFolder); setConfirmDelFolder(null) }} /></>}>
+          <p style={{ margin: 0, fontSize: 12.5, color: '#A1A1AA', lineHeight: 1.6 }}>
+            Le dossier <b style={{ color: '#F4F4F6' }}>{confirmDelFolder}</b> sera supprimé, mais <b style={{ color: '#34D399' }}>tes vidéos ne sont PAS supprimées</b> : elles sont simplement retirées du dossier et restent dans « Tous ». Tu pourras les regrouper dans un nouveau dossier.
+          </p>
+        </Modal>
       )}
 
       {renameFolderOf && (
