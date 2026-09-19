@@ -42,6 +42,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
   const [images, setImages] = useState<Media[]>([])
   const [loading, setLoading] = useState(true)
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const [group, setGroup] = useState('Tous')
   const [imageIds, setImageIds] = useState<string[]>([])       // pool d'images
   const [imgMode, setImgMode] = useState<'seq' | 'random'>('seq')
   const [stickerTexts, setStickerTexts] = useState<string[]>(['Voir plus'])  // pool de textes sticker
@@ -85,6 +86,13 @@ export default function StoryComposer({ theme, user, org, onBack }: {
   const setStickerAt = (i: number, v: string) => setStickerTexts(c => c.map((x, k) => k === i ? v : x))
   const removeSticker = (i: number) => setStickerTexts(c => c.length <= 1 ? [''] : c.filter((_, k) => k !== i))
   const selected = phones.filter(p => sel.has(p.id))
+  // Filtre par groupe (comme dans Publication/Reels).
+  const groups = useMemo(() => {
+    const s = new Set<string>()
+    phones.forEach(p => { if (p.group_name) s.add(p.group_name) })
+    return ['Tous', ...[...s].sort()]
+  }, [phones])
+  const shownPhones = useMemo(() => phones.filter(p => group === 'Tous' || p.group_name === group), [phones, group])
   const nSel = sel.size
   const chosenImgs = images.filter(m => imageIds.includes(m.id))
   const nLinked = selected.filter(p => (links[p.id] ?? '').trim()).length
@@ -220,11 +228,21 @@ export default function StoryComposer({ theme, user, org, onBack }: {
         {/* Comptes + liens */}
         <Panel theme={theme}>
           <PanelHead title="Comptes & liens" sub={nSel ? `${nLinked}/${nSel} liens · ${nSel} crédit${nSel > 1 ? 's' : ''}` : 'aucun'}
-            right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(phones.map(p => p.id)))} />} />
+            right={<>
+              <Btn theme={theme} sm label="Tout" onClick={() => setSel(s => { const n = new Set(s); shownPhones.forEach(p => n.add(p.id)); return n })} />
+              <Btn theme={theme} sm tone="quiet" label="Aucun" onClick={() => setSel(new Set())} />
+            </>} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
+            <select value={group} onChange={e => setGroup(e.target.value)} style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#E4E4E7', fontSize: 11.5, outline: 'none', cursor: 'pointer' }}>
+              {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
+            </select>
+            <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#52525B' }}>{shownPhones.length} affichés · {nSel} cochés</span>
+          </div>
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
             {loading ? <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div>
-              : phones.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun compte.</div>
-              : phones.map(p => {
+              : shownPhones.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun compte.</div>
+              : shownPhones.map(p => {
                 const on = sel.has(p.id)
                 return (
                   <div key={p.id} style={{ borderLeft: '2px solid ' + (on ? theme.accent : 'transparent'), background: on ? `rgba(${theme.tone},0.06)` : 'transparent' }}>
