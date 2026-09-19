@@ -447,7 +447,7 @@ export async function geelarkUploadVideo(
 // La story n'a pas d'endpoint natif : on importe un flow RPA (« Story Scaleflow »)
 // dans le compte GeeLark (une seule fois, mis en cache), puis on l'exécute par
 // téléphone via /task/rpa/add avec un paramMap (image + lien + texte du sticker).
-const STORY_FLOW_VERSION = 'v10'
+const STORY_FLOW_VERSION = 'v11'
 const _storyFlowCache = new Map<string, Promise<string | null>>()
 function storyFlowLsKey(b: string) { return `sf-story-flowid:${b.slice(-14)}` }
 function storyFlowVerKey(b: string) { return `sf-story-flowver:${b.slice(-14)}` }
