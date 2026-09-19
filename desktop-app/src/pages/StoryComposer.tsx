@@ -106,7 +106,11 @@ export default function StoryComposer({ theme, user, org, onBack }: {
   const nSel = sel.size
   const chosenImgs = images.filter(m => imageIds.includes(m.id))
   const nLinked = selected.filter(p => (links[p.id] ?? '').trim()).length
-  const ready = nSel > 0 && chosenImgs.length > 0 && nLinked === nSel && !!bearer && !running
+  const nMissing = nSel - nLinked   // comptes cochés SANS lien (seront ignorés)
+  // Publiable dès qu'AU MOINS un compte coché a un lien (les comptes sans lien sont
+  // simplement ignorés + non débités). Avant : il fallait un lien sur TOUS → bloqué
+  // dès qu'un seul manquait, sans dire lequel.
+  const ready = nLinked > 0 && chosenImgs.length > 0 && !!bearer && !running
   const [schedOpen, setSchedOpen] = useState(false)
 
   async function resolveUrl(m: Media): Promise<string | null> {
@@ -119,8 +123,11 @@ export default function StoryComposer({ theme, user, org, onBack }: {
 
   async function launch(scheduledUnix?: number) {
     if (!ready) return
-    const targets = selected.filter(p => p.geelark_id)
+    // On ne poste (et ne débite) QUE les comptes qui ont un lien sticker.
+    const targets = selected.filter(p => p.geelark_id && (links[p.id] ?? '').trim())
+    if (targets.length === 0) return
     setRunning(true); setLogs([])
+    if (nMissing > 0) setLogs(l => [...l, `⚠ ${nMissing} compte(s) sans lien — ignoré(s) et non débité(s).`])
     setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-250), m])
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
@@ -224,7 +231,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
           <Btn theme={theme} tone="quiet" disabled={!ready} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
             label="Programmer" onClick={() => setSchedOpen(true)} />
           <Btn theme={theme} tone="primary" disabled={!ready} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z"
-            label={running ? 'Publication…' : ready ? `Publier sur ${nSel}` : 'Publier'} onClick={() => launch()} />
+            label={running ? 'Publication…' : ready ? `Publier sur ${nLinked}${nMissing > 0 ? ` (${nMissing} sans lien)` : ''}` : 'Publier'} onClick={() => launch()} />
         </>}
       />
 
@@ -264,11 +271,16 @@ export default function StoryComposer({ theme, user, org, onBack }: {
                         <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                       </span>
                     </button>
-                    {on && (
+                    {on && (() => {
+                      const missing = !(links[p.id] ?? '').trim()
+                      return (
                       <div style={{ padding: '0 13px 9px 34px' }}>
-                        <input value={links[p.id] ?? ''} onChange={e => setLink(p, e.target.value)} placeholder="https://lien-du-compte…" style={inputStyle} />
+                        <input value={links[p.id] ?? ''} onChange={e => setLink(p, e.target.value)} placeholder="https://lien-du-compte…"
+                          style={{ ...inputStyle, border: `1px solid ${missing ? 'rgba(248,113,113,0.5)' : 'rgba(255,255,255,0.08)'}` }} />
+                        {missing && <span style={{ display: 'block', marginTop: 3, fontSize: 10, color: '#FCA5A5' }}>Lien requis — ce compte sera ignoré</span>}
                       </div>
-                    )}
+                      )
+                    })()}
                   </div>
                 )
               })}
