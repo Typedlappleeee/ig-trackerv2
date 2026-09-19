@@ -43,6 +43,8 @@ export default function StoryComposer({ theme, user, org, onBack }: {
   const [loading, setLoading] = useState(true)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [group, setGroup] = useState('Tous')
+  const [rotationConfigured, setRotationConfigured] = useState(false)
+  const [rotationOn, setRotationOn] = useState(false)   // OFF par défaut → tout lancer en parallèle
   const [imageIds, setImageIds] = useState<string[]>([])       // pool d'images
   const [imgMode, setImgMode] = useState<'seq' | 'random'>('seq')
   const [stickerTexts, setStickerTexts] = useState<string[]>(['Voir plus'])  // pool de textes sticker
@@ -76,6 +78,14 @@ export default function StoryComposer({ theme, user, org, onBack }: {
   }, [currentOrg?.id, user.id])
 
   useEffect(() => { load() }, [load])
+
+  // Proxy rotatif dispo ? (Paramètres). Par défaut OFF → tout lancer en parallèle.
+  useEffect(() => {
+    loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => {
+      setRotationConfigured(c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim())))
+      setRotationOn(false)
+    })
+  }, [currentOrg?.id, user.id])
 
   const { thumbFor } = useBankThumbs(images)
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -114,7 +124,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as Phase })))
     const push = (m: string) => setLogs(l => [...l.slice(-250), m])
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
-    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
+    const rotU = resolveRotationUrls(); const rot = (rotationOn && rotU.length) ? rotU : undefined
 
     // Débit d'avance (1 crédit/compte pour une story), remboursement des échecs.
     const ownerId = currentOrg?.owner_id ?? user.id
@@ -322,6 +332,22 @@ export default function StoryComposer({ theme, user, org, onBack }: {
                   </span>
                 )}
               </div>
+            </div>
+          </Panel>
+
+          {/* Comportement du run : tout lancer en parallèle OU rotation IP (série) */}
+          <Panel theme={theme}>
+            <PanelHead title="Comportement du run" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px' }}>
+              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Rotation d’IP proxy</span>
+                <span style={{ fontSize: 11, color: '#52525B' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque compte → envoi en série' : 'Désactivée → tout lancer en même temps (parallèle)'}</span>
+              </span>
+              <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
+                title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 40, height: 23, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+                <span style={{ width: 19, height: 19, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+              </span>
             </div>
           </Panel>
 

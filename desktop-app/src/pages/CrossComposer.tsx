@@ -44,6 +44,8 @@ export default function CrossComposer({ theme, user, org, onBack }: {
   const [runItems, setRunItems] = useState<RunItem[]>([])
   const [logs, setLogs] = useState<string[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [rotationConfigured, setRotationConfigured] = useState(false)
+  const [rotationOn, setRotationOn] = useState(false)   // OFF par défaut → tout lancer en parallèle
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -57,6 +59,14 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     setLoading(false)
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
+
+  // Proxy rotatif dispo ? Par défaut OFF → tout lancer en parallèle.
+  useEffect(() => {
+    loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => {
+      setRotationConfigured(c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim())))
+      setRotationOn(false)
+    })
+  }, [currentOrg?.id, user.id])
 
   const { thumbFor } = useBankThumbs(videos)
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -80,7 +90,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     setRunItems(targets.flatMap(p => platList.map(pl => ({ id: `${p.id}:${pl}`, name: `${phoneLabel(p)} · ${pl}`, phase: 'pending' as Phase }))))
     const push = (m: string) => setLogs(l => [...l.slice(-300), m])
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
-    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
+    const rotU = resolveRotationUrls(); const rot = (rotationOn && rotU.length) ? rotU : undefined
     const ownerId = currentOrg?.owner_id ?? user.id
     const run = await startCreditRun(ownerId, CREDIT_COSTS.mass_posting, targets.length * platList.length)
     if (isCreditError(run)) { push(`❌ Crédits insuffisants (il faut ${cost}).`); setRunItems([]); setRunning(false); return }
@@ -223,6 +233,21 @@ export default function CrossComposer({ theme, user, org, onBack }: {
             <PanelHead title="Légende" />
             <div style={{ padding: 13 }}>
               <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={3} placeholder="Légende (facultatif)…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 11, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, fontFamily: 'inherit', outline: 'none' }} />
+            </div>
+          </Panel>
+          {/* Comportement : tout lancer en parallèle OU rotation IP (série) */}
+          <Panel theme={theme}>
+            <PanelHead title="Comportement du run" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px' }}>
+              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Rotation d’IP proxy</span>
+                <span style={{ fontSize: 11, color: '#52525B' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque compte → envoi en série' : 'Désactivée → tout lancer en même temps (parallèle)'}</span>
+              </span>
+              <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
+                title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 40, height: 23, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+                <span style={{ width: 19, height: 19, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+              </span>
             </div>
           </Panel>
           {runItems.length > 0 && (
