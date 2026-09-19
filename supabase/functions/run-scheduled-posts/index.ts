@@ -12,7 +12,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import trialFlowDef from './trialFlow.ts'
-import { postStoryServer } from './geelark-story.ts'
+import { postStoryFlowServer } from './geelark-story.ts'
 import { notifyOwner } from './notify.ts'
 import { runAccountSync } from './tracking-report.ts'
 import { runStatsSync } from './stats-sync.ts'
@@ -1326,7 +1326,8 @@ Deno.serve(async (req) => {
             { onConflict: 'geelark_id' },
           ).then(() => {}, () => {})
           try {
-            const res = await postStoryServer(bearer, phone.geelark_id, { imageUrl, linkUrl: link, linkText, rotationUrls }, m => log(`  ${name}: ${m}`))
+            // Flow RPA 2.0 (même chemin que le web : fix story + CTA sticker lien).
+            const res = await postStoryFlowServer(bearer, phone.geelark_id, { imageUrl, linkUrl: link, linkText, rotationUrls }, m => log(`  ${name}: ${m}`))
             if (res.ok) log(`✅ ${name} — story publiée`)
             else log(`❌ ${name} : ${res.error ?? 'échec'}`)
           } catch (e) {
