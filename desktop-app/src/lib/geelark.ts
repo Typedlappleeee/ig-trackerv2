@@ -109,6 +109,25 @@ export async function stopPhones(bearer: string, ids: string[]): Promise<number>
   return Number.isFinite(success) ? success : ids.length
 }
 
+// Éteint UN téléphone de façon SÛRE (anti-coût) : réessaie et VÉRIFIE l'extinction.
+// Le simple /phone/stop peut échouer/ne pas prendre → le téléphone restait allumé
+// après une erreur. Ici on retente jusqu'à 4 fois et on confirme via /phone/list.
+export async function stopPhoneSurely(bearer: string, phoneId: string, log?: (m: string) => void): Promise<boolean> {
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try { await stopPhones(bearer, [phoneId]) } catch { /* on vérifie quand même l'état */ }
+    await sleep(2500)
+    try {
+      const phones = await fetchAllPhones(bearer)
+      const st = Number(phones.find(p => p.id === phoneId)?.status ?? -1)
+      // 1=stopped, 3=stopping (en cours d'extinction) → considéré OK.
+      if (st === 1 || st === 3 || st === -1) { log?.('📴 Téléphone éteint.'); return true }
+    } catch { /* réseau — on retente le stop */ }
+    if (attempt < 4) log?.(`  ↻ Extinction non confirmée — nouvelle tentative (${attempt}/3)…`)
+  }
+  log?.('⚠️ Téléphone peut-être encore allumé — le watchdog serveur l\'éteindra.')
+  return false
+}
+
 // ── Rotation d'IP proxy (best-effort, ne throw jamais) ───────────────────────
 // Appelle le « Change IP URL » du fournisseur (ex. dongle 4G / Prox'Easy). En
 // Electron (webSecurity:false) le GET direct passe. Laisse le temps à la nouvelle
@@ -244,7 +263,7 @@ export async function warmupAccountNative(
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
     // Anti-coût : on éteint toujours le téléphone à la fin.
-    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+    await stopPhoneSurely(bearer, phoneId, log)
   }
 }
 
@@ -294,7 +313,7 @@ export async function loginInstagramOnPhone(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
-    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+    await stopPhoneSurely(bearer, phoneId, log)
   }
 }
 
@@ -338,7 +357,7 @@ export async function crossPostToPhone(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
-    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+    await stopPhoneSurely(bearer, phoneId, log)
   }
 }
 
@@ -389,7 +408,7 @@ export async function editProfileOnPhone(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
-    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+    await stopPhoneSurely(bearer, phoneId, log)
   }
 }
 
@@ -613,7 +632,7 @@ export async function postStoryToPhone(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
-    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+    await stopPhoneSurely(bearer, phoneId, log)
   }
 }
 
@@ -780,6 +799,6 @@ export async function postReelToPhone(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
-    try { await stopPhones(bearer, [phoneId]); log('📴 Téléphone éteint.') } catch { /* ignore */ }
+    await stopPhoneSurely(bearer, phoneId, log)
   }
 }
