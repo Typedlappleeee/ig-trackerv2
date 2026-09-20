@@ -79,68 +79,20 @@ function TileCheck({ on, onToggle }: { on: boolean; onToggle: (e: React.MouseEve
   )
 }
 
-// ── Génération de miniatures vidéo (frame capturée) — LAZY + concurrence limitée.
-//    Sans ça, chaque vidéo montait un <video> ; au-delà de ~75 éléments simultanés,
-//    le navigateur cesse d'en décoder → miniatures blanches après un gros import.
-//    On capture UNE image (canvas) quand la tuile devient visible, on la met en cache
-//    (data URL) et on affiche un <img> léger. Le <video> ne sert plus que de repli
-//    transitoire pendant la génération d'une tuile visible. ─────────────────────────
-const _vthumbCache = new Map<string, string>()   // item.id → dataURL
-const _vthumbFailed = new Set<string>()           // captures impossibles (ex. CORS)
-let _vthumbActive = 0
-const _vthumbQueue: (() => void)[] = []
-function _vthumbAcquire(): Promise<void> {
-  if (_vthumbActive < 3) { _vthumbActive++; return Promise.resolve() }
-  return new Promise(res => _vthumbQueue.push(() => { _vthumbActive++; res() }))
-}
-function _vthumbRelease() { _vthumbActive = Math.max(0, _vthumbActive - 1); const n = _vthumbQueue.shift(); if (n) n() }
-
-function captureVideoFrame(url: string): Promise<string | null> {
-  return new Promise(resolve => {
-    const v = document.createElement('video')
-    v.muted = true; v.playsInline = true; v.preload = 'metadata'
-    try { v.crossOrigin = 'anonymous' } catch { /* ignore */ }
-    let done = false
-    const finish = (r: string | null) => { if (done) return; done = true; try { v.removeAttribute('src'); v.load() } catch { /* ignore */ } resolve(r) }
-    v.onloadeddata = () => { try { v.currentTime = Math.min(0.1, (v.duration || 1) / 2) } catch { finish(null) } }
-    v.onseeked = () => {
-      try {
-        const w = 200, ar = v.videoHeight ? v.videoWidth / v.videoHeight : 0.5625
-        const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w / (ar || 0.5625))
-        const ctx = c.getContext('2d'); if (!ctx) return finish(null)
-        ctx.drawImage(v, 0, 0, c.width, c.height)
-        finish(c.toDataURL('image/jpeg', 0.62))   // throw si canvas « tainted » (CORS) → catch
-      } catch { finish(null) }
-    }
-    v.onerror = () => finish(null)
-    setTimeout(() => finish(null), 15000)
-    v.src = url
-  })
-}
-
-function useVideoThumb(id: string, url: string | null, enabled: boolean, ref: React.RefObject<HTMLElement | null>): { thumb: string | null; failed: boolean } {
-  const [thumb, setThumb] = useState<string | null>(() => _vthumbCache.get(id) ?? null)
-  const [failed, setFailed] = useState<boolean>(() => _vthumbFailed.has(id))
+// ── Aperçu vidéo LAZY : on ne monte le <video> QUE lorsque la tuile est visible.
+//    Sans ça, chaque vidéo montait un <video> en permanence ; au-delà de ~75 décodages
+//    simultanés le navigateur en abandonne → miniatures blanches ET lecture noire
+//    (décodeurs saturés). On NE touche PAS à crossOrigin (ça empoisonnait le cache de
+//    l'URL → la lecture devenait noire). Hors écran → placeholder. ────────────────────
+function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin = '400px'): boolean {
+  const [inView, setInView] = useState(false)
   useEffect(() => {
-    if (!enabled || !url || thumb) return
-    if (_vthumbCache.has(id)) { setThumb(_vthumbCache.get(id)!); return }
     const el = ref.current; if (!el) return
-    let cancelled = false
-    const io = new IntersectionObserver(async entries => {
-      if (!entries[0]?.isIntersecting) return
-      io.disconnect()
-      await _vthumbAcquire()
-      if (cancelled) return _vthumbRelease()
-      const data = await captureVideoFrame(url)
-      _vthumbRelease()
-      if (cancelled) return
-      if (data) { _vthumbCache.set(id, data); setThumb(data) }
-      else { _vthumbFailed.add(id); setFailed(true) }
-    }, { rootMargin: '300px' })
+    const io = new IntersectionObserver(entries => setInView(!!entries[0]?.isIntersecting), { rootMargin })
     io.observe(el)
-    return () => { cancelled = true; io.disconnect() }
-  }, [id, url, enabled, thumb, ref])
-  return { thumb, failed }
+    return () => io.disconnect()
+  }, [ref, rootMargin])
+  return inView
 }
 
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
@@ -152,9 +104,7 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
   const fresh = (item.used_count ?? 0) === 0
   const dur = type === 'video' ? fmtDuration(item.duration) : ''
   const btnRef = useRef<HTMLButtonElement>(null)
-  // Vidéo sans vraie miniature stockée → on génère une frame (cache + lazy).
-  const needGen = type === 'video' && !thumb
-  const { thumb: genThumb, failed: genFailed } = useVideoThumb(item.id, needGen ? media : null, needGen, btnRef)
+  const inView = useInView(btnRef)
   const placeholder: CSSProperties = {
     position: 'absolute', inset: 0,
     background: `repeating-linear-gradient(135deg, rgba(${h},0.20), rgba(${h},0.20) 7px, rgba(${h},0.05) 7px, rgba(${h},0.05) 14px)`,
@@ -177,14 +127,11 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
       {thumb
         ? <img src={thumb} alt="" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : type === 'video'
-          // Vidéo : miniature générée (frame capturée, en cache) → <img> léger.
-          // Repli <video> UNIQUEMENT tant qu'une tuile visible génère encore (ou si la
-          // capture a échoué, ex. CORS) → jamais 600 <video> d'un coup.
-          ? (genThumb
-              ? <img src={genThumb} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-              : (media && genFailed)
-                ? <video src={`${media}#t=0.1`} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <span style={placeholder} />)
+          // Vidéo : aperçu (1re image) monté SEULEMENT si la tuile est visible → limite
+          // le nombre de <video> décodés en même temps. Hors écran → placeholder.
+          ? (media && inView
+              ? <video src={`${media}#t=0.1`} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={placeholder} />)
           : media
             ? <img src={media} alt="" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={placeholder} />}
