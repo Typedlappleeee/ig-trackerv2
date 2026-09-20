@@ -463,6 +463,53 @@
                   },
                   {
                     "config": {
+                      "content": "wm size",
+                      "timeout": 30000,
+                      "variable": "WmSize"
+                    },
+                    "name": "Get screen size",
+                    "type": "executeADB",
+                    "id": "a8d90192-c7a0-4f84-a58f-164805d58cfc"
+                  },
+                  {
+                    "config": {
+                      "injectVariables": [
+                        "WmSize"
+                      ],
+                      "type": "js",
+                      "script": "async function main({ WmSize }) {\n  var m = String(WmSize).match(/(\\d+)x(\\d+)/)\n  var w = m ? parseInt(m[1]) : 1080\n  var h = m ? parseInt(m[2]) : 1920\n  var sx = Math.floor(w/2), sy = Math.floor(h*0.45)\n  var tx = Math.floor(w*0.74), ty = Math.floor(h*0.82)\n  return { DragCmd: 'input swipe ' + sx + ' ' + sy + ' ' + tx + ' ' + ty + ' 900' }\n}",
+                      "variableMap": [
+                        {
+                          "value": "DragCmd",
+                          "variable": "DragCmd"
+                        }
+                      ]
+                    },
+                    "name": "Build drag (vers bas-droite)",
+                    "type": "script",
+                    "id": "51e5cb27-0795-460c-ab18-b1d6c3fa872b"
+                  },
+                  {
+                    "config": {
+                      "content": "${DragCmd}",
+                      "timeout": 30000,
+                      "variable": ""
+                    },
+                    "name": "Drag sticker en bas",
+                    "type": "executeADB",
+                    "id": "e5cc1d88-29df-4106-8c5d-a5c042b569c7"
+                  },
+                  {
+                    "config": {
+                      "timeout": 1500,
+                      "timeoutType": "fixedValue"
+                    },
+                    "name": "Time",
+                    "type": "waitTime",
+                    "id": "367d7027-a279-42fe-bd50-a662e60f60eb"
+                  },
+                  {
+                    "config": {
                       "doubleClick": false,
                       "filterCollection": [
                         [
