@@ -97,7 +97,7 @@
             "RawVideoOutput",
             "RawImageOutput"
           ],
-          "script": "async function main({ RawVideoOutput, RawImageOutput }) {\nvar mediaId = null\nvar mediaType = null\nvar mediaUri = null\nvar adbCmd = null\nvar mediaFormat = null\n\nvar videoRows = RawVideoOutput.split('Row:')\nvar i = 0\nwhile (i < videoRows.length) {\n    if (videoRows[i].indexOf('bucket_display_name=Download') !== -1) {\n        var matchId = videoRows[i].match(/_id=(\\d+)/)\n        var matchMime = videoRows[i].match(/mime_type=([^\\s,]+)/)\n        if (matchId && matchMime) {\n            mediaId = matchId[1]\n            mediaType = matchMime[1]\n            mediaUri = 'content://media/external/video/media/' + mediaId\n        }\n    }\n    i++\n}\n\nif (!mediaId) {\n    var imageRows = RawImageOutput.split('Row:')\n    var j = 0\n    while (j < imageRows.length) {\n        if (imageRows[j].indexOf('bucket_display_name=Download') !== -1) {\n            var matchId2 = imageRows[j].match(/_id=(\\d+)/)\n            var matchMime2 = imageRows[j].match(/mime_type=([^\\s,]+)/)\n            if (matchId2 && matchMime2) {\n                mediaId = matchId2[1]\n                mediaType = matchMime2[1]\n                mediaUri = 'content://media/external/images/media/' + mediaId\n            }\n        }\n        j++\n    }\n}\n\nif (mediaType && mediaType.indexOf('video') !== -1) {\n    mediaFormat = 'VIDEO'\n    adbCmd = 'am start -n com.instagram.android/com.instagram.mainactivity.InstagramMainActivity ; sleep 4 ; am start -a com.instagram.share.ADD_TO_STORY -n com.instagram.android/com.instagram.share.handleractivity.StoryShareHandlerActivity --eu android.intent.extra.STREAM ' + mediaUri + ' -t video/mp4 --grant-read-uri-permission'\n} else {\n    mediaFormat = 'IMAGE'\n    adbCmd = 'am start -n com.instagram.android/com.instagram.mainactivity.InstagramMainActivity ; sleep 4 ; am start -a android.intent.action.SEND -n com.instagram.android/com.instagram.share.handleractivity.StoryShareHandlerActivity --eu android.intent.extra.STREAM ' + mediaUri + ' -t image/jpeg --grant-read-uri-permission'\n}\n\nreturn { AdbCmd: adbCmd, MediaFormat: mediaFormat }\n}",
+          "script": "async function main({ RawVideoOutput, RawImageOutput }) {\nvar mediaId = null\nvar mediaType = null\nvar mediaUri = null\nvar adbCmd = null\nvar mediaFormat = null\n\nvar videoRows = RawVideoOutput.split('Row:')\nvar i = 0\nwhile (i < videoRows.length) {\n    if (videoRows[i].indexOf('bucket_display_name=Download') !== -1) {\n        var matchId = videoRows[i].match(/_id=(\\d+)/)\n        var matchMime = videoRows[i].match(/mime_type=([^\\s,]+)/)\n        if (matchId && matchMime) {\n            mediaId = matchId[1]\n            mediaType = matchMime[1]\n            mediaUri = 'content://media/external/video/media/' + mediaId\n        }\n    }\n    i++\n}\n\nif (!mediaId) {\n    var imageRows = RawImageOutput.split('Row:')\n    var j = 0\n    while (j < imageRows.length) {\n        if (imageRows[j].indexOf('bucket_display_name=Download') !== -1) {\n            var matchId2 = imageRows[j].match(/_id=(\\d+)/)\n            var matchMime2 = imageRows[j].match(/mime_type=([^\\s,]+)/)\n            if (matchId2 && matchMime2) {\n                mediaId = matchId2[1]\n                mediaType = matchMime2[1]\n                mediaUri = 'content://media/external/images/media/' + mediaId\n            }\n        }\n        j++\n    }\n}\n\nif (mediaType && mediaType.indexOf('video') !== -1) {\n    mediaFormat = 'VIDEO'\n    adbCmd = 'am start -n com.instagram.android/com.instagram.mainactivity.InstagramMainActivity ; sleep 4 ; am start -a com.instagram.share.ADD_TO_STORY -n com.instagram.android/com.instagram.share.handleractivity.StoryShareHandlerActivity --eu android.intent.extra.STREAM ' + mediaUri + ' -t video/mp4 --grant-read-uri-permission'\n} else {\n    mediaFormat = 'IMAGE'\n    adbCmd = 'am start -n com.instagram.android/com.instagram.mainactivity.InstagramMainActivity ; sleep 4 ; am start -a com.instagram.share.ADD_TO_STORY -n com.instagram.android/com.instagram.share.handleractivity.StoryShareHandlerActivity --eu android.intent.extra.STREAM ' + mediaUri + ' -t ' + mediaType + ' --grant-read-uri-permission'\n}\n\nreturn { AdbCmd: adbCmd, MediaFormat: mediaFormat }\n}",
           "type": "js",
           "variableMap": [
             {
@@ -467,13 +467,6 @@
                       "filterCollection": [
                         [
                           {
-                            "content": "Your stor",
-                            "filterType": "contains",
-                            "type": "text"
-                          }
-                        ],
-                        [
-                          {
                             "content": "Your story",
                             "filterType": "equal",
                             "type": "text"
@@ -517,13 +510,6 @@
                 "filterCollection": [
                   [
                     {
-                      "content": "Your stor",
-                      "filterType": "contains",
-                      "type": "text"
-                    }
-                  ],
-                  [
-                    {
                       "content": "Your story",
                       "filterType": "equal",
                       "type": "text"
@@ -548,13 +534,6 @@
                     "config": {
                       "doubleClick": false,
                       "filterCollection": [
-                        [
-                          {
-                            "content": "Your stor",
-                            "filterType": "contains",
-                            "type": "text"
-                          }
-                        ],
                         [
                           {
                             "content": "Your story",
@@ -1413,7 +1392,9 @@
         "key": "Media",
         "tips": "Video or Image",
         "type": "file",
-        "value": []
+        "value": [
+          "https://sv-upgrade.geelark.cn/user-upload/603263790926069875/rpaFile/rdEaJZz1KFY8ZcX25AZA.mp4?fileName=LL 01.mp4"
+        ]
       },
       {
         "createFrom": "",
@@ -1463,5 +1444,5 @@
     ]
   },
   "desc": "This is a custom task",
-  "title": "Story Scaleflow"
+  "title": "Story post - 2.0"
 }
