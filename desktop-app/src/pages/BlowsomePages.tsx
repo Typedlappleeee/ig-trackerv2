@@ -423,7 +423,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           if (R.isCancelled()) break
           setProgress(0)
           push(`  · variante ${i + 1}/${per}…`)
-          const hooks = { onProgress: setProgress, onLog: () => {} }
+          const hooks = { onProgress: setProgress, onLog: (m: string) => { if (/Video:|Audio:|error|Error|decod|Invalid|unable|hevc|Duration/i.test(m)) push(m.trim()) } }
           // Choix de la légende : pool (seq/aléatoire) sinon IA.
           let capText: string | null = null
           if (burnCap) {

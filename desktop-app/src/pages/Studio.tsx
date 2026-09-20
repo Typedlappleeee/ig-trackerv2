@@ -131,7 +131,9 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
     if (tool === 'subs' && !conns.groq) { push('⚠ Clé Groq manquante (Réglages) pour la transcription.'); return }
 
     setRunning(true); setLogs([]); setResults([]); setProgress(0)
-    const hooks = { onProgress: setProgress, onLog: (_m: string) => {} }
+    // On remonte les logs ffmpeg pertinents (codec source, erreurs de décodage) dans le
+    // panneau → indispensable pour diagnostiquer les sorties noires (.mov HEVC, etc.).
+    const hooks = { onProgress: setProgress, onLog: (m: string) => { if (/Video:|Audio:|error|Error|decod|Invalid|unable|hevc|Duration/i.test(m)) push(m.trim()) } }
     const perOut = (tool === 'spoof' || tool === 'remix' || isImgTool) ? Math.max(1, Math.min(24, copies)) : 1
     const R = startRun('studio', `${T.t} · ${chosen.length} ${isImgTool ? 'photo' : 'vidéo'}${chosen.length > 1 ? 's' : ''}`, chosen.length * perOut)
     try {
