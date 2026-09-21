@@ -484,6 +484,67 @@
                   },
                   {
                     "config": {
+                      "content": "wm size",
+                      "timeout": 30000,
+                      "variable": "WmSize"
+                    },
+                    "id": "a9d67079-ef07-49bf-a8c1-eddedc0a9a5a",
+                    "isNewAdd": false,
+                    "name": "Get screen size",
+                    "type": "executeADB"
+                  },
+                  {
+                    "config": {
+                      "injectVariables": [
+                        "WmSize"
+                      ],
+                      "type": "js",
+                      "script": "async function main({ WmSize }) {\n  var m = String(WmSize).match(/(\\d+)x(\\d+)/)\n  var w = m ? parseInt(m[1]) : 1080\n  var h = m ? parseInt(m[2]) : 1920\n  var sx = Math.floor(w/2), sy = Math.floor(h*0.52)\n  var tx = Math.floor(w*0.72), ty = Math.floor(h*0.82)\n  return { DragCmd: 'input swipe ' + sx + ' ' + sy + ' ' + tx + ' ' + ty + ' 1500' }\n}",
+                      "variableMap": [
+                        {
+                          "value": "DragCmd",
+                          "variable": "DragCmd"
+                        }
+                      ]
+                    },
+                    "id": "6312a774-2c04-4fc8-b333-788c2f4ed05e",
+                    "isNewAdd": false,
+                    "name": "Build drag (sticker vers bas-droite)",
+                    "type": "script"
+                  },
+                  {
+                    "config": {
+                      "timeout": 1200,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "eef8c630-8990-49a9-bf68-dfb9f2eb281c",
+                    "isNewAdd": false,
+                    "name": "Time",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "content": "${DragCmd}",
+                      "timeout": 30000,
+                      "variable": ""
+                    },
+                    "id": "226636ca-0472-4968-b7c8-7e1c421033f0",
+                    "isNewAdd": false,
+                    "name": "Drag sticker en bas-droite",
+                    "type": "executeADB"
+                  },
+                  {
+                    "config": {
+                      "timeout": 1200,
+                      "timeoutType": "fixedValue"
+                    },
+                    "id": "6ef86785-2926-4d0a-a01b-bde3b900b2d4",
+                    "isNewAdd": false,
+                    "name": "Time",
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
                       "doubleClick": false,
                       "filterCollection": [
                         [
