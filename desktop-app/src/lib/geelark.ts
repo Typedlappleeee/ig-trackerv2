@@ -7,6 +7,7 @@
 
 import storyFlowDef from './geelarkStoryFlow.json'
 import photoFlowDef from './geelarkPhotoFlow.json'
+import warmupFlowDef from './geelarkWarmupFlow.json'
 import loginFlowDef from './geelarkLoginFlow.json'
 import reelsFlowDef from './geelarkReelsFlow.json'
 import trialFlowDef from './geelarkTrialFlow.json'
@@ -238,15 +239,44 @@ async function pollRpaTask(bearer: string, taskId: string, log: (m: string) => v
     if (!it) continue
     const st = Number(it['status'])
     if (st === 3) { log('   ✅ Tâche terminée'); return { ok: true } }
-    if ([4, 7, 8].includes(st)) return { ok: false, error: (it['failDesc'] as string) ?? `statut ${st}` }
+    if ([4, 7, 8].includes(st)) {
+      const fd = (it['failDesc'] ?? it['failMsg'] ?? it['msg']) as string | undefined
+      log(`   ❌ Tâche échouée : ${fd ?? `statut ${st}`}`)
+      return { ok: false, error: fd ?? `statut ${st}` }
+    }
   }
   log('   ⏳ Délai dépassé — la tâche peut continuer côté GeeLark.')
   return { ok: true }
 }
 
-// Warmup IA natif (instagramWarmup) : GeeLark pilote un warmup humain côté serveur.
-// browseVideo = nombre de vidéos parcourues (1-100). Démarre le téléphone, lance la
-// tâche, la suit, puis éteint le téléphone (anti-coût). Best-effort.
+// Warmup via flow RPA GeeLark CUSTOM (fourni) : recherche mot-clé + Reels, avec
+// like/comment/follow aléatoires. Lève « Not logged in » si le compte n'est pas
+// connecté (au lieu de finir en 2 s en silence comme le warmup natif).
+const WARMUP_FLOW_VERSION = 'v1'
+const _warmupFlowCache = new Map<string, Promise<string | null>>()
+async function ensureWarmupFlowId(bearer: string, log: (m: string) => void): Promise<string | null> {
+  const cached = _warmupFlowCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    const lsK = `sf-warmup-flowid:${bearer.slice(-14)}`, lsV = `sf-warmup-flowver:${bearer.slice(-14)}`
+    let stored: string | null = null, ver: string | null = null
+    try { stored = localStorage.getItem(lsK); ver = localStorage.getItem(lsV) } catch { /* ignore */ }
+    if (stored && ver === WARMUP_FLOW_VERSION) return stored
+    log(stored ? '🔄 Mise à jour du flow « Warmup »…' : '📥 Import du flow « Warmup » dans GeeLark…')
+    try {
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(warmupFlowDef) }, bearer)
+      if (Number(res['code']) !== 0) { log(`⚠ Import flow warmup : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(lsK, id); localStorage.setItem(lsV, WARMUP_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log(`⚠ Import flow warmup : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _warmupFlowCache.set(bearer, p)
+  p.then(v => { if (!v) _warmupFlowCache.delete(bearer) }).catch(() => _warmupFlowCache.delete(bearer))
+  return p
+}
+
+// Démarre le téléphone → lance le flow warmup (Reels + interactions) → suit → éteint.
 export async function warmupAccountNative(
   bearer: string,
   phoneId: string,
@@ -254,27 +284,27 @@ export async function warmupAccountNative(
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    const flowId = await ensureWarmupFlowId(bearer, log)
+    if (!flowId) return { ok: false, error: 'Flow warmup indisponible' }
     const ready = await ensurePhoneRunning(bearer, phoneId, log, config.rotationUrls)
     if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
-    const browseVideo = Math.max(1, Math.min(100, Math.round(config.browseVideo)))
-    log(`🔥 Création de la tâche de warmup (${browseVideo} vidéos${config.keyword ? `, mot-clé « ${config.keyword} »` : ''})…`)
-    const res = await geelarkFetch('/rpa/task/instagramWarmup', {
-      id: phoneId,
-      scheduleAt: Math.floor(Date.now() / 1000) + 5,
-      browseVideo,
-      ...(config.keyword?.trim() ? { keyword: config.keyword.trim() } : {}),
-      name: 'ScaleFlow warmup',
+    const n = Math.max(1, Math.min(100, Math.round(config.browseVideo)))
+    const kw = config.keyword?.trim()
+    log(`🔥 Lancement du warmup (${n} vidéos${kw ? `, mot-clé « ${kw} »` : ''})…`)
+    // Sans mot-clé : on N'ENVOIE PAS SearchKeyword → le flow prend la branche
+    // « parcourir les Reels » (sinon la branche recherche boucle sur une liste vide).
+    const paramMap: Record<string, unknown> = kw ? { NumberOfVideosViewed: n, SearchKeyword: [kw] } : { NumberOfVideosViewed: n }
+    const res = await geelarkFetch('/task/rpa/add', {
+      id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 3, name: 'Warmup Scaleflow', paramMap,
     }, bearer)
     if (Number(res['code']) !== 0) return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
     log('   Tâche créée — warmup en cours…')
-    const r = await pollRpaTask(bearer, taskId, log, 25 * 60_000)
-    return r
+    return await pollRpaTask(bearer, taskId, log, 25 * 60_000)
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
-    // Anti-coût : on éteint toujours le téléphone à la fin.
     await stopPhoneSurely(bearer, phoneId, log)
   }
 }
