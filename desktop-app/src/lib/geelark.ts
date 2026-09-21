@@ -114,18 +114,29 @@ export async function stopPhones(bearer: string, ids: string[]): Promise<number>
 // Le simple /phone/stop peut échouer/ne pas prendre → le téléphone restait allumé
 // après une erreur. Ici on retente jusqu'à 4 fois et on confirme via /phone/list.
 export async function stopPhoneSurely(bearer: string, phoneId: string, log?: (m: string) => void): Promise<boolean> {
+  // Signal FIABLE = la réponse de /phone/stop (code 0 / successAmount) : GeeLark a
+  // ACCEPTÉ l'arrêt → il éteindra le téléphone (l'extinction réelle prend quelques s).
+  // On ne se base PAS sur /phone/list (trop lent à refléter → faux « non confirmée »).
   for (let attempt = 1; attempt <= 4; attempt++) {
-    try { await stopPhones(bearer, [phoneId]) } catch { /* on vérifie quand même l'état */ }
-    await sleep(2500)
     try {
-      const phones = await fetchAllPhones(bearer)
-      const st = Number(phones.find(p => p.id === phoneId)?.status ?? -1)
-      // 1=stopped, 3=stopping (en cours d'extinction) → considéré OK.
-      if (st === 1 || st === 3 || st === -1) { log?.('📴 Téléphone éteint.'); return true }
-    } catch { /* réseau — on retente le stop */ }
-    if (attempt < 4) log?.(`  ↻ Extinction non confirmée — nouvelle tentative (${attempt}/3)…`)
+      const res = await geelarkFetch('/phone/stop', { ids: [phoneId] }, bearer)
+      const code = Number(res['code'] ?? -1)
+      const data = (res['data'] as Record<string, unknown>) ?? {}
+      const success = Number(data['successAmount'] ?? (code === 0 ? 1 : 0))
+      const failed = Number(data['failAmount'] ?? 0)
+      if (code === 0 && failed === 0) { log?.('📴 Téléphone éteint.'); return true }
+      if (success > 0) { log?.('📴 Téléphone éteint.'); return true }
+    } catch { /* réseau — on retente */ }
+    if (attempt < 4) { log?.(`  ↻ Arrêt refusé — nouvelle tentative (${attempt}/3)…`); await sleep(4000) }
   }
-  log?.('⚠️ Téléphone peut-être encore allumé — le watchdog serveur l\'éteindra.')
+  // Dernier recours : peut-être DÉJÀ éteint (le stop a été accepté mais renvoyé une
+  // erreur car le tel n'était plus démarré) → on vérifie l'état réel.
+  try {
+    const phones = await fetchAllPhones(bearer)
+    const st = Number(phones.find(p => p.id === phoneId)?.status ?? -1)
+    if (st !== 0 && st !== 2) { log?.('📴 Téléphone éteint.'); return true }  // 0=démarré, 2=démarrage
+  } catch { /* ignore */ }
+  log?.('⚠️ Arrêt non confirmé — le watchdog serveur éteindra le téléphone.')
   return false
 }
 
