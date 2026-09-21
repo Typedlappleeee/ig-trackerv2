@@ -28,7 +28,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
 
   if (mode === 'reels') return <ReelsComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
   if (mode === 'story') return <StoryComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
-  if (mode === 'photo') return <PhotoComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
+  if (mode === 'photo' && isAdmin) return <PhotoComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
   if (mode === 'cross' && isAdmin) return <CrossComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
 
   return (
@@ -36,7 +36,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
       <PageHead title="Publication" sub="Choisis un format. Les comptes et le contenu se règlent à l'étape suivante." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
         {FORMATS.map(f => {
-          const adminOnly = f.id === 'cross' && !isAdmin
+          const adminOnly = (f.id === 'cross' || f.id === 'photo') && !isAdmin
           const locked = !f.ready || adminOnly
           return (
           <button key={f.id} disabled={locked} onClick={locked ? undefined : f.id === 'reels' ? () => setMode('reels') : f.id === 'story' ? () => setMode('story') : f.id === 'photo' ? () => setMode('photo') : f.id === 'cross' ? () => setMode('cross') : undefined} style={{
