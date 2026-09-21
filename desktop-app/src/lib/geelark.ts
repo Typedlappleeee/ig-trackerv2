@@ -400,9 +400,10 @@ export async function editProfileOnPhone(
   bearer: string, phoneId: string,
   fields: { nickname?: string; biography?: string; linkURL?: string; linkTitle?: string },
   log: (m: string) => void,
+  rotationUrls?: string[],
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    const ready = await ensurePhoneRunning(bearer, phoneId, log, rotationUrls)
     if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
     log('✏️ Création de la tâche d\'édition de profil…')
     const res = await geelarkFetch('/rpa/task/instagramEdit', {

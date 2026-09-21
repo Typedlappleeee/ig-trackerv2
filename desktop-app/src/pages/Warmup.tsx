@@ -44,6 +44,8 @@ export default function Warmup({ theme, infra, user, org }: {
   const [logs, setLogs] = useState<string[]>([])
   const [wtab, setWtab] = useState<WTab>('warm')
   const [wgroup, setWgroup] = useState('Tous')
+  const [rotationConfigured, setRotationConfigured] = useState(false)
+  const [rotationOn, setRotationOn] = useState(false)
   const [edit, setEdit] = useState({ nickname: '', biography: '', linkURL: '', linkTitle: '' })
   const [creds, setCreds] = useState<Record<string, { email: string; password: string; totp: string }>>({})
 
@@ -60,6 +62,13 @@ export default function Warmup({ theme, infra, user, org }: {
   }, [currentOrg?.id, user.id, infra])
 
   useEffect(() => { load() }, [load])
+  // Proxy rotatif dispo ? Par défaut OFF (choix par run, comme les composers).
+  useEffect(() => {
+    loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => {
+      setRotationConfigured(c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim())))
+      setRotationOn(false)
+    })
+  }, [currentOrg?.id, user.id])
 
   // Lancement RÉEL : warmup natif GeeLark, un téléphone après l'autre (les tâches
   // durent longtemps ; le séquentiel évite de saturer le démon shell).
@@ -73,7 +82,7 @@ export default function Warmup({ theme, infra, user, org }: {
     const browseVideo = Math.max(1, Math.min(100, Math.round(dur * 2)))
     const pushLog = (m: string) => setLogs(l => [...l.slice(-200), m])
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
-    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
+    const rotU = resolveRotationUrls(); const rot = (rotationOn && rotU.length) ? rotU : undefined
 
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
@@ -93,10 +102,12 @@ export default function Warmup({ theme, infra, user, org }: {
     setRunning(true); setLogs([])
     setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as RunPhase })))
     const push = (m: string) => setLogs(l => [...l.slice(-200), m])
+    await loadProxyRotation(currentOrg?.id ?? null, user.id)
+    const rotU = resolveRotationUrls(); const rot = (rotationOn && rotU.length) ? rotU : undefined
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— ${phoneLabel(p)} —`)
-      const r = await editProfileOnPhone(bearer, p.geelark_id!, edit, push)
+      const r = await editProfileOnPhone(bearer, p.geelark_id!, edit, push, rot)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
     push('✔ Édition terminée.')
@@ -111,7 +122,7 @@ export default function Warmup({ theme, infra, user, org }: {
     setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as RunPhase })))
     const push = (m: string) => setLogs(l => [...l.slice(-200), m])
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
-    const rotU = resolveRotationUrls(); const rot = rotU.length ? rotU : undefined
+    const rotU = resolveRotationUrls(); const rot = (rotationOn && rotU.length) ? rotU : undefined
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— ${phoneLabel(p)} —`)
@@ -154,6 +165,19 @@ export default function Warmup({ theme, infra, user, org }: {
             color: wtab === k ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 700, transition: 'all .14s ease',
           }}>{l}</button>
         ))}
+      </div>
+
+      {/* Rotation d'IP proxy — même toggle que les composers (Reels/Story/Photo…). */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', marginBottom: 12, borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Rotation d’IP proxy</span>
+          <span style={{ fontSize: 11, color: '#52525B' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque téléphone (envoi en série)' : 'Désactivée pour ce run'}</span>
+        </span>
+        <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
+          title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 40, height: 23, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+          <span style={{ width: 19, height: 19, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+        </span>
       </div>
 
       {wtab !== 'warm' ? (
