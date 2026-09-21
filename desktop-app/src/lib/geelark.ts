@@ -6,6 +6,7 @@
 // démarrage/arrêt de téléphone, sonde de tâche RPA). Best-effort, jamais de secret loggé.
 
 import storyFlowDef from './geelarkStoryFlow.json'
+import photoFlowDef from './geelarkPhotoFlow.json'
 import loginFlowDef from './geelarkLoginFlow.json'
 import reelsFlowDef from './geelarkReelsFlow.json'
 import trialFlowDef from './geelarkTrialFlow.json'
@@ -652,6 +653,86 @@ export async function scheduleStoryOnPhone(
     }
     const res = await geelarkFetch('/task/rpa/add', {
       id: phoneId, flowId, scheduleAt: scheduleAtUnix, name: 'Story Scaleflow (programmé)', paramMap,
+    }, bearer)
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string | undefined
+    if (Number(res['code']) === 0 && taskId) return { ok: true, taskId }
+    return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' } }
+}
+
+// ── Post PHOTO (feed) via flow RPA GeeLark « Instagram Photo post » ───────────
+// Media = 1 image (photo simple) ou plusieurs (carrousel). Caption = description.
+// MusicID laissé vide → post feed normal (pas d'audio Reels).
+const PHOTO_FLOW_VERSION = 'v1'
+const _photoFlowCache = new Map<string, Promise<string | null>>()
+function photoFlowLsKey(b: string) { return `sf-photo-flowid:${b.slice(-14)}` }
+function photoFlowVerKey(b: string) { return `sf-photo-flowver:${b.slice(-14)}` }
+
+async function ensurePhotoFlowId(bearer: string, log: (m: string) => void): Promise<string | null> {
+  const cached = _photoFlowCache.get(bearer)
+  if (cached) return cached
+  const p = (async (): Promise<string | null> => {
+    let stored: string | null = null, ver: string | null = null
+    try { stored = localStorage.getItem(photoFlowLsKey(bearer)); ver = localStorage.getItem(photoFlowVerKey(bearer)) } catch { /* ignore */ }
+    if (stored && ver === PHOTO_FLOW_VERSION) return stored
+    log(stored ? '🔄 Mise à jour du flow « Photo »…' : '📥 Import du flow « Photo » dans GeeLark…')
+    try {
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(photoFlowDef) }, bearer)
+      if (Number(res['code']) !== 0) { log(`⚠ Import flow photo : ${res['msg'] ?? res['code']}`); return null }
+      const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
+      if (id) { try { localStorage.setItem(photoFlowLsKey(bearer), id); localStorage.setItem(photoFlowVerKey(bearer), PHOTO_FLOW_VERSION) } catch { /* ignore */ } return id }
+      return null
+    } catch (e) { log(`⚠ Import flow photo : ${e instanceof Error ? e.message : String(e)}`); return null }
+  })()
+  _photoFlowCache.set(bearer, p)
+  p.then(v => { if (!v) _photoFlowCache.delete(bearer) }).catch(() => _photoFlowCache.delete(bearer))
+  return p
+}
+
+// Publie une PHOTO (ou carrousel) sur UN téléphone : import flow → démarre →
+// tâche RPA (Media + Caption) → suit → éteint (anti-coût).
+export async function postPhotoToPhone(
+  bearer: string,
+  phoneId: string,
+  opts: { imageResourceUrls: string[]; caption?: string; rotationUrls?: string[] },
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    if (!opts.imageResourceUrls?.length) return { ok: false, error: 'Aucune image' }
+    const flowId = await ensurePhotoFlowId(bearer, log)
+    if (!flowId) return { ok: false, error: 'Flow photo indisponible' }
+    const ready = await ensurePhoneRunning(bearer, phoneId, log, opts.rotationUrls)
+    if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
+    log('🖼 Lancement du post photo…')
+    const paramMap = { Media: opts.imageResourceUrls, Caption: opts.caption ?? '', MusicID: '' }
+    const res = await geelarkFetch('/task/rpa/add', {
+      id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 3, name: 'Photo Scaleflow', paramMap,
+    }, bearer)
+    if (Number(res['code']) !== 0) return { ok: false, error: `GeeLark : ${res['msg'] ?? res['code']}` }
+    const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
+    log('   Tâche créée — publication en cours…')
+    return await pollRpaTask(bearer, taskId, log, 15 * 60_000)
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
+  } finally {
+    await stopPhoneSurely(bearer, phoneId, log)
+  }
+}
+
+// Programme un post photo pour une heure FUTURE (GeeLark, PC éteint).
+export async function schedulePhotoOnPhone(
+  bearer: string, phoneId: string,
+  opts: { imageResourceUrls: string[]; caption?: string },
+  scheduleAtUnix: number, log: (m: string) => void,
+): Promise<{ ok: boolean; taskId?: string; error?: string }> {
+  try {
+    if (!opts.imageResourceUrls?.length) return { ok: false, error: 'Aucune image' }
+    const flowId = await ensurePhotoFlowId(bearer, log)
+    if (!flowId) return { ok: false, error: 'Flow photo indisponible' }
+    const paramMap = { Media: opts.imageResourceUrls, Caption: opts.caption ?? '', MusicID: '' }
+    const res = await geelarkFetch('/task/rpa/add', {
+      id: phoneId, flowId, scheduleAt: scheduleAtUnix, name: 'Photo Scaleflow (programmé)', paramMap,
     }, bearer)
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string | undefined
     if (Number(res['code']) === 0 && taskId) return { ok: true, taskId }

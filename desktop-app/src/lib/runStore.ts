@@ -3,7 +3,7 @@
 // sa progression ici ; un widget flottant l'affiche partout et permet d'annuler.
 import { useSyncExternalStore } from 'react'
 
-export type RunKind = 'reels' | 'story' | 'cross' | 'studio' | 'auto' | 'farm'
+export type RunKind = 'reels' | 'story' | 'photo' | 'cross' | 'studio' | 'auto' | 'farm'
 export interface RunState {
   id: string
   kind: RunKind
