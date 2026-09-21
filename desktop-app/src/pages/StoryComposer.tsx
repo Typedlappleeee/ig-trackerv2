@@ -185,25 +185,41 @@ export default function StoryComposer({ theme, user, org, onBack }: {
 
     const concurrency = rot ? 1 : jobs.length
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${jobs.length} compte(s) en parallèle.`)
-    let okN = 0, errN = 0
     const results = new Map<string, { name: string; ok: boolean; error?: string }>()
     const postOne = async ({ p, img, st }: (typeof jobs)[number]) => {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— ${phoneLabel(p)} · ${img.title} —`)
       const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl: resByImg.get(img.id)!, linkUrl: links[p.id], linkText: st, rotationUrls: rot }, push)
-      if (r.ok) okN++; else { run.markFailed(); errN++ }
-      results.set(p.id, { name: phoneLabel(p), ok: r.ok, error: r.ok ? undefined : r.error })
-      R.tick(r.ok)
+      const already = results.get(p.id)?.ok === true
+      results.set(p.id, { name: phoneLabel(p), ok: r.ok || already, error: r.ok ? undefined : r.error })
+      if (!already) R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
-    for (let b = 0; b < jobs.length; b += concurrency) {
-      if (R.isCancelled()) { push('⏹ Annulé.'); break }
-      const batch = jobs.slice(b, b + concurrency)
-      const batchIds = [...new Set(batch.map(j => j.p.geelark_id).filter((x): x is string => !!x))]
-      await registerPhoneWatch(batchIds, { orgId: currentOrg?.id ?? null, userId: user.id, stopAt: new Date(Date.now() + 30 * 60_000) })
-      await Promise.all(batch.map(postOne))
-      await unregisterPhoneWatch(batchIds)
+    const runBatches = async (list: typeof jobs) => {
+      for (let b = 0; b < list.length; b += concurrency) {
+        if (R.isCancelled()) { push('⏹ Annulé.'); break }
+        const batch = list.slice(b, b + concurrency)
+        const batchIds = [...new Set(batch.map(j => j.p.geelark_id).filter((x): x is string => !!x))]
+        await registerPhoneWatch(batchIds, { orgId: currentOrg?.id ?? null, userId: user.id, stopAt: new Date(Date.now() + 30 * 60_000) })
+        await Promise.all(batch.map(postOne))
+        await unregisterPhoneWatch(batchIds)
+      }
     }
+    await runBatches(jobs)
+    // Réessai automatique des comptes échoués (2 passes max) → monte le taux de réussite
+    // bien au-dessus de 50 %. Une story échouée n'a pas été publiée → pas de doublon.
+    for (let attempt = 1; attempt <= 2 && !R.isCancelled(); attempt++) {
+      const failed = jobs.filter(j => results.get(j.p.id)?.ok === false)
+      if (failed.length === 0) break
+      push(`↻ Réessai ${attempt}/2 — ${failed.length} compte(s) échoué(s)…`)
+      await runBatches(failed)
+    }
+    // Comptage final (après réessais) + crédits : on ne rembourse que les comptes
+    // DÉFINITIVEMENT échoués.
+    const finals = [...results.values()]
+    const okN = finals.filter(r => r.ok).length
+    const errN = finals.filter(r => !r.ok).length
+    for (let i = 0; i < errN; i++) run.markFailed()
     R.finish()
     if (jobs.length > 0) {
       const { error: prErr } = await supabase.from('post_runs').insert({
