@@ -34,6 +34,27 @@
       },
       {
         "config": {
+          "content": "cmd media rescan 2>/dev/null; am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download 2>/dev/null; am broadcast -a android.intent.action.MEDIA_MOUNTED -d file:///sdcard 2>/dev/null; true",
+          "timeout": 30000,
+          "variable": ""
+        },
+        "id": "808bc81a-221a-43a6-a55b-10a80ee41528",
+        "isNewAdd": false,
+        "name": "Rescan galerie",
+        "type": "executeADB"
+      },
+      {
+        "config": {
+          "timeout": 4000,
+          "timeoutType": "fixedValue"
+        },
+        "id": "f6b4eb40-04ff-487e-9323-ae1ec561b43f",
+        "isNewAdd": false,
+        "name": "Time",
+        "type": "waitTime"
+      },
+      {
+        "config": {
           "packgename": "com.instagram.android"
         },
         "id": "ed63f893-5859-40da-9694-4b18e4e1d9bd",
