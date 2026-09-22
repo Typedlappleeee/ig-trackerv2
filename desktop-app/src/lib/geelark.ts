@@ -115,9 +115,17 @@ export async function stopPhones(bearer: string, ids: string[]): Promise<number>
 // Le simple /phone/stop peut échouer/ne pas prendre → le téléphone restait allumé
 // après une erreur. Ici on retente jusqu'à 4 fois et on confirme via /phone/list.
 export async function stopPhoneSurely(bearer: string, phoneId: string, log?: (m: string) => void): Promise<boolean> {
-  // Signal FIABLE = la réponse de /phone/stop (code 0 / successAmount) : GeeLark a
-  // ACCEPTÉ l'arrêt → il éteindra le téléphone (l'extinction réelle prend quelques s).
-  // On ne se base PAS sur /phone/list (trop lent à refléter → faux « non confirmée »).
+  // GeeLark éteint SOUVENT le téléphone tout seul après une tâche RPA → /phone/stop
+  // peut alors « échouer » (rien à arrêter) alors que le tel est déjà arrêté. On
+  // considère donc l'arrêt OK si : (a) /phone/stop est accepté (code 0/success), OU
+  // (b) l'état réel du tel est déjà « arrêté » ou « en cours d'arrêt ».
+  const isStopped = async (): Promise<boolean> => {
+    try {
+      const phones = await fetchAllPhones(bearer)
+      const st = Number(phones.find(p => p.id === phoneId)?.status ?? -1)
+      return st === 1 || st === 3   // 1=arrêté, 3=en cours d'arrêt
+    } catch { return false }
+  }
   for (let attempt = 1; attempt <= 4; attempt++) {
     try {
       const res = await geelarkFetch('/phone/stop', { ids: [phoneId] }, bearer)
@@ -125,18 +133,12 @@ export async function stopPhoneSurely(bearer: string, phoneId: string, log?: (m:
       const data = (res['data'] as Record<string, unknown>) ?? {}
       const success = Number(data['successAmount'] ?? (code === 0 ? 1 : 0))
       const failed = Number(data['failAmount'] ?? 0)
-      if (code === 0 && failed === 0) { log?.('📴 Téléphone éteint.'); return true }
-      if (success > 0) { log?.('📴 Téléphone éteint.'); return true }
-    } catch { /* réseau — on retente */ }
-    if (attempt < 4) { log?.(`  ↻ Arrêt refusé — nouvelle tentative (${attempt}/3)…`); await sleep(4000) }
+      if ((code === 0 && failed === 0) || success > 0) { log?.('📴 Téléphone éteint.'); return true }
+    } catch { /* réseau — on vérifie quand même l'état */ }
+    // Déjà arrêté par GeeLark (auto-stop après tâche) ? → OK, pas d'alarme.
+    if (await isStopped()) { log?.('📴 Téléphone éteint.'); return true }
+    if (attempt < 4) await sleep(4000)
   }
-  // Dernier recours : peut-être DÉJÀ éteint (le stop a été accepté mais renvoyé une
-  // erreur car le tel n'était plus démarré) → on vérifie l'état réel.
-  try {
-    const phones = await fetchAllPhones(bearer)
-    const st = Number(phones.find(p => p.id === phoneId)?.status ?? -1)
-    if (st !== 0 && st !== 2) { log?.('📴 Téléphone éteint.'); return true }  // 0=démarré, 2=démarrage
-  } catch { /* ignore */ }
   log?.('⚠️ Arrêt non confirmé — le watchdog serveur éteindra le téléphone.')
   return false
 }
@@ -514,7 +516,7 @@ export async function geelarkUploadVideo(
 // La story n'a pas d'endpoint natif : on importe un flow RPA (« Story Scaleflow »)
 // dans le compte GeeLark (une seule fois, mis en cache), puis on l'exécute par
 // téléphone via /task/rpa/add avec un paramMap (image + lien + texte du sticker).
-const STORY_FLOW_VERSION = 'v17'
+const STORY_FLOW_VERSION = 'v18'
 const _storyFlowCache = new Map<string, Promise<string | null>>()
 function storyFlowLsKey(b: string) { return `sf-story-flowid:${b.slice(-14)}` }
 function storyFlowVerKey(b: string) { return `sf-story-flowver:${b.slice(-14)}` }
