@@ -351,7 +351,12 @@ export async function loginInstagramOnPhone(
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
     log('   Tâche créée — connexion en cours…')
-    return await pollRpaTask(bearer, taskId, log, 10 * 60_000)
+    const r = await pollRpaTask(bearer, taskId, log, 10 * 60_000)
+    // IMPORTANT : après un login réussi, on laisse Instagram ÉCRIRE la session sur
+    // le disque avant d'éteindre. Sinon on coupait le tel juste après la 2FA et la
+    // session n'était pas persistée → compte déconnecté au redémarrage.
+    if (r.ok) { log('   💾 Sauvegarde de la session (20 s)…'); await sleep(20000) }
+    return r
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
