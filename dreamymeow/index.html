@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Spoof Image</title>
+<meta name="description" content="Rend chaque photo unique : micro zoom + ré-encodage + métadonnées EXIF (appareil + GPS) réécrites. 100% dans ton navigateur." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
+<style>
+  :root{
+    --bg:#0A0B0E; --panel:#121218; --panel2:#16161d; --edge:rgba(255,255,255,.08);
+    --txt:#F2F0FF; --mut:#9a97a8; --dim:#6b6878; --acc:#c084fc; --acc2:#a855f7;
+    --ok:#34d399; --pink:236,72,153;
+  }
+  :root:not([data-theme="dark"]){
+    @media (prefers-color-scheme: light){ }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(60% 40% at 50% -5%, rgba(168,85,247,.18), transparent 70%),
+      var(--bg);
+    color:var(--txt); font-family:'Manrope',system-ui,sans-serif; min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px; margin:0 auto; padding:28px 16px 60px}
+  header{display:flex; align-items:center; gap:12px; margin-bottom:6px}
+  .logo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(145deg,#c084fc,#7c3aed); box-shadow:0 10px 30px -10px rgba(168,85,247,.9); flex:0 0 auto}
+  h1{font-family:'Space Grotesk',sans-serif; font-size:22px; margin:0; letter-spacing:-.02em}
+  .brand{margin-left:auto; font-size:12px; color:var(--dim); font-weight:700; letter-spacing:.03em}
+  .lead{color:var(--mut); font-size:13.5px; line-height:1.6; margin:2px 0 20px}
+  .card{background:linear-gradient(168deg,rgba(24,20,44,.5),rgba(12,10,22,.6)); border:1px solid var(--edge); border-radius:16px; padding:18px; margin-bottom:14px}
+  .drop{border:1.5px dashed rgba(168,85,247,.4); border-radius:14px; padding:30px 18px; text-align:center; cursor:pointer; transition:.15s; background:rgba(168,85,247,.04)}
+  .drop.hot{background:rgba(168,85,247,.12); border-color:var(--acc)}
+  .drop b{color:var(--acc)}
+  .drop small{display:block; color:var(--dim); margin-top:6px; font-size:11.5px}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px}
+  label.f{display:block; font-size:10.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--dim); margin:0 0 6px}
+  select,input[type=number]{width:100%; height:40px; padding:0 12px; border-radius:10px; background:rgba(255,255,255,.03); border:1px solid var(--edge); color:var(--txt); font-size:13.5px; font-family:inherit; outline:none}
+  select:focus,input:focus{border-color:rgba(168,85,247,.5)}
+  option{background:#16161c}
+  .seg{display:flex; gap:4px; padding:4px; border-radius:11px; background:rgba(255,255,255,.03); border:1px solid var(--edge)}
+  .seg button{flex:1; height:32px; border:none; border-radius:8px; background:transparent; color:var(--mut); font-weight:700; font-size:12.5px; cursor:pointer; font-family:inherit}
+  .seg button.on{background:linear-gradient(135deg,#c084fc,#7c3aed); color:#fff}
+  .go{width:100%; margin-top:16px; height:48px; border:none; border-radius:12px; cursor:pointer; font-family:inherit; font-size:15px; font-weight:800; color:#fff;
+    background:linear-gradient(135deg,#c084fc,#7c3aed); box-shadow:0 12px 30px -12px rgba(168,85,247,.9)}
+  .go:disabled{opacity:.45; cursor:not-allowed; box-shadow:none}
+  .bar{display:flex; align-items:center; gap:10px; margin:14px 0}
+  .bar .count{font-size:12.5px; color:var(--mut)}
+  .bar .dl{margin-left:auto}
+  .btn2{height:34px; padding:0 14px; border-radius:9px; border:1px solid var(--edge); background:rgba(255,255,255,.04); color:var(--txt); font-weight:700; font-size:12.5px; cursor:pointer; font-family:inherit}
+  .results{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-top:12px}
+  .thumb{position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--edge); background:#000; aspect-ratio:4/5}
+  .thumb img{width:100%;height:100%;object-fit:cover; display:block}
+  .thumb a{position:absolute; inset:auto 6px 6px auto; width:28px;height:28px;border-radius:8px; display:grid;place-items:center; background:rgba(0,0,0,.6); color:#fff; text-decoration:none; backdrop-filter:blur(4px)}
+  .thumb .tag{position:absolute; top:6px; left:6px; font-size:9px; font-weight:800; padding:2px 6px; border-radius:5px; background:rgba(0,0,0,.55); color:#e9d5ff}
+  .empty{color:var(--dim); text-align:center; font-size:12.5px; padding:24px}
+  footer{color:var(--dim); font-size:11.5px; text-align:center; margin-top:26px; line-height:1.6}
+  a.link{color:var(--acc); text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="logo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></span>
+    <h1>Spoof Image</h1>
+    <span class="brand">dreamymeow.com</span>
+  </header>
+  <p class="lead">Rend chaque photo <b>unique</b> pour l'algo : micro zoom/recadrage + ré-encodage JPEG (efface l'EXIF d'origine) + métadonnées réécrites (appareil&nbsp;+&nbsp;GPS). Tout se passe <b>dans ton navigateur</b> — aucune image n'est envoyée sur un serveur.</p>
+
+  <div class="card">
+    <div id="drop" class="drop">
+      <b>Dépose tes photos ici</b> ou clique pour choisir
+      <small>JPG / PNG / WEBP · plusieurs à la fois · sortie en .jpg</small>
+      <input id="file" type="file" accept="image/*" multiple hidden />
+    </div>
+    <div id="picked" class="empty" style="padding:10px 0 0">Aucune image sélectionnée.</div>
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <label class="f">Appareil (métadonnées)</label>
+        <select id="device"></select>
+      </div>
+      <div>
+        <label class="f">Localisation GPS</label>
+        <select id="gps"></select>
+      </div>
+      <div>
+        <label class="f">Variantes par image</label>
+        <input id="copies" type="number" min="1" max="20" value="1" />
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <label class="f">Intensité</label>
+      <div class="seg" id="intensity">
+        <button data-v="subtle">Subtile</button>
+        <button data-v="normal" class="on">Normale</button>
+        <button data-v="strong">Forte</button>
+      </div>
+    </div>
+    <button id="go" class="go" disabled>Spoofer</button>
+  </div>
+
+  <div id="out" style="display:none">
+    <div class="bar">
+      <span class="count" id="count"></span>
+      <button id="dlall" class="btn2 dl">Tout télécharger</button>
+    </div>
+    <div class="results" id="results"></div>
+  </div>
+
+  <footer>
+    100% côté client · aucune donnée envoyée · <a class="link" href="https://dreamymeow.com">dreamymeow.com</a>
+  </footer>
+</div>
+
+<script>
+/* ── Données (identiques à ScaleFlow) ─────────────────────────────── */
+const DEVICES = [
+  { k:'none', label:'Aucun (métadonnées effacées)', apple:false, make:'', model:'', software:'' },
+  { k:'iphone15pro', label:'iPhone 15 Pro', apple:true, make:'Apple', model:'iPhone 15 Pro', software:'17.4.1' },
+  { k:'iphone15', label:'iPhone 15', apple:true, make:'Apple', model:'iPhone 15', software:'17.3' },
+  { k:'iphone14pro', label:'iPhone 14 Pro', apple:true, make:'Apple', model:'iPhone 14 Pro', software:'17.2' },
+  { k:'iphone14', label:'iPhone 14', apple:true, make:'Apple', model:'iPhone 14', software:'16.6' },
+  { k:'iphone13', label:'iPhone 13', apple:true, make:'Apple', model:'iPhone 13', software:'16.5' },
+  { k:'iphone12', label:'iPhone 12', apple:true, make:'Apple', model:'iPhone 12', software:'16.3' },
+  { k:'iphone11', label:'iPhone 11', apple:true, make:'Apple', model:'iPhone 11', software:'15.7' },
+  { k:'iphonese', label:'iPhone SE', apple:true, make:'Apple', model:'iPhone SE', software:'16.5' },
+  { k:'s23', label:'Samsung Galaxy S23', apple:false, make:'samsung', model:'SM-S911B', software:'' },
+  { k:'s22', label:'Samsung Galaxy S22', apple:false, make:'samsung', model:'SM-S901B', software:'' },
+  { k:'pixel8', label:'Google Pixel 8', apple:false, make:'Google', model:'Pixel 8', software:'' },
+];
+const GPS_CITIES = [
+  { k:'none', label:'Aucune', lat:0, lon:0 },
+  { k:'france', label:'🇫🇷 France (aléatoire)', lat:46.6, lon:2.2 },
+  { k:'paris', label:'Paris', lat:48.8566, lon:2.3522 },
+  { k:'lyon', label:'Lyon', lat:45.7640, lon:4.8357 },
+  { k:'marseille', label:'Marseille', lat:43.2965, lon:5.3698 },
+  { k:'bordeaux', label:'Bordeaux', lat:44.8378, lon:-0.5792 },
+  { k:'lille', label:'Lille', lat:50.6292, lon:3.0573 },
+  { k:'bruxelles', label:'Bruxelles', lat:50.8503, lon:4.3517 },
+  { k:'geneve', label:'Genève', lat:46.2044, lon:6.1432 },
+  { k:'montreal', label:'Montréal', lat:45.5017, lon:-73.5673 },
+  { k:'londres', label:'Londres', lat:51.5074, lon:-0.1278 },
+  { k:'newyork', label:'New York', lat:40.7128, lon:-74.0060 },
+  { k:'losangeles', label:'Los Angeles', lat:34.0522, lon:-118.2437 },
+  { k:'dubai', label:'Dubaï', lat:25.2048, lon:55.2708 },
+];
+const FRANCE = [[48.8566,2.3522],[45.7640,4.8357],[43.2965,5.3698],[44.8378,-0.5792],[50.6292,3.0573],[43.6047,1.4442],[43.7102,7.2620],[47.2184,-1.5536],[48.5734,7.7521],[43.6108,3.8767],[47.3220,5.0415],[48.1173,-1.6778]];
+function randomFranceGps(){ const c=FRANCE[Math.floor(Math.random()*FRANCE.length)]; const j=()=>(Math.random()-.5)*.06; return { lat:+(c[0]+j()).toFixed(4), lon:+(c[1]+j()).toFixed(4) }; }
+function gpsFor(k){ if(k==='france') return randomFranceGps(); const c=GPS_CITIES.find(x=>x.k===k); return (!c||c.k==='none')?null:{lat:c.lat,lon:c.lon}; }
+function ranges(i){ if(i==='subtle')return{z:[1.01,1.025]}; if(i==='strong')return{z:[1.03,1.08]}; return{z:[1.02,1.05]}; }
+
+/* ── Spoof image (port exact de runImageSpoof) ────────────────────── */
+function buildExif(deviceKey, gps){
+  if(typeof piexif==='undefined') return null;
+  const zeroth={}, gpsIfd={};
+  const d = deviceKey && deviceKey!=='none' ? DEVICES.find(x=>x.k===deviceKey) : null;
+  if(d && d.make){ zeroth[piexif.ImageIFD.Make]=d.make; zeroth[piexif.ImageIFD.Model]=d.model; if(d.software) zeroth[piexif.ImageIFD.Software]=d.software; }
+  if(gps){
+    gpsIfd[piexif.GPSIFD.GPSLatitudeRef]= gps.lat>=0?'N':'S';
+    gpsIfd[piexif.GPSIFD.GPSLatitude]= piexif.GPSHelper.degToDmsRational(Math.abs(gps.lat));
+    gpsIfd[piexif.GPSIFD.GPSLongitudeRef]= gps.lon>=0?'E':'W';
+    gpsIfd[piexif.GPSIFD.GPSLongitude]= piexif.GPSHelper.degToDmsRational(Math.abs(gps.lon));
+  }
+  if(!Object.keys(zeroth).length && !Object.keys(gpsIfd).length) return null;
+  try { return piexif.dump({'0th':zeroth,'Exif':{},'GPS':gpsIfd,'1st':{},thumbnail:null}); } catch(e){ return null; }
+}
+async function spoofImage(file, opts){
+  const r = ranges(opts.intensity);
+  const rnd=(mul,min,max)=> min + ((Math.sin(opts.seed*mul)+1)/2)*(max-min);
+  const z = rnd(197.5, r.z[0], r.z[1]);
+  const bmp = await createImageBitmap(file);
+  const W=bmp.width, H=bmp.height;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d');
+  const cw=W/z, ch=H/z;
+  ctx.drawImage(bmp,(W-cw)/2,(H-ch)/2,cw,ch,0,0,W,H);
+  bmp.close && bmp.close();
+  const q = +(0.90 + ((Math.sin(opts.seed*13.7)+1)/2)*0.06).toFixed(3);
+  let dataUrl = cv.toDataURL('image/jpeg', q);
+  const exif = buildExif(opts.device, opts.gps);
+  if(exif){ try{ dataUrl = piexif.insert(exif, dataUrl); }catch(e){} }
+  return dataUrl;
+}
+
+/* ── UI ───────────────────────────────────────────────────────────── */
+const $=s=>document.querySelector(s);
+const dsel=$('#device'), gsel=$('#gps');
+DEVICES.forEach(d=>{ const o=document.createElement('option'); o.value=d.k; o.textContent=d.label; dsel.appendChild(o); });
+GPS_CITIES.forEach(c=>{ const o=document.createElement('option'); o.value=c.k; o.textContent=c.label; gsel.appendChild(o); });
+dsel.value='iphone15pro'; gsel.value='france';
+let intensity='normal';
+$('#intensity').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; intensity=b.dataset.v; [...$('#intensity').children].forEach(x=>x.classList.toggle('on',x===b)); });
+
+let files=[];
+const drop=$('#drop'), input=$('#file');
+drop.addEventListener('click',()=>input.click());
+input.addEventListener('change',()=>addFiles(input.files));
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hot');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hot');}));
+drop.addEventListener('drop',e=>{ if(e.dataTransfer?.files) addFiles(e.dataTransfer.files); });
+function addFiles(list){
+  const imgs=[...list].filter(f=>f.type.startsWith('image/'));
+  files=files.concat(imgs);
+  $('#picked').textContent = files.length ? `${files.length} image(s) prête(s).` : 'Aucune image sélectionnée.';
+  $('#go').disabled = files.length===0;
+}
+
+const outputs=[]; // {url, name}
+$('#go').addEventListener('click', run);
+async function run(){
+  if(!files.length) return;
+  const go=$('#go'); go.disabled=true; go.textContent='Traitement…';
+  outputs.forEach(o=>URL.revokeObjectURL && o.blobUrl && URL.revokeObjectURL(o.blobUrl));
+  outputs.length=0;
+  const results=$('#results'); results.innerHTML=''; $('#out').style.display='block';
+  const copies=Math.max(1,Math.min(20, parseInt($('#copies').value)||1));
+  const device=dsel.value, gpsKey=gsel.value;
+  let done=0, total=files.length*copies;
+  for(const f of files){
+    const base=(f.name.replace(/\.[^.]+$/,'')||'image');
+    for(let i=0;i<copies;i++){
+      const seed=Math.random()*1000;
+      const gps=gpsFor(gpsKey);
+      let dataUrl;
+      try{ dataUrl=await spoofImage(f,{seed,intensity,device,gps}); }
+      catch(e){ done++; continue; }
+      const name = copies>1 ? `${base}_spoof_${i+1}.jpg` : `${base}_spoof.jpg`;
+      addResult(dataUrl,name,`${done+1}`);
+      outputs.push({dataUrl,name});
+      done++; $('#count').textContent=`${done}/${total} générée(s)`;
+      await new Promise(r=>setTimeout(r,0)); // laisse respirer l'UI
+    }
+  }
+  go.disabled=false; go.textContent='Spoofer';
+  $('#count').textContent=`${outputs.length} image(s) générée(s) · prêtes à télécharger`;
+}
+function addResult(dataUrl,name,tag){
+  const div=document.createElement('div'); div.className='thumb';
+  const img=document.createElement('img'); img.src=dataUrl; img.alt=name;
+  const a=document.createElement('a'); a.href=dataUrl; a.download=name; a.title='Télécharger';
+  a.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
+  const t=document.createElement('span'); t.className='tag'; t.textContent='#'+tag;
+  div.appendChild(img); div.appendChild(t); div.appendChild(a);
+  $('#results').appendChild(div);
+}
+$('#dlall').addEventListener('click',async()=>{
+  for(const o of outputs){
+    const a=document.createElement('a'); a.href=o.dataUrl; a.download=o.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    await new Promise(r=>setTimeout(r,150));
+  }
+});
+</script>
+</body>
+</html>
