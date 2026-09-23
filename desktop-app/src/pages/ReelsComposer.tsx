@@ -16,6 +16,7 @@ import { startRun, cancelRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
 import { recordGeelarkSchedule } from '@/lib/scheduling'
+import { loadLast, saveLast, loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 
 // Valeur datetime-local (fuseau LOCAL) décalée de `plusMin` minutes par rapport à maintenant.
 function schedLocalValue(plusMin: number): string {
@@ -85,12 +86,72 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const [rotationOn, setRotationOn] = useState(false)                 // activé POUR CE RUN (togglable)
   const [simulPhones, setSimulPhones] = useState<'all' | number>('all')  // téléphones simultanés
 
+  // ── Presets & mémorisation des réglages ───────────────────────────────────
+  // Config complète mémorisée (dernier réglage auto-restauré + presets nommés),
+  // pour ne plus refaire les réglages ni recoller les captions à chaque fois.
+  type ReelsCfg = {
+    captions: string[]; capMode: 'seq' | 'random'; vidMode: 'seq' | 'random'
+    autoRemove: boolean; reelsTrial: boolean; simulPhones: 'all' | number
+    rotationOn: boolean; group: string; healthy: boolean
+  }
+  const COMPOSER = 'reels'
+  const orgId = currentOrg?.id ?? null
+  const [presets, setPresets] = useState<ComposerPreset<ReelsCfg>[]>([])
+  const [presetSel, setPresetSel] = useState('')
+  const restoredRef = useRef(false)
+
+  const currentCfg = (): ReelsCfg => ({ captions, capMode, vidMode, autoRemove, reelsTrial, simulPhones, rotationOn, group, healthy })
+  const applyCfg = useCallback((c: Partial<ReelsCfg>, rotOk: boolean) => {
+    if (c.captions && c.captions.length) setCaptions(c.captions); else if (c.captions) setCaptions([''])
+    if (c.capMode) setCapMode(c.capMode)
+    if (c.vidMode) setVidMode(c.vidMode)
+    if (typeof c.autoRemove === 'boolean') setAutoRemove(c.autoRemove)
+    if (typeof c.reelsTrial === 'boolean') setReelsTrial(c.reelsTrial)
+    if (c.simulPhones !== undefined) setSimulPhones(c.simulPhones)
+    if (typeof c.group === 'string') setGroup(c.group)
+    if (typeof c.healthy === 'boolean') setHealthy(c.healthy)
+    setRotationOn(rotOk && !!c.rotationOn)  // rotation seulement si un proxy est configuré
+  }, [])
+
   useEffect(() => {
     loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => {
       const ok = c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim()))
-      setRotationConfigured(ok); setRotationOn(false)   // par défaut : OFF (activable si configuré)
+      setRotationConfigured(ok)
+      // Restaure le DERNIER réglage utilisé (une seule fois, une fois la rotation connue).
+      if (!restoredRef.current) {
+        restoredRef.current = true
+        const last = loadLast<ReelsCfg>(COMPOSER, orgId)
+        if (last) applyCfg(last, ok); else setRotationOn(false)
+        setPresets(loadPresets<ReelsCfg>(COMPOSER, orgId))
+      } else {
+        setRotationOn(v => ok && v)
+      }
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrg?.id, user.id])
+
+  // Sauvegarde auto du dernier réglage à chaque changement.
+  useEffect(() => {
+    if (!restoredRef.current) return
+    saveLast<ReelsCfg>(COMPOSER, orgId, currentCfg())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captions, capMode, vidMode, autoRemove, reelsTrial, simulPhones, rotationOn, group, healthy, orgId])
+
+  const doSavePreset = () => {
+    const name = window.prompt('Nom du preset (réglages + captions) :', presetSel || '')
+    if (!name || !name.trim()) return
+    setPresets(savePreset<ReelsCfg>(COMPOSER, orgId, name, currentCfg()))
+    setPresetSel(name.trim())
+  }
+  const doLoadPreset = (name: string) => {
+    const p = presets.find(x => x.name === name)
+    if (p) { applyCfg(p.config, rotationConfigured); setPresetSel(name) }
+  }
+  const doDeletePreset = () => {
+    if (!presetSel) return
+    if (!window.confirm(`Supprimer le preset « ${presetSel} » ?`)) return
+    setPresets(deletePreset<ReelsCfg>(COMPOSER, orgId, presetSel)); setPresetSel('')
+  }
 
   const setCaptionAt = (i: number, v: string) => setCaptions(c => c.map((x, k) => k === i ? v : x))
   const addCaption = (v = '') => setCaptions(c => [...c, v])
@@ -360,6 +421,19 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       )}
 
       {stepper}
+
+      {/* ── Barre de presets (réglages + captions mémorisés) ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px', padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Presets</span>
+        <select value={presetSel} onChange={e => { const v = e.target.value; if (v) doLoadPreset(v); else setPresetSel('') }}
+          style={{ height: 30, padding: '0 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.09)', background: '#101015', color: '#E4E4E7', fontSize: 12, fontWeight: 600, outline: 'none', minWidth: 170, cursor: 'pointer' }}>
+          <option value="" style={{ background: '#16161C' }}>{presets.length ? '— Charger un preset —' : 'Aucun preset enregistré'}</option>
+          {presets.map(p => <option key={p.name} value={p.name} style={{ background: '#16161C' }}>{p.name}</option>)}
+        </select>
+        <Btn theme={theme} sm tone="primary" icon="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z|M17 21v-8H7v8|M7 3v5h8" label="Enregistrer" onClick={doSavePreset} />
+        {presetSel && <Btn theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" label="Supprimer" onClick={doDeletePreset} />}
+        <span style={{ marginLeft: 'auto', fontSize: 10.5, color: '#52525B' }}>Tes réglages sont mémorisés automatiquement</span>
+      </div>
 
       {/* ── Étape 1 : Comptes ── */}
       {step === 1 && (
