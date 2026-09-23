@@ -318,7 +318,8 @@ async function spoofImage(file, opts){
   const over=rot?(1+Math.abs(Math.sin(rot))*0.9):1;
   const cw=W/z, ch=H/z; ctx.imageSmoothingQuality='high';
   if(opts.tf.flip){ ctx.scale(-over,over); } else { ctx.scale(over,over); }
-  ctx.drawImage(bmp,-W/2,-H/2,W,H,-cw/2,-ch/2,cw,ch); ctx.restore();
+  // crop centré (cw×ch) redimensionné pour REMPLIR tout le canvas (zoom in, pas de bords noirs)
+  ctx.drawImage(bmp, (W-cw)/2,(H-ch)/2, cw,ch, -W/2,-H/2, W,H); ctx.restore();
   bmp.close && bmp.close();
   if(opts.tf.light||opts.tf.noise){
     const img=ctx.getImageData(0,0,W,H); const px=img.data;
@@ -381,8 +382,8 @@ async function run(){
       const device=resolveDevice(deviceSel);
       let res; try{ res=await spoofImage(f,{seed,intensity,device,gps,date,tf}); }catch(e){ done++; continue; }
       const hafter=await sha256Short(dataUrlToBytes(res.dataUrl).buffer);
-      const name=copies>1?`${base}_${i+1}.jpg`:`${base}.jpg`;
       const idx=outputs.length;
+      const name=`dreamymeow${idx+1}.jpg`;
       outputs.push({dataUrl:res.dataUrl,name,summary:res.summary,before,hbefore,hafter,dims:res.dims});
       addResult(res.dataUrl,name,idx);
       done++; $('#count').textContent=`${done}/${total} générée(s)`; $('#progbar').style.width=(done/total*100)+'%';
