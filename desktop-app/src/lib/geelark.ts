@@ -312,7 +312,7 @@ export async function warmupAccountNative(
 }
 
 // ── Auto-login Instagram via flow RPA GeeLark ────────────────────────────────
-const LOGIN_FLOW_VERSION = '1'
+const LOGIN_FLOW_VERSION = '2'
 const _loginFlowCache = new Map<string, Promise<string | null>>()
 async function ensureLoginFlowId(bearer: string, log: (m: string) => void): Promise<string | null> {
   const cached = _loginFlowCache.get(bearer)
@@ -341,6 +341,7 @@ export async function loginInstagramOnPhone(
   creds: { email: string; password: string; totp?: string; rotationUrls?: string[] },
   log: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
+  let attempted = false
   try {
     const flowId = await ensureLoginFlowId(bearer, log)
     if (!flowId) return { ok: false, error: 'Flow login indisponible' }
@@ -353,15 +354,19 @@ export async function loginInstagramOnPhone(
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
     log('   Tâche créée — connexion en cours…')
+    attempted = true
     const r = await pollRpaTask(bearer, taskId, log, 10 * 60_000)
-    // IMPORTANT : après un login réussi, on laisse Instagram ÉCRIRE la session sur
-    // le disque avant d'éteindre. Sinon on coupait le tel juste après la 2FA et la
-    // session n'était pas persistée → compte déconnecté au redémarrage.
-    if (r.ok) { log('   💾 Sauvegarde de la session (20 s)…'); await sleep(20000) }
     return r
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
+    // IMPORTANT : le flow RPA se termine dès la validation de la 2FA, AVANT
+    // qu'Instagram ait atteint le feed et écrit la session d'auth sur le disque.
+    // Que GeeLark marque la tâche « réussie » OU « échouée » à ce moment-là, on
+    // laisse toujours le téléphone allumé assez longtemps pour que la session soit
+    // persistée — sinon on coupe le tel juste après la 2FA et le compte se retrouve
+    // déconnecté au redémarrage. On n'attend que si on a réellement lancé le login.
+    if (attempted) { log('   💾 Sauvegarde de la session (20 s)…'); await sleep(20000) }
     await stopPhoneSurely(bearer, phoneId, log)
   }
 }

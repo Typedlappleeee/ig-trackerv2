@@ -1766,6 +1766,25 @@
             ]
           ]
         }
+      },
+      {
+        "id": "cbfb88b6-d46a-48da-a5ab-c43dd1578696",
+        "name": "Log",
+        "type": "log",
+        "config": {
+          "content": "Sauvegarde session (persistance auth) - 40s",
+          "remark": "SF_SESSION_SETTLE_LOG"
+        }
+      },
+      {
+        "id": "c09854ba-44ee-4bd9-bc93-7f591248ba30",
+        "name": "Time",
+        "type": "waitTime",
+        "config": {
+          "timeout": 40000,
+          "timeoutType": "fixedValue",
+          "remark": "SF_SESSION_SETTLE"
+        }
       }
     ],
     "contentType": "phone",
