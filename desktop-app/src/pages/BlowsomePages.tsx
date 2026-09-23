@@ -16,7 +16,7 @@ import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
-import { loadLast, saveLast, loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
+import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
 const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
@@ -478,7 +478,6 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const autoOrgId = currentOrg?.id ?? null
   const [presets, setPresets] = useState<ComposerPreset<AutoCfg>[]>([])
   const [presetSel, setPresetSel] = useState('')
-  const autoRestored = useRef(false)
 
   const autoCfg = (): AutoCfg => ({ variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder })
   const applyAutoCfg = (c: Partial<AutoCfg>) => {
@@ -510,20 +509,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     if (typeof c.destFolder === 'string') setDestFolder(c.destFolder)
   }
 
-  useEffect(() => {
-    autoRestored.current = false
-    const last = loadLast<AutoCfg>(AUTO_COMPOSER, autoOrgId)
-    if (last) applyAutoCfg(last)
-    setPresets(loadPresets<AutoCfg>(AUTO_COMPOSER, autoOrgId))
-    autoRestored.current = true
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoOrgId])
-
-  useEffect(() => {
-    if (!autoRestored.current) return
-    saveLast<AutoCfg>(AUTO_COMPOSER, autoOrgId, autoCfg())
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder, autoOrgId])
+  // Charge la LISTE des presets nommés (aucune restauration automatique de réglages).
+  useEffect(() => { setPresets(loadPresets<AutoCfg>(AUTO_COMPOSER, autoOrgId)) }, [autoOrgId])
 
   const doSavePreset = () => {
     const name = window.prompt('Nom du preset (réglages + légendes) :', presetSel || '')

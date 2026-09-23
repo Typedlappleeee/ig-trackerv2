@@ -16,7 +16,7 @@ import { startRun, cancelRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
 import { recordGeelarkSchedule } from '@/lib/scheduling'
-import { loadLast, saveLast, loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
+import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 
 // Valeur datetime-local (fuseau LOCAL) décalée de `plusMin` minutes par rapport à maintenant.
 function schedLocalValue(plusMin: number): string {
@@ -98,10 +98,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const orgId = currentOrg?.id ?? null
   const [presets, setPresets] = useState<ComposerPreset<ReelsCfg>[]>([])
   const [presetSel, setPresetSel] = useState('')
-  const restoredRef = useRef(false)
 
   const currentCfg = (): ReelsCfg => ({ captions, capMode, vidMode, autoRemove, reelsTrial, simulPhones, rotationOn, group, healthy })
-  const applyCfg = useCallback((c: Partial<ReelsCfg>, rotOk: boolean) => {
+  const applyCfg = (c: Partial<ReelsCfg>, rotOk: boolean) => {
     if (c.captions && c.captions.length) setCaptions(c.captions); else if (c.captions) setCaptions([''])
     if (c.capMode) setCapMode(c.capMode)
     if (c.vidMode) setVidMode(c.vidMode)
@@ -111,31 +110,18 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     if (typeof c.group === 'string') setGroup(c.group)
     if (typeof c.healthy === 'boolean') setHealthy(c.healthy)
     setRotationOn(rotOk && !!c.rotationOn)  // rotation seulement si un proxy est configuré
-  }, [])
+  }
 
+  // Charge la config proxy/rotation (dispo ou non) — sans activer la rotation par défaut.
   useEffect(() => {
     loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => {
       const ok = c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim()))
-      setRotationConfigured(ok)
-      // Restaure le DERNIER réglage utilisé (une seule fois, une fois la rotation connue).
-      if (!restoredRef.current) {
-        restoredRef.current = true
-        const last = loadLast<ReelsCfg>(COMPOSER, orgId)
-        if (last) applyCfg(last, ok); else setRotationOn(false)
-        setPresets(loadPresets<ReelsCfg>(COMPOSER, orgId))
-      } else {
-        setRotationOn(v => ok && v)
-      }
+      setRotationConfigured(ok); setRotationOn(false)
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrg?.id, user.id])
 
-  // Sauvegarde auto du dernier réglage à chaque changement.
-  useEffect(() => {
-    if (!restoredRef.current) return
-    saveLast<ReelsCfg>(COMPOSER, orgId, currentCfg())
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [captions, capMode, vidMode, autoRemove, reelsTrial, simulPhones, rotationOn, group, healthy, orgId])
+  // Charge la LISTE des presets nommés (aucune restauration automatique de réglages).
+  useEffect(() => { setPresets(loadPresets<ReelsCfg>(COMPOSER, orgId)) }, [orgId])
 
   const doSavePreset = () => {
     const name = window.prompt('Nom du preset (réglages + captions) :', presetSel || '')
