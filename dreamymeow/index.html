@@ -314,12 +314,15 @@ async function spoofImage(file, opts){
   const ctx=cv.getContext('2d');
   const z=opts.tf.zoom?rnd(197.5,r.z[0],r.z[1]):1;
   const rot=opts.tf.rotate?(rnd(83.1,-r.rot,r.rot)*Math.PI/180):0;
+  const cw=W/z, ch=H/z;                 // crop source centré
+  const sx=(W-cw)/2, sy=(H-ch)/2;
+  // facteur de couverture : garantit qu'aucun bord noir n'apparaît après rotation
+  const cover = Math.abs(Math.cos(rot)) + Math.abs(Math.sin(rot))*(Math.max(W,H)/Math.min(W,H)) + 0.01;
   ctx.save(); ctx.translate(W/2,H/2); if(rot) ctx.rotate(rot);
-  const over=rot?(1+Math.abs(Math.sin(rot))*0.9):1;
-  const cw=W/z, ch=H/z; ctx.imageSmoothingQuality='high';
-  if(opts.tf.flip){ ctx.scale(-over,over); } else { ctx.scale(over,over); }
-  // crop centré (cw×ch) redimensionné pour REMPLIR tout le canvas (zoom in, pas de bords noirs)
-  ctx.drawImage(bmp, (W-cw)/2,(H-ch)/2, cw,ch, -W/2,-H/2, W,H); ctx.restore();
+  ctx.scale((opts.tf.flip?-1:1)*cover, cover);
+  ctx.imageSmoothingQuality='high';
+  // crop centré redimensionné pour REMPLIR tout le canvas (zoom in)
+  ctx.drawImage(bmp, sx,sy, cw,ch, -W/2,-H/2, W,H); ctx.restore();
   bmp.close && bmp.close();
   if(opts.tf.light||opts.tf.noise){
     const img=ctx.getImageData(0,0,W,H); const px=img.data;
