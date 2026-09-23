@@ -16,6 +16,7 @@ import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
+import { loadLast, saveLast, loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
 const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
@@ -463,6 +464,82 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     setRunning(false); setProgress(0)
   }
 
+  // ── Presets & mémorisation des réglages Auto-contenu ──────────────────────
+  // Tous les réglages (montage + légendes) sont mémorisés : dernier réglage
+  // auto-restauré, + presets nommés rechargeables en 1 clic.
+  type AutoCfg = {
+    variants: number; intensity: SpoofIntensity; tendance: boolean; gpsCity: string; device: string
+    burnCap: boolean; capPool: string; capMode: 'seq' | 'random'; capStyle: CaptionStyle; withCap: boolean
+    capManual: boolean; capPos: 'top' | 'center' | 'bottom'; capX: number; capY: number
+    useTrim: boolean; trimRandom: boolean; trimRandMin: string; trimRandMax: string; trimEndMin: string; trimEndMax: string; trimStart: string; trimEnd: string
+    useSpeed: boolean; speedMin: string; speedMax: string; destFolder: string
+  }
+  const AUTO_COMPOSER = 'auto-contenu'
+  const autoOrgId = currentOrg?.id ?? null
+  const [presets, setPresets] = useState<ComposerPreset<AutoCfg>[]>([])
+  const [presetSel, setPresetSel] = useState('')
+  const autoRestored = useRef(false)
+
+  const autoCfg = (): AutoCfg => ({ variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder })
+  const applyAutoCfg = (c: Partial<AutoCfg>) => {
+    if (typeof c.variants === 'number') setVariants(c.variants)
+    if (c.intensity) setIntensity(c.intensity)
+    if (typeof c.tendance === 'boolean') setTendance(c.tendance)
+    if (typeof c.gpsCity === 'string') setGpsCity(c.gpsCity)
+    if (typeof c.device === 'string') setDevice(c.device)
+    if (typeof c.burnCap === 'boolean') setBurnCap(c.burnCap)
+    if (typeof c.capPool === 'string') setCapPool(c.capPool)
+    if (c.capMode) setCapMode(c.capMode)
+    if (c.capStyle) setCapStyle(c.capStyle)
+    if (typeof c.withCap === 'boolean') setWithCap(c.withCap)
+    if (typeof c.capManual === 'boolean') setCapManual(c.capManual)
+    if (c.capPos) setCapPos(c.capPos)
+    if (typeof c.capX === 'number') setCapX(c.capX)
+    if (typeof c.capY === 'number') setCapY(c.capY)
+    if (typeof c.useTrim === 'boolean') setUseTrim(c.useTrim)
+    if (typeof c.trimRandom === 'boolean') setTrimRandom(c.trimRandom)
+    if (typeof c.trimRandMin === 'string') setTrimRandMin(c.trimRandMin)
+    if (typeof c.trimRandMax === 'string') setTrimRandMax(c.trimRandMax)
+    if (typeof c.trimEndMin === 'string') setTrimEndMin(c.trimEndMin)
+    if (typeof c.trimEndMax === 'string') setTrimEndMax(c.trimEndMax)
+    if (typeof c.trimStart === 'string') setTrimStart(c.trimStart)
+    if (typeof c.trimEnd === 'string') setTrimEnd(c.trimEnd)
+    if (typeof c.useSpeed === 'boolean') setUseSpeed(c.useSpeed)
+    if (typeof c.speedMin === 'string') setSpeedMin(c.speedMin)
+    if (typeof c.speedMax === 'string') setSpeedMax(c.speedMax)
+    if (typeof c.destFolder === 'string') setDestFolder(c.destFolder)
+  }
+
+  useEffect(() => {
+    autoRestored.current = false
+    const last = loadLast<AutoCfg>(AUTO_COMPOSER, autoOrgId)
+    if (last) applyAutoCfg(last)
+    setPresets(loadPresets<AutoCfg>(AUTO_COMPOSER, autoOrgId))
+    autoRestored.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOrgId])
+
+  useEffect(() => {
+    if (!autoRestored.current) return
+    saveLast<AutoCfg>(AUTO_COMPOSER, autoOrgId, autoCfg())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder, autoOrgId])
+
+  const doSavePreset = () => {
+    const name = window.prompt('Nom du preset (réglages + légendes) :', presetSel || '')
+    if (!name || !name.trim()) return
+    setPresets(savePreset<AutoCfg>(AUTO_COMPOSER, autoOrgId, name, autoCfg()))
+    setPresetSel(name.trim())
+  }
+  const doLoadPreset = (name: string) => {
+    const p = presets.find(x => x.name === name)
+    if (p) { applyAutoCfg(p.config); setPresetSel(name) }
+  }
+  const doDeletePreset = () => {
+    if (!presetSel || !window.confirm(`Supprimer le preset « ${presetSel} » ?`)) return
+    setPresets(deletePreset<AutoCfg>(AUTO_COMPOSER, autoOrgId, presetSel)); setPresetSel('')
+  }
+
   const shortcuts = [
     { t: 'Ouvrir le Studio', d: 'Contrôle fin : remix, spoof, sous-titres, mixer, incrustation, montage.', go: 'blowTools' },
     { t: 'Voir la banque', d: 'Tout ton contenu VIP, prêt à publier.', go: 'bank' },
@@ -473,6 +550,19 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <Head title="Auto-contenu" sub="Choisis des vidéos → X variantes uniques : légende (pool + style Snapchat), coupe, micro-vitesse, spoof + GPS."
         right={<BlowBtn label={running ? `Génération… ${Math.round(progress * 100)}%` : 'Générer'} onClick={generate} />} />
+
+      {/* Presets : réglages + légendes mémorisés, rechargeables en 1 clic */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12, padding: '9px 13px', borderRadius: 12, background: 'rgba(233,196,106,0.05)', border: '1px solid rgba(233,196,106,0.18)' }}>
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: GOLD }}>Presets</span>
+        <select value={presetSel} onChange={e => { const v = e.target.value; if (v) doLoadPreset(v); else setPresetSel('') }}
+          style={{ height: 30, padding: '0 8px', borderRadius: 8, border: '1px solid rgba(233,196,106,0.28)', background: '#171410', color: INK, fontSize: 12, fontWeight: 600, outline: 'none', minWidth: 180, cursor: 'pointer' }}>
+          <option value="" style={{ background: '#171410' }}>{presets.length ? '— Charger un preset —' : 'Aucun preset enregistré'}</option>
+          {presets.map(p => <option key={p.name} value={p.name} style={{ background: '#171410' }}>{p.name}</option>)}
+        </select>
+        <BlowBtn label="Enregistrer" onClick={doSavePreset} />
+        {presetSel && <BlowBtn label="Supprimer" ghost onClick={doDeletePreset} />}
+        <span style={{ marginLeft: 'auto', fontSize: 10.5, color: MUTED }}>Tes réglages sont mémorisés automatiquement</span>
+      </div>
 
       <Card style={{ padding: 18, marginBottom: 12 }}>
         {/* Source */}
