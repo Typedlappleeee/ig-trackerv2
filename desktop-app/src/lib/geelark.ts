@@ -312,7 +312,7 @@ export async function warmupAccountNative(
 }
 
 // ── Auto-login Instagram via flow RPA GeeLark ────────────────────────────────
-const LOGIN_FLOW_VERSION = '2'
+const LOGIN_FLOW_VERSION = '3'
 const _loginFlowCache = new Map<string, Promise<string | null>>()
 async function ensureLoginFlowId(bearer: string, log: (m: string) => void): Promise<string | null> {
   const cached = _loginFlowCache.get(bearer)

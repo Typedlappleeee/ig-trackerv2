@@ -1561,6 +1561,25 @@
         }
       },
       {
+        "id": "6d013839-5dbd-4cf9-8885-d91783518d3f",
+        "name": "Log",
+        "type": "log",
+        "config": {
+          "content": "Post-2FA : attente connexion Instagram (30s) avant verif",
+          "remark": "SF_POST_2FA_SETTLE_LOG"
+        }
+      },
+      {
+        "id": "40ef142d-6dc3-4470-bb8a-1a0f97f1a167",
+        "name": "Time",
+        "type": "waitTime",
+        "config": {
+          "timeout": 30000,
+          "timeoutType": "fixedValue",
+          "remark": "SF_POST_2FA_SETTLE"
+        }
+      },
+      {
         "id": "1764147a-42fa-43c2-9c9e-27b0dff0dca3",
         "name": "Element appears",
         "type": "waitEle",
