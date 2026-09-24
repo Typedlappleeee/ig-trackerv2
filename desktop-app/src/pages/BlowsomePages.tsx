@@ -124,6 +124,14 @@ function ConnectIrt({ title }: { title: string }) {
 // ── Parc VIP / Phone Farm (iRemoTech) ─────────────────────────────────────────
 const BLOW_THEME = themeFor('blowsome')
 
+// Noms de containers Crane définis par l'utilisateur POUR CHAQUE iPhone (localStorage).
+function loadDevContainers(deviceId: string): string[] {
+  try { const raw = localStorage.getItem(`sf-irt-containers:${deviceId}`); const a = raw ? JSON.parse(raw) : []; return Array.isArray(a) ? a : [] } catch { return [] }
+}
+function saveDevContainers(deviceId: string, list: string[]): void {
+  try { localStorage.setItem(`sf-irt-containers:${deviceId}`, JSON.stringify(list)) } catch { /* noop */ }
+}
+
 export function BlowParc({ user, org }: { user: User; org: OrgState }) {
   const { currentOrg } = org
   const irt = useIremotech(user, org)
@@ -150,10 +158,11 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
   const [testTarget, setTestTarget] = useState('')
   const [testDev, setTestDev] = useState('')
   const [testing, setTesting] = useState(false)
-  // Publication multi-container : une vidéo + une légende PAR container.
+  // Publication container par container, PAR TÉLÉPHONE : une vidéo + une légende par container.
   type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null }
-  type ContainerJob = { container: string; vid: VidRef | null; caption: string }
-  const [containersInput, setContainersInput] = useState('')
+  type ContainerJob = { container: string; on: boolean; vid: VidRef | null; caption: string }
+  const [publishDev, setPublishDev] = useState<IrtDevice | null>(null) // iPhone dont le panneau est ouvert
+  const [newContainer, setNewContainer] = useState('')
   const [jobs, setJobs] = useState<ContainerJob[]>([])
   const [pickingFor, setPickingFor] = useState<number | null>(null)
   const [runningMulti, setRunningMulti] = useState(false)
@@ -213,55 +222,61 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
 
   // Publie une vidéo sur chaque container coché, l'un après l'autre :
   //   sélection container (vision) → rejeu de la séquence de post (upload + taps).
-  // Construit/rafraîchit les lignes (une par container) depuis le champ texte,
-  // en conservant les vidéos/légendes déjà assignées.
-  function buildJobs() {
-    const containers = containersInput.split(/[,\s]+/).map(s => s.trim()).filter(Boolean)
-    const uniq = [...new Set(containers)]
-    setJobs(prev => uniq.map(c => prev.find(j => j.container === c) ?? { container: c, vid: null, caption: '' }))
-  }
-
   async function signedUrlFor(v: VidRef): Promise<string | undefined> {
     if (v.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600); return data?.signedUrl ?? undefined }
     return v.file_url ?? undefined
   }
 
-  // Pour chaque container : ouvre le container → INJECTE sa vidéo (une fois ouvert) →
-  // publie le Reel à la vision avec sa légende.
+  // Ouvre le panneau de publication d'un iPhone : charge ses containers enregistrés.
+  function openPublish(d: IrtDevice) {
+    const names = loadDevContainers(d.public_id)
+    setJobs(names.map(c => ({ container: c, on: false, vid: null, caption: '' })))
+    setPublishDev(d); setLogs([]); setNewContainer('')
+  }
+  // Ajoute un container au téléphone courant (persisté).
+  function addContainer() {
+    const name = newContainer.trim()
+    if (!name || !publishDev) return
+    const list = [...new Set([...loadDevContainers(publishDev.public_id), name])]
+    saveDevContainers(publishDev.public_id, list)
+    setJobs(js => js.some(j => j.container === name) ? js : [...js, { container: name, on: true, vid: null, caption: '' }])
+    setNewContainer('')
+  }
+  function removeContainer(name: string) {
+    if (!publishDev) return
+    saveDevContainers(publishDev.public_id, loadDevContainers(publishDev.public_id).filter(c => c !== name))
+    setJobs(js => js.filter(j => j.container !== name))
+  }
+
+  // Publie sur l'iPhone ouvert : pour chaque container coché → ouverture (vision) →
+  // injection de SA vidéo (une fois ouvert) → publication du Reel à la vision.
   async function runContainerJobs() {
-    if (!irt.key || runSel.size === 0 || runningMulti) return
-    const ready = jobs.filter(j => j.container && j.vid)
-    if (ready.length === 0) { setLogs(['⚠ Assigne au moins une vidéo à un container.']); return }
+    if (!irt.key || !publishDev || runningMulti) return
+    const dev = publishDev.public_id
+    const ready = jobs.filter(j => j.on && j.vid)
+    if (ready.length === 0) { setLogs(['⚠ Coche au moins un container et assigne-lui une vidéo.']); return }
     setRunningMulti(true); setLogs([])
     const push = (m: string) => setLogs(l => [...l.slice(-400), m])
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-    const devs = [...runSel]
-    push(`▶ Publication vision : ${ready.length} container(s) × ${devs.length} iPhone(s)`)
-    const R = startRun('farm', `Containers · ${devs.length}×${ready.length}`, devs.length * ready.length)
-    for (const dev of devs) {
+    push(`▶ ${publishDev.name ?? dev} — ${ready.length} container(s)`)
+    const R = startRun('farm', `${publishDev.name ?? dev} · ${ready.length} container(s)`, ready.length)
+    for (const job of ready) {
       if (R.isCancelled()) break
-      for (const job of ready) {
-        if (R.isCancelled()) break
-        push(`\n📦 [${dev}] → container « ${job.container} » · ${job.vid!.title}`)
-        // 1. Ouvre le container (vision)
-        const ok = await selectContainerByVision(irt.key, dev, job.container, { log: push, shouldStop: () => R.isCancelled() })
-        if (!ok) { push(`  ⏭ container « ${job.container} » non atteint → suivant`); R.tick(false); continue }
-        await sleep(1200)
-        // 2. Injecte SA vidéo maintenant que le container est ouvert → devient la plus récente
-        const url = await signedUrlFor(job.vid!)
-        if (!url) { push('  ❌ URL vidéo introuvable → suivant'); R.tick(false); continue }
-        push('  ⬆ Injection de la vidéo dans la pellicule…')
-        await uploadMedia(irt.key, dev, url, (job.vid!.title || 'video') + '.mp4')
-        await sleep(2500) // laisse iOS indexer la nouvelle vidéo (elle passe en tête)
-        // 3. Publie le Reel (vision) avec sa légende
-        const posted = await postReelByVision(irt.key, dev, { caption: job.caption }, { log: push, shouldStop: () => R.isCancelled() })
-        push(posted ? `  ✅ container « ${job.container} » publié` : `  ⚠ container « ${job.container} » : publication interrompue`)
-        R.tick(posted)
-      }
-      if (R.isCancelled()) break
+      push(`\n📦 container « ${job.container} » · ${job.vid!.title}`)
+      const ok = await selectContainerByVision(irt.key, dev, job.container, { log: push, shouldStop: () => R.isCancelled() })
+      if (!ok) { push(`  ⏭ « ${job.container} » non atteint → suivant`); R.tick(false); continue }
+      await sleep(1200)
+      const url = await signedUrlFor(job.vid!)
+      if (!url) { push('  ❌ URL vidéo introuvable → suivant'); R.tick(false); continue }
+      push('  ⬆ Injection de la vidéo (elle passe en tête de pellicule)…')
+      await uploadMedia(irt.key, dev, url, (job.vid!.title || 'video') + '.mp4')
+      await sleep(2500)
+      const posted = await postReelByVision(irt.key, dev, { caption: job.caption }, { log: push, shouldStop: () => R.isCancelled() })
+      push(posted ? `  ✅ « ${job.container} » publié` : `  ⚠ « ${job.container} » : publication interrompue`)
+      R.tick(posted)
     }
     R.finish()
-    push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé — tous les containers traités.')
+    push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.')
     setRunningMulti(false)
   }
 
@@ -322,38 +337,8 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
               )}
             </Card>
 
-            {/* Publication container par container — 100 % vision, une vidéo + légende par container */}
-            <Card style={{ padding: 18, marginBottom: 16 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>📦 Publier container par container (vision)</div>
-              <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Une vidéo + une légende par container. Pour chacun : ouverture du container (vision) → injection de sa vidéo → publication du Reel à l'OCR (+ → REEL → dernière vidéo → Next → Next → Share). Coche les iPhones dans la grille plus bas.</p>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-                <input value={containersInput} onChange={e => setContainersInput(e.target.value)} placeholder="Containers — ex. 6, 7, 10, Default"
-                  style={{ flex: 1, minWidth: 200, boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-                <button style={btn} onClick={buildJobs}>Créer les lignes</button>
-              </div>
-              {jobs.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-                  {jobs.map((j, i) => (
-                    <div key={j.container} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.12)' }}>
-                      <span style={{ minWidth: 74, fontSize: 12, fontWeight: 800, color: GOLD }}>📦 {j.container}</span>
-                      <button style={{ ...btn, background: j.vid ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)', border: j.vid ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(216,180,254,0.14)' }}
-                        onClick={() => { setPickingFor(i); setPicker(true) }}>{j.vid ? `🎞 ${j.vid.title}` : 'Choisir une vidéo'}</button>
-                      <input value={j.caption} onChange={e => { const v = e.target.value; setJobs(js => js.map((x, k) => k === i ? { ...x, caption: v } : x)) }} placeholder="Légende (facultatif)"
-                        style={{ flex: 1, minWidth: 160, boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-                      <button style={{ ...btn, color: '#F87171', padding: '0 10px' }} onClick={() => setJobs(js => js.filter((_, k) => k !== i))}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: MUTED }}>{runSel.size} iPhone(s) coché(s) · {jobs.filter(j => j.vid).length}/{jobs.length} vidéo(s) assignée(s)</span>
-                <button style={{ ...btn, marginLeft: 'auto', background: GOLD, color: '#1a1206', border: 'none', opacity: jobs.some(j => j.vid) && runSel.size && !runningMulti ? 1 : 0.5 }}
-                  disabled={!jobs.some(j => j.vid) || !runSel.size || runningMulti} onClick={runContainerJobs}>
-                  {runningMulti ? 'Publication…' : `Publier ${jobs.filter(j => j.vid).length} container(s)`}
-                </button>
-              </div>
-              {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 220, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
-            </Card>
+            {/* La publication container par container se fait désormais PAR TÉLÉPHONE
+                (bouton « 📦 Publier » sur chaque carte iPhone → panneau dédié). */}
 
             {/* Test : sélection de container par VISION (OCR du sélecteur Crane) */}
             <Card style={{ padding: 18, marginBottom: 16 }}>
@@ -387,7 +372,10 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
                       </span>
                       {runSeq && <span onClick={() => toggleRun(d.public_id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 5, cursor: 'pointer', flexShrink: 0, background: checked ? GOLD : 'transparent', border: checked ? 'none' : '1px solid rgba(216,180,254,0.3)', color: '#1a1206', fontSize: 11, fontWeight: 900 }}>{checked ? '✓' : ''}</span>}
                     </div>
-                    <button onClick={() => setLive(d)} style={{ ...btn, width: '100%', marginTop: 12, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.3)', color: '#D8B4FE' }}>Contrôler en direct</button>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                      <button onClick={() => setLive(d)} style={{ ...btn, flex: 1, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.3)', color: '#D8B4FE' }}>Contrôler</button>
+                      <button onClick={() => openPublish(d)} style={{ ...btn, flex: 1, background: GOLD, border: 'none', color: '#1a1206', fontWeight: 800 }}>📦 Publier</button>
+                    </div>
                   </Card>
                 )
               })}
@@ -398,6 +386,54 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
       {live && irt.key && (
         <LiveDevice apiKey={irt.key} device={live} onClose={() => setLive(null)}
           onSaveSequence={(steps) => { setLive(null); setPendingSteps(steps) }} />
+      )}
+
+      {publishDev && createPortal(
+        <div onClick={() => !runningMulti && setPublishDev(null)} style={{ position: 'fixed', inset: 0, zIndex: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(4,3,8,0.8)', backdropFilter: 'blur(6px)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.16)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: INK }}>📦 Publier — {publishDev.name ?? publishDev.public_id}</div>
+              <button style={{ ...btn, marginLeft: 'auto', padding: '0 10px' }} onClick={() => !runningMulti && setPublishDev(null)}>Fermer</button>
+            </div>
+            <p style={{ margin: '0 0 14px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Définis les containers de cet iPhone (une fois), coche ceux à publier, assigne une vidéo + une légende à chacun. Pour chaque container coché : ouverture (vision) → injection de sa vidéo → publication du Reel (OCR).</p>
+
+            {/* Gestion des noms de containers */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+              <input value={newContainer} onChange={e => setNewContainer(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addContainer() }} placeholder="Nom du container (ex. 6, Default…)"
+                style={{ flex: 1, minWidth: 180, boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
+              <button style={{ ...btn, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.3)', color: '#D8B4FE' }} onClick={addContainer}>+ Ajouter</button>
+            </div>
+
+            {jobs.length === 0 ? (
+              <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Aucun container. Ajoute-les ci-dessus (ils seront mémorisés pour cet iPhone).</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {jobs.map((j, i) => (
+                  <div key={j.container} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: 10, borderRadius: 10, background: j.on ? 'rgba(233,196,106,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${j.on ? 'rgba(233,196,106,0.28)' : 'rgba(216,180,254,0.12)'}` }}>
+                    <span onClick={() => setJobs(js => js.map((x, k) => k === i ? { ...x, on: !x.on } : x))}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, cursor: 'pointer', flexShrink: 0, background: j.on ? GOLD : 'transparent', border: j.on ? 'none' : '1px solid rgba(216,180,254,0.3)', color: '#1a1206', fontSize: 12, fontWeight: 900 }}>{j.on ? '✓' : ''}</span>
+                    <span style={{ minWidth: 60, fontSize: 12.5, fontWeight: 800, color: GOLD }}>{j.container}</span>
+                    <button style={{ ...btn, background: j.vid ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)', border: j.vid ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(216,180,254,0.14)' }}
+                      onClick={() => { setPickingFor(i); setPicker(true) }}>{j.vid ? `🎞 ${j.vid.title.slice(0, 18)}` : 'Vidéo'}</button>
+                    <input value={j.caption} onChange={e => { const v = e.target.value; setJobs(js => js.map((x, k) => k === i ? { ...x, caption: v } : x)) }} placeholder="Légende"
+                      style={{ flex: 1, minWidth: 120, boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
+                    <button style={{ ...btn, color: '#F87171', padding: '0 9px' }} title="Retirer ce container" onClick={() => removeContainer(j.container)}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: MUTED }}>{jobs.filter(j => j.on && j.vid).length} container(s) prêt(s)</span>
+              <button style={{ ...btn, marginLeft: 'auto', background: GOLD, color: '#1a1206', border: 'none', fontWeight: 800, opacity: jobs.some(j => j.on && j.vid) && !runningMulti ? 1 : 0.5 }}
+                disabled={!jobs.some(j => j.on && j.vid) || runningMulti} onClick={runContainerJobs}>
+                {runningMulti ? 'Publication…' : `Publier ${jobs.filter(j => j.on && j.vid).length} container(s)`}
+              </button>
+            </div>
+            {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 240, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
+          </div>
+        </div>,
+        document.body,
       )}
 
       {pendingSteps && createPortal(
