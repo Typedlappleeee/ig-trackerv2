@@ -18,6 +18,37 @@ function imgSize(dataUrl: string): Promise<{ w: number; h: number }> {
 
 export interface VisionHooks { log?: (m: string) => void; shouldStop?: () => boolean }
 
+// Brique réutilisable : cherche à l'écran un bouton dont le TEXTE matche l'un des
+// motifs (ex. /reel/i, /next|suivant/i, /share|partager/i) et tape dessus.
+// Réessaie plusieurs fois (l'écran met parfois du temps à charger). true si tapé.
+export async function findTapText(
+  key: string, deviceId: string, patterns: RegExp[], hooks?: VisionHooks,
+  opts?: { tries?: number; label?: string; minY?: number; maxY?: number },
+): Promise<boolean> {
+  const tries = opts?.tries ?? 5
+  const label = opts?.label ?? patterns.map(p => p.source).join('|')
+  for (let i = 0; i < tries; i++) {
+    if (hooks?.shouldStop?.()) return false
+    const shot = await snapshot(key, deviceId)
+    if (!shot) { await sleep(600); continue }
+    const { w: W, h: H } = await imgSize(shot)
+    if (!W || !H) { await sleep(500); continue }
+    // Texte d'UI (souvent clair) → pas de binarisation, grayscale ×2.
+    const words = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11', '6'] })
+    const minY = (opts?.minY ?? 0) * H, maxY = (opts?.maxY ?? 1) * H
+    const hit = words.find(o => o.cy >= minY && o.cy <= maxY && patterns.some(p => p.test(o.text)))
+    if (hit) {
+      hooks?.log?.(`🎯 « ${hit.text} » trouvé → tap (${hit.cx}, ${hit.cy})`)
+      await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: hit.cy })
+      return true
+    }
+    if (i === 0) hooks?.log?.(`🔎 recherche « ${label} »… (lu : ${words.map(w => w.text).filter(Boolean).slice(0, 12).join(', ') || 'rien'})`)
+    await sleep(800)
+  }
+  hooks?.log?.(`❌ bouton « ${label} » introuvable`)
+  return false
+}
+
 // Cherche le container `target` (ex. "12" ou "Default") dans le sélecteur affiché à
 // l'écran et tape dessus. Scrolle haut/bas jusqu'à le trouver. true si tapé.
 export async function findAndTapContainer(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
