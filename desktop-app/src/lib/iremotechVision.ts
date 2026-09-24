@@ -264,20 +264,31 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   return true
 }
 
-// Ferme Instagram via le multitâche (iPhone Face ID) : accueil → ouvre l'app switcher
-// (swipe lent depuis le bas) → balaie la carte vers le haut → accueil. Force Crane à
-// re-proposer le container au prochain lancement.
+// Ferme Instagram via le multitâche : accueil → ouvre l'app switcher → REPÈRE la carte
+// « Instagram » (par son nom, OCR) et balaie CELLE-LÀ vers le haut → accueil. Ne ferme
+// jamais une autre appli. Force Crane à re-proposer le container au prochain lancement.
 export async function closeInstagram(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
   hooks?.log?.('🚪 Fermeture d’Instagram…')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1300)
-  const shot = await snapshot(key, deviceId)
+  let shot = await snapshot(key, deviceId)
   const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
   if (!W || !H) { return }
   const cx = Math.round(W * 0.5)
+  // 1) Ouvre l'app switcher (swipe lent depuis le bas).
   await sendAction(key, deviceId, { type: 'swipe', x1: cx, y1: Math.round(H * 0.99), x2: cx, y2: Math.round(H * 0.5), duration_ms: 1000 })
-  await sleep(1700)
-  await sendAction(key, deviceId, { type: 'swipe', x1: cx, y1: Math.round(H * 0.6), x2: cx, y2: Math.round(H * 0.08), duration_ms: 400 })
+  await sleep(1800)
+  // 2) Repère la carte « Instagram » par son nom (double polarité) → balaie CELLE-LÀ.
+  shot = await snapshot(key, deviceId)
+  let swx = cx // repli : carte centrale (IG est normalement la plus récente)
+  if (shot) {
+    const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
+    const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
+    const ig = [...wa, ...wb].find(o => /instagram/i.test(o.text) || /^[il]nstagram$/i.test(o.text))
+    if (ig) { swx = ig.cx; hooks?.log?.(`   carte Instagram repérée (x=${swx}) → balayage`) }
+    else hooks?.log?.('   nom « Instagram » non lu → carte centrale (la plus récente)')
+  }
+  await sendAction(key, deviceId, { type: 'swipe', x1: swx, y1: Math.round(H * 0.55), x2: swx, y2: Math.round(H * 0.08), duration_ms: 400 })
   await sleep(1200)
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(900)
