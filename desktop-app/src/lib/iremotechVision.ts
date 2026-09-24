@@ -18,10 +18,11 @@ function imgSize(dataUrl: string): Promise<{ w: number; h: number }> {
 
 export interface VisionHooks { log?: (m: string) => void; shouldStop?: () => boolean }
 
-// Cycle mode avion ON→OFF (nouvelle IP / reset réseau) avant chaque posting.
-export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, onMs = 4000, offMs = 7000): Promise<void> {
+// Cycle mode avion ON → attente 8 s → OFF (nouvelle IP / reset réseau) avant chaque posting.
+export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, onMs = 8000, offMs = 7000): Promise<void> {
   hooks?.log?.('✈️ Mode avion ON…')
   await sendAction(key, deviceId, { type: 'airplane', on: true })
+  hooks?.log?.(`   attente ${Math.round(onMs / 1000)} s en mode avion…`)
   await sleep(onMs)
   hooks?.log?.('✈️ Mode avion OFF (reconnexion / nouvelle IP)…')
   await sendAction(key, deviceId, { type: 'airplane', on: false })
@@ -85,7 +86,9 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
     // Cible visible ?
     const hit = rows.find(o => isDefault ? /^default$/i.test(o.text) : o.text === wanted)
     if (hit) {
-      hooks?.log?.(`🎯 « ${wanted} » trouvé → tap (${hit.cx}, ${hit.cy})`)
+      hooks?.log?.(`🎯 « ${wanted} » trouvé → double-tap (${hit.cx}, ${hit.cy})`)
+      await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: hit.cy })
+      await sleep(180)
       await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: hit.cy })
       return true
     }
