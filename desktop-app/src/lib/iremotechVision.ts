@@ -167,6 +167,7 @@ const REEL_ANCHORS = {
   firstThumb: { x: 0.50, y: 0.40 },  // 1re vignette de la galerie = dernière vidéo
   nextBtn: { x: 0.85, y: 0.93 },     // bouton Next → bas-droite (position fixe, tels identiques)
   shareBtn: { x: 0.85, y: 0.93 },    // bouton Share → bas-droite
+  captionField: { x: 0.35, y: 0.57 }, // champ « Add a caption » (milieu-gauche)
 }
 
 // Tape un bouton : cherche son TEXTE (vision) et, à défaut, tape sa position connue
@@ -207,20 +208,26 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   // 5. Next (écran d'édition) : vision → sinon position connue.
   await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (édition)')
   await sleep(2600)
-  // 6. Légende (facultatif) puis Share
+  // 6. Légende : on tape le champ « Add a caption » (milieu), on écrit, on referme le clavier.
   if (opts.caption && opts.caption.trim()) {
     hooks?.log?.('✏️ Saisie de la légende…')
-    if (await findTapText(key, deviceId, [/caption|légende|write/i], hooks, { label: 'champ légende', maxY: 0.55 })) {
-      await sleep(1000)
-      await sendAction(key, deviceId, { type: 'text', text: opts.caption.trim() })
-      await sleep(900)
-      // Certaines versions ouvrent un éditeur plein écran avec OK/Done → on le valide si présent.
-      await findTapText(key, deviceId, [/^ok$|^done$|^ok next$|terminé/i], hooks, { label: 'OK légende', tries: 2 })
-      await sleep(700)
-    }
+    await tapFrac(A.captionField.x, A.captionField.y)
+    await sleep(1300)
+    await sendAction(key, deviceId, { type: 'text', text: opts.caption.trim() })
+    await sleep(900)
+    await tapFrac(0.5, 0.25) // tape le preview → referme le clavier (sinon le bouton du bas est caché)
+    await sleep(1300)
   }
-  await tapButton(key, deviceId, [/share|partager/i], A.shareBtn, W, H, hooks, [0.62, 1], 'Share')
-  hooks?.log?.('📤 Reel partagé.')
+  // 7. Publier : « Share » direct, sinon un « Next » intermédiaire puis « Share ».
+  if (await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 3, cropY: [0.85, 1] })) {
+    hooks?.log?.('📤 Reel partagé.')
+  } else {
+    hooks?.log?.('   pas de Share direct → Next intermédiaire puis Share')
+    await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.85, 1], 'Next (avant Share)')
+    await sleep(2600)
+    await tapButton(key, deviceId, [/share|partager/i], A.shareBtn, W, H, hooks, [0.85, 1], 'Share')
+    hooks?.log?.('📤 Reel partagé.')
+  }
   await sleep(3500)
   return true
 }
