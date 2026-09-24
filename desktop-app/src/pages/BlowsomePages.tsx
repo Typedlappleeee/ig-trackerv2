@@ -12,7 +12,7 @@ import {
 import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
-import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
+import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
@@ -416,7 +416,14 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         push(`— ${v.title} —`)
         const bytes = await resolveSourceBytes(v)
         // Durée réelle (pour la coupe de fin aléatoire) — lue une fois par vidéo.
-        const dur = (useTrim && trimRandom) ? await videoDurationFromBytes(bytes) : 0
+        // Fallback ffmpeg si le <video> du navigateur échoue (HEVC/.mov) → sinon la
+        // coupe de fin serait silencieusement annulée.
+        let dur = (useTrim && trimRandom) ? await videoDurationFromBytes(bytes) : 0
+        if (useTrim && trimRandom && dur <= 0) {
+          dur = await probeDuration(bytes).catch(() => 0)
+          if (dur > 0) push(`  ⏱ durée lue via ffmpeg : ${dur.toFixed(1)}s`)
+          else push('  ⚠ durée illisible → coupe de fin ignorée (début OK)')
+        }
         // Légende IA : complète le pool si activé (une seule génération / vidéo).
         let aiCap: string | null = null
         if (burnCap && withCap && conns.groq) { aiCap = await generateCaption(conns.groq, v.title); if (aiCap) push('  ✍ légende IA générée') }

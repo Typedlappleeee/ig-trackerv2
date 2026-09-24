@@ -32,6 +32,28 @@ export async function getFFmpeg(): Promise<FFmpeg> {
 
 export function isFfmpegReady(): boolean { return !!instance }
 
+// Durée d'une vidéo (secondes) lue par ffmpeg — fiable même en HEVC/.mov où le
+// lecteur <video> du navigateur échoue. `ffmpeg -i` sort en erreur (pas de fichier
+// de sortie) mais imprime « Duration: HH:MM:SS.ss » qu'on parse depuis les logs.
+export async function probeDuration(input: Blob | ArrayBuffer | Uint8Array): Promise<number> {
+  const ff = await getFFmpeg()
+  const name = `probe_${Math.random().toString(36).slice(2)}.mp4`
+  let dur = 0
+  const onLog = ({ message }: { message: string }) => {
+    const m = message.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/)
+    if (m) dur = (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3])
+  }
+  ff.on('log', onLog)
+  try {
+    await ff.writeFile(name, (await toU8(input)).slice())
+    try { await ff.exec(['-i', name]) } catch { /* pas de fichier de sortie → exec échoue, normal */ }
+  } catch { /* noop */ } finally {
+    ff.off('log', onLog)
+    try { await ff.deleteFile(name) } catch { /* noop */ }
+  }
+  return dur
+}
+
 export interface RunOpts {
   input: Blob | ArrayBuffer | Uint8Array   // vidéo/image source
   inputName?: string                        // ex. 'in.mp4'
