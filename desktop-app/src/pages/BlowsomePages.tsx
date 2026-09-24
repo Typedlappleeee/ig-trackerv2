@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { themeFor } from '@/lib/theme'
 import {
-  useIremotech, listDevices, fetchUsage, loadSequences, saveSequence, deleteSequence, replaySequence,
+  useIremotech, listDevices, fetchUsage, loadSequences, saveSequence, deleteSequence, replaySequence, uploadMedia,
   type IrtDevice, type IrtUsage, type IrtSequence, type SeqStep,
 } from '@/lib/iremotech'
 import LiveDevice from '@/components/LiveDevice'
@@ -17,7 +17,7 @@ import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFo
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
-import { selectContainerByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision } from '@/lib/iremotechVision'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
 const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
@@ -206,33 +206,36 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
   // Publie une vidéo sur chaque container coché, l'un après l'autre :
   //   sélection container (vision) → rejeu de la séquence de post (upload + taps).
   async function launchContainerRun() {
-    if (!irt.key || !runSeq || runSel.size === 0 || runningMulti) return
+    if (!irt.key || !runVid || runSel.size === 0 || runningMulti) return
     const containers = containersInput.split(/[,\s]+/).map(s => s.trim()).filter(Boolean)
     if (containers.length === 0) { setLogs(['⚠ Indique au moins un container (ex. 6, 7, 10).']); return }
     setRunningMulti(true); setLogs([])
     const push = (m: string) => setLogs(l => [...l.slice(-400), m])
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-    // Média (URL signée) — préparé une fois.
-    let videoUrl: string | undefined, videoName: string | undefined
-    if (runVid) {
-      videoName = runVid.title + '.mp4'
-      if (runVid.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(runVid.storage_path, 3600); videoUrl = data?.signedUrl ?? undefined }
-      else videoUrl = runVid.file_url ?? undefined
-    }
+    // Média (URL signée) — sera injecté dans la pellicule de chaque iPhone.
+    const videoName = (runVid.title || 'video') + '.mp4'
+    let videoUrl: string | undefined
+    if (runVid.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(runVid.storage_path, 3600); videoUrl = data?.signedUrl ?? undefined }
+    else videoUrl = runVid.file_url ?? undefined
+    if (!videoUrl) { push('❌ Vidéo introuvable (URL).'); setRunningMulti(false); return }
     const devs = [...runSel]
-    push(`▶ Publication sur ${containers.length} container(s) × ${devs.length} iPhone(s) : ${containers.join(', ')}`)
+    push(`▶ Publication vision sur ${containers.length} container(s) × ${devs.length} iPhone(s) : ${containers.join(', ')}`)
     const R = startRun('farm', `Multi-container · ${devs.length}×${containers.length}`, devs.length * containers.length)
     for (const dev of devs) {
+      if (R.isCancelled()) break
+      // La pellicule iOS est partagée entre containers Crane → 1 seul upload par iPhone.
+      push(`⬆ [${dev}] Injection de la vidéo dans la pellicule…`)
+      await uploadMedia(irt.key, dev, videoUrl, videoName)
+      await sleep(1500)
       for (const c of containers) {
         if (R.isCancelled()) break
         push(`\n📦 [${dev}] → container « ${c} »`)
         const ok = await selectContainerByVision(irt.key, dev, c, { log: push, shouldStop: () => R.isCancelled() })
-        if (!ok) { push(`  ⏭ container « ${c} » non atteint → on passe au suivant`); R.tick(false); continue }
+        if (!ok) { push(`  ⏭ container « ${c} » non atteint → suivant`); R.tick(false); continue }
         await sleep(1500) // laisse Instagram s'ouvrir dans le container
-        push('  ▶ publication (rejeu de la séquence)…')
-        await replaySequence(irt.key, [dev], runSeq.steps, { videoUrl, videoName, caption: runCaption }, { log: push, shouldStop: () => R.isCancelled() })
-        push(`  ✅ container « ${c} » publié`)
-        R.tick(true)
+        const posted = await postReelByVision(irt.key, dev, { caption: runCaption }, { log: push, shouldStop: () => R.isCancelled() })
+        push(posted ? `  ✅ container « ${c} » publié` : `  ⚠ container « ${c} » : publication interrompue`)
+        R.tick(posted)
       }
       if (R.isCancelled()) break
     }
@@ -291,24 +294,34 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
                       </div>
                       <input value={runCaption} onChange={e => setRunCaption(e.target.value)} placeholder="Légende (remplace l'étape marquée « comme légende »)"
                         style={{ width: '100%', boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-                      {/* Publication container par container (Crane) */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 10, marginTop: 2, borderTop: '1px solid rgba(216,180,254,0.12)' }}>
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: GOLD }}>📦 Publier container par container</span>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <input value={containersInput} onChange={e => setContainersInput(e.target.value)} placeholder="Containers à publier — ex. 6, 7, 10, Default"
-                            style={{ flex: 1, minWidth: 200, boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-                          <button style={{ ...btn, background: GOLD, color: '#1a1206', border: 'none', opacity: containersInput.trim() && runSel.size && !runningMulti ? 1 : 0.5 }}
-                            disabled={!containersInput.trim() || !runSel.size || runningMulti} onClick={launchContainerRun}>
-                            {runningMulti ? 'Publication…' : `Publier sur ${containersInput.split(/[,\s]+/).filter(Boolean).length || 0} container(s)`}
-                          </button>
-                        </div>
-                        <span style={{ fontSize: 10.5, color: MUTED }}>Pour chaque container : sélection par vision → rejeu de la séquence « {runSeq.name} ». Coche les iPhones plus bas.</span>
-                      </div>
                       {logs.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 180, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
                     </div>
                   )}
                 </div>
               )}
+            </Card>
+
+            {/* Publication container par container — 100 % vision (OCR) */}
+            <Card style={{ padding: 18, marginBottom: 16 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>📦 Publier container par container (vision)</div>
+              <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Choisis une vidéo + les containers. Pour chacun : sélection du container par vision → publication du Reel pilotée à l'OCR (+ → REEL → dernière vidéo → Next → Next → Share). Coche les iPhones dans la grille plus bas.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button style={btn} onClick={() => setPicker(true)}>{runVid ? `Vidéo : ${runVid.title}` : 'Choisir une vidéo'}</button>
+                  <span style={{ fontSize: 11, color: MUTED }}>{runSel.size} iPhone(s) coché(s)</span>
+                </div>
+                <input value={runCaption} onChange={e => setRunCaption(e.target.value)} placeholder="Légende (facultatif)"
+                  style={{ width: '100%', boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input value={containersInput} onChange={e => setContainersInput(e.target.value)} placeholder="Containers — ex. 6, 7, 10, Default"
+                    style={{ flex: 1, minWidth: 200, boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
+                  <button style={{ ...btn, background: GOLD, color: '#1a1206', border: 'none', opacity: containersInput.trim() && runSel.size && runVid && !runningMulti ? 1 : 0.5 }}
+                    disabled={!containersInput.trim() || !runSel.size || !runVid || runningMulti} onClick={launchContainerRun}>
+                    {runningMulti ? 'Publication…' : `Publier sur ${containersInput.split(/[,\s]+/).filter(Boolean).length || 0} container(s)`}
+                  </button>
+                </div>
+              </div>
+              {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 220, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
             </Card>
 
             {/* Test : sélection de container par VISION (OCR du sélecteur Crane) */}

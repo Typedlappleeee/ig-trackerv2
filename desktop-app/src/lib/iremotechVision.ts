@@ -125,6 +125,59 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
   return false
 }
 
+// ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────
+// Chemin (Instagram EN) validé sur captures : feed → + (haut-gauche) → REEL →
+// 1re vignette (dernière vidéo uploadée) → Next → Next → légende → Share.
+// Les 2 seuls éléments non-textuels (+ et 1re vignette) sont des ANCRES en
+// fractions d'écran (iPhones identiques) ; tout le reste est trouvé par OCR et
+// VÉRIFIÉ (si un bouton texte manque, on abandonne proprement — jamais de post raté).
+const REEL_ANCHORS = {
+  createPlus: { x: 0.07, y: 0.075 }, // bouton + création, haut-gauche du feed
+  firstThumb: { x: 0.50, y: 0.40 },  // 1re vignette de la galerie = dernière vidéo
+}
+
+export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
+  const A = opts.anchors ?? REEL_ANCHORS
+  const shot0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
+
+  // 1. Ouvrir le créateur (+ haut-gauche)
+  hooks?.log?.('➕ Ouverture du créateur (+)…')
+  await tapFrac(A.createPlus.x, A.createPlus.y)
+  await sleep(2200)
+  // 2. Passer en mode REEL (barre du bas POST STORY REEL LIVE)
+  if (!await findTapText(key, deviceId, [/^reels?$/i], hooks, { label: 'REEL', minY: 0.78 })) return false
+  await sleep(1600)
+  // 3. Sélectionner la 1re vignette (= dernière vidéo uploadée)
+  hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
+  await tapFrac(A.firstThumb.x, A.firstThumb.y)
+  await sleep(1300)
+  // 4. Next (apparaît une fois la vidéo sélectionnée) — si absent = vignette ratée → abandon
+  if (!await findTapText(key, deviceId, [/^next$|suivant/i], hooks, { label: 'Next (après sélection)', minY: 0.75 })) return false
+  await sleep(2600)
+  // 5. Next (écran d'édition)
+  if (!await findTapText(key, deviceId, [/^next$|suivant/i], hooks, { label: 'Next (édition)', minY: 0.75 })) return false
+  await sleep(2600)
+  // 6. Légende (facultatif) puis Share
+  if (opts.caption && opts.caption.trim()) {
+    hooks?.log?.('✏️ Saisie de la légende…')
+    if (await findTapText(key, deviceId, [/caption|légende|write/i], hooks, { label: 'champ légende', maxY: 0.55 })) {
+      await sleep(1000)
+      await sendAction(key, deviceId, { type: 'text', text: opts.caption.trim() })
+      await sleep(900)
+      // Certaines versions ouvrent un éditeur plein écran avec OK/Done → on le valide si présent.
+      await findTapText(key, deviceId, [/^ok$|^done$|^ok next$|terminé/i], hooks, { label: 'OK légende', tries: 2 })
+      await sleep(700)
+    }
+  }
+  if (!await findTapText(key, deviceId, [/^share$|partager/i], hooks, { label: 'Share', minY: 0.45 })) return false
+  hooks?.log?.('📤 Reel partagé.')
+  await sleep(3500)
+  return true
+}
+
 // Ouvre Instagram (via l'icône → déclenche le sélecteur Crane) puis sélectionne le container.
 export async function selectContainerByVision(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
   hooks?.log?.('🏠 Retour à l’écran d’accueil…')
