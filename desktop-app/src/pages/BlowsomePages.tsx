@@ -17,6 +17,7 @@ import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFo
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
+import { selectContainerByVision } from '@/lib/iremotechVision'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
 const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
@@ -145,6 +146,10 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
   const [picker, setPicker] = useState(false)
   const [running, setRunning] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
+  // Test de la sélection de container par VISION (OCR du sélecteur Crane).
+  const [testTarget, setTestTarget] = useState('')
+  const [testDev, setTestDev] = useState('')
+  const [testing, setTesting] = useState(false)
 
   const loadSeq = useCallback(async () => { setSequences(await loadSequences(currentOrg?.id ?? null, user.id)) }, [currentOrg?.id, user.id])
 
@@ -195,6 +200,20 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
     setRunning(false)
   }
 
+  async function runVisionTest() {
+    const dev = testDev || devices[0]?.public_id
+    if (!irt.key || !dev || !testTarget.trim() || testing) return
+    setTesting(true); setLogs([])
+    const push = (m: string) => setLogs(l => [...l.slice(-200), m])
+    push(`🔎 Test vision : aller au container « ${testTarget.trim()} » sur ${dev}`)
+    push('   (1er appel : chargement du moteur OCR ~2-3 s)')
+    try {
+      const ok = await selectContainerByVision(irt.key, dev, testTarget.trim(), { log: push })
+      push(ok ? '✅ Container sélectionné — tap effectué.' : '❌ Échec — regarde les lignes ci-dessus.')
+    } catch (e) { push(`❌ ${e instanceof Error ? e.message : 'Erreur'}`) }
+    setTesting(false)
+  }
+
   const btn: CSSProperties = { height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(216,180,254,0.14)', color: INK }
 
   return (
@@ -236,6 +255,22 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
                   )}
                 </div>
               )}
+            </Card>
+
+            {/* Test : sélection de container par VISION (OCR du sélecteur Crane) */}
+            <Card style={{ padding: 18, marginBottom: 16 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>🧪 Test — aller à un container (vision)</div>
+              <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Ouvre Instagram, lit le sélecteur Crane à l'écran et tape le bon container (scroll auto). Vérifie la fiabilité sur 1 iPhone avant qu'on construise la boucle de post.</p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select value={testDev || devices[0]?.public_id || ''} onChange={e => setTestDev(e.target.value)}
+                  style={{ height: 34, padding: '0 10px', borderRadius: 8, background: '#171410', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
+                  {devices.map(d => <option key={d.public_id} value={d.public_id} style={{ background: '#171410' }}>{d.name || d.public_id}</option>)}
+                </select>
+                <input value={testTarget} onChange={e => setTestTarget(e.target.value)} placeholder="Container (ex. 12 ou Default)"
+                  style={{ height: 34, width: 200, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
+                <button style={{ ...btn, background: GOLD, color: '#1a1206', border: 'none', opacity: testTarget.trim() && !testing ? 1 : 0.5 }} disabled={!testTarget.trim() || testing} onClick={runVisionTest}>{testing ? 'Test en cours…' : 'Tester'}</button>
+              </div>
+              {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
             </Card>
 
             {/* Grille des appareils */}

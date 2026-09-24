@@ -8,8 +8,8 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "node scripts/copy-ffmpeg.mjs && vite",
-    "build": "node scripts/copy-ffmpeg.mjs && vite build",
+    "dev": "node scripts/copy-ffmpeg.mjs && node scripts/copy-tesseract.mjs && vite",
+    "build": "node scripts/copy-ffmpeg.mjs && node scripts/copy-tesseract.mjs && vite build",
     "preview": "vite preview",
     "electron": "electron .",
     "dist": "vite build && electron-builder"
@@ -56,6 +56,7 @@
     "jszip": "^3.10.2",
     "piexifjs": "^1.0.6",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tesseract.js": "^7.0.0"
   }
 }

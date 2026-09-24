@@ -2,3 +2,9 @@ node_modules/
 dist/
 
 public/ffmpeg/
+
+# Tesseract OCR : cœurs wasm + worker régénérés depuis node_modules (on garde eng.traineddata.gz)
+public/tesseract/*.wasm
+public/tesseract/*.wasm.js
+public/tesseract/tesseract-core-*.js
+public/tesseract/worker.min.js
