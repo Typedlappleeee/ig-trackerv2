@@ -150,6 +150,9 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
   const [testTarget, setTestTarget] = useState('')
   const [testDev, setTestDev] = useState('')
   const [testing, setTesting] = useState(false)
+  // Publication multi-container.
+  const [containersInput, setContainersInput] = useState('')
+  const [runningMulti, setRunningMulti] = useState(false)
 
   const loadSeq = useCallback(async () => { setSequences(await loadSequences(currentOrg?.id ?? null, user.id)) }, [currentOrg?.id, user.id])
 
@@ -198,6 +201,44 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
     R.finish()
     push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.')
     setRunning(false)
+  }
+
+  // Publie une vidéo sur chaque container coché, l'un après l'autre :
+  //   sélection container (vision) → rejeu de la séquence de post (upload + taps).
+  async function launchContainerRun() {
+    if (!irt.key || !runSeq || runSel.size === 0 || runningMulti) return
+    const containers = containersInput.split(/[,\s]+/).map(s => s.trim()).filter(Boolean)
+    if (containers.length === 0) { setLogs(['⚠ Indique au moins un container (ex. 6, 7, 10).']); return }
+    setRunningMulti(true); setLogs([])
+    const push = (m: string) => setLogs(l => [...l.slice(-400), m])
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+    // Média (URL signée) — préparé une fois.
+    let videoUrl: string | undefined, videoName: string | undefined
+    if (runVid) {
+      videoName = runVid.title + '.mp4'
+      if (runVid.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(runVid.storage_path, 3600); videoUrl = data?.signedUrl ?? undefined }
+      else videoUrl = runVid.file_url ?? undefined
+    }
+    const devs = [...runSel]
+    push(`▶ Publication sur ${containers.length} container(s) × ${devs.length} iPhone(s) : ${containers.join(', ')}`)
+    const R = startRun('farm', `Multi-container · ${devs.length}×${containers.length}`, devs.length * containers.length)
+    for (const dev of devs) {
+      for (const c of containers) {
+        if (R.isCancelled()) break
+        push(`\n📦 [${dev}] → container « ${c} »`)
+        const ok = await selectContainerByVision(irt.key, dev, c, { log: push, shouldStop: () => R.isCancelled() })
+        if (!ok) { push(`  ⏭ container « ${c} » non atteint → on passe au suivant`); R.tick(false); continue }
+        await sleep(1500) // laisse Instagram s'ouvrir dans le container
+        push('  ▶ publication (rejeu de la séquence)…')
+        await replaySequence(irt.key, [dev], runSeq.steps, { videoUrl, videoName, caption: runCaption }, { log: push, shouldStop: () => R.isCancelled() })
+        push(`  ✅ container « ${c} » publié`)
+        R.tick(true)
+      }
+      if (R.isCancelled()) break
+    }
+    R.finish()
+    push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé — tous les containers traités.')
+    setRunningMulti(false)
   }
 
   async function runVisionTest() {
@@ -250,7 +291,20 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
                       </div>
                       <input value={runCaption} onChange={e => setRunCaption(e.target.value)} placeholder="Légende (remplace l'étape marquée « comme légende »)"
                         style={{ width: '100%', boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-                      {logs.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 150, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
+                      {/* Publication container par container (Crane) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 10, marginTop: 2, borderTop: '1px solid rgba(216,180,254,0.12)' }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: GOLD }}>📦 Publier container par container</span>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input value={containersInput} onChange={e => setContainersInput(e.target.value)} placeholder="Containers à publier — ex. 6, 7, 10, Default"
+                            style={{ flex: 1, minWidth: 200, boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
+                          <button style={{ ...btn, background: GOLD, color: '#1a1206', border: 'none', opacity: containersInput.trim() && runSel.size && !runningMulti ? 1 : 0.5 }}
+                            disabled={!containersInput.trim() || !runSel.size || runningMulti} onClick={launchContainerRun}>
+                            {runningMulti ? 'Publication…' : `Publier sur ${containersInput.split(/[,\s]+/).filter(Boolean).length || 0} container(s)`}
+                          </button>
+                        </div>
+                        <span style={{ fontSize: 10.5, color: MUTED }}>Pour chaque container : sélection par vision → rejeu de la séquence « {runSeq.name} ». Coche les iPhones plus bas.</span>
+                      </div>
+                      {logs.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 180, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
                     </div>
                   )}
                 </div>
