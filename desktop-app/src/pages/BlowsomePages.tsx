@@ -273,7 +273,8 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
       if (!url) { push('  ❌ URL vidéo introuvable → suivant'); R.tick(false); continue }
       push('  ⬆ Injection de la vidéo (elle passe en tête de pellicule)…')
       await uploadMedia(irt.key, dev, url, (job.vid!.title || 'video') + '.mp4')
-      await sleep(2500)
+      push('  ⏳ Attente 10 s (indexation de la vidéo)…')
+      await sleep(10000)
       const posted = await postReelByVision(irt.key, dev, { caption: job.caption }, { log: push, shouldStop: () => R.isCancelled() })
       push(posted ? `  ✅ « ${job.container} » publié` : `  ⚠ « ${job.container} » : publication interrompue`)
       R.tick(posted)
