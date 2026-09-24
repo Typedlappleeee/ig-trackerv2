@@ -54,10 +54,11 @@ export async function findTapText(
     if (!shot) { await sleep(600); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
-    // Double lecture : niveaux de gris (texte foncé sur clair) + binarisée (texte
-    // BLANC sur bouton coloré, ex. « Next » blanc sur bleu, invisible en grayscale simple).
+    // Double lecture polarité : normale (texte foncé sur clair) + INVERSÉE (texte clair
+    // sur fond foncé → devient foncé sur clair). Couvre le texte de N'IMPORTE QUELLE
+    // couleur tant qu'il contraste (ex. « Next » blanc sur bouton bleu).
     const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
-    const wb = await ocrWords(shot, undefined, { threshold: 170, scale: 2, psms: ['11'] })
+    const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
     const words = [...wa, ...wb]
     const minY = (opts?.minY ?? 0) * H, maxY = (opts?.maxY ?? 1) * H
     const hit = words.find(o => o.cy >= minY && o.cy <= maxY && patterns.some(p => p.test(o.text)))

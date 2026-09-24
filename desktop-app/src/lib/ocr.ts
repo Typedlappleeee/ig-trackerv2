@@ -10,6 +10,7 @@ export interface OcrWord { text: string; x: number; y: number; w: number; h: num
 export interface OcrOpts {
   scale?: number       // agrandissement avant OCR (défaut 2.5) — clé pour les petits chiffres
   threshold?: number | null   // binarisation : lum < seuil → noir (défaut 195). null = pas de binarisation
+  invert?: boolean     // inverse les tons (texte CLAIR sur fond FONCÉ → lisible par Tesseract)
   psms?: string[]      // modes de segmentation à fusionner (défaut ['6','11'])
 }
 
@@ -36,7 +37,7 @@ function loadImg(src: string): Promise<HTMLImageElement> {
 
 // Agrandit + met en niveaux de gris + binarise (chiffres foncés → noir sur blanc).
 // Améliore énormément la lecture de chiffres clairs/peu contrastés (sélecteur Crane).
-async function preprocess(image: string, scale: number, threshold: number | null): Promise<string> {
+async function preprocess(image: string, scale: number, threshold: number | null, invert: boolean): Promise<string> {
   const img = await loadImg(image)
   const W = Math.max(1, Math.round(img.naturalWidth * scale)), H = Math.max(1, Math.round(img.naturalHeight * scale))
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H
@@ -45,7 +46,8 @@ async function preprocess(image: string, scale: number, threshold: number | null
   ctx.drawImage(img, 0, 0, W, H)
   const d = ctx.getImageData(0, 0, W, H); const p = d.data
   for (let i = 0; i < p.length; i += 4) {
-    const g = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]
+    let g = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]
+    if (invert) g = 255 - g
     const v = threshold == null ? g : (g < threshold ? 0 : 255)
     p[i] = p[i + 1] = p[i + 2] = v
   }
@@ -58,8 +60,9 @@ async function preprocess(image: string, scale: number, threshold: number | null
 export async function ocrWords(image: string, whitelist?: string, opts?: OcrOpts): Promise<OcrWord[]> {
   const scale = opts?.scale ?? 2.5
   const threshold = opts?.threshold === undefined ? 195 : opts.threshold
+  const invert = opts?.invert ?? false
   const psms = opts?.psms ?? ['6', '11']
-  const src = (scale !== 1 || threshold != null) ? await preprocess(image, scale, threshold) : image
+  const src = (scale !== 1 || threshold != null || invert) ? await preprocess(image, scale, threshold, invert) : image
   const w = await getWorker()
   const merged: OcrWord[] = []
   for (const psm of psms) {
