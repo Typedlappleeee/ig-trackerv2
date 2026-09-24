@@ -70,7 +70,9 @@ export interface RunOpts {
 export async function runFfmpeg(o: RunOpts): Promise<Uint8Array> {
   const ff = await getFFmpeg()
   const inName = o.inputName ?? 'input.mp4'
-  const outName = o.outName ?? 'output.mp4'
+  // Sortie vidéo en .mov (QuickTime) par défaut — demandé pour la ferme iPhone/iRemoTech.
+  // Les appels qui produisent autre chose (ex. audio .mp3) fournissent leur propre outName.
+  const outName = o.outName ?? 'output.mov'
   progressCb = o.onProgress ?? null
   const ring: string[] = []
   const logHandler = ({ message }: { message: string }) => { ring.push(message); if (ring.length > 60) ring.shift(); o.onLog?.(message) }

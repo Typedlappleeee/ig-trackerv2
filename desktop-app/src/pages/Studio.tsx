@@ -181,9 +181,9 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
         }
         // Sauvegarde banque + lien de téléchargement.
         for (const o of outs) {
-          const ext = o.ext ?? 'mp4'
+          const ext = o.ext ?? 'mov'
           await saveOutputToBank(user.id, currentOrg?.id ?? null, o.data, o.title, ext, destFolder || null)
-          const url = URL.createObjectURL(new Blob([o.data as BlobPart], { type: ext === 'jpg' ? 'image/jpeg' : 'video/mp4' }))
+          const url = URL.createObjectURL(new Blob([o.data as BlobPart], { type: ext === 'jpg' ? 'image/jpeg' : ext === 'mov' ? 'video/quicktime' : 'video/mp4' }))
           setResults(r => [...r, { title: o.title, url, ext }])
           R.tick(true)
         }

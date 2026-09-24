@@ -633,7 +633,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             speed,
             caption: capText ? { text: capText, pos, style: capStyle } : null,
           }, hooks)
-          await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
+          await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mov', destFolder || null)
           done++; setMade(done); R.tick(true)
         }
       }

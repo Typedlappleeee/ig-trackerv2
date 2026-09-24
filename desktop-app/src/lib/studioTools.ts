@@ -19,11 +19,11 @@ export async function resolveSourceBytes(v: SourceRef, file?: File): Promise<Uin
 }
 
 // Enregistre un mp4 de sortie dans la banque (bucket content + content_bank).
-export async function saveOutputToBank(userId: string, orgId: string | null, bytes: Uint8Array, title: string, ext = 'mp4', folder: string | null = null): Promise<string | null> {
+export async function saveOutputToBank(userId: string, orgId: string | null, bytes: Uint8Array, title: string, ext = 'mov', folder: string | null = null): Promise<string | null> {
   const scopeFolder = orgId ? `orgs/${orgId}` : `users/${userId}`
   const id = crypto.randomUUID()
   const storagePath = `videos/${scopeFolder}/${id}.${ext}`
-  const mime = ext === 'mp4' ? 'video/mp4' : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'application/octet-stream'
+  const mime = ext === 'mov' ? 'video/quicktime' : ext === 'mp4' ? 'video/mp4' : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'application/octet-stream'
   const blob = new Blob([bytes as BlobPart], { type: mime })
   const up = await supabase.storage.from('content').upload(storagePath, blob, { contentType: blob.type, upsert: false })
   if (up.error) return null
