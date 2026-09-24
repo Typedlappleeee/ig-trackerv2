@@ -163,8 +163,24 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
 // fractions d'écran (iPhones identiques) ; tout le reste est trouvé par OCR et
 // VÉRIFIÉ (si un bouton texte manque, on abandonne proprement — jamais de post raté).
 const REEL_ANCHORS = {
-  createPlus: { x: 0.07, y: 0.06 },  // bouton + création, haut-gauche du feed (un peu plus haut)
+  createPlus: { x: 0.07, y: 0.06 },  // bouton + création, haut-gauche du feed
   firstThumb: { x: 0.50, y: 0.40 },  // 1re vignette de la galerie = dernière vidéo
+  nextBtn: { x: 0.85, y: 0.93 },     // bouton Next → bas-droite (position fixe, tels identiques)
+  shareBtn: { x: 0.85, y: 0.93 },    // bouton Share → bas-droite
+}
+
+// Tape un bouton : cherche son TEXTE (vision) et, à défaut, tape sa position connue
+// (ancre). Ne bloque jamais tant que la position est fiable (iPhones identiques).
+async function tapButton(
+  key: string, deviceId: string, patterns: RegExp[], anchor: { x: number; y: number },
+  W: number, H: number, hooks?: VisionHooks, cropY?: [number, number], label?: string,
+): Promise<boolean> {
+  const found = await findTapText(key, deviceId, patterns, hooks, { label: label ?? patterns[0].source, tries: 4, cropY })
+  if (found) return true
+  const x = Math.round(anchor.x * W), y = Math.round(anchor.y * H)
+  hooks?.log?.(`↪ « ${label ?? patterns[0].source} » non lu → tap position connue (${x}, ${y})`)
+  await sendAction(key, deviceId, { type: 'tap', x, y })
+  return true
 }
 
 export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
@@ -185,12 +201,11 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
   await tapFrac(A.firstThumb.x, A.firstThumb.y)
   await sleep(1300)
-  // 4. Next (apparaît une fois la vidéo sélectionnée) — recadré sur le bas (là où est le bouton).
-  //    Si absent = vignette ratée → abandon propre.
-  if (!await findTapText(key, deviceId, [/next|suivant/i], hooks, { label: 'Next (après sélection)', tries: 7, cropY: [0.80, 1] })) return false
+  // 4. Next (après sélection) : vision → sinon position connue (bas-droite).
+  await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (après sélection)')
   await sleep(2600)
-  // 5. Next (écran d'édition) — recadré sur le bas.
-  if (!await findTapText(key, deviceId, [/next|suivant/i], hooks, { label: 'Next (édition)', tries: 7, cropY: [0.80, 1] })) return false
+  // 5. Next (écran d'édition) : vision → sinon position connue.
+  await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (édition)')
   await sleep(2600)
   // 6. Légende (facultatif) puis Share
   if (opts.caption && opts.caption.trim()) {
@@ -204,7 +219,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
       await sleep(700)
     }
   }
-  if (!await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 7, cropY: [0.62, 1] })) return false
+  await tapButton(key, deviceId, [/share|partager/i], A.shareBtn, W, H, hooks, [0.62, 1], 'Share')
   hooks?.log?.('📤 Reel partagé.')
   await sleep(3500)
   return true
