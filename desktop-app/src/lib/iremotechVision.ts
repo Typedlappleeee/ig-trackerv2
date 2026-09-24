@@ -278,6 +278,9 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     hooks?.log?.('📤 Reel partagé.')
   }
   await sleep(4000) // laisse le partage se finaliser
+  hooks?.log?.('🏠 Retour à l’accueil.')
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1200)
   return true
 }
 
