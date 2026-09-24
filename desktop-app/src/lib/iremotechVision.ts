@@ -78,8 +78,9 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
     if (!shot) { await sleep(700); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
-    const words = await ocrWords(shot) // texte complet (pas de whitelist)
-    const ig = words.find(o => /instagram/i.test(o.text) || /^nstagram$/i.test(o.text))
+    // Libellé blanc sur fond varié → PAS de binarisation (elle effacerait le blanc).
+    const words = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
+    const ig = words.find(o => /instagram/i.test(o.text) || /^[il]nstagram$/i.test(o.text))
     if (ig) {
       const ty = Math.max(0, ig.cy - Math.round(H * 0.035)) // viser l'icône, juste au-dessus du libellé
       hooks?.log?.(`📸 icône Instagram repérée → tap (${ig.cx}, ${ty})`)
