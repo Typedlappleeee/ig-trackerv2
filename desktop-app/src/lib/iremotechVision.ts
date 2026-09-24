@@ -278,7 +278,6 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     hooks?.log?.('📤 Reel partagé.')
   }
   await sleep(4000) // laisse le partage se finaliser
-  await closeInstagram(key, deviceId, hooks)
   return true
 }
 
