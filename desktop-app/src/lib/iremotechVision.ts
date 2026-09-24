@@ -18,6 +18,16 @@ function imgSize(dataUrl: string): Promise<{ w: number; h: number }> {
 
 export interface VisionHooks { log?: (m: string) => void; shouldStop?: () => boolean }
 
+// Cycle mode avion ON→OFF (nouvelle IP / reset réseau) avant chaque posting.
+export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, onMs = 4000, offMs = 7000): Promise<void> {
+  hooks?.log?.('✈️ Mode avion ON…')
+  await sendAction(key, deviceId, { type: 'airplane', on: true })
+  await sleep(onMs)
+  hooks?.log?.('✈️ Mode avion OFF (reconnexion / nouvelle IP)…')
+  await sendAction(key, deviceId, { type: 'airplane', on: false })
+  await sleep(offMs)
+}
+
 // Brique réutilisable : cherche à l'écran un bouton dont le TEXTE matche l'un des
 // motifs (ex. /reel/i, /next|suivant/i, /share|partager/i) et tape dessus.
 // Réessaie plusieurs fois (l'écran met parfois du temps à charger). true si tapé.

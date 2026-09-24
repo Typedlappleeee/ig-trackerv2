@@ -17,7 +17,7 @@ import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFo
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
-import { selectContainerByVision, postReelByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, airplaneReset } from '@/lib/iremotechVision'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
 const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
@@ -263,6 +263,9 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
     for (const job of ready) {
       if (R.isCancelled()) break
       push(`\n📦 container « ${job.container} » · ${job.vid!.title}`)
+      // Cycle mode avion (nouvelle IP) AVANT d'ouvrir le container.
+      await airplaneReset(irt.key, dev, { log: push, shouldStop: () => R.isCancelled() })
+      if (R.isCancelled()) break
       const ok = await selectContainerByVision(irt.key, dev, job.container, { log: push, shouldStop: () => R.isCancelled() })
       if (!ok) { push(`  ⏭ « ${job.container} » non atteint → suivant`); R.tick(false); continue }
       await sleep(1200)
@@ -388,7 +391,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
           onSaveSequence={(steps) => { setLive(null); setPendingSteps(steps) }} />
       )}
 
-      {publishDev && createPortal(
+      {publishDev && !picker && createPortal(
         <div onClick={() => !runningMulti && setPublishDev(null)} style={{ position: 'fixed', inset: 0, zIndex: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(4,3,8,0.8)', backdropFilter: 'blur(6px)' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.16)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
