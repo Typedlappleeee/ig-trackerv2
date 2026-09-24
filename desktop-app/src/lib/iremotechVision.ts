@@ -77,7 +77,9 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
     if (!W || !H) { hooks?.log?.('⚠ image illisible'); await sleep(500); continue }
     const words = await ocrWords(shot, whitelist)
     // Libellés plausibles de container : chiffres purs ou "Default", dans la moitié basse.
-    const rows = words.filter(o => o.text && (/^\d{1,3}$/.test(o.text) || /^default$/i.test(o.text)) && o.cy > H * 0.30)
+    // On exclut seulement la barre d'état tout en haut (< 13 %) — sinon un sélecteur
+    // haut à l'écran perdait ses 1res lignes (« Default », « 6 »).
+    const rows = words.filter(o => o.text && (/^\d{1,3}$/.test(o.text) || /^default$/i.test(o.text)) && o.cy > H * 0.13)
     if (rows.length) sawSheet = true
     hooks?.log?.(`👁 lu : ${rows.map(r => r.text).join(', ') || '(rien)'}`)
     // Cible visible ?
