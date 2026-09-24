@@ -76,6 +76,17 @@ export async function findTapText(
   return false
 }
 
+// Ferme les popups Instagram fréquents qui bloquent le flux (« Not now », « OK »,
+// « Skip », notifications, « Add to your story »…). Balayage léger, sans échec.
+export async function dismissPopups(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
+  const found = await findTapText(
+    key, deviceId,
+    [/^not now$/i, /^plus tard$/i, /^pas maintenant$/i, /^skip$/i, /^ignorer$/i, /^cancel$/i, /^annuler$/i, /^dismiss$/i],
+    hooks, { label: 'popup', tries: 1 },
+  )
+  if (found) { hooks?.log?.('   (popup fermé)'); await sleep(1200) }
+}
+
 // Cherche le container `target` (ex. "12" ou "Default") dans le sélecteur affiché à
 // l'écran et tape dessus. Scrolle haut/bas jusqu'à le trouver. true si tapé.
 export async function findAndTapContainer(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
@@ -191,6 +202,8 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
 
+  // 0. Ferme un éventuel popup avant de commencer (sinon il bloque le tap du +).
+  await dismissPopups(key, deviceId, hooks)
   // 1. Ouvrir le créateur (+ haut-gauche)
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   await tapFrac(A.createPlus.x, A.createPlus.y)
