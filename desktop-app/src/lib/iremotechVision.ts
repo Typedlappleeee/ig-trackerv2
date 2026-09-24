@@ -123,7 +123,7 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
     const words = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
     const ig = words.find(o => /instagram/i.test(o.text) || /^[il]nstagram$/i.test(o.text))
     if (ig) {
-      const ty = Math.max(0, ig.cy - Math.round(H * 0.035)) // viser l'icône, juste au-dessus du libellé
+      const ty = Math.max(0, ig.cy - Math.round(H * 0.055)) // viser l'icône, bien au-dessus du libellé
       hooks?.log?.(`📸 icône Instagram repérée → tap (${ig.cx}, ${ty})`)
       await sendAction(key, deviceId, { type: 'tap', x: ig.cx, y: ty })
       return true
