@@ -21,25 +21,43 @@ export interface VisionHooks { log?: (m: string) => void; shouldStop?: () => boo
 // Rotation d'IP via le mode avion iRemoTech : ON → attente → OFF, puis on renvoie le
 // OFF plusieurs fois en vérifiant la reconnexion (snapshot). Si iRemoTech pilote via
 // un canal qui survit à l'avion, le OFF passe ; sinon on le signale clairement.
-// Le bouton avion d'iRemoTech est un TOGGLE : chaque appel = un appui. On appuie une
-// 1re fois (→ ON), on attend, on appuie une 2e fois (→ OFF) — exactement comme deux
-// clics manuels dans l'UI (qui, eux, éteignent bien l'avion). On NE spamme PAS l'appui
-// dans la boucle (ça re-basculerait en avion) : on appuie OFF une fois, puis on vérifie.
+// Rotation d'IP en opérant le CENTRE DE CONTRÔLE (comme à la main) : on ouvre le CC
+// (swipe depuis le coin haut-droit), on tape l'icône avion (ON), on attend 8 s, on
+// re-tape l'icône (OFF), on ferme le CC, puis on laisse le réseau revenir. Les taps
+// atteignent le device via iRemoTech (dont le contrôle survit à l'avion).
+const AIRPLANE_ICON = { x: 0.155, y: 0.30 } // icône avion dans le Centre de contrôle (haut-gauche du bloc connectivité)
+
 export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
-  hooks?.log?.('✈️ Mode avion ON (appui bouton)…')
-  await sendAction(key, deviceId, { type: 'airplane', on: true })
-  await sleep(holdMs)
-  hooks?.log?.('✈️ Mode avion OFF (2e appui bouton)…')
-  await sendAction(key, deviceId, { type: 'airplane', on: true }) // 2e appui = toggle OFF
+  // Écran connu d'abord.
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1000)
+  const shot = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('⚠ écran illisible → mode avion sauté'); return }
+  const tapIcon = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(AIRPLANE_ICON.x * W), y: Math.round(AIRPLANE_ICON.y * H) })
+  // 1. Ouvrir le Centre de contrôle (swipe depuis le coin haut-droit vers le bas).
+  hooks?.log?.('✈️ Ouverture du Centre de contrôle…')
+  await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.94), y1: Math.round(H * 0.008), x2: Math.round(W * 0.94), y2: Math.round(H * 0.55), duration_ms: 550 })
+  await sleep(1600)
+  // 2. Activer l'avion.
+  hooks?.log?.('✈️ Mode avion ON…')
+  await tapIcon()
+  await sleep(holdMs) // 8 s en avion → l'IP tourne
+  // 3. Désactiver l'avion (2e tap sur la même icône).
+  hooks?.log?.('✈️ Mode avion OFF…')
+  await tapIcon()
   await sleep(2000)
-  for (let i = 0; i < 10; i++) {
+  // 4. Fermer le Centre de contrôle.
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(2500)
+  // 5. Laisser le réseau revenir (vérif snapshot).
+  for (let i = 0; i < 6; i++) {
     if (hooks?.shouldStop?.()) return
     const s = await snapshot(key, deviceId)
     if (s) { hooks?.log?.('   réseau rétabli ✓'); return }
-    if (i === 2 || i === 6) hooks?.log?.('   reconnexion en cours…')
     await sleep(3000)
   }
-  hooks?.log?.('   ⚠ toujours hors-ligne après ~30 s (dis-moi, on ajuste)')
+  hooks?.log?.('   (réseau pas encore confirmé, on continue)')
 }
 
 // Brique réutilisable : cherche à l'écran un bouton dont le TEXTE matche l'un des
@@ -275,9 +293,9 @@ export async function closeInstagram(key: string, deviceId: string, hooks?: Visi
   const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
   if (!W || !H) { return }
   const cx = Math.round(W * 0.5)
-  // 1) Ouvre l'app switcher (swipe lent depuis le bas).
-  await sendAction(key, deviceId, { type: 'swipe', x1: cx, y1: Math.round(H * 0.99), x2: cx, y2: Math.round(H * 0.5), duration_ms: 1000 })
-  await sleep(1800)
+  // 1) Ouvre l'app switcher : swipe LENT depuis le tout bas jusqu'au milieu (Face ID).
+  await sendAction(key, deviceId, { type: 'swipe', x1: cx, y1: Math.round(H * 0.995), x2: cx, y2: Math.round(H * 0.45), duration_ms: 1400 })
+  await sleep(2000)
   // 2) Repère la carte « Instagram » par son nom (double polarité) → balaie CELLE-LÀ.
   shot = await snapshot(key, deviceId)
   let swx = cx // repli : carte centrale (IG est normalement la plus récente)
