@@ -150,8 +150,12 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
   const [testTarget, setTestTarget] = useState('')
   const [testDev, setTestDev] = useState('')
   const [testing, setTesting] = useState(false)
-  // Publication multi-container.
+  // Publication multi-container : une vidéo + une légende PAR container.
+  type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null }
+  type ContainerJob = { container: string; vid: VidRef | null; caption: string }
   const [containersInput, setContainersInput] = useState('')
+  const [jobs, setJobs] = useState<ContainerJob[]>([])
+  const [pickingFor, setPickingFor] = useState<number | null>(null)
   const [runningMulti, setRunningMulti] = useState(false)
 
   const loadSeq = useCallback(async () => { setSequences(await loadSequences(currentOrg?.id ?? null, user.id)) }, [currentOrg?.id, user.id])
@@ -176,11 +180,15 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
   }
 
   async function applyPicker(r: PickerResult) {
-    if (r.kind !== 'videos' || r.ids.length === 0) return
+    if (r.kind !== 'videos' || r.ids.length === 0) { setPickingFor(null); return }
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', [r.ids[0]])
-    const v = (data ?? [])[0]
-    if (v) setRunVid(v)
+    const v = (data ?? [])[0] as VidRef | undefined
+    if (v) {
+      if (pickingFor != null) { const i = pickingFor; setJobs(js => js.map((j, k) => k === i ? { ...j, vid: v } : j)) }
+      else setRunVid(v)
+    }
+    setPickingFor(null)
   }
 
   async function launchRun() {
@@ -205,36 +213,49 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
 
   // Publie une vidéo sur chaque container coché, l'un après l'autre :
   //   sélection container (vision) → rejeu de la séquence de post (upload + taps).
-  async function launchContainerRun() {
-    if (!irt.key || !runVid || runSel.size === 0 || runningMulti) return
+  // Construit/rafraîchit les lignes (une par container) depuis le champ texte,
+  // en conservant les vidéos/légendes déjà assignées.
+  function buildJobs() {
     const containers = containersInput.split(/[,\s]+/).map(s => s.trim()).filter(Boolean)
-    if (containers.length === 0) { setLogs(['⚠ Indique au moins un container (ex. 6, 7, 10).']); return }
+    const uniq = [...new Set(containers)]
+    setJobs(prev => uniq.map(c => prev.find(j => j.container === c) ?? { container: c, vid: null, caption: '' }))
+  }
+
+  async function signedUrlFor(v: VidRef): Promise<string | undefined> {
+    if (v.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600); return data?.signedUrl ?? undefined }
+    return v.file_url ?? undefined
+  }
+
+  // Pour chaque container : ouvre le container → INJECTE sa vidéo (une fois ouvert) →
+  // publie le Reel à la vision avec sa légende.
+  async function runContainerJobs() {
+    if (!irt.key || runSel.size === 0 || runningMulti) return
+    const ready = jobs.filter(j => j.container && j.vid)
+    if (ready.length === 0) { setLogs(['⚠ Assigne au moins une vidéo à un container.']); return }
     setRunningMulti(true); setLogs([])
     const push = (m: string) => setLogs(l => [...l.slice(-400), m])
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-    // Média (URL signée) — sera injecté dans la pellicule de chaque iPhone.
-    const videoName = (runVid.title || 'video') + '.mp4'
-    let videoUrl: string | undefined
-    if (runVid.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(runVid.storage_path, 3600); videoUrl = data?.signedUrl ?? undefined }
-    else videoUrl = runVid.file_url ?? undefined
-    if (!videoUrl) { push('❌ Vidéo introuvable (URL).'); setRunningMulti(false); return }
     const devs = [...runSel]
-    push(`▶ Publication vision sur ${containers.length} container(s) × ${devs.length} iPhone(s) : ${containers.join(', ')}`)
-    const R = startRun('farm', `Multi-container · ${devs.length}×${containers.length}`, devs.length * containers.length)
+    push(`▶ Publication vision : ${ready.length} container(s) × ${devs.length} iPhone(s)`)
+    const R = startRun('farm', `Containers · ${devs.length}×${ready.length}`, devs.length * ready.length)
     for (const dev of devs) {
       if (R.isCancelled()) break
-      // La pellicule iOS est partagée entre containers Crane → 1 seul upload par iPhone.
-      push(`⬆ [${dev}] Injection de la vidéo dans la pellicule…`)
-      await uploadMedia(irt.key, dev, videoUrl, videoName)
-      await sleep(1500)
-      for (const c of containers) {
+      for (const job of ready) {
         if (R.isCancelled()) break
-        push(`\n📦 [${dev}] → container « ${c} »`)
-        const ok = await selectContainerByVision(irt.key, dev, c, { log: push, shouldStop: () => R.isCancelled() })
-        if (!ok) { push(`  ⏭ container « ${c} » non atteint → suivant`); R.tick(false); continue }
-        await sleep(1500) // laisse Instagram s'ouvrir dans le container
-        const posted = await postReelByVision(irt.key, dev, { caption: runCaption }, { log: push, shouldStop: () => R.isCancelled() })
-        push(posted ? `  ✅ container « ${c} » publié` : `  ⚠ container « ${c} » : publication interrompue`)
+        push(`\n📦 [${dev}] → container « ${job.container} » · ${job.vid!.title}`)
+        // 1. Ouvre le container (vision)
+        const ok = await selectContainerByVision(irt.key, dev, job.container, { log: push, shouldStop: () => R.isCancelled() })
+        if (!ok) { push(`  ⏭ container « ${job.container} » non atteint → suivant`); R.tick(false); continue }
+        await sleep(1200)
+        // 2. Injecte SA vidéo maintenant que le container est ouvert → devient la plus récente
+        const url = await signedUrlFor(job.vid!)
+        if (!url) { push('  ❌ URL vidéo introuvable → suivant'); R.tick(false); continue }
+        push('  ⬆ Injection de la vidéo dans la pellicule…')
+        await uploadMedia(irt.key, dev, url, (job.vid!.title || 'video') + '.mp4')
+        await sleep(2500) // laisse iOS indexer la nouvelle vidéo (elle passe en tête)
+        // 3. Publie le Reel (vision) avec sa légende
+        const posted = await postReelByVision(irt.key, dev, { caption: job.caption }, { log: push, shouldStop: () => R.isCancelled() })
+        push(posted ? `  ✅ container « ${job.container} » publié` : `  ⚠ container « ${job.container} » : publication interrompue`)
         R.tick(posted)
       }
       if (R.isCancelled()) break
@@ -301,25 +322,35 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
               )}
             </Card>
 
-            {/* Publication container par container — 100 % vision (OCR) */}
+            {/* Publication container par container — 100 % vision, une vidéo + légende par container */}
             <Card style={{ padding: 18, marginBottom: 16 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>📦 Publier container par container (vision)</div>
-              <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Choisis une vidéo + les containers. Pour chacun : sélection du container par vision → publication du Reel pilotée à l'OCR (+ → REEL → dernière vidéo → Next → Next → Share). Coche les iPhones dans la grille plus bas.</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button style={btn} onClick={() => setPicker(true)}>{runVid ? `Vidéo : ${runVid.title}` : 'Choisir une vidéo'}</button>
-                  <span style={{ fontSize: 11, color: MUTED }}>{runSel.size} iPhone(s) coché(s)</span>
+              <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Une vidéo + une légende par container. Pour chacun : ouverture du container (vision) → injection de sa vidéo → publication du Reel à l'OCR (+ → REEL → dernière vidéo → Next → Next → Share). Coche les iPhones dans la grille plus bas.</p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                <input value={containersInput} onChange={e => setContainersInput(e.target.value)} placeholder="Containers — ex. 6, 7, 10, Default"
+                  style={{ flex: 1, minWidth: 200, boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
+                <button style={btn} onClick={buildJobs}>Créer les lignes</button>
+              </div>
+              {jobs.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                  {jobs.map((j, i) => (
+                    <div key={j.container} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.12)' }}>
+                      <span style={{ minWidth: 74, fontSize: 12, fontWeight: 800, color: GOLD }}>📦 {j.container}</span>
+                      <button style={{ ...btn, background: j.vid ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)', border: j.vid ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(216,180,254,0.14)' }}
+                        onClick={() => { setPickingFor(i); setPicker(true) }}>{j.vid ? `🎞 ${j.vid.title}` : 'Choisir une vidéo'}</button>
+                      <input value={j.caption} onChange={e => { const v = e.target.value; setJobs(js => js.map((x, k) => k === i ? { ...x, caption: v } : x)) }} placeholder="Légende (facultatif)"
+                        style={{ flex: 1, minWidth: 160, boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
+                      <button style={{ ...btn, color: '#F87171', padding: '0 10px' }} onClick={() => setJobs(js => js.filter((_, k) => k !== i))}>✕</button>
+                    </div>
+                  ))}
                 </div>
-                <input value={runCaption} onChange={e => setRunCaption(e.target.value)} placeholder="Légende (facultatif)"
-                  style={{ width: '100%', boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input value={containersInput} onChange={e => setContainersInput(e.target.value)} placeholder="Containers — ex. 6, 7, 10, Default"
-                    style={{ flex: 1, minWidth: 200, boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-                  <button style={{ ...btn, background: GOLD, color: '#1a1206', border: 'none', opacity: containersInput.trim() && runSel.size && runVid && !runningMulti ? 1 : 0.5 }}
-                    disabled={!containersInput.trim() || !runSel.size || !runVid || runningMulti} onClick={launchContainerRun}>
-                    {runningMulti ? 'Publication…' : `Publier sur ${containersInput.split(/[,\s]+/).filter(Boolean).length || 0} container(s)`}
-                  </button>
-                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: MUTED }}>{runSel.size} iPhone(s) coché(s) · {jobs.filter(j => j.vid).length}/{jobs.length} vidéo(s) assignée(s)</span>
+                <button style={{ ...btn, marginLeft: 'auto', background: GOLD, color: '#1a1206', border: 'none', opacity: jobs.some(j => j.vid) && runSel.size && !runningMulti ? 1 : 0.5 }}
+                  disabled={!jobs.some(j => j.vid) || !runSel.size || runningMulti} onClick={runContainerJobs}>
+                  {runningMulti ? 'Publication…' : `Publier ${jobs.filter(j => j.vid).length} container(s)`}
+                </button>
               </div>
               {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 220, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
             </Card>
