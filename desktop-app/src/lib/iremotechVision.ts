@@ -21,23 +21,25 @@ export interface VisionHooks { log?: (m: string) => void; shouldStop?: () => boo
 // Rotation d'IP via le mode avion iRemoTech : ON → attente → OFF, puis on renvoie le
 // OFF plusieurs fois en vérifiant la reconnexion (snapshot). Si iRemoTech pilote via
 // un canal qui survit à l'avion, le OFF passe ; sinon on le signale clairement.
+// Le bouton avion d'iRemoTech est un TOGGLE : chaque appel = un appui. On appuie une
+// 1re fois (→ ON), on attend, on appuie une 2e fois (→ OFF) — exactement comme deux
+// clics manuels dans l'UI (qui, eux, éteignent bien l'avion). On NE spamme PAS l'appui
+// dans la boucle (ça re-basculerait en avion) : on appuie OFF une fois, puis on vérifie.
 export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
-  hooks?.log?.('✈️ Mode avion ON…')
+  hooks?.log?.('✈️ Mode avion ON (appui bouton)…')
   await sendAction(key, deviceId, { type: 'airplane', on: true })
   await sleep(holdMs)
-  hooks?.log?.('✈️ Mode avion OFF (reconnexion)…')
-  // On renvoie le OFF à CHAQUE tentative, sur une fenêtre patiente (~60 s) : iRemoTech
-  // délivre souvent un OFF en file d'attente dès que son canal de contrôle revient.
-  for (let i = 0; i < 15; i++) {
+  hooks?.log?.('✈️ Mode avion OFF (2e appui bouton)…')
+  await sendAction(key, deviceId, { type: 'airplane', on: true }) // 2e appui = toggle OFF
+  await sleep(2000)
+  for (let i = 0; i < 10; i++) {
     if (hooks?.shouldStop?.()) return
-    await sendAction(key, deviceId, { type: 'airplane', on: false })
-    await sleep(1200)
     const s = await snapshot(key, deviceId)
-    if (s) { hooks?.log?.(`   réseau rétabli ✓ (après ${i + 1} essai${i ? 's' : ''})`); return }
-    if (i === 0 || i === 5 || i === 10) hooks?.log?.('   reconnexion en cours…')
-    await sleep(2800)
+    if (s) { hooks?.log?.('   réseau rétabli ✓'); return }
+    if (i === 2 || i === 6) hooks?.log?.('   reconnexion en cours…')
+    await sleep(3000)
   }
-  hooks?.log?.('   ⚠ toujours hors-ligne après ~60 s — dis-moi le comportement exact (voir chat)')
+  hooks?.log?.('   ⚠ toujours hors-ligne après ~30 s (dis-moi, on ajuste)')
 }
 
 // Brique réutilisable : cherche à l'écran un bouton dont le TEXTE matche l'un des
