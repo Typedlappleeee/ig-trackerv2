@@ -18,23 +18,25 @@ function imgSize(dataUrl: string): Promise<{ w: number; h: number }> {
 
 export interface VisionHooks { log?: (m: string) => void; shouldStop?: () => boolean }
 
-// Rotation d'IP via le "bouton mode avion" d'iRemoTech : UN SEUL appel (iRemoTech gère
-// le pulse avion + la reconnexion côté device). On n'envoie PAS de "OFF" séparé — il
-// n'arriverait jamais, le téléphone étant déjà hors-réseau. On attend puis on vérifie
-// que le device est bien revenu en ligne (snapshot) avant de continuer.
-export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, waitMs = 10000): Promise<void> {
-  hooks?.log?.('✈️ Mode avion (bouton iRemoTech) → nouvelle IP…')
+// Rotation d'IP via le mode avion iRemoTech : ON → attente → OFF, puis on renvoie le
+// OFF plusieurs fois en vérifiant la reconnexion (snapshot). Si iRemoTech pilote via
+// un canal qui survit à l'avion, le OFF passe ; sinon on le signale clairement.
+export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
+  hooks?.log?.('✈️ Mode avion ON…')
   await sendAction(key, deviceId, { type: 'airplane', on: true })
-  await sleep(waitMs)
-  // Vérifie le retour en ligne (jusqu'à ~15 s de plus).
-  for (let i = 0; i < 5; i++) {
+  await sleep(holdMs)
+  hooks?.log?.('✈️ Mode avion OFF (reconnexion)…')
+  await sendAction(key, deviceId, { type: 'airplane', on: false })
+  await sleep(1500)
+  for (let i = 0; i < 6; i++) {
     if (hooks?.shouldStop?.()) return
     const s = await snapshot(key, deviceId)
     if (s) { hooks?.log?.('   réseau rétabli ✓'); return }
-    hooks?.log?.('   attente reconnexion…')
-    await sleep(3000)
+    hooks?.log?.('   reconnexion… (renvoi OFF avion)')
+    await sendAction(key, deviceId, { type: 'airplane', on: false })
+    await sleep(3500)
   }
-  hooks?.log?.('   ⚠ toujours hors-ligne après l’avion (vérifie le comportement du bouton iRemoTech)')
+  hooks?.log?.('   ⚠ toujours hors-ligne : iRemoTech ne délivre pas le OFF hors-réseau → il faudra la rotation par proxy')
 }
 
 // Brique réutilisable : cherche à l'écran un bouton dont le TEXTE matche l'un des
@@ -155,7 +157,7 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
 // fractions d'écran (iPhones identiques) ; tout le reste est trouvé par OCR et
 // VÉRIFIÉ (si un bouton texte manque, on abandonne proprement — jamais de post raté).
 const REEL_ANCHORS = {
-  createPlus: { x: 0.07, y: 0.075 }, // bouton + création, haut-gauche du feed
+  createPlus: { x: 0.07, y: 0.06 },  // bouton + création, haut-gauche du feed (un peu plus haut)
   firstThumb: { x: 0.50, y: 0.40 },  // 1re vignette de la galerie = dernière vidéo
 }
 
@@ -171,17 +173,18 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   await tapFrac(A.createPlus.x, A.createPlus.y)
   await sleep(2200)
   // 2. Passer en mode REEL (barre du bas POST STORY REEL LIVE)
-  if (!await findTapText(key, deviceId, [/^reels?$/i], hooks, { label: 'REEL', minY: 0.78 })) return false
+  if (!await findTapText(key, deviceId, [/reels?/i], hooks, { label: 'REEL', minY: 0.72, tries: 6 })) return false
   await sleep(1600)
   // 3. Sélectionner la 1re vignette (= dernière vidéo uploadée)
   hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
   await tapFrac(A.firstThumb.x, A.firstThumb.y)
   await sleep(1300)
-  // 4. Next (apparaît une fois la vidéo sélectionnée) — si absent = vignette ratée → abandon
-  if (!await findTapText(key, deviceId, [/^next$|suivant/i], hooks, { label: 'Next (après sélection)', minY: 0.75 })) return false
+  // 4. Next (apparaît une fois la vidéo sélectionnée) — détecté N'IMPORTE OÙ à l'écran.
+  //    Si absent = vignette ratée → abandon propre.
+  if (!await findTapText(key, deviceId, [/next|suivant/i], hooks, { label: 'Next (après sélection)', tries: 7 })) return false
   await sleep(2600)
-  // 5. Next (écran d'édition)
-  if (!await findTapText(key, deviceId, [/^next$|suivant/i], hooks, { label: 'Next (édition)', minY: 0.75 })) return false
+  // 5. Next (écran d'édition) — détecté n'importe où.
+  if (!await findTapText(key, deviceId, [/next|suivant/i], hooks, { label: 'Next (édition)', tries: 7 })) return false
   await sleep(2600)
   // 6. Légende (facultatif) puis Share
   if (opts.caption && opts.caption.trim()) {
@@ -195,7 +198,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
       await sleep(700)
     }
   }
-  if (!await findTapText(key, deviceId, [/^share$|partager/i], hooks, { label: 'Share', minY: 0.45 })) return false
+  if (!await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 7 })) return false
   hooks?.log?.('📤 Reel partagé.')
   await sleep(3500)
   return true
