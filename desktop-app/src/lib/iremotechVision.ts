@@ -26,17 +26,18 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
   await sendAction(key, deviceId, { type: 'airplane', on: true })
   await sleep(holdMs)
   hooks?.log?.('✈️ Mode avion OFF (reconnexion)…')
-  await sendAction(key, deviceId, { type: 'airplane', on: false })
-  await sleep(1500)
-  for (let i = 0; i < 6; i++) {
+  // On renvoie le OFF à CHAQUE tentative, sur une fenêtre patiente (~60 s) : iRemoTech
+  // délivre souvent un OFF en file d'attente dès que son canal de contrôle revient.
+  for (let i = 0; i < 15; i++) {
     if (hooks?.shouldStop?.()) return
-    const s = await snapshot(key, deviceId)
-    if (s) { hooks?.log?.('   réseau rétabli ✓'); return }
-    hooks?.log?.('   reconnexion… (renvoi OFF avion)')
     await sendAction(key, deviceId, { type: 'airplane', on: false })
-    await sleep(3500)
+    await sleep(1200)
+    const s = await snapshot(key, deviceId)
+    if (s) { hooks?.log?.(`   réseau rétabli ✓ (après ${i + 1} essai${i ? 's' : ''})`); return }
+    if (i === 0 || i === 5 || i === 10) hooks?.log?.('   reconnexion en cours…')
+    await sleep(2800)
   }
-  hooks?.log?.('   ⚠ toujours hors-ligne : iRemoTech ne délivre pas le OFF hors-réseau → il faudra la rotation par proxy')
+  hooks?.log?.('   ⚠ toujours hors-ligne après ~60 s — dis-moi le comportement exact (voir chat)')
 }
 
 // Brique réutilisable : cherche à l'écran un bouton dont le TEXTE matche l'un des
