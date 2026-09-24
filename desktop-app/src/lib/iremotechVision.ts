@@ -18,15 +18,23 @@ function imgSize(dataUrl: string): Promise<{ w: number; h: number }> {
 
 export interface VisionHooks { log?: (m: string) => void; shouldStop?: () => boolean }
 
-// Cycle mode avion ON → attente 8 s → OFF (nouvelle IP / reset réseau) avant chaque posting.
-export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, onMs = 8000, offMs = 7000): Promise<void> {
-  hooks?.log?.('✈️ Mode avion ON…')
+// Rotation d'IP via le "bouton mode avion" d'iRemoTech : UN SEUL appel (iRemoTech gère
+// le pulse avion + la reconnexion côté device). On n'envoie PAS de "OFF" séparé — il
+// n'arriverait jamais, le téléphone étant déjà hors-réseau. On attend puis on vérifie
+// que le device est bien revenu en ligne (snapshot) avant de continuer.
+export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, waitMs = 10000): Promise<void> {
+  hooks?.log?.('✈️ Mode avion (bouton iRemoTech) → nouvelle IP…')
   await sendAction(key, deviceId, { type: 'airplane', on: true })
-  hooks?.log?.(`   attente ${Math.round(onMs / 1000)} s en mode avion…`)
-  await sleep(onMs)
-  hooks?.log?.('✈️ Mode avion OFF (reconnexion / nouvelle IP)…')
-  await sendAction(key, deviceId, { type: 'airplane', on: false })
-  await sleep(offMs)
+  await sleep(waitMs)
+  // Vérifie le retour en ligne (jusqu'à ~15 s de plus).
+  for (let i = 0; i < 5; i++) {
+    if (hooks?.shouldStop?.()) return
+    const s = await snapshot(key, deviceId)
+    if (s) { hooks?.log?.('   réseau rétabli ✓'); return }
+    hooks?.log?.('   attente reconnexion…')
+    await sleep(3000)
+  }
+  hooks?.log?.('   ⚠ toujours hors-ligne après l’avion (vérifie le comportement du bouton iRemoTech)')
 }
 
 // Brique réutilisable : cherche à l'écran un bouton dont le TEXTE matche l'un des
