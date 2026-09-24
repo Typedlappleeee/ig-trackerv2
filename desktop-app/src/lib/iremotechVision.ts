@@ -44,7 +44,7 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
 // Réessaie plusieurs fois (l'écran met parfois du temps à charger). true si tapé.
 export async function findTapText(
   key: string, deviceId: string, patterns: RegExp[], hooks?: VisionHooks,
-  opts?: { tries?: number; label?: string; minY?: number; maxY?: number },
+  opts?: { tries?: number; label?: string; minY?: number; maxY?: number; cropY?: [number, number] },
 ): Promise<boolean> {
   const tries = opts?.tries ?? 5
   const label = opts?.label ?? patterns.map(p => p.source).join('|')
@@ -54,11 +54,13 @@ export async function findTapText(
     if (!shot) { await sleep(600); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
-    // Double lecture polarité : normale (texte foncé sur clair) + INVERSÉE (texte clair
-    // sur fond foncé → devient foncé sur clair). Couvre le texte de N'IMPORTE QUELLE
-    // couleur tant qu'il contraste (ex. « Next » blanc sur bouton bleu).
-    const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
-    const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
+    // Lecture RECADRÉE sur la zone du bouton (cropY) → texte plus gros, sans le bruit
+    // des vignettes ; en DOUBLE POLARITÉ (normale + inversée) → texte de n'importe
+    // quelle couleur tant qu'il contraste (ex. « Next » blanc sur bouton bleu).
+    const crop = opts?.cropY
+    const sc = crop ? 3.5 : 2
+    const wa = await ocrWords(shot, undefined, { threshold: null, scale: sc, psms: ['11'], cropY: crop })
+    const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: sc, psms: ['11'], cropY: crop })
     const words = [...wa, ...wb]
     const minY = (opts?.minY ?? 0) * H, maxY = (opts?.maxY ?? 1) * H
     const hit = words.find(o => o.cy >= minY && o.cy <= maxY && patterns.some(p => p.test(o.text)))
@@ -183,12 +185,12 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
   await tapFrac(A.firstThumb.x, A.firstThumb.y)
   await sleep(1300)
-  // 4. Next (apparaît une fois la vidéo sélectionnée) — détecté N'IMPORTE OÙ à l'écran.
+  // 4. Next (apparaît une fois la vidéo sélectionnée) — recadré sur le bas (là où est le bouton).
   //    Si absent = vignette ratée → abandon propre.
-  if (!await findTapText(key, deviceId, [/next|suivant/i], hooks, { label: 'Next (après sélection)', tries: 7 })) return false
+  if (!await findTapText(key, deviceId, [/next|suivant/i], hooks, { label: 'Next (après sélection)', tries: 7, cropY: [0.80, 1] })) return false
   await sleep(2600)
-  // 5. Next (écran d'édition) — détecté n'importe où.
-  if (!await findTapText(key, deviceId, [/next|suivant/i], hooks, { label: 'Next (édition)', tries: 7 })) return false
+  // 5. Next (écran d'édition) — recadré sur le bas.
+  if (!await findTapText(key, deviceId, [/next|suivant/i], hooks, { label: 'Next (édition)', tries: 7, cropY: [0.80, 1] })) return false
   await sleep(2600)
   // 6. Légende (facultatif) puis Share
   if (opts.caption && opts.caption.trim()) {
@@ -202,7 +204,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
       await sleep(700)
     }
   }
-  if (!await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 7 })) return false
+  if (!await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 7, cropY: [0.62, 1] })) return false
   hooks?.log?.('📤 Reel partagé.')
   await sleep(3500)
   return true
