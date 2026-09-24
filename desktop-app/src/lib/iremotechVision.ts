@@ -182,6 +182,7 @@ const REEL_ANCHORS = {
   nextBtn: { x: 0.85, y: 0.93 },     // bouton Next → bas-droite (position fixe, tels identiques)
   shareBtn: { x: 0.85, y: 0.93 },    // bouton Share → bas-droite
   captionField: { x: 0.35, y: 0.57 }, // champ « Add a caption » (milieu-gauche)
+  okBtn: { x: 0.92, y: 0.095 },        // bouton « OK » de l'éditeur de légende (haut-droite)
 }
 
 // Tape un bouton : cherche son TEXTE (vision) et, à défaut, tape sa position connue
@@ -237,15 +238,16 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   // 5. Next (écran d'édition) : vision → bouton bleu → position.
   await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (édition)')
   await sleep(3000)
-  // 6. Légende : on tape le champ « Add a caption » (milieu), on écrit, on referme le clavier.
+  // 6. Légende : taper « Add a caption » ouvre un éditeur plein écran → écrire → valider « OK » (haut-droite).
   if (opts.caption && opts.caption.trim()) {
     hooks?.log?.('✏️ Saisie de la légende…')
     await tapFrac(A.captionField.x, A.captionField.y)
-    await sleep(1300)
+    await sleep(1400) // laisse l'éditeur de légende s'ouvrir
     await sendAction(key, deviceId, { type: 'text', text: opts.caption.trim() })
     await sleep(900)
-    await tapFrac(0.5, 0.25) // tape le preview → referme le clavier (sinon le bouton du bas est caché)
-    await sleep(1300)
+    hooks?.log?.('   validation « OK »…')
+    await tapButton(key, deviceId, [/^ok$/i], A.okBtn, W, H, hooks, [0, 0.14], 'OK légende')
+    await sleep(1400)
   }
   // 7. Publier : « Share » direct, sinon un « Next » intermédiaire puis « Share ».
   if (await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 3, cropY: [0.85, 1] })) {
