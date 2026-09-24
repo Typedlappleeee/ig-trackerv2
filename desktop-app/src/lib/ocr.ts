@@ -30,10 +30,10 @@ async function getWorker(): Promise<Worker> {
 // `whitelist` restreint les caractères reconnus (ex. chiffres) → plus fiable.
 export async function ocrWords(image: string, whitelist?: string): Promise<OcrWord[]> {
   const w = await getWorker()
-  if (whitelist != null) {
-    // PSM 11 = "sparse text" : bien pour des libellés isolés (lignes d'une liste).
-    await w.setParameters({ tessedit_char_whitelist: whitelist, tessedit_pageseg_mode: '11' } as never)
-  }
+  // PSM 11 = "sparse text" (libellés isolés). On (re)définit TOUJOURS la whitelist :
+  // sinon un filtre chiffres posé à un appel précédent resterait actif et empêcherait
+  // de relire des lettres (ex. le libellé « Instagram »).
+  await w.setParameters({ tessedit_char_whitelist: whitelist ?? '', tessedit_pageseg_mode: '11' } as never)
   // v7 : les mots sont dans la hiérarchie blocks → paragraphs → lines → words.
   const { data } = await w.recognize(image, undefined, { blocks: true })
   const out: OcrWord[] = []

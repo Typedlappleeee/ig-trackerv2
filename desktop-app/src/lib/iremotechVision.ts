@@ -68,10 +68,39 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
   return false
 }
 
-// Ouvre Instagram (déclenche le sélecteur Crane) puis sélectionne le container voulu.
+// Tape l'icône Instagram sur l'écran d'accueil (repérée par OCR). C'est CE geste qui
+// déclenche le sélecteur Crane — l'ouverture par open_url ne le déclenche pas.
+// Cherche sur jusqu'à 3 pages d'accueil (swipe). true si tapé.
+async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  for (let page = 0; page < 3; page++) {
+    if (hooks?.shouldStop?.()) return false
+    const shot = await snapshot(key, deviceId)
+    if (!shot) { await sleep(700); continue }
+    const { w: W, h: H } = await imgSize(shot)
+    if (!W || !H) { await sleep(500); continue }
+    const words = await ocrWords(shot) // texte complet (pas de whitelist)
+    const ig = words.find(o => /instagram/i.test(o.text) || /^nstagram$/i.test(o.text))
+    if (ig) {
+      const ty = Math.max(0, ig.cy - Math.round(H * 0.035)) // viser l'icône, juste au-dessus du libellé
+      hooks?.log?.(`📸 icône Instagram repérée → tap (${ig.cx}, ${ty})`)
+      await sendAction(key, deviceId, { type: 'tap', x: ig.cx, y: ty })
+      return true
+    }
+    hooks?.log?.('🔎 Instagram pas sur cette page → page suivante')
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.6), x2: Math.round(W * 0.18), y2: Math.round(H * 0.6), duration_ms: 350 })
+    await sleep(900)
+  }
+  return false
+}
+
+// Ouvre Instagram (via l'icône → déclenche le sélecteur Crane) puis sélectionne le container.
 export async function selectContainerByVision(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
-  hooks?.log?.('📲 Ouverture d’Instagram (sélecteur Crane)…')
-  await sendAction(key, deviceId, { type: 'open_url', url: 'instagram://' })
-  await sleep(2800) // laisse le sélecteur apparaître
+  hooks?.log?.('🏠 Retour à l’écran d’accueil…')
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1200)
+  hooks?.log?.('📲 Recherche de l’icône Instagram…')
+  const opened = await tapInstagramIcon(key, deviceId, hooks)
+  if (!opened) { hooks?.log?.('❌ Icône Instagram introuvable sur l’accueil (mets-la sur la 1re page).'); return false }
+  await sleep(2800) // laisse le sélecteur Crane apparaître
   return findAndTapContainer(key, deviceId, target, hooks)
 }
