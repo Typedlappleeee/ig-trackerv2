@@ -3,7 +3,7 @@
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
 import { snapshot, sendAction } from './iremotech'
-import { ocrWords } from './ocr'
+import { ocrWords, findBlueButton } from './ocr'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -190,10 +190,22 @@ async function tapButton(
   key: string, deviceId: string, patterns: RegExp[], anchor: { x: number; y: number },
   W: number, H: number, hooks?: VisionHooks, cropY?: [number, number], label?: string,
 ): Promise<boolean> {
-  const found = await findTapText(key, deviceId, patterns, hooks, { label: label ?? patterns[0].source, tries: 4, cropY })
-  if (found) return true
+  const lab = label ?? patterns[0].source
+  // 1. Vision : lire le texte du bouton.
+  if (await findTapText(key, deviceId, patterns, hooks, { label: lab, tries: 3, cropY })) return true
+  // 2. Couleur : le bouton d'action Instagram est BLEU (Next/Share) — les outils sont gris.
+  const shot = await snapshot(key, deviceId)
+  if (shot) {
+    const blue = await findBlueButton(shot, cropY ? cropY[0] : 0.6, cropY ? cropY[1] : 1)
+    if (blue) {
+      hooks?.log?.(`🔵 « ${lab} » : bouton bleu détecté → tap (${blue.cx}, ${blue.cy})`)
+      await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: blue.cy })
+      return true
+    }
+  }
+  // 3. Dernier recours : position connue.
   const x = Math.round(anchor.x * W), y = Math.round(anchor.y * H)
-  hooks?.log?.(`↪ « ${label ?? patterns[0].source} » non lu → tap position connue (${x}, ${y})`)
+  hooks?.log?.(`↪ « ${lab} » non détecté → tap position connue (${x}, ${y})`)
   await sendAction(key, deviceId, { type: 'tap', x, y })
   return true
 }
@@ -217,13 +229,14 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   // 3. Sélectionner la 1re vignette (= dernière vidéo uploadée)
   hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
   await tapFrac(A.firstThumb.x, A.firstThumb.y)
-  await sleep(1300)
-  // 4. Next (après sélection) : vision → sinon position connue (bas-droite).
+  await sleep(1800)
+  // 4. Next (après sélection) : vision → bouton bleu → position.
   await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (après sélection)')
-  await sleep(2600)
-  // 5. Next (écran d'édition) : vision → sinon position connue.
+  hooks?.log?.('   ⏳ chargement de la vidéo dans l’éditeur…')
+  await sleep(5000) // laisse l'éditeur charger la vidéo (sinon aperçu gris → Next mal placé)
+  // 5. Next (écran d'édition) : vision → bouton bleu → position.
   await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (édition)')
-  await sleep(2600)
+  await sleep(3000)
   // 6. Légende : on tape le champ « Add a caption » (milieu), on écrit, on referme le clavier.
   if (opts.caption && opts.caption.trim()) {
     hooks?.log?.('✏️ Saisie de la légende…')

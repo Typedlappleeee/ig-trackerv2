@@ -101,6 +101,37 @@ export async function ocrWords(image: string, whitelist?: string, opts?: OcrOpts
   return out
 }
 
+// Détecte le bouton d'action Instagram par sa COULEUR (bleu vif : Next/Share/Partager),
+// dans une bande verticale [yMin,yMax]. Les outils (Overlay, Captions…) sont gris → ignorés.
+// Renvoie le centre du plus gros amas bleu, en coordonnées de l'image d'origine. null si absent.
+export async function findBlueButton(image: string, yMin = 0.55, yMax = 1): Promise<{ cx: number; cy: number } | null> {
+  const img = await loadImg(image)
+  const W = img.naturalWidth, H = img.naturalHeight
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H
+  const ctx = cv.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+  const y0 = Math.max(0, Math.round(yMin * H)), y1 = Math.min(H, Math.round(yMax * H))
+  const rows = Math.max(1, y1 - y0)
+  const data = ctx.getImageData(0, y0, W, rows).data
+  let sx = 0, sy = 0, n = 0
+  let minX = W, maxX = 0, minY = rows, maxY = 0
+  for (let yy = 0; yy < rows; yy++) {
+    for (let xx = 0; xx < W; xx++) {
+      const i = (yy * W + xx) * 4
+      const r = data[i], g = data[i + 1], b = data[i + 2]
+      // Bleu Instagram (#0095F6 / #3897F0) : B élevé, R faible, B >> R.
+      if (b > 170 && r < 130 && b > r + 70 && g > 70 && g < 205) {
+        sx += xx; sy += yy; n++
+        if (xx < minX) minX = xx; if (xx > maxX) maxX = xx
+        if (yy < minY) minY = yy; if (yy > maxY) maxY = yy
+      }
+    }
+  }
+  if (n < 120) return null // pas assez de bleu → pas de bouton
+  // Centre de la boîte englobante (plus stable que le centroïde si le bleu est irrégulier).
+  return { cx: Math.round((minX + maxX) / 2), cy: y0 + Math.round((minY + maxY) / 2) }
+}
+
 export async function terminateOcr(): Promise<void> {
   if (!workerP) return
   try { const w = await workerP; await w.terminate() } catch { /* noop */ }
