@@ -61,9 +61,20 @@ async function preprocess(image: string, scale: number, threshold: number | null
   return { url: cv.toDataURL('image/png'), offY: y0 }
 }
 
+// Sérialise les appels OCR : le worker Tesseract est unique, donc deux lectures
+// concurrentes (ex. 2 iPhones en parallèle) se télescoperaient. Le mutex garde les
+// taps/attentes/uploads parallèles et ne sérialise QUE la reconnaissance.
+let ocrMutex: Promise<unknown> = Promise.resolve()
+export async function ocrWords(image: string, whitelist?: string, opts?: OcrOpts): Promise<OcrWord[]> {
+  const run = () => ocrWordsInner(image, whitelist, opts)
+  const p = ocrMutex.then(run, run)
+  ocrMutex = p.then(() => undefined, () => undefined)
+  return p
+}
+
 // Lit les « mots » d'une image avec leurs positions (dans l'espace de l'image d'origine).
 // `whitelist` restreint les caractères (ex. chiffres) → plus fiable.
-export async function ocrWords(image: string, whitelist?: string, opts?: OcrOpts): Promise<OcrWord[]> {
+async function ocrWordsInner(image: string, whitelist?: string, opts?: OcrOpts): Promise<OcrWord[]> {
   const scale = opts?.scale ?? 2.5
   const threshold = opts?.threshold === undefined ? 195 : opts.threshold
   const invert = opts?.invert ?? false

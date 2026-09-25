@@ -8,6 +8,7 @@ import Shell, { type PageKey } from '@/Shell'
 import Home from '@/pages/Home'
 import BlowsomeHome from '@/pages/BlowsomeHome'
 import { BlowParc, BlowContent } from '@/pages/BlowsomePages'
+import { BlowAutoPilot } from '@/pages/BlowAutoPilot'
 import Phones from '@/pages/Phones'
 import Bank from '@/pages/Bank'
 import Proxies from '@/pages/Proxies'
@@ -110,6 +111,7 @@ function AppInner({ user }: { user: User }) {
 
   const content = infra === 'blowsome'
     ? (page === 'blowParc' ? <BlowParc user={user} org={org} />
+      : page === 'blowAuto' ? <BlowAutoPilot user={user} org={org} />
       : page === 'blowContent' ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'blowTools' ? <Studio theme={theme} infra={infra} user={user} org={org} />
       : page === 'publish' ? <Publish theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} />

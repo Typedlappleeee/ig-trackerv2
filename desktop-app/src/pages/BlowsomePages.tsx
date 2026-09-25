@@ -18,6 +18,7 @@ import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 import { selectContainerByVision, postReelByVision, airplaneReset } from '@/lib/iremotechVision'
+import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
 const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
@@ -123,14 +124,6 @@ function ConnectIrt({ title }: { title: string }) {
 
 // ── Parc VIP / Phone Farm (iRemoTech) ─────────────────────────────────────────
 const BLOW_THEME = themeFor('blowsome')
-
-// Noms de containers Crane définis par l'utilisateur POUR CHAQUE iPhone (localStorage).
-function loadDevContainers(deviceId: string): string[] {
-  try { const raw = localStorage.getItem(`sf-irt-containers:${deviceId}`); const a = raw ? JSON.parse(raw) : []; return Array.isArray(a) ? a : [] } catch { return [] }
-}
-function saveDevContainers(deviceId: string, list: string[]): void {
-  try { localStorage.setItem(`sf-irt-containers:${deviceId}`, JSON.stringify(list)) } catch { /* noop */ }
-}
 
 export function BlowParc({ user, org }: { user: User; org: OrgState }) {
   const { currentOrg } = org

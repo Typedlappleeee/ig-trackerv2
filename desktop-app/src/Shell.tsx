@@ -10,7 +10,7 @@ export type PageKey =
   | 'flows' | 'recipes' | 'publish' | 'automation' | 'warmup'
   | 'studio'
   | 'insights' | 'health'
-  | 'blowParc' | 'blowContent' | 'blowTools'
+  | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
   | 'scheduled'
   | 'admin'
   | 'settings'
@@ -32,6 +32,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       ] },
       { g: 'Parc', items: [
         { k: 'blowParc', l: 'Phone Farm', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined },
+        { k: 'blowAuto', l: 'Pilote Auto', i: 'M12 2v4|M12 18v4|M4.9 4.9l2.8 2.8|M16.3 16.3l2.8 2.8|M2 12h4|M18 12h4|M4.9 19.1l2.8-2.8|M16.3 7.7l2.8-2.8' },
         { k: 'insights', l: 'Performances', i: 'M22 12h-4l-3 9L9 3l-3 9H2' },
       ] },
     ]
@@ -93,6 +94,7 @@ const TITLES: Record<PageKey, string[]> = {
   insights: ['Analyse', 'Performances'],
   health: ['Analyse', 'Santé des comptes'],
   blowParc: ['Blowsome', 'Phone Farm'],
+  blowAuto: ['Blowsome', 'Pilote Auto'],
   blowContent: ['Blowsome', 'Auto-contenu'],
   blowTools: ['Blowsome', 'Outils VIP'],
   scheduled: ['Diffusion', 'Programmé'],
