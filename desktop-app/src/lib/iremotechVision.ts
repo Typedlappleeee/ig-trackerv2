@@ -408,9 +408,22 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   // 11. Done (haut-droite) de « Add link » — si absent, on saute l'étape et on continue.
   if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.16], 'Done (lien)', 6)) hooks?.log?.('   (pas de Done lien → on continue)')
   await sleep(2200)
-  // 12. Glisser le sticker lien vers le bas-droite (carré rouge) — drag LENT = reste appuyé.
-  hooks?.log?.('✋ Positionnement du sticker lien (bas-droite)…')
-  await sendAction(key, deviceId, { type: 'drag', x1: Math.round(A.stickerFrom.x * W), y1: Math.round(A.stickerFrom.y * H), x2: Math.round(A.stickerTo.x * W), y2: Math.round(A.stickerTo.y * H), duration_ms: 2800 })
+  // 12. Repérer le sticker lien à l'écran (par son texte) et le glisser PILE dessus →
+  //     bas-droite. Le sticker n'est pas au centre → on le localise avant de l'attraper.
+  hooks?.log?.('✋ Repérage puis positionnement du sticker lien…')
+  let fromX = Math.round(A.stickerFrom.x * W), fromY = Math.round(A.stickerFrom.y * H)
+  const shotS = await snapshot(key, deviceId)
+  if (shotS) {
+    const wa = await ocrWords(shotS, undefined, { threshold: null, scale: 2, psms: ['11'] })
+    const wb = await ocrWords(shotS, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
+    const stickerTxt = (opts.caption && opts.caption.trim()) || ''
+    const reTxt = stickerTxt ? new RegExp(stickerTxt.slice(0, 12).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null
+    // On ignore la zone du bas (boutons Your story / caption) et le haut (barre d'état/outils).
+    const hit = [...wa, ...wb].find(o => o.cy > H * 0.18 && o.cy < H * 0.78 && ((reTxt && reTxt.test(o.text)) || /^link$/i.test(o.text)))
+    if (hit) { fromX = hit.cx; fromY = hit.cy; hooks?.log?.(`   sticker repéré (${hit.cx}, ${hit.cy})`) }
+    else hooks?.log?.('   sticker non lu → position par défaut (centre)')
+  }
+  await sendAction(key, deviceId, { type: 'drag', x1: fromX, y1: fromY, x2: Math.round(A.stickerTo.x * W), y2: Math.round(A.stickerTo.y * H), duration_ms: 2800 })
   await sleep(1600)
   // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
   const shot2 = await snapshot(key, deviceId)
