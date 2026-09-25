@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision } from '@/lib/iremotechVision'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -182,6 +182,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
         if (R.isCancelled()) break
         push(`\n${tag} 📦 container « ${job.container} » · ${job.vid.title}`)
         if (airplaneOn) await airplaneReset(key, p.dev, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
+        await warmupEditsByVision(key, p.dev, job.container, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
         const ok = await selectContainerByVision(key, p.dev, job.container, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
         if (!ok) { push(`${tag} ⏭ container « ${job.container} » non atteint → suivant`); R.tick(false); continue }
         await sleep(1200)

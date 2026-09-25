@@ -17,7 +17,7 @@ import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFo
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
-import { selectContainerByVision, postReelByVision, airplaneReset } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision } from '@/lib/iremotechVision'
 import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
@@ -258,6 +258,8 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
       push(`\n📦 container « ${job.container} » · ${job.vid!.title}`)
       // Cycle mode avion (nouvelle IP) AVANT d'ouvrir le container.
       await airplaneReset(irt.key, dev, { log: push, shouldStop: () => R.isCancelled() })
+      if (R.isCancelled()) break
+      await warmupEditsByVision(irt.key, dev, job.container, { log: push, shouldStop: () => R.isCancelled() })
       if (R.isCancelled()) break
       const ok = await selectContainerByVision(irt.key, dev, job.container, { log: push, shouldStop: () => R.isCancelled() })
       if (!ok) { push(`  ⏭ « ${job.container} » non atteint → suivant`); R.tick(false); continue }

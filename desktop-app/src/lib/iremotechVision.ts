@@ -179,10 +179,14 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
   return false
 }
 
-// Tape l'icône Instagram sur l'écran d'accueil (repérée par OCR). C'est CE geste qui
-// déclenche le sélecteur Crane — l'ouverture par open_url ne le déclenche pas.
+// Tape l'icône d'une app sur l'écran d'accueil (libellé repéré par OCR). C'est CE geste
+// qui déclenche le sélecteur Crane — l'ouverture par open_url ne le déclenche pas.
 // Cherche sur jusqu'à 3 pages d'accueil (swipe). true si tapé.
-async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+async function tapAppIcon(
+  key: string, deviceId: string,
+  matcher: (t: string) => boolean, label: string,
+  hooks?: VisionHooks,
+): Promise<boolean> {
   for (let page = 0; page < 3; page++) {
     if (hooks?.shouldStop?.()) return false
     const shot = await snapshot(key, deviceId)
@@ -191,18 +195,22 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
     if (!W || !H) { await sleep(500); continue }
     // Libellé blanc sur fond varié → PAS de binarisation (elle effacerait le blanc).
     const words = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
-    const ig = words.find(o => /instagram/i.test(o.text) || /^[il]nstagram$/i.test(o.text))
-    if (ig) {
-      const ty = Math.max(0, ig.cy - Math.round(H * 0.055)) // viser l'icône, bien au-dessus du libellé
-      hooks?.log?.(`📸 icône Instagram repérée → tap (${ig.cx}, ${ty})`)
-      await sendAction(key, deviceId, { type: 'tap', x: ig.cx, y: ty })
+    const hit = words.find(o => matcher(o.text))
+    if (hit) {
+      const ty = Math.max(0, hit.cy - Math.round(H * 0.055)) // viser l'icône, bien au-dessus du libellé
+      hooks?.log?.(`📸 icône ${label} repérée → tap (${hit.cx}, ${ty})`)
+      await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: ty })
       return true
     }
-    hooks?.log?.('🔎 Instagram pas sur cette page → page suivante')
+    hooks?.log?.(`🔎 ${label} pas sur cette page → page suivante`)
     await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.6), x2: Math.round(W * 0.18), y2: Math.round(H * 0.6), duration_ms: 350 })
     await sleep(900)
   }
   return false
+}
+
+async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  return tapAppIcon(key, deviceId, t => /instagram/i.test(t) || /^[il]nstagram$/i.test(t), 'Instagram', hooks)
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────
@@ -473,6 +481,42 @@ export async function closeInstagram(key: string, deviceId: string, hooks?: Visi
   await sleep(1200)
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(900)
+}
+
+// Échauffement « Edits » avant chaque cycle : ouvre l'app Edits (même conteneur que
+// l'IG à publier, via le sélecteur Crane), tape le 1er projet (le plus récent, en haut
+// à gauche) puis revient à l'accueil. Best-effort : ne bloque JAMAIS le posting si Edits
+// échoue — on log et on continue vers Instagram.
+const EDITS_FIRST_PROJECT = { x: 0.20, y: 0.23 } // vignette du 1er projet (haut-gauche)
+export async function warmupEditsByVision(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
+  try {
+    hooks?.log?.('🎬 Échauffement Edits…')
+    await sendAction(key, deviceId, { type: 'press', name: 'home' })
+    await sleep(1200)
+    hooks?.log?.('📲 Recherche de l’icône Edits…')
+    const opened = await tapAppIcon(key, deviceId, t => /^edits$/i.test(t) || /^[el]dits$/i.test(t), 'Edits', hooks)
+    if (!opened) { hooks?.log?.('⚠ icône Edits introuvable — on passe directement à Instagram.'); return false }
+    await sleep(2800) // laisse le sélecteur Crane apparaître
+    const inContainer = await findAndTapContainer(key, deviceId, target, hooks)
+    if (!inContainer) { hooks?.log?.('⚠ conteneur Edits non sélectionné — on passe à Instagram.'); await sendAction(key, deviceId, { type: 'press', name: 'home' }); return false }
+    await sleep(3500) // laisse la liste des projets s’afficher
+    const shot = await snapshot(key, deviceId)
+    const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
+    if (W && H) {
+      const x = Math.round(W * EDITS_FIRST_PROJECT.x), y = Math.round(H * EDITS_FIRST_PROJECT.y)
+      hooks?.log?.(`🖼 ouverture du 1er projet Edits → tap (${x}, ${y})`)
+      await sendAction(key, deviceId, { type: 'tap', x, y })
+      await sleep(2500)
+    }
+    hooks?.log?.('🏠 Retour à l’accueil (fin échauffement Edits).')
+    await sendAction(key, deviceId, { type: 'press', name: 'home' })
+    await sleep(1200)
+    return true
+  } catch (e) {
+    hooks?.log?.(`⚠ échauffement Edits ignoré (${e instanceof Error ? e.message : String(e)}).`)
+    try { await sendAction(key, deviceId, { type: 'press', name: 'home' }) } catch { /* noop */ }
+    return false
+  }
 }
 
 // Ouvre Instagram (via l'icône → déclenche le sélecteur Crane) puis sélectionne le container.
