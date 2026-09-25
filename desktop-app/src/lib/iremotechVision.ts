@@ -424,8 +424,17 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   // 14. Bouton « Share » de la feuille (bas, bleu, pleine largeur).
   if (!await tapButton(key, deviceId, [/^share$|partager/i], A.shareSheet, W, H, hooks, [0.80, 1], 'Share (feuille)')) return false
   hooks?.log?.('📤 Story partagée.')
-  await sleep(4000)
-  await dismissPopups(key, deviceId, hooks) // ferme une éventuelle fenêtre post-partage
+  await sleep(3500)
+  // Parfois une feuille « Also share to » apparaît après le partage → taper « Done ».
+  if (await findTapText(key, deviceId, [/^done$/i], hooks, { label: 'Done (Also share to)', cropY: [0.82, 1], tries: 3 })) {
+    hooks?.log?.('   feuille « Also share to » → Done')
+    await sleep(1800)
+  } else {
+    // Repli : le « Done » est un gros bouton bleu en bas.
+    const s = await snapshot(key, deviceId)
+    if (s) { const blue = await findBlueButton(s, 0.82, 1); if (blue) { hooks?.log?.('   « Done » (bouton bleu bas) → tap'); await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: blue.cy }); await sleep(1800) } }
+  }
+  await dismissPopups(key, deviceId, hooks) // autre popup éventuel
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1200)
   return true
