@@ -410,30 +410,10 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   hooks?.log?.('✅ Validation « Done » (haut-droite)…')
   await tapFrac(A.linkDone.x, A.linkDone.y)
   await sleep(2200)
-  // 12. Repérer le sticker lien à l'écran puis le glisser PILE dessus → bas-droite.
-  //     Le sticker n'est pas toujours au même endroit → on le localise (texte OU lien).
-  hooks?.log?.('✋ Repérage du sticker lien…')
-  let fromX = Math.round(0.5 * W), fromY = Math.round(0.45 * H), found = false
-  // Marqueurs de recherche : le texte du sticker, le domaine du lien, ou « link ».
-  const marks: RegExp[] = [/^link$/i]
-  if (opts.caption && opts.caption.trim()) marks.unshift(new RegExp(opts.caption.trim().slice(0, 10).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
-  const host = opts.link.trim().replace(/^https?:\/\//i, '').split('/')[0]
-  if (host) marks.push(new RegExp(host.slice(0, 12).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
-  for (let t = 0; t < 3 && !found; t++) {
-    const shot = await snapshot(key, deviceId)
-    if (shot) {
-      const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2.5, psms: ['11'] })
-      const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2.5, psms: ['11'] })
-      const cand = [...wa, ...wb].filter(o => o.cy > 0.15 * H && o.cy < 0.80 * H)
-      const hit = cand.find(o => marks.some(re => re.test(o.text)))
-      if (hit) { fromX = hit.cx; fromY = hit.cy; found = true; hooks?.log?.(`   🎯 sticker repéré (${hit.cx}, ${hit.cy})`) }
-    }
-    if (!found) await sleep(700)
-  }
-  if (!found) hooks?.log?.('   sticker non repéré → départ au centre')
-  // Glissement : UN SEUL geste continu (swipe = doigt qui reste appuyé du sticker jusqu'à
-  // la cible), comme un déplacement manuel. Durée modérée pour rester bien appuyé.
-  hooks?.log?.('✋ Glissement du sticker en bas-droite (appui continu)…')
+  // 12. Glisser le sticker (placé au CENTRE par défaut) vers le bas-droite — un seul
+  //     swipe continu (doigt qui reste appuyé), depuis le milieu de l'écran.
+  hooks?.log?.('✋ Glissement du sticker (centre → bas-droite)…')
+  const fromX = Math.round(0.5 * W), fromY = Math.round(0.45 * H)
   const toX = Math.round(A.stickerTo.x * W), toY = Math.round(A.stickerTo.y * H)
   await sendAction(key, deviceId, { type: 'swipe', x1: fromX, y1: fromY, x2: toX, y2: toY, duration_ms: 1400 })
   await sleep(1800)
