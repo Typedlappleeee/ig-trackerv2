@@ -221,6 +221,7 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
 // VÉRIFIÉ (si un bouton texte manque, on abandonne proprement — jamais de post raté).
 const REEL_ANCHORS = {
   createPlus: { x: 0.07, y: 0.06 },  // bouton + création, haut-gauche du feed
+  galleryThumb: { x: 0.09, y: 0.93 }, // vignette galerie en bas-GAUCHE de la caméra
   firstThumb: { x: 0.50, y: 0.40 },  // 1re vignette de la galerie = dernière vidéo
   nextBtn: { x: 0.85, y: 0.93 },     // bouton Next → bas-droite (position fixe, tels identiques)
   shareBtn: { x: 0.85, y: 0.93 },    // bouton Share → bas-droite
@@ -263,8 +264,11 @@ async function selectMode(key: string, deviceId: string, patterns: RegExp[], lab
     const shot = await snapshot(key, deviceId)
     const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
     if (!W || !H) { await sleep(600); continue }
+    // La barre des modes (POST STORY INSTANTS REEL LIVE) est TOUT EN BAS (~91 % de
+    // hauteur). On balaie exactement à ce niveau — plus haut, on scrolle l'aperçu / le
+    // carrousel d'effets (rien ne bouge dans la barre des modes).
     hooks?.log?.(`↔ scroll du bandeau des modes pour trouver ${label}…`)
-    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.87), x2: Math.round(W * 0.25), y2: Math.round(H * 0.87), duration_ms: 350 })
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.91), x2: Math.round(W * 0.25), y2: Math.round(H * 0.91), duration_ms: 350 })
     await sleep(900)
   }
   hooks?.log?.(`❌ mode ${label} introuvable`)
@@ -287,7 +291,12 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   // 2. Passer en mode REEL (bandeau du bas POST STORY INSTANTS REEL LIVE) — scroll si besoin.
   if (!await selectMode(key, deviceId, [/reels?/i], 'REEL', hooks)) return false
   await sleep(1600)
-  // 3. Sélectionner la 1re vignette (= dernière vidéo uploadée)
+  // 3. Ouvrir la galerie : la caméra Reel affiche une vignette en BAS-GAUCHE — c'est ELLE
+  //    qu'on tape (pas le centre de l'écran, qui n'est que l'aperçu caméra).
+  hooks?.log?.('🖼 Ouverture de la galerie (bas-gauche)…')
+  await tapFrac(A.galleryThumb.x, A.galleryThumb.y)
+  await sleep(1800)
+  // 4. Sélectionner la 1re vignette (= dernière vidéo uploadée)
   hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
   await tapFrac(A.firstThumb.x, A.firstThumb.y)
   await sleep(1800)
