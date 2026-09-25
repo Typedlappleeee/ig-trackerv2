@@ -123,11 +123,18 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
 
   async function applyPicker(r: PickerResult) {
     setPicker(false)
-    if (r.kind !== 'videos' || r.ids.length === 0) return
+    if ((r.kind !== 'videos' && r.kind !== 'images') || r.ids.length === 0) return
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', r.ids)
     const vids = (data ?? []) as VidRef[]
     setVideoPool(p => { const ex = new Set(p.map(v => v.id)); return [...p, ...vids.filter(v => !ex.has(v.id))] })
+  }
+  // Nom de fichier avec la vraie extension (mp4 pour reels, jpg/png pour story photo).
+  function mediaFilename(v: VidRef): string {
+    const src = (v.storage_path ?? v.file_url ?? '').toLowerCase()
+    const ext = (src.split('.').pop() || '').replace(/[^a-z0-9]/g, '')
+    const good = ['mp4', 'mov', 'jpg', 'jpeg', 'png', 'webp', 'heic'].includes(ext) ? ext : (mode === 'story' ? 'jpg' : 'mp4')
+    return (v.title || 'media') + '.' + good
   }
   async function signedUrlFor(v: VidRef): Promise<string | undefined> {
     if (v.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600); return data?.signedUrl ?? undefined }
@@ -141,7 +148,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
   async function run() {
     if (!irt.key || running) return
     if (totalJobs === 0) { setLogs(['⚠ Sélectionne au moins un container.']); return }
-    if (videoPool.length === 0) { setLogs(['⚠ Ajoute au moins une vidéo au pool.']); return }
+    if (videoPool.length === 0) { setLogs(['⚠ Ajoute au moins un média au pool.']); return }
     if (mode === 'story') {
       const missing = [...sel].flatMap(dev => [...(selConts[dev] ?? [])].filter(c => !(storyLinks[linkKey(dev, c)] || storyLink.trim())))
       if (missing.length) { setLogs([`⚠ ${missing.length} container(s) sans lien CTA — mets un lien par container ou un lien par défaut.`]); return }
@@ -181,7 +188,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
         const url = await signedUrlFor(job.vid)
         if (!url) { push(`${tag} ❌ URL vidéo introuvable → suivant`); R.tick(false); continue }
         push(`${tag} ⬆ injection de la vidéo…`)
-        await uploadMedia(key, p.dev, url, (job.vid.title || 'video') + '.mp4')
+        await uploadMedia(key, p.dev, url, mediaFilename(job.vid))
         push(`${tag} ⏳ 10 s (indexation)…`)
         await sleep(10000)
         const posted = mode === 'story'
@@ -294,12 +301,12 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
       {/* 2 · Pool de contenu */}
       <div style={card}>
         <div style={{ fontSize: 13.5, fontWeight: 800, color: INK, marginBottom: 3 }}>2 · Type, pool de vidéos & textes</div>
-        <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED }}>Chaque container reçoit une vidéo tirée <b>au hasard</b> de ce pool.</p>
+        <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED }}>Chaque container reçoit un média tiré <b>au hasard</b> de ce pool.</p>
 
         {/* Type d'automatisation */}
         <div style={{ display: 'flex', gap: 6, padding: 4, borderRadius: 11, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(216,180,254,0.14)', width: 'fit-content', marginBottom: 12 }}>
           {([['reel', 'Reel'], ['story', 'Story + lien']] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setMode(k)} style={{ height: 30, padding: '0 16px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 800, background: mode === k ? GOLD : 'transparent', color: mode === k ? '#1a1206' : MUTED }}>{l}</button>
+            <button key={k} onClick={() => { setMode(k); setVideoPool([]) }} style={{ height: 30, padding: '0 16px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 800, background: mode === k ? GOLD : 'transparent', color: mode === k ? '#1a1206' : MUTED }}>{l}</button>
           ))}
         </div>
 
@@ -311,8 +318,8 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-          <button style={gold} onClick={() => setPicker(true)}>+ Ajouter des vidéos</button>
-          <span style={{ fontSize: 12, color: MUTED }}>{videoPool.length} vidéo(s) dans le pool</span>
+          <button style={gold} onClick={() => setPicker(true)}>+ Ajouter des {mode === 'story' ? 'photos' : 'vidéos'}</button>
+          <span style={{ fontSize: 12, color: MUTED }}>{videoPool.length} {mode === 'story' ? 'photo(s)' : 'vidéo(s)'} dans le pool</span>
           {videoPool.length > 0 && <button style={btn} onClick={() => setVideoPool([])}>Vider</button>}
         </div>
         {videoPool.length > 0 && (
@@ -342,7 +349,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
       {/* 4 · Lancer */}
       <div style={card}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12.5, color: MUTED }}>{totalJobs} publication(s) · {videoPool.length} vidéo(s) · {captions.length} légende(s)</span>
+          <span style={{ fontSize: 12.5, color: MUTED }}>{totalJobs} publication(s) · {videoPool.length} {mode === 'story' ? 'photo(s)' : 'vidéo(s)'} · {captions.length} {mode === 'story' ? 'texte(s)' : 'légende(s)'}</span>
           {running && runId && <button style={{ ...btn, marginLeft: 'auto', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
           <button style={{ ...gold, height: 44, padding: '0 22px', marginLeft: running ? 0 : 'auto', fontSize: 14, opacity: totalJobs && videoPool.length && !running ? 1 : 0.5 }} disabled={!totalJobs || !videoPool.length || running} onClick={run}>
             {running ? 'En cours…' : `Lancer ${totalJobs} publication(s)`}
@@ -352,8 +359,8 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
       </div>
 
       {picker && (
-        <BankPicker theme={BLOW_THEME} user={user} org={org} kind="videos" multi
-          title="Ajouter des vidéos au pool" onClose={() => setPicker(false)} onApply={applyPicker} />
+        <BankPicker theme={BLOW_THEME} user={user} org={org} kind={mode === 'story' ? 'images' : 'videos'} multi
+          title={mode === 'story' ? 'Ajouter des photos au pool' : 'Ajouter des vidéos au pool'} onClose={() => setPicker(false)} onApply={applyPicker} />
       )}
     </div>
   )
