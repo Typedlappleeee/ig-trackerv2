@@ -410,23 +410,31 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   hooks?.log?.('✅ Validation « Done » (haut-droite)…')
   await tapFrac(A.linkDone.x, A.linkDone.y)
   await sleep(2200)
-  // 12. Repérer le sticker lien à l'écran (par son texte) et le glisser PILE dessus →
-  //     bas-droite. Le sticker n'est pas au centre → on le localise avant de l'attraper.
-  hooks?.log?.('✋ Repérage puis positionnement du sticker lien…')
-  let fromX = Math.round(A.stickerFrom.x * W), fromY = Math.round(A.stickerFrom.y * H)
-  const shotS = await snapshot(key, deviceId)
-  if (shotS) {
-    const wa = await ocrWords(shotS, undefined, { threshold: null, scale: 2, psms: ['11'] })
-    const wb = await ocrWords(shotS, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
-    const stickerTxt = (opts.caption && opts.caption.trim()) || ''
-    const reTxt = stickerTxt ? new RegExp(stickerTxt.slice(0, 12).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null
-    // On ignore la zone du bas (boutons Your story / caption) et le haut (barre d'état/outils).
-    const hit = [...wa, ...wb].find(o => o.cy > H * 0.18 && o.cy < H * 0.78 && ((reTxt && reTxt.test(o.text)) || /^link$/i.test(o.text)))
-    if (hit) { fromX = hit.cx; fromY = hit.cy; hooks?.log?.(`   sticker repéré (${hit.cx}, ${hit.cy})`) }
-    else hooks?.log?.('   sticker non lu → position par défaut (centre)')
+  // 12. Repérer le sticker lien à l'écran puis le glisser PILE dessus → bas-droite.
+  //     Le sticker n'est pas toujours au même endroit → on le localise (texte OU lien).
+  hooks?.log?.('✋ Repérage du sticker lien…')
+  let fromX = Math.round(0.5 * W), fromY = Math.round(0.45 * H), found = false
+  // Marqueurs de recherche : le texte du sticker, le domaine du lien, ou « link ».
+  const marks: RegExp[] = [/^link$/i]
+  if (opts.caption && opts.caption.trim()) marks.unshift(new RegExp(opts.caption.trim().slice(0, 10).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
+  const host = opts.link.trim().replace(/^https?:\/\//i, '').split('/')[0]
+  if (host) marks.push(new RegExp(host.slice(0, 12).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
+  for (let t = 0; t < 3 && !found; t++) {
+    const shot = await snapshot(key, deviceId)
+    if (shot) {
+      const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2.5, psms: ['11'] })
+      const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2.5, psms: ['11'] })
+      const cand = [...wa, ...wb].filter(o => o.cy > 0.15 * H && o.cy < 0.80 * H)
+      const hit = cand.find(o => marks.some(re => re.test(o.text)))
+      if (hit) { fromX = hit.cx; fromY = hit.cy; found = true; hooks?.log?.(`   🎯 sticker repéré (${hit.cx}, ${hit.cy})`) }
+    }
+    if (!found) await sleep(700)
   }
-  await sendAction(key, deviceId, { type: 'drag', x1: fromX, y1: fromY, x2: Math.round(A.stickerTo.x * W), y2: Math.round(A.stickerTo.y * H), duration_ms: 2800 })
-  await sleep(1600)
+  if (!found) hooks?.log?.('   sticker non repéré → départ au centre')
+  // Drag LENT (4 s) = touche appuyée longtemps → attrape bien le sticker, puis dépose.
+  hooks?.log?.('✋ Glissement en bas-droite…')
+  await sendAction(key, deviceId, { type: 'drag', x1: fromX, y1: fromY, x2: Math.round(A.stickerTo.x * W), y2: Math.round(A.stickerTo.y * H), duration_ms: 4000 })
+  await sleep(1800)
   // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
   const shot2 = await snapshot(key, deviceId)
   let arrowTapped = false
