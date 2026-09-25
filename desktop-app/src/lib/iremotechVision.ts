@@ -308,7 +308,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
 // (vignette bas-gauche) → 1re vidéo (dernière uploadée) → Done (haut-droite) →
 // icône sticker (droite) → [sticker lien + partage — à venir].
 const STORY_ANCHORS = {
-  galleryThumb: { x: 0.09, y: 0.93 }, // vignette galerie en bas-gauche du story camera
+  galleryThumb: { x: 0.09, y: 0.95 }, // vignette galerie en bas-gauche du story camera
   firstThumb: { x: 0.50, y: 0.40 },   // 1re vidéo de la galerie (dernière uploadée)
   doneBtn: { x: 0.87, y: 0.12 },      // « Done » haut-droite (après sélection vidéo)
   stickerIcon: { x: 0.85, y: 0.19 },  // icône sticker (GIF/lien) sur le côté droit
