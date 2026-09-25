@@ -23,6 +23,35 @@ function extOf(m: Media): string { return (m.storage_path ?? m.file_url ?? '').t
 function isImg(m: Media): boolean { return IMG_EXT.includes(extOf(m)) }
 const HUES = ['139,92,246', '6,182,212', '236,72,153', '16,185,129', '245,158,11', '99,102,241']
 
+// Tuile LAZY : ne monte l'aperçu (vidéo/image) que quand elle est visible à l'écran
+// (IntersectionObserver) et le décharge hors écran. Évite de monter 600 <video> d'un
+// coup → la banque ne rame/bug plus.
+function MediaTile({ m, prev, on, hue, accent, accentBtn, onToggle }: {
+  m: Media; prev: string | null; on: boolean; hue: string; accent: string; accentBtn: string; onToggle: () => void
+}) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const [vis, setVis] = useState(false)
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    const io = new IntersectionObserver(es => setVis(es[0]?.isIntersecting ?? false), { rootMargin: '300px' })
+    io.observe(el); return () => io.disconnect()
+  }, [])
+  const isVid = !isImg(m) && !m.thumbnail_url && !m.thumbnail_path
+  return (
+    <button ref={ref} onClick={onToggle} title={m.title} style={{
+      position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden',
+      border: '1.5px solid ' + (on ? accent : 'rgba(255,255,255,0.07)'),
+      background: `linear-gradient(160deg, rgba(${hue},0.16), rgba(${hue},0.04))`,
+    }}>
+      {vis && prev && (isVid
+        ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
+      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? accentBtn : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+    </button>
+  )
+}
+
+
 export default function BankPicker({ theme, user, org, kind, multi = true, initialIds = [], title, onClose, onApply }: {
   theme: Theme; user: User; org: OrgState
   kind: PickerKind; multi?: boolean; initialIds?: string[]
@@ -198,21 +227,10 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
         ) : (
           filteredMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>Aucun contenu dans la banque.<br />Glisse-dépose tes fichiers ici ou clique « Mon PC ».</div> : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 9 }}>
-              {filteredMedia.map((m, i) => {
-                const on = sel.includes(m.id); const prev = thumbFor(m); const h = HUES[i % 6]; const img = isImg(m)
-                return (
-                  <button key={m.id} onClick={() => toggle(m.id)} title={m.title} style={{
-                    position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden',
-                    border: '1.5px solid ' + (on ? theme.accent : 'rgba(255,255,255,0.07)'),
-                    background: `linear-gradient(160deg, rgba(${h},0.16), rgba(${h},0.04))`,
-                  }}>
-                    {prev && (!img && !m.thumbnail_url && !m.thumbnail_path
-                      ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
-                    <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? theme.accentBtn : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
-                  </button>
-                )
-              })}
+              {filteredMedia.map((m, i) => (
+                <MediaTile key={m.id} m={m} prev={thumbFor(m)} on={sel.includes(m.id)} hue={HUES[i % 6]}
+                  accent={theme.accent} accentBtn={theme.accentBtn} onToggle={() => toggle(m.id)} />
+              ))}
             </div>
           )
         )}

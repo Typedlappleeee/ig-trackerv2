@@ -229,6 +229,24 @@ async function tapButton(
   return true
 }
 
+// Passe en mode REEL sur le bandeau du bas (POST STORY INSTANTS REEL LIVE). Si REEL
+// n'est pas visible, scrolle le bandeau HORIZONTALEMENT (vers la gauche) jusqu'à le
+// trouver, puis tape dessus — comme le scroll des containers, mais horizontal.
+async function selectReelMode(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  for (let i = 0; i < 6; i++) {
+    if (hooks?.shouldStop?.()) return false
+    if (await findTapText(key, deviceId, [/reels?/i], hooks, { label: 'REEL', minY: 0.72, tries: 2, cropY: [0.78, 1] })) return true
+    const shot = await snapshot(key, deviceId)
+    const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
+    if (!W || !H) { await sleep(600); continue }
+    hooks?.log?.('↔ scroll du bandeau des modes pour trouver REEL…')
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.87), x2: Math.round(W * 0.25), y2: Math.round(H * 0.87), duration_ms: 350 })
+    await sleep(900)
+  }
+  hooks?.log?.('❌ mode REEL introuvable')
+  return false
+}
+
 export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
   const shot0 = await snapshot(key, deviceId)
@@ -242,8 +260,8 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   await tapFrac(A.createPlus.x, A.createPlus.y)
   await sleep(2200)
-  // 2. Passer en mode REEL (barre du bas POST STORY REEL LIVE)
-  if (!await findTapText(key, deviceId, [/reels?/i], hooks, { label: 'REEL', minY: 0.72, tries: 6 })) return false
+  // 2. Passer en mode REEL (bandeau du bas POST STORY INSTANTS REEL LIVE) — scroll si besoin.
+  if (!await selectReelMode(key, deviceId, hooks)) return false
   await sleep(1600)
   // 3. Sélectionner la 1re vignette (= dernière vidéo uploadée)
   hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
