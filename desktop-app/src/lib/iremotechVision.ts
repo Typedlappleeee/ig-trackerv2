@@ -35,10 +35,10 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
   const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('⚠ écran illisible → mode avion sauté'); return }
   const tapIcon = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(AIRPLANE_ICON.x * W), y: Math.round(AIRPLANE_ICON.y * H) })
-  // 1. Ouvrir le Centre de contrôle (swipe du BAS vers le HAUT).
+  // 1. Ouvrir le Centre de contrôle (swipe du TOUT EN BAS vers le haut, franc).
   hooks?.log?.('✈️ Ouverture du Centre de contrôle (swipe bas→haut)…')
-  await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H * 0.995), x2: Math.round(W * 0.5), y2: Math.round(H * 0.4), duration_ms: 550 })
-  await sleep(1600)
+  await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H * 0.999), x2: Math.round(W * 0.5), y2: Math.round(H * 0.22), duration_ms: 750 })
+  await sleep(1800)
   // 2. Activer l'avion.
   hooks?.log?.('✈️ Mode avion ON…')
   await tapIcon()
