@@ -335,7 +335,7 @@ const STORY_ANCHORS = {
   customText: { x: 0.5, y: 0.35 },    // « Customize sticker text »
   linkDone: { x: 0.9, y: 0.11 },      // « Done » de « Add link » (haut-droite)
   stickerFrom: { x: 0.5, y: 0.43 },   // position initiale du sticker lien
-  stickerTo: { x: 0.72, y: 0.80 },    // cible : bas-droite (carré rouge)
+  stickerTo: { x: 0.72, y: 0.68 },    // cible : bas-droite, mais AU-DESSUS de la zone légende/boutons
   shareArrow: { x: 0.87, y: 0.93 },   // flèche bleue de partage (bas-droite)
   shareSheet: { x: 0.5, y: 0.93 },    // bouton « Share » de la feuille de partage (bas, pleine largeur)
 }
