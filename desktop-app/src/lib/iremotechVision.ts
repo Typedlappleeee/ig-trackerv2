@@ -223,9 +223,9 @@ async function tapButton(
     }
   }
   // 3. Non détecté : on N'APPUIE PAS à l'aveugle (risque de taper le mauvais bouton).
-  //    On abandonne → l'appelant passera au container suivant en recommençant le cycle.
+  //    On renvoie false — l'appelant décide (sauter l'étape OU passer au container suivant).
   void anchor; void W; void H
-  hooks?.log?.(`❌ « ${lab} » non détecté → on abandonne ce container`)
+  hooks?.log?.(`❌ « ${lab} » non détecté`)
   return false
 }
 
