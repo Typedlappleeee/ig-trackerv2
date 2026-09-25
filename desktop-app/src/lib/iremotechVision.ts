@@ -329,7 +329,7 @@ const STORY_ANCHORS = {
   galleryThumb: { x: 0.09, y: 0.95 }, // vignette galerie en bas-gauche du story camera
   firstThumb: { x: 0.50, y: 0.40 },   // 1re vidéo de la galerie (dernière uploadée)
   doneBtn: { x: 0.87, y: 0.12 },      // « Done » haut-droite (après sélection vidéo)
-  stickerIcon: { x: 0.82, y: 0.18 },  // icône « sticker » (côté droit, 2e du haut sous Aa)
+  stickerIcon: { x: 0.91, y: 0.16 },  // icône « sticker » (tout à droite, 2e du haut sous Aa)
   searchBar: { x: 0.5, y: 0.18 },     // barre de recherche du tiroir stickers
   urlField: { x: 0.5, y: 0.21 },      // champ URL de « Add link »
   customText: { x: 0.5, y: 0.35 },    // « Customize sticker text »
