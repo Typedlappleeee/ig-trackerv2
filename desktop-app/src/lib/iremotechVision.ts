@@ -345,8 +345,8 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   hooks?.log?.('🎞️ Sélection du dernier média…')
   await tapFrac(A.firstThumb.x, A.firstThumb.y)
   await sleep(3500) // laisse le média se charger (le « Done » apparaît ensuite)
-  // 5. Done (haut-droite) — patient ; si absent → on skip ce container.
-  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0, 0.16], 'Done', 6)) return false
+  // 5. Done (haut-droite) — si absent, on saute juste l'étape et on continue (des fois il n'y en a pas).
+  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0, 0.16], 'Done', 6)) hooks?.log?.('   (pas de Done → on continue)')
   await sleep(2600)
   // 6. Icône sticker (côté droit) → ouvre le tiroir des stickers.
   hooks?.log?.('🔖 Ouverture des stickers…')
@@ -378,8 +378,8 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
       await sleep(800)
     }
   }
-  // 11. Done (haut-droite) de « Add link » — patient ; si absent → skip.
-  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.16], 'Done (lien)', 6)) return false
+  // 11. Done (haut-droite) de « Add link » — si absent, on saute l'étape et on continue.
+  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.16], 'Done (lien)', 6)) hooks?.log?.('   (pas de Done lien → on continue)')
   await sleep(2000)
   // 12. Glisser le sticker lien vers le bas-droite (carré rouge).
   hooks?.log?.('✋ Positionnement du sticker lien (bas-droite)…')
