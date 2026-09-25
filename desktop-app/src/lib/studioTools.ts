@@ -19,7 +19,7 @@ export async function resolveSourceBytes(v: SourceRef, file?: File): Promise<Uin
 }
 
 // Enregistre un mp4 de sortie dans la banque (bucket content + content_bank).
-export async function saveOutputToBank(userId: string, orgId: string | null, bytes: Uint8Array, title: string, ext = 'mov', folder: string | null = null): Promise<string | null> {
+export async function saveOutputToBank(userId: string, orgId: string | null, bytes: Uint8Array, title: string, ext = 'mp4', folder: string | null = null): Promise<string | null> {
   const scopeFolder = orgId ? `orgs/${orgId}` : `users/${userId}`
   const id = crypto.randomUUID()
   const storagePath = `videos/${scopeFolder}/${id}.${ext}`
