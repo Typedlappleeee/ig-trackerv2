@@ -310,8 +310,16 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
 const STORY_ANCHORS = {
   galleryThumb: { x: 0.09, y: 0.93 }, // vignette galerie en bas-gauche du story camera
   firstThumb: { x: 0.50, y: 0.40 },   // 1re vidéo de la galerie (dernière uploadée)
-  doneBtn: { x: 0.87, y: 0.12 },      // « Done » haut-droite
+  doneBtn: { x: 0.87, y: 0.12 },      // « Done » haut-droite (après sélection vidéo)
   stickerIcon: { x: 0.85, y: 0.19 },  // icône sticker (GIF/lien) sur le côté droit
+  searchBar: { x: 0.5, y: 0.18 },     // barre de recherche du tiroir stickers
+  urlField: { x: 0.5, y: 0.21 },      // champ URL de « Add link »
+  customText: { x: 0.5, y: 0.35 },    // « Customize sticker text »
+  linkDone: { x: 0.9, y: 0.11 },      // « Done » de « Add link » (haut-droite)
+  stickerFrom: { x: 0.5, y: 0.43 },   // position initiale du sticker lien
+  stickerTo: { x: 0.72, y: 0.80 },    // cible : bas-droite (carré rouge)
+  shareArrow: { x: 0.87, y: 0.93 },   // flèche bleue de partage (bas-droite)
+  shareSheet: { x: 0.5, y: 0.93 },    // bouton « Share » de la feuille de partage (bas, pleine largeur)
 }
 
 export async function postStoryByVision(key: string, deviceId: string, opts: { caption?: string; link?: string; anchors?: typeof STORY_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
@@ -340,14 +348,59 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   // 5. Done (haut-droite) — vision, sinon abandon.
   if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0, 0.16], 'Done')) return false
   await sleep(2600)
-  // 6. Icône sticker (côté droit) → pour ajouter le sticker lien.
+  // 6. Icône sticker (côté droit) → ouvre le tiroir des stickers.
   hooks?.log?.('🔖 Ouverture des stickers…')
   await tapFrac(A.stickerIcon.x, A.stickerIcon.y)
   await sleep(1600)
-  // TODO — suite du flow (choisir sticker « Lien », saisir l'URL, positionner, partager)
-  // en attente des prochaines captures. Pour l'instant on s'arrête ici.
-  hooks?.log?.('⏸ Story : base OK (jusqu’aux stickers). Suite du flow à venir.')
-  return false
+  if (!opts.link || !opts.link.trim()) { hooks?.log?.('⚠ Aucun lien fourni pour la story.'); return false }
+
+  // 7. Recherche → « link ».
+  if (!await findTapText(key, deviceId, [/search|rechercher/i], hooks, { label: 'Search', maxY: 0.3, tries: 3 })) {
+    await tapFrac(A.searchBar.x, A.searchBar.y) // repli : tap la barre de recherche
+  }
+  await sleep(1000)
+  await sendAction(key, deviceId, { type: 'text', text: 'link' })
+  await sleep(1400)
+  // 8. Taper le sticker « Link » (dans la section Stickers, en haut) — détection visuelle robuste.
+  if (!await findTapText(key, deviceId, [/^link$/i], hooks, { label: 'sticker Link', minY: 0.12, maxY: 0.36, tries: 5 })) return false
+  await sleep(1600)
+  // 9. Saisir l'URL.
+  hooks?.log?.('🔗 Saisie de l’URL…')
+  await tapFrac(A.urlField.x, A.urlField.y)
+  await sleep(900)
+  await sendAction(key, deviceId, { type: 'text', text: opts.link.trim() })
+  await sleep(900)
+  // 10. Texte du sticker (facultatif) via « Customize sticker text ».
+  if (opts.caption && opts.caption.trim()) {
+    if (await findTapText(key, deviceId, [/customize|sticker text|texte/i], hooks, { label: 'Customize sticker text', tries: 3 })) {
+      await sleep(1000)
+      await sendAction(key, deviceId, { type: 'text', text: opts.caption.trim() })
+      await sleep(800)
+    }
+  }
+  // 11. Done (haut-droite) de « Add link ».
+  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.16], 'Done (lien)')) return false
+  await sleep(2000)
+  // 12. Glisser le sticker lien vers le bas-droite (carré rouge).
+  hooks?.log?.('✋ Positionnement du sticker lien (bas-droite)…')
+  await sendAction(key, deviceId, { type: 'drag', x1: Math.round(A.stickerFrom.x * W), y1: Math.round(A.stickerFrom.y * H), x2: Math.round(A.stickerTo.x * W), y2: Math.round(A.stickerTo.y * H), duration_ms: 1400 })
+  await sleep(1500)
+  // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
+  const shot2 = await snapshot(key, deviceId)
+  let arrowTapped = false
+  if (shot2) {
+    const blue = await findBlueButton(shot2, 0.85, 1)
+    if (blue) { hooks?.log?.(`🔵 flèche de partage → tap (${blue.cx}, ${blue.cy})`); await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: blue.cy }); arrowTapped = true }
+  }
+  if (!arrowTapped) { hooks?.log?.('   flèche bleue non lue → position connue'); await tapFrac(A.shareArrow.x, A.shareArrow.y) }
+  await sleep(2200)
+  // 14. Bouton « Share » de la feuille (bas, bleu, pleine largeur).
+  if (!await tapButton(key, deviceId, [/^share$|partager/i], A.shareSheet, W, H, hooks, [0.80, 1], 'Share (feuille)')) return false
+  hooks?.log?.('📤 Story partagée.')
+  await sleep(4000)
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1200)
+  return true
 }
 
 // Ferme Instagram via le multitâche : accueil → ouvre l'app switcher → REPÈRE la carte

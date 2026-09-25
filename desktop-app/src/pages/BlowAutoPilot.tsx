@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, airplaneReset } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset } from '@/lib/iremotechVision'
 import { loadDevContainers, addDevContainer, removeDevContainer } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -70,6 +70,8 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
   const [videoPool, setVideoPool] = useState<VidRef[]>([])
   const [captionPool, setCaptionPool] = useState('')
   const [picker, setPicker] = useState(false)
+  const [mode, setMode] = useState<'reel' | 'story'>('reel')  // type d'automatisation
+  const [storyLink, setStoryLink] = useState('')               // lien CTA (mode story)
 
   const [airplaneOn, setAirplaneOn] = useState(true)
   const [uniqueUse, setUniqueUse] = useState(false)
@@ -132,6 +134,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
     if (!irt.key || running) return
     if (totalJobs === 0) { setLogs(['⚠ Sélectionne au moins un container.']); return }
     if (videoPool.length === 0) { setLogs(['⚠ Ajoute au moins une vidéo au pool.']); return }
+    if (mode === 'story' && !storyLink.trim()) { setLogs(['⚠ Renseigne le lien CTA (mode Story).']); return }
     setRunning(true); setLogs([])
     const key = irt.key
     const push = (m: string) => setLogs(l => [...l.slice(-600), m])
@@ -170,7 +173,9 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
         await uploadMedia(key, p.dev, url, (job.vid.title || 'video') + '.mp4')
         push(`${tag} ⏳ 10 s (indexation)…`)
         await sleep(10000)
-        const posted = await postReelByVision(key, p.dev, { caption: job.caption }, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
+        const posted = mode === 'story'
+          ? await postStoryByVision(key, p.dev, { link: storyLink.trim(), caption: job.caption }, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
+          : await postReelByVision(key, p.dev, { caption: job.caption }, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
         R.tick(posted)
       }
@@ -265,8 +270,22 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
 
       {/* 2 · Pool de contenu */}
       <div style={card}>
-        <div style={{ fontSize: 13.5, fontWeight: 800, color: INK, marginBottom: 3 }}>2 · Pool de vidéos & légendes</div>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: INK, marginBottom: 3 }}>2 · Type, pool de vidéos & textes</div>
         <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED }}>Chaque container reçoit une vidéo tirée <b>au hasard</b> de ce pool.</p>
+
+        {/* Type d'automatisation */}
+        <div style={{ display: 'flex', gap: 6, padding: 4, borderRadius: 11, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(216,180,254,0.14)', width: 'fit-content', marginBottom: 12 }}>
+          {([['reel', 'Reel'], ['story', 'Story + lien']] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setMode(k)} style={{ height: 30, padding: '0 16px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 800, background: mode === k ? GOLD : 'transparent', color: mode === k ? '#1a1206' : MUTED }}>{l}</button>
+          ))}
+        </div>
+
+        {mode === 'story' && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, margin: '0 0 6px' }}>Lien CTA (sticker de la story)</div>
+            <input value={storyLink} onChange={e => setStoryLink(e.target.value)} placeholder="https://mon-lien.com" style={{ ...inp, width: '100%', height: 38 }} />
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
           <button style={gold} onClick={() => setPicker(true)}>+ Ajouter des vidéos</button>
           <span style={{ fontSize: 12, color: MUTED }}>{videoPool.length} vidéo(s) dans le pool</span>
