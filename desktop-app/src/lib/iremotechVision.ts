@@ -333,7 +333,7 @@ const STORY_ANCHORS = {
   searchBar: { x: 0.5, y: 0.18 },     // barre de recherche du tiroir stickers
   urlField: { x: 0.5, y: 0.21 },      // champ URL de « Add link »
   customText: { x: 0.5, y: 0.35 },    // « Customize sticker text »
-  linkDone: { x: 0.83, y: 0.115 },     // « Done » de « Add link » (haut-droite)
+  linkDone: { x: 0.83, y: 0.145 },     // « Done » de « Add link » (haut-droite)
   stickerFrom: { x: 0.5, y: 0.43 },   // position initiale du sticker lien
   stickerTo: { x: 0.72, y: 0.68 },    // cible : bas-droite, mais AU-DESSUS de la zone légende/boutons
   shareArrow: { x: 0.87, y: 0.93 },   // flèche bleue de partage (bas-droite)
