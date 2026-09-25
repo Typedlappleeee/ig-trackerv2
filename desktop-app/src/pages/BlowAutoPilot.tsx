@@ -14,7 +14,7 @@ import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, postReelByVision, airplaneReset } from '@/lib/iremotechVision'
 import { loadDevContainers, addDevContainer, removeDevContainer } from '@/lib/irtContainers'
-import { startRun } from '@/lib/runStore'
+import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { themeFor } from '@/lib/theme'
 
@@ -76,6 +76,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
   const [parallel, setParallel] = useState(false)
 
   const [running, setRunning] = useState(false)
+  const [runId, setRunId] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
 
   const load = useCallback(() => {
@@ -95,7 +96,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
 
   const budget = usage?.actions ?? { remaining: usage?.remaining, budget: usage?.budget }
 
-  const togglePhone = (id: string) => setSel(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else { n.add(id); setSelConts(sc => sc[id] ? sc : { ...sc, [id]: new Set(conts[id] ?? []) }) } return n })
+  const togglePhone = (id: string) => setSel(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else { n.add(id); setSelConts(sc => sc[id] ? sc : { ...sc, [id]: new Set() }) } return n })
   const toggleCont = (dev: string, name: string) => setSelConts(sc => { const cur = new Set(sc[dev] ?? []); if (cur.has(name)) cur.delete(name); else cur.add(name); return { ...sc, [dev]: cur } })
   const addC = (dev: string) => {
     const name = (newC[dev] ?? '').trim(); if (!name) return
@@ -152,6 +153,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
 
     push(`▶ Pilote Auto : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s) · pool ${videoPool.length} vidéo(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
     const R = startRun('farm', `Pilote Auto · ${byPhone.length} tel × ${totalJobs}`, totalJobs)
+    setRunId(R.id)
 
     const runPhone = async (p: typeof byPhone[number]) => {
       const tag = `[${p.name}]`
@@ -179,7 +181,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
 
     R.finish()
     push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé — toutes les publications traitées.')
-    setRunning(false)
+    setRunning(false); setRunId(null)
   }
 
   if (!irt.key) {
@@ -284,7 +286,8 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
       <div style={card}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12.5, color: MUTED }}>{totalJobs} publication(s) · {videoPool.length} vidéo(s) · {captions.length} légende(s)</span>
-          <button style={{ ...gold, height: 44, padding: '0 22px', marginLeft: 'auto', fontSize: 14, opacity: totalJobs && videoPool.length && !running ? 1 : 0.5 }} disabled={!totalJobs || !videoPool.length || running} onClick={run}>
+          {running && runId && <button style={{ ...btn, marginLeft: 'auto', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
+          <button style={{ ...gold, height: 44, padding: '0 22px', marginLeft: running ? 0 : 'auto', fontSize: 14, opacity: totalJobs && videoPool.length && !running ? 1 : 0.5 }} disabled={!totalJobs || !videoPool.length || running} onClick={run}>
             {running ? 'En cours…' : `Lancer ${totalJobs} publication(s)`}
           </button>
         </div>
