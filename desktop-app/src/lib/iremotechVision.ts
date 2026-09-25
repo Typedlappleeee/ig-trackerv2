@@ -63,6 +63,23 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
 // Brique réutilisable : cherche à l'écran un bouton dont le TEXTE matche l'un des
 // motifs (ex. /reel/i, /next|suivant/i, /share|partager/i) et tape dessus.
 // Réessaie plusieurs fois (l'écran met parfois du temps à charger). true si tapé.
+// Vrai si un texte matchant est présent à l'écran (SANS taper) — pour vérifier qu'on
+// est sur le bon écran avant d'agir.
+async function hasText(key: string, deviceId: string, patterns: RegExp[], hooks?: VisionHooks, opts?: { cropY?: [number, number]; tries?: number }): Promise<boolean> {
+  const tries = opts?.tries ?? 3
+  for (let i = 0; i < tries; i++) {
+    if (hooks?.shouldStop?.()) return false
+    const shot = await snapshot(key, deviceId)
+    if (shot) {
+      const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'], cropY: opts?.cropY })
+      const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'], cropY: opts?.cropY })
+      if ([...wa, ...wb].some(o => patterns.some(p => p.test(o.text)))) return true
+    }
+    await sleep(700)
+  }
+  return false
+}
+
 export async function findTapText(
   key: string, deviceId: string, patterns: RegExp[], hooks?: VisionHooks,
   opts?: { tries?: number; label?: string; minY?: number; maxY?: number; cropY?: [number, number] },
@@ -369,27 +386,31 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
     await tapFrac(0.45, 0.235)
   }
   await sleep(1600)
-  // 9. Saisir l'URL.
+  // 8b. VÉRIF : on doit être sur l'écran « Add link ». Sinon (le sticker Link a raté),
+  //     on n'écrit PAS l'URL (sinon elle s'ajoute à la recherche « link » → « linktest… »).
+  if (!await hasText(key, deviceId, [/add link|^url$/i], hooks, { cropY: [0, 0.3], tries: 4 })) {
+    hooks?.log?.('❌ écran « Add link » non atteint → on abandonne le container')
+    return false
+  }
+  // 9. Saisir l'URL — le champ URL est déjà focus à l'ouverture, on tape directement.
   hooks?.log?.('🔗 Saisie de l’URL…')
-  await tapFrac(A.urlField.x, A.urlField.y)
-  await sleep(900)
   await sendAction(key, deviceId, { type: 'text', text: opts.link.trim() })
   await sleep(900)
   // 10. Texte du sticker (facultatif) via « Customize sticker text ».
   if (opts.caption && opts.caption.trim()) {
-    if (await findTapText(key, deviceId, [/customize|sticker text|texte/i], hooks, { label: 'Customize sticker text', tries: 3 })) {
-      await sleep(1000)
+    if (await findTapText(key, deviceId, [/customize|sticker text/i], hooks, { label: 'Customize sticker text', tries: 3 })) {
+      await sleep(1200)
       await sendAction(key, deviceId, { type: 'text', text: opts.caption.trim() })
       await sleep(800)
     }
   }
   // 11. Done (haut-droite) de « Add link » — si absent, on saute l'étape et on continue.
   if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.16], 'Done (lien)', 6)) hooks?.log?.('   (pas de Done lien → on continue)')
-  await sleep(2000)
-  // 12. Glisser le sticker lien vers le bas-droite (carré rouge).
+  await sleep(2200)
+  // 12. Glisser le sticker lien vers le bas-droite (carré rouge) — drag LENT = reste appuyé.
   hooks?.log?.('✋ Positionnement du sticker lien (bas-droite)…')
-  await sendAction(key, deviceId, { type: 'drag', x1: Math.round(A.stickerFrom.x * W), y1: Math.round(A.stickerFrom.y * H), x2: Math.round(A.stickerTo.x * W), y2: Math.round(A.stickerTo.y * H), duration_ms: 1400 })
-  await sleep(1500)
+  await sendAction(key, deviceId, { type: 'drag', x1: Math.round(A.stickerFrom.x * W), y1: Math.round(A.stickerFrom.y * H), x2: Math.round(A.stickerTo.x * W), y2: Math.round(A.stickerTo.y * H), duration_ms: 2800 })
+  await sleep(1600)
   // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
   const shot2 = await snapshot(key, deviceId)
   let arrowTapped = false
