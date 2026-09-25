@@ -386,9 +386,9 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
     await tapFrac(0.45, 0.235)
   }
   await sleep(1600)
-  // 8b. VÉRIF : on doit être sur l'écran « Add link ». Sinon (le sticker Link a raté),
-  //     on n'écrit PAS l'URL (sinon elle s'ajoute à la recherche « link » → « linktest… »).
-  if (!await hasText(key, deviceId, [/add link|^url$/i], hooks, { cropY: [0, 0.3], tries: 4 })) {
+  // 8b. VÉRIF : on doit être sur l'écran « Add link » (marqueurs mono-mot : URL / Customize /
+  //     Cancel). Sinon (le sticker Link a raté) on n'écrit PAS l'URL.
+  if (!await hasText(key, deviceId, [/^url$/i, /customize/i, /^cancel$/i], hooks, { cropY: [0, 0.4], tries: 4 })) {
     hooks?.log?.('❌ écran « Add link » non atteint → on abandonne le container')
     return false
   }
