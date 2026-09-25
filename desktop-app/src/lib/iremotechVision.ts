@@ -431,12 +431,11 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
     if (!found) await sleep(700)
   }
   if (!found) hooks?.log?.('   sticker non repéré → départ au centre')
-  // Glissement : appui long pour « ramasser » le sticker, puis drag lent vers bas-droite.
-  hooks?.log?.('✋ Glissement en bas-droite (appui long + drag)…')
+  // Glissement : UN SEUL geste continu (swipe = doigt qui reste appuyé du sticker jusqu'à
+  // la cible), comme un déplacement manuel. Durée modérée pour rester bien appuyé.
+  hooks?.log?.('✋ Glissement du sticker en bas-droite (appui continu)…')
   const toX = Math.round(A.stickerTo.x * W), toY = Math.round(A.stickerTo.y * H)
-  await sendAction(key, deviceId, { type: 'long_press', x: fromX, y: fromY, hold_ms: 700 })
-  await sleep(250)
-  await sendAction(key, deviceId, { type: 'drag', x1: fromX, y1: fromY, x2: toX, y2: toY, duration_ms: 3500 })
+  await sendAction(key, deviceId, { type: 'swipe', x1: fromX, y1: fromY, x2: toX, y2: toY, duration_ms: 1400 })
   await sleep(1800)
   // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
   const shot2 = await snapshot(key, deviceId)
