@@ -188,7 +188,9 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
     return (
       <div>
         <H title="Pilote Auto" />
-        <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>iRemoTech pas encore branché. Colle ta clé API dans <b style={{ color: GOLD }}>Phone Farm → ⚙</b>.</div>
+        {irt.loading
+          ? <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>Chargement…</div>
+          : <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>iRemoTech pas encore branché. Colle ta clé API dans <b style={{ color: GOLD }}>Phone Farm → ⚙</b>.</div>}
       </div>
     )
   }
