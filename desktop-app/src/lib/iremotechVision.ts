@@ -207,11 +207,11 @@ const REEL_ANCHORS = {
 // (ancre). Ne bloque jamais tant que la position est fiable (iPhones identiques).
 async function tapButton(
   key: string, deviceId: string, patterns: RegExp[], anchor: { x: number; y: number },
-  W: number, H: number, hooks?: VisionHooks, cropY?: [number, number], label?: string,
+  W: number, H: number, hooks?: VisionHooks, cropY?: [number, number], label?: string, tries = 3,
 ): Promise<boolean> {
   const lab = label ?? patterns[0].source
-  // 1. Vision : lire le texte du bouton.
-  if (await findTapText(key, deviceId, patterns, hooks, { label: lab, tries: 3, cropY })) return true
+  // 1. Vision : lire le texte du bouton (plusieurs essais → tolère un affichage lent).
+  if (await findTapText(key, deviceId, patterns, hooks, { label: lab, tries, cropY })) return true
   // 2. Couleur : le bouton d'action Instagram est BLEU (Next/Share) — les outils sont gris.
   const shot = await snapshot(key, deviceId)
   if (shot) {
@@ -341,12 +341,12 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   hooks?.log?.('🖼️ Ouverture de la galerie…')
   await tapFrac(A.galleryThumb.x, A.galleryThumb.y)
   await sleep(1800)
-  // 4. Sélectionner la 1re vidéo (dernière uploadée).
-  hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
+  // 4. Sélectionner la 1re vidéo/photo (dernière uploadée).
+  hooks?.log?.('🎞️ Sélection du dernier média…')
   await tapFrac(A.firstThumb.x, A.firstThumb.y)
-  await sleep(2600)
-  // 5. Done (haut-droite) — vision, sinon abandon.
-  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0, 0.16], 'Done')) return false
+  await sleep(3500) // laisse le média se charger (le « Done » apparaît ensuite)
+  // 5. Done (haut-droite) — patient ; si absent → on skip ce container.
+  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0, 0.16], 'Done', 6)) return false
   await sleep(2600)
   // 6. Icône sticker (côté droit) → ouvre le tiroir des stickers.
   hooks?.log?.('🔖 Ouverture des stickers…')
@@ -378,8 +378,8 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
       await sleep(800)
     }
   }
-  // 11. Done (haut-droite) de « Add link ».
-  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.16], 'Done (lien)')) return false
+  // 11. Done (haut-droite) de « Add link » — patient ; si absent → skip.
+  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.16], 'Done (lien)', 6)) return false
   await sleep(2000)
   // 12. Glisser le sticker lien vers le bas-droite (carré rouge).
   hooks?.log?.('✋ Positionnement du sticker lien (bas-droite)…')
