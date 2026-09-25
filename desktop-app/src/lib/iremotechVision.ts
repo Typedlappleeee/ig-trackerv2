@@ -229,21 +229,20 @@ async function tapButton(
   return false
 }
 
-// Passe en mode REEL sur le bandeau du bas (POST STORY INSTANTS REEL LIVE). Si REEL
-// n'est pas visible, scrolle le bandeau HORIZONTALEMENT (vers la gauche) jusqu'à le
-// trouver, puis tape dessus — comme le scroll des containers, mais horizontal.
-async function selectReelMode(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+// Sélectionne un mode dans le bandeau du bas (POST STORY INSTANTS REEL LIVE). Si le
+// mode voulu n'est pas visible, scrolle le bandeau HORIZONTALEMENT jusqu'à le trouver.
+async function selectMode(key: string, deviceId: string, patterns: RegExp[], label: string, hooks?: VisionHooks): Promise<boolean> {
   for (let i = 0; i < 6; i++) {
     if (hooks?.shouldStop?.()) return false
-    if (await findTapText(key, deviceId, [/reels?/i], hooks, { label: 'REEL', minY: 0.72, tries: 2, cropY: [0.78, 1] })) return true
+    if (await findTapText(key, deviceId, patterns, hooks, { label, minY: 0.72, tries: 2, cropY: [0.78, 1] })) return true
     const shot = await snapshot(key, deviceId)
     const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
     if (!W || !H) { await sleep(600); continue }
-    hooks?.log?.('↔ scroll du bandeau des modes pour trouver REEL…')
+    hooks?.log?.(`↔ scroll du bandeau des modes pour trouver ${label}…`)
     await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.87), x2: Math.round(W * 0.25), y2: Math.round(H * 0.87), duration_ms: 350 })
     await sleep(900)
   }
-  hooks?.log?.('❌ mode REEL introuvable')
+  hooks?.log?.(`❌ mode ${label} introuvable`)
   return false
 }
 
@@ -261,7 +260,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   await tapFrac(A.createPlus.x, A.createPlus.y)
   await sleep(2200)
   // 2. Passer en mode REEL (bandeau du bas POST STORY INSTANTS REEL LIVE) — scroll si besoin.
-  if (!await selectReelMode(key, deviceId, hooks)) return false
+  if (!await selectMode(key, deviceId, [/reels?/i], 'REEL', hooks)) return false
   await sleep(1600)
   // 3. Sélectionner la 1re vignette (= dernière vidéo uploadée)
   hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
@@ -302,6 +301,53 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1200)
   return true
+}
+
+// ── Publication d'une STORY pilotée à la VISION (base — flow lien à compléter) ──
+// Chemin (Instagram EN) d'après captures : (+ créateur) → mode STORY → galerie
+// (vignette bas-gauche) → 1re vidéo (dernière uploadée) → Done (haut-droite) →
+// icône sticker (droite) → [sticker lien + partage — à venir].
+const STORY_ANCHORS = {
+  galleryThumb: { x: 0.09, y: 0.93 }, // vignette galerie en bas-gauche du story camera
+  firstThumb: { x: 0.50, y: 0.40 },   // 1re vidéo de la galerie (dernière uploadée)
+  doneBtn: { x: 0.87, y: 0.12 },      // « Done » haut-droite
+  stickerIcon: { x: 0.85, y: 0.19 },  // icône sticker (GIF/lien) sur le côté droit
+}
+
+export async function postStoryByVision(key: string, deviceId: string, opts: { caption?: string; link?: string; anchors?: typeof STORY_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
+  const A = opts.anchors ?? STORY_ANCHORS
+  const shot0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
+
+  await dismissPopups(key, deviceId, hooks)
+  // 1. Ouvrir le créateur (+ haut-gauche) — même point d'entrée que le Reel.
+  hooks?.log?.('➕ Ouverture du créateur (+)…')
+  await tapFrac(REEL_ANCHORS.createPlus.x, REEL_ANCHORS.createPlus.y)
+  await sleep(2200)
+  // 2. Mode STORY (bandeau du bas).
+  if (!await selectMode(key, deviceId, [/story|stories/i], 'STORY', hooks)) return false
+  await sleep(1600)
+  // 3. Ouvrir la galerie (vignette bas-gauche du story camera).
+  hooks?.log?.('🖼️ Ouverture de la galerie…')
+  await tapFrac(A.galleryThumb.x, A.galleryThumb.y)
+  await sleep(1800)
+  // 4. Sélectionner la 1re vidéo (dernière uploadée).
+  hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
+  await tapFrac(A.firstThumb.x, A.firstThumb.y)
+  await sleep(2600)
+  // 5. Done (haut-droite) — vision, sinon abandon.
+  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0, 0.16], 'Done')) return false
+  await sleep(2600)
+  // 6. Icône sticker (côté droit) → pour ajouter le sticker lien.
+  hooks?.log?.('🔖 Ouverture des stickers…')
+  await tapFrac(A.stickerIcon.x, A.stickerIcon.y)
+  await sleep(1600)
+  // TODO — suite du flow (choisir sticker « Lien », saisir l'URL, positionner, partager)
+  // en attente des prochaines captures. Pour l'instant on s'arrête ici.
+  hooks?.log?.('⏸ Story : base OK (jusqu’aux stickers). Suite du flow à venir.')
+  return false
 }
 
 // Ferme Instagram via le multitâche : accueil → ouvre l'app switcher → REPÈRE la carte
