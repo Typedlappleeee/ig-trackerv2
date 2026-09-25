@@ -35,9 +35,9 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
   const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('⚠ écran illisible → mode avion sauté'); return }
   const tapIcon = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(AIRPLANE_ICON.x * W), y: Math.round(AIRPLANE_ICON.y * H) })
-  // 1. Ouvrir le Centre de contrôle (swipe depuis le coin haut-droit vers le bas).
-  hooks?.log?.('✈️ Ouverture du Centre de contrôle…')
-  await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.94), y1: Math.round(H * 0.008), x2: Math.round(W * 0.94), y2: Math.round(H * 0.55), duration_ms: 550 })
+  // 1. Ouvrir le Centre de contrôle (swipe du BAS vers le HAUT).
+  hooks?.log?.('✈️ Ouverture du Centre de contrôle (swipe bas→haut)…')
+  await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H * 0.995), x2: Math.round(W * 0.5), y2: Math.round(H * 0.4), duration_ms: 550 })
   await sleep(1600)
   // 2. Activer l'avion.
   hooks?.log?.('✈️ Mode avion ON…')
@@ -239,8 +239,8 @@ async function selectReelMode(key: string, deviceId: string, hooks?: VisionHooks
     const shot = await snapshot(key, deviceId)
     const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
     if (!W || !H) { await sleep(600); continue }
-    hooks?.log?.('↑ scroll du bas vers le haut pour trouver REEL…')
-    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H * 0.9), x2: Math.round(W * 0.5), y2: Math.round(H * 0.45), duration_ms: 350 })
+    hooks?.log?.('↔ scroll du bandeau des modes pour trouver REEL…')
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.87), x2: Math.round(W * 0.25), y2: Math.round(H * 0.87), duration_ms: 350 })
     await sleep(900)
   }
   hooks?.log?.('❌ mode REEL introuvable')
