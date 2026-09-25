@@ -405,8 +405,12 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
       await sleep(800)
     }
   }
-  // 11. Done (haut-droite) de « Add link » — si absent, on saute l'étape et on continue.
-  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.16], 'Done (lien)', 6)) hooks?.log?.('   (pas de Done lien → on continue)')
+  // 11. Done (haut-droite) de « Add link ». On EST sûr d'être sur cet écran (vérifié en 8b),
+  //     donc si l'OCR/couleur échoue on tape sa position connue (haut-droite).
+  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.20], 'Done (lien)', 6)) {
+    hooks?.log?.('   « Done » non lu → position connue (haut-droite)')
+    await tapFrac(A.linkDone.x, A.linkDone.y)
+  }
   await sleep(2200)
   // 12. Repérer le sticker lien à l'écran (par son texte) et le glisser PILE dessus →
   //     bas-droite. Le sticker n'est pas au centre → on le localise avant de l'attraper.
