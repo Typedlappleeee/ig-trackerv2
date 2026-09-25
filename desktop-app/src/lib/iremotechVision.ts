@@ -222,11 +222,11 @@ async function tapButton(
       return true
     }
   }
-  // 3. Dernier recours : position connue.
-  const x = Math.round(anchor.x * W), y = Math.round(anchor.y * H)
-  hooks?.log?.(`↪ « ${lab} » non détecté → tap position connue (${x}, ${y})`)
-  await sendAction(key, deviceId, { type: 'tap', x, y })
-  return true
+  // 3. Non détecté : on N'APPUIE PAS à l'aveugle (risque de taper le mauvais bouton).
+  //    On abandonne → l'appelant passera au container suivant en recommençant le cycle.
+  void anchor; void W; void H
+  hooks?.log?.(`❌ « ${lab} » non détecté → on abandonne ce container`)
+  return false
 }
 
 // Passe en mode REEL sur le bandeau du bas (POST STORY INSTANTS REEL LIVE). Si REEL
@@ -267,12 +267,13 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
   await tapFrac(A.firstThumb.x, A.firstThumb.y)
   await sleep(1800)
-  // 4. Next (après sélection) : vision → bouton bleu → position.
-  await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (après sélection)')
+  // 4. Next (après sélection) : vision → bouton bleu. Si non détecté → on abandonne ce
+  //    container (l'appelant passera au suivant en recommençant le cycle).
+  if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (après sélection)')) return false
   hooks?.log?.('   ⏳ chargement de la vidéo dans l’éditeur…')
-  await sleep(5000) // laisse l'éditeur charger la vidéo (sinon aperçu gris → Next mal placé)
-  // 5. Next (écran d'édition) : vision → bouton bleu → position.
-  await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (édition)')
+  await sleep(5000) // laisse l'éditeur charger la vidéo (sinon aperçu gris)
+  // 5. Next (écran d'édition).
+  if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (édition)')) return false
   await sleep(3000)
   // 6. Légende : taper « Add a caption » ouvre un éditeur plein écran → écrire → valider « OK » (haut-droite).
   if (opts.caption && opts.caption.trim()) {
@@ -286,13 +287,14 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     await sleep(1400)
   }
   // 7. Publier : « Share » direct, sinon un « Next » intermédiaire puis « Share ».
+  //    Si Share n'est jamais détecté → on abandonne (container suivant).
   if (await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 3, cropY: [0.85, 1] })) {
     hooks?.log?.('📤 Reel partagé.')
   } else {
     hooks?.log?.('   pas de Share direct → Next intermédiaire puis Share')
-    await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.85, 1], 'Next (avant Share)')
+    if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.85, 1], 'Next (avant Share)')) return false
     await sleep(2600)
-    await tapButton(key, deviceId, [/share|partager/i], A.shareBtn, W, H, hooks, [0.85, 1], 'Share')
+    if (!await tapButton(key, deviceId, [/share|partager/i], A.shareBtn, W, H, hooks, [0.85, 1], 'Share')) return false
     hooks?.log?.('📤 Reel partagé.')
   }
   await sleep(4000) // laisse le partage se finaliser
