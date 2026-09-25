@@ -239,8 +239,8 @@ async function selectReelMode(key: string, deviceId: string, hooks?: VisionHooks
     const shot = await snapshot(key, deviceId)
     const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
     if (!W || !H) { await sleep(600); continue }
-    hooks?.log?.('↔ scroll du bandeau des modes pour trouver REEL…')
-    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.87), x2: Math.round(W * 0.25), y2: Math.round(H * 0.87), duration_ms: 350 })
+    hooks?.log?.('↑ scroll du bas vers le haut pour trouver REEL…')
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H * 0.9), x2: Math.round(W * 0.5), y2: Math.round(H * 0.45), duration_ms: 350 })
     await sleep(900)
   }
   hooks?.log?.('❌ mode REEL introuvable')
