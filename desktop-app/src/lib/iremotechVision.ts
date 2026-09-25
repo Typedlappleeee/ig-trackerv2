@@ -361,9 +361,13 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   await sleep(1000)
   await sendAction(key, deviceId, { type: 'text', text: 'link' })
   await sleep(1400)
-  // 8. Taper le sticker « Link » (section Stickers, en haut) — recadré sur cette zone
-  //    (gros zoom, sans le bruit GIPHY) → détection robuste.
-  if (!await findTapText(key, deviceId, [/link/i], hooks, { label: 'sticker Link', cropY: [0.13, 0.37], tries: 6 })) return false
+  // 8. Sticker « Link » : OCR recadré serré sur la ligne « Stickers » (exclut GIPHY),
+  //    sinon POSITION connue (après recherche « link » le bouton est toujours au même
+  //    endroit) → ne bloque plus.
+  if (!await findTapText(key, deviceId, [/^link$/i], hooks, { label: 'sticker Link', cropY: [0.16, 0.30], tries: 4 })) {
+    hooks?.log?.('   « Link » non lu → position connue (centre de la ligne Stickers)')
+    await tapFrac(0.45, 0.235)
+  }
   await sleep(1600)
   // 9. Saisir l'URL.
   hooks?.log?.('🔗 Saisie de l’URL…')
