@@ -333,7 +333,7 @@ const STORY_ANCHORS = {
   searchBar: { x: 0.5, y: 0.18 },     // barre de recherche du tiroir stickers
   urlField: { x: 0.5, y: 0.21 },      // champ URL de « Add link »
   customText: { x: 0.5, y: 0.35 },    // « Customize sticker text »
-  linkDone: { x: 0.9, y: 0.11 },      // « Done » de « Add link » (haut-droite)
+  linkDone: { x: 0.83, y: 0.115 },     // « Done » de « Add link » (haut-droite)
   stickerFrom: { x: 0.5, y: 0.43 },   // position initiale du sticker lien
   stickerTo: { x: 0.72, y: 0.68 },    // cible : bas-droite, mais AU-DESSUS de la zone légende/boutons
   shareArrow: { x: 0.87, y: 0.93 },   // flèche bleue de partage (bas-droite)
@@ -405,12 +405,10 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
       await sleep(800)
     }
   }
-  // 11. Done (haut-droite) de « Add link ». Détection recadrée SERRÉ sur la barre de titre
-  //     (Cancel / Add link / Done) → le petit « Done » bleu devient net. Position connue en secours.
-  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0.06, 0.17], 'Done (lien)', 8)) {
-    hooks?.log?.('   « Done » non lu → position connue (haut-droite)')
-    await tapFrac(A.linkDone.x, A.linkDone.y)
-  }
+  // 11. Done de « Add link » : on a DÉJÀ vérifié l'écran (8b) et le bouton est toujours
+  //     en haut-droite → on tape sa position directement (fiable, sans OCR capricieux).
+  hooks?.log?.('✅ Validation « Done » (haut-droite)…')
+  await tapFrac(A.linkDone.x, A.linkDone.y)
   await sleep(2200)
   // 12. Repérer le sticker lien à l'écran (par son texte) et le glisser PILE dessus →
   //     bas-droite. Le sticker n'est pas au centre → on le localise avant de l'attraper.
