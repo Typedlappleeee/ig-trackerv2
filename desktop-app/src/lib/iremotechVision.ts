@@ -361,8 +361,9 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   await sleep(1000)
   await sendAction(key, deviceId, { type: 'text', text: 'link' })
   await sleep(1400)
-  // 8. Taper le sticker « Link » (dans la section Stickers, en haut) — détection visuelle robuste.
-  if (!await findTapText(key, deviceId, [/^link$/i], hooks, { label: 'sticker Link', minY: 0.12, maxY: 0.36, tries: 5 })) return false
+  // 8. Taper le sticker « Link » (section Stickers, en haut) — recadré sur cette zone
+  //    (gros zoom, sans le bruit GIPHY) → détection robuste.
+  if (!await findTapText(key, deviceId, [/link/i], hooks, { label: 'sticker Link', cropY: [0.13, 0.37], tries: 6 })) return false
   await sleep(1600)
   // 9. Saisir l'URL.
   hooks?.log?.('🔗 Saisie de l’URL…')
