@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset } from '@/lib/iremotechVision'
-import { loadDevContainers, addDevContainer, removeDevContainer } from '@/lib/irtContainers'
+import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { themeFor } from '@/lib/theme'
@@ -71,7 +71,10 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
   const [captionPool, setCaptionPool] = useState('')
   const [picker, setPicker] = useState(false)
   const [mode, setMode] = useState<'reel' | 'story'>('reel')  // type d'automatisation
-  const [storyLink, setStoryLink] = useState('')               // lien CTA (mode story)
+  const [storyLink, setStoryLink] = useState('')               // lien CTA par défaut (mode story)
+  const [storyLinks, setStoryLinks] = useState<Record<string, string>>({}) // lien PAR container : clé `${dev}::${c}`
+  const linkKey = (dev: string, c: string) => `${dev}::${c}`
+  const setLink = (dev: string, c: string, url: string) => { setStoryLinks(m => ({ ...m, [linkKey(dev, c)]: url })); saveStoryLink(dev, c, url) }
 
   const [airplaneOn, setAirplaneOn] = useState(true)
   const [uniqueUse, setUniqueUse] = useState(false)
@@ -88,8 +91,13 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
       .then(([d, u]) => {
         setDevices(d); setUsage(u)
         const c: Record<string, string[]> = {}
-        for (const dev of d) c[dev.public_id] = loadDevContainers(dev.public_id)
-        setConts(c)
+        const sl: Record<string, string> = {}
+        for (const dev of d) {
+          const list = loadDevContainers(dev.public_id)
+          c[dev.public_id] = list
+          for (const name of list) { const v = loadStoryLink(dev.public_id, name); if (v) sl[`${dev.public_id}::${name}`] = v }
+        }
+        setConts(c); setStoryLinks(sl)
       })
       .catch(e => setErr(e instanceof Error ? e.message : 'Connexion iRemoTech échouée'))
       .finally(() => setLoading(false))
@@ -134,7 +142,10 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
     if (!irt.key || running) return
     if (totalJobs === 0) { setLogs(['⚠ Sélectionne au moins un container.']); return }
     if (videoPool.length === 0) { setLogs(['⚠ Ajoute au moins une vidéo au pool.']); return }
-    if (mode === 'story' && !storyLink.trim()) { setLogs(['⚠ Renseigne le lien CTA (mode Story).']); return }
+    if (mode === 'story') {
+      const missing = [...sel].flatMap(dev => [...(selConts[dev] ?? [])].filter(c => !(storyLinks[linkKey(dev, c)] || storyLink.trim())))
+      if (missing.length) { setLogs([`⚠ ${missing.length} container(s) sans lien CTA — mets un lien par container ou un lien par défaut.`]); return }
+    }
     setRunning(true); setLogs([])
     const key = irt.key
     const push = (m: string) => setLogs(l => [...l.slice(-600), m])
@@ -151,7 +162,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
     const byPhone = [...sel].map(dev => ({
       dev,
       name: devices.find(d => d.public_id === dev)?.name ?? dev,
-      jobs: [...(selConts[dev] ?? [])].map(container => ({ container, vid: pickVid(), caption: pickCap() })),
+      jobs: [...(selConts[dev] ?? [])].map(container => ({ container, vid: pickVid(), caption: pickCap(), link: storyLinks[linkKey(dev, container)] || storyLink.trim() })),
     })).filter(p => p.jobs.length)
 
     push(`▶ Pilote Auto : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s) · pool ${videoPool.length} vidéo(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
@@ -174,7 +185,7 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
         push(`${tag} ⏳ 10 s (indexation)…`)
         await sleep(10000)
         const posted = mode === 'story'
-          ? await postStoryByVision(key, p.dev, { link: storyLink.trim(), caption: job.caption }, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
+          ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
           : await postReelByVision(key, p.dev, { caption: job.caption }, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
         R.tick(posted)
@@ -263,6 +274,18 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
                 <input value={newC[devId] ?? ''} onChange={e => setNewC(v => ({ ...v, [devId]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(devId) }} placeholder="Nom du container (ex. 6, Default…)" style={{ ...inp, flex: 1, height: 40, fontSize: 13.5 }} />
                 <button style={{ ...gold, height: 40, padding: '0 18px' }} onClick={() => addC(devId)}>+ Ajouter</button>
               </div>
+              {/* Lien CTA par container (mode story) */}
+              {mode === 'story' && picked.size > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(233,196,106,0.18)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM }}>Lien du sticker par container</span>
+                  {[...picked].map(c => (
+                    <div key={c} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ minWidth: 54, fontSize: 12.5, fontWeight: 800, color: GOLD }}>{c}</span>
+                      <input value={storyLinks[linkKey(devId, c)] ?? ''} onChange={e => setLink(devId, c, e.target.value)} placeholder={storyLink.trim() ? `défaut : ${storyLink.trim()}` : 'https://…'} style={{ ...inp, flex: 1, height: 34, fontSize: 12 }} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}
@@ -282,8 +305,9 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
 
         {mode === 'story' && (
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, margin: '0 0 6px' }}>Lien CTA (sticker de la story)</div>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, margin: '0 0 6px' }}>Lien CTA par défaut (si un container n'a pas son propre lien)</div>
             <input value={storyLink} onChange={e => setStoryLink(e.target.value)} placeholder="https://mon-lien.com" style={{ ...inp, width: '100%', height: 38 }} />
+            <p style={{ margin: '6px 0 0', fontSize: 11, color: DIM }}>Astuce : mets un lien précis par container dans la section 1 (mémorisé).</p>
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>

@@ -19,3 +19,11 @@ export function removeDevContainer(deviceId: string, name: string): string[] {
   saveDevContainers(deviceId, list)
   return list
 }
+
+// Lien CTA de la story, PAR container (mémorisé, comme les liens par compte GeeLark).
+export function loadStoryLink(deviceId: string, container: string): string {
+  try { return localStorage.getItem(`sf-irt-storylink:${deviceId}:${container}`) ?? '' } catch { return '' }
+}
+export function saveStoryLink(deviceId: string, container: string, url: string): void {
+  try { if (url.trim()) localStorage.setItem(`sf-irt-storylink:${deviceId}:${container}`, url.trim()); else localStorage.removeItem(`sf-irt-storylink:${deviceId}:${container}`) } catch { /* noop */ }
+}
