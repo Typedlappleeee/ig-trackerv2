@@ -206,49 +206,61 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
       {/* 1 · Téléphones & containers */}
       <div style={card}>
         <div style={{ fontSize: 13.5, fontWeight: 800, color: INK, marginBottom: 3 }}>1 · Téléphones & containers</div>
-        <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED }}>Coche les iPhones, puis les containers à publier sur chacun ({totalJobs} sélectionné{totalJobs > 1 ? 's' : ''}).</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 12 }}>
+        <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED }}>Coche les iPhones, puis choisis les containers à publier sur chacun ({totalJobs} sélectionné{totalJobs > 1 ? 's' : ''}).</p>
+
+        {/* Sélection des téléphones (compact) */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {devices.map(d => {
             const on = sel.has(d.public_id)
             const list = conts[d.public_id] ?? []
-            const picked = selConts[d.public_id] ?? new Set()
             return (
-              <div key={d.public_id} style={{ padding: 12, borderRadius: 12, background: on ? 'rgba(233,196,106,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${on ? 'rgba(233,196,106,0.28)' : 'rgba(216,180,254,0.12)'}` }}>
-                <div onClick={() => togglePhone(d.public_id)} style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, flexShrink: 0, background: on ? GOLD : 'transparent', border: on ? 'none' : '1px solid rgba(216,180,254,0.3)', color: '#1a1206', fontSize: 12, fontWeight: 900 }}>{on ? '✓' : ''}</span>
-                  <span style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name ?? d.public_id}</div>
-                    <div style={{ fontSize: 10.5, color: DIM }}>{d.model ?? 'iPhone'} · {list.length} container(s)</div>
-                  </span>
-                </div>
-                {on && (
-                  <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {list.map(c => {
-                        const cp = picked.has(c)
-                        return (
-                          <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', background: cp ? GOLD : 'rgba(255,255,255,0.04)', color: cp ? '#1a1206' : MUTED, border: cp ? 'none' : '1px solid rgba(216,180,254,0.14)' }}>
-                            <span onClick={() => toggleCont(d.public_id, c)}>{c}</span>
-                            <span onClick={() => removeC(d.public_id, c)} title="Retirer" style={{ opacity: 0.6, fontWeight: 900 }}>×</span>
-                          </span>
-                        )
-                      })}
-                      {list.length === 0 && <span style={{ fontSize: 11, color: DIM }}>Aucun container — ajoute-les ↓</span>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input value={newC[d.public_id] ?? ''} onChange={e => setNewC(v => ({ ...v, [d.public_id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(d.public_id) }} placeholder="Nom du container (ex. 6)" style={{ ...inp, flex: 1, height: 30, fontSize: 11.5 }} />
-                      <button style={{ ...btn, height: 30 }} onClick={() => addC(d.public_id)}>+</button>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button style={{ ...btn, height: 26, fontSize: 11, padding: '0 9px' }} onClick={() => setSelConts(sc => ({ ...sc, [d.public_id]: new Set(list) }))}>Tout</button>
-                      <button style={{ ...btn, height: 26, fontSize: 11, padding: '0 9px' }} onClick={() => setSelConts(sc => ({ ...sc, [d.public_id]: new Set() }))}>Aucun</button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <button key={d.public_id} onClick={() => togglePhone(d.public_id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 15px', borderRadius: 11, cursor: 'pointer', background: on ? GOLD : 'rgba(255,255,255,0.03)', color: on ? '#1a1206' : INK, border: on ? 'none' : '1px solid rgba(216,180,254,0.16)', fontSize: 13.5, fontWeight: 700 }}>
+                <span style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: on ? '#1a1206' : 'transparent', color: GOLD, fontSize: 11, fontWeight: 900, border: on ? 'none' : '1px solid rgba(216,180,254,0.3)' }}>{on ? '✓' : ''}</span>
+                {d.name ?? d.public_id}
+                <span style={{ fontSize: 11, opacity: 0.7 }}>· {list.length}c</span>
+              </button>
             )
           })}
         </div>
+
+        {/* Zone containers — spacieuse, une par téléphone sélectionné */}
+        {[...sel].map(devId => {
+          const d = devices.find(x => x.public_id === devId)
+          const list = conts[devId] ?? []
+          const picked = selConts[devId] ?? new Set()
+          return (
+            <div key={devId} style={{ marginTop: 14, padding: 16, borderRadius: 14, background: 'rgba(233,196,106,0.04)', border: '1px solid rgba(233,196,106,0.22)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: GOLD }}>📱 {d?.name ?? devId}</span>
+                <span style={{ fontSize: 12, color: MUTED }}>{picked.size}/{list.length} container(s) coché(s)</span>
+                <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                  <button style={btn} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set(list) }))}>Tout cocher</button>
+                  <button style={btn} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set() }))}>Aucun</button>
+                </span>
+              </div>
+              {list.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginBottom: 12 }}>
+                  {list.map(c => {
+                    const cp = picked.has(c)
+                    return (
+                      <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 8px 0 14px', borderRadius: 11, fontSize: 15, fontWeight: 800, background: cp ? GOLD : 'rgba(255,255,255,0.04)', color: cp ? '#1a1206' : INK, border: cp ? 'none' : '1px solid rgba(216,180,254,0.16)' }}>
+                        <span onClick={() => toggleCont(devId, c)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                          <span style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: cp ? '#1a1206' : 'transparent', color: GOLD, fontSize: 11, fontWeight: 900, border: cp ? 'none' : '1px solid rgba(216,180,254,0.3)' }}>{cp ? '✓' : ''}</span>
+                          {c}
+                        </span>
+                        <span onClick={() => removeC(devId, c)} title="Retirer ce container" style={{ cursor: 'pointer', opacity: 0.55, fontWeight: 900, fontSize: 18, padding: '0 4px' }}>×</span>
+                      </span>
+                    )
+                  })}
+                </div>
+              ) : <p style={{ margin: '0 0 12px', fontSize: 12.5, color: DIM }}>Aucun container pour cet iPhone — ajoute-les ci-dessous.</p>}
+              <div style={{ display: 'flex', gap: 8, maxWidth: 420 }}>
+                <input value={newC[devId] ?? ''} onChange={e => setNewC(v => ({ ...v, [devId]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(devId) }} placeholder="Nom du container (ex. 6, Default…)" style={{ ...inp, flex: 1, height: 40, fontSize: 13.5 }} />
+                <button style={{ ...gold, height: 40, padding: '0 18px' }} onClick={() => addC(devId)}>+ Ajouter</button>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* 2 · Pool de contenu */}
