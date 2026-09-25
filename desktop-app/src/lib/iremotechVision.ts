@@ -314,6 +314,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     hooks?.log?.('📤 Reel partagé.')
   }
   await sleep(4000) // laisse le partage se finaliser
+  await dismissPopups(key, deviceId, hooks) // ferme une éventuelle fenêtre post-partage (pas toujours là)
   hooks?.log?.('🏠 Retour à l’accueil.')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1200)
@@ -424,6 +425,7 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   if (!await tapButton(key, deviceId, [/^share$|partager/i], A.shareSheet, W, H, hooks, [0.80, 1], 'Share (feuille)')) return false
   hooks?.log?.('📤 Story partagée.')
   await sleep(4000)
+  await dismissPopups(key, deviceId, hooks) // ferme une éventuelle fenêtre post-partage
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1200)
   return true

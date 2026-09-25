@@ -200,7 +200,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
         if (R.isCancelled()) { push('⏹ Annulé.'); break }
         const batch = list.slice(b, b + concurrency)
         const batchIds = [...new Set(batch.map(j => j.p.geelark_id).filter((x): x is string => !!x))]
-        await registerPhoneWatch(batchIds, { orgId: currentOrg?.id ?? null, userId: user.id, stopAt: new Date(Date.now() + 30 * 60_000) })
+        await registerPhoneWatch(batchIds, { orgId: currentOrg?.id ?? null, userId: user.id, stopAt: new Date(Date.now() + 10 * 60_000) })
         await Promise.all(batch.map(postOne))
         await unregisterPhoneWatch(batchIds)
       }

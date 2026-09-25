@@ -306,7 +306,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       const batchIds = [...new Set(batch.map(j => j.p.geelark_id).filter((x): x is string => !!x))]
       // Filet anti-coût : si l'onglet se ferme en plein run, le watchdog serveur éteint
       // ces téléphones après stop_at (30 min) — sinon ils restent allumés indéfiniment.
-      await registerPhoneWatch(batchIds, { orgId: currentOrg?.id ?? null, userId: user.id, stopAt: new Date(Date.now() + 30 * 60_000) })
+      await registerPhoneWatch(batchIds, { orgId: currentOrg?.id ?? null, userId: user.id, stopAt: new Date(Date.now() + 10 * 60_000) })
       // Sans proxy rotatif : démarrage GROUPÉ du lot en UN appel /phone/start (comme
       // l'ancienne app) au lieu de N démarrages simultanés que GeeLark refuse en partie.
       // → chaque post saute son démarrage individuel (skipStart). Si le groupé plante,
