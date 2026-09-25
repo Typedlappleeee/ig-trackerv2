@@ -405,9 +405,9 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
       await sleep(800)
     }
   }
-  // 11. Done (haut-droite) de « Add link ». On EST sûr d'être sur cet écran (vérifié en 8b),
-  //     donc si l'OCR/couleur échoue on tape sa position connue (haut-droite).
-  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0, 0.20], 'Done (lien)', 6)) {
+  // 11. Done (haut-droite) de « Add link ». Détection recadrée SERRÉ sur la barre de titre
+  //     (Cancel / Add link / Done) → le petit « Done » bleu devient net. Position connue en secours.
+  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.linkDone, W, H, hooks, [0.06, 0.17], 'Done (lien)', 8)) {
     hooks?.log?.('   « Done » non lu → position connue (haut-droite)')
     await tapFrac(A.linkDone.x, A.linkDone.y)
   }
