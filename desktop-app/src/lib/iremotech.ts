@@ -41,6 +41,7 @@ export type IrtAction =
   | { type: 'press'; name?: string; key?: string; modifiers?: string[] }
   | { type: 'open_url'; url: string }
   | { type: 'airplane'; on: boolean }
+  | { type: 'calibrate' }
 
 // ── Clé API : perso (app_config) d'abord, sinon agence (org_config) ───────────
 async function readKey(table: string, col: string, val: string): Promise<string | null> {

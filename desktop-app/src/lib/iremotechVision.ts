@@ -27,6 +27,20 @@ export interface VisionHooks { log?: (m: string) => void; shouldStop?: () => boo
 // atteignent le device via iRemoTech (dont le contrôle survit à l'avion).
 const AIRPLANE_ICON = { x: 0.155, y: 0.30 } // icône avion dans le Centre de contrôle (haut-gauche du bloc connectivité)
 
+// Recalibrage du clic (bouton « Calibrate » de la section SYSTEM d'iRemoTech). À lancer
+// au début de chaque automatisation pour que les taps tombent au bon endroit. Best-effort :
+// si l'action n'est pas acceptée (nom différent côté API), on log et on continue.
+export async function recalibrateTouch(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
+  hooks?.log?.('🎯 Recalibrage du clic (Calibrate)…')
+  try {
+    const ok = await sendAction(key, deviceId, { type: 'calibrate' })
+    if (ok) { hooks?.log?.('   ✓ recalibrage lancé'); await sleep(4000) }
+    else hooks?.log?.('   ⚠ « calibrate » refusé par l’API iRemoTech (nom d’action différent ?) — on continue')
+  } catch (e) {
+    hooks?.log?.(`   ⚠ recalibrage ignoré (${e instanceof Error ? e.message : String(e)})`)
+  }
+}
+
 export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
   // Écran connu d'abord.
   await sendAction(key, deviceId, { type: 'press', name: 'home' })

@@ -17,7 +17,7 @@ import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFo
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
-import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
 import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
 
 // ── Design system Blowsome (mauve/or) ────────────────────────────────────────
@@ -253,6 +253,8 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
     push(`▶ ${publishDev.name ?? dev} — ${ready.length} container(s)`)
     const R = startRun('farm', `${publishDev.name ?? dev} · ${ready.length} container(s)`, ready.length)
+    // Recalibrage du clic au début de l'automatisation.
+    await recalibrateTouch(irt.key, dev, { log: push, shouldStop: () => R.isCancelled() })
     for (const job of ready) {
       if (R.isCancelled()) break
       push(`\n📦 container « ${job.container} » · ${job.vid!.title}`)

@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -178,6 +178,8 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
 
     const runPhone = async (p: typeof byPhone[number]) => {
       const tag = `[${p.name}]`
+      // Recalibrage du clic au tout début de l'automatisation de ce téléphone.
+      await recalibrateTouch(key, p.dev, { log: (m) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() })
       for (const job of p.jobs) {
         if (R.isCancelled()) break
         push(`\n${tag} 📦 container « ${job.container} » · ${job.vid.title}`)
