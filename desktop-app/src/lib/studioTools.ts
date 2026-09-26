@@ -345,9 +345,15 @@ function groupWords(words: Segment[], maxWords = SUB_MAX_WORDS): Segment[] {
 export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks): Promise<Uint8Array> {
   h?.onLog?.('🎧 Extraction audio…')
   const audio = await runFfmpeg({ input, args: ['-vn', '-ar', '16000', '-ac', '1', '-c:a', 'libmp3lame', '-q:a', '5'], outName: 'a.mp3' })
-  h?.onLog?.('📝 Transcription au mot (Groq Whisper)…')
+  // Pas (ou quasi pas) d'octets audio → la vidéo n'a pas de piste son (ou elle est muette).
+  if (!audio || audio.length < 2000) {
+    throw new Error('Cette vidéo n’a pas de piste audio (ou le son est muet) — rien à transcrire.')
+  }
+  h?.onLog?.(`📝 Transcription au mot (Groq Whisper)… (${(audio.length / 1048576).toFixed(1)} Mo audio)`)
   const words = await transcribeWordsGroq(groqKey, new Blob([audio as BlobPart], { type: 'audio/mpeg' }))
-  if (words.length === 0) throw new Error('Transcription vide')
+  if (words.length === 0) {
+    throw new Error('Aucune parole détectée dans l’audio (musique/bruit seul, ou voix inaudible). Essaie une vidéo avec de la voix claire.')
+  }
   const blocks = groupWords(words)
   h?.onLog?.(`🖊 ${blocks.length} groupes (2–4 mots) — incrustation…`)
   // Un PNG (1080px) par groupe, overlay activé entre ses timecodes. Chaîne d'overlays.
