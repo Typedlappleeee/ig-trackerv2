@@ -1,63 +1,62 @@
-// Proxy serverless HeroSMS (numéros virtuels, ex-SMS-Activate) — garde le token côté
-// serveur, évite le CORS. Hôte fixe. Auth: header « Authorization ».
-//
-// La doc montre « Authorization: ApiKey <key> », mais selon la config le serveur peut
-// attendre la clé BRUTE (« Authorization: <key> ») ou « Bearer <key> ». On essaie les
-// variantes et on garde celle qui n'est pas rejetée (BAD_API_KEY / 401).
+// Proxy serverless HeroSMS — protocole COMPATIBLE SMS-Activate (auth par query ?api_key=).
+// HeroSMS se présente comme « compatible ex-SMS-Activate » ; l'API native /api/v1 (auth
+// header) refuse la clé, donc on utilise le handler SMS-Activate. On essaie les URLs
+// candidates et on garde celle qui répond.
 //
 // Config Vercel (optionnelle) : HEROSMS_API_KEY. Sinon le client envoie sa clé.
+// Le client POST { op, apiKey?, ... }. Réponses SMS-Activate = TEXTE (ACCESS_*, STATUS_*).
 
-const BASE = 'https://hero-sms.com/api/v1'
+const CANDIDATE_BASES = [
+  'https://hero-sms.com/stubs/handler_api.php',
+  'https://hero-sms.com/api/v1',
+  'https://hero-sms.com/handler_api.php',
+]
 
-async function jsonOr(res) { try { return await res.json() } catch { return null } }
-function isBadKey(status, data) {
-  if (status === 401 || status === 403) return true
-  const t = data && typeof data === 'object' ? `${data.title ?? ''} ${data.details ?? ''} ${data.message ?? ''}` : String(data ?? '')
-  return /bad_api_key|invalid api key|unauthorized|unauthenticated|forbidden|api key/i.test(t)
+// Actions SMS-Activate par op.
+function actionFor(op, b) {
+  switch (op) {
+    case 'ping':   return { action: 'getBalance' }
+    case 'buy':    return { action: 'getNumberV2', service: b.service || 'ig', country: String(b.country ?? ''), ...(b.maxPrice != null ? { maxPrice: String(b.maxPrice) } : {}), ...(b.operator ? { operator: b.operator } : {}) }
+    case 'status': return { action: 'getStatus', id: String(b.id ?? '') }
+    case 'finish': return { action: 'setStatus', id: String(b.id ?? ''), status: '6' }
+    case 'cancel': return { action: 'setStatus', id: String(b.id ?? ''), status: '8' }
+    case 'prices': return { action: 'getPrices', service: b.service || 'ig', country: String(b.country ?? '') }
+    default: return null
+  }
+}
+
+// Une réponse qui indique « mauvais endpoint » → on essaie l'URL suivante.
+function looksWrongEndpoint(status, text) {
+  return status === 404 || /<html|<!doctype|not found|no such|bad_action|wrong_action|unauthenticated/i.test(text)
 }
 
 export default async (req, res) => {
-  if (req.method === 'GET') return res.status(200).json({ ok: true, base: BASE })
+  if (req.method === 'GET') return res.status(200).json({ ok: true, bases: CANDIDATE_BASES })
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
 
   const b = req.body ?? {}
-  const op = b.op
   const KEY = (typeof b.apiKey === 'string' && b.apiKey.trim()) ? b.apiKey.trim() : process.env.HEROSMS_API_KEY
   if (!KEY) return res.status(200).json({ ok: false, error: 'Clé HeroSMS absente : colle ton token dans ScaleFlow, ou définis HEROSMS_API_KEY sur Vercel.' })
-  const enc = encodeURIComponent
 
-  // Décrit la requête (méthode / url / corps) selon l'op ; l'auth est ajoutée ensuite.
-  let url, method = 'GET', jsonBody = null
-  if (op === 'buy') {
-    const body = { amount: 1, service: b.service || 'ig', country: Number(b.country), verificationType: 'sms' }
-    if (b.operator) body.operator = b.operator
-    if (b.maxPrice != null) { body.maxPrice = Number(b.maxPrice); body.fixedPrice = Boolean(b.fixedPrice) }
-    url = `${BASE}/activations`; method = 'POST'; jsonBody = body
-  } else if (op === 'offers') {
-    const p = new URLSearchParams()
-    if (b.service) p.set('services', String(b.service))
-    if (b.country != null) p.set('countries', String(b.country))
-    url = `${BASE}/activations/offers/sms?${p.toString()}`
-  } else if (op === 'ping')   { url = `${BASE}/activations?size=1` }
-  else if (op === 'otp')      { url = `${BASE}/activations/${enc(String(b.id))}/otp/last` }
-  else if (op === 'active')   { url = `${BASE}/activations` }
-  else if (op === 'finish')   { url = `${BASE}/activations/${enc(String(b.id))}/finish`; method = 'POST' }
-  else if (op === 'cancel')   { url = `${BASE}/activations/${enc(String(b.id))}`; method = 'DELETE' }
-  else return res.status(400).json({ ok: false, error: `op inconnu: ${op}` })
+  const params = actionFor(b.op, b)
+  if (!params) return res.status(200).json({ ok: false, error: `op inconnu: ${b.op}` })
 
-  const authVariants = [`ApiKey ${KEY}`, KEY, `Bearer ${KEY}`]
   try {
     let last = null
-    for (const auth of authVariants) {
-      const headers = { Authorization: auth, Accept: 'application/json' }
-      if (jsonBody) headers['Content-Type'] = 'application/json'
-      const r = await fetch(url, { method, headers, body: jsonBody ? JSON.stringify(jsonBody) : undefined, signal: AbortSignal.timeout(25000) })
-      if (r.status === 204) return res.status(200).json({ ok: true, status: 204, auth })
-      const data = await jsonOr(r)
-      if (isBadKey(r.status, data)) { last = { ok: false, status: r.status, data }; continue } // essaie la variante suivante
-      return res.status(200).json({ ok: r.ok, status: r.status, data, auth: auth.split(' ')[0] || 'raw' })
+    for (const base of CANDIDATE_BASES) {
+      const qs = new URLSearchParams({ api_key: KEY, ...params })
+      let r
+      try { r = await fetch(`${base}?${qs.toString()}`, { signal: AbortSignal.timeout(25000) }) }
+      catch (e) { last = { ok: false, error: String(e && e.message || e), base }; continue }
+      const text = (await r.text()).trim()
+      if (looksWrongEndpoint(r.status, text)) { last = { ok: false, status: r.status, text, base }; continue }
+      // Réponse exploitable de ce endpoint. On tente aussi de parser du JSON (getNumberV2/getPrices).
+      let data = null
+      try { data = JSON.parse(text) } catch { /* texte SMS-Activate */ }
+      const badKey = /BAD_KEY|WRONG_TOKEN|Unauthenticated/i.test(text)
+      return res.status(200).json({ ok: r.status < 400 && !badKey, status: r.status, text, data, base })
     }
-    return res.status(200).json(last ?? { ok: false, error: 'auth HeroSMS refusée (toutes variantes)' })
+    return res.status(200).json(last ?? { ok: false, error: 'Aucun endpoint HeroSMS n’a répondu' })
   } catch (e) {
     return res.status(200).json({ ok: false, error: (e && e.message) ? e.message : String(e) })
   }
