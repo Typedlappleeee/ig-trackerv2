@@ -432,7 +432,7 @@ async function sha256Hex(data: Uint8Array): Promise<string> {
 // ── Réglages du style des sous-titres AUTO (faciles à ajuster) ─────────────────
 // Taille = fraction de la largeur vidéo (0.058 ≈ gros, style viral). Police : très
 // grasse et arrondie ; on tombe sur Arial Black si la 1re n'est pas installée.
-const SUB_FONT_FRAC   = 0.065
+const SUB_FONT_FRAC   = 0.085
 const SUB_FONT_FAMILY = `"Arial Black", system-ui, Arial, sans-serif`
 
 // ── Texte → PNG transparent via canvas (pas besoin de police côté ffmpeg) ──────
