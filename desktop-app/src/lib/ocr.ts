@@ -115,19 +115,22 @@ async function ocrWordsInner(image: string, whitelist?: string, opts?: OcrOpts):
 // Détecte le bouton d'action Instagram par sa COULEUR (bleu vif : Next/Share/Partager),
 // dans une bande verticale [yMin,yMax]. Les outils (Overlay, Captions…) sont gris → ignorés.
 // Renvoie le centre du plus gros amas bleu, en coordonnées de l'image d'origine. null si absent.
-export async function findBlueButton(image: string, yMin = 0.55, yMax = 1): Promise<{ cx: number; cy: number } | null> {
+export async function findBlueButton(image: string, yMin = 0.55, yMax = 1, xMin = 0, xMax = 1): Promise<{ cx: number; cy: number } | null> {
   const img = await loadImg(image)
   const W = img.naturalWidth, H = img.naturalHeight
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H
   const ctx = cv.getContext('2d')!
   ctx.drawImage(img, 0, 0)
   const y0 = Math.max(0, Math.round(yMin * H)), y1 = Math.min(H, Math.round(yMax * H))
+  // Bande horizontale optionnelle : pour un bouton connu à droite (Next/Share), on
+  // ignore le reste → évite qu'un amas bleu à gauche décale le centre (ex. « First draft »).
+  const x0 = Math.max(0, Math.round(xMin * W)), x1 = Math.min(W, Math.round(xMax * W))
   const rows = Math.max(1, y1 - y0)
   const data = ctx.getImageData(0, y0, W, rows).data
   let sx = 0, sy = 0, n = 0
   let minX = W, maxX = 0, minY = rows, maxY = 0
   for (let yy = 0; yy < rows; yy++) {
-    for (let xx = 0; xx < W; xx++) {
+    for (let xx = x0; xx < x1; xx++) {
       const i = (yy * W + xx) * 4
       const r = data[i], g = data[i + 1], b = data[i + 2]
       // Bleu Instagram (#0095F6 / #3897F0) : B élevé, R faible, B >> R.

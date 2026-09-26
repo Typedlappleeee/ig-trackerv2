@@ -35,10 +35,23 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
   const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('⚠ écran illisible → mode avion sauté'); return }
   const tapIcon = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(AIRPLANE_ICON.x * W), y: Math.round(AIRPLANE_ICON.y * H) })
-  // 1. Ouvrir le Centre de contrôle (swipe du TOUT EN BAS vers le haut, franc).
-  hooks?.log?.('✈️ Ouverture du Centre de contrôle (swipe bas→haut)…')
-  await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H * 0.999), x2: Math.round(W * 0.5), y2: Math.round(H * 0.22), duration_ms: 750 })
-  await sleep(1800)
+  // 1. Ouvrir le Centre de contrôle (swipe du TOUT EN BAS vers le haut, franc et LENT).
+  //    Retry : parfois le geste ne « prend » pas depuis le bord → on vérifie que l'accueil
+  //    (icônes Instagram/Edits) a bien disparu, sinon on rebalaie.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (hooks?.shouldStop?.()) return
+    hooks?.log?.(attempt === 0 ? '✈️ Ouverture du Centre de contrôle (swipe bas→haut)…' : `✈️ CC pas ouvert → nouvel essai (${attempt + 1}/3)…`)
+    // Départ collé au bord bas, remontée longue, geste lent (iOS reconnaît mieux le tirage du bord).
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H) - 1, x2: Math.round(W * 0.5), y2: Math.round(H * 0.15), duration_ms: 950 })
+    await sleep(1700)
+    // Vérif : si on lit encore une icône d'accueil connue → le CC ne s'est pas ouvert.
+    const chk = await snapshot(key, deviceId)
+    if (!chk) break // pas de snapshot : on tente la suite quand même
+    const w1 = await ocrWords(chk, undefined, { threshold: null, scale: 2, psms: ['11'] })
+    const homeStill = w1.some(o => /instagram|edits|r[ée]glages|settings|app\s?store/i.test(o.text))
+    if (!homeStill) break // accueil disparu → CC ouvert (ou autre écran) → on continue
+    await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(800) // reset avant re-essai
+  }
   // 2. Activer l'avion.
   hooks?.log?.('✈️ Mode avion ON…')
   await tapIcon()
@@ -82,7 +95,7 @@ async function hasText(key: string, deviceId: string, patterns: RegExp[], hooks?
 
 export async function findTapText(
   key: string, deviceId: string, patterns: RegExp[], hooks?: VisionHooks,
-  opts?: { tries?: number; label?: string; minY?: number; maxY?: number; cropY?: [number, number] },
+  opts?: { tries?: number; label?: string; minY?: number; maxY?: number; minX?: number; maxX?: number; cropY?: [number, number] },
 ): Promise<boolean> {
   const tries = opts?.tries ?? 5
   const label = opts?.label ?? patterns.map(p => p.source).join('|')
@@ -101,7 +114,8 @@ export async function findTapText(
     const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: sc, psms: ['11'], cropY: crop })
     const words = [...wa, ...wb]
     const minY = (opts?.minY ?? 0) * H, maxY = (opts?.maxY ?? 1) * H
-    const hit = words.find(o => o.cy >= minY && o.cy <= maxY && patterns.some(p => p.test(o.text)))
+    const minX = (opts?.minX ?? 0) * W, maxX = (opts?.maxX ?? 1) * W
+    const hit = words.find(o => o.cy >= minY && o.cy <= maxY && o.cx >= minX && o.cx <= maxX && patterns.some(p => p.test(o.text)))
     if (hit) {
       hooks?.log?.(`🎯 « ${hit.text} » trouvé → tap (${hit.cx}, ${hit.cy})`)
       await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: hit.cy })
@@ -234,14 +248,18 @@ const REEL_ANCHORS = {
 async function tapButton(
   key: string, deviceId: string, patterns: RegExp[], anchor: { x: number; y: number },
   W: number, H: number, hooks?: VisionHooks, cropY?: [number, number], label?: string, tries = 3,
+  blueX?: [number, number],
 ): Promise<boolean> {
   const lab = label ?? patterns[0].source
   // 1. Vision : lire le texte du bouton (plusieurs essais → tolère un affichage lent).
-  if (await findTapText(key, deviceId, patterns, hooks, { label: lab, tries, cropY })) return true
+  //    minX : si le bouton est connu à droite (Next/Share), on ignore les textes de
+  //    gauche (ex. « First draft ») pour ne jamais taper à côté.
+  const minX = blueX ? blueX[0] : undefined
+  if (await findTapText(key, deviceId, patterns, hooks, { label: lab, tries, cropY, minX })) return true
   // 2. Couleur : le bouton d'action Instagram est BLEU (Next/Share) — les outils sont gris.
   const shot = await snapshot(key, deviceId)
   if (shot) {
-    const blue = await findBlueButton(shot, cropY ? cropY[0] : 0.6, cropY ? cropY[1] : 1)
+    const blue = await findBlueButton(shot, cropY ? cropY[0] : 0.6, cropY ? cropY[1] : 1, blueX ? blueX[0] : 0, blueX ? blueX[1] : 1)
     if (blue) {
       hooks?.log?.(`🔵 « ${lab} » : bouton bleu détecté → tap (${blue.cx}, ${blue.cy})`)
       await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: blue.cy })
@@ -302,11 +320,11 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   await sleep(1800)
   // 4. Next (après sélection) : vision → bouton bleu. Si non détecté → on abandonne ce
   //    container (l'appelant passera au suivant en recommençant le cycle).
-  if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (après sélection)')) return false
+  if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (après sélection)', 3, [0.5, 1])) return false
   hooks?.log?.('   ⏳ chargement de la vidéo dans l’éditeur…')
   await sleep(5000) // laisse l'éditeur charger la vidéo (sinon aperçu gris)
   // 5. Next (écran d'édition).
-  if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (édition)')) return false
+  if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (édition)', 3, [0.5, 1])) return false
   await sleep(3000)
   // 6. Légende : taper « Add a caption » ouvre un éditeur plein écran → écrire → valider « OK » (haut-droite).
   if (opts.caption && opts.caption.trim()) {
@@ -321,13 +339,13 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   }
   // 7. Publier : « Share » direct, sinon un « Next » intermédiaire puis « Share ».
   //    Si Share n'est jamais détecté → on abandonne (container suivant).
-  if (await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 3, cropY: [0.85, 1] })) {
+  if (await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 3, cropY: [0.85, 1], minX: 0.5 })) {
     hooks?.log?.('📤 Reel partagé.')
   } else {
     hooks?.log?.('   pas de Share direct → Next intermédiaire puis Share')
-    if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.85, 1], 'Next (avant Share)')) return false
+    if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.85, 1], 'Next (avant Share)', 3, [0.5, 1])) return false
     await sleep(2600)
-    if (!await tapButton(key, deviceId, [/share|partager/i], A.shareBtn, W, H, hooks, [0.85, 1], 'Share')) return false
+    if (!await tapButton(key, deviceId, [/share|partager/i], A.shareBtn, W, H, hooks, [0.85, 1], 'Share', 3, [0.5, 1])) return false
     hooks?.log?.('📤 Reel partagé.')
   }
   await sleep(4000) // laisse le partage se finaliser
