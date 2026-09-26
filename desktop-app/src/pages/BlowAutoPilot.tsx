@@ -527,7 +527,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
           {smsProvider === 'herosms' ? (
             <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <input value={heroKey} onChange={e => { setHeroKey(e.target.value); try { localStorage.setItem('sf-herosms-key', e.target.value) } catch { /* noop */ } }}
+              <input value={heroKey} onChange={e => { const v = e.target.value.trim(); setHeroKey(v); try { localStorage.setItem('sf-herosms-key', v) } catch { /* noop */ } }}
                 placeholder="Token HeroSMS (numéro + code SMS auto)" type="password"
                 style={{ ...inp, flex: 1, height: 40 }} />
               <button style={{ ...btn, height: 40, padding: '0 14px' }} disabled={!heroKey || running}

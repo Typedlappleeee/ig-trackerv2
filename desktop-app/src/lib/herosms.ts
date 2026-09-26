@@ -68,7 +68,7 @@ export async function herosmsBuy(
   if (r.ok && d && (d.activationId || d.phoneNumber)) return { id: Number(d.activationId), phone: String(d.phoneNumber), price: d.activationCost != null ? Number(d.activationCost) : undefined }
   const m = (r.text ?? '').match(/ACCESS_NUMBER:(\d+):(\d+)/)
   if (m) return { id: Number(m[1]), phone: m[2] }
-  throw new Error(r.text || r.error || 'achat HeroSMS échoué')
+  throw new Error(`${r.text || r.error || 'achat HeroSMS échoué'}${r.base ? ` [${r.base.replace('https://hero-sms.com', '')}]` : ''}`)
 }
 
 // getStatus → « STATUS_OK:<code> » (code reçu) / « STATUS_WAIT_CODE » (attente).
