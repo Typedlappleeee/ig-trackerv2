@@ -937,7 +937,12 @@ Deno.serve(async (req) => {
                 ? await gPost(bearer, '/task/rpa/add', { id: phone.geelark_id, flowId, scheduleAt: rNow, name: 'Reels Trial Scaleflow', paramMap: { Video: [tokens[vIdx]], Caption: rDesc, Trial: true } })
                 : await gPost(bearer, '/rpa/task/instagramPubReels', { id: phone.geelark_id, scheduleAt: rNow, description: rDesc, video: [tokens[vIdx]] })
             } else {
-              r = await gPost(bearer, '/rpa/task/instagramPubReels', { id: phone.geelark_id, scheduleAt: rNow, description: rDesc, video: [tokens[vIdx]] })
+              // Publication normale → NOTRE flow adapté (resource-id/texte, tolérant à l'UI IG),
+              // natif seulement si l'import du flow échoue.
+              const flowId = await ensureTrialFlow(bearer, log)
+              r = flowId
+                ? await gPost(bearer, '/task/rpa/add', { id: phone.geelark_id, flowId, scheduleAt: rNow, name: 'Reels Scaleflow', paramMap: { Video: [tokens[vIdx]], Caption: rDesc, Trial: false } })
+                : await gPost(bearer, '/rpa/task/instagramPubReels', { id: phone.geelark_id, scheduleAt: rNow, description: rDesc, video: [tokens[vIdx]] })
             }
             const tid = r.data?.id ?? r.data?.taskId ?? null
             if (r.code === 0 && tid) {
@@ -1047,21 +1052,19 @@ Deno.serve(async (req) => {
         const scheduleAt  = baseTs + i * delayMin * 60
         const description = (videos[videoIdx]?.desc?.trim() || post.caption)
         const video       = resolvedTokens[videoIdx]
-        // Reel d'ESSAI → flow RPA « Trial » (le natif ne sait pas activer le mode essai).
-        // Sinon → natif instagramPubReels.
+        // Reel d'ESSAI → flow RPA « Trial » (Trial:true). Publication normale → le MÊME
+        // flow adapté en Trial:false (navigation par resource-id/texte IG, tolérant aux
+        // changements d'UI). Le natif instagramPubReels ne sert que si l'import du flow échoue.
         let res: Record<string, any>
-        if (post.reels_trial) {
-          const flowId = await ensureTrialFlow(bearer, log)
-          if (flowId) {
-            res = await gPost(bearer, '/task/rpa/add', {
-              id: phone.geelark_id, flowId, scheduleAt, name: 'Reels Trial Scaleflow',
-              paramMap: { Video: [video], Caption: description, Trial: true },
-            })
-          } else {
-            log(`⚠ Flow Trial indisponible pour ${phone.ig_username ?? phone.phone_name} — publication simple.`)
-            res = await gPost(bearer, '/rpa/task/instagramPubReels', { id: phone.geelark_id, scheduleAt, description, video: [video] })
-          }
+        const flowId = await ensureTrialFlow(bearer, log)
+        if (flowId) {
+          res = await gPost(bearer, '/task/rpa/add', {
+            id: phone.geelark_id, flowId, scheduleAt,
+            name: post.reels_trial ? 'Reels Trial Scaleflow' : 'Reels Scaleflow',
+            paramMap: { Video: [video], Caption: description, Trial: !!post.reels_trial },
+          })
         } else {
+          log(`⚠ Flow adapté indisponible pour ${phone.ig_username ?? phone.phone_name} — publication native.`)
           res = await gPost(bearer, '/rpa/task/instagramPubReels', { id: phone.geelark_id, scheduleAt, description, video: [video] })
         }
         const taskId = res.data?.id ?? res.data?.taskId ?? null

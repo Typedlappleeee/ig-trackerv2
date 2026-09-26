@@ -918,8 +918,39 @@ export async function postReelToPhone(
       }
     }
 
-    // Natif (sans miniature ni essai) OU repli si le flow a échoué.
-    log('🎬 Création de la tâche de publication Reels…')
+    // PUBLICATION NORMALE (sans miniature ni essai).
+    // On privilégie NOTRE flow RPA « adapté » (navigation par resource-id/texte Instagram :
+    // creation_tab, caption_input_text_view… → tolérant aux changements d'UI). Le template
+    // NATIF instagramPubReels repère l'onglet REEL visuellement et casse dès qu'Instagram
+    // bouge sa caméra → il ne sert plus que de repli.
+    const customFlowId = await ensureTrialFlowId(bearer, log).catch(() => null)
+    if (customFlowId) {
+      log('🎬 Création de la tâche Reels (flow adapté)…')
+      const resC = await geelarkFetch('/task/rpa/add', {
+        id: phoneId, flowId: customFlowId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'Reels Scaleflow',
+        paramMap: { Video: [videoResourceUrl], Caption: caption ?? '', Trial: false },
+      }, bearer)
+      if (Number(resC['code']) === 0) {
+        const dC = resC['data'] as Record<string, unknown> | undefined
+        const tidC = (dC?.['taskId'] ?? dC?.['id']) as string | undefined
+        if (tidC) {
+          log('   Tâche créée — publication en cours…')
+          const rC = await pollRpaTask(bearer, tidC, log, 20 * 60_000)
+          if (rC.ok) return rC
+          // Compte réellement déconnecté → aucun flow ne peut publier : message clair, pas de repli.
+          if (/not logged in|login wall|sign in before|needhuman|déconnect/i.test(rC.error ?? '')) {
+            log('   ⛔ Compte DÉCONNECTÉ sur ce téléphone — reconnecte-le (onglet Connexion) avant de reposter.')
+            return { ok: false, error: 'Compte déconnecté sur ce téléphone — reconnexion nécessaire avant de reposter.' }
+          }
+          log('   ↻ Flow adapté en échec → repli sur le template natif GeeLark…')
+        }
+      } else {
+        log(`   ⚠ Flow adapté indisponible (${resC['msg'] ?? resC['code']}) — repli natif.`)
+      }
+    }
+
+    // Repli : template NATIF GeeLark.
+    log('🎬 Création de la tâche de publication Reels (natif)…')
     const res = await geelarkFetch('/rpa/task/instagramPubReels', {
       id: phoneId,
       scheduleAt: Math.floor(Date.now() / 1000) + 5,
@@ -931,34 +962,9 @@ export async function postReelToPhone(
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
     log('   Tâche créée — publication en cours…')
     const nat = await pollRpaTask(bearer, taskId, log, 20 * 60_000)
-    if (nat.ok) return nat
-
-    const err = nat.error ?? ''
-    // (a) Compte réellement déconnecté (mur de connexion Instagram) → aucun flow ne
-    //     peut publier : on échoue vite avec un message actionnable (crédit remboursé
-    //     par la phase settle). Inutile de relancer, ça garderait le tel allumé pour rien.
-    if (/not logged in|login wall|sign in before|needhuman|déconnect/i.test(err)) {
+    if (!nat.ok && /not logged in|login wall|sign in before|needhuman|déconnect/i.test(nat.error ?? '')) {
       log('   ⛔ Compte DÉCONNECTÉ sur ce téléphone — reconnecte-le (onglet Connexion) avant de reposter.')
       return { ok: false, error: 'Compte déconnecté sur ce téléphone — reconnexion nécessaire avant de reposter.' }
-    }
-    // (b) Le template NATIF de GeeLark ne trouve plus l'onglet REEL / la caméra (Instagram
-    //     a bougé son UI). On tente notre PROPRE flow RPA (ancré sur le texte, plus tolérant)
-    //     en publication normale (Trial:false). Repli unique, seulement sur ce type d'échec.
-    if (/reel tab|camera mode|camera page|did not appear|envfail/i.test(err)) {
-      log('   ↻ Template natif en échec (UI Instagram modifiée) → repli via notre flow RPA…')
-      const flowId = await ensureTrialFlowId(bearer, log).catch(() => null)
-      if (flowId) {
-        const res2 = await geelarkFetch('/task/rpa/add', {
-          id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'Reels Scaleflow (repli)',
-          paramMap: { Video: [videoResourceUrl], Caption: caption ?? '', Trial: false },
-        }, bearer)
-        if (Number(res2['code']) === 0) {
-          const d2 = res2['data'] as Record<string, unknown> | undefined
-          const tid2 = (d2?.['taskId'] ?? d2?.['id']) as string | undefined
-          if (tid2) { log('   Tâche de repli créée — publication en cours…'); return await pollRpaTask(bearer, tid2, log, 20 * 60_000) }
-        }
-        log(`   ⚠ Repli indisponible (${res2['msg'] ?? res2['code']}).`)
-      }
     }
     return nat
   } catch (e) {
