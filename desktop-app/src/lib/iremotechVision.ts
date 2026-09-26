@@ -295,6 +295,30 @@ async function tapButton(
   return false
 }
 
+// Tape un bouton d'action bas-droite (Next/Share) PUIS vérifie qu'on a bien changé
+// d'écran : les repères `stillHere` de l'écran courant doivent DISPARAÎTRE. Réessaie
+// en décalant légèrement le tap de secours (couvre un petit décalage de calibration).
+async function tapAdvance(
+  key: string, deviceId: string, patterns: RegExp[], base: { x: number; y: number },
+  W: number, H: number, stillHere: RegExp[], hooks?: VisionHooks, label = 'Next', tries = 4,
+): Promise<boolean> {
+  const dx = [0, 0.03, -0.03, 0.06], dy = [0, -0.01, -0.02, 0]
+  for (let t = 0; t < tries; t++) {
+    if (hooks?.shouldStop?.()) return false
+    const anchor = { x: base.x + dx[t % dx.length], y: base.y + dy[t % dy.length] }
+    await tapButton(key, deviceId, patterns, anchor, W, H, hooks, [0.80, 1], t ? `${label} (essai ${t + 1})` : label, 2, [0.5, 1])
+    await sleep(2600)
+    // Toujours sur le même écran ? (repères encore lisibles → le tap n'a pas fait avancer)
+    if (!await hasText(key, deviceId, stillHere, hooks, { cropY: [0.72, 1], tries: 1 })) {
+      hooks?.log?.(`   ✓ ${label} : passé à l'écran suivant`)
+      return true
+    }
+    hooks?.log?.(`   ↻ ${label} n'a pas fait avancer → réessai (position ajustée)`)
+  }
+  hooks?.log?.(`❌ ${label} : impossible d'avancer après ${tries} essais`)
+  return false
+}
+
 // Sélectionne un mode dans le bandeau du bas (POST STORY INSTANTS REEL LIVE). Si le
 // mode voulu n'est pas visible, scrolle le bandeau HORIZONTALEMENT jusqu'à le trouver.
 async function selectMode(key: string, deviceId: string, patterns: RegExp[], label: string, hooks?: VisionHooks): Promise<boolean> {
@@ -345,8 +369,9 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (après sélection)', 3, [0.5, 1])) return false
   hooks?.log?.('   ⏳ chargement de la vidéo dans l’éditeur…')
   await sleep(5000) // laisse l'éditeur charger la vidéo (sinon aperçu gris)
-  // 5. Next (écran d'édition).
-  if (!await tapButton(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (édition)', 3, [0.5, 1])) return false
+  // 5. Next (écran d'édition) — AUTO-VÉRIFIÉ : on tape puis on contrôle que les outils
+  //    d'édition (Overlay / Edit video) ont disparu ; sinon on retape (position ajustée).
+  if (!await tapAdvance(key, deviceId, [/next|suivant/i], A.nextBtn, W, H, [/overlay/i, /edit\s?video/i], hooks, 'Next (édition)')) return false
   await sleep(3000)
   // 6. Légende : taper « Add a caption » ouvre un éditeur plein écran → écrire → valider « OK » (haut-droite).
   if (opts.caption && opts.caption.trim()) {
