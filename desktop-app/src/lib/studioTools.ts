@@ -54,10 +54,13 @@ function intensityRanges(i: SpoofIntensity) {
 }
 // Spoof visuel = UNIQUEMENT le zoom/recadrage (pas de brightness/contrast/saturation).
 // L'unicité vient du zoom + des métadonnées effacées/réécrites (voir runSpoof).
-export function spoofFilter(seed: number, intensity: SpoofIntensity = 'normal'): string {
+// Facteur de zoom du spoof (exposé pour l'afficher à l'utilisateur).
+export function spoofZoomFactor(seed: number, intensity: SpoofIntensity = 'normal'): number {
   const r = intensityRanges(intensity)
-  const rnd = (mul: number, min: number, max: number) => min + ((Math.sin(seed * mul) + 1) / 2) * (max - min)
-  const z = rnd(197.5, r.z[0], r.z[1]).toFixed(3)
+  return r.z[0] + ((Math.sin(seed * 197.5) + 1) / 2) * (r.z[1] - r.z[0])
+}
+export function spoofFilter(seed: number, intensity: SpoofIntensity = 'normal'): string {
+  const z = spoofZoomFactor(seed, intensity).toFixed(3)
   return `scale=iw*${z}:ih*${z},crop=iw/${z}:ih/${z},${EVEN}`
 }
 // Localisations GPS proposées (écrites dans les métadonnées mp4 par le spoof).
@@ -370,7 +373,16 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
   // Zoom spoof appliqué à la base AVANT l'incrustation → les sous-titres restent nets
   // et jamais rognés (ils sont dessinés par-dessus la vidéo déjà zoomée, en 1080 de large).
   const spoofChain = doSpoof ? ',' + spoofFilter(seed, intensity) : ''
-  if (doSpoof) h?.onLog?.('🎭 Spoof de la sortie (métadonnées + GPS + zoom unique)…')
+  if (doSpoof) {
+    // On AFFICHE précisément ce qui est spoofé (preuve visible).
+    const devLabel = SPOOF_DEVICES.find(x => x.k === device)?.label ?? 'aucun'
+    const zPct = ((spoofZoomFactor(seed, intensity) - 1) * 100).toFixed(1)
+    h?.onLog?.('🎭 Spoof appliqué à la sortie :')
+    h?.onLog?.('   🧹 Métadonnées d’origine effacées')
+    if (gps) h?.onLog?.(`   📍 Localisation GPS réécrite : ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)} (France)`)
+    h?.onLog?.(`   📱 Appareil simulé : ${devLabel}`)
+    h?.onLog?.(`   🔍 Recadrage/zoom unique : +${zPct}%`)
+  }
   // Un PNG (1080px) par groupe, overlay activé entre ses timecodes. Chaîne d'overlays.
   // IMPORTANT : on met d'abord la vidéo à 1080 de large (= largeur du PNG). Sinon, sur une
   // vidéo qui ne fait pas 1080 px, une ligne pleine largeur dépasse des bords (hors écran).
@@ -395,11 +407,26 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
   const meta: string[] = doSpoof ? ['-map_metadata', '-1'] : []
   if (doSpoof && gps) { const loc = iso6709(gps.lat, gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
   if (doSpoof) meta.push(...deviceMetaArgs(device))
-  return runFfmpeg({
+  const output = await runFfmpeg({
     input, inputName: 'in.mp4', extra,
     args: [...inputs, '-filter_complex', chain, '-map', '[v]', '-map', '0:a?', ...meta, ...H264],
     onProgress: h?.onProgress, onLog: h?.onLog,
   })
+  if (doSpoof) {
+    // Preuve d'unicité : SHA-256 de la vidéo de sortie (différent à chaque export).
+    const sig = await sha256Hex(output)
+    h?.onLog?.(`   🔑 Empreinte unique (SHA-256) : ${sig.slice(0, 16)}…`)
+  }
+  return output
+}
+
+// SHA-256 (hex) d'un buffer — via l'API Web Crypto (dispo navigateur + Electron).
+async function sha256Hex(data: Uint8Array): Promise<string> {
+  try {
+    const src = new Uint8Array(data)
+    const buf = await crypto.subtle.digest('SHA-256', src.buffer as ArrayBuffer)
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+  } catch { return '(indisponible)' }
 }
 
 // ── Réglages du style des sous-titres AUTO (faciles à ajuster) ─────────────────
