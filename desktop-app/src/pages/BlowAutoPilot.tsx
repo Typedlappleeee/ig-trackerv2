@@ -90,6 +90,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [running, setRunning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
+  const [phonesOpen, setPhonesOpen] = useState(true) // sélecteur téléphones déplié
 
   const load = useCallback(() => {
     if (!irt.key) return
@@ -278,13 +279,78 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     )
   }
 
-  // Récap de sélection (affiché en tête des onglets d'action).
-  const SelSummary = () => (
-    <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: 14 }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: totalJobs ? INK : '#F87171' }}>
-        {totalJobs ? `${totalJobs} container(s) · ${sel.size} iPhone(s)` : 'Aucun container sélectionné'}
-      </span>
-      <button style={{ ...btn, marginLeft: 'auto' }} onClick={() => goTab('phones')}>📱 Gérer la sélection</button>
+  // Sélecteur téléphones + containers, INLINE sur chaque page (choisis et lance sans
+  // changer d'onglet, façon GeeLark). Repliable pour gagner de la place.
+  const phonePicker = (opts?: { manage?: boolean }) => (
+    <div style={card}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setPhonesOpen(o => !o)}>
+        <span style={{ fontSize: 13.5, fontWeight: 800, color: INK }}>📱 Téléphones & containers</span>
+        <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: totalJobs ? 'rgba(233,196,106,0.16)' : 'rgba(248,113,113,0.14)', color: totalJobs ? GOLD : '#F87171' }}>
+          {totalJobs ? `${totalJobs} container(s) · ${sel.size} iPhone(s)` : 'aucune sélection'}
+        </span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          {sel.size > 0 && <span onClick={e => { e.stopPropagation(); setSel(new Set()); setSelConts({}) }} style={{ ...btn, height: 28, display: 'inline-flex', alignItems: 'center' }}>Tout désélectionner</span>}
+          <span style={{ fontSize: 16, color: MUTED, transform: phonesOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>›</span>
+        </span>
+      </div>
+
+      {phonesOpen && (
+        <div style={{ marginTop: 12 }}>
+          {/* Chips téléphones */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            {devices.map(d => {
+              const on = sel.has(d.public_id)
+              const list = conts[d.public_id] ?? []
+              return (
+                <button key={d.public_id} onClick={() => togglePhone(d.public_id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 38, padding: '0 13px', borderRadius: 10, cursor: 'pointer', background: on ? GOLD : 'rgba(255,255,255,0.03)', color: on ? '#1a1206' : INK, border: on ? 'none' : '1px solid rgba(216,180,254,0.16)', fontSize: 13, fontWeight: 700 }}>
+                  <span style={{ display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: 4, background: on ? '#1a1206' : 'transparent', color: GOLD, fontSize: 10, fontWeight: 900, border: on ? 'none' : '1px solid rgba(216,180,254,0.3)' }}>{on ? '✓' : ''}</span>
+                  {d.name ?? d.public_id}<span style={{ fontSize: 10.5, opacity: 0.7 }}>· {list.length}c</span>
+                </button>
+              )
+            })}
+            {devices.length === 0 && !loading && <span style={{ fontSize: 12.5, color: DIM }}>Aucun iPhone détecté sur ta clé iRemoTech.</span>}
+          </div>
+
+          {/* Containers par téléphone sélectionné */}
+          {[...sel].map(devId => {
+            const d = devices.find(x => x.public_id === devId)
+            const list = conts[devId] ?? []
+            const picked = selConts[devId] ?? new Set()
+            return (
+              <div key={devId} style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(233,196,106,0.04)', border: '1px solid rgba(233,196,106,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 9 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 800, color: GOLD }}>📱 {d?.name ?? devId}</span>
+                  <span style={{ fontSize: 11.5, color: MUTED }}>{picked.size}/{list.length}</span>
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                    <button style={{ ...btn, height: 28 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set(list) }))}>Tout</button>
+                    <button style={{ ...btn, height: 28 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set() }))}>Aucun</button>
+                  </span>
+                </div>
+                {list.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 9 }}>
+                    {list.map(c => {
+                      const cp = picked.has(c)
+                      return (
+                        <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 6px 0 11px', borderRadius: 9, fontSize: 13, fontWeight: 800, background: cp ? GOLD : 'rgba(255,255,255,0.04)', color: cp ? '#1a1206' : INK, border: cp ? 'none' : '1px solid rgba(216,180,254,0.16)' }}>
+                          <span onClick={() => toggleCont(devId, c)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ display: 'grid', placeItems: 'center', width: 15, height: 15, borderRadius: 4, background: cp ? '#1a1206' : 'transparent', color: GOLD, fontSize: 10, fontWeight: 900, border: cp ? 'none' : '1px solid rgba(216,180,254,0.3)' }}>{cp ? '✓' : ''}</span>
+                            {c}
+                          </span>
+                          {opts?.manage && <span onClick={() => removeC(devId, c)} title="Retirer" style={{ cursor: 'pointer', opacity: 0.5, fontWeight: 900, fontSize: 16, padding: '0 2px' }}>×</span>}
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 7, maxWidth: 380 }}>
+                  <input value={newC[devId] ?? ''} onChange={e => setNewC(v => ({ ...v, [devId]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(devId) }} placeholder="+ container (ex. 6, Default…)" style={{ ...inp, flex: 1, height: 34 }} />
+                  <button style={{ ...gold, height: 34, padding: '0 14px' }} onClick={() => addC(devId)}>Ajouter</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 
@@ -329,76 +395,22 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {err &&<div style={{ ...card, color: '#F87171', fontSize: 13, textAlign: 'center' }}>{err}</div>}
       {loading && <div style={{ ...card, color: MUTED, fontSize: 13, textAlign: 'center' }}>Connexion à iRemoTech…</div>}
 
-      {/* ─────────────── ONGLET TÉLÉPHONES ─────────────── */}
-      {curTab === 'phones' && (
-        <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 3 }}>Téléphones & containers</div>
-          <p style={{ margin: '0 0 14px', fontSize: 12, color: MUTED }}>Coche les iPhones, puis choisis les containers Crane sur lesquels agir. Cette sélection est utilisée par tous les onglets ({totalJobs} container{totalJobs > 1 ? 's' : ''} sélectionné{totalJobs > 1 ? 's' : ''}).</p>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {devices.map(d => {
-              const on = sel.has(d.public_id)
-              const list = conts[d.public_id] ?? []
-              return (
-                <button key={d.public_id} onClick={() => togglePhone(d.public_id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 15px', borderRadius: 11, cursor: 'pointer', background: on ? GOLD : 'rgba(255,255,255,0.03)', color: on ? '#1a1206' : INK, border: on ? 'none' : '1px solid rgba(216,180,254,0.16)', fontSize: 13.5, fontWeight: 700 }}>
-                  <span style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: on ? '#1a1206' : 'transparent', color: GOLD, fontSize: 11, fontWeight: 900, border: on ? 'none' : '1px solid rgba(216,180,254,0.3)' }}>{on ? '✓' : ''}</span>
-                  {d.name ?? d.public_id}
-                  <span style={{ fontSize: 11, opacity: 0.7 }}>· {list.length}c</span>
-                </button>
-              )
-            })}
-            {devices.length === 0 && !loading && <span style={{ fontSize: 12.5, color: DIM }}>Aucun iPhone détecté sur ta clé iRemoTech.</span>}
+      {/* ─────────────── ONGLET TÉLÉPHONES (gestion complète) ─────────────── */}
+      {curTab === 'phones' && (<>
+        <p style={{ margin: '0 0 12px', fontSize: 12.5, color: MUTED }}>Gère tes iPhones et leurs containers Crane. Tu peux aussi choisir/lancer directement depuis les onglets Posting, Story et Création de compte.</p>
+        {phonePicker({ manage: true })}
+        {sel.size > 0 && (
+          <div style={{ ...card, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button style={gold} onClick={() => goTab('posting')}>🎬 Aller au Posting →</button>
+            <button style={btn} onClick={() => goTab('story')}>📸 Aller à Story →</button>
+            <button style={btn} onClick={() => goTab('account')}>🆕 Créer des comptes →</button>
           </div>
-
-          {[...sel].map(devId => {
-            const d = devices.find(x => x.public_id === devId)
-            const list = conts[devId] ?? []
-            const picked = selConts[devId] ?? new Set()
-            return (
-              <div key={devId} style={{ marginTop: 14, padding: 16, borderRadius: 14, background: 'rgba(233,196,106,0.04)', border: '1px solid rgba(233,196,106,0.22)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <span style={{ fontSize: 15, fontWeight: 800, color: GOLD }}>📱 {d?.name ?? devId}</span>
-                  <span style={{ fontSize: 12, color: MUTED }}>{picked.size}/{list.length} container(s) coché(s)</span>
-                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                    <button style={btn} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set(list) }))}>Tout cocher</button>
-                    <button style={btn} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set() }))}>Aucun</button>
-                  </span>
-                </div>
-                {list.length > 0 ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginBottom: 12 }}>
-                    {list.map(c => {
-                      const cp = picked.has(c)
-                      return (
-                        <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 8px 0 14px', borderRadius: 11, fontSize: 15, fontWeight: 800, background: cp ? GOLD : 'rgba(255,255,255,0.04)', color: cp ? '#1a1206' : INK, border: cp ? 'none' : '1px solid rgba(216,180,254,0.16)' }}>
-                          <span onClick={() => toggleCont(devId, c)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                            <span style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: cp ? '#1a1206' : 'transparent', color: GOLD, fontSize: 11, fontWeight: 900, border: cp ? 'none' : '1px solid rgba(216,180,254,0.3)' }}>{cp ? '✓' : ''}</span>
-                            {c}
-                          </span>
-                          <span onClick={() => removeC(devId, c)} title="Retirer ce container" style={{ cursor: 'pointer', opacity: 0.55, fontWeight: 900, fontSize: 18, padding: '0 4px' }}>×</span>
-                        </span>
-                      )
-                    })}
-                  </div>
-                ) : <p style={{ margin: '0 0 12px', fontSize: 12.5, color: DIM }}>Aucun container pour cet iPhone — ajoute-les ci-dessous.</p>}
-                <div style={{ display: 'flex', gap: 8, maxWidth: 420 }}>
-                  <input value={newC[devId] ?? ''} onChange={e => setNewC(v => ({ ...v, [devId]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(devId) }} placeholder="Nom du container (ex. 6, Default…)" style={{ ...inp, flex: 1, height: 40, fontSize: 13.5 }} />
-                  <button style={{ ...gold, height: 40, padding: '0 18px' }} onClick={() => addC(devId)}>+ Ajouter</button>
-                </div>
-              </div>
-            )
-          })}
-          {sel.size > 0 && (
-            <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-              <button style={gold} onClick={() => goTab('posting')}>🎬 Passer au Posting →</button>
-              <button style={btn} onClick={() => goTab('account')}>🆕 Créer des comptes →</button>
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </>)}
 
       {/* ─────────────── ONGLET POSTING ─────────────── */}
       {curTab === 'posting' && (<>
-        <SelSummary />
+        {phonePicker()}
         <div style={card}>
           <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 3 }}>🎬 Posting — Reels</div>
           <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque container coché reçoit une vidéo tirée <b>au hasard</b> du pool et publie un Reel.</p>
@@ -427,7 +439,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
       {/* ─────────────── ONGLET STORY ─────────────── */}
       {curTab === 'story' && (<>
-        <SelSummary />
+        {phonePicker()}
         <div style={card}>
           <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 3 }}>📸 Story — photo + lien</div>
           <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque container reçoit une photo tirée au hasard, avec son lien sticker (CTA).</p>
@@ -471,7 +483,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
       {/* ─────────────── ONGLET CRÉATION DE COMPTE ─────────────── */}
       {curTab === 'account' && (<>
-        <SelSummary />
+        {phonePicker()}
         <div style={card}>
           <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 3 }}>🆕 Création de compte Instagram</div>
           <p style={{ margin: '0 0 14px', fontSize: 12, color: MUTED }}>Ouvre IG sur chaque container « frais » (déconnecté) et crée un compte. Avec un token 5sim : numéro + code SMS automatiques.</p>
