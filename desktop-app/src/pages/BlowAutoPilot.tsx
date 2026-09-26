@@ -13,6 +13,7 @@ import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision } from '@/lib/iremotechVision'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
+import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel } from '@/lib/herosms'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -85,6 +86,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [uniqueUse, setUniqueUse] = useState(false)
   const [parallel, setParallel] = useState(false)
   const [sim5Key, setSim5Key] = useState(() => { try { return localStorage.getItem('sf-5sim-key') ?? '' } catch { return '' } })
+  const [heroKey, setHeroKey] = useState(() => { try { return localStorage.getItem('sf-herosms-key') ?? '' } catch { return '' } })
+  const [smsProvider, setSmsProvider] = useState<'5sim' | 'herosms'>(() => { try { return (localStorage.getItem('sf-sms-provider') as '5sim' | 'herosms') || '5sim' } catch { return '5sim' } })
   const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('uk')
 
   const [running, setRunning] = useState(false)
@@ -223,12 +226,28 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     if (!key || running) return
     const jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].map(c => ({ dev, c })))
     if (jobs.length === 0) { setLogs(['⚠ Coche au moins un container (onglet Téléphones).']); return }
+    // Config pays : identifiants propres à chaque fournisseur SMS.
+    //  - 5sim : simCountry (nom), operator ; HeroSMS : heroCountry (id SMS-Activate : USA=12, UK=16).
     const CFG = acctCountry === 'usa'
-      ? { label: /states/i, countryY: 0.37, simCountry: 'usa', operator: 'virtual8', dial: '1', name: 'United States' }
-      : { label: /kingdom/i, countryY: 0.29, simCountry: 'england', operator: 'any', dial: '44', name: 'United Kingdom' }
+      ? { label: /states/i, countryY: 0.37, simCountry: 'usa', operator: 'virtual8', heroCountry: 12, dial: '1', name: 'United States' }
+      : { label: /kingdom/i, countryY: 0.29, simCountry: 'england', operator: 'any', heroCountry: 16, dial: '44', name: 'United Kingdom' }
+
+    // Fournisseur SMS actif (clé + fonctions unifiées buy/wait/finish/cancel).
+    const usingHero = smsProvider === 'herosms'
+    const smsKey = usingHero ? heroKey : sim5Key
+    const provName = usingHero ? 'HeroSMS' : '5sim'
+    const buyNumber = () => usingHero
+      ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig' })
+      : fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
+    const waitCode = (id: number) => usingHero
+      ? herosmsWaitCode(heroKey, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs: 6 * 60_000 })
+      : fivesimWaitCode(sim5Key, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs: 6 * 60_000 })
+    const cancelNum = (id: number) => usingHero ? herosmsCancel(heroKey, id) : fivesimCancel(sim5Key, id)
+    const finishNum = (id: number) => usingHero ? herosmsFinish(heroKey, id) : fivesimFinish(sim5Key, id)
+
     setRunning(true); setLogs([])
     const R = startRun('farm', `Création compte ${CFG.name} · ${jobs.length}`, jobs.length); setRunId(R.id)
-    push(`▶ Création de compte (${CFG.name})${sim5Key ? ' + numéro 5sim' : ' (test, sans numéro)'} : ${jobs.length} container(s)`)
+    push(`▶ Création de compte (${CFG.name})${smsKey ? ` + numéro ${provName}` : ' (test, sans numéro)'} : ${jobs.length} container(s)`)
     for (const { dev, c } of jobs) {
       if (R.isCancelled()) break
       const tag = `[${devices.find(d => d.public_id === dev)?.name ?? dev}·${c}]`
@@ -239,29 +258,29 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       if (!opened) { push(`${tag} ⏭ container non atteint`); R.tick(false); continue }
       await sleep(1500)
 
-      if (!sim5Key) {
+      if (!smsKey) {
         const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY }, hooks)
         push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`); R.tick(r.ok); continue
       }
 
       let order: { id: number; phone: string } | null = null
       try {
-        push(`${tag} 🛒 achat d'un numéro ${CFG.name} (5sim)…`)
-        order = await fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
+        push(`${tag} 🛒 achat d'un numéro ${CFG.name} (${provName})…`)
+        order = await buyNumber()
         push(`${tag} 📞 numéro : ${order.phone}`)
-      } catch (e) { push(`${tag} ✗ achat 5sim: ${e instanceof Error ? e.message : String(e)}`); R.tick(false); continue }
+      } catch (e) { push(`${tag} ✗ achat ${provName}: ${e instanceof Error ? e.message : String(e)}`); R.tick(false); continue }
 
       const num = localPhone(order.phone, CFG.dial)
       const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY, phoneNumber: num }, hooks)
       if (r.stage !== 'number_submitted') {
         push(`${tag} ✗ échec avant SMS (étape ${r.stage}) → annulation du numéro`)
-        try { await fivesimCancel(sim5Key, order.id) } catch { /* noop */ }
+        try { await cancelNum(order.id) } catch { /* noop */ }
         R.tick(false); continue
       }
-      const code = await fivesimWaitCode(sim5Key, order.id, { onLog: hooks.log, shouldStop: hooks.shouldStop, maxMs: 6 * 60_000 })
-      if (!code) { push(`${tag} ✗ pas de code SMS reçu → annulation`); try { await fivesimCancel(sim5Key, order.id) } catch { /* noop */ } R.tick(false); continue }
+      const code = await waitCode(order.id)
+      if (!code) { push(`${tag} ✗ pas de code SMS reçu → annulation`); try { await cancelNum(order.id) } catch { /* noop */ } R.tick(false); continue }
       const okCode = await enterSmsCodeByVision(key, dev, code, hooks)
-      try { await fivesimFinish(sim5Key, order.id) } catch { /* noop */ }
+      try { await finishNum(order.id) } catch { /* noop */ }
       push(`${tag} ${okCode ? '✓ compte : code saisi' : '⚠ code non validé (à vérifier)'}`)
       R.tick(okCode)
     }
@@ -497,18 +516,32 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             ))}
           </div>
 
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, marginBottom: 7 }}>Token 5sim (optionnel)</div>
-          <input value={sim5Key} onChange={e => { setSim5Key(e.target.value); try { localStorage.setItem('sf-5sim-key', e.target.value) } catch { /* noop */ } }}
-            placeholder="Colle ton token 5sim pour l'achat de numéro + code SMS auto" type="password"
-            style={{ ...inp, width: '100%', height: 40, marginBottom: 8 }} />
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, marginBottom: 7 }}>Fournisseur de numéro</div>
+          <div style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 10, background: 'rgba(0,0,0,0.3)', marginBottom: 12 }}>
+            {(['herosms', '5sim'] as const).map(p => (
+              <button key={p} onClick={() => { setSmsProvider(p); try { localStorage.setItem('sf-sms-provider', p) } catch { /* noop */ } }} style={{ height: 32, padding: '0 16px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 800, background: smsProvider === p ? GOLD : 'transparent', color: smsProvider === p ? '#1a1206' : MUTED }}>
+                {p === 'herosms' ? 'HeroSMS' : '5sim'}
+              </button>
+            ))}
+          </div>
+
+          {smsProvider === 'herosms' ? (
+            <input value={heroKey} onChange={e => { setHeroKey(e.target.value); try { localStorage.setItem('sf-herosms-key', e.target.value) } catch { /* noop */ } }}
+              placeholder="Token HeroSMS (numéro + code SMS auto)" type="password"
+              style={{ ...inp, width: '100%', height: 40, marginBottom: 8 }} />
+          ) : (
+            <input value={sim5Key} onChange={e => { setSim5Key(e.target.value); try { localStorage.setItem('sf-5sim-key', e.target.value) } catch { /* noop */ } }}
+              placeholder="Token 5sim (numéro + code SMS auto)" type="password"
+              style={{ ...inp, width: '100%', height: 40, marginBottom: 8 }} />
+          )}
           <p style={{ margin: 0, fontSize: 11.5, color: MUTED }}>
-            {sim5Key
-              ? <>✓ 5sim branché : achète un numéro {acctCountry === 'usa' ? '🇺🇸' : '🇬🇧'}, le saisit, attend le SMS et rentre le code.</>
+            {(smsProvider === 'herosms' ? heroKey : sim5Key)
+              ? <>✓ {smsProvider === 'herosms' ? 'HeroSMS' : '5sim'} branché : achète un numéro {acctCountry === 'usa' ? '🇺🇸' : '🇬🇧'}, le saisit, attend le SMS et rentre le code.</>
               : <>Sans token : le flow va jusqu'au choix du pays (test) puis s'arrête.</>}
           </p>
         </div>
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />
-        <LaunchBar label={sim5Key ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={createAccounts} />
+        <LaunchBar label={(smsProvider === 'herosms' ? heroKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={createAccounts} />
         <LogPanel />
       </>)}
 
