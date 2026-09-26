@@ -5,6 +5,7 @@
   "functions": {
     "api/geelark-upload.js": { "maxDuration": 60 },
     "api/groq.mjs": { "maxDuration": 60 },
+    "api/fivesim.mjs": { "maxDuration": 30 },
     "api/iremotech.js": { "maxDuration": 60 },
     "api/iremotech-stream.js": { "maxDuration": 60 },
     "api/meta-callback.js": { "maxDuration": 15 },
