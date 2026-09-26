@@ -47,15 +47,24 @@ function errText(r: ProxyResp): string {
 }
 
 // Prix disponible le PLUS ÉLEVÉ dans [min, max] pour service+pays (à partir des offres).
-// Renvoie null si la tranche est vide (aucun numéro dispo à ce prix).
+// Renvoie null si la tranche est vide. Robuste au nesting variable de la réponse.
 export async function herosmsBestPriceInRange(
-  apiKey: string, service: string, country: number, min: number, max: number,
+  apiKey: string, service: string, country: number, min: number, max: number, onLog?: (m: string) => void,
 ): Promise<number | null> {
   const r = await call('offers', apiKey, { service, country })
-  const svc = r.data?.data?.[service] ?? r.data?.[service]
-  const entry = svc?.[String(country)]
-  const map = entry?.map as Record<string, number> | undefined
-  if (!map) return null
+  if (!r.ok) { onLog?.(`   ⚠ offers: ${errText(r)}`); return null }
+  const root = (r.data?.data ?? r.data) as any
+  // svc = objet { <countryId>: { map: {...} } } pour le service demandé.
+  let svc = root?.[service]
+  if (!svc && root && typeof root === 'object') {
+    // parfois la racine est { <service>: {...} } déjà, ou { data: { <service>: … } }
+    svc = root?.data?.[service] ?? undefined
+  }
+  if (!svc) { onLog?.(`   ⚠ offers: service « ${service} » absent (clés: ${root ? Object.keys(root).join(',').slice(0, 80) : '∅'})`); return null }
+  const entry = svc[String(country)] ?? svc[country as unknown as string]
+  if (!entry) { onLog?.(`   ⚠ offers: pays ${country} absent (pays dispo: ${Object.keys(svc).join(',').slice(0, 80)})`); return null }
+  const map = entry.map as Record<string, number> | undefined
+  if (!map) { onLog?.('   ⚠ offers: pas de « map » de prix'); return null }
   const prices = Object.entries(map)
     .map(([p, count]) => ({ price: Number(p), count: Number(count) }))
     .filter(x => x.count > 0 && x.price >= min && x.price <= max)
@@ -75,10 +84,16 @@ export async function herosmsBuy(
   let maxPrice = opts.maxPrice
   let fixedPrice = false
   if (opts.priceMin != null && opts.priceMax != null) {
-    const best = await herosmsBestPriceInRange(apiKey, service, opts.country, opts.priceMin, opts.priceMax)
-    if (best == null) throw new Error(`Aucun numéro dispo entre ${opts.priceMin}$ et ${opts.priceMax}$ (service ${service}, pays ${opts.country})`)
-    maxPrice = best; fixedPrice = true
-    opts.onLog?.(`   💲 prix choisi (le + cher de la tranche) : ${best.toFixed(4)}$`)
+    const best = await herosmsBestPriceInRange(apiKey, service, opts.country, opts.priceMin, opts.priceMax, opts.onLog)
+    if (best != null) {
+      maxPrice = best; fixedPrice = true
+      opts.onLog?.(`   💲 prix choisi (le + cher de la tranche) : ${best.toFixed(4)}$`)
+    } else {
+      // Repli : on n'a pas pu lire les offres → on achète quand même sous le prix max
+      // (le moins cher dispo ≤ priceMax), pour ne pas bloquer la création.
+      maxPrice = opts.priceMax; fixedPrice = false
+      opts.onLog?.(`   ⚠ tranche non lisible → achat ≤ ${opts.priceMax}$ (repli)`)
+    }
   }
   const r = await call('buy', apiKey, { country: opts.country, service, operator: opts.operator, maxPrice, fixedPrice })
   const item = Array.isArray(r.data?.data) ? r.data.data[0] : (Array.isArray(r.data) ? r.data[0] : null)

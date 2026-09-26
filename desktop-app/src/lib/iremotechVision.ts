@@ -35,7 +35,7 @@ export async function recalibrateTouch(key: string, deviceId: string, hooks?: Vi
   // On ne connaît pas le nom exact de l'action côté API iRemoTech → on essaie plusieurs
   // variantes plausibles et on garde la première acceptée. Best-effort (n'échoue jamais).
   const variants = [
-    { type: 'calibrate' }, { type: 'recalibrate' }, { type: 'touch_calibrate' },
+    { type: 'recalibrate' }, { type: 'calibrate' }, { type: 'touch_calibrate' },
     { type: 'calibration' }, { type: 'press', name: 'calibrate' },
   ] as unknown as Parameters<typeof sendAction>[2][]
   try {
