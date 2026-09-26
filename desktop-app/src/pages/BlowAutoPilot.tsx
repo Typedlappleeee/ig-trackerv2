@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision } from '@/lib/iremotechVision'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -210,6 +210,34 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
     setRunning(false); setRunId(null)
   }
 
+  // TEST création de compte : ouvre Instagram sur chaque container coché et joue le
+  // début du flow (Get started → Change → United Kingdom). Numéro à brancher (API SIM).
+  async function createAccounts() {
+    const key = irt.key
+    if (!key) return
+    const jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].map(c => ({ dev, c })))
+    if (jobs.length === 0) { setLogs(['⚠ Coche au moins un container sur un téléphone.']); return }
+    setRunning(true); setLogs([])
+    const push = (m: string) => setLogs(l => [...l.slice(-400), m])
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+    const R = startRun('farm', `Création compte · ${jobs.length} container(s)`, jobs.length); setRunId(R.id)
+    push(`▶ Création de compte (test) : ${jobs.length} container(s)`)
+    for (const { dev, c } of jobs) {
+      if (R.isCancelled()) break
+      const tag = `[${devices.find(d => d.public_id === dev)?.name ?? dev}·${c}]`
+      const hooks = { log: (m: string) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() }
+      await recalibrateTouch(key, dev, hooks)
+      if (airplaneOn) await airplaneReset(key, dev, hooks)
+      const opened = await selectContainerByVision(key, dev, c, hooks)
+      if (!opened) { push(`${tag} ⏭ container non atteint`); R.tick(false); continue }
+      await sleep(1500)
+      const r = await createInstagramAccountByVision(key, dev, {}, hooks)
+      push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`)
+      R.tick(r.ok)
+    }
+    R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'); setRunning(false); setRunId(null)
+  }
+
   if (!irt.key) {
     return (
       <div>
@@ -354,7 +382,10 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12.5, color: MUTED }}>{totalJobs} publication(s) · {videoPool.length} {mode === 'story' ? 'photo(s)' : 'vidéo(s)'} · {captions.length} {mode === 'story' ? 'texte(s)' : 'légende(s)'}</span>
           {running && runId && <button style={{ ...btn, marginLeft: 'auto', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
-          <button style={{ ...gold, height: 44, padding: '0 22px', marginLeft: running ? 0 : 'auto', fontSize: 14, opacity: totalJobs && videoPool.length && !running ? 1 : 0.5 }} disabled={!totalJobs || !videoPool.length || running} onClick={run}>
+          <button style={{ ...btn, height: 44, padding: '0 16px', marginLeft: running ? 0 : 'auto', opacity: running ? 0.5 : 1 }} disabled={running} onClick={createAccounts} title="Ouvre IG sur chaque container coché et joue le début de la création de compte (Get started → United Kingdom)">
+            🆕 Créer un compte (test UK)
+          </button>
+          <button style={{ ...gold, height: 44, padding: '0 22px', fontSize: 14, opacity: totalJobs && videoPool.length && !running ? 1 : 0.5 }} disabled={!totalJobs || !videoPool.length || running} onClick={run}>
             {running ? 'En cours…' : `Lancer ${totalJobs} publication(s)`}
           </button>
         </div>

@@ -403,6 +403,83 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   return true
 }
 
+// ── Création de compte Instagram pilotée à la VISION (début du flow) ────────────
+// Écrans (Instagram EN) : « Join Instagram » → Get started → « What's your mobile
+// number? » → Change (pays) → recherche « United » → United Kingdom → (si numéro
+// fourni) saisie du numéro + Next. Le numéro viendra d'une API SIM (5sim) branchée
+// plus tard : tant qu'aucun numéro n'est fourni, on s'arrête après le choix du pays.
+export interface CreateAccountOpts {
+  phoneNumber?: string        // numéro fourni par l'API SIM (sans indicatif si UK déjà sélectionné)
+  searchTerm?: string         // terme tapé dans la recherche pays (défaut « United »)
+  countryLabel?: RegExp       // libellé à cocher (défaut /united kingdom/i)
+}
+export async function createInstagramAccountByVision(
+  key: string, deviceId: string, opts: CreateAccountOpts, hooks?: VisionHooks,
+): Promise<{ ok: boolean; stage: string }> {
+  const searchTerm = opts.searchTerm ?? 'United'
+  const countryLabel = opts.countryLabel ?? /united\s*kingdom/i
+  const shot0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('❌ écran illisible'); return { ok: false, stage: 'snapshot' } }
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
+
+  // 1. Écran « Join Instagram » → bouton bleu « Get started ».
+  hooks?.log?.('🆕 Création de compte : « Get started »…')
+  if (!await findTapText(key, deviceId, [/get started/i, /^s.?inscrire/i, /cr[ée]er un compte/i], hooks, { label: 'Get started', tries: 6 })) {
+    hooks?.log?.('❌ « Get started » introuvable (Instagram doit être sur l’écran « Join Instagram »).')
+    return { ok: false, stage: 'get_started' }
+  }
+  await sleep(2800)
+
+  // 2. Écran « What's your mobile number? » → lien bleu « Change » (choix du pays).
+  await hasText(key, deviceId, [/mobile number/i, /num[ée]ro de mobile/i], hooks, { tries: 4 })
+  hooks?.log?.('🌍 Ouverture du choix de pays : « Change »…')
+  if (!await findTapText(key, deviceId, [/^change$/i, /^changer$/i], hooks, { label: 'Change', tries: 5, minY: 0.08, maxY: 0.5 })) {
+    hooks?.log?.('❌ « Change » introuvable')
+    return { ok: false, stage: 'change' }
+  }
+  await sleep(2200)
+
+  // 3. Écran « Select a country » → barre de recherche → taper le terme.
+  hooks?.log?.(`🔎 Recherche du pays « ${searchTerm} »…`)
+  if (!await findTapText(key, deviceId, [/search countr/i, /rechercher/i], hooks, { label: 'barre de recherche', tries: 4, maxY: 0.25 })) {
+    // Repli : taper la zone de la barre de recherche (tout en haut).
+    hooks?.log?.('   (barre non lue → tap position haute)')
+    await tapFrac(0.5, 0.11)
+  }
+  await sleep(1200)
+  await sendAction(key, deviceId, { type: 'text', text: searchTerm })
+  await sleep(1900)
+
+  // 4. Cocher « United Kingdom ».
+  hooks?.log?.('🇬🇧 Sélection « United Kingdom »…')
+  if (!await findTapText(key, deviceId, [countryLabel], hooks, { label: 'United Kingdom', tries: 6 })) {
+    hooks?.log?.('❌ « United Kingdom » introuvable dans les résultats')
+    return { ok: false, stage: 'country' }
+  }
+  await sleep(2200)
+
+  // 5. Saisie du numéro si l'API SIM l'a fourni ; sinon on s'arrête (prêt pour le numéro).
+  if (!opts.phoneNumber) {
+    hooks?.log?.('⏸ Pays réglé sur UK. En attente d’un numéro (API SIM) pour continuer.')
+    return { ok: true, stage: 'ready_for_number' }
+  }
+  hooks?.log?.('📱 Saisie du numéro de mobile…')
+  if (!await findTapText(key, deviceId, [/mobile number/i, /num[ée]ro de mobile/i], hooks, { label: 'champ numéro', tries: 4 })) {
+    await tapFrac(0.5, 0.33) // repli : position du champ sous le libellé pays
+  }
+  await sleep(1000)
+  await sendAction(key, deviceId, { type: 'text', text: opts.phoneNumber })
+  await sleep(1200)
+  // Bouton bleu « Next » (centré, au-dessus de « Sign up with email »).
+  if (!await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], { x: 0.5, y: 0.62 }, W, H, hooks, [0.45, 0.9], 'Next (numéro)', 3, [0, 1])) {
+    hooks?.log?.('❌ « Next » (numéro) non détecté')
+    return { ok: false, stage: 'next_number' }
+  }
+  hooks?.log?.('✅ Numéro soumis — en attente du code SMS (étape suivante à brancher).')
+  return { ok: true, stage: 'number_submitted' }
+}
+
 // ── Publication d'une STORY pilotée à la VISION (base — flow lien à compléter) ──
 // Chemin (Instagram EN) d'après captures : (+ créateur) → mode STORY → galerie
 // (vignette bas-gauche) → 1re vidéo (dernière uploadée) → Done (haut-droite) →
