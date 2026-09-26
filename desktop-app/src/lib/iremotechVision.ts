@@ -280,9 +280,17 @@ async function tapButton(
       return true
     }
   }
-  // 3. Non détecté : on N'APPUIE PAS à l'aveugle (risque de taper le mauvais bouton).
-  //    On renvoie false — l'appelant décide (sauter l'étape OU passer au container suivant).
-  void anchor; void W; void H
+  // 3. Non détecté. Si le bouton est un bouton d'action connu en BAS-DROITE (blueX fourni,
+  //    ex. Next/Share), on tape sa POSITION CONNUE en dernier recours : cette position est
+  //    sous la rangée d'outils et à droite de « First draft » → aucun risque de mauvais bouton.
+  if (blueX) {
+    const ax = Math.round(anchor.x * W), ay = Math.round(anchor.y * H)
+    hooks?.log?.(`↳ « ${lab} » non lu → tap position connue (${ax}, ${ay})`)
+    await sendAction(key, deviceId, { type: 'tap', x: ax, y: ay })
+    return true
+  }
+  // Sinon (bouton sans position fiable) on n'appuie pas à l'aveugle.
+  void W; void H
   hooks?.log?.(`❌ « ${lab} » non détecté`)
   return false
 }
