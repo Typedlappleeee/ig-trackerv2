@@ -88,9 +88,9 @@ function AppInner({ user }: { user: User }) {
   // Garde-fou : si l'accès Blowsome n'est pas (ou plus) accordé, on ne reste jamais
   // sur cette infra VIP — retour GeeLark. (Même logique de porte que le web.)
   useEffect(() => {
-    // Cloud ET Blowsome sont réservés au rôle Blowsome : sans lui → retour GeeLark.
-    if ((infra === 'blowsome' || infra === 'cloud') && !license.loading && !license.blowsome) setInfra('geelark')
-  }, [infra, license.loading, license.blowsome])
+    // Cloud, Blowsome ET iRemoTech sont réservés au rôle Blowsome (ou admin) : sinon → GeeLark.
+    if ((infra === 'blowsome' || infra === 'cloud' || infra === 'iremotech') && !license.loading && !license.blowsome && !license.isSuperAdmin) setInfra('geelark')
+  }, [infra, license.loading, license.blowsome, license.isSuperAdmin])
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -109,7 +109,14 @@ function AppInner({ user }: { user: User }) {
   const orgName = org.currentOrg?.name ?? 'Espace perso'
   const roleLabel = org.role ? org.role.charAt(0).toUpperCase() + org.role.slice(1) : ''
 
-  const content = infra === 'blowsome'
+  const IRT_TAB = { irtPhones: 'phones', irtPosting: 'posting', irtStory: 'story', irtAccount: 'account' } as const
+  const IRT_PAGE = { phones: 'irtPhones', posting: 'irtPosting', story: 'irtStory', account: 'irtAccount' } as const
+
+  const content = infra === 'iremotech'
+    ? <BlowAutoPilot user={user} org={org}
+        tab={(IRT_TAB as Record<string, 'phones' | 'posting' | 'story' | 'account'>)[page] ?? 'phones'}
+        onTab={(t) => setPage(IRT_PAGE[t] as PageKey)} />
+    : infra === 'blowsome'
     ? (page === 'blowParc' ? <BlowParc user={user} org={org} />
       : page === 'blowAuto' ? <BlowAutoPilot user={user} org={org} />
       : page === 'blowContent' ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />

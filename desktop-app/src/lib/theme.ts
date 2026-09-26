@@ -1,7 +1,7 @@
 // Thèmes portés à l'identique du prototype ScaleFlow.dc.html (_theme()).
 // Le thème suit l'infrastructure choisie : Cloud = cyan premium, GeeLark = violet.
 
-export type InfraKey = 'geelark' | 'cloud' | 'blowsome'
+export type InfraKey = 'geelark' | 'iremotech' | 'cloud' | 'blowsome'
 
 export interface Theme {
   cloud: boolean
@@ -22,6 +22,22 @@ export interface Theme {
 }
 
 export function themeFor(infra: InfraKey): Theme {
+  if (infra === 'iremotech') {
+    // Thème iRemoTech — ambre/or (vrais iPhones, automatisation par vision).
+    return {
+      cloud: false,
+      accent: '#E9C46A', accentSoft: '#F0D48A', accentText: '#F3DDA0',
+      accentBtn: '#D9A93E', accentBtnEdge: '#E9C46A',
+      tone: '233,196,106',
+      selBg: 'rgba(233,196,106,0.1)', selEdge: 'rgba(233,196,106,0.45)',
+      navBg: 'linear-gradient(178deg,#17130A,#0F0C07 62%)',
+      appBg: '#0C0A06',
+      panelBg: 'linear-gradient(168deg,#181307,#120E06)',
+      panelEdge: 'rgba(233,196,106,0.14)',
+      mainWash: 'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(233,196,106,0.07), transparent 62%)',
+      rim: 'linear-gradient(180deg, transparent, rgba(233,196,106,0.4) 22%, rgba(233,196,106,0.28) 78%, transparent)',
+    }
+  }
   if (infra === 'blowsome') {
     // Thème VIP Blowsome — mauve premium + or (design system de la sous-app web).
     return {
@@ -88,6 +104,13 @@ export const INFRAS: Record<InfraKey, Infra> = {
     icon: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01',
     desc: 'Appareils loués · automatisation RPA GeeLark',
     boot: '~45 s', quota: '200 max',
+  },
+  iremotech: {
+    k: 'iremotech', name: 'iRemoTech', short: 'iRemoTech',
+    tone: '233,196,106', color: '#F3DDA0',
+    icon: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M11 18h2',
+    desc: 'Vrais iPhones jailbreak · automatisation par vision (Crane)',
+    boot: '~30 s', quota: 'par appareil',
   },
   cloud: {
     k: 'cloud', name: 'ScaleFlow Cloud', short: 'Cloud',

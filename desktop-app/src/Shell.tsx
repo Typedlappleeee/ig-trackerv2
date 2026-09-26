@@ -11,6 +11,7 @@ export type PageKey =
   | 'studio'
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
+  | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtAccount'
   | 'scheduled'
   | 'admin'
   | 'settings'
@@ -19,6 +20,18 @@ interface NavItem { k: PageKey; l: string; i: string; n?: number }
 interface NavSection { g: string | null; items: NavItem[] }
 
 function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number | null): NavSection[] {
+  if (infra === 'iremotech') {
+    return [
+      { g: null, items: [
+        { k: 'irtPhones', l: 'Téléphones', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M11 18h2' },
+      ] },
+      { g: 'Automatisation', items: [
+        { k: 'irtPosting', l: 'Posting', i: 'M12 2v4|M12 18v4|M4.9 4.9l2.8 2.8|M16.3 16.3l2.8 2.8|M2 12h4|M18 12h4|M4.9 19.1l2.8-2.8|M16.3 7.7l2.8-2.8' },
+        { k: 'irtStory', l: 'Story', i: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M12 8v4l3 2' },
+        { k: 'irtAccount', l: 'Création de compte', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M19 8v6|M22 11h-6' },
+      ] },
+    ]
+  }
   if (infra === 'blowsome') {
     return [
       { g: null, items: [{ k: 'hub', l: 'Dashboard', i: 'M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z' }] },
@@ -32,7 +45,6 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       ] },
       { g: 'Parc', items: [
         { k: 'blowParc', l: 'Phone Farm', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined },
-        { k: 'blowAuto', l: 'Pilote Auto', i: 'M12 2v4|M12 18v4|M4.9 4.9l2.8 2.8|M16.3 16.3l2.8 2.8|M2 12h4|M18 12h4|M4.9 19.1l2.8-2.8|M16.3 7.7l2.8-2.8' },
         { k: 'insights', l: 'Performances', i: 'M22 12h-4l-3 9L9 3l-3 9H2' },
       ] },
     ]
@@ -97,6 +109,10 @@ const TITLES: Record<PageKey, string[]> = {
   blowAuto: ['Blowsome', 'Pilote Auto'],
   blowContent: ['Blowsome', 'Auto-contenu'],
   blowTools: ['Blowsome', 'Outils VIP'],
+  irtPhones: ['iRemoTech', 'Téléphones'],
+  irtPosting: ['iRemoTech', 'Posting'],
+  irtStory: ['iRemoTech', 'Story'],
+  irtAccount: ['iRemoTech', 'Création de compte'],
   scheduled: ['Diffusion', 'Programmé'],
   admin: ['Admin', 'Licences'],
   settings: ['Réglages'],
@@ -199,10 +215,10 @@ export default function Shell({
               background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)',
               animation: 'aIn 0.2s cubic-bezier(0.16,1,0.3,1) both',
             }}>
-              {Object.values(INFRAS).filter(o => (o.k !== 'blowsome' && o.k !== 'cloud') || canBlowsome).map(o => {
+              {Object.values(INFRAS).filter(o => (o.k !== 'blowsome' && o.k !== 'cloud' && o.k !== 'iremotech') || canBlowsome || isAdmin).map(o => {
                 const on = infra === o.k
                 return (
-                  <button key={o.k} onClick={() => { setInfra(o.k); setInfraOpen(false); setPage('hub') }}
+                  <button key={o.k} onClick={() => { setInfra(o.k); setInfraOpen(false); setPage(o.k === 'iremotech' ? 'irtPhones' : 'hub') }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 12px', border: 'none', cursor: 'pointer', textAlign: 'left',
                       background: on ? `rgba(${o.tone},0.1)` : 'transparent', borderLeft: `2px solid ${on ? `rgb(${o.tone})` : 'transparent'}`, transition: 'background .14s ease', boxSizing: 'border-box',
