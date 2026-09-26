@@ -342,7 +342,10 @@ function groupWords(words: Segment[], maxWords = SUB_MAX_WORDS): Segment[] {
   return blocks
 }
 
-export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks): Promise<Uint8Array> {
+// spoof=false → sous-titres seuls. Sinon (défaut), la sortie est AUSSI spoofée :
+// métadonnées effacées + localisation GPS + fabricant/modèle + micro-zoom unique →
+// chaque vidéo qui sort du sous-titre est une copie unique (anti-empreinte / anti-repost).
+export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks, spoof: SpoofOpts | false = {}): Promise<Uint8Array> {
   h?.onLog?.('🎧 Extraction audio…')
   const audio = await runFfmpeg({ input, args: ['-vn', '-ar', '16000', '-ac', '1', '-c:a', 'libmp3lame', '-q:a', '5'], outName: 'a.mp3' })
   // Pas (ou quasi pas) d'octets audio → la vidéo n'a pas de piste son (ou elle est muette).
@@ -356,10 +359,24 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
   }
   const blocks = groupWords(words)
   h?.onLog?.(`🖊 ${blocks.length} groupes (2–4 mots) — incrustation…`)
+  // Spoof de la sortie (unique par vidéo) : micro-zoom léger (n'empiète pas sur les
+  // sous-titres à 75 %) + métadonnées effacées + GPS + appareil aléatoires.
+  const doSpoof = spoof !== false
+  const spOpts: SpoofOpts = doSpoof ? (spoof as SpoofOpts) : {}
+  const seed = Math.random() * 1000 + 1
+  const gps = doSpoof ? (spOpts.gps ?? randomFranceGps()) : null
+  const device = doSpoof ? (spOpts.device ?? SPOOF_DEVICES[1 + Math.floor(Math.random() * (SPOOF_DEVICES.length - 1))].k) : null
+  const intensity: SpoofIntensity = spOpts.intensity ?? 'subtle'
+  // Zoom spoof appliqué à la base AVANT l'incrustation → les sous-titres restent nets
+  // et jamais rognés (ils sont dessinés par-dessus la vidéo déjà zoomée, en 1080 de large).
+  const spoofChain = doSpoof ? ',' + spoofFilter(seed, intensity) : ''
+  if (doSpoof) h?.onLog?.('🎭 Spoof de la sortie (métadonnées + GPS + zoom unique)…')
   // Un PNG (1080px) par groupe, overlay activé entre ses timecodes. Chaîne d'overlays.
+  // IMPORTANT : on met d'abord la vidéo à 1080 de large (= largeur du PNG). Sinon, sur une
+  // vidéo qui ne fait pas 1080 px, une ligne pleine largeur dépasse des bords (hors écran).
   const extra: { name: string; data: Uint8Array }[] = []
-  let chain = ''
-  let cursor = '[0:v]'
+  let chain = `[0:v]scale=1080:-2,setsar=1${spoofChain}[base];`
+  let cursor = '[base]'
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i]
     // Prolonge l'affichage jusqu'au groupe suivant (max SUB_HOLD_MAX) → pas de clignotement.
@@ -374,9 +391,13 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
   }
   chain += `[vv]${EVEN}[v]`
   const inputs = extra.flatMap(e => ['-i', e.name])
+  // Métadonnées : effacées puis (si spoof) GPS + fabricant/modèle réécrits.
+  const meta: string[] = doSpoof ? ['-map_metadata', '-1'] : []
+  if (doSpoof && gps) { const loc = iso6709(gps.lat, gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
+  if (doSpoof) meta.push(...deviceMetaArgs(device))
   return runFfmpeg({
     input, inputName: 'in.mp4', extra,
-    args: [...inputs, '-filter_complex', chain, '-map', '[v]', '-map', '0:a?', ...H264],
+    args: [...inputs, '-filter_complex', chain, '-map', '[v]', '-map', '0:a?', ...meta, ...H264],
     onProgress: h?.onProgress, onLog: h?.onLog,
   })
 }
@@ -395,13 +416,14 @@ export async function textToPng(text: string, width: number, subtitle = false, s
   const snap = style === 'snapchat'
   const padX = Math.round(width * (snap ? 0.05 : 0.04))
   // Sous-titres auto : plus gros (groupes de 2–4 mots, style viral centre-bas).
-  const fontSize = subtitle ? Math.round(width * SUB_FONT_FRAC) : Math.round(width * (snap ? 0.034 : 0.052))
+  let fontSize = subtitle ? Math.round(width * SUB_FONT_FRAC) : Math.round(width * (snap ? 0.034 : 0.052))
   // Snapchat : Helvetica régulier. Sous-titres auto : très gras arrondi. Sinon Arial gras.
-  const font = snap
-    ? `400 ${fontSize}px Helvetica, "Helvetica Neue", Arial, sans-serif`
+  const buildFont = (px: number) => snap
+    ? `400 ${px}px Helvetica, "Helvetica Neue", Arial, sans-serif`
     : subtitle
-      ? `800 ${fontSize}px ${SUB_FONT_FAMILY}`
-      : `700 ${fontSize}px system-ui, Arial, sans-serif`
+      ? `800 ${px}px ${SUB_FONT_FAMILY}`
+      : `700 ${px}px system-ui, Arial, sans-serif`
+  let font = buildFont(fontSize)
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
   ctx.font = font
@@ -415,6 +437,14 @@ export async function textToPng(text: string, width: number, subtitle = false, s
     if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w } else cur = t
   }
   if (cur) lines.push(cur)
+  // Sécurité anti-débordement : si une ligne (ex. un mot très long) dépasse encore la
+  // largeur utile, on réduit la police pour la faire tenir (jamais de texte hors écran).
+  const widest = Math.max(...lines.map(ln => ctx.measureText(ln).width), 1)
+  if (widest > maxW) {
+    fontSize = Math.max(12, Math.floor(fontSize * (maxW / widest)))
+    font = buildFont(fontSize)
+    ctx.font = font
+  }
   // Sous-titres : padding vertical plus grand pour ne pas rogner l'ombre portée.
   const vpad = Math.round(fontSize * (snap ? 0.42 : subtitle ? 0.6 : 0.4))
   const lineH = Math.round(fontSize * (snap ? 1.05 : subtitle ? 1.22 : 1.32))
