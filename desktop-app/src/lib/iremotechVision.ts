@@ -32,10 +32,18 @@ const AIRPLANE_ICON = { x: 0.155, y: 0.30 } // icône avion dans le Centre de co
 // si l'action n'est pas acceptée (nom différent côté API), on log et on continue.
 export async function recalibrateTouch(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
   hooks?.log?.('🎯 Recalibrage du clic (Calibrate)…')
+  // On ne connaît pas le nom exact de l'action côté API iRemoTech → on essaie plusieurs
+  // variantes plausibles et on garde la première acceptée. Best-effort (n'échoue jamais).
+  const variants = [
+    { type: 'calibrate' }, { type: 'recalibrate' }, { type: 'touch_calibrate' },
+    { type: 'calibration' }, { type: 'press', name: 'calibrate' },
+  ] as unknown as Parameters<typeof sendAction>[2][]
   try {
-    const ok = await sendAction(key, deviceId, { type: 'calibrate' })
-    if (ok) { hooks?.log?.('   ✓ recalibrage lancé'); await sleep(4000) }
-    else hooks?.log?.('   ⚠ « calibrate » refusé par l’API iRemoTech (nom d’action différent ?) — on continue')
+    for (const a of variants) {
+      const ok = await sendAction(key, deviceId, a).catch(() => false)
+      if (ok) { hooks?.log?.(`   ✓ recalibrage lancé (${JSON.stringify(a)})`); await sleep(4000); return }
+    }
+    hooks?.log?.('   ⚠ aucune action « calibrate » acceptée par l’API — on continue (dis-moi le nom exact).')
   } catch (e) {
     hooks?.log?.(`   ⚠ recalibrage ignoré (${e instanceof Error ? e.message : String(e)})`)
   }
@@ -411,28 +419,38 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
 export interface CreateAccountOpts {
   phoneNumber?: string        // numéro fourni par l'API SIM (sans indicatif si UK déjà sélectionné)
   searchTerm?: string         // terme tapé dans la recherche pays (défaut « United »)
-  countryLabel?: RegExp       // libellé à cocher (défaut /united kingdom/i)
+  countryLabel?: RegExp       // mot distinctif du pays à cocher (défaut /kingdom/i)
+  countryY?: number           // fraction de hauteur du pays dans les résultats (fallback si OCR rate)
 }
 export async function createInstagramAccountByVision(
   key: string, deviceId: string, opts: CreateAccountOpts, hooks?: VisionHooks,
 ): Promise<{ ok: boolean; stage: string }> {
   const searchTerm = opts.searchTerm ?? 'United'
-  const countryLabel = opts.countryLabel ?? /united\s*kingdom/i
+  const countryLabel = opts.countryLabel ?? /kingdom/i
   const shot0 = await snapshot(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible'); return { ok: false, stage: 'snapshot' } }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
 
   // 1. Écran « Join Instagram » → bouton bleu « Get started ».
+  // NB : l'OCR renvoie les mots SÉPARÉS → on matche un mot distinctif isolé (« started »),
+  // pas la chaîne « get started » (qui ne matcherait aucun mot seul).
   hooks?.log?.('🆕 Création de compte : « Get started »…')
-  if (!await findTapText(key, deviceId, [/get started/i, /^s.?inscrire/i, /cr[ée]er un compte/i], hooks, { label: 'Get started', tries: 6 })) {
-    hooks?.log?.('❌ « Get started » introuvable (Instagram doit être sur l’écran « Join Instagram »).')
+  // On vérifie d'abord qu'on est bien sur l'écran « Join Instagram » (mot « Instagram »
+  // OU le bouton), sinon inutile de taper à l'aveugle.
+  const onJoin = await hasText(key, deviceId, [/instagram/i, /^started$/i, /^get$/i], hooks, { tries: 5 })
+  if (!onJoin) {
+    hooks?.log?.('❌ Écran « Join Instagram » non détecté (container déjà connecté ?).')
     return { ok: false, stage: 'get_started' }
+  }
+  if (!await findTapText(key, deviceId, [/^started$/i, /^get$/i, /^s.?inscrire$/i, /commencer/i], hooks, { label: 'Get started', tries: 3 })) {
+    hooks?.log?.('   « Get started » non lu → tap position connue (bouton bleu ~75%).')
+    await tapFrac(0.5, 0.75)
   }
   await sleep(2800)
 
   // 2. Écran « What's your mobile number? » → lien bleu « Change » (choix du pays).
-  await hasText(key, deviceId, [/mobile number/i, /num[ée]ro de mobile/i], hooks, { tries: 4 })
+  await hasText(key, deviceId, [/mobile/i, /^number$/i], hooks, { tries: 4 })
   hooks?.log?.('🌍 Ouverture du choix de pays : « Change »…')
   if (!await findTapText(key, deviceId, [/^change$/i, /^changer$/i], hooks, { label: 'Change', tries: 5, minY: 0.08, maxY: 0.5 })) {
     hooks?.log?.('❌ « Change » introuvable')
@@ -442,7 +460,7 @@ export async function createInstagramAccountByVision(
 
   // 3. Écran « Select a country » → barre de recherche → taper le terme.
   hooks?.log?.(`🔎 Recherche du pays « ${searchTerm} »…`)
-  if (!await findTapText(key, deviceId, [/search countr/i, /rechercher/i], hooks, { label: 'barre de recherche', tries: 4, maxY: 0.25 })) {
+  if (!await findTapText(key, deviceId, [/^search$/i, /countr/i, /rechercher/i], hooks, { label: 'barre de recherche', tries: 4, maxY: 0.25 })) {
     // Repli : taper la zone de la barre de recherche (tout en haut).
     hooks?.log?.('   (barre non lue → tap position haute)')
     await tapFrac(0.5, 0.11)
@@ -451,11 +469,13 @@ export async function createInstagramAccountByVision(
   await sendAction(key, deviceId, { type: 'text', text: searchTerm })
   await sleep(1900)
 
-  // 4. Cocher « United Kingdom ».
-  hooks?.log?.('🇬🇧 Sélection « United Kingdom »…')
-  if (!await findTapText(key, deviceId, [countryLabel], hooks, { label: 'United Kingdom', tries: 6 })) {
-    hooks?.log?.('❌ « United Kingdom » introuvable dans les résultats')
-    return { ok: false, stage: 'country' }
+  // 4. Cocher le pays (mot distinctif : « Kingdom » / « States »).
+  hooks?.log?.('🌍 Sélection du pays…')
+  if (!await findTapText(key, deviceId, [countryLabel], hooks, { label: 'pays', tries: 5, maxY: 0.7 })) {
+    // Repli : les résultats de « United » sont ordonnés (Arab Emirates, Kingdom, States).
+    const fy = opts.countryY ?? 0.29
+    hooks?.log?.(`   pays non lu → tap position connue (0.4, ${fy}).`)
+    await tapFrac(0.4, fy)
   }
   await sleep(2200)
 
@@ -465,7 +485,7 @@ export async function createInstagramAccountByVision(
     return { ok: true, stage: 'ready_for_number' }
   }
   hooks?.log?.('📱 Saisie du numéro de mobile…')
-  if (!await findTapText(key, deviceId, [/mobile number/i, /num[ée]ro de mobile/i], hooks, { label: 'champ numéro', tries: 4 })) {
+  if (!await findTapText(key, deviceId, [/^number$/i, /mobile/i, /num[ée]ro/i], hooks, { label: 'champ numéro', tries: 4, maxY: 0.5 })) {
     await tapFrac(0.5, 0.33) // repli : position du champ sous le libellé pays
   }
   await sleep(1000)
@@ -488,9 +508,9 @@ export async function enterSmsCodeByVision(key: string, deviceId: string, code: 
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
   hooks?.log?.(`🔢 Saisie du code SMS (${code})…`)
   // Vérifie qu'on est bien sur l'écran de code (best-effort).
-  await hasText(key, deviceId, [/confirmation code/i, /enter the code/i, /code we sent/i, /code de confirmation/i, /enter code/i], hooks, { tries: 4 })
+  await hasText(key, deviceId, [/confirmation/i, /^code$/i, /^enter$/i], hooks, { tries: 4 })
   // Tape le champ de code (souvent centre-haut) puis saisit le code.
-  if (!await findTapText(key, deviceId, [/confirmation code/i, /enter code/i, /^code$/i], hooks, { label: 'champ code', tries: 3, maxY: 0.55 })) {
+  if (!await findTapText(key, deviceId, [/confirmation/i, /^code$/i], hooks, { label: 'champ code', tries: 3, maxY: 0.55 })) {
     await tapFrac(0.5, 0.3)
   }
   await sleep(900)

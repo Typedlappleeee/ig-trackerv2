@@ -224,8 +224,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].map(c => ({ dev, c })))
     if (jobs.length === 0) { setLogs(['⚠ Coche au moins un container (onglet Téléphones).']); return }
     const CFG = acctCountry === 'usa'
-      ? { label: /united\s*states/i, simCountry: 'usa', dial: '1', name: 'United States' }
-      : { label: /united\s*kingdom/i, simCountry: 'england', dial: '44', name: 'United Kingdom' }
+      ? { label: /states/i, countryY: 0.37, simCountry: 'usa', dial: '1', name: 'United States' }
+      : { label: /kingdom/i, countryY: 0.29, simCountry: 'england', dial: '44', name: 'United Kingdom' }
     setRunning(true); setLogs([])
     const R = startRun('farm', `Création compte ${CFG.name} · ${jobs.length}`, jobs.length); setRunId(R.id)
     push(`▶ Création de compte (${CFG.name})${sim5Key ? ' + numéro 5sim' : ' (test, sans numéro)'} : ${jobs.length} container(s)`)
@@ -240,7 +240,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       await sleep(1500)
 
       if (!sim5Key) {
-        const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label }, hooks)
+        const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY }, hooks)
         push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`); R.tick(r.ok); continue
       }
 
@@ -252,7 +252,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       } catch (e) { push(`${tag} ✗ achat 5sim: ${e instanceof Error ? e.message : String(e)}`); R.tick(false); continue }
 
       const num = localPhone(order.phone, CFG.dial)
-      const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, phoneNumber: num }, hooks)
+      const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY, phoneNumber: num }, hooks)
       if (r.stage !== 'number_submitted') {
         push(`${tag} ✗ échec avant SMS (étape ${r.stage}) → annulation du numéro`)
         try { await fivesimCancel(sim5Key, order.id) } catch { /* noop */ }
