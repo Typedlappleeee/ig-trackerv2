@@ -35,6 +35,11 @@ export default async (req, res) => {
         method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify(body), signal: AbortSignal.timeout(25000),
       })
+    } else if (op === 'offers') {
+      const p = new URLSearchParams()
+      if (b.service) p.set('services', String(b.service))
+      if (b.country != null) p.set('countries', String(b.country))
+      r = await fetch(`${BASE}/activations/offers/sms?${p.toString()}`, { headers, signal: AbortSignal.timeout(20000) })
     } else if (op === 'otp') {
       r = await fetch(`${BASE}/activations/${enc(String(b.id))}/otp/last`, { headers, signal: AbortSignal.timeout(20000) })
     } else if (op === 'active') {

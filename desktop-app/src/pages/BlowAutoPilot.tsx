@@ -237,7 +237,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const smsKey = usingHero ? heroKey : sim5Key
     const provName = usingHero ? 'HeroSMS' : '5sim'
     const buyNumber = () => usingHero
-      ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig' })
+      ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig', priceMin: 0.25, priceMax: 0.40, onLog: (m: string) => push(m) })
       : fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
     const waitCode = (id: number) => usingHero
       ? herosmsWaitCode(heroKey, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs: 6 * 60_000 })

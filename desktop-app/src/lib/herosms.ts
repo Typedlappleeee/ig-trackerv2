@@ -22,8 +22,11 @@ async function call(op: string, apiKey: string, extra: Record<string, unknown> =
     if (op === 'buy') {
       const body: Record<string, unknown> = { amount: 1, service: extra.service || 'ig', country: Number(extra.country), verificationType: 'sms' }
       if (extra.operator) body.operator = extra.operator
-      if (extra.maxPrice != null) { body.maxPrice = Number(extra.maxPrice); body.fixedPrice = false }
+      if (extra.maxPrice != null) { body.maxPrice = Number(extra.maxPrice); body.fixedPrice = Boolean(extra.fixedPrice) }
       r = await fetch(`${BASE}/activations`, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    } else if (op === 'offers') {
+      const p = new URLSearchParams(); if (extra.service) p.set('services', String(extra.service)); if (extra.country != null) p.set('countries', String(extra.country))
+      r = await fetch(`${BASE}/activations/offers/sms?${p.toString()}`, { headers: H })
     } else if (op === 'otp') r = await fetch(`${BASE}/activations/${enc(String(extra.id))}/otp/last`, { headers: H })
     else if (op === 'active') r = await fetch(`${BASE}/activations`, { headers: H })
     else if (op === 'finish') r = await fetch(`${BASE}/activations/${enc(String(extra.id))}/finish`, { method: 'POST', headers: H })
@@ -43,15 +46,44 @@ function errText(r: ProxyResp): string {
   return typeof d === 'string' ? d : `HTTP ${r.status ?? '?'}`
 }
 
+// Prix disponible le PLUS ÉLEVÉ dans [min, max] pour service+pays (à partir des offres).
+// Renvoie null si la tranche est vide (aucun numéro dispo à ce prix).
+export async function herosmsBestPriceInRange(
+  apiKey: string, service: string, country: number, min: number, max: number,
+): Promise<number | null> {
+  const r = await call('offers', apiKey, { service, country })
+  const svc = r.data?.data?.[service] ?? r.data?.[service]
+  const entry = svc?.[String(country)]
+  const map = entry?.map as Record<string, number> | undefined
+  if (!map) return null
+  const prices = Object.entries(map)
+    .map(([p, count]) => ({ price: Number(p), count: Number(count) }))
+    .filter(x => x.count > 0 && x.price >= min && x.price <= max)
+    .sort((a, b) => b.price - a.price) // plus cher d'abord
+  return prices.length ? prices[0].price : null
+}
+
 // Achat d'une activation. HeroSMS renvoie { data: [{ id, phone, ... }] }. Le numéro est
 // au format international sans « + » (ex. « 447367782101 »).
+// Si priceMin/priceMax fournis : on choisit le prix le PLUS ÉLEVÉ dispo dans la tranche
+// et on achète pile à ce prix (fixedPrice).
 export async function herosmsBuy(
-  apiKey: string, opts: { country: number; service?: string; operator?: string; maxPrice?: number },
-): Promise<{ id: number; phone: string }> {
-  const r = await call('buy', apiKey, { country: opts.country, service: opts.service ?? 'ig', operator: opts.operator, maxPrice: opts.maxPrice })
+  apiKey: string,
+  opts: { country: number; service?: string; operator?: string; maxPrice?: number; priceMin?: number; priceMax?: number; onLog?: (m: string) => void },
+): Promise<{ id: number; phone: string; price?: number }> {
+  const service = opts.service ?? 'ig'
+  let maxPrice = opts.maxPrice
+  let fixedPrice = false
+  if (opts.priceMin != null && opts.priceMax != null) {
+    const best = await herosmsBestPriceInRange(apiKey, service, opts.country, opts.priceMin, opts.priceMax)
+    if (best == null) throw new Error(`Aucun numéro dispo entre ${opts.priceMin}$ et ${opts.priceMax}$ (service ${service}, pays ${opts.country})`)
+    maxPrice = best; fixedPrice = true
+    opts.onLog?.(`   💲 prix choisi (le + cher de la tranche) : ${best.toFixed(4)}$`)
+  }
+  const r = await call('buy', apiKey, { country: opts.country, service, operator: opts.operator, maxPrice, fixedPrice })
   const item = Array.isArray(r.data?.data) ? r.data.data[0] : (Array.isArray(r.data) ? r.data[0] : null)
   if (!r.ok || !item || !item.id || !item.phone) throw new Error(errText(r))
-  return { id: Number(item.id), phone: String(item.phone) }
+  return { id: Number(item.id), phone: String(item.phone), price: item.price != null ? Number(item.price) : undefined }
 }
 
 // Extrait un code numérique (4–8 chiffres) d'un objet OTP HeroSMS (forme variable).
