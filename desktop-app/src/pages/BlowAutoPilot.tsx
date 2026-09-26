@@ -224,8 +224,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].map(c => ({ dev, c })))
     if (jobs.length === 0) { setLogs(['⚠ Coche au moins un container (onglet Téléphones).']); return }
     const CFG = acctCountry === 'usa'
-      ? { label: /states/i, countryY: 0.37, simCountry: 'usa', dial: '1', name: 'United States' }
-      : { label: /kingdom/i, countryY: 0.29, simCountry: 'england', dial: '44', name: 'United Kingdom' }
+      ? { label: /states/i, countryY: 0.37, simCountry: 'usa', operator: 'virtual8', dial: '1', name: 'United States' }
+      : { label: /kingdom/i, countryY: 0.29, simCountry: 'england', operator: 'any', dial: '44', name: 'United Kingdom' }
     setRunning(true); setLogs([])
     const R = startRun('farm', `Création compte ${CFG.name} · ${jobs.length}`, jobs.length); setRunId(R.id)
     push(`▶ Création de compte (${CFG.name})${sim5Key ? ' + numéro 5sim' : ' (test, sans numéro)'} : ${jobs.length} container(s)`)
@@ -247,7 +247,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       let order: { id: number; phone: string } | null = null
       try {
         push(`${tag} 🛒 achat d'un numéro ${CFG.name} (5sim)…`)
-        order = await fivesimBuy(sim5Key, { country: CFG.simCountry, product: 'instagram' })
+        order = await fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
         push(`${tag} 📞 numéro : ${order.phone}`)
       } catch (e) { push(`${tag} ✗ achat 5sim: ${e instanceof Error ? e.message : String(e)}`); R.tick(false); continue }
 
