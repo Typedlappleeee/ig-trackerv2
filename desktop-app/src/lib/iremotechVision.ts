@@ -487,9 +487,9 @@ export async function createInstagramAccountByVision(
     return { ok: true, stage: 'ready_for_number' }
   }
   hooks?.log?.('📱 Saisie du numéro de mobile…')
-  if (!await findTapText(key, deviceId, [/^number$/i, /mobile/i, /num[ée]ro/i], hooks, { label: 'champ numéro', tries: 4, maxY: 0.5 })) {
-    await tapFrac(0.5, 0.33) // repli : position du champ sous le libellé pays
-  }
+  // Champ de saisie : PAS d'OCR (« number » traîne dans le titre « mobile number » en
+  // haut → mis-tap). On tape directement la position connue du champ (~31% de hauteur).
+  await tapFrac(0.5, 0.31)
   await sleep(1000)
   await sendAction(key, deviceId, { type: 'text', text: opts.phoneNumber })
   await sleep(1200)
@@ -511,10 +511,9 @@ export async function enterSmsCodeByVision(key: string, deviceId: string, code: 
   hooks?.log?.(`🔢 Saisie du code SMS (${code})…`)
   // Vérifie qu'on est bien sur l'écran de code (best-effort).
   await hasText(key, deviceId, [/confirmation/i, /^code$/i, /^enter$/i], hooks, { tries: 4 })
-  // Tape le champ de code (souvent centre-haut) puis saisit le code.
-  if (!await findTapText(key, deviceId, [/confirmation/i, /^code$/i], hooks, { label: 'champ code', tries: 3, maxY: 0.55 })) {
-    await tapFrac(0.5, 0.3)
-  }
+  // Champ de code : PAS d'OCR (« code » traîne dans le titre) → tap direct de la position
+  // connue du champ (~30% de hauteur). Ajuste-moi ce chiffre si besoin sur capture.
+  await tapFrac(0.5, 0.30)
   await sleep(900)
   await sendAction(key, deviceId, { type: 'text', text: code })
   await sleep(1300)
