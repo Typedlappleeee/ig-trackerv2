@@ -394,7 +394,9 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
     // Prolonge l'affichage jusqu'au groupe suivant (max SUB_HOLD_MAX) → pas de clignotement.
     const nextStart = blocks[i + 1]?.start ?? (b.end + SUB_HOLD_MAX)
     const end = Math.min(nextStart, b.end + SUB_HOLD_MAX)
-    extra.push({ name: `s${i}.png`, data: await textToPng(b.text, 1080, true) })
+    // On retire les virgules du texte affiché (rendu plus propre).
+    const shown = b.text.replace(/,/g, '').replace(/\s+/g, ' ').trim()
+    extra.push({ name: `s${i}.png`, data: await textToPng(shown, 1080, true) })
     const out = i === blocks.length - 1 ? '[vv]' : `[v${i}]`
     // Centre vertical à SUB_Y_FRAC de la hauteur (le PNG est centré sur ce point).
     const y = `(H*${SUB_Y_FRAC.toFixed(3)})-(h/2)`
