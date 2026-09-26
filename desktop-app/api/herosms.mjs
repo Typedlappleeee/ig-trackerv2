@@ -38,6 +38,33 @@ export default async (req, res) => {
   const KEY = (typeof b.apiKey === 'string' && b.apiKey.trim()) ? b.apiKey.trim() : process.env.HEROSMS_API_KEY
   if (!KEY) return res.status(200).json({ ok: false, error: 'Clé HeroSMS absente : colle ton token dans ScaleFlow, ou définis HEROSMS_API_KEY sur Vercel.' })
 
+  // ── Testeur d'auth : essaie une matrice endpoint × méthode et renvoie chaque résultat.
+  if (b.op === 'probe') {
+    const k = encodeURIComponent(KEY)
+    const combos = [
+      { label: 'stubs ?api_key getBalance', url: `https://hero-sms.com/stubs/handler_api.php?action=getBalance&api_key=${k}` },
+      { label: 'stubs ?apiKey getBalance',  url: `https://hero-sms.com/stubs/handler_api.php?action=getBalance&apiKey=${k}` },
+      { label: 'stubs ?token getBalance',   url: `https://hero-sms.com/stubs/handler_api.php?action=getBalance&token=${k}` },
+      { label: 'handler ?api_key getBalance', url: `https://hero-sms.com/handler_api.php?action=getBalance&api_key=${k}` },
+      { label: 'api/v1 Auth:ApiKey',  url: 'https://hero-sms.com/api/v1/activations?size=1', headers: { Authorization: `ApiKey ${KEY}` } },
+      { label: 'api/v1 Auth:Bearer',  url: 'https://hero-sms.com/api/v1/activations?size=1', headers: { Authorization: `Bearer ${KEY}` } },
+      { label: 'api/v1 Auth:raw',     url: 'https://hero-sms.com/api/v1/activations?size=1', headers: { Authorization: KEY } },
+      { label: 'api/v1 X-Api-Key',    url: 'https://hero-sms.com/api/v1/activations?size=1', headers: { 'X-Api-Key': KEY } },
+    ]
+    const results = []
+    for (const c of combos) {
+      try {
+        const r = await fetch(c.url, { headers: { Accept: 'application/json', ...(c.headers || {}) }, signal: AbortSignal.timeout(9000) })
+        const text = (await r.text()).trim().replace(/\s+/g, ' ').slice(0, 90)
+        const good = r.status >= 200 && r.status < 300 && !/BAD_KEY|Unauth|error|no such/i.test(text)
+        results.push({ label: c.label, status: r.status, good, snippet: text })
+      } catch (e) {
+        results.push({ label: c.label, status: 0, good: false, snippet: String(e && e.message || e).slice(0, 60) })
+      }
+    }
+    return res.status(200).json({ ok: results.some(x => x.good), results })
+  }
+
   const params = actionFor(b.op, b)
   if (!params) return res.status(200).json({ ok: false, error: `op inconnu: ${b.op}` })
 

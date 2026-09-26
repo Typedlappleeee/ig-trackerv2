@@ -13,7 +13,7 @@ import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision } from '@/lib/iremotechVision'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
-import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing } from '@/lib/herosms'
+import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe } from '@/lib/herosms'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -532,9 +532,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 style={{ ...inp, flex: 1, height: 40 }} />
               <button style={{ ...btn, height: 40, padding: '0 14px' }} disabled={!heroKey || running}
                 onClick={async () => {
-                  setLogs(['🔑 Test de la clé HeroSMS…'])
-                  const r = await herosmsPing(heroKey)
-                  push(r.ok ? `✓ clé HeroSMS valide (auth: ${r.auth ?? '?'})` : `✗ clé refusée : ${r.error}`)
+                  setLogs(['🔑 Test d’authentification HeroSMS (matrice)…'])
+                  const r = await herosmsProbe(heroKey)
+                  for (const x of r.results) push(`${x.good ? '✅' : '✗'} ${x.label} — ${x.status} — ${x.snippet}`)
+                  push(r.ok ? '➡️ Une combinaison marche — envoie-moi la ligne ✅.' : '➡️ Aucune combinaison acceptée — clé/compte à vérifier côté HeroSMS.')
                 }}>Tester la clé</button>
             </div>
           ) : (

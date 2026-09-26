@@ -46,6 +46,16 @@ async function call(op: string, apiKey: string, extra: Record<string, unknown> =
   return { ok: false, error: 'Aucun endpoint HeroSMS n’a répondu' }
 }
 
+// Testeur d'auth : essaie une matrice endpoint × méthode. Renvoie chaque résultat.
+export async function herosmsProbe(apiKey: string): Promise<{ ok: boolean; results: { label: string; status: number; good: boolean; snippet: string }[] }> {
+  const r = await fetch('/api/herosms', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ op: 'probe', apiKey }),
+  })
+  const j = await r.json()
+  return { ok: !!j.ok, results: Array.isArray(j.results) ? j.results : [] }
+}
+
 // Test de clé : getBalance → « ACCESS_BALANCE:xx ».
 export async function herosmsPing(apiKey: string): Promise<{ ok: boolean; auth?: string; error?: string }> {
   const r = await call('ping', apiKey)
