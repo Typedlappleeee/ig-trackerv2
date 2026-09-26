@@ -462,11 +462,9 @@ export async function createInstagramAccountByVision(
 
   // 3. Écran « Select a country » → barre de recherche → taper le terme.
   hooks?.log?.(`🔎 Recherche du pays « ${searchTerm} »…`)
-  if (!await findTapText(key, deviceId, [/^search$/i, /countr/i, /rechercher/i], hooks, { label: 'barre de recherche', tries: 4, maxY: 0.3 })) {
-    // Repli : la barre de recherche est SOUS le titre « Select a country » (~15% de hauteur).
-    hooks?.log?.('   (barre non lue → tap position connue ~15%)')
-    await tapFrac(0.5, 0.15)
-  }
+  // Barre de recherche : tap DIRECT de sa position (sous le titre « Select a country »,
+  // ~18% de hauteur) — plus fiable que l'OCR pour focus le champ.
+  await tapFrac(0.5, 0.18)
   await sleep(1200)
   await sendAction(key, deviceId, { type: 'text', text: searchTerm })
   await sleep(1900)
