@@ -438,14 +438,16 @@ export async function createInstagramAccountByVision(
   hooks?.log?.('🆕 Création de compte : « Get started »…')
   // On vérifie d'abord qu'on est bien sur l'écran « Join Instagram » (mot « Instagram »
   // OU le bouton), sinon inutile de taper à l'aveugle.
-  const onJoin = await hasText(key, deviceId, [/instagram/i, /^started$/i, /^get$/i], hooks, { tries: 5 })
+  const onJoin = await hasText(key, deviceId, [/instagram/i, /^started$/i], hooks, { tries: 5 })
   if (!onJoin) {
     hooks?.log?.('❌ Écran « Join Instagram » non détecté (container déjà connecté ?).')
     return { ok: false, stage: 'get_started' }
   }
-  if (!await findTapText(key, deviceId, [/^started$/i, /^get$/i, /^s.?inscrire$/i, /commencer/i], hooks, { label: 'Get started', tries: 3 })) {
-    hooks?.log?.('   « Get started » non lu → tap position connue (bouton bleu ~75%).')
-    await tapFrac(0.5, 0.75)
+  // « started » n'est QUE sur le bouton (« get » traîne dans « who get you » plus haut) ;
+  // on restreint aussi à la moitié basse pour ne jamais taper le texte de description.
+  if (!await findTapText(key, deviceId, [/^started$/i, /^s.?inscrire$/i, /commencer/i], hooks, { label: 'Get started', tries: 3, minY: 0.6 })) {
+    hooks?.log?.('   « Get started » non lu → tap position connue (bouton bleu ~80%).')
+    await tapFrac(0.5, 0.80)
   }
   await sleep(2800)
 
@@ -460,10 +462,10 @@ export async function createInstagramAccountByVision(
 
   // 3. Écran « Select a country » → barre de recherche → taper le terme.
   hooks?.log?.(`🔎 Recherche du pays « ${searchTerm} »…`)
-  if (!await findTapText(key, deviceId, [/^search$/i, /countr/i, /rechercher/i], hooks, { label: 'barre de recherche', tries: 4, maxY: 0.25 })) {
-    // Repli : taper la zone de la barre de recherche (tout en haut).
-    hooks?.log?.('   (barre non lue → tap position haute)')
-    await tapFrac(0.5, 0.11)
+  if (!await findTapText(key, deviceId, [/^search$/i, /countr/i, /rechercher/i], hooks, { label: 'barre de recherche', tries: 4, maxY: 0.3 })) {
+    // Repli : la barre de recherche est SOUS le titre « Select a country » (~15% de hauteur).
+    hooks?.log?.('   (barre non lue → tap position connue ~15%)')
+    await tapFrac(0.5, 0.15)
   }
   await sleep(1200)
   await sendAction(key, deviceId, { type: 'text', text: searchTerm })
