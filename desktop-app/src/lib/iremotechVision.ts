@@ -476,8 +476,33 @@ export async function createInstagramAccountByVision(
     hooks?.log?.('❌ « Next » (numéro) non détecté')
     return { ok: false, stage: 'next_number' }
   }
-  hooks?.log?.('✅ Numéro soumis — en attente du code SMS (étape suivante à brancher).')
+  hooks?.log?.('✅ Numéro soumis — en attente du code SMS.')
   return { ok: true, stage: 'number_submitted' }
+}
+
+// Saisit le code SMS reçu (écran « Enter the confirmation code ») puis valide.
+export async function enterSmsCodeByVision(key: string, deviceId: string, code: string, hooks?: VisionHooks): Promise<boolean> {
+  const shot0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('❌ écran illisible (code)'); return false }
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
+  hooks?.log?.(`🔢 Saisie du code SMS (${code})…`)
+  // Vérifie qu'on est bien sur l'écran de code (best-effort).
+  await hasText(key, deviceId, [/confirmation code/i, /enter the code/i, /code we sent/i, /code de confirmation/i, /enter code/i], hooks, { tries: 4 })
+  // Tape le champ de code (souvent centre-haut) puis saisit le code.
+  if (!await findTapText(key, deviceId, [/confirmation code/i, /enter code/i, /^code$/i], hooks, { label: 'champ code', tries: 3, maxY: 0.55 })) {
+    await tapFrac(0.5, 0.3)
+  }
+  await sleep(900)
+  await sendAction(key, deviceId, { type: 'text', text: code })
+  await sleep(1300)
+  // Bouton bleu « Next » / « Confirm ».
+  if (!await tapButton(key, deviceId, [/^next$/i, /^suivant$/i, /confirm/i, /^done$/i], { x: 0.5, y: 0.62 }, W, H, hooks, [0.4, 0.95], 'Valider code', 3, [0, 1])) {
+    hooks?.log?.('⚠ bouton de validation du code non détecté')
+    return false
+  }
+  hooks?.log?.('✅ Code soumis.')
+  return true
 }
 
 // ── Publication d'une STORY pilotée à la VISION (base — flow lien à compléter) ──

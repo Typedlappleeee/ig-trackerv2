@@ -12,7 +12,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision } from '@/lib/iremotechVision'
+import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -79,6 +80,8 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
   const [airplaneOn, setAirplaneOn] = useState(true)
   const [uniqueUse, setUniqueUse] = useState(false)
   const [parallel, setParallel] = useState(false)
+  const [sim5Key, setSim5Key] = useState(() => { try { return localStorage.getItem('sf-5sim-key') ?? '' } catch { return '' } })
+  const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('uk')
 
   const [running, setRunning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
@@ -210,18 +213,22 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
     setRunning(false); setRunId(null)
   }
 
-  // TEST création de compte : ouvre Instagram sur chaque container coché et joue le
-  // début du flow (Get started → Change → United Kingdom). Numéro à brancher (API SIM).
+  // Création de compte : ouvre IG sur chaque container coché → Get started → Change →
+  // pays choisi (UK ou USA). Si une clé 5sim est fournie : achète un numéro, le saisit,
+  // attend le SMS et rentre le code. Sinon on s'arrête après le choix du pays (test).
   async function createAccounts() {
     const key = irt.key
     if (!key) return
     const jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].map(c => ({ dev, c })))
     if (jobs.length === 0) { setLogs(['⚠ Coche au moins un container sur un téléphone.']); return }
+    const CFG = acctCountry === 'usa'
+      ? { label: /united\s*states/i, simCountry: 'usa', dial: '1', name: 'United States' }
+      : { label: /united\s*kingdom/i, simCountry: 'england', dial: '44', name: 'United Kingdom' }
     setRunning(true); setLogs([])
     const push = (m: string) => setLogs(l => [...l.slice(-400), m])
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-    const R = startRun('farm', `Création compte · ${jobs.length} container(s)`, jobs.length); setRunId(R.id)
-    push(`▶ Création de compte (test) : ${jobs.length} container(s)`)
+    const R = startRun('farm', `Création compte ${CFG.name} · ${jobs.length}`, jobs.length); setRunId(R.id)
+    push(`▶ Création de compte (${CFG.name})${sim5Key ? ' + numéro 5sim' : ' (test, sans numéro)'} : ${jobs.length} container(s)`)
     for (const { dev, c } of jobs) {
       if (R.isCancelled()) break
       const tag = `[${devices.find(d => d.public_id === dev)?.name ?? dev}·${c}]`
@@ -231,9 +238,35 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
       const opened = await selectContainerByVision(key, dev, c, hooks)
       if (!opened) { push(`${tag} ⏭ container non atteint`); R.tick(false); continue }
       await sleep(1500)
-      const r = await createInstagramAccountByVision(key, dev, {}, hooks)
-      push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`)
-      R.tick(r.ok)
+
+      // Sans clé 5sim → on va juste jusqu'au choix du pays (test).
+      if (!sim5Key) {
+        const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label }, hooks)
+        push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`); R.tick(r.ok); continue
+      }
+
+      // Avec 5sim : achète un numéro AVANT de saisir (fenêtre d'activation 15 min).
+      let order: { id: number; phone: string } | null = null
+      try {
+        push(`${tag} 🛒 achat d'un numéro ${CFG.name} (5sim)…`)
+        order = await fivesimBuy(sim5Key, { country: CFG.simCountry, product: 'instagram' })
+        push(`${tag} 📞 numéro : ${order.phone}`)
+      } catch (e) { push(`${tag} ✗ achat 5sim: ${e instanceof Error ? e.message : String(e)}`); R.tick(false); continue }
+
+      const num = localPhone(order.phone, CFG.dial)
+      const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, phoneNumber: num }, hooks)
+      if (r.stage !== 'number_submitted') {
+        push(`${tag} ✗ échec avant SMS (étape ${r.stage}) → annulation du numéro`)
+        try { await fivesimCancel(sim5Key, order.id) } catch { /* noop */ }
+        R.tick(false); continue
+      }
+      // Attend le code SMS puis le saisit.
+      const code = await fivesimWaitCode(sim5Key, order.id, { onLog: hooks.log, shouldStop: hooks.shouldStop, maxMs: 8 * 60_000 })
+      if (!code) { push(`${tag} ✗ pas de code SMS reçu → annulation`); try { await fivesimCancel(sim5Key, order.id) } catch { /* noop */ } R.tick(false); continue }
+      const okCode = await enterSmsCodeByVision(key, dev, code, hooks)
+      try { await fivesimFinish(sim5Key, order.id) } catch { /* noop */ }
+      push(`${tag} ${okCode ? '✓ compte : code saisi' : '⚠ code non validé (à vérifier)'}`)
+      R.tick(okCode)
     }
     R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'); setRunning(false); setRunId(null)
   }
@@ -377,15 +410,36 @@ export function BlowAutoPilot({ user, org }: { user: User; org: OrgState }) {
         </div>
       </div>
 
+      {/* 3bis · Création de compte (5sim) */}
+      <div style={card}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: INK, marginBottom: 8 }}>🆕 Création de compte Instagram</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 9, background: 'rgba(0,0,0,0.3)' }}>
+            {(['uk', 'usa'] as const).map(k => (
+              <button key={k} onClick={() => setAcctCountry(k)} style={{ height: 30, padding: '0 14px', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, fontWeight: 800, background: acctCountry === k ? GOLD : 'transparent', color: acctCountry === k ? '#1a1206' : MUTED }}>
+                {k === 'uk' ? '🇬🇧 United Kingdom' : '🇺🇸 United States'}
+              </button>
+            ))}
+          </div>
+          <input value={sim5Key} onChange={e => { setSim5Key(e.target.value); try { localStorage.setItem('sf-5sim-key', e.target.value) } catch { /* noop */ } }}
+            placeholder="Token 5sim (numéro + code SMS auto)" type="password"
+            style={{ flex: 1, minWidth: 200, height: 40, padding: '0 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.16)', color: INK, fontSize: 13 }} />
+          <button style={{ ...btn, height: 44, padding: '0 18px', opacity: running ? 0.5 : 1 }} disabled={running} onClick={createAccounts}
+            title="Ouvre IG sur chaque container coché et crée un compte (numéro + code SMS via 5sim si le token est renseigné)">
+            {running ? 'En cours…' : sim5Key ? '🆕 Créer les comptes' : '🆕 Tester le flow (sans numéro)'}
+          </button>
+        </div>
+        <div style={{ marginTop: 6, fontSize: 11.5, color: MUTED }}>
+          Sans token 5sim : va jusqu'au choix du pays (test). Avec token : achète un numéro {acctCountry === 'usa' ? '🇺🇸' : '🇬🇧'}, le saisit, attend le SMS et rentre le code. Containers « frais » (déconnectés) requis.
+        </div>
+      </div>
+
       {/* 4 · Lancer */}
       <div style={card}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12.5, color: MUTED }}>{totalJobs} publication(s) · {videoPool.length} {mode === 'story' ? 'photo(s)' : 'vidéo(s)'} · {captions.length} {mode === 'story' ? 'texte(s)' : 'légende(s)'}</span>
           {running && runId && <button style={{ ...btn, marginLeft: 'auto', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
-          <button style={{ ...btn, height: 44, padding: '0 16px', marginLeft: running ? 0 : 'auto', opacity: running ? 0.5 : 1 }} disabled={running} onClick={createAccounts} title="Ouvre IG sur chaque container coché et joue le début de la création de compte (Get started → United Kingdom)">
-            🆕 Créer un compte (test UK)
-          </button>
-          <button style={{ ...gold, height: 44, padding: '0 22px', fontSize: 14, opacity: totalJobs && videoPool.length && !running ? 1 : 0.5 }} disabled={!totalJobs || !videoPool.length || running} onClick={run}>
+          <button style={{ ...gold, height: 44, padding: '0 22px', marginLeft: running ? 0 : 'auto', fontSize: 14, opacity: totalJobs && videoPool.length && !running ? 1 : 0.5 }} disabled={!totalJobs || !videoPool.length || running} onClick={run}>
             {running ? 'En cours…' : `Lancer ${totalJobs} publication(s)`}
           </button>
         </div>
