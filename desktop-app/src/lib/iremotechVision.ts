@@ -462,9 +462,9 @@ export async function createInstagramAccountByVision(
 
   // 3. Écran « Select a country » → barre de recherche → taper le terme.
   hooks?.log?.(`🔎 Recherche du pays « ${searchTerm} »…`)
-  // Barre de recherche : tap DIRECT de sa position (sous le titre « Select a country »,
-  // ~18% de hauteur) — plus fiable que l'OCR pour focus le champ.
-  await tapFrac(0.5, 0.18)
+  // Barre de recherche : DOUBLE-tap de sa position (sous le titre « Select a country »,
+  // ~18% de hauteur) — un simple tap posait le curseur sans focus le champ.
+  await tapFrac(0.5, 0.18); await sleep(200); await tapFrac(0.5, 0.18)
   await sleep(1200)
   await sendAction(key, deviceId, { type: 'text', text: searchTerm })
   await sleep(1900)
@@ -485,9 +485,9 @@ export async function createInstagramAccountByVision(
     return { ok: true, stage: 'ready_for_number' }
   }
   hooks?.log?.('📱 Saisie du numéro de mobile…')
-  // Champ de saisie : PAS d'OCR (« number » traîne dans le titre « mobile number » en
-  // haut → mis-tap). On tape directement la position connue du champ (~31% de hauteur).
-  await tapFrac(0.5, 0.31)
+  // Champ de saisie : PAS d'OCR (« number » traîne dans le titre) → DOUBLE-tap direct de
+  // la position connue du champ (~31%) pour bien le focus.
+  await tapFrac(0.5, 0.31); await sleep(200); await tapFrac(0.5, 0.31)
   await sleep(1000)
   await sendAction(key, deviceId, { type: 'text', text: opts.phoneNumber })
   await sleep(1200)
@@ -509,9 +509,9 @@ export async function enterSmsCodeByVision(key: string, deviceId: string, code: 
   hooks?.log?.(`🔢 Saisie du code SMS (${code})…`)
   // Vérifie qu'on est bien sur l'écran de code (best-effort).
   await hasText(key, deviceId, [/confirmation/i, /^code$/i, /^enter$/i], hooks, { tries: 4 })
-  // Champ de code : PAS d'OCR (« code » traîne dans le titre) → tap direct de la position
-  // connue du champ (~30% de hauteur). Ajuste-moi ce chiffre si besoin sur capture.
-  await tapFrac(0.5, 0.30)
+  // Champ de code : PAS d'OCR (« code » traîne dans le titre) → DOUBLE-tap direct de la
+  // position connue du champ (~30%). Ajuste-moi ce chiffre si besoin sur capture.
+  await tapFrac(0.5, 0.30); await sleep(200); await tapFrac(0.5, 0.30)
   await sleep(900)
   await sendAction(key, deviceId, { type: 'text', text: code })
   await sleep(1300)
