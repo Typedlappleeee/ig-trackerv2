@@ -127,6 +127,13 @@ export async function herosmsCheckCode(apiKey: string, id: number): Promise<stri
   return null
 }
 
+// Test de la clé : appelle un endpoint authentifié léger. Renvoie {ok, auth?} ou l'erreur.
+export async function herosmsPing(apiKey: string): Promise<{ ok: boolean; auth?: string; error?: string }> {
+  const r = await call('ping', apiKey)
+  if (r.ok) return { ok: true, auth: (r as any).auth }
+  return { ok: false, error: errText(r) }
+}
+
 export async function herosmsFinish(apiKey: string, id: number): Promise<void> { await call('finish', apiKey, { id }) }
 export async function herosmsCancel(apiKey: string, id: number): Promise<void> { await call('cancel', apiKey, { id }) }
 

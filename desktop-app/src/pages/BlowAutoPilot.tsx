@@ -13,7 +13,7 @@ import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision } from '@/lib/iremotechVision'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
-import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel } from '@/lib/herosms'
+import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing } from '@/lib/herosms'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -526,9 +526,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           </div>
 
           {smsProvider === 'herosms' ? (
-            <input value={heroKey} onChange={e => { setHeroKey(e.target.value); try { localStorage.setItem('sf-herosms-key', e.target.value) } catch { /* noop */ } }}
-              placeholder="Token HeroSMS (numéro + code SMS auto)" type="password"
-              style={{ ...inp, width: '100%', height: 40, marginBottom: 8 }} />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input value={heroKey} onChange={e => { setHeroKey(e.target.value); try { localStorage.setItem('sf-herosms-key', e.target.value) } catch { /* noop */ } }}
+                placeholder="Token HeroSMS (numéro + code SMS auto)" type="password"
+                style={{ ...inp, flex: 1, height: 40 }} />
+              <button style={{ ...btn, height: 40, padding: '0 14px' }} disabled={!heroKey || running}
+                onClick={async () => {
+                  setLogs(['🔑 Test de la clé HeroSMS…'])
+                  const r = await herosmsPing(heroKey)
+                  push(r.ok ? `✓ clé HeroSMS valide (auth: ${r.auth ?? '?'})` : `✗ clé refusée : ${r.error}`)
+                }}>Tester la clé</button>
+            </div>
           ) : (
             <input value={sim5Key} onChange={e => { setSim5Key(e.target.value); try { localStorage.setItem('sf-5sim-key', e.target.value) } catch { /* noop */ } }}
               placeholder="Token 5sim (numéro + code SMS auto)" type="password"
