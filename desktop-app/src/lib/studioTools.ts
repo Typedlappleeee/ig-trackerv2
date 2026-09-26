@@ -318,7 +318,7 @@ export async function runCaption(input: Uint8Array, text: string, pos: CaptionPo
 
 // ── Sous-titres : audio → Groq Whisper (au MOT) → groupes de 2–4 mots → overlay ──
 // Position centre-bas (~75 % de hauteur), texte gros qui défile groupe par groupe.
-const SUB_MAX_WORDS = 3       // 2–4 mots par groupe (on vise 3)
+const SUB_MAX_WORDS = 2       // 1–2 mots par groupe (défilé rapide, gros texte)
 const SUB_Y_FRAC    = 0.75    // hauteur du centre du sous-titre (0 = haut, 1 = bas)
 const SUB_PAUSE_GAP = 0.45    // silence (s) qui force une coupure de groupe
 const SUB_HOLD_MAX  = 0.6     // s : prolongation max d'un groupe pour éviter le clignotement
@@ -432,7 +432,7 @@ async function sha256Hex(data: Uint8Array): Promise<string> {
 // ── Réglages du style des sous-titres AUTO (faciles à ajuster) ─────────────────
 // Taille = fraction de la largeur vidéo (0.058 ≈ gros, style viral). Police : très
 // grasse et arrondie ; on tombe sur Arial Black si la 1re n'est pas installée.
-const SUB_FONT_FRAC   = 0.044
+const SUB_FONT_FRAC   = 0.065
 const SUB_FONT_FAMILY = `"Arial Black", system-ui, Arial, sans-serif`
 
 // ── Texte → PNG transparent via canvas (pas besoin de police côté ffmpeg) ──────
