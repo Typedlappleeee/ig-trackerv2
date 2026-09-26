@@ -2,7 +2,7 @@
 // source (banque ou PC) et produit un mp4 prêt à poster, enregistré dans la banque.
 import { supabase } from './supabase'
 import { runFfmpeg, fetchInput } from './ffmpeg'
-import { transcribeGroq, type Segment } from './subtitles'
+import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
 
 export interface SourceRef { id?: string; title: string; storage_path?: string | null; file_url?: string | null }
@@ -313,23 +313,57 @@ export async function runCaption(input: Uint8Array, text: string, pos: CaptionPo
   })
 }
 
-// ── Sous-titres : audio → Groq Whisper → PNG par segment → overlay minuté ──────
+// ── Sous-titres : audio → Groq Whisper (au MOT) → groupes de 2–4 mots → overlay ──
+// Position centre-bas (~75 % de hauteur), texte gros qui défile groupe par groupe.
+const SUB_MAX_WORDS = 3       // 2–4 mots par groupe (on vise 3)
+const SUB_Y_FRAC    = 0.75    // hauteur du centre du sous-titre (0 = haut, 1 = bas)
+const SUB_PAUSE_GAP = 0.45    // silence (s) qui force une coupure de groupe
+const SUB_HOLD_MAX  = 0.6     // s : prolongation max d'un groupe pour éviter le clignotement
+
+// Regroupe les mots en blocs de 2–4 mots, en coupant aussi sur les pauses et la
+// ponctuation forte. Chaque bloc porte le start du 1er mot et le end du dernier.
+function groupWords(words: Segment[], maxWords = SUB_MAX_WORDS): Segment[] {
+  const blocks: Segment[] = []
+  let cur: Segment[] = []
+  const flush = () => {
+    if (!cur.length) return
+    blocks.push({ start: cur[0].start, end: cur[cur.length - 1].end, text: cur.map(w => w.text).join(' ') })
+    cur = []
+  }
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]
+    cur.push(w)
+    const next = words[i + 1]
+    const endsSentence = /[.!?…:]$/.test(w.text)
+    const bigPause = next ? (next.start - w.end) > SUB_PAUSE_GAP : false
+    if (cur.length >= maxWords || endsSentence || bigPause) flush()
+  }
+  flush()
+  return blocks
+}
+
 export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks): Promise<Uint8Array> {
   h?.onLog?.('🎧 Extraction audio…')
   const audio = await runFfmpeg({ input, args: ['-vn', '-ar', '16000', '-ac', '1', '-c:a', 'libmp3lame', '-q:a', '5'], outName: 'a.mp3' })
-  h?.onLog?.('📝 Transcription (Groq Whisper)…')
-  const segments = await transcribeGroq(groqKey, new Blob([audio as BlobPart], { type: 'audio/mpeg' }))
-  if (segments.length === 0) throw new Error('Transcription vide')
-  h?.onLog?.(`🖊 ${segments.length} segments — incrustation…`)
-  // Un PNG (1080px) par segment, overlay activé entre ses timecodes. Chaîne d'overlays.
+  h?.onLog?.('📝 Transcription au mot (Groq Whisper)…')
+  const words = await transcribeWordsGroq(groqKey, new Blob([audio as BlobPart], { type: 'audio/mpeg' }))
+  if (words.length === 0) throw new Error('Transcription vide')
+  const blocks = groupWords(words)
+  h?.onLog?.(`🖊 ${blocks.length} groupes (2–4 mots) — incrustation…`)
+  // Un PNG (1080px) par groupe, overlay activé entre ses timecodes. Chaîne d'overlays.
   const extra: { name: string; data: Uint8Array }[] = []
   let chain = ''
   let cursor = '[0:v]'
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i]
-    extra.push({ name: `s${i}.png`, data: await textToPng(seg.text, 1080, true) })
-    const out = i === segments.length - 1 ? '[vv]' : `[v${i}]`
-    chain += `${cursor}[${i + 1}:v]overlay=(W-w)/2:H-h-H*0.08:enable='between(t,${seg.start.toFixed(2)},${seg.end.toFixed(2)})'${out};`
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i]
+    // Prolonge l'affichage jusqu'au groupe suivant (max SUB_HOLD_MAX) → pas de clignotement.
+    const nextStart = blocks[i + 1]?.start ?? (b.end + SUB_HOLD_MAX)
+    const end = Math.min(nextStart, b.end + SUB_HOLD_MAX)
+    extra.push({ name: `s${i}.png`, data: await textToPng(b.text, 1080, true) })
+    const out = i === blocks.length - 1 ? '[vv]' : `[v${i}]`
+    // Centre vertical à SUB_Y_FRAC de la hauteur (le PNG est centré sur ce point).
+    const y = `(H*${SUB_Y_FRAC.toFixed(3)})-(h/2)`
+    chain += `${cursor}[${i + 1}:v]overlay=(W-w)/2:${y}:enable='between(t,${b.start.toFixed(2)},${end.toFixed(2)})'${out};`
     cursor = `[v${i}]`
   }
   chain += `[vv]${EVEN}[v]`
@@ -341,6 +375,12 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
   })
 }
 
+// ── Réglages du style des sous-titres AUTO (faciles à ajuster) ─────────────────
+// Taille = fraction de la largeur vidéo (0.058 ≈ gros, style viral). Police : très
+// grasse et arrondie ; on tombe sur Arial Black si la 1re n'est pas installée.
+const SUB_FONT_FRAC   = 0.058
+const SUB_FONT_FAMILY = `"Arial Black", system-ui, Arial, sans-serif`
+
 // ── Texte → PNG transparent via canvas (pas besoin de police côté ffmpeg) ──────
 // style 'outline' : texte blanc contour noir (par défaut). 'snapchat' : bande noire
 // translucide pleine largeur + texte blanc centré (rendu story/Snapchat).
@@ -348,11 +388,14 @@ export type CaptionStyle = 'outline' | 'snapchat'
 export async function textToPng(text: string, width: number, subtitle = false, style: CaptionStyle = 'outline'): Promise<Uint8Array> {
   const snap = style === 'snapchat'
   const padX = Math.round(width * (snap ? 0.05 : 0.04))
-  const fontSize = subtitle ? Math.round(width * 0.045) : Math.round(width * (snap ? 0.034 : 0.052))
-  // Snapchat : Helvetica RÉGULIER ; sinon Arial gras (contour).
+  // Sous-titres auto : plus gros (groupes de 2–4 mots, style viral centre-bas).
+  const fontSize = subtitle ? Math.round(width * SUB_FONT_FRAC) : Math.round(width * (snap ? 0.034 : 0.052))
+  // Snapchat : Helvetica régulier. Sous-titres auto : très gras arrondi. Sinon Arial gras.
   const font = snap
     ? `400 ${fontSize}px Helvetica, "Helvetica Neue", Arial, sans-serif`
-    : `700 ${fontSize}px system-ui, Arial, sans-serif`
+    : subtitle
+      ? `800 ${fontSize}px ${SUB_FONT_FAMILY}`
+      : `700 ${fontSize}px system-ui, Arial, sans-serif`
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
   ctx.font = font
@@ -366,8 +409,9 @@ export async function textToPng(text: string, width: number, subtitle = false, s
     if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w } else cur = t
   }
   if (cur) lines.push(cur)
-  const vpad = Math.round(fontSize * (snap ? 0.42 : 0.4))
-  const lineH = Math.round(fontSize * (snap ? 1.05 : 1.32))
+  // Sous-titres : padding vertical plus grand pour ne pas rogner l'ombre portée.
+  const vpad = Math.round(fontSize * (snap ? 0.42 : subtitle ? 0.6 : 0.4))
+  const lineH = Math.round(fontSize * (snap ? 1.05 : subtitle ? 1.22 : 1.32))
   const height = lines.length * lineH + vpad * 2
   canvas.width = width; canvas.height = height
   ctx.font = font
@@ -381,10 +425,24 @@ export async function textToPng(text: string, width: number, subtitle = false, s
   } else {
     lines.forEach((ln, i) => {
       const cy = vpad + i * lineH + lineH / 2
-      // Contour noir + remplissage blanc (lisible sur toute vidéo).
-      ctx.lineWidth = Math.round(fontSize * 0.16); ctx.strokeStyle = 'rgba(0,0,0,0.9)'
-      ctx.strokeText(ln, width / 2, cy)
-      ctx.fillStyle = '#fff'; ctx.fillText(ln, width / 2, cy)
+      if (subtitle) {
+        // Sous-titre auto : ombre portée douce + contour noir net + blanc pur (rendu « propre »).
+        ctx.save()
+        ctx.shadowColor = 'rgba(0,0,0,0.55)'
+        ctx.shadowBlur = Math.round(fontSize * 0.22)
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = Math.round(fontSize * 0.05)
+        ctx.lineJoin = 'round'
+        ctx.lineWidth = Math.round(fontSize * 0.14); ctx.strokeStyle = 'rgba(0,0,0,0.92)'
+        ctx.strokeText(ln, width / 2, cy)
+        ctx.restore()
+        ctx.fillStyle = '#fff'; ctx.fillText(ln, width / 2, cy)
+      } else {
+        // Contour noir + remplissage blanc (lisible sur toute vidéo).
+        ctx.lineWidth = Math.round(fontSize * 0.16); ctx.strokeStyle = 'rgba(0,0,0,0.9)'
+        ctx.strokeText(ln, width / 2, cy)
+        ctx.fillStyle = '#fff'; ctx.fillText(ln, width / 2, cy)
+      }
     })
   }
   const blob: Blob = await new Promise(res => canvas.toBlob(b => res(b!), 'image/png'))
