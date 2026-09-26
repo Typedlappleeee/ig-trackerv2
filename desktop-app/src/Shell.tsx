@@ -11,7 +11,7 @@ export type PageKey =
   | 'studio'
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
-  | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtAccount'
+  | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount'
   | 'scheduled'
   | 'admin'
   | 'settings'
@@ -28,6 +28,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       { g: 'Automatisation', items: [
         { k: 'irtPosting', l: 'Posting', i: 'M12 2v4|M12 18v4|M4.9 4.9l2.8 2.8|M16.3 16.3l2.8 2.8|M2 12h4|M18 12h4|M4.9 19.1l2.8-2.8|M16.3 7.7l2.8-2.8' },
         { k: 'irtStory', l: 'Story', i: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M12 8v4l3 2' },
+        { k: 'irtWarmup', l: 'Warm-up', i: 'M12 2s5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 1-3s0 2 2 2 1-4-2-6c3 1 4 4 4 4' },
         { k: 'irtAccount', l: 'Création de compte', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M19 8v6|M22 11h-6' },
       ] },
     ]
@@ -112,6 +113,7 @@ const TITLES: Record<PageKey, string[]> = {
   irtPhones: ['iRemoTech', 'Téléphones'],
   irtPosting: ['iRemoTech', 'Posting'],
   irtStory: ['iRemoTech', 'Story'],
+  irtWarmup: ['iRemoTech', 'Warm-up'],
   irtAccount: ['iRemoTech', 'Création de compte'],
   scheduled: ['Diffusion', 'Programmé'],
   admin: ['Admin', 'Licences'],

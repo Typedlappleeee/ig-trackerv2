@@ -11,7 +11,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision } from '@/lib/iremotechVision'
+import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe } from '@/lib/herosms'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
@@ -23,7 +24,7 @@ const BLOW_THEME = themeFor('blowsome')
 
 const GOLD = '#E9C46A', INK = '#ECE9F5', MUTED = '#A79FBD', DIM = '#6b6478', SERIF = "'Space Grotesk',sans-serif"
 type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null }
-export type IrtTab = 'phones' | 'posting' | 'story' | 'account'
+export type IrtTab = 'phones' | 'posting' | 'story' | 'warmup' | 'account'
 
 const card: CSSProperties = { background: 'linear-gradient(168deg,rgba(24,20,44,0.5),rgba(12,10,22,0.6))', border: '1px solid rgba(216,180,254,0.12)', borderRadius: 16, padding: 18, marginBottom: 14 }
 const btn: CSSProperties = { height: 34, padding: '0 13px', borderRadius: 9, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(216,180,254,0.16)', color: INK }
@@ -89,6 +90,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [heroKey, setHeroKey] = useState(() => { try { return localStorage.getItem('sf-herosms-key') ?? '' } catch { return '' } })
   const [smsProvider, setSmsProvider] = useState<'5sim' | 'herosms'>(() => { try { return (localStorage.getItem('sf-sms-provider') as '5sim' | 'herosms') || '5sim' } catch { return '5sim' } })
   const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('uk')
+  // Warm-up
+  const [wPreset, setWPreset] = useState<'careful' | 'balanced' | 'aggressive' | 'custom'>('balanced')
+  const [wDurMin, setWDurMin] = useState(8)     // minutes (custom)
+  const [wDurMax, setWDurMax] = useState(12)
+  const [wLikePct, setWLikePct] = useState(5)   // %
+  const [wCommentPct, setWCommentPct] = useState(0)
+  const [wComments, setWComments] = useState('')
 
   const [running, setRunning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
@@ -287,6 +295,59 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'); setRunning(false); setRunId(null)
   }
 
+  // Réglages warm-up dérivés du preset (comme l'outil : Careful/Balanced/Aggressive).
+  function warmupCfg(): { minMs: number; maxMs: number; likeRate: number; commentRate: number; comments: string[] } {
+    const comments = wComments.split('\n').map(s => s.trim()).filter(Boolean)
+    if (wPreset === 'careful')    return { minMs: 5 * 60_000, maxMs: 8 * 60_000, likeRate: 0.02, commentRate: 0, comments }
+    if (wPreset === 'balanced')   return { minMs: 8 * 60_000, maxMs: 12 * 60_000, likeRate: 0.05, commentRate: 0, comments }
+    if (wPreset === 'aggressive') return { minMs: 12 * 60_000, maxMs: 15 * 60_000, likeRate: 0.12, commentRate: 0, comments }
+    // custom
+    const lo = Math.max(1, Math.min(15, wDurMin)), hi = Math.max(lo, Math.min(15, wDurMax))
+    return { minMs: lo * 60_000, maxMs: hi * 60_000, likeRate: wLikePct / 100, commentRate: (comments.length ? wCommentPct : 0) / 100, comments }
+  }
+
+  // Warm-up par conteneur, avec rotation d'IP (mode avion) entre chaque — ce que
+  // l'outil externe ne fait pas.
+  async function runWarmup() {
+    if (!irt.key || running) return
+    const key = irt.key
+    const cfg = warmupCfg()
+    const byPhone = [...sel].map(dev => ({
+      dev, name: devices.find(d => d.public_id === dev)?.name ?? dev,
+      conts: [...(selConts[dev] ?? new Set())],
+    })).filter(p => p.conts.length)
+    if (byPhone.length === 0) { setLogs(['⚠ Coche au moins un conteneur (sélecteur en haut).']); return }
+    setRunning(true); setLogs([])
+    const total = byPhone.reduce((n, p) => n + p.conts.length, 0)
+    const R = startRun('farm', `Warm-up iRemoTech · ${total} compte(s)`, total); setRunId(R.id)
+    push(`▶ Warm-up (${wPreset}) : ${byPhone.length} iPhone(s) · ${total} compte(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
+
+    const runPhone = async (p: typeof byPhone[number]) => {
+      const tag = `[${p.name}]`
+      const hooks = { log: (m: string) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() }
+      await recalibrateTouch(key, p.dev, hooks)
+      for (const c of p.conts) {
+        if (R.isCancelled()) break
+        push(`\n${tag} 🔥 conteneur « ${c} »`)
+        if (airplaneOn) await airplaneReset(key, p.dev, hooks)
+        const opened = await selectContainerByVision(key, p.dev, c, hooks)
+        if (!opened) { push(`${tag} ⏭ conteneur non atteint`); R.tick(false); continue }
+        await sleep(1200)
+        const started = Date.now()
+        let res
+        try { res = await warmupByVision(key, p.dev, cfg, hooks) } catch (e) { push(`${tag} ✗ ${e instanceof Error ? e.message : String(e)}`) }
+        const durationSec = Math.round((Date.now() - started) / 1000)
+        const result: 'completed' | 'stopped' | 'failed' = res?.ok ? (R.isCancelled() ? 'stopped' : 'completed') : 'failed'
+        addWarmupSession({ at: Date.now(), device: p.dev, deviceName: p.name, container: c, durationSec, reels: res?.reels ?? 0, likes: res?.likes ?? 0, comments: res?.comments ?? 0, result })
+        R.tick(!!res?.ok)
+      }
+    }
+
+    if (parallel) await Promise.all(byPhone.map(runPhone))
+    else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
+    R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Warm-up terminé.'); setRunning(false); setRunId(null)
+  }
+
   if (!irt.key) {
     return (
       <div>
@@ -388,6 +449,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     { k: 'phones', label: 'Téléphones', icon: '📱' },
     { k: 'posting', label: 'Posting', icon: '🎬' },
     { k: 'story', label: 'Story', icon: '📸' },
+    { k: 'warmup', label: 'Warm-up', icon: '🔥' },
     { k: 'account', label: 'Création de compte', icon: '🆕' },
   ]
 
@@ -497,6 +559,48 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         </div>
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />
         <LaunchBar label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || !storyPool.length || running} running={running} onClick={() => run('story')} />
+        <LogPanel />
+      </>)}
+
+      {/* ─────────────── ONGLET WARM-UP ─────────────── */}
+      {curTab === 'warmup' && (<>
+        {phonePicker()}
+        <div style={card}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 3 }}>🔥 Warm-up</div>
+          <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Active chaque compte façon humaine (scroll Reels, regard, like…), un conteneur après l'autre, avec <b>rotation d'IP entre chaque</b> (mode avion).</p>
+
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, marginBottom: 7 }}>Intensité</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+            {([['careful', 'Careful', '5–8 min · 2%'], ['balanced', 'Balanced', '8–12 min · 5%'], ['aggressive', 'Aggressive', '12–15 min · 12%'], ['custom', 'Custom', 'sur mesure']] as const).map(([k, l, sub]) => (
+              <button key={k} onClick={() => setWPreset(k)} style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start', padding: '8px 14px', border: 'none', borderRadius: 10, cursor: 'pointer', background: wPreset === k ? GOLD : 'rgba(255,255,255,0.03)', color: wPreset === k ? '#1a1206' : INK, boxShadow: wPreset === k ? 'none' : 'inset 0 0 0 1px rgba(216,180,254,0.16)' }}>
+                <span style={{ fontSize: 13, fontWeight: 800 }}>{l}</span>
+                <span style={{ fontSize: 10.5, opacity: 0.8 }}>{sub}</span>
+              </button>
+            ))}
+          </div>
+
+          {wPreset === 'custom' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 6 }}>
+              <label style={{ fontSize: 12, color: MUTED }}>Durée min (min)
+                <input type="number" min={1} max={15} value={wDurMin} onChange={e => setWDurMin(+e.target.value)} style={{ ...inp, width: '100%', height: 34, marginTop: 4 }} /></label>
+              <label style={{ fontSize: 12, color: MUTED }}>Durée max (min)
+                <input type="number" min={1} max={15} value={wDurMax} onChange={e => setWDurMax(+e.target.value)} style={{ ...inp, width: '100%', height: 34, marginTop: 4 }} /></label>
+              <label style={{ fontSize: 12, color: MUTED }}>Taux de like (%)
+                <input type="number" min={0} max={100} value={wLikePct} onChange={e => setWLikePct(+e.target.value)} style={{ ...inp, width: '100%', height: 34, marginTop: 4 }} /></label>
+              <label style={{ fontSize: 12, color: MUTED }}>Taux de comment (%)
+                <input type="number" min={0} max={100} value={wCommentPct} onChange={e => setWCommentPct(+e.target.value)} style={{ ...inp, width: '100%', height: 34, marginTop: 4 }} /></label>
+            </div>
+          )}
+          {wPreset === 'custom' && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, margin: '10px 0 6px' }}>Commentaires (un par ligne, au hasard — laisse vide pour ne pas commenter)</div>
+              <textarea value={wComments} onChange={e => setWComments(e.target.value)} rows={2} placeholder={'🔥\ntrop bien\n😍'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 46, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
+            </>
+          )}
+          <p style={{ margin: '8px 0 0', fontSize: 11, color: DIM }}>Chaque session est aléatoire (durée, temps de visionnage, reels likés) pour rester crédible.</p>
+        </div>
+        <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />
+        <LaunchBar label={`Lancer le warm-up (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={runWarmup} />
         <LogPanel />
       </>)}
 

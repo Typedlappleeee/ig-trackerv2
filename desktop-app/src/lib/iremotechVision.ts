@@ -524,6 +524,100 @@ export async function enterSmsCodeByVision(key: string, deviceId: string, code: 
   return true
 }
 
+// ── Warm-up piloté à la VISION (activité humaine sur les Reels) ────────────────
+// Après selectContainerByVision (IG ouvert), on va sur l'onglet Reels puis, pendant
+// une durée tirée au hasard, on défile : on regarde chaque reel un temps aléatoire
+// (parfois un « glance » court), on like selon un taux, on commente selon un taux.
+// Comportement aléatoire à chaque session → reste humain.
+export interface WarmupOpts {
+  minMs: number            // durée mini de la session (ms)
+  maxMs: number            // durée maxi de la session (ms)
+  likeRate: number         // 0..1 : proba de liker un reel
+  commentRate?: number     // 0..1 : proba de commenter un reel
+  comments?: string[]      // pool de commentaires (tirés au hasard)
+  glanceRate?: number      // 0..1 : proba de « glance » (regard court) — défaut 0.25
+}
+export interface WarmupResult { ok: boolean; reels: number; likes: number; comments: number }
+
+const REELS_TAB = { x: 0.70, y: 0.965 } // onglet Reels dans la barre du bas (5 icônes)
+const rnd = (a: number, b: number) => a + Math.random() * (b - a)
+
+export async function warmupByVision(key: string, deviceId: string, opts: WarmupOpts, hooks?: VisionHooks): Promise<WarmupResult> {
+  const shot0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('❌ écran illisible (warm-up)'); return { ok: false, reels: 0, likes: 0, comments: 0 } }
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
+  const glanceRate = opts.glanceRate ?? 0.25
+
+  // 0. Fermer un éventuel popup, puis ouvrir l'onglet Reels.
+  await dismissPopups(key, deviceId, hooks)
+  hooks?.log?.('🔥 Warm-up : ouverture des Reels…')
+  await tapFrac(REELS_TAB.x, REELS_TAB.y)
+  await sleep(2800)
+
+  const duration = Math.round(rnd(opts.minMs, opts.maxMs))
+  const endAt = Date.now() + duration
+  hooks?.log?.(`   session ~${Math.round(duration / 1000)}s (like ${Math.round(opts.likeRate * 100)}%${opts.commentRate ? `, comment ${Math.round(opts.commentRate * 100)}%` : ''})`)
+  let reels = 0, likes = 0, comments = 0
+
+  while (Date.now() < endAt) {
+    if (hooks?.shouldStop?.()) break
+    // Regarder le reel : dwell aléatoire (glance court OU visionnage plus long).
+    const glance = Math.random() < glanceRate
+    await sleep(Math.round(glance ? rnd(800, 2200) : rnd(3500, 9000)))
+    reels++
+    if (hooks?.shouldStop?.()) break
+
+    // Like (double-tap au centre) selon le taux.
+    if (Math.random() < opts.likeRate) {
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.5 * W), y: Math.round(0.45 * H) })
+      await sleep(150)
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.5 * W), y: Math.round(0.45 * H) })
+      likes++
+      hooks?.log?.(`   ❤️ like (${likes})`)
+      await sleep(Math.round(rnd(600, 1400)))
+    }
+
+    // Commentaire (best-effort) selon le taux.
+    if (opts.commentRate && opts.comments && opts.comments.length && Math.random() < opts.commentRate) {
+      const text = opts.comments[Math.floor(Math.random() * opts.comments.length)]
+      const ok = await tryComment(key, deviceId, text, W, H, hooks)
+      if (ok) { comments++; hooks?.log?.(`   💬 commenté : "${text}"`) }
+    }
+
+    // Reel suivant : swipe vers le haut.
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(0.5 * W), y1: Math.round(0.80 * H), x2: Math.round(0.5 * W), y2: Math.round(0.20 * H), duration_ms: 350 })
+    await sleep(Math.round(rnd(500, 1300)))
+  }
+
+  hooks?.log?.(`🏁 Warm-up terminé : ${reels} reels · ${likes} likes · ${comments} comments.`)
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1000)
+  return { ok: true, reels, likes, comments }
+}
+
+// Poste un commentaire sur le reel courant (best-effort) : ouvre les commentaires
+// (icône bulle, droite), tape le champ, écrit, poste, puis referme.
+async function tryComment(key: string, deviceId: string, text: string, W: number, H: number, hooks?: VisionHooks): Promise<boolean> {
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
+  try {
+    await tapFrac(0.92, 0.55)   // icône commentaire (colonne d'actions à droite)
+    await sleep(1800)
+    await tapFrac(0.5, 0.92)    // champ « Add a comment… » en bas
+    await sleep(1000)
+    await sendAction(key, deviceId, { type: 'text', text })
+    await sleep(800)
+    // Bouton d'envoi (flèche/Post) à droite du champ, sinon on abandonne proprement.
+    if (!await tapButton(key, deviceId, [/^post$/i, /^send$/i, /publier/i, /envoyer/i], { x: 0.92, y: 0.92 }, W, H, hooks, [0.85, 1], 'Post commentaire', 2, [0.6, 1])) {
+      await sendAction(key, deviceId, { type: 'press', name: 'back' }); return false
+    }
+    await sleep(900)
+    await sendAction(key, deviceId, { type: 'press', name: 'back' }) // referme la feuille commentaires
+    await sleep(700)
+    return true
+  } catch { return false }
+}
+
 // ── Publication d'une STORY pilotée à la VISION (base — flow lien à compléter) ──
 // Chemin (Instagram EN) d'après captures : (+ créateur) → mode STORY → galerie
 // (vignette bas-gauche) → 1re vidéo (dernière uploadée) → Done (haut-droite) →
