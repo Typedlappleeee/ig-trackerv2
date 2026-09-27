@@ -551,9 +551,11 @@ const FR_FIRST = ['Camille', 'Léa', 'Manon', 'Chloé', 'Sarah', 'Emma', 'Julie'
 const FR_LAST = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Michel', 'Garcia', 'Roux', 'Fontaine', 'Girard', 'Bonnet', 'Dupont', 'Lambert', 'Fournier', 'Rousseau', 'Vincent', 'Faure', 'André', 'Mercier', 'Blanc', 'Guerin', 'Boyer', 'Garnier', 'Chevalier']
 const pick = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)]
 function randomPassword(n = 15): string {
-  const U = 'ABCDEFGHJKLMNPQRSTUVWXYZ', L = 'abcdefghijkmnpqrstuvwxyz', D = '23456789', S = '!@#$%&*?'
-  const all = U + L + D + S
-  const p = [pick([...U]), pick([...L]), pick([...D]), pick([...S])]
+  // Alphanumérique uniquement : les caractères spéciaux cassent la saisie iRemoTech sur le
+  // champ mot de passe (et IG n'exige que « 6 lettres/chiffres »).
+  const U = 'ABCDEFGHJKLMNPQRSTUVWXYZ', L = 'abcdefghijkmnpqrstuvwxyz', D = '23456789'
+  const all = U + L + D
+  const p = [pick([...U]), pick([...L]), pick([...D])]
   while (p.length < n) p.push(all[Math.floor(Math.random() * all.length)])
   for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[p[i], p[j]] = [p[j], p[i]] }
   return p.join('')
@@ -582,8 +584,19 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   hooks?.log?.('🔑 Mot de passe…')
   // Champ ciblé par son placeholder « Password » (zone Y pour éviter le titre « Create a password »).
   if (!await findTapText(key, deviceId, [/^password$/i], hooks, { label: 'champ mot de passe', tries: 3, minY: 0.25, maxY: 0.42 })) await tapFrac(0.5, 0.31)
-  await sleep(800)
+  await sleep(500)
+  // Champ MASQUÉ (secure) → on révèle via l'icône œil (droite, même ligne) pour fiabiliser
+  // la saisie, puis on re-focus le champ (à gauche de l'œil) avant de taper.
+  await tapFrac(0.90, 0.31); await sleep(400)
+  await tapFrac(0.35, 0.31); await sleep(500)
   await sendAction(key, deviceId, { type: 'text', text: password })
+  await sleep(700)
+  // Filet : si le champ est resté vide (saisie en bloc refusée), on retape char par char.
+  if (await hasText(key, deviceId, [/can.?t be empty/i, /vide/i], hooks, { cropY: [0.25, 0.5], tries: 1 })) {
+    hooks?.log?.('   ↻ saisie en bloc refusée → char par char…')
+    await tapFrac(0.35, 0.31); await sleep(400)
+    for (const ch of password) { await sendAction(key, deviceId, { type: 'text', text: ch }); await sleep(60) }
+  }
   await sleep(700)
   await tapNext('Next (mot de passe)')
   await sleep(3200)
