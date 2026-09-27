@@ -580,7 +580,9 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   await hasText(key, deviceId, [/password/i, /mot de passe/i], hooks, { tries: 5 })
   const password = randomPassword(15)
   hooks?.log?.('🔑 Mot de passe…')
-  await tapFrac(0.5, 0.20); await sleep(800)
+  // Champ ciblé par son placeholder « Password » (zone Y pour éviter le titre « Create a password »).
+  if (!await findTapText(key, deviceId, [/^password$/i], hooks, { label: 'champ mot de passe', tries: 3, minY: 0.25, maxY: 0.42 })) await tapFrac(0.5, 0.31)
+  await sleep(800)
   await sendAction(key, deviceId, { type: 'text', text: password })
   await sleep(700)
   await tapNext('Next (mot de passe)')
@@ -600,7 +602,8 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   // 3. Full name : nom de femme française aléatoire.
   const first = pick(FR_FIRST), fullName = `${first} ${pick(FR_LAST)}`
   hooks?.log?.(`🧑 Nom : ${fullName}`)
-  await tapFrac(0.5, 0.22); await sleep(700)
+  if (!await findTapText(key, deviceId, [/full name/i, /nom complet/i], hooks, { label: 'champ nom', tries: 3, minY: 0.15, maxY: 0.35 })) await tapFrac(0.5, 0.25)
+  await sleep(700)
   await sendAction(key, deviceId, { type: 'text', text: fullName })
   await sleep(600)
   await tapNext('Next (nom)')
