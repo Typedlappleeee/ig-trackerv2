@@ -546,6 +546,100 @@ export async function requestSmsResendByVision(key: string, deviceId: string, ho
   return true
 }
 
+// ── Fin d'inscription IG : mot de passe → anniversaire → nom → username → I agree ──
+const FR_FIRST = ['Camille', 'Léa', 'Manon', 'Chloé', 'Sarah', 'Emma', 'Julie', 'Marie', 'Laura', 'Clara', 'Inès', 'Jade', 'Louise', 'Alice', 'Lucie', 'Anaïs', 'Océane', 'Pauline', 'Justine', 'Élise', 'Margaux', 'Célia', 'Zoé', 'Ambre', 'Lina', 'Nina', 'Romane', 'Eva', 'Lola', 'Maëva']
+const FR_LAST = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Michel', 'Garcia', 'Roux', 'Fontaine', 'Girard', 'Bonnet', 'Dupont', 'Lambert', 'Fournier', 'Rousseau', 'Vincent', 'Faure', 'André', 'Mercier', 'Blanc', 'Guerin', 'Boyer', 'Garnier', 'Chevalier']
+const pick = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)]
+function randomPassword(n = 15): string {
+  const U = 'ABCDEFGHJKLMNPQRSTUVWXYZ', L = 'abcdefghijkmnpqrstuvwxyz', D = '23456789', S = '!@#$%&*?'
+  const all = U + L + D + S
+  const p = [pick([...U]), pick([...L]), pick([...D]), pick([...S])]
+  while (p.length < n) p.push(all[Math.floor(Math.random() * all.length)])
+  for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[p[i], p[j]] = [p[j], p[i]] }
+  return p.join('')
+}
+function randomUsername(first: string): string {
+  const n = 5 + Math.floor(Math.random() * 4) // 5–8
+  const ch = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let s = ''; for (let i = 0; i < n; i++) s += ch[Math.floor(Math.random() * ch.length)]
+  const base = first.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '')
+  return base + s
+}
+
+export interface SignupCreds { username: string; password: string; fullName: string }
+export async function completeSignupByVision(key: string, deviceId: string, hooks?: VisionHooks): Promise<{ ok: boolean; creds?: SignupCreds }> {
+  const shot0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('❌ écran illisible (inscription)'); return { ok: false } }
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
+  const tapNext = async (label: string) => {
+    if (!await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], { x: 0.5, y: 0.4 }, W, H, hooks, [0.25, 0.55], label, 3, [0, 1])) await tapFrac(0.5, 0.36)
+  }
+
+  // 1. Create a password.
+  await hasText(key, deviceId, [/password/i, /mot de passe/i], hooks, { tries: 5 })
+  const password = randomPassword(15)
+  hooks?.log?.('🔑 Mot de passe…')
+  await tapFrac(0.5, 0.20); await sleep(800)
+  await sendAction(key, deviceId, { type: 'text', text: password })
+  await sleep(700)
+  await tapNext('Next (mot de passe)')
+  await sleep(3200)
+
+  // 2. Birthday : scroll aléatoire des molettes (année reculée pour être adulte).
+  hooks?.log?.('🎂 Anniversaire (scroll aléatoire)…')
+  const swipeCol = (fx: number, dy: number) => sendAction(key, deviceId, { type: 'swipe', x1: Math.round(fx * W), y1: Math.round(0.82 * H), x2: Math.round(fx * W), y2: Math.round((0.82 - dy) * H), duration_ms: 600 })
+  // Année (colonne droite) : reculer ~20-30 ans → plusieurs balayages vers le haut.
+  const ys = 4 + Math.floor(Math.random() * 3)
+  for (let i = 0; i < ys; i++) { await swipeCol(0.78, 0.30 + Math.random() * 0.12); await sleep(500) }
+  await swipeCol(0.25, (Math.random() < 0.5 ? 1 : -1) * (0.08 + Math.random() * 0.18)); await sleep(500) // mois
+  await swipeCol(0.5, (Math.random() < 0.5 ? 1 : -1) * (0.08 + Math.random() * 0.18)); await sleep(500)  // jour
+  await tapNext('Next (anniversaire)')
+  await sleep(3200)
+
+  // 3. Full name : nom de femme française aléatoire.
+  const first = pick(FR_FIRST), fullName = `${first} ${pick(FR_LAST)}`
+  hooks?.log?.(`🧑 Nom : ${fullName}`)
+  await tapFrac(0.5, 0.22); await sleep(700)
+  await sendAction(key, deviceId, { type: 'text', text: fullName })
+  await sleep(600)
+  await tapNext('Next (nom)')
+  await sleep(3200)
+
+  // 4. Username : effacer la suggestion puis saisir prénom + 5–8 car. aléatoires.
+  const username = randomUsername(first)
+  hooks?.log?.(`🏷 Username : @${username}`)
+  await tapFrac(0.5, 0.24); await sleep(700)
+  for (let i = 0; i < 30; i++) await sendAction(key, deviceId, { type: 'key', key: 'Backspace' }) // vide le champ
+  await sleep(500)
+  await sendAction(key, deviceId, { type: 'text', text: username })
+  await sleep(900)
+  await tapNext('Next (username)')
+  await sleep(3200)
+  // Éventuel écran/Next intermédiaire.
+  await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], { x: 0.5, y: 0.4 }, W, H, hooks, [0.25, 0.55], 'Next (suite)', 1, [0, 1])
+  await sleep(2000)
+
+  // 5. Terms → I agree.
+  hooks?.log?.('📜 Conditions → « I agree »…')
+  if (!await tapButton(key, deviceId, [/i agree/i, /^agree$/i, /j.?accepte/i], { x: 0.5, y: 0.74 }, W, H, hooks, [0.6, 0.9], 'I agree', 4, [0, 1])) await tapFrac(0.5, 0.74)
+  await sleep(3000)
+
+  // 6. Écrans de fin (photo de profil, « vibe », suivre 5 personnes, notifications…) :
+  //    on préfère TOUJOURS « Skip » (n'importe où) ; sinon « Next » (bouton bleu, ex. Follow 5) ;
+  //    sinon on considère qu'on est arrivé au fil → on s'arrête.
+  hooks?.log?.('⏭ Écrans de fin (Skip / Next)…')
+  for (let i = 0; i < 8; i++) {
+    if (hooks?.shouldStop?.()) break
+    await sleep(1800)
+    if (await findTapText(key, deviceId, [/^skip$/i, /^ignorer$/i, /^plus tard$/i, /^not now$/i], hooks, { label: 'Skip', tries: 1 })) continue
+    if (await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], { x: 0.5, y: 0.93 }, W, H, hooks, [0.85, 1], 'Next (fin)', 1, [0, 1])) continue
+    break // plus de Skip/Next → probablement le fil d'accueil
+  }
+  hooks?.log?.(`✅ Compte créé — 🔐 @${username} · ${password}`)
+  return { ok: true, creds: { username, password, fullName } }
+}
+
 // ── Warm-up piloté à la VISION (activité humaine sur les Reels) ────────────────
 // Après selectContainerByVision (IG ouvert), on va sur l'onglet Reels puis, pendant
 // une durée tirée au hasard, on défile : on regarde chaque reel un temps aléatoire

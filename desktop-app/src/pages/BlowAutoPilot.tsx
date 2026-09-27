@@ -11,7 +11,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, requestSmsResendByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, requestSmsResendByVision, completeSignupByVision } from '@/lib/iremotechVision'
+import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe } from '@/lib/herosms'
@@ -97,6 +98,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [wLikePct, setWLikePct] = useState(5)   // %
   const [wCommentPct, setWCommentPct] = useState(0)
   const [wComments, setWComments] = useState('')
+  const [createdAccts, setCreatedAccts] = useState<CreatedAccount[]>(() => loadCreatedAccounts())
 
   const [running, setRunning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
@@ -258,8 +260,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     push(`▶ Création de compte (${CFG.name})${smsKey ? ` + numéro ${provName}` : ' (test, sans numéro)'} : ${jobs.length} container(s)`)
     for (const { dev, c } of jobs) {
       if (R.isCancelled()) break
-      const tag = `[${devices.find(d => d.public_id === dev)?.name ?? dev}·${c}]`
-      const hooks = { log: (m: string) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() }
+      const devName = devices.find(d => d.public_id === dev)?.name ?? dev
+      const tag = `[${devName}·${c}]`
+      const acctLog: string[] = []
+      const hooks = { log: (m: string) => { push(`${tag} ${m}`); acctLog.push(m) }, shouldStop: () => R.isCancelled() }
       await recalibrateTouch(key, dev, hooks)
       if (airplaneOn) await airplaneReset(key, dev, hooks)
       const opened = await selectContainerByVision(key, dev, c, hooks)
@@ -295,8 +299,16 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       if (!code) { push(`${tag} ✗ pas de code SMS reçu → annulation`); try { await cancelNum(order.id) } catch { /* noop */ } R.tick(false); continue }
       const okCode = await enterSmsCodeByVision(key, dev, code, hooks)
       try { await finishNum(order.id) } catch { /* noop */ }
-      push(`${tag} ${okCode ? '✓ compte : code saisi' : '⚠ code non validé (à vérifier)'}`)
-      R.tick(okCode)
+      let creds: { username: string; password: string; fullName: string } | undefined
+      if (okCode) {
+        const done = await completeSignupByVision(key, dev, hooks)
+        creds = done.creds
+        push(`${tag} ${done.ok ? '✅ compte créé' : '⚠ inscription incomplète'}`)
+        R.tick(done.ok)
+      } else { push(`${tag} ⚠ code non validé`); R.tick(false) }
+      // Enregistre le compte créé (identifiants + numéro + logs) → catégorie « Comptes créés ».
+      addCreatedAccount({ at: Date.now(), device: dev, deviceName: devName, container: c, username: creds?.username, password: creds?.password, fullName: creds?.fullName, phone: order.phone, provider: provName, price: order.price, country: CFG.name, ok: !!creds, log: acctLog })
+      setCreatedAccts(loadCreatedAccounts())
     }
     R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'); setRunning(false); setRunId(null)
   }
@@ -662,6 +674,31 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />
         <LaunchBar label={(smsProvider === 'herosms' ? heroKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={createAccounts} />
         <LogPanel />
+        {createdAccts.length > 0 && (
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: INK }}>✅ Comptes créés ({createdAccts.length})</span>
+              <button style={{ ...btn, marginLeft: 'auto', height: 28 }} onClick={() => { const t = createdAccts.map(a => `${a.username ?? '?'}\t${a.password ?? ''}\t${a.phone ?? ''}\t${a.deviceName ?? a.device}·${a.container}`).join('\n'); try { navigator.clipboard.writeText(t) } catch { /* noop */ } }}>Copier tout</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto' }}>
+              {createdAccts.map(a => (
+                <div key={a.at} style={{ padding: 11, borderRadius: 10, background: a.ok ? 'rgba(233,196,106,0.05)' : 'rgba(248,113,113,0.06)', border: `1px solid ${a.ok ? 'rgba(233,196,106,0.2)' : 'rgba(248,113,113,0.25)'}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 800, color: a.ok ? GOLD : '#F87171' }}>@{a.username ?? '—'}</span>
+                    <span style={{ fontSize: 11.5, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10.5, color: DIM }}>{a.country}{a.price != null ? ` · ${a.price}$` : ''}</span>
+                    <button onClick={() => { removeCreatedAccount(a.at); setCreatedAccts(loadCreatedAccounts()) }} title="Retirer" style={{ cursor: 'pointer', background: 'none', border: 'none', color: '#F87171', fontWeight: 900, fontSize: 16 }}>×</button>
+                  </div>
+                  <div style={{ marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: INK }}>
+                    <span>🔑 {a.password ?? '—'}</span>
+                    <span>📞 {a.phone ?? '—'}</span>
+                    {a.fullName && <span style={{ color: MUTED }}>{a.fullName}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </>)}
 
       {picker && (
