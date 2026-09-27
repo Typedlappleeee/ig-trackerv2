@@ -11,7 +11,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, requestSmsResendByVision } from '@/lib/iremotechVision'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe } from '@/lib/herosms'
@@ -247,9 +247,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const buyNumber = () => usingHero
       ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig', priceMin: 0.25, priceMax: 0.40, onLog: (m: string) => push(m) })
       : fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
-    const waitCode = (id: number) => usingHero
-      ? herosmsWaitCode(heroKey, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs: 6 * 60_000 })
-      : fivesimWaitCode(sim5Key, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs: 6 * 60_000 })
+    const waitCode = (id: number, maxMs: number) => usingHero
+      ? herosmsWaitCode(heroKey, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
+      : fivesimWaitCode(sim5Key, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
     const cancelNum = (id: number) => usingHero ? herosmsCancel(heroKey, id) : fivesimCancel(sim5Key, id)
     const finishNum = (id: number) => usingHero ? herosmsFinish(heroKey, id) : fivesimFinish(sim5Key, id)
 
@@ -271,11 +271,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`); R.tick(r.ok); continue
       }
 
-      let order: { id: number; phone: string } | null = null
+      let order: { id: number; phone: string; price?: number } | null = null
       try {
         push(`${tag} 🛒 achat d'un numéro ${CFG.name} (${provName})…`)
         order = await buyNumber()
-        push(`${tag} 📞 numéro : ${order.phone}`)
+        push(`${tag} 📞 numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}`)
+        if (order.price != null && (order.price < 0.25 || order.price > 0.40)) push(`${tag} ⚠ prix ${order.price}$ hors tranche 0.25–0.40$ (protocole compat ne fixe qu'un plafond)`)
       } catch (e) { push(`${tag} ✗ achat ${provName}: ${e instanceof Error ? e.message : String(e)}`); R.tick(false); continue }
 
       const num = localPhone(order.phone, CFG.dial)
@@ -285,7 +286,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         try { await cancelNum(order.id) } catch { /* noop */ }
         R.tick(false); continue
       }
-      const code = await waitCode(order.id)
+      // IG envoie souvent le code par WhatsApp → on attend ~70s, puis on force l'envoi par SMS.
+      let code = await waitCode(order.id, 70_000)
+      if (!code && !R.isCancelled()) {
+        await requestSmsResendByVision(key, dev, hooks)
+        code = await waitCode(order.id, 5 * 60_000)
+      }
       if (!code) { push(`${tag} ✗ pas de code SMS reçu → annulation`); try { await cancelNum(order.id) } catch { /* noop */ } R.tick(false); continue }
       const okCode = await enterSmsCodeByVision(key, dev, code, hooks)
       try { await finishNum(order.id) } catch { /* noop */ }

@@ -524,6 +524,28 @@ export async function enterSmsCodeByVision(key: string, deviceId: string, code: 
   return true
 }
 
+// Force l'envoi du code par SMS : Instagram l'envoie souvent par WhatsApp d'abord
+// (donc l'API SMS ne reçoit rien). On tape « I didn't get the code » puis, dans la
+// feuille, « Send code via SMS ».
+export async function requestSmsResendByVision(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  const shot0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) return false
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
+  hooks?.log?.('🔁 Pas de code → « I didn\'t get the code » puis « Send code via SMS »…')
+  // 1. « I didn't get the code » (bouton clair sous « Next »).
+  if (!await findTapText(key, deviceId, [/didn.?t get/i, /get the code/i, /pas re[çc]u/i], hooks, { label: "I didn't get the code", tries: 4, minY: 0.3 })) {
+    await tapFrac(0.5, 0.47)
+  }
+  await sleep(1800)
+  // 2. Feuille → « Send code via SMS » (1re option).
+  if (!await findTapText(key, deviceId, [/via sms/i, /par sms/i, /send code via sms/i], hooks, { label: 'Send code via SMS', tries: 4 })) {
+    await tapFrac(0.5, 0.33)
+  }
+  await sleep(2500)
+  return true
+}
+
 // ── Warm-up piloté à la VISION (activité humaine sur les Reels) ────────────────
 // Après selectContainerByVision (IG ouvert), on va sur l'onglet Reels puis, pendant
 // une durée tirée au hasard, on défile : on regarde chaque reel un temps aléatoire

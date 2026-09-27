@@ -52,14 +52,14 @@ export async function fivesimBalance(apiKey: string): Promise<number> {
 // Achète un numéro d'activation (défaut : Instagram, Angleterre, n'importe quel opérateur).
 export async function fivesimBuy(
   apiKey: string, opts?: { country?: string; operator?: string; product?: string },
-): Promise<{ id: number; phone: string }> {
+): Promise<{ id: number; phone: string; price?: number }> {
   const r = await call('buy', apiKey, { country: opts?.country || 'england', operator: opts?.operator || 'any', product: opts?.product || 'instagram' })
   if (!r.ok || typeof r.data !== 'object' || !r.data) {
     throw new Error(typeof r.data === 'string' ? r.data : (r.error || 'achat 5sim échoué'))
   }
-  const d = r.data as { id?: number; phone?: string }
+  const d = r.data as { id?: number; phone?: string; price?: number }
   if (!d.id || !d.phone) throw new Error('réponse 5sim sans id/numéro (' + JSON.stringify(r.data).slice(0, 120) + ')')
-  return { id: d.id, phone: d.phone }
+  return { id: d.id, phone: d.phone, price: d.price != null ? Number(d.price) : undefined }
 }
 
 function parseOrder(data: unknown): FivesimOrder | null {
