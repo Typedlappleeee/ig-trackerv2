@@ -64,16 +64,43 @@ export async function herosmsPing(apiKey: string): Promise<{ ok: boolean; auth?:
   return { ok: false, error: t || r.error || 'refusée' }
 }
 
-// getNumberV2 → JSON { activationId, phoneNumber } ; repli texte « ACCESS_NUMBER:id:phone ».
+// Prix le PLUS ÉLEVÉ dispo dans [min,max] via l'API NATIVE (offres = paliers de prix).
+async function nativeBestPriceInRange(apiKey: string, service: string, country: number, min: number, max: number, onLog?: (m: string) => void): Promise<number | null> {
+  const r = await call('native_offers', apiKey, { service, country })
+  if (!r.ok) { onLog?.(`   ⚠ offres natives: ${r.error ?? ('HTTP ' + (r.status ?? '?'))}`); return null }
+  const root = (r.data?.data ?? r.data) as any
+  const map = root?.[service]?.[String(country)]?.map as Record<string, number> | undefined
+  if (!map) { onLog?.(`   ⚠ offres natives sans « map » (pays ${country})`); return null }
+  const prices = Object.entries(map).map(([p, c]) => ({ price: Number(p), count: Number(c) }))
+    .filter(x => x.count > 0 && x.price >= min && x.price <= max).sort((a, b) => b.price - a.price)
+  return prices.length ? prices[0].price : null
+}
+
+// Achat. Si priceMin/priceMax : on tente l'API NATIVE (offres + achat à prix fixe = le plus
+// cher de la tranche). Repli sur le compat getNumberV2 (plafond seul) si le natif est indispo.
 export async function herosmsBuy(
   apiKey: string,
   opts: { country: number; service?: string; operator?: string; maxPrice?: number; priceMin?: number; priceMax?: number; onLog?: (m: string) => void },
 ): Promise<{ id: number; phone: string; price?: number }> {
-  // Protocole compat : pas de sélection « plus cher dans la tranche » (getPrices ne donne
-  // pas de paliers) → on borne au prix max de la tranche (best-effort).
+  const service = opts.service ?? 'ig'
+
+  // 1. Ciblage de tranche via l'API native.
+  if (opts.priceMin != null && opts.priceMax != null) {
+    const best = await nativeBestPriceInRange(apiKey, service, opts.country, opts.priceMin, opts.priceMax, opts.onLog)
+    if (best != null) {
+      const nb = await call('native_buy', apiKey, { country: opts.country, service, maxPrice: best, fixedPrice: true })
+      const item = Array.isArray(nb.data?.data) ? nb.data.data[0] : null
+      if (nb.ok && item?.id && item?.phone) {
+        opts.onLog?.(`   💲 prix ciblé (natif, le + cher de 0.25–0.40$) : ${best.toFixed(4)}$`)
+        return { id: Number(item.id), phone: String(item.phone), price: item.price != null ? Number(item.price) : best }
+      }
+      opts.onLog?.(`   ⚠ achat natif refusé → repli compat (${(nb.data && (nb.data.title || nb.data.details)) || nb.error || nb.status || ''})`)
+    }
+  }
+
+  // 2. Repli compat getNumberV2 (plafond = priceMax).
   const maxPrice = opts.maxPrice ?? opts.priceMax
-  if (opts.priceMax != null) opts.onLog?.(`   💲 achat borné à ≤ ${opts.priceMax}$`)
-  const r = await call('buy', apiKey, { country: opts.country, service: opts.service ?? 'ig', operator: opts.operator, maxPrice })
+  const r = await call('buy', apiKey, { country: opts.country, service, operator: opts.operator, maxPrice })
   const d = r.data
   if (r.ok && d && (d.activationId || d.phoneNumber)) return { id: Number(d.activationId), phone: String(d.phoneNumber), price: d.activationCost != null ? Number(d.activationCost) : undefined }
   const m = (r.text ?? '').match(/ACCESS_NUMBER:(\d+):(\d+)/)

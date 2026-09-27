@@ -65,6 +65,32 @@ export default async (req, res) => {
     return res.status(200).json({ ok: results.some(x => x.good), results })
   }
 
+  // ── API NATIVE (/api/v1, auth header) : offres (paliers de prix) + achat à prix fixe.
+  // Utilisée pour cibler une tranche de prix précise (le compat ne fixe qu'un plafond).
+  if (b.op === 'native_offers' || b.op === 'native_buy') {
+    const authFormats = [`ApiKey ${KEY}`, `Bearer ${KEY}`, KEY]
+    let url, method = 'GET', body = null
+    if (b.op === 'native_offers') {
+      const p = new URLSearchParams(); p.set('services', b.service || 'ig'); if (b.country != null) p.set('countries', String(b.country))
+      url = `https://hero-sms.com/api/v1/activations/offers/sms?${p.toString()}`
+    } else {
+      url = 'https://hero-sms.com/api/v1/activations'; method = 'POST'
+      body = { amount: 1, service: b.service || 'ig', country: Number(b.country), verificationType: 'sms' }
+      if (b.maxPrice != null) { body.maxPrice = Number(b.maxPrice); body.fixedPrice = Boolean(b.fixedPrice) }
+      if (b.operator) body.operator = b.operator
+    }
+    for (const auth of authFormats) {
+      const headers = { Authorization: auth, Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) }
+      let r
+      try { r = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(25000) }) } catch { continue }
+      const text = await r.text()
+      if (/BAD_API_KEY|Unauthenticated|Invalid API key|Unauthorized/i.test(text)) continue
+      let data = null; try { data = JSON.parse(text) } catch { /* ignore */ }
+      return res.status(200).json({ ok: r.ok, status: r.status, data, text: data ? undefined : text, auth: auth.split(' ')[0] })
+    }
+    return res.status(200).json({ ok: false, error: 'API native HeroSMS : auth refusée (compat OK, natif non)' })
+  }
+
   const params = actionFor(b.op, b)
   if (!params) return res.status(200).json({ ok: false, error: `op inconnu: ${b.op}` })
 
