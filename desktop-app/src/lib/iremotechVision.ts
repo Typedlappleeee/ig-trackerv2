@@ -604,10 +604,11 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   // 2. Birthday : scroll aléatoire des molettes. dy > 0 = swipe vers le BAS (recule dans le
   //    temps). Amplitude modérée, peu de swipes (l'utilisateur : « mauvais sens + trop long »).
   hooks?.log?.('🎂 Anniversaire (scroll aléatoire)…')
-  const swipeCol = (fx: number, dy: number) => sendAction(key, deviceId, { type: 'swipe', x1: Math.round(fx * W), y1: Math.round(0.80 * H), x2: Math.round(fx * W), y2: Math.round((0.80 + dy) * H), duration_ms: 350 })
-  for (let i = 0; i < 2; i++) { await swipeCol(0.78, 0.12 + Math.random() * 0.06); await sleep(500) } // année
-  await swipeCol(0.25, (Math.random() < 0.5 ? 1 : -1) * (0.06 + Math.random() * 0.08)); await sleep(500) // mois
-  await swipeCol(0.5, (Math.random() < 0.5 ? 1 : -1) * (0.06 + Math.random() * 0.08)); await sleep(500)  // jour
+  const swipeCol = (fx: number, dy: number) => sendAction(key, deviceId, { type: 'swipe', x1: Math.round(fx * W), y1: Math.round(0.80 * H), x2: Math.round(fx * W), y2: Math.round((0.80 + dy) * H), duration_ms: 400 })
+  // Année : assez de recul pour un ÂGE ADULTE (sinon IG grise « Next »).
+  for (let i = 0; i < 4; i++) { await swipeCol(0.78, 0.14 + Math.random() * 0.06); await sleep(450) }
+  await swipeCol(0.25, (Math.random() < 0.5 ? 1 : -1) * (0.06 + Math.random() * 0.08)); await sleep(450) // mois
+  await swipeCol(0.5, (Math.random() < 0.5 ? 1 : -1) * (0.06 + Math.random() * 0.08)); await sleep(700)  // jour
   await tapNext('Next (anniversaire)')
   await sleep(3200)
 
