@@ -15,7 +15,7 @@ import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneR
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
-import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe } from '@/lib/herosms'
+import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -91,6 +91,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [heroKey, setHeroKey] = useState(() => { try { return localStorage.getItem('sf-herosms-key') ?? '' } catch { return '' } })
   const [smsProvider, setSmsProvider] = useState<'5sim' | 'herosms'>(() => { try { return (localStorage.getItem('sf-sms-provider') as '5sim' | 'herosms') || '5sim' } catch { return '5sim' } })
   const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('uk')
+  const [heroOffers, setHeroOffers] = useState<{ price: number; count: number }[]>([]) // paliers de prix HeroSMS
+  const [heroPrice, setHeroPrice] = useState<number | null>(null)                       // prix exact choisi (null = auto)
+  const [offersLoading, setOffersLoading] = useState(false)
+  const [showAllPrices, setShowAllPrices] = useState(false)
   // Warm-up
   const [wPreset, setWPreset] = useState<'careful' | 'balanced' | 'aggressive' | 'custom'>('balanced')
   const [wDurMin, setWDurMin] = useState(8)     // minutes (custom)
@@ -247,7 +251,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const smsKey = usingHero ? heroKey : sim5Key
     const provName = usingHero ? 'HeroSMS' : '5sim'
     const buyNumber = () => usingHero
-      ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig', priceMin: 0.20, priceMax: 0.35, pick: 'low', onLog: (m: string) => push(m) })
+      ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig', priceMin: heroPrice ?? 0.20, priceMax: heroPrice ?? 0.35, pick: 'low', onLog: (m: string) => push(m) })
       : fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
     const waitCode = (id: number, maxMs: number) => usingHero
       ? herosmsWaitCode(heroKey, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
@@ -675,6 +679,38 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <input value={sim5Key} onChange={e => { setSim5Key(e.target.value); try { localStorage.setItem('sf-5sim-key', e.target.value) } catch { /* noop */ } }}
               placeholder="Token 5sim (numéro + code SMS auto)" type="password"
               style={{ ...inp, width: '100%', height: 40, marginBottom: 8 }} />
+          )}
+          {smsProvider === 'herosms' && (
+            <div style={{ marginTop: 10, marginBottom: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM }}>Prix du numéro</span>
+                <button style={{ ...btn, height: 28, padding: '0 12px' }} disabled={!heroKey || offersLoading}
+                  onClick={async () => {
+                    setOffersLoading(true)
+                    try {
+                      const list = await herosmsOffers(heroKey, acctCountry === 'usa' ? 12 : 16)
+                      setHeroOffers(list)
+                      if (!list.length) push('⚠ Aucun prix renvoyé par HeroSMS (liste dispo côté web).')
+                    } finally { setOffersLoading(false) }
+                  }}>{offersLoading ? 'Chargement…' : 'Charger les prix'}</button>
+                {heroOffers.length > 0 && (
+                  <label style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: MUTED, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={showAllPrices} onChange={e => setShowAllPrices(e.target.checked)} /> tout voir
+                  </label>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <button onClick={() => setHeroPrice(null)} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 800, background: heroPrice === null ? GOLD : 'rgba(0,0,0,0.3)', color: heroPrice === null ? '#1a1206' : MUTED }}>Auto (moins cher)</button>
+                {heroOffers.filter(o => showAllPrices || (o.price >= 0.20 && o.price <= 0.35)).map(o => (
+                  <button key={o.price} onClick={() => setHeroPrice(o.price)} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 800, background: heroPrice === o.price ? GOLD : 'rgba(0,0,0,0.3)', color: heroPrice === o.price ? '#1a1206' : INK }}>
+                    {o.price.toFixed(2)}$ · {o.count} dispo
+                  </button>
+                ))}
+                {heroOffers.length > 0 && !showAllPrices && !heroOffers.some(o => o.price >= 0.20 && o.price <= 0.35) && (
+                  <span style={{ fontSize: 11.5, color: MUTED, alignSelf: 'center' }}>Aucun palier entre 0,20–0,35 $ — coche « tout voir ».</span>
+                )}
+              </div>
+            </div>
           )}
           <p style={{ margin: 0, fontSize: 11.5, color: MUTED }}>
             {(smsProvider === 'herosms' ? heroKey : sim5Key)

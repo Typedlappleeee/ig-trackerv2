@@ -78,6 +78,21 @@ async function nativeBestPriceInRange(apiKey: string, service: string, country: 
   return prices.length ? prices[0].price : null
 }
 
+// Liste des paliers de prix disponibles (prix + nombre de numéros dispo), triés croissant.
+// Pour l'UI « choisir le prix ». Web uniquement (native_offers via /api/herosms) ; côté desktop
+// le protocole compat ne renvoie pas d'offres → liste vide (on retombe sur l'achat auto).
+export async function herosmsOffers(apiKey: string, country: number, service = 'ig'): Promise<{ price: number; count: number }[]> {
+  const r = await call('native_offers', apiKey, { service, country })
+  if (!r.ok) return []
+  const root = (r.data?.data ?? r.data) as any
+  const map = root?.[service]?.[String(country)]?.map as Record<string, number> | undefined
+  if (!map) return []
+  return Object.entries(map)
+    .map(([p, c]) => ({ price: Number(p), count: Number(c) }))
+    .filter(x => x.count > 0 && !Number.isNaN(x.price))
+    .sort((a, b) => a.price - b.price)
+}
+
 // Achat. Si priceMin/priceMax : on tente l'API NATIVE (offres + achat à prix fixe = le plus
 // cher de la tranche). Repli sur le compat getNumberV2 (plafond seul) si le natif est indispo.
 export async function herosmsBuy(
