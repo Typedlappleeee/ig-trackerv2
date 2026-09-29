@@ -537,10 +537,10 @@ export async function createInstagramAccountByVision(
   // Account) → on le cible par OCR de son placeholder « Mobile » dans la zone du champ
   // (minY 0.30 exclut le titre à ~0.13 ; maxY 0.42 exclut l'erreur rouge « required » à ~0.43).
   // DOUBLE-tap pour bien le focus ; repli position ~0.385 si non lu.
-  const numPt = await findWordPoint(key, deviceId, [/mobile/i], hooks, { minY: 0.30, maxY: 0.42, tries: 2 })
+  const numPt = await findWordPoint(key, deviceId, [/mobile/i], hooks, { minY: 0.28, maxY: 0.39, tries: 2 })
   const nx = numPt ? numPt.x : Math.round(0.5 * W)
-  const ny = numPt ? numPt.y : Math.round(0.385 * H)
-  if (!numPt) hooks?.log?.('   champ numéro non lu → tap position connue (0.5, 0.385).')
+  const ny = numPt ? numPt.y : Math.round(0.34 * H)
+  if (!numPt) hooks?.log?.('   champ numéro non lu → tap position connue (0.5, 0.34).')
   await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny }); await sleep(220)
   await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny })
   await sleep(1000)
