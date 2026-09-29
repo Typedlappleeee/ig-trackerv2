@@ -3,7 +3,7 @@
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
 import { snapshot, sendAction } from './iremotech'
-import { ocrWords, findBlueButton } from './ocr'
+import { ocrWords, findBlueButton, findInstagramIcon } from './ocr'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -249,6 +249,7 @@ async function tapAppIcon(
   key: string, deviceId: string,
   matcher: (t: string) => boolean, label: string,
   hooks?: VisionHooks,
+  iconDetect?: (shot: string) => Promise<{ cx: number; cy: number } | null>,
 ): Promise<boolean> {
   for (let page = 0; page < 3; page++) {
     if (hooks?.shouldStop?.()) return false
@@ -256,6 +257,15 @@ async function tapAppIcon(
     if (!shot) { await sleep(700); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
+    // 0. Détection par LOGO (couleur du dégradé) — plus fiable que l'OCR du libellé.
+    if (iconDetect) {
+      const p = await iconDetect(shot).catch(() => null)
+      if (p) {
+        hooks?.log?.(`🎨 logo ${label} repéré (couleur) → tap (${p.cx}, ${p.cy})`)
+        await sendAction(key, deviceId, { type: 'tap', x: p.cx, y: p.cy })
+        return true
+      }
+    }
     // Libellé souvent BLANC sur fond d'écran varié → OCR MULTI-PASSES (normal + inversé, plusieurs
     // scales et psm) sinon le texte clair ne se lit pas (icône « trouvée » mais libellé non OCRisé).
     const words: { text: string; cx: number; cy: number }[] = []
@@ -283,8 +293,8 @@ async function tapAppIcon(
 }
 
 async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
-  // Matcher tolérant : « Instagram », mais aussi lecture OCR approximative (« lnstagram », « 1nsta », « nstagr »).
-  return tapAppIcon(key, deviceId, t => /[il1]nsta/i.test(t) || /nstagr/i.test(t), 'Instagram', hooks)
+  // 1) logo par couleur (dégradé IG) ; 2) repli OCR du libellé (tolérant aux confusions).
+  return tapAppIcon(key, deviceId, t => /[il1]nsta/i.test(t) || /nstagr/i.test(t), 'Instagram', hooks, shot => findInstagramIcon(shot))
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────

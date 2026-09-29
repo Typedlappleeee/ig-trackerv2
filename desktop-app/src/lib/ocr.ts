@@ -146,6 +146,49 @@ export async function findBlueButton(image: string, yMin = 0.55, yMax = 1, xMin 
   return { cx: Math.round((minX + maxX) / 2), cy: y0 + Math.round((minY + maxY) / 2) }
 }
 
+// Détecte l'icône Instagram par son DÉGRADÉ (violet↔rose↔orange) plutôt que par le libellé
+// (texte blanc peu lisible sur fond d'écran). On repère la zone de taille « icône » qui contient
+// le plus de pixels « chauds » IG ET à la fois du violet (b élevé) ET de l'orange (b faible) —
+// signature du dégradé, ce qui écarte un aplat rouge (YouTube) ou jaune (Snapchat).
+export async function findInstagramIcon(image: string, yMin = 0, yMax = 1, xMin = 0, xMax = 1): Promise<{ cx: number; cy: number } | null> {
+  const img = await loadImg(image)
+  const W = img.naturalWidth, H = img.naturalHeight
+  if (!W || !H) return null
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H
+  const ctx = cv.getContext('2d')!; ctx.drawImage(img, 0, 0)
+  const data = ctx.getImageData(0, 0, W, H).data
+  const x0 = Math.max(0, Math.round(xMin * W)), x1 = Math.min(W, Math.round(xMax * W))
+  const y0 = Math.max(0, Math.round(yMin * H)), y1 = Math.min(H, Math.round(yMax * H))
+  const cell = Math.max(24, Math.round(W * 0.12)) // ~ taille d'une icône
+  const cols = Math.ceil(W / cell) + 1
+  const warm = new Float64Array(cols * (Math.ceil(H / cell) + 1))
+  const sx = new Float64Array(warm.length), sy = new Float64Array(warm.length)
+  const purp = new Float64Array(warm.length), orng = new Float64Array(warm.length)
+  const step = 2 // sous-échantillonnage (perf)
+  for (let y = y0; y < y1; y += step) {
+    for (let x = x0; x < x1; x += step) {
+      const i = (y * W + x) * 4
+      const r = data[i], g = data[i + 1], b = data[i + 2]
+      // Couleur « chaude » du dégradé IG : R élevé, G faible, pas franchement bleu.
+      if (r > 180 && g < 125 && r > g + 70 && b < 210) {
+        const ci = Math.floor(x / cell) + Math.floor(y / cell) * cols
+        warm[ci]++; sx[ci] += x; sy[ci] += y
+        if (b > 115) purp[ci]++   // partie violette / rose (bas-gauche du dégradé)
+        if (b < 90) orng[ci]++    // partie orange / rouge (haut-droite)
+      }
+    }
+  }
+  const minWarm = ((cell * cell) / (step * step)) * 0.16 // densité mini dans la cellule
+  let best = -1, bestScore = 0
+  for (let c = 0; c < warm.length; c++) {
+    if (warm[c] < minWarm) continue
+    if (purp[c] < 3 || orng[c] < 3) continue // exiger le DÉGRADÉ (violet + orange) → écarte un aplat
+    if (warm[c] > bestScore) { bestScore = warm[c]; best = c }
+  }
+  if (best < 0) return null
+  return { cx: Math.round(sx[best] / warm[best]), cy: Math.round(sy[best] / warm[best]) }
+}
+
 export async function terminateOcr(): Promise<void> {
   if (!workerP) return
   try { const w = await workerP; await w.terminate() } catch { /* noop */ }
