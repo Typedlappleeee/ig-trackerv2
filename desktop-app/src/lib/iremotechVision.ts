@@ -677,19 +677,21 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   await hasText(key, deviceId, [/password/i, /mot de passe/i], hooks, { tries: 5 })
   const password = randomPassword(15)
   hooks?.log?.('🔑 Mot de passe…')
-  // Champ ciblé par son placeholder « Password » (zone Y pour éviter le titre « Create a password »).
-  if (!await findTapText(key, deviceId, [/^password$/i], hooks, { label: 'champ mot de passe', tries: 3, minY: 0.25, maxY: 0.42 })) await tapFrac(0.5, 0.31)
-  await sleep(500)
-  // Champ MASQUÉ (secure) → on révèle via l'icône œil (droite, même ligne) pour fiabiliser
-  // la saisie, puis on re-focus le champ (à gauche de l'œil) avant de taper.
-  await tapFrac(0.90, 0.31); await sleep(400)
-  await tapFrac(0.35, 0.31); await sleep(500)
+  // Champ « Password » : on le localise par son placeholder (zone Y pour éviter le titre) puis on
+  // DOUBLE-TAP le centre du champ à cette hauteur ; repli position connue ~0.33. Pas d'icône œil
+  // ni de re-focus figé (ça ratait et dé-focusait le champ → saisie perdue).
+  const pwPt = await findWordPoint(key, deviceId, [/^password$/i], hooks, { minY: 0.25, maxY: 0.42, tries: 2 })
+  const pwY = pwPt ? pwPt.y : Math.round(0.33 * H)
+  const pwX = Math.round(0.5 * W)
+  if (!pwPt) hooks?.log?.('   champ mot de passe non lu → tap position connue (0.5, 0.33).')
+  await sendAction(key, deviceId, { type: 'tap', x: pwX, y: pwY }); await sleep(220)
+  await sendAction(key, deviceId, { type: 'tap', x: pwX, y: pwY }); await sleep(600)
   await sendAction(key, deviceId, { type: 'text', text: password })
   await sleep(700)
-  // Filet : si le champ est resté vide (saisie en bloc refusée), on retape char par char.
-  if (await hasText(key, deviceId, [/can.?t be empty/i, /vide/i], hooks, { cropY: [0.25, 0.5], tries: 1 })) {
+  // Filet : si le champ est resté vide (saisie en bloc refusée), on re-tape le champ et char par char.
+  if (await hasText(key, deviceId, [/can.?t be empty/i, /vide/i], hooks, { cropY: [0.2, 0.5], tries: 1 })) {
     hooks?.log?.('   ↻ saisie en bloc refusée → char par char…')
-    await tapFrac(0.35, 0.31); await sleep(400)
+    await sendAction(key, deviceId, { type: 'tap', x: pwX, y: pwY }); await sleep(300)
     for (const ch of password) { await sendAction(key, deviceId, { type: 'text', text: ch }); await sleep(60) }
   }
   await sleep(700)
