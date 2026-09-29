@@ -64,15 +64,17 @@ export async function herosmsPing(apiKey: string): Promise<{ ok: boolean; auth?:
   return { ok: false, error: t || r.error || 'refusée' }
 }
 
-// Prix le PLUS ÉLEVÉ dispo dans [min,max] via l'API NATIVE (offres = paliers de prix).
-async function nativeBestPriceInRange(apiKey: string, service: string, country: number, min: number, max: number, onLog?: (m: string) => void): Promise<number | null> {
+// Prix dispo dans [min,max] via l'API NATIVE (offres = paliers de prix). `pick` = 'high'
+// (le plus cher, défaut) ou 'low' (le moins cher).
+async function nativeBestPriceInRange(apiKey: string, service: string, country: number, min: number, max: number, pick: 'low' | 'high', onLog?: (m: string) => void): Promise<number | null> {
   const r = await call('native_offers', apiKey, { service, country })
   if (!r.ok) { onLog?.(`   ⚠ offres natives: ${r.error ?? ('HTTP ' + (r.status ?? '?'))}`); return null }
   const root = (r.data?.data ?? r.data) as any
   const map = root?.[service]?.[String(country)]?.map as Record<string, number> | undefined
   if (!map) { onLog?.(`   ⚠ offres natives sans « map » (pays ${country})`); return null }
   const prices = Object.entries(map).map(([p, c]) => ({ price: Number(p), count: Number(c) }))
-    .filter(x => x.count > 0 && x.price >= min && x.price <= max).sort((a, b) => b.price - a.price)
+    .filter(x => x.count > 0 && x.price >= min && x.price <= max)
+    .sort((a, b) => pick === 'low' ? a.price - b.price : b.price - a.price)
   return prices.length ? prices[0].price : null
 }
 
@@ -80,18 +82,19 @@ async function nativeBestPriceInRange(apiKey: string, service: string, country: 
 // cher de la tranche). Repli sur le compat getNumberV2 (plafond seul) si le natif est indispo.
 export async function herosmsBuy(
   apiKey: string,
-  opts: { country: number; service?: string; operator?: string; maxPrice?: number; priceMin?: number; priceMax?: number; onLog?: (m: string) => void },
+  opts: { country: number; service?: string; operator?: string; maxPrice?: number; priceMin?: number; priceMax?: number; pick?: 'low' | 'high'; onLog?: (m: string) => void },
 ): Promise<{ id: number; phone: string; price?: number }> {
   const service = opts.service ?? 'ig'
+  const pick = opts.pick ?? 'high'
 
   // 1. Ciblage de tranche via l'API native.
   if (opts.priceMin != null && opts.priceMax != null) {
-    const best = await nativeBestPriceInRange(apiKey, service, opts.country, opts.priceMin, opts.priceMax, opts.onLog)
+    const best = await nativeBestPriceInRange(apiKey, service, opts.country, opts.priceMin, opts.priceMax, pick, opts.onLog)
     if (best != null) {
       const nb = await call('native_buy', apiKey, { country: opts.country, service, maxPrice: best, fixedPrice: true })
       const item = Array.isArray(nb.data?.data) ? nb.data.data[0] : null
       if (nb.ok && item?.id && item?.phone) {
-        opts.onLog?.(`   💲 prix ciblé (natif, le + cher de 0.25–0.40$) : ${best.toFixed(4)}$`)
+        opts.onLog?.(`   💲 prix ciblé (natif, le ${pick === 'low' ? 'moins' : 'plus'} cher de ${opts.priceMin}–${opts.priceMax}$) : ${best.toFixed(4)}$`)
         return { id: Number(item.id), phone: String(item.phone), price: item.price != null ? Number(item.price) : best }
       }
       opts.onLog?.(`   ⚠ achat natif refusé → repli compat (${(nb.data && (nb.data.title || nb.data.details)) || nb.error || nb.status || ''})`)
