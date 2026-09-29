@@ -256,11 +256,18 @@ async function tapAppIcon(
     if (!shot) { await sleep(700); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
-    // Libellé souvent BLANC sur fond d'écran varié → double polarité (normal + inversé) et gros
-    // scale, sinon le texte clair ne se lit pas (icône « trouvée » mais libellé non OCRisé).
-    const wa = await ocrWords(shot, undefined, { threshold: null, scale: 3, psms: ['11'] })
-    const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 3, psms: ['11'] })
-    const words = [...wa, ...wb]
+    // Libellé souvent BLANC sur fond d'écran varié → OCR MULTI-PASSES (normal + inversé, plusieurs
+    // scales et psm) sinon le texte clair ne se lit pas (icône « trouvée » mais libellé non OCRisé).
+    const words: { text: string; cx: number; cy: number }[] = []
+    for (const inv of [false, true]) {
+      for (const sc of [3, 4]) {
+        const w = await ocrWords(shot, undefined, { threshold: null, invert: inv, scale: sc, psms: ['11', '12', '6'] })
+        words.push(...w)
+      }
+    }
+    // Diagnostic : on montre ce que l'OCR a lu (pour caler le matcher si l'icône n'est pas trouvée).
+    const lus = [...new Set(words.map(w => w.text).filter(Boolean))].slice(0, 24)
+    hooks?.log?.(`👁 accueil lu : ${lus.join(', ') || '(rien)'}`)
     const hit = words.find(o => matcher(o.text))
     if (hit) {
       const ty = Math.max(0, hit.cy - Math.round(H * 0.055)) // viser l'icône, bien au-dessus du libellé
@@ -276,8 +283,8 @@ async function tapAppIcon(
 }
 
 async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
-  // Matcher tolérant : « Instagram », mais aussi lecture OCR approximative (« lnstagram », « insta… »).
-  return tapAppIcon(key, deviceId, t => /insta/i.test(t) || /[il]nsta/i.test(t), 'Instagram', hooks)
+  // Matcher tolérant : « Instagram », mais aussi lecture OCR approximative (« lnstagram », « 1nsta », « nstagr »).
+  return tapAppIcon(key, deviceId, t => /[il1]nsta/i.test(t) || /nstagr/i.test(t), 'Instagram', hooks)
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────
