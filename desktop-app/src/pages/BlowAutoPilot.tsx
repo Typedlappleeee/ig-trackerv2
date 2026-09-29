@@ -11,7 +11,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, resubmitNumberByVision, completeSignupByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
@@ -264,48 +264,50 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const tag = `[${devName}·${c}]`
       const acctLog: string[] = []
       const hooks = { log: (m: string) => { push(`${tag} ${m}`); acctLog.push(m) }, shouldStop: () => R.isCancelled() }
-      await recalibrateTouch(key, dev, hooks)
-      if (airplaneOn) await airplaneReset(key, dev, hooks)
-      const opened = await selectContainerByVision(key, dev, c, hooks)
-      if (!opened) { push(`${tag} ⏭ container non atteint`); R.tick(false); continue }
-      await sleep(1500)
-
+      // Sans numéro (test) : cycle unique.
       if (!smsKey) {
+        await recalibrateTouch(key, dev, hooks)
+        if (airplaneOn) await airplaneReset(key, dev, hooks)
+        const opened = await selectContainerByVision(key, dev, c, hooks)
+        if (!opened) { push(`${tag} ⏭ container non atteint`); R.tick(false); continue }
+        await sleep(1500)
         const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY }, hooks)
         push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`); R.tick(r.ok); continue
       }
 
+      // Avec numéro : on tente le CYCLE COMPLET, et si aucun code n'arrive sous 60s on annule le
+      // numéro et on RECOMMENCE TOUT DE 0 (re-sélection du conteneur → nouveau numéro → flow),
+      // jusqu'à 3 cycles. Bien plus fiable que d'insister sur un numéro qui ne reçoit jamais.
       let order: { id: number; phone: string; price?: number } | null = null
-      try {
-        push(`${tag} 🛒 achat d'un numéro ${CFG.name} (${provName})…`)
-        order = await buyNumber()
-        push(`${tag} 📞 numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}`)
-        if (order.price != null && (order.price < 0.20 || order.price > 0.35)) push(`${tag} ⚠ prix ${order.price}$ hors tranche 0.20–0.35$ (protocole compat ne fixe qu'un plafond)`)
-      } catch (e) { push(`${tag} ✗ achat ${provName}: ${e instanceof Error ? e.message : String(e)}`); R.tick(false); continue }
-
-      const num = localPhone(order.phone, CFG.dial)
-      const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY, phoneNumber: num }, hooks)
-      if (r.stage !== 'number_submitted') {
-        push(`${tag} ✗ échec avant SMS (étape ${r.stage}) → annulation du numéro`)
-        try { await cancelNum(order.id) } catch { /* noop */ }
-        R.tick(false); continue
-      }
-      // Attente du code ~60s. Si rien : on ANNULE ce numéro, on en PREND un neuf, on revient à
-      // l'écran numéro et on re-saisit — jusqu'à 3 numéros au total (souvent un numéro ne reçoit
-      // jamais le SMS IG). Bien plus fiable que d'insister sur le même numéro.
-      let code = await waitCode(order.id, 60_000)
-      for (let numTry = 1; numTry < 3 && !code && !R.isCancelled(); numTry++) {
-        push(`${tag} ⏱ pas de code sous 60s → annulation + nouveau numéro (essai ${numTry + 1}/3)`)
-        try { await cancelNum(order.id) } catch { /* noop */ }
+      let code: string | null = null
+      for (let cycle = 0; cycle < 3 && !code && !R.isCancelled(); cycle++) {
+        if (cycle > 0) push(`${tag} 🔄 on recommence tout le cycle (${cycle + 1}/3)…`)
+        await recalibrateTouch(key, dev, hooks)
+        if (airplaneOn) await airplaneReset(key, dev, hooks)
+        const opened = await selectContainerByVision(key, dev, c, hooks)
+        if (!opened) { push(`${tag} ⏭ container non atteint`); break }
+        await sleep(1500)
         try {
+          push(`${tag} 🛒 achat d'un numéro ${CFG.name} (${provName})…`)
           order = await buyNumber()
-          push(`${tag} 📞 nouveau numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}`)
+          push(`${tag} 📞 numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}`)
+          if (order.price != null && (order.price < 0.20 || order.price > 0.35)) push(`${tag} ⚠ prix ${order.price}$ hors tranche 0.20–0.35$ (protocole compat ne fixe qu'un plafond)`)
         } catch (e) { push(`${tag} ✗ achat ${provName}: ${e instanceof Error ? e.message : String(e)}`); break }
-        const reNum = localPhone(order.phone, CFG.dial)
-        if (!await resubmitNumberByVision(key, dev, reNum, hooks)) { push(`${tag} ✗ ré-saisie du numéro échouée`); break }
+        const num = localPhone(order.phone, CFG.dial)
+        const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY, phoneNumber: num }, hooks)
+        if (r.stage !== 'number_submitted') {
+          push(`${tag} ✗ échec avant SMS (étape ${r.stage}) → annulation du numéro, on recommence de 0`)
+          try { await cancelNum(order.id) } catch { /* noop */ }
+          order = null; continue
+        }
         code = await waitCode(order.id, 60_000)
+        if (!code) {
+          push(`${tag} ⏱ pas de code sous 60s → annulation du numéro, on recommence de 0`)
+          try { await cancelNum(order.id) } catch { /* noop */ }
+          order = null; continue
+        }
       }
-      if (!code) { push(`${tag} ✗ pas de code SMS reçu → annulation`); try { await cancelNum(order.id) } catch { /* noop */ } R.tick(false); continue }
+      if (!code || !order) { push(`${tag} ✗ pas de code SMS reçu après 3 cycles`); R.tick(false); continue }
       const okCode = await enterSmsCodeByVision(key, dev, code, hooks)
       try { await finishNum(order.id) } catch { /* noop */ }
       let creds: { username: string; password: string; fullName: string } | undefined
