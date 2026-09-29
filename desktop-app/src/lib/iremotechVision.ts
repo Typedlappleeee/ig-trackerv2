@@ -256,11 +256,15 @@ async function tapAppIcon(
     if (!shot) { await sleep(700); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
-    // Libellé souvent blanc → on lit en double polarité (normal + inversé), sans binariser.
-    const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
-    const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
-    const words = [...wa, ...wb]
-    const lus = [...new Set(words.map(w => w.text).filter(Boolean))].slice(0, 24)
+    // Libellé BLANC sur fond coloré : on ISOLE le texte quasi-blanc (invert + seuil) → le blanc
+    // devient texte noir net, le fond coloré ET l'ombre du libellé disparaissent. 2 seuils (labels
+    // + ou - lumineux) + un repli grayscale. Rapide (3 passes) et fiable.
+    const words: { text: string; cx: number; cy: number }[] = []
+    for (const th of [95, 140]) {
+      words.push(...await ocrWords(shot, undefined, { threshold: th, invert: true, scale: 3, psms: ['11'] }))
+    }
+    words.push(...await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] }))
+    const lus = [...new Set(words.map(w => w.text).filter(Boolean))].slice(0, 28)
     hooks?.log?.(`👁 accueil lu : ${lus.join(', ') || '(rien)'}`)
     const hit = words.find(o => matcher(o.text))
     if (hit) {
