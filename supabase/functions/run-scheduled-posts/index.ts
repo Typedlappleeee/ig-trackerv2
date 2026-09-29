@@ -48,12 +48,12 @@ async function removeUsedBankVideos(db: any, orgId: string | null, userId: strin
   try {
     const ids = toRemove.map(v => v.bank_id).filter(Boolean) as string[]
     if (ids.length) {
-      let q = db.from('content_bank').delete().in('id', ids)
+      // SOFT-DELETE : on marque `deleted_at` (corbeille, restaurable 7 j) au lieu de supprimer
+      // définitivement — on GARDE le fichier storage pour pouvoir restaurer.
+      let q = db.from('content_bank').update({ deleted_at: new Date().toISOString() }).in('id', ids)
       q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId).is('org_id', null)
       await q
     }
-    const paths = toRemove.flatMap(v => [v.storage_path, v.thumbnail_path]).filter(Boolean) as string[]
-    if (paths.length) await db.storage.from('content').remove(paths)
   } catch { /* best-effort */ }
   return toRemove.length
 }
@@ -385,6 +385,21 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ buckets }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
   }
+
+  // ── Purge corbeille banque : supprime DÉFINITIVEMENT les médias en corbeille > 7 jours.
+  try {
+    const cutoff = new Date(Date.now() - 7 * 86400000).toISOString()
+    const { data: expired } = await db.from('content_bank')
+      .select('id, storage_path, thumbnail_path').lt('deleted_at', cutoff).limit(500)
+    if (expired && expired.length) {
+      const ids = (expired as { id: string }[]).map(r => r.id)
+      await db.from('content_bank').delete().in('id', ids)
+      const paths = (expired as { storage_path?: string; thumbnail_path?: string }[])
+        .flatMap(r => [r.storage_path, r.thumbnail_path]).filter(Boolean) as string[]
+      if (paths.length) await db.storage.from('content').remove(paths)
+      summary['trash_purge'] = `${ids.length} média(s) purgé(s) (corbeille > 7 j)`
+    }
+  } catch { /* best-effort */ }
 
   // ── Étape 0-tracking : sync journalier des comptes (par lots) ──
   // Plafonné à ~60s pour ne pas affamer le posting. Best-effort.

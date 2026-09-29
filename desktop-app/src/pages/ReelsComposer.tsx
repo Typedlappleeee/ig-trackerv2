@@ -343,12 +343,11 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     // (les échecs restent dans la banque pour pouvoir relancer).
     if (autoRemove && postedVidIds.size > 0) {
       const ids = [...postedVidIds]
-      const objs = distinct.filter(v => postedVidIds.has(v.id)).map(v => v.storage_path).filter(Boolean) as string[]
       try {
-        await supabase.from('content_bank').delete().in('id', ids)
-        if (objs.length) await supabase.storage.from('content').remove(objs)
-        push(`🗑 ${ids.length} vidéo(s) retirée(s) de la banque (usage unique).`)
-      } catch { push('⚠ Retrait des vidéos (usage unique) échoué — à faire manuellement.') }
+        // SOFT-DELETE : corbeille (restaurable 7 j), on garde le fichier.
+        await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).in('id', ids)
+        push(`🗑 ${ids.length} vidéo(s) → corbeille (usage unique, restaurable 7 j).`)
+      } catch { push('⚠ Mise en corbeille (usage unique) échouée — à faire manuellement.') }
     } else if (!autoRemove && postedVidIds.size > 0) {
       // Usage unique désactivé → on garde les vidéos mais on incrémente leur compteur
       // de publications (pour « Jamais publiées » / tri « Moins publiées » dans la banque).

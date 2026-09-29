@@ -26,6 +26,7 @@ interface ContentItem {
   tags: string[] | null
   description?: string | null   // légende propre au média (pré-remplit le post)
   created_at: string
+  deleted_at?: string | null    // corbeille : soft-delete (restaurable 7 j)
 }
 
 // Les lignes « sentinelles » matérialisent un dossier vide (aucun média) — on les
@@ -167,6 +168,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 }) {
   const { currentOrg } = org
   const [items, setItems] = useState<ContentItem[]>([])
+  const [trash, setTrash] = useState<ContentItem[]>([])
+  const [showTrash, setShowTrash] = useState(false)
   const [folderNames, setFolderNames] = useState<string[]>([]) // dossiers vides (sentinelles)
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -195,7 +198,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     if (err) { setError('Erreur lors du chargement de la banque.'); setItems([]); setFolderNames([]); setLoading(false); return }
     const rows = (data ?? []) as ContentItem[]
     setFolderNames(rows.filter(isSentinel).map(r => r.folder ?? r.title).filter((f): f is string => Boolean(f)))
-    setItems(rows.filter(r => !isSentinel(r)))
+    // Médias en corbeille (deleted_at) exclus de la banque, listés à part (restaurable 7 j).
+    setItems(rows.filter(r => !isSentinel(r) && !r.deleted_at))
+    setTrash(rows.filter(r => !isSentinel(r) && !!r.deleted_at).sort((a, b) => (b.deleted_at ?? '').localeCompare(a.deleted_at ?? '')))
     setLoading(false)
   }, [currentOrg?.id, user.id])
 
@@ -436,52 +441,49 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     if (ids.length === 0) return
     setDeleting(true)
     const chunk = <T,>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
-    const idSet = new Set(ids)
-    const objsFallback = items.filter(i => idSet.has(i.id)).flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
 
-    let deleted = 0; let firstErr: string | null = null; let rpcMissing = false
-    const bucketPaths: string[] = []
-    // Voie fiable : RPC SECURITY DEFINER — supprime ce que l'appelant a le DROIT de
-    // supprimer et renvoie le VRAI nombre. Par lots (URL/payload limités).
+    // SOFT-DELETE : on met en CORBEILLE (deleted_at) au lieu de supprimer définitivement —
+    // restaurable 7 jours, le fichier storage est conservé.
+    let deleted = 0; let firstErr: string | null = null
+    const nowIso = new Date().toISOString()
     for (const part of chunk(ids, 200)) {
-      const { data, error } = await supabase.rpc('delete_bank_items', { p_ids: part })
-      if (error) {
-        if (/PGRST202|not find|schema cache/i.test(error.message)) { rpcMissing = true; break }
-        if (!firstErr) firstErr = error.message
-        continue
-      }
-      const r = data as { deleted?: number; paths?: string[] } | null
-      deleted += r?.deleted ?? 0
-      if (Array.isArray(r?.paths)) bucketPaths.push(...(r!.paths as string[]))
-    }
-
-    // Fallback (RPC pas déployée) : DELETE direct par lots, avec .select() pour
-    // connaître le VRAI nombre supprimé (0 = bloqué par la RLS → message honnête).
-    if (rpcMissing) {
-      deleted = 0; firstErr = null
-      for (const part of chunk(ids, 100)) {
-        const { data, error } = await supabase.from('content_bank').delete().in('id', part).select('id')
-        if (error) { if (!firstErr) firstErr = error.message } else { deleted += (data?.length ?? 0) }
-      }
-      bucketPaths.push(...objsFallback)
-    }
-
-    // Purge des fichiers du bucket par lots (best-effort).
-    for (const part of chunk(bucketPaths, 100)) {
-      try { if (part.length) await supabase.storage.from('content').remove(part) } catch { /* best-effort */ }
+      let q = supabase.from('content_bank').update({ deleted_at: nowIso }).in('id', part).select('id')
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      const { data, error } = await q
+      if (error) { if (!firstErr) firstErr = error.message } else { deleted += (data?.length ?? 0) }
     }
 
     setDeleting(false); setConfirmDel(null)
     if (deleted === 0) {
       setNotice(firstErr
-        ? `Échec de la suppression : ${firstErr}`
-        : "Aucun média supprimé — ils appartiennent à un autre compte ou à une organisation où tu n'es pas admin. Connecte-toi avec le compte propriétaire, ou passe admin de l'orga.")
+        ? `Échec de la mise en corbeille : ${firstErr}`
+        : "Aucun média mis en corbeille — ils appartiennent à un autre compte ou à une organisation où tu n'es pas admin.")
       setSel(new Set()); load(); return
     }
     setNotice(deleted < ids.length
-      ? `${deleted}/${ids.length} média(s) supprimé(s) — les autres ne t'appartiennent pas (autre compte/orga).`
-      : `${deleted} média(s) supprimé(s).`)
+      ? `${deleted}/${ids.length} média(s) → corbeille (restaurable 7 j) — les autres ne t'appartiennent pas.`
+      : `${deleted} média(s) → corbeille (restaurable 7 j).`)
     setSel(new Set()); load()
+  }
+
+  // Corbeille : restaurer (deleted_at = null) ou supprimer DÉFINITIVEMENT (row + fichier).
+  async function restoreMedia(ids: string[]) {
+    if (!ids.length) return
+    let q = supabase.from('content_bank').update({ deleted_at: null }).in('id', ids)
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    await q; load()
+  }
+  async function purgeMedia(items: ContentItem[]) {
+    const ids = items.map(i => i.id)
+    if (!ids.length) return
+    const paths = items.flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
+    let q = supabase.from('content_bank').delete().in('id', ids)
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    await q
+    for (const part of ((a: string[], n: number) => { const o: string[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o })(paths, 100)) {
+      try { if (part.length) await supabase.storage.from('content').remove(part) } catch { /* best-effort */ }
+    }
+    load()
   }
 
   // ── Renommer un média + éditer les tags ──────────────────────────────────────
@@ -681,6 +683,34 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         if (files.length) importFiles(files)
         else setNotice('Dépose des vidéos ou des images.')
       }}>
+      {showTrash && (
+        <div onClick={() => setShowTrash(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px,96vw)', maxHeight: '82vh', overflowY: 'auto', borderRadius: 16, background: theme.panelBg, border: `1px solid ${theme.panelEdge}`, padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: theme.accentText }}>🗑 Corbeille ({trash.length})</span>
+              <button onClick={() => setShowTrash(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: theme.accentText, fontSize: 20, cursor: 'pointer' }}>×</button>
+            </div>
+            <p style={{ margin: '0 0 12px', fontSize: 12, opacity: 0.7 }}>Médias supprimés — restaurables 7 jours puis purgés définitivement.</p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <Btn theme={theme} sm tone="primary" label="Tout restaurer" onClick={() => { restoreMedia(trash.map(t => t.id)); setShowTrash(false) }} />
+              <Btn theme={theme} sm tone="quiet" label="Vider définitivement" onClick={() => { if (confirm('Supprimer DÉFINITIVEMENT tous les médias de la corbeille ?')) { purgeMedia(trash); setShowTrash(false) } }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {trash.map(t => {
+                const days = t.deleted_at ? Math.max(0, 7 - Math.floor((Date.now() - new Date(t.deleted_at).getTime()) / 86400000)) : 7
+                return (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: `1px solid ${theme.panelEdge}` }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                    <span style={{ fontSize: 10.5, opacity: 0.6 }}>purge dans {days}j</span>
+                    <Btn theme={theme} sm tone="quiet" label="Restaurer" onClick={() => restoreMedia([t.id])} />
+                    <button onClick={() => { if (confirm('Supprimer définitivement ce média ?')) purgeMedia([t]) }} title="Supprimer définitivement" style={{ background: 'none', border: 'none', color: '#F87171', fontWeight: 900, fontSize: 16, cursor: 'pointer' }}>×</button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
       {dragFiles && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -709,6 +739,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           </p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {trash.length > 0 && <Btn label={`Corbeille (${trash.length})`} theme={theme} icon="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" onClick={() => setShowTrash(true)} />}
           <Btn label="Sync Drive" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
           <Btn label={uploading ? uploading : "Importer"} theme={theme} tone="primary" icon="M12 5v14|M5 12h14" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
         </div>
