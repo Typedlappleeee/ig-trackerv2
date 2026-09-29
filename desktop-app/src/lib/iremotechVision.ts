@@ -256,8 +256,11 @@ async function tapAppIcon(
     if (!shot) { await sleep(700); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
-    // Libellé blanc sur fond varié → PAS de binarisation (elle effacerait le blanc).
-    const words = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
+    // Libellé souvent BLANC sur fond d'écran varié → double polarité (normal + inversé) et gros
+    // scale, sinon le texte clair ne se lit pas (icône « trouvée » mais libellé non OCRisé).
+    const wa = await ocrWords(shot, undefined, { threshold: null, scale: 3, psms: ['11'] })
+    const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 3, psms: ['11'] })
+    const words = [...wa, ...wb]
     const hit = words.find(o => matcher(o.text))
     if (hit) {
       const ty = Math.max(0, hit.cy - Math.round(H * 0.055)) // viser l'icône, bien au-dessus du libellé
@@ -273,7 +276,8 @@ async function tapAppIcon(
 }
 
 async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
-  return tapAppIcon(key, deviceId, t => /instagram/i.test(t) || /^[il]nstagram$/i.test(t), 'Instagram', hooks)
+  // Matcher tolérant : « Instagram », mais aussi lecture OCR approximative (« lnstagram », « insta… »).
+  return tapAppIcon(key, deviceId, t => /insta/i.test(t) || /[il]nsta/i.test(t), 'Instagram', hooks)
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────
