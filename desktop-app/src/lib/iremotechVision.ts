@@ -150,6 +150,33 @@ export async function findTapText(
   return false
 }
 
+// Comme findTapText mais NE TAPE PAS : renvoie la position (px) du 1er mot trouvé dans
+// la zone, ou null. Utile quand on veut taper soi-même (double-tap, ré-essais avec vérif).
+async function findWordPoint(
+  key: string, deviceId: string, patterns: RegExp[], hooks?: VisionHooks,
+  opts?: { tries?: number; minY?: number; maxY?: number; minX?: number; maxX?: number; cropY?: [number, number] },
+): Promise<{ x: number; y: number } | null> {
+  const tries = opts?.tries ?? 2
+  for (let i = 0; i < tries; i++) {
+    if (hooks?.shouldStop?.()) return null
+    const shot = await snapshot(key, deviceId)
+    if (!shot) { await sleep(500); continue }
+    const { w: W, h: H } = await imgSize(shot)
+    if (!W || !H) { await sleep(400); continue }
+    const crop = opts?.cropY
+    const sc = crop ? 3.5 : 2
+    const wa = await ocrWords(shot, undefined, { threshold: null, scale: sc, psms: ['11'], cropY: crop })
+    const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: sc, psms: ['11'], cropY: crop })
+    const words = [...wa, ...wb]
+    const minY = (opts?.minY ?? 0) * H, maxY = (opts?.maxY ?? 1) * H
+    const minX = (opts?.minX ?? 0) * W, maxX = (opts?.maxX ?? 1) * W
+    const hit = words.find(o => o.cy >= minY && o.cy <= maxY && o.cx >= minX && o.cx <= maxX && patterns.some(p => p.test(o.text)))
+    if (hit) return { x: hit.cx, y: hit.cy }
+    await sleep(600)
+  }
+  return null
+}
+
 // Ferme les popups Instagram fréquents qui bloquent le flux (« Not now », « OK »,
 // « Skip », notifications, « Add to your story »…). Balayage léger, sans échec.
 export async function dismissPopups(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
@@ -445,11 +472,32 @@ export async function createInstagramAccountByVision(
   }
   // « started » n'est QUE sur le bouton (« get » traîne dans « who get you » plus haut) ;
   // on restreint aussi à la moitié basse pour ne jamais taper le texte de description.
-  if (!await findTapText(key, deviceId, [/^started$/i, /^s.?inscrire$/i, /commencer/i], hooks, { label: 'Get started', tries: 3, minY: 0.6 })) {
-    hooks?.log?.('   « Get started » non lu → tap position connue (bouton bleu ~80%).')
-    await tapFrac(0.5, 0.80)
+  // ⚠ Le tap simple sur ce bouton « marche pas » parfois (touch avalé) → on TAPE puis on
+  // VÉRIFIE qu'on a avancé (écran mobile/number/Change) ; sinon on ré-appuie (double-tap +
+  // ancre) jusqu'à 4 essais. On ne continue que quand l'écran suivant est bien apparu.
+  let advanced = false
+  for (let attempt = 0; attempt < 4 && !advanced; attempt++) {
+    if (hooks?.shouldStop?.()) return { ok: false, stage: 'get_started' }
+    // Position du bouton : OCR du mot, sinon ancre connue (bouton bleu ~80%).
+    const btn = await findWordPoint(key, deviceId, [/^started$/i, /^s.?inscrire$/i, /commencer$/i], hooks, { minY: 0.6 })
+    const bx = btn ? btn.x : Math.round(0.5 * W)
+    const by = btn ? btn.y : Math.round(0.80 * H)
+    if (!btn && attempt === 0) hooks?.log?.('   « Get started » non lu → tap position connue (bouton bleu ~80%).')
+    hooks?.log?.(`👆 « S'inscrire » (essai ${attempt + 1}) → tap (${bx}, ${by})`)
+    // Double-tap franc : un seul tap n'est pas toujours enregistré par ce bouton.
+    await sendAction(key, deviceId, { type: 'tap', x: bx, y: by })
+    await sleep(220)
+    await sendAction(key, deviceId, { type: 'tap', x: bx, y: by })
+    await sleep(2600)
+    // Avancé ? L'écran suivant (« What's your mobile number? ») porte mobile/number/Change,
+    // et le bouton « S'inscrire » a disparu.
+    advanced = await hasText(key, deviceId, [/mobile/i, /^number$/i, /^change$/i, /changer/i], hooks, { tries: 2 })
+    if (!advanced) hooks?.log?.('   écran pas avancé après « S\'inscrire » → nouvel essai.')
   }
-  await sleep(2800)
+  if (!advanced) {
+    hooks?.log?.('❌ « S\'inscrire » : l\'écran n\'a pas avancé après plusieurs essais.')
+    return { ok: false, stage: 'get_started' }
+  }
 
   // 2. Écran « What's your mobile number? » → lien bleu « Change » (choix du pays).
   await hasText(key, deviceId, [/mobile/i, /^number$/i], hooks, { tries: 4 })
