@@ -146,11 +146,12 @@ export async function findBlueButton(image: string, yMin = 0.55, yMax = 1, xMin 
   return { cx: Math.round((minX + maxX) / 2), cy: y0 + Math.round((minY + maxY) / 2) }
 }
 
-// Détecte l'icône Instagram par son DÉGRADÉ (violet↔rose↔orange) plutôt que par le libellé
-// (texte blanc peu lisible sur fond d'écran). On repère la zone de taille « icône » qui contient
-// le plus de pixels « chauds » IG ET à la fois du violet (b élevé) ET de l'orange (b faible) —
-// signature du dégradé, ce qui écarte un aplat rouge (YouTube) ou jaune (Snapchat).
-export async function findInstagramIcon(image: string, yMin = 0, yMax = 1, xMin = 0, xMax = 1): Promise<{ cx: number; cy: number } | null> {
+// Détecte l'icône Instagram par son LOGO (forme + couleur), pas par le libellé (texte blanc peu
+// lisible). On glisse une fenêtre de taille « icône » et on ne retient QUE celle qui réunit les 4
+// marqueurs du logo IG à la fois : dégradé CHAUD dense + VIOLET (bas-gauche) + ORANGE (haut-droite)
+// + l'objectif photo BLANC au centre. Cette combinaison n'existe ni sur le fond d'écran ni sur un
+// aplat rouge/jaune → on n'ouvre plus la mauvaise appli.
+export async function findInstagramIcon(image: string, yMin = 0.05, yMax = 0.96, xMin = 0, xMax = 1): Promise<{ cx: number; cy: number } | null> {
   const img = await loadImg(image)
   const W = img.naturalWidth, H = img.naturalHeight
   if (!W || !H) return null
@@ -159,34 +160,44 @@ export async function findInstagramIcon(image: string, yMin = 0, yMax = 1, xMin 
   const data = ctx.getImageData(0, 0, W, H).data
   const x0 = Math.max(0, Math.round(xMin * W)), x1 = Math.min(W, Math.round(xMax * W))
   const y0 = Math.max(0, Math.round(yMin * H)), y1 = Math.min(H, Math.round(yMax * H))
-  const cell = Math.max(24, Math.round(W * 0.12)) // ~ taille d'une icône
-  const cols = Math.ceil(W / cell) + 1
-  const warm = new Float64Array(cols * (Math.ceil(H / cell) + 1))
-  const sx = new Float64Array(warm.length), sy = new Float64Array(warm.length)
-  const purp = new Float64Array(warm.length), orng = new Float64Array(warm.length)
-  const step = 2 // sous-échantillonnage (perf)
+  const iconPx = Math.max(40, Math.round(W * 0.14))            // taille approx. d'une icône
+  const fc = Math.max(6, Math.round(W * 0.022))                // fine cellule d'accumulation
+  const cols = Math.ceil(W / fc) + 1, gridRows = Math.ceil(H / fc) + 1
+  const warm = new Int32Array(cols * gridRows)
+  const white = new Int32Array(warm.length), purp = new Int32Array(warm.length), orng = new Int32Array(warm.length)
+  const step = 2
   for (let y = y0; y < y1; y += step) {
     for (let x = x0; x < x1; x += step) {
       const i = (y * W + x) * 4
       const r = data[i], g = data[i + 1], b = data[i + 2]
-      // Couleur « chaude » du dégradé IG : R élevé, G faible, pas franchement bleu.
-      if (r > 180 && g < 125 && r > g + 70 && b < 210) {
-        const ci = Math.floor(x / cell) + Math.floor(y / cell) * cols
-        warm[ci]++; sx[ci] += x; sy[ci] += y
-        if (b > 115) purp[ci]++   // partie violette / rose (bas-gauche du dégradé)
-        if (b < 90) orng[ci]++    // partie orange / rouge (haut-droite)
+      const ci = Math.floor(x / fc) + Math.floor(y / fc) * cols
+      if (r > 180 && g < 125 && r > g + 70 && b < 210) {        // chaud (dégradé IG)
+        warm[ci]++
+        if (b > 115) purp[ci]++                                 // violet / rose
+        if (b < 90) orng[ci]++                                  // orange / rouge
+      } else if (r > 205 && g > 205 && b > 205) {
+        white[ci]++                                             // objectif photo blanc
       }
     }
   }
-  const minWarm = ((cell * cell) / (step * step)) * 0.16 // densité mini dans la cellule
-  let best = -1, bestScore = 0
-  for (let c = 0; c < warm.length; c++) {
-    if (warm[c] < minWarm) continue
-    if (purp[c] < 3 || orng[c] < 3) continue // exiger le DÉGRADÉ (violet + orange) → écarte un aplat
-    if (warm[c] > bestScore) { bestScore = warm[c]; best = c }
+  const win = Math.max(2, Math.round(iconPx / fc))              // fenêtre = 1 icône
+  const winSamples = (win * fc / step) * (win * fc / step)
+  let best: { cx: number; cy: number } | null = null, bestWarm = 0
+  for (let gy = 0; gy + win < gridRows; gy++) {
+    for (let gx = 0; gx + win < cols; gx++) {
+      let sw = 0, swh = 0, sp = 0, so = 0
+      for (let j = 0; j < win; j++) for (let i = 0; i < win; i++) {
+        const idx = (gx + i) + (gy + j) * cols
+        sw += warm[idx]; swh += white[idx]; sp += purp[idx]; so += orng[idx]
+      }
+      // Marqueurs simultanés du logo IG : remplissage chaud dense + violet + orange + blanc central.
+      if (sw > bestWarm && sw > winSamples * 0.30 && sp >= 4 && so >= 4 && swh >= 3) {
+        bestWarm = sw
+        best = { cx: Math.round((gx + win / 2) * fc), cy: Math.round((gy + win / 2) * fc) }
+      }
+    }
   }
-  if (best < 0) return null
-  return { cx: Math.round(sx[best] / warm[best]), cy: Math.round(sy[best] / warm[best]) }
+  return best
 }
 
 export async function terminateOcr(): Promise<void> {
