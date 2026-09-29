@@ -90,7 +90,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [sim5Key, setSim5Key] = useState(() => { try { return localStorage.getItem('sf-5sim-key') ?? '' } catch { return '' } })
   const [heroKey, setHeroKey] = useState(() => { try { return localStorage.getItem('sf-herosms-key') ?? '' } catch { return '' } })
   const [smsProvider, setSmsProvider] = useState<'5sim' | 'herosms'>(() => { try { return (localStorage.getItem('sf-sms-provider') as '5sim' | 'herosms') || '5sim' } catch { return '5sim' } })
-  const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('uk')
+  const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('usa')
   const [heroOffers, setHeroOffers] = useState<{ price: number; count: number }[]>([]) // paliers de prix HeroSMS
   const [heroPrice, setHeroPrice] = useState<number | null>(null)                       // prix exact choisi (null = auto)
   const [offersLoading, setOffersLoading] = useState(false)
@@ -241,17 +241,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].map(c => ({ dev, c })))
     if (jobs.length === 0) { setLogs(['⚠ Coche au moins un container (onglet Téléphones).']); return }
     // Config pays : identifiants propres à chaque fournisseur SMS.
-    //  - 5sim : simCountry (nom), operator ; HeroSMS : heroCountry (id SMS-Activate : USA=12, UK=16).
+    //  - 5sim : simCountry (nom), operator ; HeroSMS : heroCountry (id SMS-Activate : USA=187, UK=16).
+    //  - USA : opérateur « textnow » (priorisé), on prend le numéro le PLUS CHER dispo.
     const CFG = acctCountry === 'usa'
-      ? { label: /states/i, countryY: 0.37, simCountry: 'usa', operator: 'virtual8', heroCountry: 12, dial: '1', name: 'United States' }
+      ? { label: /states/i, countryY: 0.37, simCountry: 'usa', operator: 'textnow', heroCountry: 187, dial: '1', name: 'United States' }
       : { label: /kingdom/i, countryY: 0.29, simCountry: 'england', operator: 'any', heroCountry: 16, dial: '44', name: 'United Kingdom' }
 
     // Fournisseur SMS actif (clé + fonctions unifiées buy/wait/finish/cancel).
     const usingHero = smsProvider === 'herosms'
     const smsKey = usingHero ? heroKey : sim5Key
     const provName = usingHero ? 'HeroSMS' : '5sim'
+    // HeroSMS : si un prix est choisi dans l'UI → achat à ce palier exact ; sinon on prend le
+    // PLUS CHER dispo (pick 'high') dans une large tranche. Opérateur = CFG.operator (USA=textnow).
     const buyNumber = () => usingHero
-      ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig', priceMin: heroPrice ?? 0.20, priceMax: heroPrice ?? 0.35, pick: 'low', onLog: (m: string) => push(m) })
+      ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig', operator: CFG.operator, priceMin: heroPrice ?? 0.20, priceMax: heroPrice ?? 5.00, pick: 'high', onLog: (m: string) => push(m) })
       : fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
     const waitCode = (id: number, maxMs: number) => usingHero
       ? herosmsWaitCode(heroKey, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
@@ -300,8 +303,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           await sleep(1500)
           push(`${tag} 🛒 achat d'un numéro ${CFG.name} (${provName})…`)
           order = await buyNumber()
-          push(`${tag} 📞 numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}`)
-          if (order.price != null && (order.price < 0.20 || order.price > 0.35)) push(`${tag} ⚠ prix ${order.price}$ hors tranche 0.20–0.35$ (protocole compat ne fixe qu'un plafond)`)
+          push(`${tag} 📞 numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}${usingHero && acctCountry === 'usa' ? ' · textnow' : ''}`)
           const num = localPhone(order.phone, CFG.dial)
           const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY, phoneNumber: num }, chooks)
           if (stuck) { push(`${tag} ⏱ bloqué > 60s → on recommence de 0`); continue }
@@ -696,7 +698,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                   onClick={async () => {
                     setOffersLoading(true)
                     try {
-                      const list = await herosmsOffers(heroKey, acctCountry === 'usa' ? 12 : 16)
+                      const list = await herosmsOffers(heroKey, acctCountry === 'usa' ? 187 : 16)
                       setHeroOffers(list)
                       if (!list.length) push('⚠ Aucun prix renvoyé par HeroSMS (liste dispo côté web).')
                     } finally { setOffersLoading(false) }
@@ -709,13 +711,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 <button onClick={() => setHeroPrice(null)} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 800, background: heroPrice === null ? GOLD : 'rgba(0,0,0,0.3)', color: heroPrice === null ? '#1a1206' : MUTED }}>Auto (moins cher)</button>
-                {heroOffers.filter(o => showAllPrices || (o.price >= 0.20 && o.price <= 0.35)).map(o => (
+                {heroOffers.filter(o => showAllPrices || o.price >= 0.20).map(o => (
                   <button key={o.price} onClick={() => setHeroPrice(o.price)} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 800, background: heroPrice === o.price ? GOLD : 'rgba(0,0,0,0.3)', color: heroPrice === o.price ? '#1a1206' : INK }}>
                     {o.price.toFixed(2)}$ · {o.count} dispo
                   </button>
                 ))}
-                {heroOffers.length > 0 && !showAllPrices && !heroOffers.some(o => o.price >= 0.20 && o.price <= 0.35) && (
-                  <span style={{ fontSize: 11.5, color: MUTED, alignSelf: 'center' }}>Aucun palier entre 0,20–0,35 $ — coche « tout voir ».</span>
+                {heroOffers.length > 0 && !showAllPrices && !heroOffers.some(o => o.price >= 0.20) && (
+                  <span style={{ fontSize: 11.5, color: MUTED, alignSelf: 'center' }}>Aucun palier ≥ 0,20 $ — coche « tout voir ».</span>
                 )}
               </div>
             </div>

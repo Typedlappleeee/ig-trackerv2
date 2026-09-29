@@ -106,7 +106,7 @@ export async function herosmsBuy(
   if (opts.priceMin != null && opts.priceMax != null) {
     const best = await nativeBestPriceInRange(apiKey, service, opts.country, opts.priceMin, opts.priceMax, pick, opts.onLog)
     if (best != null) {
-      const nb = await call('native_buy', apiKey, { country: opts.country, service, maxPrice: best, fixedPrice: true })
+      const nb = await call('native_buy', apiKey, { country: opts.country, service, maxPrice: best, fixedPrice: true, ...(opts.operator ? { operator: opts.operator } : {}) })
       const item = Array.isArray(nb.data?.data) ? nb.data.data[0] : null
       if (nb.ok && item?.id && item?.phone) {
         opts.onLog?.(`   💲 prix ciblé (natif, le ${pick === 'low' ? 'moins' : 'plus'} cher de ${opts.priceMin}–${opts.priceMax}$) : ${best.toFixed(4)}$`)
