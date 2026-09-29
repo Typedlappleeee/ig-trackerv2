@@ -5,7 +5,7 @@
 //   • Story      : pool de photos + lien CTA par container → Story (vision)
 //   • Compte     : création de compte IG (pays UK/USA + numéro/SMS 5sim)
 // La sélection téléphones/containers est PARTAGÉE entre les onglets.
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -773,7 +773,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const okN = createdAccts.filter(a => a.ok).length
         const koN = createdAccts.length - okN
         const fmt = (t: number) => new Date(t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
-        const line = (a: CreatedAccount) => [a.username ?? '', a.password ?? '', a.phone ?? '', `${a.deviceName ?? a.device}·${a.container}`, a.country ?? '', a.ok ? 'ok' : 'echec'].join('\t')
+        // Format compact « username:password » (collé) pour copier-coller / import en masse.
+        const line = (a: CreatedAccount) => `${a.username ?? ''}:${a.password ?? ''}`
         const copyAll = () => { try { navigator.clipboard.writeText(filtered.map(line).join('\n')) } catch { /* noop */ } }
         const exportCsv = () => {
           const head = ['username', 'password', 'fullName', 'phone', 'provider', 'price', 'country', 'device', 'container', 'statut', 'date']
@@ -814,33 +815,54 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>
               {createdAccts.length === 0 ? 'Aucun compte créé pour l’instant — lance une création dans l’onglet « Création de compte ».' : 'Aucun compte ne correspond à ta recherche.'}
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {filtered.map(a => (
-                <div key={a.at} style={{ padding: 12, borderRadius: 10, background: a.ok ? 'rgba(52,211,153,0.05)' : 'rgba(248,113,113,0.06)', border: `1px solid ${a.ok ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.25)'}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: a.ok ? '#34D399' : '#F87171' }}>@{a.username ?? '—'}</span>
-                    <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 99, background: a.ok ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)', color: a.ok ? '#34D399' : '#F87171' }}>{a.ok ? 'CRÉÉ' : 'ÉCHEC'}</span>
-                    <span style={{ fontSize: 11.5, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 10.5, color: DIM }}>{a.country ?? ''}{a.price != null ? ` · ${a.price}$` : ''}{a.provider ? ` · ${a.provider}` : ''} · {fmt(a.at)}</span>
-                  </div>
-                  <div style={{ marginTop: 5, display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: INK }}>
-                    <span>🔑 {a.password ?? '—'}</span>
-                    <span>📞 {a.phone ?? '—'}</span>
-                    {a.fullName && <span style={{ color: MUTED }}>{a.fullName}</span>}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                    <button style={{ ...btn, height: 26, fontSize: 11 }} onClick={() => { try { navigator.clipboard.writeText(line(a)) } catch { /* noop */ } }}>Copier</button>
-                    {a.log && a.log.length > 0 && <button style={{ ...btn, height: 26, fontSize: 11 }} onClick={() => setAcctLogOpen(acctLogOpen === a.at ? null : a.at)}>{acctLogOpen === a.at ? 'Masquer le log' : 'Voir le log'}</button>}
-                    <button style={{ ...btn, height: 26, fontSize: 11, marginLeft: 'auto', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => { removeCreatedAccount(a.at); setCreatedAccts(loadCreatedAccounts()) }}>Supprimer</button>
-                  </div>
-                  {acctLogOpen === a.at && a.log && (
-                    <div style={{ marginTop: 8, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 220, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{a.log.join('\n')}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          ) : (() => {
+            const th: React.CSSProperties = { textAlign: 'left', padding: '8px 14px', fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid rgba(216,180,254,0.16)', whiteSpace: 'nowrap' }
+            const td: React.CSSProperties = { padding: '10px 14px', borderBottom: '1px solid rgba(216,180,254,0.07)', verticalAlign: 'middle', whiteSpace: 'nowrap' }
+            return (
+              <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
+                  <thead>
+                    <tr>
+                      <th style={th}>username:password</th>
+                      <th style={th}>Statut</th>
+                      <th style={th}>Téléphone · Conteneur</th>
+                      <th style={th}>Date</th>
+                      <th style={{ ...th, textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((a, idx) => (
+                      <Fragment key={a.at}>
+                        <tr style={{ background: idx % 2 ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
+                          <td style={{ ...td, fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: INK, cursor: 'pointer' }} title="Cliquer pour copier"
+                            onClick={() => { try { navigator.clipboard.writeText(line(a)) } catch { /* noop */ } }}>
+                            {(a.username ?? '?')}<span style={{ color: DIM }}>:</span>{(a.password ?? '?')}
+                          </td>
+                          <td style={td}><span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: a.ok ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)', color: a.ok ? '#34D399' : '#F87171' }}>{a.ok ? 'CRÉÉ' : 'ÉCHEC'}</span></td>
+                          <td style={{ ...td, fontSize: 12, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</td>
+                          <td style={{ ...td, fontSize: 11.5, color: DIM }}>{fmt(a.at)}</td>
+                          <td style={{ ...td, textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: 6 }}>
+                              <button style={{ ...btn, height: 26, fontSize: 11, padding: '0 10px' }} onClick={() => { try { navigator.clipboard.writeText(line(a)) } catch { /* noop */ } }}>Copier</button>
+                              {a.log && a.log.length > 0 && <button style={{ ...btn, height: 26, fontSize: 11, padding: '0 10px' }} onClick={() => setAcctLogOpen(acctLogOpen === a.at ? null : a.at)}>Log</button>}
+                              <button style={{ ...btn, height: 26, fontSize: 11, padding: '0 10px', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => { removeCreatedAccount(a.at); setCreatedAccts(loadCreatedAccounts()) }}>×</button>
+                            </div>
+                          </td>
+                        </tr>
+                        {acctLogOpen === a.at && a.log && (
+                          <tr>
+                            <td colSpan={5} style={{ padding: '0 14px 10px' }}>
+                              <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 240, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{a.log.join('\n')}</div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()}
         </>)
       })()}
 
