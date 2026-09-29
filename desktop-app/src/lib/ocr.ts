@@ -164,20 +164,21 @@ export async function findInstagramIcon(image: string, yMin = 0.05, yMax = 0.96,
   const fc = Math.max(6, Math.round(W * 0.022))                // fine cellule d'accumulation
   const cols = Math.ceil(W / fc) + 1, gridRows = Math.ceil(H / fc) + 1
   const warm = new Int32Array(cols * gridRows)
-  const white = new Int32Array(warm.length), purp = new Int32Array(warm.length), orng = new Int32Array(warm.length)
+  const white = new Int32Array(warm.length), viol = new Int32Array(warm.length), yell = new Int32Array(warm.length)
   const step = 2
   for (let y = y0; y < y1; y += step) {
     for (let x = x0; x < x1; x += step) {
       const i = (y * W + x) * 4
       const r = data[i], g = data[i + 1], b = data[i + 2]
       const ci = Math.floor(x / fc) + Math.floor(y / fc) * cols
-      if (r > 180 && g < 125 && r > g + 70 && b < 210) {        // chaud (dégradé IG)
-        warm[ci]++
-        if (b > 115) purp[ci]++                                 // violet / rose
-        if (b < 90) orng[ci]++                                  // orange / rouge
-      } else if (r > 205 && g > 205 && b > 205) {
-        white[ci]++                                             // objectif photo blanc
-      }
+      // Remplissage « chaud » (présent AUSSI sur Musique — sert juste de densité).
+      if (r > 170 && g < 140 && b < 220 && r > g + 40) warm[ci]++
+      // VRAI violet / bleu (bas-gauche du dégradé IG : #833AB4, #5851DB) — ABSENT sur Musique (rouge/rose).
+      if (b > 150 && r < 200 && g < 110 && b > g + 60) viol[ci]++
+      // JAUNE / orange clair (haut-droite du dégradé IG : #FCAF45, #FEDA77) — ABSENT sur Musique.
+      if (r > 215 && g > 140 && g < 205 && b < 130) yell[ci]++
+      // Objectif photo BLANC au centre.
+      if (r > 205 && g > 205 && b > 205) white[ci]++
     }
   }
   const win = Math.max(2, Math.round(iconPx / fc))              // fenêtre = 1 icône
@@ -185,13 +186,14 @@ export async function findInstagramIcon(image: string, yMin = 0.05, yMax = 0.96,
   let best: { cx: number; cy: number } | null = null, bestWarm = 0
   for (let gy = 0; gy + win < gridRows; gy++) {
     for (let gx = 0; gx + win < cols; gx++) {
-      let sw = 0, swh = 0, sp = 0, so = 0
+      let sw = 0, swh = 0, sv = 0, sy2 = 0
       for (let j = 0; j < win; j++) for (let i = 0; i < win; i++) {
         const idx = (gx + i) + (gy + j) * cols
-        sw += warm[idx]; swh += white[idx]; sp += purp[idx]; so += orng[idx]
+        sw += warm[idx]; swh += white[idx]; sv += viol[idx]; sy2 += yell[idx]
       }
-      // Marqueurs simultanés du logo IG : remplissage chaud dense + violet + orange + blanc central.
-      if (sw > bestWarm && sw > winSamples * 0.30 && sp >= 4 && so >= 4 && swh >= 3) {
+      // Logo IG = remplissage chaud dense + VRAI violet/bleu + JAUNE + blanc central, tous ensemble.
+      // (Musique a le chaud + le blanc mais NI violet-bleu NI jaune → exclue.)
+      if (sw > bestWarm && sw > winSamples * 0.30 && sv >= 3 && sy2 >= 3 && swh >= 2) {
         bestWarm = sw
         best = { cx: Math.round((gx + win / 2) * fc), cy: Math.round((gy + win / 2) * fc) }
       }
