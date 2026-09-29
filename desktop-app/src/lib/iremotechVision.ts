@@ -533,9 +533,16 @@ export async function createInstagramAccountByVision(
     return { ok: true, stage: 'ready_for_number' }
   }
   hooks?.log?.('📱 Saisie du numéro de mobile…')
-  // Champ de saisie : PAS d'OCR (« number » traîne dans le titre) → DOUBLE-tap direct de
-  // la position connue du champ (~31%) pour bien le focus.
-  await tapFrac(0.5, 0.31); await sleep(200); await tapFrac(0.5, 0.31)
+  // Le champ « Mobile number » DESCEND selon la longueur du texte au-dessus (mention Meta
+  // Account) → on le cible par OCR de son placeholder « Mobile » dans la zone du champ
+  // (minY 0.30 exclut le titre à ~0.13 ; maxY 0.42 exclut l'erreur rouge « required » à ~0.43).
+  // DOUBLE-tap pour bien le focus ; repli position ~0.385 si non lu.
+  const numPt = await findWordPoint(key, deviceId, [/mobile/i], hooks, { minY: 0.30, maxY: 0.42, tries: 2 })
+  const nx = numPt ? numPt.x : Math.round(0.5 * W)
+  const ny = numPt ? numPt.y : Math.round(0.385 * H)
+  if (!numPt) hooks?.log?.('   champ numéro non lu → tap position connue (0.5, 0.385).')
+  await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny }); await sleep(220)
+  await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny })
   await sleep(1000)
   await sendAction(key, deviceId, { type: 'text', text: opts.phoneNumber })
   await sleep(1200)
