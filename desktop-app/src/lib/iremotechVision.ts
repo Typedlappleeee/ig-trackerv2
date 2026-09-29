@@ -765,20 +765,38 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   // ⚠ Ne JAMAIS taper le bouton bleu de ces écrans : c'est un opt-in (Add picture / Follow /
   // Notifications), pas « Next ». On prend « Skip » par texte en priorité ; sinon le Skip est
   // le bouton secondaire JUSTE SOUS le bouton bleu → on tape sous le bleu, jamais dessus.
-  hooks?.log?.('⏭ Écrans de fin (Skip)…')
-  for (let i = 0; i < 8; i++) {
+  hooks?.log?.('⏭ Écrans de fin (Skip / Next)…')
+  let idle = 0
+  for (let i = 0; i < 14 && idle < 3; i++) {
     if (hooks?.shouldStop?.()) break
-    await sleep(1800)
-    if (await findTapText(key, deviceId, [/^skip$/i, /^ignorer$/i, /^plus tard$/i, /^not now$/i, /^pas maintenant$/i], hooks, { label: 'Skip', tries: 2, minY: 0.55 })) continue
+    await sleep(1400)
+    // A. « Skip » explicite (jamais un opt-in).
+    if (await findTapText(key, deviceId, [/^skip$/i, /^ignorer$/i, /^plus tard$/i, /^not now$/i, /^pas maintenant$/i], hooks, { label: 'Skip', tries: 1, minY: 0.5 })) { idle = 0; continue }
+    // B. Écran « Review the settings for your new profile » (Turn on Notifications/Contacts/Location) :
+    //    le bouton bleu « Next » est TOUT EN BAS, visible après scroll. On scrolle puis on tape Next
+    //    DIRECTEMENT — surtout PAS les « Turn on » (opt-in), ni « sous » le bouton.
+    if (await hasText(key, deviceId, [/review the settings/i, /review the/i], hooks, { tries: 1 })) {
+      hooks?.log?.('   ⚙ écran « Review the settings » → scroll + Next')
+      for (let s = 0; s < 3; s++) { await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(0.5 * W), y1: Math.round(0.72 * H), x2: Math.round(0.5 * W), y2: Math.round(0.30 * H), duration_ms: 350 }); await sleep(700) }
+      if (await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next (réglages)', tries: 2, minY: 0.6 })) { idle = 0; await sleep(2000); continue }
+      const rshot = await snapshot(key, deviceId)
+      const rb = rshot ? await findBlueButton(rshot, 0.8, 1, 0, 1) : null
+      if (rb) { hooks?.log?.(`   🔵 Next (bouton bleu bas) → tap (${rb.cx}, ${rb.cy})`); await sendAction(key, deviceId, { type: 'tap', x: rb.cx, y: rb.cy }); idle = 0; await sleep(2000); continue }
+      idle++; continue
+    }
+    // C. « Next »/« Suivant » visible (avance légitime, ex. autres écrans) → tap direct.
+    if (await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next', tries: 1, minY: 0.55 })) { idle = 0; continue }
+    // D. Vrai opt-in bleu (Add picture / Follow) avec un « Skip » secondaire JUSTE EN DESSOUS →
+    //    on tape SOUS le bouton bleu (jamais dessus).
     const endShot = await snapshot(key, deviceId)
     const blue = endShot ? await findBlueButton(endShot, 0.75, 0.95, 0, 1) : null
     if (blue) {
       const belowY = Math.min(H - 6, blue.cy + Math.round(0.075 * H))
-      hooks?.log?.(`   ⏭ « Skip » non lu, bouton bleu (opt-in) en ${blue.cy} → tap SOUS (${blue.cx}, ${belowY})`)
+      hooks?.log?.(`   ⏭ opt-in bleu en ${blue.cy} → tap SOUS (Skip) (${blue.cx}, ${belowY})`)
       await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: belowY })
-      continue
+      idle = 0; continue
     }
-    break // ni Skip ni bouton bleu → probablement le fil d'accueil
+    idle++ // rien d'actionnable → probablement le fil d'accueil ; on sort après quelques essais
   }
   hooks?.log?.(`✅ Compte créé — 🔐 @${username} · ${password}`)
   return { ok: true, creds: { username, password, fullName } }
