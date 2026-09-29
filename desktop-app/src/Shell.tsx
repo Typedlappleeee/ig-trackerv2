@@ -11,7 +11,7 @@ export type PageKey =
   | 'studio'
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
-  | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount'
+  | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
   | 'scheduled'
   | 'admin'
   | 'settings'
@@ -30,6 +30,9 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
         { k: 'irtStory', l: 'Story', i: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M12 8v4l3 2' },
         { k: 'irtWarmup', l: 'Warm-up', i: 'M12 2s5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 1-3s0 2 2 2 1-4-2-6c3 1 4 4 4 4' },
         { k: 'irtAccount', l: 'Création de compte', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M19 8v6|M22 11h-6' },
+      ] },
+      { g: 'Comptes', items: [
+        { k: 'irtComptes', l: 'Comptes', i: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M23 21v-2a4 4 0 0 0-3-3.87|M16 3.13a4 4 0 0 1 0 7.75' },
       ] },
     ]
   }
@@ -115,6 +118,7 @@ const TITLES: Record<PageKey, string[]> = {
   irtStory: ['iRemoTech', 'Story'],
   irtWarmup: ['iRemoTech', 'Warm-up'],
   irtAccount: ['iRemoTech', 'Création de compte'],
+  irtComptes: ['iRemoTech', 'Comptes'],
   scheduled: ['Diffusion', 'Programmé'],
   admin: ['Admin', 'Licences'],
   settings: ['Réglages'],

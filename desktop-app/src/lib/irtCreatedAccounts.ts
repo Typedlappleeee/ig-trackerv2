@@ -33,3 +33,7 @@ export function addCreatedAccount(a: CreatedAccount): void {
 export function removeCreatedAccount(at: number): void {
   try { localStorage.setItem(KEY, JSON.stringify(loadCreatedAccounts().filter(a => a.at !== at))) } catch { /* noop */ }
 }
+
+export function clearCreatedAccounts(): void {
+  try { localStorage.removeItem(KEY) } catch { /* noop */ }
+}

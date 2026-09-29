@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision } from '@/lib/iremotechVision'
-import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, type CreatedAccount } from '@/lib/irtCreatedAccounts'
+import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
@@ -25,7 +25,7 @@ const BLOW_THEME = themeFor('blowsome')
 
 const GOLD = '#E9C46A', INK = '#ECE9F5', MUTED = '#A79FBD', DIM = '#6b6478', SERIF = "'Space Grotesk',sans-serif"
 type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null }
-export type IrtTab = 'phones' | 'posting' | 'story' | 'warmup' | 'account'
+export type IrtTab = 'phones' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
 
 const card: CSSProperties = { background: 'linear-gradient(168deg,rgba(24,20,44,0.5),rgba(12,10,22,0.6))', border: '1px solid rgba(216,180,254,0.12)', borderRadius: 16, padding: 18, marginBottom: 14 }
 const btn: CSSProperties = { height: 34, padding: '0 13px', borderRadius: 9, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(216,180,254,0.16)', color: INK }
@@ -103,6 +103,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [wCommentPct, setWCommentPct] = useState(0)
   const [wComments, setWComments] = useState('')
   const [createdAccts, setCreatedAccts] = useState<CreatedAccount[]>(() => loadCreatedAccounts())
+  const [acctSearch, setAcctSearch] = useState('')
+  const [acctFilter, setAcctFilter] = useState<'all' | 'ok' | 'ko'>('all')
+  const [acctLogOpen, setAcctLogOpen] = useState<number | null>(null)
 
   const [running, setRunning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
@@ -494,6 +497,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     { k: 'story', label: 'Story', icon: '📸' },
     { k: 'warmup', label: 'Warm-up', icon: '🔥' },
     { k: 'account', label: 'Création de compte', icon: '🆕' },
+    { k: 'comptes', label: 'Comptes', icon: '👤' },
   ]
 
   return (
@@ -757,6 +761,88 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           </div>
         )}
       </>)}
+
+      {curTab === 'comptes' && (() => {
+        const q = acctSearch.trim().toLowerCase()
+        const filtered = createdAccts.filter(a => {
+          if (acctFilter === 'ok' && !a.ok) return false
+          if (acctFilter === 'ko' && a.ok) return false
+          if (!q) return true
+          return [a.username, a.phone, a.container, a.deviceName, a.device, a.fullName, a.country].some(v => (v ?? '').toString().toLowerCase().includes(q))
+        })
+        const okN = createdAccts.filter(a => a.ok).length
+        const koN = createdAccts.length - okN
+        const fmt = (t: number) => new Date(t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+        const line = (a: CreatedAccount) => [a.username ?? '', a.password ?? '', a.phone ?? '', `${a.deviceName ?? a.device}·${a.container}`, a.country ?? '', a.ok ? 'ok' : 'echec'].join('\t')
+        const copyAll = () => { try { navigator.clipboard.writeText(filtered.map(line).join('\n')) } catch { /* noop */ } }
+        const exportCsv = () => {
+          const head = ['username', 'password', 'fullName', 'phone', 'provider', 'price', 'country', 'device', 'container', 'statut', 'date']
+          const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+          const rows = filtered.map(a => [a.username, a.password, a.fullName, a.phone, a.provider, a.price, a.country, a.deviceName ?? a.device, a.container, a.ok ? 'cree' : 'echec', new Date(a.at).toISOString()].map(esc).join(','))
+          const csv = head.join(',') + '\n' + rows.join('\n')
+          const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+          const el = document.createElement('a'); el.href = url; el.download = `comptes-ig-${new Date().toISOString().slice(0, 10)}.csv`; el.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
+        }
+        return (<>
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: INK }}>👤 Comptes créés</div>
+              <div style={{ display: 'flex', gap: 14, marginLeft: 'auto', fontSize: 12 }}>
+                <span style={{ color: MUTED }}>Total <b style={{ color: INK }}>{createdAccts.length}</b></span>
+                <span style={{ color: '#34D399' }}>Réussis <b>{okN}</b></span>
+                <span style={{ color: '#F87171' }}>Échoués <b>{koN}</b></span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input value={acctSearch} onChange={e => setAcctSearch(e.target.value)} placeholder="Rechercher (username, numéro, conteneur, téléphone…)" style={{ ...inp, flex: 1, minWidth: 220, height: 38 }} />
+              <div style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 10, background: 'rgba(0,0,0,0.3)' }}>
+                {([['all', 'Tous'], ['ok', 'Réussis'], ['ko', 'Échoués']] as const).map(([k, l]) => (
+                  <button key={k} onClick={() => setAcctFilter(k)} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 800, background: acctFilter === k ? GOLD : 'transparent', color: acctFilter === k ? '#1a1206' : MUTED }}>{l}</button>
+                ))}
+              </div>
+            </div>
+            {createdAccts.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <button style={{ ...btn, height: 32 }} onClick={copyAll}>Copier tout ({filtered.length})</button>
+                <button style={{ ...btn, height: 32 }} onClick={exportCsv}>Exporter CSV</button>
+                <button style={{ ...btn, height: 32, color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => { if (window.confirm('Vider TOUS les comptes enregistrés ? (irréversible)')) { clearCreatedAccounts(); setCreatedAccts([]) } }}>Vider</button>
+              </div>
+            )}
+          </div>
+
+          {filtered.length === 0 ? (
+            <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>
+              {createdAccts.length === 0 ? 'Aucun compte créé pour l’instant — lance une création dans l’onglet « Création de compte ».' : 'Aucun compte ne correspond à ta recherche.'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {filtered.map(a => (
+                <div key={a.at} style={{ padding: 12, borderRadius: 10, background: a.ok ? 'rgba(52,211,153,0.05)' : 'rgba(248,113,113,0.06)', border: `1px solid ${a.ok ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.25)'}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: a.ok ? '#34D399' : '#F87171' }}>@{a.username ?? '—'}</span>
+                    <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 99, background: a.ok ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)', color: a.ok ? '#34D399' : '#F87171' }}>{a.ok ? 'CRÉÉ' : 'ÉCHEC'}</span>
+                    <span style={{ fontSize: 11.5, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10.5, color: DIM }}>{a.country ?? ''}{a.price != null ? ` · ${a.price}$` : ''}{a.provider ? ` · ${a.provider}` : ''} · {fmt(a.at)}</span>
+                  </div>
+                  <div style={{ marginTop: 5, display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: INK }}>
+                    <span>🔑 {a.password ?? '—'}</span>
+                    <span>📞 {a.phone ?? '—'}</span>
+                    {a.fullName && <span style={{ color: MUTED }}>{a.fullName}</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    <button style={{ ...btn, height: 26, fontSize: 11 }} onClick={() => { try { navigator.clipboard.writeText(line(a)) } catch { /* noop */ } }}>Copier</button>
+                    {a.log && a.log.length > 0 && <button style={{ ...btn, height: 26, fontSize: 11 }} onClick={() => setAcctLogOpen(acctLogOpen === a.at ? null : a.at)}>{acctLogOpen === a.at ? 'Masquer le log' : 'Voir le log'}</button>}
+                    <button style={{ ...btn, height: 26, fontSize: 11, marginLeft: 'auto', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => { removeCreatedAccount(a.at); setCreatedAccts(loadCreatedAccounts()) }}>Supprimer</button>
+                  </div>
+                  {acctLogOpen === a.at && a.log && (
+                    <div style={{ marginTop: 8, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 220, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{a.log.join('\n')}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>)
+      })()}
 
       {picker && (
         <BankPicker theme={BLOW_THEME} user={user} org={org} kind={picker === 'story' ? 'images' : 'videos'} multi
