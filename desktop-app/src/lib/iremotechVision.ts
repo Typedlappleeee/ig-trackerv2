@@ -265,7 +265,7 @@ async function tapAppIcon(
     }
     words.push(...await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] }))
     const lus = [...new Set(words.map(w => w.text).filter(Boolean))].slice(0, 28)
-    hooks?.log?.(`👁 accueil lu : ${lus.join(', ') || '(rien)'}`)
+    hooks?.log?.(`👁 accueil (${W}×${H}) lu : ${lus.join(', ') || '(rien)'}`)
     const hit = words.find(o => matcher(o.text))
     if (hit) {
       const ty = Math.max(0, hit.cy - Math.round(H * 0.055)) // viser l'icône, bien au-dessus du libellé
