@@ -704,13 +704,23 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   // 6. Écrans de fin (photo de profil, « vibe », suivre 5 personnes, notifications…) :
   //    on préfère TOUJOURS « Skip » (n'importe où) ; sinon « Next » (bouton bleu, ex. Follow 5) ;
   //    sinon on considère qu'on est arrivé au fil → on s'arrête.
-  hooks?.log?.('⏭ Écrans de fin (Skip / Next)…')
+  // ⚠ Ne JAMAIS taper le bouton bleu de ces écrans : c'est un opt-in (Add picture / Follow /
+  // Notifications), pas « Next ». On prend « Skip » par texte en priorité ; sinon le Skip est
+  // le bouton secondaire JUSTE SOUS le bouton bleu → on tape sous le bleu, jamais dessus.
+  hooks?.log?.('⏭ Écrans de fin (Skip)…')
   for (let i = 0; i < 8; i++) {
     if (hooks?.shouldStop?.()) break
     await sleep(1800)
-    if (await findTapText(key, deviceId, [/^skip$/i, /^ignorer$/i, /^plus tard$/i, /^not now$/i], hooks, { label: 'Skip', tries: 1 })) continue
-    if (await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], { x: 0.5, y: 0.93 }, W, H, hooks, [0.85, 1], 'Next (fin)', 1, [0, 1])) continue
-    break // plus de Skip/Next → probablement le fil d'accueil
+    if (await findTapText(key, deviceId, [/^skip$/i, /^ignorer$/i, /^plus tard$/i, /^not now$/i, /^pas maintenant$/i], hooks, { label: 'Skip', tries: 2, minY: 0.55 })) continue
+    const endShot = await snapshot(key, deviceId)
+    const blue = endShot ? await findBlueButton(endShot, 0.75, 0.95, 0, 1) : null
+    if (blue) {
+      const belowY = Math.min(H - 6, blue.cy + Math.round(0.075 * H))
+      hooks?.log?.(`   ⏭ « Skip » non lu, bouton bleu (opt-in) en ${blue.cy} → tap SOUS (${blue.cx}, ${belowY})`)
+      await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: belowY })
+      continue
+    }
+    break // ni Skip ni bouton bleu → probablement le fil d'accueil
   }
   hooks?.log?.(`✅ Compte créé — 🔐 @${username} · ${password}`)
   return { ok: true, creds: { username, password, fullName } }
