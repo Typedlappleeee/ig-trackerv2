@@ -786,6 +786,9 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
     }
     // C. « Next »/« Suivant » visible (avance légitime, ex. autres écrans) → tap direct.
     if (await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next', tries: 1, minY: 0.55 })) { idle = 0; continue }
+    // C2. « I agree » / « J'accepte » (accepter les conditions, bouton bleu) → tap DIRECT (jamais
+    //     « sous » : « I already have an account » est en dessous).
+    if (await findTapText(key, deviceId, [/i agree/i, /^agree$/i, /j.?accepte/i, /^accepter$/i], hooks, { label: 'I agree', tries: 1, minY: 0.5 })) { idle = 0; await sleep(2500); continue }
     // D. Vrai opt-in bleu (Add picture / Follow) avec un « Skip » secondaire JUSTE EN DESSOUS →
     //    on tape SOUS le bouton bleu (jamais dessus).
     const endShot = await snapshot(key, deviceId)
