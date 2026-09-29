@@ -257,26 +257,20 @@ async function tapAppIcon(
     if (!shot) { await sleep(700); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
-    // 0. Détection par LOGO (couleur du dégradé) — plus fiable que l'OCR du libellé.
-    if (iconDetect) {
-      const p = await iconDetect(shot).catch(() => null)
-      if (p) {
-        hooks?.log?.(`🎨 logo ${label} repéré (couleur) → tap (${p.cx}, ${p.cy})`)
-        await sendAction(key, deviceId, { type: 'tap', x: p.cx, y: p.cy })
-        return true
-      }
-    }
-    // Libellé souvent BLANC sur fond d'écran varié → OCR MULTI-PASSES (normal + inversé, plusieurs
-    // scales et psm) sinon le texte clair ne se lit pas (icône « trouvée » mais libellé non OCRisé).
+    // Libellé BLANC sur fond d'écran coloré : la clé est d'ISOLER le texte quasi-blanc avant l'OCR.
+    // `invert:true` + `threshold` bas → seuls les pixels très clairs (le libellé) deviennent du
+    // texte noir net, le fond coloré disparaît. On tente plusieurs seuils (labels + ou - lumineux).
     const words: { text: string; cx: number; cy: number }[] = []
-    for (const inv of [false, true]) {
+    for (const th of [70, 95, 120]) {
       for (const sc of [3, 4]) {
-        const w = await ocrWords(shot, undefined, { threshold: null, invert: inv, scale: sc, psms: ['11', '12', '6'] })
+        const w = await ocrWords(shot, undefined, { threshold: th, invert: true, scale: sc, psms: ['11', '6'] })
         words.push(...w)
       }
     }
+    // Repli grayscale (au cas où le libellé serait foncé sur fond clair).
+    words.push(...await ocrWords(shot, undefined, { threshold: null, scale: 3, psms: ['11'] }))
     // Diagnostic : on montre ce que l'OCR a lu (pour caler le matcher si l'icône n'est pas trouvée).
-    const lus = [...new Set(words.map(w => w.text).filter(Boolean))].slice(0, 24)
+    const lus = [...new Set(words.map(w => w.text).filter(Boolean))].slice(0, 30)
     hooks?.log?.(`👁 accueil lu : ${lus.join(', ') || '(rien)'}`)
     const hit = words.find(o => matcher(o.text))
     if (hit) {
@@ -284,6 +278,15 @@ async function tapAppIcon(
       hooks?.log?.(`📸 icône ${label} repérée → tap (${hit.cx}, ${ty})`)
       await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: ty })
       return true
+    }
+    // Repli LOGO (couleur du dégradé, strict) UNIQUEMENT si le texte n'a rien donné.
+    if (iconDetect) {
+      const p = await iconDetect(shot).catch(() => null)
+      if (p) {
+        hooks?.log?.(`🎨 logo ${label} repéré (couleur) → tap (${p.cx}, ${p.cy})`)
+        await sendAction(key, deviceId, { type: 'tap', x: p.cx, y: p.cy })
+        return true
+      }
     }
     hooks?.log?.(`🔎 ${label} pas sur cette page → page suivante`)
     await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.6), x2: Math.round(W * 0.18), y2: Math.round(H * 0.6), duration_ms: 350 })
