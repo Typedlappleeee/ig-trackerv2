@@ -657,8 +657,20 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   for (let i = 0; i < 4; i++) { await swipeCol(0.78, 0.14 + Math.random() * 0.06); await sleep(450) }
   await swipeCol(0.25, (Math.random() < 0.5 ? 1 : -1) * (0.06 + Math.random() * 0.08)); await sleep(450) // mois
   await swipeCol(0.5, (Math.random() < 0.5 ? 1 : -1) * (0.06 + Math.random() * 0.08)); await sleep(700)  // jour
-  await tapNext('Next (anniversaire)')
-  await sleep(3200)
+  // Ici « Next » est CENTRÉ (~0.47), pas en bas-droite, et il reste GRISÉ tant que les molettes
+  // animent (âge non figé). On laisse d'abord les molettes se poser, puis on tape en VÉRIFIANT
+  // qu'on a quitté l'écran anniversaire ; sinon on retape (Next était grisé / tap manqué).
+  await sleep(1200)
+  let bdayOk = false
+  for (let t = 0; t < 4 && !bdayOk; t++) {
+    if (hooks?.shouldStop?.()) break
+    await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], { x: 0.5, y: 0.47 }, W, H, hooks, [0.30, 0.62], t ? `Next anniversaire (essai ${t + 1})` : 'Next (anniversaire)', 2, [0, 1])
+    await sleep(2400)
+    bdayOk = !await hasText(key, deviceId, [/birthday/i, /anniversaire/i], hooks, { cropY: [0, 0.35], tries: 1 })
+    if (!bdayOk) hooks?.log?.('   ↻ toujours sur l’écran anniversaire → réessai Next')
+  }
+  if (!bdayOk) hooks?.log?.('   ⚠ anniversaire : Next n’a pas fait avancer après plusieurs essais.')
+  await sleep(1500)
 
   // 3. Full name : nom de femme française aléatoire.
   const first = pick(FR_FIRST), fullName = `${first} ${pick(FR_LAST)}`
