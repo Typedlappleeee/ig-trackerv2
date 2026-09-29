@@ -579,6 +579,46 @@ export async function enterSmsCodeByVision(key: string, deviceId: string, code: 
   return true
 }
 
+// Depuis l'écran « Enter the confirmation code » : revient à l'écran numéro (flèche retour
+// haut-gauche), vide l'ancien numéro et saisit le NOUVEAU, puis re-soumet. Sert quand aucun
+// code n'arrive sous 60 s → on jette le numéro et on en essaie un autre. true si on est bien
+// repassé sur l'écran de code (numéro re-soumis).
+export async function resubmitNumberByVision(key: string, deviceId: string, phoneNumber: string, hooks?: VisionHooks): Promise<boolean> {
+  const shot0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('❌ écran illisible (ré-saisie numéro)'); return false }
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
+  hooks?.log?.('↩ Retour à l’écran numéro pour re-saisir un nouveau numéro…')
+  // Flèche retour (haut-gauche).
+  await tapFrac(0.06, 0.06); await sleep(2200)
+  // Vérifie qu'on est bien revenu sur l'écran numéro.
+  if (!await hasText(key, deviceId, [/mobile/i, /^number$/i], hooks, { tries: 4 })) {
+    hooks?.log?.('❌ écran numéro non retrouvé après retour')
+    return false
+  }
+  // Champ « Mobile number » (même ciblage que la saisie initiale).
+  const numPt = await findWordPoint(key, deviceId, [/mobile/i], hooks, { minY: 0.28, maxY: 0.39, tries: 2 })
+  const nx = numPt ? numPt.x : Math.round(0.5 * W)
+  const ny = numPt ? numPt.y : Math.round(0.34 * H)
+  await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny }); await sleep(220)
+  await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny }); await sleep(700)
+  // Vide l'ancien numéro puis saisit le nouveau.
+  for (let i = 0; i < 24; i++) await sendAction(key, deviceId, { type: 'key', key: 'Backspace' })
+  await sleep(400)
+  await sendAction(key, deviceId, { type: 'text', text: phoneNumber })
+  await sleep(1200)
+  // Next (bouton bleu centré) + vérifie qu'on a quitté l'écran numéro (→ écran code).
+  let ok = false
+  for (let t = 0; t < 3 && !ok; t++) {
+    await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], { x: 0.5, y: 0.62 }, W, H, hooks, [0.45, 0.9], t ? `Next numéro (essai ${t + 1})` : 'Next (numéro)', 2, [0, 1])
+    await sleep(2600)
+    ok = !await hasText(key, deviceId, [/mobile number/i, /required/i], hooks, { cropY: [0.25, 0.55], tries: 1 })
+    if (!ok) hooks?.log?.('   ↻ toujours sur l’écran numéro → réessai Next')
+  }
+  if (ok) hooks?.log?.('✅ Nouveau numéro soumis — en attente du code SMS.')
+  return ok
+}
+
 // Force l'envoi du code par SMS : Instagram l'envoie souvent par WhatsApp d'abord
 // (donc l'API SMS ne reçoit rien). On tape « I didn't get the code » puis, dans la
 // feuille, « Send code via SMS ».

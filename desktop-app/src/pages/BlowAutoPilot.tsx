@@ -11,7 +11,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, requestSmsResendByVision, completeSignupByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, resubmitNumberByVision, completeSignupByVision } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
@@ -247,7 +247,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const smsKey = usingHero ? heroKey : sim5Key
     const provName = usingHero ? 'HeroSMS' : '5sim'
     const buyNumber = () => usingHero
-      ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig', priceMin: 0, priceMax: 0.36, pick: 'low', onLog: (m: string) => push(m) })
+      ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig', priceMin: 0.20, priceMax: 0.35, pick: 'low', onLog: (m: string) => push(m) })
       : fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
     const waitCode = (id: number, maxMs: number) => usingHero
       ? herosmsWaitCode(heroKey, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
@@ -280,7 +280,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         push(`${tag} 🛒 achat d'un numéro ${CFG.name} (${provName})…`)
         order = await buyNumber()
         push(`${tag} 📞 numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}`)
-        if (order.price != null && (order.price < 0.25 || order.price > 0.40)) push(`${tag} ⚠ prix ${order.price}$ hors tranche 0.25–0.40$ (protocole compat ne fixe qu'un plafond)`)
+        if (order.price != null && (order.price < 0.20 || order.price > 0.35)) push(`${tag} ⚠ prix ${order.price}$ hors tranche 0.20–0.35$ (protocole compat ne fixe qu'un plafond)`)
       } catch (e) { push(`${tag} ✗ achat ${provName}: ${e instanceof Error ? e.message : String(e)}`); R.tick(false); continue }
 
       const num = localPhone(order.phone, CFG.dial)
@@ -290,11 +290,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         try { await cancelNum(order.id) } catch { /* noop */ }
         R.tick(false); continue
       }
-      // IG envoie souvent le code par WhatsApp → on attend ~70s, puis on force l'envoi par SMS.
-      let code = await waitCode(order.id, 70_000)
-      if (!code && !R.isCancelled()) {
-        await requestSmsResendByVision(key, dev, hooks)
-        code = await waitCode(order.id, 5 * 60_000)
+      // Attente du code ~60s. Si rien : on ANNULE ce numéro, on en PREND un neuf, on revient à
+      // l'écran numéro et on re-saisit — jusqu'à 3 numéros au total (souvent un numéro ne reçoit
+      // jamais le SMS IG). Bien plus fiable que d'insister sur le même numéro.
+      let code = await waitCode(order.id, 60_000)
+      for (let numTry = 1; numTry < 3 && !code && !R.isCancelled(); numTry++) {
+        push(`${tag} ⏱ pas de code sous 60s → annulation + nouveau numéro (essai ${numTry + 1}/3)`)
+        try { await cancelNum(order.id) } catch { /* noop */ }
+        try {
+          order = await buyNumber()
+          push(`${tag} 📞 nouveau numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}`)
+        } catch (e) { push(`${tag} ✗ achat ${provName}: ${e instanceof Error ? e.message : String(e)}`); break }
+        const reNum = localPhone(order.phone, CFG.dial)
+        if (!await resubmitNumberByVision(key, dev, reNum, hooks)) { push(`${tag} ✗ ré-saisie du numéro échouée`); break }
+        code = await waitCode(order.id, 60_000)
       }
       if (!code) { push(`${tag} ✗ pas de code SMS reçu → annulation`); try { await cancelNum(order.id) } catch { /* noop */ } R.tick(false); continue }
       const okCode = await enterSmsCodeByVision(key, dev, code, hooks)
