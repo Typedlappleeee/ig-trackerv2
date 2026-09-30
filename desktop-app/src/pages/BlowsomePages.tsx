@@ -584,7 +584,14 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
       for (const v of sources) {
         if (R.isCancelled()) { push('⏹ Annulé.'); break }
         push(`— ${v.title} —`)
-        const bytes = await resolveSourceBytes(v)
+        let bytes: Uint8Array
+        try {
+          bytes = await resolveSourceBytes(v)
+          push(`  📥 source chargée (${Math.round(bytes.byteLength / 1024)} Ko)`)
+        } catch (se) {
+          push(`  ❌ source « ${v.title} » illisible : ${se instanceof Error ? (se.message || se.name) : String(se)} → vidéo suivante`)
+          R.tick(false); continue
+        }
         // Durée réelle (pour la coupe de fin aléatoire) — lue une fois par vidéo.
         // Fallback ffmpeg si le <video> du navigateur échoue (HEVC/.mov) → sinon la
         // coupe de fin serait silencieusement annulée.
@@ -601,7 +608,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           if (R.isCancelled()) break
           setProgress(0)
           push(`  · variante ${i + 1}/${per}…`)
-          const hooks = { onProgress: setProgress, onLog: (m: string) => { if (/Video:|Audio:|error|Error|decod|Invalid|unable|hevc|Duration/i.test(m)) push(m.trim()) } }
+          const hooks = { onProgress: setProgress, onLog: (m: string) => { if (/Video:|Audio:|error|Error|decod|Invalid|unable|hevc|Duration|fail|No such|Conversion|moov|Output|not found|permission|denied|network|nan|NaN/i.test(m)) push(m.trim()) } }
           // Choix de la légende : pool (seq/aléatoire) sinon IA.
           let capText: string | null = null
           if (burnCap) {
@@ -622,22 +629,37 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
               vEnd = end > vStart + 0.3 ? +end.toFixed(2) : null
             } else { vStart = tStart; vEnd = tEnd }
           }
-          const out = await runAutoVariant(bytes, {
-            seed: Math.random() * 1000,
-            intensity: tendance ? 'strong' : intensity, gps: gpsFor(gpsCity), device,
-            trimStart: vStart,
-            trimEnd: vEnd,
-            speed,
-            caption: capText ? { text: capText, pos, style: capStyle } : null,
-          }, hooks)
-          await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
-          done++; setMade(done); R.tick(true)
+          try {
+            const out = await runAutoVariant(bytes, {
+              seed: Math.random() * 1000,
+              intensity: tendance ? 'strong' : intensity, gps: gpsFor(gpsCity), device,
+              trimStart: vStart,
+              trimEnd: vEnd,
+              speed,
+              caption: capText ? { text: capText, pos, style: capStyle } : null,
+            }, hooks)
+            push(`    ✓ variante générée (${Math.round(out.byteLength / 1024)} Ko) → sauvegarde…`)
+            await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
+            done++; setMade(done); R.tick(true)
+          } catch (ve) {
+            // On loggue la VRAIE erreur (message + 1re ligne de stack) et on continue les autres
+            // variantes au lieu de tout faire planter.
+            const msg = ve instanceof Error ? (ve.message || ve.name || String(ve)) : (typeof ve === 'string' ? ve : JSON.stringify(ve))
+            push(`  ❌ variante ${i + 1}/${per} échouée : ${msg}`)
+            if (ve instanceof Error && ve.stack) { const l = ve.stack.split('\n')[1]?.trim(); if (l) push(`     ↳ ${l}`) }
+            R.tick(false)
+          }
         }
       }
       push(R.isCancelled() ? '⏹ Arrêté.' : `✔ ${done} variantes générées — dans la banque.`)
       R.finish()
       load()
-    } catch (e) { push(`❌ ${e instanceof Error ? e.message : 'Échec'}`); R.finish('error') }
+    } catch (e) {
+      const msg = e instanceof Error ? (e.message || e.name || String(e)) : (typeof e === 'string' ? e : JSON.stringify(e))
+      push(`❌ ${msg}`)
+      if (e instanceof Error && e.stack) { const l = e.stack.split('\n')[1]?.trim(); if (l) push(`   ↳ ${l}`) }
+      R.finish('error')
+    }
     setRunning(false); setProgress(0)
   }
 
