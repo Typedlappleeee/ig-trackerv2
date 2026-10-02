@@ -672,8 +672,29 @@ function randomUsername(first: string): string {
   return base + s
 }
 
+// Ferme COMPLÈTEMENT l'app au premier plan (iPhone Face ID) : ouvre l'App Switcher (swipe lent
+// depuis le bas + pause) puis balaie la carte centrale vers le haut pour la quitter, puis accueil.
+// iRemoTech n'a pas d'action « kill app » → on le fait au geste (coordonnées à ajuster si besoin).
+export async function forceCloseForegroundApp(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
+  const shot = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('⚠ écran illisible → fermeture app sautée'); return }
+  const x = Math.round(0.5 * W)
+  hooks?.log?.('🛑 Fermeture complète d’Instagram (App Switcher)…')
+  // 1. Ouvrir l'App Switcher : swipe LENT du tout en bas jusqu'au milieu, avec une longue durée
+  //    (le « hold » en milieu d'écran déclenche le switcher plutôt qu'un simple retour accueil).
+  await sendAction(key, deviceId, { type: 'swipe', x1: x, y1: Math.round(0.995 * H), x2: x, y2: Math.round(0.55 * H), duration_ms: 900 })
+  await sleep(1400)
+  // 2. Balayer la carte (centrée) vers le HAUT pour quitter l'app.
+  await sendAction(key, deviceId, { type: 'swipe', x1: x, y1: Math.round(0.50 * H), x2: x, y2: Math.round(0.06 * H), duration_ms: 450 })
+  await sleep(1000)
+  // 3. Revenir à l'accueil.
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1200)
+}
+
 export interface SignupCreds { username: string; password: string; fullName: string }
-export async function completeSignupByVision(key: string, deviceId: string, hooks?: VisionHooks): Promise<{ ok: boolean; creds?: SignupCreds }> {
+export async function completeSignupByVision(key: string, deviceId: string, hooks?: VisionHooks, opts?: { container?: string }): Promise<{ ok: boolean; creds?: SignupCreds }> {
   const shot0 = await snapshot(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible (inscription)'); return { ok: false } }
@@ -776,13 +797,17 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
     //    le bouton bleu « Next » est TOUT EN BAS, visible après scroll. On scrolle puis on tape Next
     //    DIRECTEMENT — surtout PAS les « Turn on » (opt-in), ni « sous » le bouton.
     if (await hasText(key, deviceId, [/review the settings/i, /review the/i], hooks, { tries: 1 })) {
-      hooks?.log?.('   ⚙ écran « Review the settings » → scroll + Next')
-      for (let s = 0; s < 3; s++) { await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(0.5 * W), y1: Math.round(0.72 * H), x2: Math.round(0.5 * W), y2: Math.round(0.30 * H), duration_ms: 350 }); await sleep(700) }
-      if (await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next (réglages)', tries: 2, minY: 0.6 })) { idle = 0; await sleep(2000); continue }
-      const rshot = await snapshot(key, deviceId)
-      const rb = rshot ? await findBlueButton(rshot, 0.8, 1, 0, 1) : null
-      if (rb) { hooks?.log?.(`   🔵 Next (bouton bleu bas) → tap (${rb.cx}, ${rb.cy})`); await sendAction(key, deviceId, { type: 'tap', x: rb.cx, y: rb.cy }); idle = 0; await sleep(2000); continue }
-      idle++; continue
+      // Le compte est déjà créé à ce stade → on FERME Instagram complètement et on le ROUVRE à
+      // neuf (via le conteneur), ce qui retombe sur le fil sans les écrans « Turn on ».
+      hooks?.log?.('   ⚙ écran « Review the settings » → fermer IG puis rouvrir')
+      await forceCloseForegroundApp(key, deviceId, hooks)
+      if (opts?.container) {
+        const reopened = await selectContainerByVision(key, deviceId, opts.container, hooks)
+        hooks?.log?.(reopened ? '   ✅ Instagram rouvert (compte finalisé)' : '   ⚠ réouverture du conteneur incertaine')
+      }
+      await sleep(2500)
+      hooks?.log?.(`✅ Compte créé — 🔐 @${username} · ${password}`)
+      return { ok: true, creds: { username, password, fullName } }
     }
     // C. « Next »/« Suivant » visible (avance légitime, ex. autres écrans) → tap direct.
     if (await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next', tries: 1, minY: 0.55 })) { idle = 0; continue }

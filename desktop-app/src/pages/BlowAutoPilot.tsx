@@ -331,7 +331,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           try { await finishNum(order.id) } catch { /* noop */ }
           resultOrder = order; order = null // numéro consommé (finishNum) → plus d'annulation
           if (!okCode) { push(`${tag} ⚠ code non validé → on recommence de 0`); continue }
-          const done = await completeSignupByVision(key, dev, chooks)
+          const done = await completeSignupByVision(key, dev, chooks, { container: c })
           creds = done.creds
           if (stuck) { push(`${tag} ⏱ bloqué > 60s pendant l'inscription → on recommence de 0`); continue }
           if (done.ok) { success = true; push(`${tag} ✅ compte créé`) }
