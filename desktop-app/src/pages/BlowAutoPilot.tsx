@@ -16,6 +16,7 @@ import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCrea
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
+import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -89,7 +90,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [parallel, setParallel] = useState(false)
   const [sim5Key, setSim5Key] = useState(() => { try { return localStorage.getItem('sf-5sim-key') ?? '' } catch { return '' } })
   const [heroKey, setHeroKey] = useState(() => { try { return localStorage.getItem('sf-herosms-key') ?? '' } catch { return '' } })
-  const [smsProvider, setSmsProvider] = useState<'5sim' | 'herosms'>(() => { try { return (localStorage.getItem('sf-sms-provider') as '5sim' | 'herosms') || '5sim' } catch { return '5sim' } })
+  const [smsProvider, setSmsProvider] = useState<'5sim' | 'herosms' | 'smspool'>(() => { try { return (localStorage.getItem('sf-sms-provider') as '5sim' | 'herosms' | 'smspool') || '5sim' } catch { return '5sim' } })
+  const [smspoolKey, setSmspoolKey] = useState(() => { try { return localStorage.getItem('sf-smspool-key') ?? '' } catch { return '' } })
+  const [smspoolMax, setSmspoolMax] = useState('0.35')          // plafond prix SMSPool ($)
+  const [smspoolPriceShown, setSmspoolPriceShown] = useState<string | null>(null)
   const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('usa')
   const [heroOffers, setHeroOffers] = useState<{ price: number; count: number }[]>([]) // paliers de prix HeroSMS
   const [heroPrice, setHeroPrice] = useState<number | null>(null)                       // prix exact choisi (null = auto)
@@ -247,23 +251,30 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     //  - 5sim : simCountry (nom), operator ; HeroSMS : heroCountry (id SMS-Activate : USA=187, UK=16).
     //  - USA : opérateur « textnow » (priorisé), on prend le numéro le PLUS CHER dispo.
     const CFG = acctCountry === 'usa'
-      ? { label: /states/i, countryY: 0.37, simCountry: 'usa', operator: 'textnow', heroCountry: 187, dial: '1', name: 'United States' }
-      : { label: /kingdom/i, countryY: 0.29, simCountry: 'england', operator: 'any', heroCountry: 16, dial: '44', name: 'United Kingdom' }
+      ? { label: /states/i, countryY: 0.37, simCountry: 'usa', operator: 'textnow', heroCountry: 187, smspoolCountry: 'United States', dial: '1', name: 'United States' }
+      : { label: /kingdom/i, countryY: 0.29, simCountry: 'england', operator: 'any', heroCountry: 16, smspoolCountry: 'United Kingdom', dial: '44', name: 'United Kingdom' }
 
-    // Fournisseur SMS actif (clé + fonctions unifiées buy/wait/finish/cancel).
+    // Fournisseur SMS actif (clé + fonctions unifiées buy/wait/finish/cancel). order.id peut être
+    // un entier (HeroSMS/5sim) ou une chaîne (SMSPool : order_id alphanumérique).
     const usingHero = smsProvider === 'herosms'
-    const smsKey = usingHero ? heroKey : sim5Key
-    const provName = usingHero ? 'HeroSMS' : '5sim'
-    // HeroSMS : si un prix est choisi dans l'UI → achat à ce palier exact ; sinon on prend le
-    // PLUS CHER dispo (pick 'high') dans une large tranche. Opérateur = CFG.operator (USA=textnow).
+    const usingPool = smsProvider === 'smspool'
+    const smsKey = usingHero ? heroKey : usingPool ? smspoolKey : sim5Key
+    const provName = usingHero ? 'HeroSMS' : usingPool ? 'SMSPool' : '5sim'
+    const poolMax = (() => { const n = parseFloat(smspoolMax); return Number.isFinite(n) && n > 0 ? n : undefined })()
+    // HeroSMS : prix choisi dans l'UI → palier exact ; sinon le PLUS CHER (pick 'high'). Opérateur
+    // = CFG.operator (USA=textnow). SMSPool : achat au prix courant plafonné à « Prix max ».
     const buyNumber = () => usingHero
       ? herosmsBuy(heroKey, { country: CFG.heroCountry, service: 'ig', operator: CFG.operator, priceMin: heroPrice ?? 0.20, priceMax: heroPrice ?? 5.00, pick: 'high', onLog: (m: string) => push(m) })
-      : fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
-    const waitCode = (id: number, maxMs: number) => usingHero
-      ? herosmsWaitCode(heroKey, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
-      : fivesimWaitCode(sim5Key, id, { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
-    const cancelNum = (id: number) => usingHero ? herosmsCancel(heroKey, id) : fivesimCancel(sim5Key, id)
-    const finishNum = (id: number) => usingHero ? herosmsFinish(heroKey, id) : fivesimFinish(sim5Key, id)
+      : usingPool
+        ? smspoolBuy(smspoolKey, { country: CFG.smspoolCountry, service: 'Instagram', maxPrice: poolMax, onLog: (m: string) => push(m) })
+        : fivesimBuy(sim5Key, { country: CFG.simCountry, operator: CFG.operator, product: 'instagram' })
+    const waitCode = (id: string | number, maxMs: number) => usingHero
+      ? herosmsWaitCode(heroKey, Number(id), { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
+      : usingPool
+        ? smspoolWaitCode(smspoolKey, String(id), { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
+        : fivesimWaitCode(sim5Key, Number(id), { onLog: (m: string) => push(m), shouldStop: () => R.isCancelled(), maxMs })
+    const cancelNum = (id: string | number) => usingHero ? herosmsCancel(heroKey, Number(id)) : usingPool ? smspoolCancel(smspoolKey, String(id)) : fivesimCancel(sim5Key, Number(id))
+    const finishNum = (id: string | number) => usingHero ? herosmsFinish(heroKey, Number(id)) : usingPool ? smspoolFinish(smspoolKey, String(id)) : fivesimFinish(sim5Key, Number(id))
 
     setRunning(true); setLogs([])
     const R = startRun('farm', `Création compte ${CFG.name} · ${jobs.length}`, jobs.length); setRunId(R.id)
@@ -290,14 +301,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       // = écran figé) OU l'absence de code sous 60s OU un échec d'étape → on ANNULE le numéro et on
       // RECOMMENCE TOUT DE 0. Chaque numéro non finalisé est annulé (finally) → remboursé.
       let success = false
-      let resultOrder: { id: number; phone: string; price?: number } | null = null
+      let resultOrder: { id: string | number; phone: string; price?: number } | null = null
       let creds: { username: string; password: string; fullName: string } | undefined
       for (let cycle = 0; !success && !R.isCancelled(); cycle++) {
         if (cycle > 0) push(`${tag} 🔄 on recommence tout le cycle (essai ${cycle + 1})…`)
         let lastBeat = Date.now(); let stuck = false
         const wd = setInterval(() => { if (Date.now() - lastBeat > 60_000) stuck = true }, 3000)
         const chooks = { log: (m: string) => { push(`${tag} ${m}`); acctLog.push(m); lastBeat = Date.now() }, shouldStop: () => R.isCancelled() || stuck }
-        let order: { id: number; phone: string; price?: number } | null = null
+        let order: { id: string | number; phone: string; price?: number } | null = null
         try {
           await recalibrateTouch(key, dev, chooks)
           if (airplaneOn) await airplaneReset(key, dev, chooks)
@@ -669,9 +680,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, marginBottom: 7 }}>Fournisseur de numéro</div>
           <div style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 10, background: 'rgba(0,0,0,0.3)', marginBottom: 12 }}>
-            {(['herosms', '5sim'] as const).map(p => (
+            {(['herosms', 'smspool', '5sim'] as const).map(p => (
               <button key={p} onClick={() => { setSmsProvider(p); try { localStorage.setItem('sf-sms-provider', p) } catch { /* noop */ } }} style={{ height: 32, padding: '0 16px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 800, background: smsProvider === p ? GOLD : 'transparent', color: smsProvider === p ? '#1a1206' : MUTED }}>
-                {p === 'herosms' ? 'HeroSMS' : '5sim'}
+                {p === 'herosms' ? 'HeroSMS' : p === 'smspool' ? 'SMSPool' : '5sim'}
               </button>
             ))}
           </div>
@@ -689,10 +700,36 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                   push(r.ok ? '➡️ Une combinaison marche — envoie-moi la ligne ✅.' : '➡️ Aucune combinaison acceptée — clé/compte à vérifier côté HeroSMS.')
                 }}>Tester la clé</button>
             </div>
+          ) : smsProvider === 'smspool' ? (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input value={smspoolKey} onChange={e => { const v = e.target.value.trim(); setSmspoolKey(v); try { localStorage.setItem('sf-smspool-key', v) } catch { /* noop */ } }}
+                placeholder="Clé API SMSPool (numéro + code SMS auto)" type="password"
+                style={{ ...inp, flex: 1, height: 40 }} />
+              <button style={{ ...btn, height: 40, padding: '0 14px' }} disabled={!smspoolKey || running}
+                onClick={async () => {
+                  setLogs(['🔑 Test de la clé SMSPool…'])
+                  const r = await smspoolPing(smspoolKey)
+                  push(r.ok ? `✅ Clé OK — solde ${r.balance ?? '?'}$` : `✗ ${r.error ?? 'clé refusée'}`)
+                }}>Tester la clé</button>
+            </div>
           ) : (
             <input value={sim5Key} onChange={e => { setSim5Key(e.target.value); try { localStorage.setItem('sf-5sim-key', e.target.value) } catch { /* noop */ } }}
               placeholder="Token 5sim (numéro + code SMS auto)" type="password"
               style={{ ...inp, width: '100%', height: 40, marginBottom: 8 }} />
+          )}
+          {smsProvider === 'smspool' && (
+            <div style={{ marginTop: 10, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM }}>Prix max $</span>
+              <input value={smspoolMax} onChange={e => setSmspoolMax(e.target.value.replace(',', '.'))} inputMode="decimal"
+                style={{ ...inp, width: 90, height: 32 }} placeholder="0.35" />
+              <button style={{ ...btn, height: 30, padding: '0 12px' }} disabled={!smspoolKey}
+                onClick={async () => {
+                  setSmspoolPriceShown('…')
+                  const p = await smspoolPrice(smspoolKey, acctCountry === 'usa' ? 'United States' : 'United Kingdom', 'Instagram')
+                  setSmspoolPriceShown(p != null ? `${p}$` : 'indispo')
+                }}>Prix actuel</button>
+              {smspoolPriceShown && <span style={{ fontSize: 12, color: smspoolPriceShown === 'indispo' ? '#F87171' : GOLD }}>prix actuel : {smspoolPriceShown}</span>}
+            </div>
           )}
           {smsProvider === 'herosms' && (
             <div style={{ marginTop: 10, marginBottom: 6 }}>
@@ -727,13 +764,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             </div>
           )}
           <p style={{ margin: 0, fontSize: 11.5, color: MUTED }}>
-            {(smsProvider === 'herosms' ? heroKey : sim5Key)
-              ? <>✓ {smsProvider === 'herosms' ? 'HeroSMS' : '5sim'} branché : achète un numéro {acctCountry === 'usa' ? '🇺🇸' : '🇬🇧'}, le saisit, attend le SMS et rentre le code.</>
+            {(smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key)
+              ? <>✓ {smsProvider === 'herosms' ? 'HeroSMS' : smsProvider === 'smspool' ? 'SMSPool' : '5sim'} branché : achète un numéro {acctCountry === 'usa' ? '🇺🇸' : '🇬🇧'}, le saisit, attend le SMS et rentre le code.</>
               : <>Sans token : le flow va jusqu'au choix du pays (test) puis s'arrête.</>}
           </p>
         </div>
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />
-        <LaunchBar label={(smsProvider === 'herosms' ? heroKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={createAccounts} />
+        <LaunchBar label={(smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={createAccounts} />
         <LogPanel />
         {createdAccts.length > 0 && (
           <div style={card}>
