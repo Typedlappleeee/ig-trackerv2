@@ -57,10 +57,17 @@ async function resolveServiceId(apiKey: string, name = 'Instagram'): Promise<num
   const k = name.toLowerCase()
   if (svcCache[k]) return svcCache[k]
   const r = await call('services', apiKey)
+  // SMSPool nomme le service « Instagram / Threads » → match EXACT sinon « contient » (ex. instagram).
+  let contains: number | null = null
   for (const s of asArray(r.data)) {
     const nm = (s?.name ?? '').toString(); const id = Number(s?.ID ?? s?.id)
-    if (nm && Number.isFinite(id) && id > 0) svcCache[nm.toLowerCase()] = id
+    if (!nm || !(Number.isFinite(id) && id > 0)) continue
+    const low = nm.toLowerCase()
+    svcCache[low] = id
+    if (low === k) return id
+    if (contains == null && low.includes(k)) contains = id
   }
+  if (contains != null) { svcCache[k] = contains; return contains }
   return svcCache[k] ?? null
 }
 
