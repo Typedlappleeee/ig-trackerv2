@@ -11,7 +11,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
@@ -327,7 +327,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           await sleep(3000)
           await requestSmsIfWhatsApp(key, dev, chooks)
           const code = await waitCode(order.id, 60_000)
-          if (!code) { push(`${tag} ⏱ pas de code sous 60s → on recommence de 0`); continue }
+          if (!code) { push(`${tag} ⏱ pas de code sous 60s → fermeture d'Instagram, on recommence de 0`); await forceCloseForegroundApp(key, dev, chooks); continue }
           const okCode = await enterSmsCodeByVision(key, dev, code, chooks)
           try { await finishNum(order.id) } catch { /* noop */ }
           resultOrder = order; order = null // numéro consommé (finishNum) → plus d'annulation
