@@ -690,12 +690,12 @@ export async function forceCloseForegroundApp(key: string, deviceId: string, hoo
   if (!W || !H) { hooks?.log?.('⚠ écran illisible → fermeture app sautée'); return }
   const x = Math.round(0.5 * W)
   hooks?.log?.('🛑 Fermeture complète d’Instagram (App Switcher)…')
-  // 1. Ouvrir l'App Switcher : swipe LENT du tout en bas jusqu'au milieu, avec une longue durée
-  //    (le « hold » en milieu d'écran déclenche le switcher plutôt qu'un simple retour accueil).
-  await sendAction(key, deviceId, { type: 'swipe', x1: x, y1: Math.round(0.995 * H), x2: x, y2: Math.round(0.55 * H), duration_ms: 900 })
-  await sleep(1400)
+  // 1. Ouvrir l'App Switcher : swipe TRÈS LENT depuis le tout en bas jusqu'à ~45 %. Sur Face ID,
+  //    une vitesse lente (longue durée) déclenche le switcher ; une vitesse rapide = retour accueil.
+  await sendAction(key, deviceId, { type: 'swipe', x1: x, y1: Math.max(0, H - 2), x2: x, y2: Math.round(0.45 * H), duration_ms: 1800 })
+  await sleep(1600)
   // 2. Balayer la carte (centrée) vers le HAUT pour quitter l'app.
-  await sendAction(key, deviceId, { type: 'swipe', x1: x, y1: Math.round(0.50 * H), x2: x, y2: Math.round(0.06 * H), duration_ms: 450 })
+  await sendAction(key, deviceId, { type: 'swipe', x1: x, y1: Math.round(0.55 * H), x2: x, y2: Math.round(0.05 * H), duration_ms: 500 })
   await sleep(1000)
   // 3. Revenir à l'accueil.
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
