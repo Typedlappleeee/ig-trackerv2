@@ -796,7 +796,7 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
     // B. Écran « Review the settings for your new profile » (Turn on Notifications/Contacts/Location) :
     //    le bouton bleu « Next » est TOUT EN BAS, visible après scroll. On scrolle puis on tape Next
     //    DIRECTEMENT — surtout PAS les « Turn on » (opt-in), ni « sous » le bouton.
-    if (await hasText(key, deviceId, [/review the settings/i, /review the/i], hooks, { tries: 1 })) {
+    if (await hasText(key, deviceId, [/review/i], hooks, { tries: 1 })) {
       // Le compte est déjà créé à ce stade → on FERME Instagram complètement et on le ROUVRE à
       // neuf (via le conteneur), ce qui retombe sur le fil sans les écrans « Turn on ».
       hooks?.log?.('   ⚙ écran « Review the settings » → fermer IG puis rouvrir')
