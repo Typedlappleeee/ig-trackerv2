@@ -650,6 +650,15 @@ export async function requestSmsResendByVision(key: string, deviceId: string, ho
   return true
 }
 
+// Sur l'écran « Enter the confirmation code » : si IG indique l'envoi par WhatsApp (« we sent via
+// WhatsApp to … »), le fournisseur SMS ne reçoit rien → on bascule en SMS via « I didn't get the
+// code » → « Get a new code via SMS ». true si la bascule a été tentée.
+export async function requestSmsIfWhatsApp(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  if (!await hasText(key, deviceId, [/whatsapp/i], hooks, { tries: 2, cropY: [0.1, 0.45] })) return false
+  hooks?.log?.('💬 Code envoyé par WhatsApp → bascule en SMS…')
+  return requestSmsResendByVision(key, deviceId, hooks)
+}
+
 // ── Fin d'inscription IG : mot de passe → anniversaire → nom → username → I agree ──
 const FR_FIRST = ['Camille', 'Léa', 'Manon', 'Chloé', 'Sarah', 'Emma', 'Julie', 'Marie', 'Laura', 'Clara', 'Inès', 'Jade', 'Louise', 'Alice', 'Lucie', 'Anaïs', 'Océane', 'Pauline', 'Justine', 'Élise', 'Margaux', 'Célia', 'Zoé', 'Ambre', 'Lina', 'Nina', 'Romane', 'Eva', 'Lola', 'Maëva']
 const FR_LAST = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Michel', 'Garcia', 'Roux', 'Fontaine', 'Girard', 'Bonnet', 'Dupont', 'Lambert', 'Fournier', 'Rousseau', 'Vincent', 'Faure', 'André', 'Mercier', 'Blanc', 'Guerin', 'Boyer', 'Garnier', 'Chevalier']

@@ -11,7 +11,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
@@ -323,8 +323,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (stuck) { push(`${tag} ⏱ bloqué > 60s → on recommence de 0`); continue }
           if (r.stage !== 'number_submitted') { push(`${tag} ✗ échec avant SMS (étape ${r.stage}) → on recommence de 0`); continue }
           // Numéro soumis : on laisse un peu de temps à IG (bascule écran code + envoi du SMS)
-          // avant d'attendre le code.
+          // avant d'attendre le code. Si IG envoie par WhatsApp → forcer la bascule en SMS.
           await sleep(3000)
+          await requestSmsIfWhatsApp(key, dev, chooks)
           const code = await waitCode(order.id, 60_000)
           if (!code) { push(`${tag} ⏱ pas de code sous 60s → on recommence de 0`); continue }
           const okCode = await enterSmsCodeByVision(key, dev, code, chooks)
