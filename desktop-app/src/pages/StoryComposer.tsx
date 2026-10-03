@@ -79,6 +79,16 @@ export default function StoryComposer({ theme, user, org, onBack }: {
 
   useEffect(() => { load() }, [load])
 
+  // Recharge UNIQUEMENT la banque d'images (après un ajout/import depuis le BankPicker), sinon une
+  // photo fraîchement importée a bien son id dans `imageIds` mais pas dans `images` → pool vide.
+  const reloadImages = useCallback(async () => {
+    const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    const { data } = await scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false })
+    const all = ((data ?? []) as Media[]).filter(m => !(SENTINELS.includes(m.notes ?? '') && !m.storage_path && !m.file_url))
+    const imgs = all.filter(isImage)
+    setImages(imgs.length > 0 ? imgs : all)
+  }, [currentOrg?.id, user.id])
+
   // Proxy rotatif dispo ? (Paramètres). Par défaut OFF → tout lancer en parallèle.
   useEffect(() => {
     loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => {
@@ -404,7 +414,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
           title={picker === 'captions' ? 'Choisir des textes de sticker' : 'Choisir des images'}
           onClose={() => setPicker(null)}
           onApply={r => {
-            if (r.kind === 'images') setImageIds(r.ids)
+            if (r.kind === 'images') { setImageIds(r.ids); reloadImages() }
             else if (r.kind === 'captions') setStickerTexts(cur => { const base = cur.filter(s => s.trim()); return [...base, ...r.texts.filter(t => !base.includes(t))] })
           }} />
       )}
