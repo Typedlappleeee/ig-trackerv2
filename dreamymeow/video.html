@@ -164,6 +164,7 @@
         <div class="toggles" id="toggles">
           <span class="chip" data-k="speed" data-i18n-title="tSpeed" title="Change légèrement la vitesse (0,98–1,02×)"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cSpeed">Micro-vitesse</span></span>
           <span class="chip" data-k="trim" data-i18n-title="tTrim" title="Coupe un court bout au début et à la fin"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cTrim">Couper un bout</span></span>
+          <span class="chip" data-k="flip" data-i18n-title="tFlip" title="Retourne la vidéo horizontalement (effet miroir)"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cFlip">Miroir</span></span>
         </div>
       </div>
     </details>
@@ -196,8 +197,13 @@
       clear:'effacer', spoof:'Spoofer', advOpts:'Options avancées',
       lblDevice:'Appareil (métadonnées)', lblGps:'Localisation GPS', lblVariants:'Variantes',
       lblIntensity:'Intensité (recadrage)', iSubtle:'Subtile', iNormal:'Normale', iStrong:'Forte',
-      cSpeed:'Micro-vitesse', cTrim:'Couper un bout',
+      cSpeed:'Micro-vitesse', cTrim:'Couper un bout', cFlip:'Miroir',
       tSpeed:'Change légèrement la vitesse (0,98–1,02×)', tTrim:'Coupe un court bout au début et à la fin',
+      tFlip:'Retourne la vidéo horizontalement (effet miroir)',
+      stall:'   ⚠ Moteur bloqué → relance automatique en mode compatible…',
+      stallFail:'Le moteur reste bloqué sur cette vidéo — essaie une vidéo plus courte',
+      downscale:(w,h)=>`   ↘ Vidéo réduite en ${w}×${h} (beaucoup plus rapide, qualité Reels)`,
+      prep:'Préparation de la vidéo…',
       foot:"100 % local — aucune vidéo n'est envoyée en ligne. Le moteur vidéo (~32 Mo) se charge une seule fois.",
       footLink:'← Spoofer image',
       notVideo:"Ce fichier ne semble pas être une vidéo.",
@@ -219,8 +225,13 @@
       clear:'clear', spoof:'Spoof', advOpts:'Advanced options',
       lblDevice:'Device (metadata)', lblGps:'GPS location', lblVariants:'Variants',
       lblIntensity:'Intensity (crop)', iSubtle:'Subtle', iNormal:'Normal', iStrong:'Strong',
-      cSpeed:'Micro-speed', cTrim:'Trim a bit',
+      cSpeed:'Micro-speed', cTrim:'Trim a bit', cFlip:'Mirror',
       tSpeed:'Slightly changes the speed (0.98–1.02×)', tTrim:'Cuts a short bit at the start and end',
+      tFlip:'Flips the video horizontally (mirror effect)',
+      stall:'   ⚠ Engine stalled → automatic restart in compatible mode…',
+      stallFail:'The engine keeps stalling on this video — try a shorter video',
+      downscale:(w,h)=>`   ↘ Video downscaled to ${w}×${h} (much faster, Reels quality)`,
+      prep:'Preparing the video…',
       foot:'100% local — no video is uploaded. The video engine (~32 MB) loads once.',
       footLink:'← Image spoofer',
       notVideo:"This file doesn't look like a video.",
@@ -307,7 +318,7 @@
   }
   let intensity='normal';
   $('#intensity').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; intensity=b.dataset.v; [...$('#intensity').children].forEach(x=>x.classList.toggle('on',x===b)); });
-  const tf={ speed:false, trim:false };
+  const tf={ speed:false, trim:false, flip:false };
   $('#toggles').addEventListener('click',e=>{ const c=e.target.closest('.chip'); if(!c)return; const k=c.dataset.k; tf[k]=!tf[k]; c.classList.toggle('on',tf[k]); });
 
   /* ══ Bascule de langue ══ */
@@ -334,97 +345,157 @@
   }
 
   /* ══ ffmpeg ══ */
-  let ffmpeg=null, baseRatio=0, totalN=1, mtActive=false;
   // Multi-thread si la page est isolée cross-origin (COOP+COEP sur /video) →
-  // encodage bien plus rapide (plusieurs CPU). Sinon repli mono-thread (marche partout).
-  const MT = (self.crossOriginIsolated===true);
+  // encodage bien plus rapide. Sinon (ou en cas de souci) mono-thread, qui marche partout.
+  const MT_OK = (self.crossOriginIsolated===true);
+  let ffmpeg=null, baseRatio=0, totalN=1, mtActive=false, forceST=false, lastBeat=Date.now();
+  let ring=[];                 // derniers messages ffmpeg (diagnostic + lecture des infos vidéo)
+  const MAX_SIDE=1920;         // Reels = 1080×1920 : au-delà, on réduit (4K iPhone → 4× plus rapide)
+  const STALL_MS=60000;        // aucun signe de vie du moteur pendant 60 s → bloqué
   function log(m){ const el=$('#log'); el.classList.add('show'); el.textContent+=m+'\n'; el.scrollTop=el.scrollHeight; }
   function setBar(r){ $('#progbar').style.width=Math.max(0,Math.min(1,r))*100+'%'; }
+
+  async function loadEngine(useMT){
+    const { FFmpeg }=window.FFmpegWASM;
+    const { toBlobURL }=window.FFmpegUtil;
+    const ff=new FFmpeg();
+    ff.on('progress',({progress})=>{ lastBeat=Date.now(); if(progress>=0&&progress<=1) setBar(baseRatio + progress/totalN); });
+    ff.on('log',({message})=>{ lastBeat=Date.now(); ring.push(message); if(ring.length>300) ring.shift(); });
+    const base = useMT ? `${FF}/mt` : FF;
+    const cfg={
+      classWorkerURL: await toBlobURL(`${FF}/814.ffmpeg.js`, 'text/javascript'),
+      coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
+    };
+    if(useMT) cfg.workerURL = await toBlobURL(`${base}/ffmpeg-core.worker.js`, 'text/javascript');
+    await ff.load(cfg);
+    return ff;
+  }
   async function ensure(){
     if(ffmpeg) return;
     if(!window.FFmpegWASM || !window.FFmpegUtil){ throw new Error(tr('engFail')); }
-    const { FFmpeg }=window.FFmpegWASM;
-    const { toBlobURL }=window.FFmpegUtil;
-    ffmpeg=new FFmpeg();
-    ffmpeg.on('progress',({progress})=>{ if(progress>=0&&progress<=1) setBar(baseRatio + progress/totalN); });
     $('#count').textContent=tr('loading');
-    const cfg={ classWorkerURL: await toBlobURL(`${FF}/814.ffmpeg.js`, 'text/javascript') };
-    if(MT){
-      cfg.coreURL   = await toBlobURL(`${FF}/mt/ffmpeg-core.js`, 'text/javascript');
-      cfg.wasmURL   = await toBlobURL(`${FF}/mt/ffmpeg-core.wasm`, 'application/wasm');
-      cfg.workerURL = await toBlobURL(`${FF}/mt/ffmpeg-core.worker.js`, 'text/javascript');
-    }else{
-      cfg.coreURL   = await toBlobURL(`${FF}/ffmpeg-core.js`, 'text/javascript');
-      cfg.wasmURL   = await toBlobURL(`${FF}/ffmpeg-core.wasm`, 'application/wasm');
-    }
-    try{ await ffmpeg.load(cfg); mtActive=MT; }
+    const useMT = MT_OK && !forceST;
+    try{ ffmpeg=await loadEngine(useMT); mtActive=useMT; }
     catch(e){
-      // Repli mono-thread si le cœur multi-thread échoue (rare).
-      if(MT){ log(tr('stMono')); mtActive=false;
-        const ff2=new FFmpeg();
-        ff2.on('progress',({progress})=>{ if(progress>=0&&progress<=1) setBar(baseRatio + progress/totalN); });
-        await ff2.load({ classWorkerURL: await toBlobURL(`${FF}/814.ffmpeg.js`, 'text/javascript'),
-          coreURL: await toBlobURL(`${FF}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${FF}/ffmpeg-core.wasm`, 'application/wasm') });
-        ffmpeg=ff2;
-      } else throw e;
+      if(!useMT) throw e;
+      log(tr('stMono')); forceST=true;
+      ffmpeg=await loadEngine(false); mtActive=false;
     }
   }
+  function resetEngine(){ try{ ffmpeg && ffmpeg.terminate(); }catch(_){} ffmpeg=null; }
+
+  // exec + anti-blocage : sans aucun message ni progression pendant STALL_MS, on
+  // considère le moteur bloqué (l'appelant le relance en mode compatible).
+  async function execGuarded(args){
+    lastBeat=Date.now();
+    let timer;
+    const stall=new Promise((_,rej)=>{ timer=setInterval(()=>{ if(Date.now()-lastBeat>STALL_MS) rej(new Error('STALL')); },3000); });
+    try{ return await Promise.race([ffmpeg.exec(args), stall]); }
+    finally{ clearInterval(timer); }
+  }
+
+  // Lit durée + taille réelles via ffmpeg (fiable même en HEVC/.mov iPhone, où le
+  // lecteur du navigateur échoue). Gère la rotation (vidéo portrait iPhone).
+  async function probe(){
+    ring=[];
+    try{ await execGuarded(['-hide_banner','-i','in.mp4']); }catch(e){ if(String(e&&e.message)==='STALL') throw e; }
+    const txt=ring.join('\n');
+    const d=txt.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+    const v=txt.match(/Video:.*?\s(\d{2,5})x(\d{2,5})/);
+    let w=v?+v[1]:0, h=v?+v[2]:0;
+    if(/rotat(?:e|ion)[^\n]*?(?:-?90|270)/i.test(txt)) [w,h]=[h,w];
+    return { dur: d ? (+d[1])*3600+(+d[2])*60+parseFloat(d[3]) : 0, w, h };
+  }
+  const even=n=>Math.max(2, Math.round(n/2)*2);
+
   async function sha(blob){ const h=await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()); return [...new Uint8Array(h)].slice(0,6).map(b=>b.toString(16).padStart(2,'0')).join(''); }
 
-  async function spoofOne(data, seed, opts){
-    // .slice() = copie : writeFile DÉTACHE le buffer passé ; sans copie, réutiliser
-    // la même source (N variantes) planterait sur « ArrayBuffer detached ».
-    await ffmpeg.writeFile('in.mp4', data.slice());
-    let vf=spoofFilter(seed, opts.intensity);
+  // Une variante. Le fichier source « in.mp4 » est déjà dans le moteur (écrit une
+  // seule fois pour toutes les variantes).
+  async function spoofOne(seed, opts, info){
+    let vf='';
+    if(info.w && info.h && Math.max(info.w,info.h)>MAX_SIDE){
+      const k=MAX_SIDE/Math.max(info.w,info.h);
+      vf+=`scale=${even(info.w*k)}:${even(info.h*k)},`;
+    }
+    vf+=spoofFilter(seed, opts.intensity);
+    if(opts.flip) vf+=',hflip';
     let af=null;
     if(opts.speed){ const s=(0.98+Math.random()*0.04); vf+=`,setpts=${(1/s).toFixed(4)}*PTS`; af=`atempo=${s.toFixed(4)}`; }
     const trim=[];
-    if(opts.trim && duration>2){
+    if(opts.trim && info.dur>2){
       const start=+(0.1+Math.random()*1.4).toFixed(2);
       const end=+(0.1+Math.random()*0.2).toFixed(2);
-      const dur=Math.max(0.5, duration-start-end);
-      trim.push('-ss', String(start), '-t', dur.toFixed(2));
+      trim.push('-ss', String(start), '-t', Math.max(0.5, info.dur-start-end).toFixed(2));
     }
     const meta=['-map_metadata','-1'];
     const g=opts.gps; if(g){ const loc=iso6709(g.lat,g.lon); meta.push('-metadata',`location=${loc}`,'-metadata',`location-eng=${loc}`); }
     meta.push(...deviceMeta(opts.device));
     const H264=['-threads','0','-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart'];
-    const runFf=(withAudioFilter)=>{
-      const a=['-i','in.mp4',...trim,'-vf',vf,...(withAudioFilter&&af?['-af',af]:[]),...meta,...H264,'out.mp4'];
-      return ffmpeg.exec(a);
-    };
-    let code=await runFf(true);
-    if(code!==0 && af){ log('   (pas de piste audio → vitesse appliquée à la vidéo seule)'); try{await ffmpeg.deleteFile('out.mp4');}catch(_){} code=await runFf(false); }
-    if(code!==0) throw new Error(`ffmpeg (code ${code})`);
+    const run=(withAf)=>execGuarded(['-hide_banner','-y','-i','in.mp4',...trim,'-vf',vf,...(withAf&&af?['-af',af]:[]),...meta,...H264,'out.mp4']);
+    ring=[];
+    let code=await run(true);
+    if(code!==0 && af){ log(tr('noAudio')); try{await ffmpeg.deleteFile('out.mp4');}catch(_){} ring=[]; code=await run(false); }
+    if(code!==0){
+      const why=ring.filter(l=>/error|invalid|failed|cannot|unsupported|not found|no such/i.test(l)).slice(-2).join(' · ') || ring.slice(-2).join(' · ');
+      throw new Error(`ffmpeg (code ${code})${why ? ' — '+why.slice(0,220) : ''}`);
+    }
     const out=await ffmpeg.readFile('out.mp4');
     try{await ffmpeg.deleteFile('out.mp4');}catch(_){}
-    try{await ffmpeg.deleteFile('in.mp4');}catch(_){}
     const u8 = out instanceof Uint8Array ? out : new Uint8Array(out);
     return new Blob([u8.buffer], {type:'video/mp4'});
+  }
+
+  // Charge la vidéo dans le moteur (une fois) et lit ses infos.
+  async function prepare(data){
+    await ensure();
+    $('#count').textContent=tr('prep');
+    await ffmpeg.writeFile('in.mp4', data.slice());   // .slice() : writeFile détache le buffer
+    return probe();
   }
 
   const urls=[];
   $('#go').addEventListener('click', async ()=>{
     if(!file) return;
     const n=Math.max(1,Math.min(12, parseInt($('#copies').value)||1));
-    const opts={ intensity, gps:gpsFor($('#gps').value), device:resolveDevice($('#device').value), speed:tf.speed, trim:tf.trim };
+    const opts={ intensity, gps:gpsFor($('#gps').value), device:resolveDevice($('#device').value), speed:tf.speed, trim:tf.trim, flip:tf.flip };
     const baseName=(file.name.replace(/\.[^.]+$/,'')||'video');
     const go=$('#go'); go.disabled=true; go.innerHTML=`<span class="spin"></span> ${tr('processing')}`;
     $('#out').style.display='block'; $('#results').innerHTML=''; $('#log').classList.remove('show'); $('#log').textContent=''; setBar(0);
     urls.forEach(u=>URL.revokeObjectURL(u)); urls.length=0;
     totalN=n;
     try{
-      await ensure();
       const data=new Uint8Array(await file.arrayBuffer());
+      let info;
+      try{ info=await prepare(data); }
+      catch(e){
+        if(String(e&&e.message)!=='STALL' && !mtActive) throw e;
+        log(tr('stall')); resetEngine(); forceST=true; info=await prepare(data);
+      }
+      if(!info.dur && duration) info.dur=duration;
+      if(info.w && info.h && Math.max(info.w,info.h)>MAX_SIDE){ const k=MAX_SIDE/Math.max(info.w,info.h); log(tr('downscale')(even(info.w*k), even(info.h*k))); }
       let okCount=0;
       for(let i=0;i<n;i++){
         baseRatio=i/n; setBar(baseRatio);
         $('#count').textContent=`${tr('spoofing')} ${tr('variant')} ${i+1}/${n}`;
         const seed=Math.random()*1000+i*13.37;
-        let blob;
-        try{ blob=await spoofOne(data, seed, opts); }
-        catch(err){ log(`❌ ${tr('variant')} ${i+1} : ${err.message||err}`); continue; }
+        let blob=null;
+        for(let attempt=0; attempt<2 && !blob; attempt++){
+          try{ blob=await spoofOne(seed, opts, info); }
+          catch(err){
+            const msg=String(err&&err.message||err);
+            const engineDied = msg==='STALL' || /terminat|abort|memory|RuntimeError|unreachable/i.test(msg);
+            if(engineDied && attempt===0){
+              // Moteur bloqué/planté : on repart à neuf en mono-thread (le plus robuste).
+              log(tr('stall')); resetEngine(); forceST=true;
+              try{ info=await prepare(data); continue; }catch(e2){ log(`❌ ${e2.message||e2}`); break; }
+            }
+            log(`❌ ${tr('variant')} ${i+1} : ${msg==='STALL' ? tr('stallFail') : msg}`);
+            break;
+          }
+        }
+        if(!blob) continue;
         const url=URL.createObjectURL(blob); urls.push(url);
         const hash=await sha(blob); okCount++;
         const row=document.createElement('div'); row.className='res';
@@ -434,9 +505,11 @@
         row.appendChild(a); $('#results').appendChild(row);
         setBar((i+1)/n);
       }
+      try{ await ffmpeg.deleteFile('in.mp4'); }catch(_){}
       $('#count').textContent=tr('ready')(okCount,n,mtActive);
     }catch(e){
       $('#count').textContent='❌ '+(e.message||e);
+      log('❌ '+(e.message||e));
     }finally{
       setBar(1); go.disabled=false;
       go.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg> '+tr('spoof');
