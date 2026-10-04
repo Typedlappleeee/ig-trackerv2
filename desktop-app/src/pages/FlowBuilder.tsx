@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type PointerEvent as RPointerEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
@@ -24,12 +24,16 @@ const areaStyle: CSSProperties = { ...inputStyle, height: 'auto', padding: 10, r
 
 // Mise en page responsive (les styles inline n'ont pas de media queries).
 const LAYOUT_CSS = `
-.fb-grid{display:grid;grid-template-columns:210px minmax(0,1fr) 320px;gap:10px;align-items:start}
+.fb-grid{display:grid;grid-template-columns:236px minmax(0,1fr) 320px;gap:10px;align-items:start}
 @media (max-width:1180px){.fb-grid{grid-template-columns:minmax(0,1fr) 300px}.fb-palette{grid-column:1 / -1}}
 @media (max-width:860px){.fb-grid{grid-template-columns:minmax(0,1fr)}}
 .fb-card .fb-actions{opacity:0;transition:opacity .12s ease}
 .fb-card:hover .fb-actions,.fb-card.sel .fb-actions{opacity:1}
 .fb-pal-item:hover{background:rgba(255,255,255,0.04)!important}
+.fb-vp{cursor:grab}.fb-vp:active{cursor:grabbing}
+.fb-lib-row .fb-lib-actions{opacity:0;transition:opacity .12s ease}
+.fb-lib-row:hover .fb-lib-actions,.fb-lib-row.on .fb-lib-actions{opacity:1}
+.fb-lib-row:hover{background:rgba(255,255,255,0.03)}
 `
 
 export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme; infra: InfraKey; user: User; org: OrgState }) {
@@ -42,12 +46,16 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
   const [sel, setSel] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [zoom, setZoom] = useState(1)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [overSlot, setOverSlot] = useState<number | null>(null)
   const [insertMenu, setInsertMenu] = useState<number | null>(null)
   const [picker, setPicker] = useState<{ blockId: string; kind: 'videos' | 'images' } | null>(null)
   const [launchOpen, setLaunchOpen] = useState(false)
+  const [newOpen, setNewOpen] = useState<number | null>(null)   // null = fermé, -1 = vide, i = modèle
+  const [confirmDel, setConfirmDel] = useState<Flow | null>(null)
+  const [view, setView] = useState({ x: 0, y: 0, z: 1 })   // déplacement + zoom du canvas
+  const vpRef = useRef<HTMLDivElement>(null)
+  const panRef = useRef<{ px: number; py: number; x: number; y: number; moved: boolean } | null>(null)
   const [phones, setPhones] = useState<Phone[]>([])
   const runs = useFlowRuns()
   const runsRef = useRef<HTMLDivElement>(null)
@@ -59,7 +67,10 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
     let alive = true
     loadFlows(user.id).then(fs => {
       if (!alive) return
-      setFlows(fs); setFlowId(fs[0]?.id ?? null); setFlowsLoading(false)
+      // Fusion (pas écrasement) : un flow créé pendant le chargement est conservé.
+      setFlows(prev => [...prev.filter(p => !fs.some(x => x.id === p.id)), ...fs])
+      setFlowId(cur => cur ?? fs[0]?.id ?? null)
+      setFlowsLoading(false)
     }).catch(() => { if (alive) setFlowsLoading(false) })
     return () => { alive = false }
   }, [user.id])
@@ -93,15 +104,67 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
   }
 
   function createFlow(name: string, types: BlockType[] = []) {
-    const nf = newFlow(name, types)
+    const nf = newFlow(name.trim() || 'Nouveau flow', types)
     setFlows(fs => [nf, ...fs]); setFlowId(nf.id); setSel(nf.blocks[0]?.id ?? null)
+    setView({ x: 0, y: 0, z: 1 })
     persist(nf, true)
   }
-  async function removeFlow() {
-    if (!flow || !window.confirm(`Supprimer le flow « ${flow.name} » ?`)) return
-    await deleteFlow(flow.id, user.id)
-    const rest = flows.filter(f => f.id !== flow.id)
-    setFlows(rest); setFlowId(rest[0]?.id ?? null); setSel(null)
+  function openFlow(id: string) { setFlowId(id); setSel(null); setInsertMenu(null); setView({ x: 0, y: 0, z: 1 }) }
+  function duplicateFlow(f: Flow) {
+    const copy: Flow = { ...JSON.parse(JSON.stringify(f)), id: newFlow().id, name: `${f.name} (copie)` }
+    copy.blocks = copy.blocks.map((b: FlowBlock) => ({ ...b, id: newBlock(b.type).id }))
+    setFlows(fs => [copy, ...fs]); openFlow(copy.id)
+    persist(copy, true)
+  }
+  async function removeFlow(f: Flow) {
+    await deleteFlow(f.id, user.id)
+    const rest = flows.filter(x => x.id !== f.id)
+    setFlows(rest)
+    if (flowId === f.id) { setFlowId(rest[0]?.id ?? null); setSel(null) }
+    setConfirmDel(null)
+  }
+
+  // ── Déplacement à la main (glisser le fond) + molette / zoom ───────────────
+  const zoomAt = (factor: number, cx?: number, cy?: number) => {
+    const r = vpRef.current?.getBoundingClientRect()
+    const px = cx ?? (r ? r.width / 2 : 0), py = cy ?? (r ? r.height / 3 : 0)
+    setView(v => {
+      const z = Math.max(0.4, Math.min(1.6, +(v.z * factor).toFixed(3)))
+      const k = z / v.z
+      return { z, x: px - (px - v.x) * k, y: py - (py - v.y) * k }
+    })
+  }
+  useEffect(() => {
+    const el = vpRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      if (e.ctrlKey || e.metaKey) {
+        const r = el.getBoundingClientRect()
+        zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top)
+      } else setView(v => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [flow?.id, flowsLoading])
+  const onPanStart = (e: RPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    if ((e.target as HTMLElement).closest('.fb-card, button, input, textarea, select, .fb-menu')) return
+    panRef.current = { px: e.clientX, py: e.clientY, x: view.x, y: view.y, moved: false }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const onPanMove = (e: RPointerEvent<HTMLDivElement>) => {
+    const p = panRef.current
+    if (!p) return
+    const dx = e.clientX - p.px, dy = e.clientY - p.py
+    if (!p.moved && Math.hypot(dx, dy) < 4) return
+    p.moved = true
+    setView(v => ({ ...v, x: p.x + dx, y: p.y + dy }))
+  }
+  const onPanEnd = () => {
+    const p = panRef.current
+    panRef.current = null
+    if (p && !p.moved) { setSel(null); setInsertMenu(null) }   // simple clic sur le fond = désélection
   }
 
   // ── Opérations sur les blocs ───────────────────────────────────────────────
@@ -173,25 +236,6 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
         </>}
       />
 
-      {/* Mes flows (onglets) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }}>
-        {flows.map(f => {
-          const on = f.id === flowId
-          return (
-            <button key={f.id} onClick={() => { setFlowId(f.id); setSel(null) }} style={{
-              display: 'flex', alignItems: 'center', gap: 7, height: 30, padding: '0 12px', borderRadius: 8, flexShrink: 0, cursor: 'pointer',
-              background: on ? `rgba(${theme.tone},0.14)` : 'rgba(255,255,255,0.02)', border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.06)'}`,
-              color: on ? theme.accentText : '#A1A1AA', fontSize: 12, fontWeight: 700,
-            }}>
-              {f.name}<span style={{ fontFamily: MONO, fontSize: 10, color: on ? theme.accentText : '#52525B', opacity: 0.8 }}>{f.blocks.length}</span>
-            </button>
-          )
-        })}
-        <button onClick={() => createFlow(`Flow ${flows.length + 1}`)} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', borderRadius: 8, flexShrink: 0, cursor: 'pointer', background: 'transparent', border: '1px dashed rgba(255,255,255,0.14)', color: '#A1A1AA', fontSize: 12, fontWeight: 700 }}>
-          <Icon d="M12 5v14|M5 12h14" size={12} /> Nouveau flow
-        </button>
-      </div>
-
       {!bearer && !conns.loading && (
         <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 9, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', color: '#FBBF24', fontSize: 12 }}>
           Connecte d'abord ton compte GeeLark (token) dans les Réglages pour pouvoir lancer un flow.
@@ -199,14 +243,16 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
       )}
 
       <div className="fb-grid">
-        {/* ── Palette ── */}
-        <div className="fb-palette">
+        {/* ── Colonne gauche : Mes flows + Blocs ── */}
+        <div className="fb-palette" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <FlowLibrary theme={theme} flows={flows} activeId={flowId} loading={flowsLoading}
+            onOpen={openFlow} onNew={() => setNewOpen(-1)} onDuplicate={duplicateFlow} onDelete={f => setConfirmDel(f)} />
           <Panel theme={theme}>
             <PanelHead title="Blocs" sub="Glisse ou clique pour ajouter" />
             <div style={{ padding: '6px 0 8px' }}>
               {(['Compte', 'Activité', 'Contenu'] as const).map(g => (
                 <div key={g}>
-                  <div style={{ padding: '8px 14px 4px', fontSize: 9.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52525B' }}>{g}</div>
+                  <div style={{ padding: '8px 14px 4px', fontSize: 9.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#71717A' }}>{g}</div>
                   {BLOCKS.filter(b => b.group === g).map(b => (
                     <div key={b.type} className="fb-pal-item" draggable
                       onDragStart={e => { e.dataTransfer.effectAllowed = 'copy'; e.dataTransfer.setData('text/plain', b.type); setDrag({ kind: 'new', type: b.type }) }}
@@ -225,30 +271,31 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
           </Panel>
         </div>
 
-        {/* ── Canvas ── */}
+        {/* ── Canvas (déplaçable à la main) ── */}
         <Panel theme={theme} style={{ overflow: 'hidden' }}>
           {flow ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-              <input value={flow.name} onChange={e => update(f => ({ ...f, name: e.target.value }))} aria-label="Nom du flow"
+              <input value={flow.name} onChange={e => update(f => ({ ...f, name: e.target.value }))} aria-label="Nom du flow" title="Clique pour renommer"
                 style={{ flex: 1, minWidth: 140, height: 30, padding: '0 8px', marginLeft: -8, borderRadius: 7, border: '1px solid transparent', background: 'transparent', color: '#F4F4F6', fontSize: 14, fontWeight: 700, outline: 'none' }}
                 onFocus={e => { e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)' }}
                 onBlur={e => { e.currentTarget.style.border = '1px solid transparent' }} />
               <Chip text={`≈ ${fmtMinutes(est)} / compte`} tone="mute" />
               <Chip text={credits > 0 ? `${credits} crédit${credits > 1 ? 's' : ''} / compte` : 'Gratuit'} tone={credits > 0 ? 'violet' : 'ok'} />
+              <Btn theme={theme} sm tone="ghost" icon="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z|M17 21v-8H7v8|M7 3v5h8" label="Enregistrer" onClick={() => persist(flow, true)} />
             </div>
           ) : null}
-          <div onClick={e => { if (e.target === e.currentTarget) { setSel(null); setInsertMenu(null) } }}
+          <div ref={vpRef} className="fb-vp"
+            onPointerDown={onPanStart} onPointerMove={onPanMove} onPointerUp={onPanEnd} onPointerCancel={onPanEnd}
             style={{
-              position: 'relative', minHeight: 520, maxHeight: 'calc(100vh - 290px)', overflow: 'auto',
-              backgroundColor: 'rgba(0,0,0,0.18)', backgroundImage: 'radial-gradient(rgba(255,255,255,0.075) 1px, transparent 1px)', backgroundSize: '18px 18px',
+              position: 'relative', height: 'max(520px, calc(100vh - 300px))', overflow: 'hidden', touchAction: 'none',
+              backgroundColor: 'rgba(0,0,0,0.18)', backgroundImage: 'radial-gradient(rgba(255,255,255,0.075) 1px, transparent 1px)',
+              backgroundSize: `${18 * view.z}px ${18 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px`,
             }}>
-            {flowsLoading ? (
-              <div style={{ padding: 60, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div>
-            ) : !flow ? (
-              <EmptyState theme={theme} onTemplate={(n, t) => createFlow(n, t)} />
+            {!flow ? (flowsLoading
+              ? <div style={{ padding: 60, textAlign: 'center', color: '#71717A', fontSize: 12 }}>Chargement…</div>
+              : <EmptyState theme={theme} onTemplate={i => setNewOpen(i)} />
             ) : (
-              <div onClick={e => { if (e.target === e.currentTarget) { setSel(null); setInsertMenu(null) } }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '26px 16px 70px', transform: `scale(${zoom})`, transformOrigin: 'top center', transition: 'transform .15s ease' }}>
+              <div style={{ position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '26px 16px 90px', transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
                 <Terminal label="Démarrage du téléphone" sub={fmtMinutes(BOOT_ESTIMATE)} icon="M5 3l14 9-14 9V3z" />
                 <Slot index={0} theme={theme} drag={drag} over={overSlot === 0} menuOpen={insertMenu === 0}
                   onOver={setOverSlot} onDrop={onDropSlot} onPlus={i => setInsertMenu(insertMenu === i ? null : i)} onPick={insertAt} />
@@ -270,15 +317,21 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
               </div>
             )}
             {flow && (
-              <div style={{ position: 'sticky', bottom: 10, left: 10, display: 'flex', gap: 2, width: 'fit-content', marginLeft: 10, marginTop: -44, padding: 3, borderRadius: 8, background: '#16161C', border: '1px solid rgba(255,255,255,0.08)' }}>
-                {([['M12 5v14|M5 12h14', () => setZoom(z => Math.min(1.3, +(z + 0.1).toFixed(2))), 'Zoom +'],
-                   ['M5 12h14', () => setZoom(z => Math.max(0.6, +(z - 0.1).toFixed(2))), 'Zoom −'],
-                   ['M15 3h6v6|M9 21H3v-6|M21 3l-7 7|M3 21l7-7', () => setZoom(1), 'Taille réelle']] as [string, () => void, string][]).map(([d, fn, t]) => (
-                  <button key={t} onClick={fn} title={t} aria-label={t} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, border: 'none', background: 'transparent', color: '#A1A1AA', cursor: 'pointer' }}>
-                    <Icon d={d} size={13} />
-                  </button>
-                ))}
-              </div>
+              <>
+                <div style={{ position: 'absolute', bottom: 10, left: 10, display: 'flex', alignItems: 'center', gap: 2, padding: 3, borderRadius: 8, background: '#16161C', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {([['M12 5v14|M5 12h14', () => zoomAt(1.15), 'Zoom avant'],
+                     ['M5 12h14', () => zoomAt(1 / 1.15), 'Zoom arrière'],
+                     ['M3 12a9 9 0 1 0 3-6.7L3 8|M3 3v5h5', () => setView({ x: 0, y: 0, z: 1 }), 'Recentrer']] as [string, () => void, string][]).map(([d, fn, t]) => (
+                    <button key={t} onClick={fn} title={t} aria-label={t} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, border: 'none', background: 'transparent', color: '#A1A1AA', cursor: 'pointer' }}>
+                      <Icon d={d} size={13} />
+                    </button>
+                  ))}
+                  <span style={{ padding: '0 6px', fontFamily: MONO, fontSize: 10, color: '#71717A' }}>{Math.round(view.z * 100)}%</span>
+                </div>
+                <div style={{ position: 'absolute', bottom: 14, right: 14, fontSize: 10.5, color: '#71717A', pointerEvents: 'none' }}>
+                  Glisse le fond pour te déplacer · Ctrl + molette pour zoomer
+                </div>
+              </>
             )}
           </div>
         </Panel>
@@ -293,12 +346,29 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
           ) : flow ? (
             <FlowSettings theme={theme} flow={flow} issues={issues}
               onError={v => update(f => ({ ...f, onError: v }))}
-              onDelete={removeFlow} />
+              onDelete={() => setConfirmDel(flow)} />
           ) : (
-            <div style={{ padding: 22, fontSize: 12, color: '#52525B', lineHeight: 1.6 }}>Crée un flow ou choisis un modèle pour commencer.</div>
+            <div style={{ padding: 22, fontSize: 12, color: '#71717A', lineHeight: 1.6 }}>Crée un flow (bouton « Nouveau » à gauche) ou choisis un modèle pour commencer.</div>
           )}
         </Panel>
       </div>
+
+      {newOpen !== null && (
+        <NewFlowModal theme={theme} preset={newOpen} names={flows.map(f => f.name)}
+          onClose={() => setNewOpen(null)}
+          onCreate={(name, types) => { createFlow(name, types); setNewOpen(null) }} />
+      )}
+
+      {confirmDel && (
+        <Modal theme={theme} title="Supprimer ce flow ?" sub={`« ${confirmDel.name} » sera supprimé définitivement.`} icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" width={440}
+          onClose={() => setConfirmDel(null)}
+          footer={<>
+            <Btn theme={theme} tone="ghost" label="Annuler" onClick={() => setConfirmDel(null)} />
+            <Btn theme={theme} tone="danger" label="Supprimer" onClick={() => removeFlow(confirmDel)} />
+          </>}>
+          <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA' }}>Les exécutions déjà lancées avec ce flow continuent normalement.</div>
+        </Modal>
+      )}
 
       {/* ── Exécutions ── */}
       <div ref={runsRef} style={{ marginTop: 14 }}>
@@ -453,7 +523,7 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
   )
 }
 
-function EmptyState({ theme, onTemplate }: { theme: Theme; onTemplate: (name: string, types: BlockType[]) => void }) {
+function EmptyState({ theme, onTemplate }: { theme: Theme; onTemplate: (preset: number) => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '56px 20px', textAlign: 'center' }}>
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 13, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.26)`, color: theme.accentText }}>
@@ -464,16 +534,130 @@ function EmptyState({ theme, onTemplate }: { theme: Theme; onTemplate: (name: st
         <div style={{ marginTop: 5, fontSize: 12.5, color: '#71717A' }}>Pars d'un modèle ou glisse des blocs depuis la gauche.</div>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-        {TEMPLATES.map(t => (
-          <button key={t.name} onClick={() => onTemplate(t.name, t.types)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, width: 190, padding: 12, borderRadius: 11, cursor: 'pointer', textAlign: 'left', background: '#15151B', border: '1px solid rgba(255,255,255,0.08)' }}>
+        {TEMPLATES.map((t, ti) => (
+          <button key={t.name} onClick={() => onTemplate(ti)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, width: 190, padding: 12, borderRadius: 11, cursor: 'pointer', textAlign: 'left', background: '#15151B', border: '1px solid rgba(255,255,255,0.08)' }}>
             <span style={{ display: 'flex', gap: 3 }}>{t.types.map((ty, i) => <BlockIcon key={i} def={ty} size={20} />)}</span>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: '#E4E4E7' }}>{t.name}</span>
             <span style={{ fontSize: 11, color: '#71717A' }}>{t.desc}</span>
           </button>
         ))}
-        <button onClick={() => onTemplate('Nouveau flow', [])} style={{ width: 120, padding: 12, borderRadius: 11, cursor: 'pointer', background: 'transparent', border: '1px dashed rgba(255,255,255,0.14)', color: '#A1A1AA', fontSize: 12, fontWeight: 700 }}>Flow vide</button>
+        <button onClick={() => onTemplate(-1)} style={{ width: 120, padding: 12, borderRadius: 11, cursor: 'pointer', background: 'transparent', border: '1px dashed rgba(255,255,255,0.14)', color: '#A1A1AA', fontSize: 12, fontWeight: 700 }}>Flow vide</button>
       </div>
     </div>
+  )
+}
+
+// ── Bibliothèque « Mes flows » ───────────────────────────────────────────────
+
+function ago(iso?: string): string {
+  if (!iso) return 'à l\'instant'
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
+  if (s < 60) return 'à l\'instant'
+  if (s < 3600) return `il y a ${Math.floor(s / 60)} min`
+  if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`
+  if (s < 30 * 86400) return `il y a ${Math.floor(s / 86400)} j`
+  return new Date(iso).toLocaleDateString('fr-FR')
+}
+
+function FlowLibrary({ theme, flows, activeId, loading, onOpen, onNew, onDuplicate, onDelete }: {
+  theme: Theme; flows: Flow[]; activeId: string | null; loading: boolean
+  onOpen: (id: string) => void; onNew: () => void; onDuplicate: (f: Flow) => void; onDelete: (f: Flow) => void
+}) {
+  const [q, setQ] = useState('')
+  const shown = flows.filter(f => !q.trim() || f.name.toLowerCase().includes(q.trim().toLowerCase()))
+  const act = (d: string, t: string, fn: () => void, danger = false) => (
+    <button onClick={e => { e.stopPropagation(); fn() }} title={t} aria-label={t}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: danger ? '#F87171' : '#A1A1AA', cursor: 'pointer', padding: 0 }}>
+      <Icon d={d} size={12} />
+    </button>
+  )
+  return (
+    <Panel theme={theme}>
+      <PanelHead title="Mes flows" sub={loading ? 'Chargement…' : `${flows.length} sauvegardé${flows.length > 1 ? 's' : ''}`}
+        right={<Btn theme={theme} sm tone="primary" icon="M12 5v14|M5 12h14" label="Nouveau" onClick={onNew} />} />
+      {flows.length > 5 && (
+        <div style={{ padding: '8px 12px 2px' }}>
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un flow…" style={{ ...inputStyle, height: 28, fontSize: 12 }} />
+        </div>
+      )}
+      <div style={{ maxHeight: 280, overflowY: 'auto', padding: '4px 0 6px' }}>
+        {!loading && flows.length === 0 && (
+          <div style={{ padding: '14px 14px 16px', fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>Aucun flow pour l'instant. Clique sur <b style={{ color: '#D4D4D8' }}>Nouveau</b> pour en créer un — il sera sauvegardé ici.</div>
+        )}
+        {shown.map(f => {
+          const on = f.id === activeId
+          return (
+            <div key={f.id} className={`fb-lib-row${on ? ' on' : ''}`} onClick={() => onOpen(f.id)} role="button" tabIndex={0}
+              onKeyDown={e => { if (e.key === 'Enter') onOpen(f.id) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px 8px 12px', cursor: 'pointer', borderLeft: `2px solid ${on ? theme.accent : 'transparent'}`, background: on ? `rgba(${theme.tone},0.08)` : undefined }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: on ? '#F4F4F6' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <span style={{ display: 'flex', gap: 3 }}>
+                    {f.blocks.slice(0, 7).map(b => <span key={b.id} title={BLOCK[b.type].label} style={{ width: 7, height: 7, borderRadius: 2, background: `rgb(${BLOCK[b.type].color})` }} />)}
+                    {f.blocks.length === 0 && <span style={{ fontSize: 10.5, color: '#71717A' }}>vide</span>}
+                  </span>
+                  <span style={{ fontSize: 10.5, color: '#71717A', whiteSpace: 'nowrap' }}>· {ago(f.updatedAt)}</span>
+                </div>
+              </div>
+              <span className="fb-lib-actions" style={{ display: 'flex', gap: 1 }}>
+                {act('M8 8h12v12H8z|M4 16V4h12', 'Dupliquer', () => onDuplicate(f))}
+                {act('M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6', 'Supprimer', () => onDelete(f), true)}
+              </span>
+            </div>
+          )
+        })}
+        {flows.length > 0 && shown.length === 0 && <div style={{ padding: 14, fontSize: 12, color: '#71717A' }}>Aucun flow ne correspond.</div>}
+      </div>
+    </Panel>
+  )
+}
+
+function NewFlowModal({ theme, preset, names, onClose, onCreate }: {
+  theme: Theme; preset: number; names: string[]; onClose: () => void; onCreate: (name: string, types: BlockType[]) => void
+}) {
+  const [tpl, setTpl] = useState(preset)
+  const [name, setName] = useState(preset >= 0 ? TEMPLATES[preset].name : '')
+  const finalName = name.trim() || (tpl >= 0 ? TEMPLATES[tpl].name : 'Nouveau flow')
+  const dup = names.some(n => n.trim().toLowerCase() === finalName.toLowerCase())
+  const submit = () => onCreate(finalName, tpl >= 0 ? TEMPLATES[tpl].types : [])
+  const options: { i: number; title: string; desc: string; types: BlockType[] }[] = [
+    { i: -1, title: 'Flow vide', desc: 'Tu ajoutes les blocs toi-même', types: [] },
+    ...TEMPLATES.map((t, i) => ({ i, title: t.name, desc: t.desc, types: t.types })),
+  ]
+  return (
+    <Modal theme={theme} title="Nouveau flow" sub="Donne-lui un nom : il sera sauvegardé dans « Mes flows »." icon="M5 3h4v4H5z|M15 17h4v4h-4z|M7 7v4a2 2 0 0 0 2 2h6a2 2 0 0 1 2 2v2" width={580}
+      onClose={onClose}
+      footer={<>
+        <Btn theme={theme} tone="ghost" label="Annuler" onClick={onClose} />
+        <Btn theme={theme} tone="primary" icon="M20 6L9 17l-5-5" label="Créer et sauvegarder" onClick={submit} />
+      </>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Field label="Nom du flow" hint={dup ? 'Un flow porte déjà ce nom — tu peux quand même le créer.' : undefined}>
+          <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit() }}
+            placeholder="ex. Lancement comptes mode" maxLength={60} style={{ ...inputStyle, height: 36, fontSize: 13.5 }} />
+        </Field>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Point de départ</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+            {options.map(o => {
+              const on = tpl === o.i
+              return (
+                <button key={o.i} onClick={() => { setTpl(o.i); if (!name.trim() || TEMPLATES.some(t => t.name === name.trim())) setName(o.i >= 0 ? o.title : '') }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: 11, borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                    background: on ? `rgba(${theme.tone},0.1)` : '#15151B', border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.08)'}` }}>
+                  <span style={{ display: 'flex', gap: 3, minHeight: 18 }}>
+                    {o.types.length ? o.types.map((ty, k) => <BlockIcon key={k} def={ty} size={18} />) : <span style={{ fontSize: 11, color: '#71717A' }}>—</span>}
+                  </span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? theme.accentText : '#E4E4E7' }}>{o.title}</span>
+                  <span style={{ fontSize: 11, color: '#A1A1AA' }}>{o.desc}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
