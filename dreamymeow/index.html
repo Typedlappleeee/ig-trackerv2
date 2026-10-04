@@ -10,6 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 <script src="/vendor/piexif.js"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/dm-auth.js"></script>
 <style>
   :root{
     --bg:#0A0B0E; --edge:rgba(255,255,255,.08); --edge2:rgba(255,255,255,.14);
@@ -84,6 +86,9 @@
   .prog i{display:block; height:100%; width:0; background:linear-gradient(90deg,#c084fc,#7c3aed); transition:width .2s}
   .bar{display:flex; align-items:center; gap:10px; margin:0 0 12px; flex-wrap:wrap}
   .bar .count{font-size:13px; color:var(--ok); font-weight:700}
+  .bkall{margin-left:auto; height:44px; padding:0 16px; border-radius:12px; border:1px solid rgba(192,132,252,.35); background:rgba(168,85,247,.1); color:#e9d5ff; font-weight:800; font-size:13px; font-family:inherit; cursor:pointer; display:none}
+  .bkall ~ .dlall{margin-left:8px}
+  .thumb .ib.ok{background:rgba(52,211,153,.55)}
   .dlall{margin-left:auto; height:44px; padding:0 20px; border-radius:12px; border:none; cursor:pointer; font-family:inherit; font-size:14px; font-weight:800; color:#fff; background:linear-gradient(135deg,#34d399,#10b981); display:inline-flex; align-items:center; gap:8px; box-shadow:0 10px 26px -12px rgba(52,211,153,.8)}
   .results{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px}
   .thumb{position:relative; border-radius:12px; overflow:hidden; border:1px solid var(--edge); background:#000; aspect-ratio:4/5}
@@ -134,6 +139,7 @@
   <nav class="tabs">
     <a class="tab on" href="/" data-i18n="tabImage">📷 Image</a>
     <a class="tab" href="/video" data-i18n="tabVideo">🎬 Vidéo</a>
+    <a class="tab" href="/bank" data-i18n="tabBank">☁ Banque</a>
   </nav>
 
   <div class="hero">
@@ -198,6 +204,7 @@
     <div class="prog"><i id="progbar"></i></div>
     <div class="bar">
       <span class="count" id="count"></span>
+      <button id="bkall" class="bkall" type="button" data-i18n="saveAll">☁ Tout mettre en banque</button>
       <button id="dlall" class="dlall"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg><span data-i18n="dlAll">Tout télécharger</span></button>
     </div>
     <div class="results" id="results"></div>
@@ -241,6 +248,7 @@ const I18N = {
     exifNone:'aucune (ou nettoyée)', exifWiped:'effacé',
     hashLabel:'Empreinte SHA-256 :', uniqueFile:'fichier unique ✓',
     devRandom:'iPhone aléatoire (recommandé)', devNone:'Aucun (métadonnées effacées)',
+    tabBank:'☁ Banque', saveAll:'☁ Tout mettre en banque', toBank:'Mettre en banque (7 jours)',
     gpsNone:'Aucune', gpsFrance:'🇫🇷 France (aléatoire)',
     metaMap:{},
   },
@@ -264,6 +272,7 @@ const I18N = {
     exifNone:'none (or cleaned)', exifWiped:'wiped',
     hashLabel:'SHA-256 fingerprint:', uniqueFile:'unique file ✓',
     devRandom:'Random iPhone (recommended)', devNone:'None (metadata cleared)',
+    tabBank:'☁ Bank', saveAll:'☁ Save all to bank', toBank:'Save to bank (7 days)',
     gpsNone:'None', gpsFrance:'🇫🇷 France (random)',
     metaMap:{ 'Appareil':'Device','Logiciel':'Software','Date':'Date','ISO':'ISO','Ouverture':'Aperture','GPS':'GPS','Altitude':'Altitude','Vitesse':'Shutter speed','Dimensions':'Dimensions','EXIF':'EXIF' },
   },
@@ -278,6 +287,7 @@ function applyLang(){
   document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML = tr(el.getAttribute('data-i18n-html')); });
   document.querySelectorAll('[data-i18n-title]').forEach(el=>{ el.title = tr(el.getAttribute('data-i18n-title')); });
   document.querySelectorAll('#lang button').forEach(b=> b.classList.toggle('on', b.dataset.l===LANG));
+  window.dispatchEvent(new Event('dm-lang'));
   if(typeof fillSelects==='function') fillSelects();
   if(typeof refreshPicked==='function') refreshPicked();
 }
@@ -457,10 +467,21 @@ function refreshPicked(){
 
 const outputs=[];
 $('#go').addEventListener('click', run);
+const hasAccess=()=> !window.dm || !dm.installed || !!(dm.me && dm.me.access);
+if(window.dm) dm.gate();
+async function toBank(btn, o){
+  if(!window.dm || o.banked) return;
+  btn.disabled=true; btn.style.opacity='.6';
+  try{ const blob=await (await fetch(o.dataUrl)).blob(); await dm.bank.save(blob, o.name, 'image'); o.banked=true; btn.classList.add('ok'); btn.title=dm.t('saved')+' — '+dm.t('keep'); }
+  catch(e){ btn.title=dm.t('save_err')+' : '+(e.message||e); }
+  finally{ btn.disabled=false; btn.style.opacity=''; }
+}
+$('#bkall').addEventListener('click', async ()=>{ const btns=[...document.querySelectorAll('#results .ib.bk')]; for(let i=0;i<outputs.length;i++) if(btns[i]) await toBank(btns[i], outputs[i]); });
 async function run(){
   if(!files.length) return;
+  if(!hasAccess()){ if(window.dm) dm.gate(); return; }
   const go=$('#go'); go.disabled=true; go.innerHTML=tr('processing');
-  outputs.length=0;
+  outputs.length=0; $('#bkall').style.display='none';
   $('#results').innerHTML=''; $('#out').style.display='block'; $('#meta').classList.remove('open'); $('#progbar').style.width='0';
   const copies=Math.max(1,Math.min(20,parseInt($('#copies').value)||1));
   const deviceSel=dsel.value, gpsKey=gsel.value, dateMode=$('#date').value;
@@ -496,6 +517,12 @@ function addResult(dataUrl,name,idx){
   const a=document.createElement('a'); a.className='ib'; a.href=dataUrl; a.download=name; a.title=tr('download');
   a.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
   ov.appendChild(info); ov.appendChild(a);
+  if(window.dm && dm.installed && dm.me){
+    const bk=document.createElement('button'); bk.className='ib bk'; bk.type='button'; bk.title=tr('toBank'); bk.setAttribute('aria-label', tr('toBank'));
+    bk.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>';
+    bk.addEventListener('click', ()=>toBank(bk, outputs[idx]));
+    ov.appendChild(bk); $('#bkall').style.display='inline-flex';
+  }
   div.appendChild(img); div.appendChild(t); div.appendChild(ov);
   $('#results').appendChild(div);
 }

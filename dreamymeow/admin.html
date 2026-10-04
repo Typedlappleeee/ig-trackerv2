@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>dreamymeow — Admin</title>
+<meta name="theme-color" content="#0A0B0E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/dm-ui.css" />
+<script src="/vendor/supabase.js"></script>
+<script src="/dm-auth.js"></script>
+<style>
+  .keys{margin-top:12px; padding:12px; border-radius:12px; background:rgba(0,0,0,.35); border:1px solid var(--edge); font-size:12.5px; line-height:1.9; white-space:pre-wrap; word-break:break-all}
+  .acts{display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end}
+  .pane[hidden]{display:none}
+  .grantIn{width:64px; height:28px; padding:0 8px; font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="logo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+    <h1 data-i="h1">dreamymeow <span>admin</span></h1>
+    <div class="right">
+      <div class="lang" id="lang"><button data-l="fr">FR</button><button data-l="en">EN</button></div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <a class="tab on" href="#users" data-tab="users" data-i="tUsers">👥 Comptes</a>
+    <a class="tab" href="#keys" data-tab="keys" data-i="tKeys">🔑 Licences</a>
+  </nav>
+
+  <div class="notice" id="info" hidden></div>
+  <div class="notice err" id="err" hidden></div>
+
+  <div class="kpis">
+    <div class="kpi"><b id="kUsers">—</b><span data-i="kUsers">Comptes</span></div>
+    <div class="kpi"><b id="kActive">—</b><span data-i="kActive">Licences actives</span></div>
+    <div class="kpi"><b id="kFree">—</b><span data-i="kFree">Clés libres</span></div>
+    <div class="kpi"><b id="kBank">—</b><span data-i="kBank">Banque (total)</span></div>
+  </div>
+
+  <!-- ═══ Comptes ═══ -->
+  <section class="pane" id="pane-users">
+    <div class="card">
+      <h3 data-i="newUser">Créer un compte client</h3>
+      <p class="sub" data-i="newUserSub" style="margin-bottom:12px">Donne ensuite le pseudo et le mot de passe à ton client.</p>
+      <form class="row" id="fUser" autocomplete="off">
+        <label class="f" style="flex:1;min-width:140px"><span data-i="username">Pseudo</span><input class="in" id="uName" required minlength="3" maxlength="24" autocapitalize="none" spellcheck="false"></label>
+        <label class="f" style="flex:1;min-width:140px"><span data-i="password">Mot de passe</span><input class="in" id="uPass" required minlength="8" autocomplete="new-password"></label>
+        <label class="f" style="width:110px"><span data-i="days">Jours</span><input class="in" id="uDays" type="number" min="0" max="3650" value="30"></label>
+        <button class="btn pri" style="height:38px" data-i="create">Créer</button>
+        <button class="btn" type="button" id="genPass" style="height:38px" data-i="gen">Générer un mot de passe</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <input class="in" id="qUser" style="flex:1;max-width:320px" data-ph="search" placeholder="Rechercher un pseudo…">
+        <button class="btn sm" id="purge" data-i="purge">Purger les fichiers expirés</button>
+      </div>
+      <div class="tscroll"><table>
+        <thead><tr><th data-i="cUser">Pseudo</th><th data-i="cLic">Licence</th><th class="hide-sm" data-i="cBank">Banque</th><th class="hide-sm" data-i="cSeen">Vu le</th><th class="hide-sm" data-i="cCreated">Créé le</th><th style="text-align:right" data-i="cActs">Actions</th></tr></thead>
+        <tbody id="users"><tr><td colspan="6" class="empty" data-i="loading">Chargement…</td></tr></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ═══ Licences ═══ -->
+  <section class="pane" id="pane-keys" hidden>
+    <div class="card">
+      <h3 data-i="newKeys">Créer des clés de licence</h3>
+      <p class="sub" data-i="newKeysSub" style="margin-bottom:12px">Chaque clé donne N jours d'accès au compte qui l'active (cumulable).</p>
+      <form class="row" id="fKeys">
+        <label class="f" style="width:110px"><span data-i="count">Nombre</span><input class="in" id="kCount" type="number" min="1" max="200" value="1"></label>
+        <label class="f" style="width:110px"><span data-i="days">Jours</span><input class="in" id="kDays" type="number" min="1" max="3650" value="30"></label>
+        <label class="f" style="flex:1;min-width:160px"><span data-i="note">Note (optionnel)</span><input class="in" id="kNote" maxlength="80" data-ph="notePh" placeholder="ex. client Instagram, 1 mois"></label>
+        <button class="btn pri" style="height:38px" data-i="generate">Générer</button>
+      </form>
+      <div id="newKeys" hidden>
+        <div class="keys mono" id="newKeysTxt"></div>
+        <div class="row" style="margin-top:8px"><button class="btn sm" id="copyNew" data-i="copyAll">Copier tout</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <div class="seg" id="kFilter">
+          <button data-f="all" class="on" data-i="fAll">Toutes</button>
+          <button data-f="free" data-i="fFree">Libres</button>
+          <button data-f="active" data-i="fActive">Actives</button>
+          <button data-f="expired" data-i="fExpired">Expirées</button>
+          <button data-f="revoked" data-i="fRevoked">Révoquées</button>
+        </div>
+      </div>
+      <div class="tscroll"><table>
+        <thead><tr><th data-i="cKey">Clé</th><th data-i="cState">État</th><th class="hide-sm" data-i="days">Jours</th><th class="hide-sm" data-i="noteCol">Note</th><th class="hide-sm" data-i="cCreated">Créée le</th><th style="text-align:right" data-i="cActs">Actions</th></tr></thead>
+        <tbody id="keys"><tr><td colspan="6" class="empty" data-i="loading">Chargement…</td></tr></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <footer><a href="/" style="color:var(--acc);text-decoration:none" data-i="back">← Retour au spoofer</a></footer>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s)
+  const I18N = {
+    fr: {
+      h1: 'dreamymeow <span>admin</span>', tUsers: '👥 Comptes', tKeys: '🔑 Licences',
+      kUsers: 'Comptes', kActive: 'Licences actives', kFree: 'Clés libres', kBank: 'Banque (total)',
+      newUser: 'Créer un compte client', newUserSub: 'Donne ensuite le pseudo et le mot de passe à ton client.',
+      username: 'Pseudo', password: 'Mot de passe', days: 'Jours', create: 'Créer', gen: 'Générer un mot de passe',
+      search: 'Rechercher un pseudo…', purge: 'Purger les fichiers expirés',
+      cUser: 'Pseudo', cLic: 'Licence', cBank: 'Banque', cSeen: 'Vu le', cCreated: 'Créé le', cActs: 'Actions',
+      loading: 'Chargement…', back: '← Retour au spoofer',
+      newKeys: 'Créer des clés de licence', newKeysSub: 'Chaque clé donne N jours d\'accès au compte qui l\'active (cumulable).',
+      count: 'Nombre', note: 'Note (optionnel)', noteCol: 'Note', notePh: 'ex. client Instagram, 1 mois', generate: 'Générer', copyAll: 'Copier tout',
+      fAll: 'Toutes', fFree: 'Libres', fActive: 'Actives', fExpired: 'Expirées', fRevoked: 'Révoquées',
+      cKey: 'Clé', cState: 'État',
+      admin: 'Admin', until: d => `jusqu'au ${d}`, none: 'Aucune', never: 'jamais',
+      grant: 'Ajouter', cut: 'Couper', mkAdmin: 'Rendre admin', unAdmin: 'Retirer admin', copy: 'Copier', revoke: 'Révoquer',
+      sFree: 'Libre', sActive: u => `Active · ${u}`, sExpired: u => `Expirée · ${u}`, sRevoked: 'Révoquée',
+      confirmCut: u => `Couper l'accès de « ${u} » ? Toutes ses licences actives seront révoquées.`,
+      confirmRevoke: k => `Révoquer la clé ${k} ?`,
+      created: (u, p) => `✓ Compte créé — pseudo : ${u} · mot de passe : ${p}`,
+      purged: n => `✓ ${n} fichier(s) expiré(s) supprimé(s).`, copied: '✓ Copié', none2: 'Aucun compte.', noKeys: 'Aucune clé.',
+      granted: (u, d) => `✓ ${d} jour(s) ajouté(s) à ${u}.`,
+    },
+    en: {
+      h1: 'dreamymeow <span>admin</span>', tUsers: '👥 Accounts', tKeys: '🔑 Licenses',
+      kUsers: 'Accounts', kActive: 'Active licenses', kFree: 'Unused keys', kBank: 'Bank (total)',
+      newUser: 'Create a client account', newUserSub: 'Then give the username and password to your client.',
+      username: 'Username', password: 'Password', days: 'Days', create: 'Create', gen: 'Generate a password',
+      search: 'Search a username…', purge: 'Purge expired files',
+      cUser: 'Username', cLic: 'License', cBank: 'Bank', cSeen: 'Last seen', cCreated: 'Created', cActs: 'Actions',
+      loading: 'Loading…', back: '← Back to the spoofer',
+      newKeys: 'Create license keys', newKeysSub: 'Each key gives N days of access to the account that activates it (stackable).',
+      count: 'Count', note: 'Note (optional)', noteCol: 'Note', notePh: 'e.g. Instagram client, 1 month', generate: 'Generate', copyAll: 'Copy all',
+      fAll: 'All', fFree: 'Unused', fActive: 'Active', fExpired: 'Expired', fRevoked: 'Revoked',
+      cKey: 'Key', cState: 'Status',
+      admin: 'Admin', until: d => `until ${d}`, none: 'None', never: 'never',
+      grant: 'Add', cut: 'Cut', mkAdmin: 'Make admin', unAdmin: 'Remove admin', copy: 'Copy', revoke: 'Revoke',
+      sFree: 'Unused', sActive: u => `Active · ${u}`, sExpired: u => `Expired · ${u}`, sRevoked: 'Revoked',
+      confirmCut: u => `Cut access for “${u}”? All their active licenses will be revoked.`,
+      confirmRevoke: k => `Revoke key ${k}?`,
+      created: (u, p) => `✓ Account created — username: ${u} · password: ${p}`,
+      purged: n => `✓ ${n} expired file(s) deleted.`, copied: '✓ Copied', none2: 'No accounts.', noKeys: 'No keys.',
+      granted: (u, d) => `✓ ${d} day(s) added to ${u}.`,
+    },
+  }
+  let LANG = (() => { try { return localStorage.getItem('dreamymeow-lang') } catch (_) { return null } })() || ((navigator.language || 'fr').toLowerCase().startsWith('fr') ? 'fr' : 'en')
+  const tr = k => I18N[LANG][k] ?? I18N.fr[k] ?? k
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  const fmt = iso => iso ? new Date(iso).toLocaleDateString(LANG === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : tr('never')
+  const mb = b => b >= 1073741824 ? (b / 1073741824).toFixed(2) + ' Go' : (b / 1048576).toFixed(1) + ' Mo'
+  const rpc = async (fn, args) => { const { data, error } = await dm.sb.rpc(fn, args); if (error) throw new Error(error.message); return data }
+  const info = m => { const e = $('#info'); e.hidden = !m; e.textContent = m || '' }
+  const err = m => { const e = $('#err'); e.hidden = !m; e.textContent = m || '' }
+
+  let users = [], keys = [], kFilter = 'all', tab = location.hash === '#keys' ? 'keys' : 'users'
+
+  function applyLang() {
+    document.documentElement.lang = LANG
+    document.querySelectorAll('[data-i]').forEach(el => { const v = tr(el.dataset.i); if (typeof v === 'string') el.innerHTML = v })
+    document.querySelectorAll('[data-ph]').forEach(el => { el.placeholder = tr(el.dataset.ph) })
+    document.querySelectorAll('#lang button').forEach(b => b.classList.toggle('on', b.dataset.l === LANG))
+    window.dispatchEvent(new Event('dm-lang'))
+    renderUsers(); renderKeys()
+  }
+  $('#lang').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; LANG = b.dataset.l; try { localStorage.setItem('dreamymeow-lang', LANG) } catch (_) {} applyLang() })
+
+  function showTab(t) {
+    tab = t
+    document.querySelectorAll('.tabs .tab').forEach(a => a.classList.toggle('on', a.dataset.tab === t))
+    $('#pane-users').hidden = t !== 'users'; $('#pane-keys').hidden = t !== 'keys'
+  }
+  document.querySelectorAll('.tabs .tab').forEach(a => a.addEventListener('click', e => { e.preventDefault(); history.replaceState(null, '', '#' + a.dataset.tab); showTab(a.dataset.tab) }))
+
+  function keyState(k) {
+    if (k.revoked_at) return 'revoked'
+    if (!k.redeemed_by) return 'free'
+    return new Date(k.expires_at) > new Date() ? 'active' : 'expired'
+  }
+  function kpis() {
+    $('#kUsers').textContent = users.length
+    $('#kActive').textContent = keys.filter(k => keyState(k) === 'active').length
+    $('#kFree').textContent = keys.filter(k => keyState(k) === 'free').length
+    $('#kBank').textContent = mb(users.reduce((s, u) => s + Number(u.bank_bytes || 0), 0))
+  }
+
+  function renderUsers() {
+    const q = $('#qUser').value.trim().toLowerCase()
+    const list = users.filter(u => !q || u.username.includes(q))
+    if (!list.length) { $('#users').innerHTML = `<tr><td colspan="6" class="empty">${tr('none2')}</td></tr>`; return }
+    $('#users').innerHTML = list.map(u => {
+      const lic = u.is_admin ? `<span class="pill acc">${tr('admin')}</span>`
+        : u.license_until ? `<span class="pill ok">${tr('until')(fmt(u.license_until))}</span>` : `<span class="pill mut">${tr('none')}</span>`
+      return `<tr data-id="${u.id}" data-u="${esc(u.username)}">
+        <td><b>${esc(u.username)}</b></td><td>${lic}</td>
+        <td class="hide-sm">${u.bank_files} · ${mb(Number(u.bank_bytes || 0))}</td>
+        <td class="hide-sm">${fmt(u.last_seen_at)}</td><td class="hide-sm">${fmt(u.created_at)}</td>
+        <td><div class="acts">
+          <input class="in grantIn" type="number" min="1" max="3650" value="30" aria-label="${tr('days')}">
+          <button class="btn sm" data-a="grant">+ ${tr('grant')}</button>
+          ${u.license_until && !u.is_admin ? `<button class="btn sm bad" data-a="cut">${tr('cut')}</button>` : ''}
+          <button class="btn sm" data-a="admin">${u.is_admin ? tr('unAdmin') : tr('mkAdmin')}</button>
+        </div></td></tr>`
+    }).join('')
+  }
+
+  function renderKeys() {
+    const list = keys.filter(k => kFilter === 'all' || keyState(k) === kFilter)
+    if (!list.length) { $('#keys').innerHTML = `<tr><td colspan="6" class="empty">${tr('noKeys')}</td></tr>`; return }
+    $('#keys').innerHTML = list.map(k => {
+      const st = keyState(k)
+      const who = esc(k.redeemed_username || '?')
+      const pill = st === 'free' ? `<span class="pill warn">${tr('sFree')}</span>`
+        : st === 'active' ? `<span class="pill ok">${tr('sActive')(who)} · ${fmt(k.expires_at)}</span>`
+        : st === 'expired' ? `<span class="pill mut">${tr('sExpired')(who)}</span>` : `<span class="pill bad">${tr('sRevoked')}</span>`
+      return `<tr data-k="${esc(k.key)}">
+        <td class="mono">${esc(k.key)}</td><td>${pill}</td><td class="hide-sm">${k.days}</td>
+        <td class="hide-sm">${esc(k.note || '')}</td><td class="hide-sm">${fmt(k.created_at)}</td>
+        <td><div class="acts"><button class="btn sm" data-a="copy">${tr('copy')}</button>${st === 'free' || st === 'active' ? `<button class="btn sm bad" data-a="revoke">${tr('revoke')}</button>` : ''}</div></td></tr>`
+    }).join('')
+  }
+
+  async function load() {
+    err('')
+    try {
+      ;[users, keys] = await Promise.all([rpc('dm_admin_users'), rpc('dm_admin_licenses')])
+      users = users || []; keys = keys || []
+      kpis(); renderUsers(); renderKeys()
+    } catch (x) { err(x.message) }
+  }
+
+  $('#qUser').addEventListener('input', renderUsers)
+  $('#kFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; kFilter = b.dataset.f; [...$('#kFilter').children].forEach(x => x.classList.toggle('on', x === b)); renderKeys() })
+
+  $('#users').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-a]'); if (!btn) return
+    const tr_ = btn.closest('tr'), id = tr_.dataset.id, uname = tr_.dataset.u
+    const u = users.find(x => x.id === id)
+    err(''); info('')
+    try {
+      if (btn.dataset.a === 'grant') {
+        const d = Math.max(1, Math.min(3650, parseInt(tr_.querySelector('.grantIn').value) || 30))
+        await rpc('dm_admin_grant', { p_user: id, p_days: d }); info(tr('granted')(uname, d))
+      }
+      if (btn.dataset.a === 'cut') { if (!confirm(tr('confirmCut')(uname))) return; await rpc('dm_admin_revoke_user', { p_user: id }) }
+      if (btn.dataset.a === 'admin') await rpc('dm_admin_set_admin', { p_user: id, p_on: !u.is_admin })
+      await load()
+    } catch (x) { err(x.message) }
+  })
+
+  $('#keys').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-a]'); if (!btn) return
+    const k = btn.closest('tr').dataset.k
+    if (btn.dataset.a === 'copy') { try { await navigator.clipboard.writeText(k); btn.textContent = tr('copied') } catch (_) {} return }
+    if (btn.dataset.a === 'revoke') {
+      if (!confirm(tr('confirmRevoke')(k))) return
+      try { await rpc('dm_admin_revoke', { p_key: k }); await load() } catch (x) { err(x.message) }
+    }
+  })
+
+  $('#genPass').addEventListener('click', () => {
+    const a = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint32Array(12))
+    $('#uPass').value = [...r].map(n => a[n % a.length]).join('')
+  })
+  $('#fUser').addEventListener('submit', async e => {
+    e.preventDefault(); err(''); info('')
+    const u = $('#uName').value.trim().toLowerCase(), p = $('#uPass').value, d = Math.max(0, parseInt($('#uDays').value) || 0)
+    try { await rpc('dm_admin_create_user', { p_username: u, p_password: p, p_days: d }); info(tr('created')(u, p)); $('#uName').value = ''; $('#uPass').value = ''; await load() }
+    catch (x) { err(x.message) }
+  })
+
+  $('#fKeys').addEventListener('submit', async e => {
+    e.preventDefault(); err('')
+    const n = Math.max(1, Math.min(200, parseInt($('#kCount').value) || 1)), d = Math.max(1, Math.min(3650, parseInt($('#kDays').value) || 30))
+    try {
+      const out = await rpc('dm_admin_create_licenses', { p_count: n, p_days: d, p_note: $('#kNote').value })
+      $('#newKeysTxt').textContent = (out || []).join('\n'); $('#newKeys').hidden = false
+      await load()
+    } catch (x) { err(x.message) }
+  })
+  $('#copyNew').addEventListener('click', async e => { try { await navigator.clipboard.writeText($('#newKeysTxt').textContent); e.target.textContent = tr('copied') } catch (_) {} })
+
+  $('#purge').addEventListener('click', async () => {
+    try { const n = await dm.bank.purgeExpired(); info(tr('purged')(n)); await load() } catch (x) { err(x.message) }
+  })
+
+  showTab(tab); applyLang()
+  dm.gate({ need: 'admin' }).then(async () => {
+    if (!dm.installed) { err('Le système de comptes n\'est pas encore installé (script SQL à appliquer dans Supabase).'); return }
+    // Ménage automatique : fichiers de banque expirés (tous comptes).
+    dm.bank.purgeExpired().then(n => { if (n) info(tr('purged')(n)) }).catch(() => {})
+    load()
+  })
+})()
+</script>
+</body>
+</html>

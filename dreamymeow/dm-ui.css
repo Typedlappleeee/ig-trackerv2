@@ -1,0 +1,66 @@
+/* Styles communs des pages Banque et Admin (mêmes couleurs que les spoofers). */
+:root{
+  --bg:#0A0B0E; --edge:rgba(255,255,255,.08); --edge2:rgba(255,255,255,.14);
+  --txt:#F2F0FF; --mut:#9a97a8; --dim:#8b88a0; --acc:#c084fc; --acc2:#7c3aed; --ok:#34d399; --bad:#f87171; --warn:#fbbf24;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:
+    radial-gradient(75% 50% at 50% -10%, rgba(168,85,247,.22), transparent 72%),
+    radial-gradient(50% 40% at 100% 0%, rgba(236,72,153,.08), transparent 60%),
+    var(--bg);
+  color:var(--txt); font-family:'Manrope',system-ui,sans-serif; min-height:100vh; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:980px; margin:0 auto; padding:34px 16px 70px}
+header{display:flex; align-items:center; gap:12px; margin-bottom:20px}
+.logo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,#c084fc,#7c3aed);box-shadow:0 12px 34px -10px rgba(168,85,247,.9);flex:0 0 auto}
+h1{font-family:'Space Grotesk',sans-serif; font-size:22px; margin:0; letter-spacing:-.02em}
+h1 span{color:var(--acc)}
+.brand{font-size:12px; color:var(--dim); font-weight:700}
+.right{margin-left:auto; display:flex; align-items:center; gap:10px}
+.lang{display:inline-flex; gap:2px; padding:3px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--edge)}
+.lang button{border:none; background:transparent; color:var(--mut); font-family:inherit; font-weight:800; font-size:11px; padding:4px 8px; border-radius:6px; cursor:pointer}
+.lang button.on{background:var(--acc); color:#1a1206}
+.tabs{display:flex; gap:6px; padding:5px; border-radius:13px; background:rgba(255,255,255,.03); border:1px solid var(--edge); margin-bottom:20px}
+.tab{flex:1; text-align:center; padding:11px 0; border-radius:9px; font-weight:800; font-size:14px; color:var(--mut); text-decoration:none}
+.tab:hover{color:var(--txt)}
+.tab.on{background:linear-gradient(135deg,#c084fc,#7c3aed); color:#fff}
+.card{background:linear-gradient(168deg,rgba(24,20,44,.55),rgba(12,10,22,.6)); border:1px solid var(--edge); border-radius:18px; padding:18px; margin-bottom:14px}
+.card h3{margin:0 0 4px; font-size:15px}
+.sub{margin:0; font-size:12.5px; color:var(--mut); line-height:1.55}
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:14px}
+.kpi{padding:14px; border-radius:14px; background:rgba(255,255,255,.025); border:1px solid var(--edge)}
+.kpi b{display:block; font-family:'Space Grotesk',sans-serif; font-size:22px; letter-spacing:-.02em}
+.kpi span{font-size:11px; font-weight:700; color:var(--dim); text-transform:uppercase; letter-spacing:.06em}
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:7px; height:36px; padding:0 14px; border-radius:10px; border:1px solid var(--edge2); background:rgba(255,255,255,.04); color:var(--txt); font-family:inherit; font-weight:800; font-size:12.5px; cursor:pointer; text-decoration:none; white-space:nowrap}
+.btn:hover{background:rgba(255,255,255,.08)}
+.btn.pri{border:none; color:#fff; background:linear-gradient(135deg,#c084fc,#7c3aed); box-shadow:0 10px 26px -12px rgba(168,85,247,.9)}
+.btn.bad{color:var(--bad); border-color:rgba(248,113,113,.3)}
+.btn.sm{height:28px; padding:0 10px; font-size:11.5px; border-radius:8px}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+input.in, select.in{height:38px; padding:0 12px; border-radius:10px; background:rgba(255,255,255,.04); border:1px solid var(--edge); color:var(--txt); font-size:13px; font-family:inherit; outline:none; min-width:0}
+input.in:focus, select.in:focus{border-color:rgba(192,132,252,.55)}
+select.in option{background:#16161c}
+label.f{display:flex; flex-direction:column; gap:5px; font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--dim)}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end}
+.seg{display:inline-flex; gap:3px; padding:3px; border-radius:10px; background:rgba(255,255,255,.03); border:1px solid var(--edge)}
+.seg button{height:28px; padding:0 12px; border:none; border-radius:7px; background:transparent; color:var(--mut); font-weight:700; font-size:12px; font-family:inherit; cursor:pointer}
+.seg button.on{background:rgba(192,132,252,.18); color:#e9d5ff}
+.pill{display:inline-flex; align-items:center; height:22px; padding:0 8px; border-radius:99px; font-size:11px; font-weight:800}
+.pill.ok{background:rgba(52,211,153,.12); color:var(--ok)}
+.pill.bad{background:rgba(248,113,113,.12); color:var(--bad)}
+.pill.mut{background:rgba(255,255,255,.06); color:var(--mut)}
+.pill.acc{background:rgba(192,132,252,.15); color:#e9d5ff}
+.pill.warn{background:rgba(251,191,36,.12); color:var(--warn)}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.notice{padding:11px 14px; border-radius:12px; font-size:12.5px; margin-bottom:14px; background:rgba(192,132,252,.08); border:1px solid rgba(192,132,252,.22); color:#e9d5ff}
+.notice.err{background:rgba(248,113,113,.08); border-color:rgba(248,113,113,.25); color:#fecaca}
+.empty{padding:40px 16px; text-align:center; color:var(--mut); font-size:13px}
+table{width:100%; border-collapse:collapse; font-size:12.5px}
+th{text-align:left; font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); padding:8px 10px; border-bottom:1px solid var(--edge)}
+td{padding:10px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.015)}
+.tscroll{overflow-x:auto}
+footer{color:var(--dim); font-size:11.5px; text-align:center; margin-top:26px}
+@media(max-width:640px){ .hide-sm{display:none} h1{font-size:19px} .brand{display:none} }

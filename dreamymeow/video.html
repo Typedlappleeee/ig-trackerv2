@@ -11,6 +11,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 <script src="/ffmpeg/ffmpeg.js"></script>
 <script src="/ffmpeg/util.js"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/dm-auth.js"></script>
 <style>
   :root{
     --bg:#0A0B0E; --edge:rgba(255,255,255,.08); --edge2:rgba(255,255,255,.14);
@@ -88,6 +90,11 @@
   .res .nm{font-weight:800; font-size:14px; font-family:'Space Grotesk',sans-serif}
   .res .mt{font-size:11px; color:var(--mut); font-family:'Space Grotesk',monospace; margin-top:3px; word-break:break-all}
   .res .mt code{color:var(--ok)}
+  .res .bk{margin-left:auto; flex:0 0 auto; height:38px; padding:0 13px; display:inline-flex; align-items:center; gap:6px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.04); color:#E9E5FF; font-weight:800; font-size:12.5px; font-family:inherit; cursor:pointer}
+  .res .bk.done{color:#34d399; border-color:rgba(52,211,153,.35); cursor:default}
+  .bar .bkall{margin-left:auto; height:34px; padding:0 14px; border-radius:10px; border:1px solid rgba(192,132,252,.35); background:rgba(168,85,247,.1); color:#e9d5ff; font-weight:800; font-size:12.5px; font-family:inherit; cursor:pointer; display:none}
+  .bar .keep{font-size:11px; color:var(--mut)}
+  .res .bk ~ .dl{margin-left:8px}
   .res .dl{margin-left:auto; flex:0 0 auto; height:38px; padding:0 16px; display:inline-flex; align-items:center; gap:7px; border-radius:10px; text-decoration:none; font-weight:800; font-size:13px; color:#fff; background:linear-gradient(135deg,#c084fc,#7c3aed)}
   .log{margin-top:12px; max-height:150px; overflow:auto; font-family:'Space Grotesk',monospace; font-size:11px; line-height:1.6; color:var(--mut); white-space:pre-wrap; background:rgba(0,0,0,.4); border:1px solid var(--edge); border-radius:10px; padding:11px; display:none}
   .log.show{display:block}
@@ -120,6 +127,7 @@
   <nav class="tabs">
     <a class="tab" href="/" data-i18n="tabImage">📷 Image</a>
     <a class="tab on" href="/video" data-i18n="tabVideo">🎬 Vidéo</a>
+    <a class="tab" href="/bank" data-i18n="tabBank">☁ Banque</a>
   </nav>
 
   <div class="hero">
@@ -172,7 +180,7 @@
 
   <div id="out">
     <div class="prog"><i id="progbar"></i></div>
-    <div class="bar"><span class="count" id="count"></span></div>
+    <div class="bar"><span class="count" id="count"></span><button class="bkall" id="bkall" data-i18n="saveAll">☁ Tout mettre en banque</button></div>
     <div class="results" id="results"></div>
     <div class="log" id="log"></div>
   </div>
@@ -203,7 +211,7 @@
       stall:'   ⚠ Moteur bloqué → relance automatique en mode compatible…',
       stallFail:'Le moteur reste bloqué sur cette vidéo — essaie une vidéo plus courte',
       downscale:(w,h)=>`   ↘ Vidéo réduite en ${w}×${h} (beaucoup plus rapide, qualité Reels)`,
-      prep:'Préparation de la vidéo…',
+      prep:'Préparation de la vidéo…', tabBank:'☁ Banque', saveAll:'☁ Tout mettre en banque',
       foot:"100 % local — aucune vidéo n'est envoyée en ligne. Le moteur vidéo (~32 Mo) se charge une seule fois.",
       footLink:'← Spoofer image',
       notVideo:"Ce fichier ne semble pas être une vidéo.",
@@ -231,7 +239,7 @@
       stall:'   ⚠ Engine stalled → automatic restart in compatible mode…',
       stallFail:'The engine keeps stalling on this video — try a shorter video',
       downscale:(w,h)=>`   ↘ Video downscaled to ${w}×${h} (much faster, Reels quality)`,
-      prep:'Preparing the video…',
+      prep:'Preparing the video…', tabBank:'☁ Bank', saveAll:'☁ Save all to bank',
       foot:'100% local — no video is uploaded. The video engine (~32 MB) loads once.',
       footLink:'← Image spoofer',
       notVideo:"This file doesn't look like a video.",
@@ -255,6 +263,7 @@
     document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML = tr(el.getAttribute('data-i18n-html')); });
     document.querySelectorAll('[data-i18n-title]').forEach(el=>{ el.title = tr(el.getAttribute('data-i18n-title')); });
     document.querySelectorAll('#lang button').forEach(b=> b.classList.toggle('on', b.dataset.l===LANG));
+    window.dispatchEvent(new Event('dm-lang'));
     if(typeof fillSelects==='function') fillSelects();
   }
 
@@ -455,15 +464,28 @@
     return probe();
   }
 
+  // Comptes & licences : la porte s'affiche si pas connecté / pas de licence.
+  const hasAccess=()=> !window.dm || !dm.installed || !!(dm.me && dm.me.access);
+  if(window.dm) dm.gate();
+  // Banque : bouton par variante + « tout mettre en banque » (conservé 7 jours).
+  const done=[];
+  async function toBank(btn, blob, name){
+    if(!window.dm || btn.classList.contains('done')) return;
+    btn.disabled=true; btn.textContent=dm.t('saving');
+    try{ await dm.bank.save(blob, name, 'video'); btn.classList.add('done'); btn.textContent=dm.t('saved'); btn.title=dm.t('keep'); }
+    catch(e){ btn.disabled=false; btn.textContent=dm.t('save_err'); btn.title=e.message||String(e); log('☁ '+(e.message||e)); }
+  }
+  $('#bkall').addEventListener('click', async ()=>{ for(const d of done) await toBank(d.btn, d.blob, d.name); });
   const urls=[];
   $('#go').addEventListener('click', async ()=>{
     if(!file) return;
+    if(!hasAccess()){ if(window.dm) dm.gate(); return; }
     const n=Math.max(1,Math.min(12, parseInt($('#copies').value)||1));
     const opts={ intensity, gps:gpsFor($('#gps').value), device:resolveDevice($('#device').value), speed:tf.speed, trim:tf.trim, flip:tf.flip };
     const baseName=(file.name.replace(/\.[^.]+$/,'')||'video');
     const go=$('#go'); go.disabled=true; go.innerHTML=`<span class="spin"></span> ${tr('processing')}`;
     $('#out').style.display='block'; $('#results').innerHTML=''; $('#log').classList.remove('show'); $('#log').textContent=''; setBar(0);
-    urls.forEach(u=>URL.revokeObjectURL(u)); urls.length=0;
+    urls.forEach(u=>URL.revokeObjectURL(u)); urls.length=0; done.length=0; $('#bkall').style.display='none';
     totalN=n;
     try{
       const data=new Uint8Array(await file.arrayBuffer());
@@ -502,6 +524,12 @@
         row.innerHTML=`<div style="min-width:0"><div class="nm">${tr('variantC')} ${i+1}</div><div class="mt">${(blob.size/1048576).toFixed(2)} ${tr('mb')} · sha <code>${hash}</code></div></div>`;
         const a=document.createElement('a'); a.className='dl'; a.href=url; a.download=`${baseName}_spoof${i+1}.mp4`;
         a.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>'+tr('download');
+        const fname=`${baseName}_spoof${i+1}.mp4`;
+        if(window.dm && dm.installed && dm.me){
+          const bk=document.createElement('button'); bk.className='bk'; bk.type='button'; bk.textContent='☁ '+dm.t('save'); bk.title=dm.t('keep');
+          bk.addEventListener('click', ()=>toBank(bk, blob, fname));
+          row.appendChild(bk); done.push({ btn:bk, blob, name:fname }); $('#bkall').style.display='inline-flex';
+        }
         row.appendChild(a); $('#results').appendChild(row);
         setBar((i+1)/n);
       }
