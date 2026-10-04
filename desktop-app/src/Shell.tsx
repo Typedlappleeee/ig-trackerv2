@@ -7,7 +7,7 @@ import { fmtNumber } from '@/lib/data'
 export type PageKey =
   | 'hub'
   | 'cloud' | 'phones' | 'proxies' | 'bank' | 'activity' | 'connections'
-  | 'flows' | 'recipes' | 'publish' | 'automation' | 'warmup'
+  | 'flows' | 'recipes' | 'publish' | 'automation' | 'warmup' | 'flowBuilder'
   | 'studio'
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
@@ -73,6 +73,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
         { k: 'recipes', l: 'Mes séquences', i: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6' },
       ] : [
         { k: 'publish', l: 'Publication', i: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
+        { k: 'flowBuilder', l: 'Flow Builder', i: 'M5 3h4v4H5z|M15 17h4v4h-4z|M7 7v4a2 2 0 0 0 2 2h6a2 2 0 0 1 2 2v2' },
         { k: 'scheduled', l: 'Programmé', i: 'M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z' },
         { k: 'warmup', l: 'Warmup', i: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z' },
       ],
@@ -106,6 +107,7 @@ const TITLES: Record<PageKey, string[]> = {
   publish: ['Diffusion', 'Publication'],
   automation: ['Diffusion', 'Automatisation'],
   warmup: ['Diffusion', 'Warmup'],
+  flowBuilder: ['Diffusion', 'Flow Builder'],
   studio: ['Production', 'Studio vidéo'],
   insights: ['Analyse', 'Performances'],
   health: ['Analyse', 'Santé des comptes'],
