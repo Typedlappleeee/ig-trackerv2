@@ -18,6 +18,7 @@ import {
 import { changeUsernameOnPhone, changeProfilePicOnPhone } from '@/lib/geelarkAdb'
 import { startCreditRun, isCreditError, CREDIT_COSTS, type CreditRun } from '@/lib/credits'
 import { startRun, type RunHandle } from '@/lib/runStore'
+import { heartbeatPhone } from '@/lib/phoneWatch'
 
 // ── Modèle ───────────────────────────────────────────────────────────────────
 export type BlockType = 'login' | 'username' | 'avatar' | 'bio' | 'warmup' | 'post' | 'story' | 'pause'
@@ -463,6 +464,7 @@ async function execBlock(
       const end = Date.now() + ms
       while (Date.now() < end) {
         if (handle.isCancelled()) return { ok: false, error: 'Annulé' }
+        if (ms < 3 * 60_000) heartbeatPhone(gid)   // pause courte, téléphone allumé
         await sleep(Math.min(5000, end - Date.now()))
       }
       return { ok: true }

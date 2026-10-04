@@ -7,6 +7,7 @@
 // dans le dump UI, avec une coordonnée de repli ; le log raconte chaque action pour
 // pouvoir recaler le flow quand Instagram change son interface.
 import { geelarkFetch, ensurePhoneRunning, sleep } from './geelark'
+import { heartbeatPhone } from './phoneWatch'
 
 type Log = (m: string) => void
 type Pt = [number, number]
@@ -16,6 +17,7 @@ type Pt = [number, number]
 // beaucoup de téléphones tournent) → on retente les erreurs « pas prêt ».
 async function shellExec(bearer: string, phoneId: string, cmd: string, maxRetries = 6): Promise<string> {
   const NOT_READY = /not running|not started|unavailable|not ready|phone.*start|starting/i
+  heartbeatPhone(phoneId)   // automatisation en cours → le serveur ne coupe pas le téléphone
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const d = await geelarkFetch('/shell/execute', { id: phoneId, cmd }, bearer)
     const code = Number(d['code'] ?? -1)
