@@ -4,7 +4,7 @@ import type { Theme } from '@/lib/theme'
 
 // Widget flottant : suit tous les runs en cours, où que tu sois dans l'app.
 // Barre de progression + bouton Annuler par run.
-const KIND_LABEL: Record<string, string> = { reels: 'Reels', story: 'Story', cross: 'Cross-post', studio: 'Studio', auto: 'Auto-contenu', farm: 'Phone Farm' }
+const KIND_LABEL: Record<string, string> = { reels: 'Reels', story: 'Story', cross: 'Cross-post', studio: 'Studio', auto: 'Auto-contenu', farm: 'Phone Farm', flow: 'Flow' }
 
 export default function RunWidget({ theme }: { theme: Theme }) {
   const runs = useRuns()

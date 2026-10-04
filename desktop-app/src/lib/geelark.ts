@@ -33,7 +33,7 @@ export function geelarkStatusLabel(status: number): string {
   return (status === 0 || status === 2) ? 'online' : 'offline'
 }
 
-async function geelarkFetch(path: string, body: unknown, bearer: string): Promise<Record<string, unknown>> {
+export async function geelarkFetch(path: string, body: unknown, bearer: string): Promise<Record<string, unknown>> {
   // WEB : relais serverless (bypass CORS). Electron : appel direct.
   if (IS_WEB) {
     const res = await fetch('/api/geelark', {
@@ -69,6 +69,37 @@ export async function fetchAllPhones(bearer: string): Promise<GeelarkPhone[]> {
     page++
   }
   return items
+}
+
+// Statut d'UN téléphone via une liste partagée (TTL court). Quand des dizaines de
+// téléphones démarrent en parallèle, chacun sondait /phone/list (toutes les pages)
+// toutes les 5 s → N listes complètes en rafale. Ici une seule liste est servie à
+// tous les appelants pendant PHONE_LIST_TTL_MS.
+const PHONE_LIST_TTL_MS = 4000
+let _phoneListCache: { bearer: string; at: number; p: Promise<GeelarkPhone[]> } | null = null
+export async function phoneStatus(bearer: string, phoneId: string, fresh = false): Promise<number> {
+  const c = _phoneListCache
+  if (fresh || !c || c.bearer !== bearer || Date.now() - c.at > PHONE_LIST_TTL_MS) {
+    _phoneListCache = { bearer, at: Date.now(), p: fetchAllPhones(bearer) }
+  }
+  try {
+    const list = await _phoneListCache!.p
+    return Number(list.find(x => x.id === phoneId)?.status ?? -1)
+  } catch {
+    _phoneListCache = null
+    return -1
+  }
+}
+
+// Téléphones dont le cycle de vie (démarrage/arrêt) est piloté par le moteur de
+// flows : les primitives (login, warmup, bio, post, story…) ne les redémarrent
+// pas inconditionnellement et ne les éteignent pas à la fin → un seul boot pour
+// tout un flow au lieu d'un boot/arrêt par bloc. Les pages existantes n'utilisent
+// pas ce registre : leur comportement est inchangé.
+const _managedPhones = new Set<string>()
+export function setPhoneManaged(phoneId: string, managed: boolean): void {
+  if (managed) _managedPhones.add(phoneId)
+  else _managedPhones.delete(phoneId)
 }
 
 export async function startPhones(bearer: string, ids: string[]): Promise<number> {
@@ -115,6 +146,8 @@ export async function stopPhones(bearer: string, ids: string[]): Promise<number>
 // Le simple /phone/stop peut échouer/ne pas prendre → le téléphone restait allumé
 // après une erreur. Ici on retente jusqu'à 4 fois et on confirme via /phone/list.
 export async function stopPhoneSurely(bearer: string, phoneId: string, log?: (m: string) => void): Promise<boolean> {
+  // Téléphone piloté par un flow : c'est le moteur qui l'éteindra à la fin du flow.
+  if (_managedPhones.has(phoneId)) return true
   // GeeLark éteint SOUVENT le téléphone tout seul après une tâche RPA → /phone/stop
   // peut alors « échouer » (rien à arrêter) alors que le tel est déjà arrêté. On
   // considère donc l'arrêt OK si : (a) /phone/stop est accepté (code 0/success), OU
@@ -205,7 +238,18 @@ async function tryStartPhone(bearer: string, phoneId: string, log: (m: string) =
 // Démarre un téléphone et attend qu'il soit en marche (status=0), max 120 s.
 // rotationUrls : si fourni, on rote l'IP AVANT le boot (le tel démarre sur la nouvelle IP).
 // Renvoie { ok, reason? } — reason = vraie cause GeeLark si le démarrage échoue.
-async function ensurePhoneRunning(bearer: string, phoneId: string, log: (m: string) => void, rotationUrls?: string[], skipStart?: boolean): Promise<{ ok: boolean; reason?: string }> {
+export async function ensurePhoneRunning(bearer: string, phoneId: string, log: (m: string) => void, rotationUrls?: string[], skipStart?: boolean): Promise<{ ok: boolean; reason?: string }> {
+  // Téléphone piloté par un flow : déjà démarré par le moteur. GeeLark l'éteint
+  // parfois tout seul après une tâche RPA → on vérifie, et on ne le relance que
+  // s'il s'est arrêté (sans re-roter l'IP : le compte garde la même IP sur le flow).
+  if (_managedPhones.has(phoneId)) {
+    const st = await phoneStatus(bearer, phoneId, true)
+    if (st === 0) return { ok: true }
+    log('↻ Le téléphone s\'est éteint entre deux blocs — redémarrage…')
+    if (st === 3) await sleep(8000)   // en cours d'arrêt : GeeLark refuse un start immédiat
+    rotationUrls = undefined
+    skipStart = st === 2   // déjà en cours de démarrage → on attend seulement
+  }
   // skipStart : le lot a déjà été démarré en UN SEUL appel /phone/start groupé
   // (évite 12 /phone/start simultanés que GeeLark refuse en partie). On attend juste.
   if (!skipStart) {
@@ -218,11 +262,7 @@ async function ensurePhoneRunning(bearer: string, phoneId: string, log: (m: stri
   log('⏳ Attente du démarrage (max 120 s)…')
   for (let i = 0; i < 24; i++) {
     await sleep(5000)
-    try {
-      const phones = await fetchAllPhones(bearer)
-      const st = Number(phones.find(x => x.id === phoneId)?.status ?? -1)
-      if (st === 0) { log('  ✅ Téléphone démarré'); return { ok: true } }
-    } catch { /* ignore polling errors */ }
+    if (await phoneStatus(bearer, phoneId) === 0) { log('  ✅ Téléphone démarré'); return { ok: true } }
   }
   log('  ⚠️ Démarrage non confirmé — on poursuit quand même')
   return { ok: true }

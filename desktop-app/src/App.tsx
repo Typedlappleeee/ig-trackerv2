@@ -17,6 +17,7 @@ import Health from '@/pages/Health'
 import Recipes from '@/pages/Recipes'
 import Publish from '@/pages/Publish'
 import Warmup from '@/pages/Warmup'
+import FlowBuilder from '@/pages/FlowBuilder'
 import Studio from '@/pages/Studio'
 import Connections from '@/pages/Connections'
 import Automation from '@/pages/Automation'
@@ -143,6 +144,8 @@ function AppInner({ user }: { user: User }) {
         ? <Publish theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} />
         : page === 'warmup'
         ? <Warmup theme={theme} infra={infra} user={user} org={org} />
+        : page === 'flowBuilder'
+        ? <FlowBuilder theme={theme} infra={infra} user={user} org={org} />
         : page === 'studio'
         ? <Studio theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'blowContent'
