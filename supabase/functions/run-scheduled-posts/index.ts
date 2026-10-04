@@ -11,7 +11,8 @@
 //   supabase secrets set CRON_SECRET=<un-uuid-aléatoire>
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { postStoryServer } from './geelark-story.ts'
+import trialFlowDef from './trialFlow.ts'
+import { postStoryFlowServer } from './geelark-story.ts'
 import { notifyOwner } from './notify.ts'
 import { runAccountSync } from './tracking-report.ts'
 import { runStatsSync } from './stats-sync.ts'
@@ -47,12 +48,12 @@ async function removeUsedBankVideos(db: any, orgId: string | null, userId: strin
   try {
     const ids = toRemove.map(v => v.bank_id).filter(Boolean) as string[]
     if (ids.length) {
-      let q = db.from('content_bank').delete().in('id', ids)
+      // SOFT-DELETE : on marque `deleted_at` (corbeille, restaurable 7 j) au lieu de supprimer
+      // définitivement — on GARDE le fichier storage pour pouvoir restaurer.
+      let q = db.from('content_bank').update({ deleted_at: new Date().toISOString() }).in('id', ids)
       q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId).is('org_id', null)
       await q
     }
-    const paths = toRemove.flatMap(v => [v.storage_path, v.thumbnail_path]).filter(Boolean) as string[]
-    if (paths.length) await db.storage.from('content').remove(paths)
   } catch { /* best-effort */ }
   return toRemove.length
 }
@@ -83,6 +84,23 @@ async function gPost(bearer: string, path: string, body: unknown): Promise<Recor
     body: JSON.stringify(body),
   })
   return await r.json().catch(() => ({}))
+}
+
+// Import (mis en cache par bearer) du flow RPA « Trial » pour les Reels d'essai
+// PROGRAMMÉS — le natif instagramPubReels n'a AUCUN paramètre trial (shareType est
+// ignoré). On importe le flow une fois puis on le lance par /task/rpa/add.
+const _trialFlowCache = new Map<string, string>()
+async function ensureTrialFlow(bearer: string, log: (m: string) => void): Promise<string | null> {
+  const key = bearer.slice(-14)
+  const cached = _trialFlowCache.get(key)
+  if (cached) return cached
+  try {
+    const res = await gPost(bearer, '/task/flow/import', { gal: JSON.stringify(trialFlowDef) })
+    const id = res?.data?.id as string | undefined
+    if (Number(res?.code) === 0 && id) { _trialFlowCache.set(key, id); return id }
+    log(`⚠ Import flow Trial : code=${res?.code} msg=${res?.msg ?? '?'}`)
+    return null
+  } catch (e) { log(`⚠ Import flow Trial : ${e instanceof Error ? e.message : String(e)}`); return null }
 }
 
 // Proxy rotatif : appelle l'URL « change IP » de chaque dongle puis attend que
@@ -367,6 +385,21 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ buckets }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
   }
+
+  // ── Purge corbeille banque : supprime DÉFINITIVEMENT les médias en corbeille > 7 jours.
+  try {
+    const cutoff = new Date(Date.now() - 7 * 86400000).toISOString()
+    const { data: expired } = await db.from('content_bank')
+      .select('id, storage_path, thumbnail_path').lt('deleted_at', cutoff).limit(500)
+    if (expired && expired.length) {
+      const ids = (expired as { id: string }[]).map(r => r.id)
+      await db.from('content_bank').delete().in('id', ids)
+      const paths = (expired as { storage_path?: string; thumbnail_path?: string }[])
+        .flatMap(r => [r.storage_path, r.thumbnail_path]).filter(Boolean) as string[]
+      if (paths.length) await db.storage.from('content').remove(paths)
+      summary['trash_purge'] = `${ids.length} média(s) purgé(s) (corbeille > 7 j)`
+    }
+  } catch { /* best-effort */ }
 
   // ── Étape 0-tracking : sync journalier des comptes (par lots) ──
   // Plafonné à ~60s pour ne pas affamer le posting. Best-effort.
@@ -910,10 +943,22 @@ Deno.serve(async (req) => {
             await rotateProxies(rotationUrls, log)
             await gPost(bearer, '/phone/start', { ids: [phone.geelark_id] })
             log('   ⏳ Boot 30 s…'); await sleep(30_000)
-            const r = await gPost(bearer, '/rpa/task/instagramPubReels', {
-              id: phone.geelark_id, scheduleAt: Math.floor(Date.now() / 1000),
-              description: (videos[vIdx]?.desc?.trim() || post.caption), video: [tokens[vIdx]],
-            })
+            const rNow = Math.floor(Date.now() / 1000)
+            const rDesc = (videos[vIdx]?.desc?.trim() || post.caption)
+            let r: Record<string, any>
+            if (post.reels_trial) {
+              const flowId = await ensureTrialFlow(bearer, log)
+              r = flowId
+                ? await gPost(bearer, '/task/rpa/add', { id: phone.geelark_id, flowId, scheduleAt: rNow, name: 'Reels Trial Scaleflow', paramMap: { Video: [tokens[vIdx]], Caption: rDesc, Trial: true } })
+                : await gPost(bearer, '/rpa/task/instagramPubReels', { id: phone.geelark_id, scheduleAt: rNow, description: rDesc, video: [tokens[vIdx]] })
+            } else {
+              // Publication normale → NOTRE flow adapté (resource-id/texte, tolérant à l'UI IG),
+              // natif seulement si l'import du flow échoue.
+              const flowId = await ensureTrialFlow(bearer, log)
+              r = flowId
+                ? await gPost(bearer, '/task/rpa/add', { id: phone.geelark_id, flowId, scheduleAt: rNow, name: 'Reels Scaleflow', paramMap: { Video: [tokens[vIdx]], Caption: rDesc, Trial: false } })
+                : await gPost(bearer, '/rpa/task/instagramPubReels', { id: phone.geelark_id, scheduleAt: rNow, description: rDesc, video: [tokens[vIdx]] })
+            }
             const tid = r.data?.id ?? r.data?.taskId ?? null
             if (r.code === 0 && tid) {
               // Poll borné (~75 s) : on DOIT attendre la fin avant de roter le dongle
@@ -983,15 +1028,6 @@ Deno.serve(async (req) => {
       const baseTs = Math.floor(Date.now() / 1000)
       const usedVideoIndices = new Set<number>()
 
-      // Fetch fresh reels_trial_unsupported flags for phones
-      const { data: phoneFlagsRaw } = await db.from('phones')
-        .select('geelark_id, reels_trial_unsupported')
-        .in('geelark_id', geelarkIds)
-      const phoneFlags = new Map<string, boolean>(
-        (phoneFlagsRaw ?? []).map((r: { geelark_id: string; reels_trial_unsupported: boolean }) =>
-          [r.geelark_id, r.reels_trial_unsupported ?? false])
-      )
-
       // Pre-resolve video tokens (upload Supabase URLs to GeeLark once, deduplicated)
       const resolvedTokens: string[] = []
       for (let vi = 0; vi < videos.length; vi++) {
@@ -1028,18 +1064,24 @@ Deno.serve(async (req) => {
           ? Math.floor(Math.random() * videos.length)
           : i % videos.length
         usedVideoIndices.add(videoIdx)
-        const trialUnsupported = phoneFlags.get(phone.geelark_id) ?? false
-        const useTrialReels = post.reels_trial && !trialUnsupported
-        if (post.reels_trial && trialUnsupported) {
-          log(`⚠ Trial Reels désactivé pour ${phone.ig_username ?? phone.phone_name} (compte non éligible)`)
+        const scheduleAt  = baseTs + i * delayMin * 60
+        const description = (videos[videoIdx]?.desc?.trim() || post.caption)
+        const video       = resolvedTokens[videoIdx]
+        // Reel d'ESSAI → flow RPA « Trial » (Trial:true). Publication normale → le MÊME
+        // flow adapté en Trial:false (navigation par resource-id/texte IG, tolérant aux
+        // changements d'UI). Le natif instagramPubReels ne sert que si l'import du flow échoue.
+        let res: Record<string, any>
+        const flowId = await ensureTrialFlow(bearer, log)
+        if (flowId) {
+          res = await gPost(bearer, '/task/rpa/add', {
+            id: phone.geelark_id, flowId, scheduleAt,
+            name: post.reels_trial ? 'Reels Trial Scaleflow' : 'Reels Scaleflow',
+            paramMap: { Video: [video], Caption: description, Trial: !!post.reels_trial },
+          })
+        } else {
+          log(`⚠ Flow adapté indisponible pour ${phone.ig_username ?? phone.phone_name} — publication native.`)
+          res = await gPost(bearer, '/rpa/task/instagramPubReels', { id: phone.geelark_id, scheduleAt, description, video: [video] })
         }
-        const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
-          id:          phone.geelark_id,
-          scheduleAt:  baseTs + i * delayMin * 60,
-          description: (videos[videoIdx]?.desc?.trim() || post.caption),
-          video:       [resolvedTokens[videoIdx]],
-          ...(useTrialReels ? { shareType: 2 } : {}),
-        })
         const taskId = res.data?.id ?? res.data?.taskId ?? null
         if (res.code === 0) {
           if (taskId) { taskIds.push(taskId); taskPhoneMap.set(taskId, phone); tasksCreated = true }
@@ -1047,11 +1089,6 @@ Deno.serve(async (req) => {
         } else {
           failedCount++
           log(`❌ Tâche refusée (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'}`)
-          // If trial reels was active for this phone and the task was refused, mark it
-          if (useTrialReels) {
-            await db.from('phones').update({ reels_trial_unsupported: true }).eq('geelark_id', phone.geelark_id)
-            log(`🔕 ${phone.ig_username ?? phone.phone_name} marqué : Trial Reels non supporté`)
-          }
         }
       }
 
@@ -1307,7 +1344,8 @@ Deno.serve(async (req) => {
             { onConflict: 'geelark_id' },
           ).then(() => {}, () => {})
           try {
-            const res = await postStoryServer(bearer, phone.geelark_id, { imageUrl, linkUrl: link, linkText, rotationUrls }, m => log(`  ${name}: ${m}`))
+            // Flow RPA 2.0 (même chemin que le web : fix story + CTA sticker lien).
+            const res = await postStoryFlowServer(bearer, phone.geelark_id, { imageUrl, linkUrl: link, linkText, rotationUrls }, m => log(`  ${name}: ${m}`))
             if (res.ok) log(`✅ ${name} — story publiée`)
             else log(`❌ ${name} : ${res.error ?? 'échec'}`)
           } catch (e) {

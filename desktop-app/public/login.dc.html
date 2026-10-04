@@ -67,7 +67,7 @@ input{font-family:inherit;}
 
 <!-- ═══ BARRE ═══ -->
 <div style="position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:clamp(24px,2.8vw,38px) clamp(30px,4vw,60px);">
-  <a href="#" style="display:inline-flex;align-items:center;gap:10px;font-size:10px;font-weight:800;letter-spacing:0.24em;text-transform:uppercase;color:rgba(236,234,245,0.4);text-decoration:none;animation:kFade 0.9s ease 0.15s both;transition:color 0.25s ease;" style-hover="color:#ECEAF5;">
+  <a id="sf-back" href="#" style="display:inline-flex;align-items:center;gap:10px;font-size:10px;font-weight:800;letter-spacing:0.24em;text-transform:uppercase;color:rgba(236,234,245,0.4);text-decoration:none;animation:kFade 0.9s ease 0.15s both;transition:color 0.25s ease;" style-hover="color:#ECEAF5;">
     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
     Retour
   </a>
@@ -161,7 +161,7 @@ input{font-family:inherit;}
       </div>
     </div>
 
-    <button onMouseEnter="{{ ctaOn }}" onMouseLeave="{{ ctaOff }}" style="position:relative;overflow:hidden;width:100%;height:50px;margin-top:28px;border:none;border-radius:12px;background:{{ ctaBg }};color:{{ ctaColor }};font-family:'Manrope',sans-serif;font-size:11px;font-weight:800;letter-spacing:0.24em;text-transform:uppercase;cursor:{{ ctaCursor }};box-shadow:{{ ctaShadow }};transition:transform 0.28s cubic-bezier(0.16,1,0.3,1), box-shadow 0.28s ease, background 0.3s ease;transform:{{ ctaLift }};box-sizing:border-box;">
+    <button id="sf-login" type="button" onMouseEnter="{{ ctaOn }}" onMouseLeave="{{ ctaOff }}" style="position:relative;overflow:hidden;width:100%;height:50px;margin-top:28px;border:none;border-radius:12px;background:{{ ctaBg }};color:{{ ctaColor }};font-family:'Manrope',sans-serif;font-size:11px;font-weight:800;letter-spacing:0.24em;text-transform:uppercase;cursor:{{ ctaCursor }};box-shadow:{{ ctaShadow }};transition:transform 0.28s cubic-bezier(0.16,1,0.3,1), box-shadow 0.28s ease, background 0.3s ease;transform:{{ ctaLift }};box-sizing:border-box;">
       <span style="position:relative;display:inline-flex;align-items:center;gap:11px;">
         Entrer au Studio
         <span style="display:flex;transform:{{ ctaArrow }};transition:transform 0.35s cubic-bezier(0.16,1,0.3,1);">
@@ -173,7 +173,7 @@ input{font-family:inherit;}
       </sc-if>
     </button>
 
-    <p style="margin:24px 0 0;text-align:center;font-size:12.5px;color:rgba(236,234,245,0.4);">Pas encore de compte ? <a href="#" style="color:#A78BFA;font-weight:700;text-decoration:none;border-bottom:1px solid rgba(167,139,250,0.3);padding-bottom:1px;transition:border-color 0.22s ease;" style-hover="border-color:#A78BFA;">S'inscrire</a></p>
+    <p style="margin:24px 0 0;text-align:center;font-size:12.5px;color:rgba(236,234,245,0.4);">Pas encore de compte ? <a id="sf-signup" href="#" style="color:#A78BFA;font-weight:700;text-decoration:none;border-bottom:1px solid rgba(167,139,250,0.3);padding-bottom:1px;transition:border-color 0.22s ease;" style-hover="border-color:#A78BFA;">S'inscrire</a></p>
 
     <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.06);">
       <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="rgba(236,234,245,0.26)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="11" rx="2.5"></rect><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"></path></svg>
@@ -427,17 +427,72 @@ class Component extends DCLogic {
 </script>
 <script>
 (function(){
-  function goApp(){ location.href='./app.dc.html'; }
-  document.addEventListener('click', function(e){
+  var SUPA='https://fvmkmkspfksscgqyvysl.supabase.co';
+  var KEY='sb_publishable_hip63djbBYnu3EsSx2gA4w_0tgjweEo';
+  function msg(m,bad){ var el=document.getElementById('sf-msg'); if(!el){el=document.createElement('div');el.id='sf-msg';el.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:99999;padding:11px 20px;border-radius:11px;font:600 13px Manrope,sans-serif;box-shadow:0 20px 50px -16px rgba(0,0,0,.7)';document.body.appendChild(el);} el.style.background=bad?'rgba(40,12,20,.96)':'rgba(20,16,34,.96)'; el.style.border='1px solid '+(bad?'rgba(248,113,113,.45)':'rgba(168,85,247,.45)'); el.style.color=bad?'#FCA5A5':'#ECEAF5'; el.textContent=m; }
+  function val(sel){ var e=document.querySelector(sel); return e?e.value.trim():''; }
+  async function login(){
+    var email=val('input[type=email]')||val('input[autocomplete="username"]')||val('input:not([type=password]):not([type=checkbox]):not([type=button])');
+    var pass=val('input[type=password]');
+    if(!email||!pass){ msg('Entre ton email et ton mot de passe.',true); return; }
+    msg('Connexion…',false);
+    try{
+      var r=await fetch(SUPA+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass})});
+      var j=await r.json();
+      if(!r.ok||j.error||j.error_code){ msg(j.error_description||j.msg||j.error||'Identifiants incorrects.',true); return; }
+      var now=Math.floor(Date.now()/1000);
+      var session={access_token:j.access_token,token_type:j.token_type||'bearer',expires_in:j.expires_in,expires_at:j.expires_at||now+(j.expires_in||3600),refresh_token:j.refresh_token,user:j.user};
+      localStorage.setItem('sb-fvmkmkspfksscgqyvysl-auth-token',JSON.stringify(session));
+      location.href='./index.html';
+    }catch(e){ msg('Erreur réseau — vérifie ta connexion internet.',true); }
+  }
+  function saveSession(j){ var now=Math.floor(Date.now()/1000); var session={access_token:j.access_token,token_type:j.token_type||'bearer',expires_in:j.expires_in,expires_at:j.expires_at||now+(j.expires_in||3600),refresh_token:j.refresh_token,user:j.user}; localStorage.setItem('sb-fvmkmkspfksscgqyvysl-auth-token',JSON.stringify(session)); }
+  async function signup(){
+    // Mot de passe : « input[type=password] » rate si l'œil « afficher » a bascule le champ
+    // en type=text → repli sur le placeholder (toujours present).
+    var email=val('input[type=email]')||val('input[autocomplete="username"]')||val('input:not([type=password]):not([type=checkbox]):not([type=button])');
+    var pass=val('input[type=password]')||val('input[placeholder="••••••••"]');
+    if(!email||!pass){ msg('Entre un email et un mot de passe pour créer ton compte.',true); return; }
+    if(pass.length<6){ msg('Mot de passe : 6 caractères minimum.',true); return; }
+    msg('Création du compte…',false);
+    try{
+      var r=await fetch(SUPA+'/auth/v1/signup',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass})});
+      var j=await r.json();
+      if(!r.ok||j.error||j.error_code){ msg(j.error_description||j.msg||j.error||('Inscription impossible (HTTP '+r.status+').'),true); return; }
+      if(j.access_token){ saveSession(j); location.href='./index.html'; return; }
+      // Pas de session renvoyee → on tente la connexion directe (si la confirmation email est
+      // desactivee cote projet, on entre tout de suite ; sinon message clair).
+      msg('Compte créé — connexion…',false);
+      try{
+        var r2=await fetch(SUPA+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass})});
+        var j2=await r2.json();
+        if(r2.ok&&j2.access_token){ saveSession(j2); location.href='./index.html'; return; }
+        var e2=((j2.error_code||'')+' '+(j2.msg||'')+' '+(j2.error_description||'')).toLowerCase();
+        if(e2.indexOf('confirm')>=0){ msg('Compte créé ✅ — confirme ton email puis connecte-toi.',false); return; }
+        msg(j2.error_description||j2.msg||'Compte créé ✅ — confirme ton email puis connecte-toi.',false);
+      }catch(e){ msg('Compte créé ✅ — confirme ton email puis connecte-toi.',false); }
+    }catch(e){ msg('Erreur réseau — vérifie ta connexion internet.',true); }
+  }
+  function goBack(){ try{ if(history.length>1){ history.back(); return; } }catch(e){} }
+  document.addEventListener('click',function(e){
     var t=e.target;
-    for(var i=0;i<5 && t;i++){
-      var txt=((t.textContent||'')+'').trim().toLowerCase();
-      if(txt.indexOf('entrer au studio')>=0 || (t.getAttribute && t.getAttribute('type')==='submit')){ e.preventDefault(); goApp(); return; }
-      t=t.parentElement;
+    // Dispatch FIABLE par id (closest = n'importe où sur le contrôle, sans confusion de
+    // texte entre le bouton « Entrer au Studio » et le lien « S'inscrire » du même bloc).
+    // On teste « S'inscrire » EN PREMIER pour qu'il ne soit jamais avalé par le login.
+    if(t.closest){
+      if(t.closest('#sf-signup')){e.preventDefault();signup();return;}
+      if(t.closest('#sf-login')){e.preventDefault();login();return;}
+      if(t.closest('#sf-back')){e.preventDefault();goBack();return;}
     }
-  }, true);
-  document.addEventListener('keydown', function(e){ if(e.key==='Enter'){ goApp(); } });
+    // Repli texte si les ids manquent : « inscrire » AVANT « entrer au studio », et on ne
+    // matche que le libellé exact du contrôle (pas un conteneur qui mélange les deux textes).
+    for(var i=0;i<5&&t;i++){var tx=((t.textContent||'')+'').trim().toLowerCase();
+      if(tx==="s'inscrire"||tx==='inscrire'){e.preventDefault();signup();return;}
+      if(tx.indexOf('entrer au studio')>=0||(t.getAttribute&&t.getAttribute('type')==='submit')){e.preventDefault();login();return;}
+      if(tx==='retour'||tx.indexOf('fermer')>=0){e.preventDefault();goBack();return;}
+      t=t.parentElement;}
+  },true);
+  document.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();login();}else if(e.key==='Escape'){e.preventDefault();goBack();}});
 })();
-</script>
-</body>
+</script></body>
 </html>

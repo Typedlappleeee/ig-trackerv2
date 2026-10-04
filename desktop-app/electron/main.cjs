@@ -12,6 +12,7 @@ function createWindow() {
     minHeight: 680,
     backgroundColor: '#07060B',
     title: 'ScaleFlow',
+    icon: path.join(__dirname, '..', 'dist', 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       webSecurity: false,

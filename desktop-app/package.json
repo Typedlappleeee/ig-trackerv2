@@ -2,16 +2,21 @@
   "name": "scaleflow-desktop",
   "private": true,
   "version": "0.1.0",
+  "description": "ScaleFlow — automatisation Instagram & TikTok multi-comptes",
+  "author": "ScaleFlow",
+  "repository": "https://github.com/Typedlappleeee/ig-trackerv2",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node scripts/copy-ffmpeg.mjs && node scripts/copy-tesseract.mjs && vite",
+    "build": "node scripts/copy-ffmpeg.mjs && node scripts/copy-tesseract.mjs && vite build",
     "preview": "vite preview",
     "electron": "electron .",
     "dist": "vite build && electron-builder"
   },
   "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^31.3.1",
     "electron-builder": "^24.13.3",
@@ -21,11 +26,37 @@
   "build": {
     "appId": "com.scaleflow.desktop",
     "productName": "ScaleFlow",
-    "directories": { "output": "release" },
-    "files": ["dist/**/*", "electron/**/*"],
-    "win": { "target": ["nsis", "portable"], "artifactName": "ScaleFlow-Setup-${version}.${ext}" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
-    "mac": { "target": ["dmg"] },
-    "linux": { "target": ["AppImage"] }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "icon": "build/icon.png",
+    "publish": null,
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "ScaleFlow-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "@ffmpeg/core": "^0.12.6",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1",
+    "@supabase/supabase-js": "^2.112.4",
+    "client-zip": "^2.5.1",
+    "jszip": "^3.10.2",
+    "piexifjs": "^1.0.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tesseract.js": "^7.0.0"
   }
 }

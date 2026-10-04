@@ -1,0 +1,563 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
+import type { User } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
+import type { Theme, InfraKey } from '@/lib/theme'
+import { Btn, Empty, Icon, Kpi, Panel, StatusDot, Modal } from '@/lib/ui'
+import type { OrgState } from '@/lib/data'
+import { fmtNumber, scopeInfra } from '@/lib/data'
+import { deriveHealth } from '@/lib/health'
+import { fetchAllPhones, geelarkStatusLabel } from '@/lib/geelark'
+import { useConnections } from '@/lib/connections'
+
+// ── Type Phone (sous-ensemble réel de la table `phones`, aligné sur
+//    electron-app/src/lib/supabase.ts). Lecture seule pour cette passe. ──────────
+interface Phone {
+  id: string
+  phone_name: string
+  ig_username: string | null
+  ig_status: string | null
+  group_name: string | null
+  status: string
+  total_views: number | null
+  pp_url: string | null
+  last_post_at: string | null
+  account_state: string | null
+  geelark_id: string | null
+  link: string | null
+}
+
+// La santé est dérivée honnêtement dans src/lib/health.ts (partagé avec l'écran Santé).
+
+const STATUS_LABEL: Record<string, string> = {
+  online: 'En ligne', warming: 'Warmup', limited: 'Limité', offline: 'Hors ligne', error: 'Erreur',
+}
+// La fabrique StatusDot attend 'warmup' pour l'animation (la DB stocke 'warming').
+function dotKind(status: string): string {
+  return status === 'warming' ? 'warmup' : status
+}
+
+function fmtViews(n: number | null): string {
+  if (!n) return '0'
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)} K`
+  return String(n)
+}
+
+const COLS = '30px minmax(0,1.4fr) 110px 96px 210px'
+
+
+// ── Case à cocher (portée du prototype) ────────────────────────────────────────
+function Check({ on, mid, onClick }: { on: boolean; mid?: boolean; onClick: () => void }) {
+  return (
+    <span
+      onClick={e => { e.stopPropagation(); onClick() }}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 15, height: 15, borderRadius: 4, cursor: 'pointer', flexShrink: 0,
+        background: on || mid ? '#7C3AED' : 'transparent',
+        border: on || mid ? 'none' : '1px solid rgba(255,255,255,0.18)',
+        color: '#fff', fontSize: 9, fontWeight: 900, transition: 'all .14s ease',
+      }}
+    >{mid ? '–' : on ? '✓' : ''}</span>
+  )
+}
+
+const TH: CSSProperties = {
+  fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B',
+}
+
+function ctaKey(p: { geelark_id: string | null; id: string }): string { return `sf-story-link-${p.geelark_id ?? p.id}` }
+
+export default function Phones({ theme, infra, user, org, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
+}) {
+  const { currentOrg, role, perms } = org
+  const [phones, setPhones] = useState<Phone[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [q, setQ] = useState('')
+  const [filter, setFilter] = useState<'all' | 'on' | 'off' | 'risk'>('all')
+  const [group, setGroup] = useState('Tous')
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [createOpen, setCreateOpen] = useState(false)
+  const [settingsPhone, setSettingsPhone] = useState<Phone | null>(null)
+  const [groupModal, setGroupModal] = useState(false)
+  const [confirmDel, setConfirmDel] = useState<string[] | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const conns = useConnections(user, org)
+  const bearer = conns.bearer
+  const [syncing, setSyncing] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    // 🔒 Membre restreint à des groupes → on ne charge que ceux-là (même règle que data.ts).
+    const restrictedGroups = (role && role !== 'owner' && role !== 'admin' && perms?.phone_groups?.mode === 'allow')
+      ? (perms.phone_groups.list ?? [])
+      : null
+    let query = supabase
+      .from('phones')
+      .select('id,phone_name,ig_username,ig_status,group_name,status,total_views,pp_url,last_post_at,account_state,geelark_id,link')
+      .order('phone_name')
+    query = currentOrg
+      ? query.eq('org_id', currentOrg.id)
+      : query.eq('user_id', user.id).is('org_id', null)
+    query = scopeInfra(query, infra)
+    if (restrictedGroups) query = query.in('group_name', restrictedGroups)
+    const { data, error: err } = await query
+    if (err) { setError('Erreur de chargement des appareils.'); setPhones([]) }
+    else setPhones((data ?? []) as Phone[])
+    setLoading(false)
+  }, [currentOrg?.id, user.id, role, perms, infra])
+
+  useEffect(() => { load() }, [load])
+
+  // VRAIE synchro GeeLark : récupère la liste chez GeeLark, SUPPRIME les téléphones
+  // absents (supprimés côté GeeLark), puis upsert (RPC qui préserve ig_username/liens).
+  const syncFromGeelark = useCallback(async () => {
+    if (syncing) return
+    if (!bearer) { setError('Token GeeLark manquant — configure-le dans les Réglages de l’app web.'); return }
+    setSyncing(true); setError(null)
+    try {
+      const items = await fetchAllPhones(bearer)
+      const rows = items.map(p => ({
+        user_id: user.id,
+        org_id: currentOrg?.id ?? null,
+        geelark_id: p.id,
+        serial_no: p.serialNo ?? null,
+        phone_name: p.serialName ?? p.name ?? p.serialNo ?? p.id ?? 'Phone inconnu',
+        group_name: p.group?.name ?? p.groupName ?? null,
+        status: geelarkStatusLabel(p.status),
+        remark: p.remark ?? null,
+        synced_at: new Date().toISOString(),
+      }))
+      const currentIds = new Set(rows.map(r => r.geelark_id))
+      // Prune : supprime les téléphones GeeLark locaux absents de GeeLark.
+      let existQ = supabase.from('phones').select('id,geelark_id').not('geelark_id', 'is', null)
+      existQ = currentOrg ? existQ.eq('org_id', currentOrg.id) : existQ.eq('user_id', user.id).is('org_id', null)
+      const { data: existing } = await existQ
+      const toDelete = (existing ?? []).filter((p: { id: string; geelark_id: string | null }) => p.geelark_id && !currentIds.has(p.geelark_id))
+      if (toDelete.length > 0) await supabase.from('phones').delete().in('id', toDelete.map((p: { id: string }) => p.id))
+      // Upsert via RPC (préserve les champs utilisateur : ig_username, liens…).
+      if (rows.length > 0) {
+        const { error: rpcErr } = await supabase.rpc('sync_geelark_phones', { p_rows: rows, p_org_id: currentOrg?.id ?? null })
+        if (rpcErr) throw new Error(rpcErr.message)
+      }
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur de synchronisation GeeLark.')
+    }
+    setSyncing(false)
+  }, [syncing, bearer, user.id, currentOrg, load])
+
+  // Retire des téléphones de ScaleFlow (ligne DB). N'agit PAS sur GeeLark : le tel
+  // reste chez GeeLark, il disparaît juste de l'app (re-synchro possible ensuite).
+  async function deletePhones(ids: string[]) {
+    if (ids.length === 0) return
+    setDeleting(true)
+    const { error: err } = await supabase.from('phones').delete().in('id', ids)
+    setDeleting(false); setConfirmDel(null)
+    if (err) { setError(`Suppression échouée : ${err.message}`); return }
+    setSel(new Set()); load()
+  }
+
+  // Rows enrichies d'un score de santé dérivé (déterministe).
+  const rows = useMemo(() => phones.map(p => ({ ...p, health: deriveHealth(p) })), [phones])
+
+  const groups = useMemo(() => {
+    const s = new Set<string>()
+    rows.forEach(p => { if (p.group_name) s.add(p.group_name) })
+    return ['Tous', ...[...s].sort((a, b) => a.localeCompare(b))]
+  }, [rows])
+
+  const ql = q.trim().toLowerCase()
+  const shown = useMemo(() => rows.filter(p =>
+    (filter === 'all'
+      || (filter === 'on' && p.status === 'online')
+      || (filter === 'off' && p.status === 'offline')
+      || (filter === 'risk' && p.health < 70))
+    && (group === 'Tous' || p.group_name === group)
+    && (!ql || p.phone_name.toLowerCase().includes(ql) || (p.ig_username ?? '').toLowerCase().includes(ql))
+  ), [rows, filter, group, ql])
+
+  const selSet = sel
+  const allOn = shown.length > 0 && shown.every(p => selSet.has(p.id))
+  const someOn = !allOn && shown.some(p => selSet.has(p.id))
+
+  const toggle = (id: string) => setSel(prev => {
+    const n = new Set(prev)
+    if (n.has(id)) n.delete(id); else n.add(id)
+    return n
+  })
+  const toggleAll = () => setSel(allOn ? new Set() : new Set(shown.map(p => p.id)))
+
+  // KPI (valeurs réelles)
+  const total = rows.length
+  const online = rows.filter(p => p.status === 'online').length
+  const offline = rows.filter(p => p.status === 'offline').length
+  const atRisk = rows.filter(p => p.health < 70).length
+
+  const el = '…'
+  const isCloud = infra === 'cloud'
+  const title = isCloud ? 'Mes appareils' : 'Téléphones GeeLark'
+  const sub = isCloud
+    ? 'Tes appareils cloud : statut, vues et actions. Le détail de santé par compte est dans « Santé des comptes ».'
+    : 'Tes cloud phones GeeLark : statut, vues et actions. Le détail de santé par compte est dans « Santé des comptes ».'
+
+  const FILTERS: { k: typeof filter; l: string; n: number }[] = [
+    { k: 'all', l: 'Tous', n: total },
+    { k: 'on', l: 'En ligne', n: online },
+    { k: 'off', l: 'Hors ligne', n: offline },
+    { k: 'risk', l: 'À risque', n: atRisk },
+  ]
+
+  return (
+    <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
+      {/* En-tête */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{
+            margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 22,
+            fontWeight: 700, letterSpacing: '-0.025em', color: '#F4F4F6',
+          }}>{title}</h1>
+          <p style={{ margin: '6px 0 0', fontSize: 12.5, lineHeight: 1.55, color: '#71717A', maxWidth: 620 }}>{sub}</p>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {isCloud
+            ? <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
+            : <Btn label={syncing ? 'Synchro…' : 'Sync GeeLark'} theme={theme} tone="primary" disabled={syncing} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={syncFromGeelark} />}
+        </div>
+      </div>
+
+      {/* KPI */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 14 }}>
+        <Kpi theme={theme} label="Total" value={loading ? el : fmtNumber(total)} />
+        <Kpi theme={theme} label="En ligne" value={loading ? el : fmtNumber(online)} color="#34D399" />
+        <Kpi theme={theme} label="Hors ligne" value={loading ? el : fmtNumber(offline)} color="#A1A1AA" />
+        <Kpi theme={theme} label="À risque" value={loading ? el : fmtNumber(atRisk)}
+          color={atRisk > 0 ? '#F87171' : undefined}
+          hint={loading ? undefined : (atRisk > 0 ? 'santé sous 70 · action requise' : 'tout va bien')}
+          hintColor={atRisk > 0 ? '#F87171' : '#34D399'} />
+      </div>
+
+      <Panel theme={theme}>
+        {/* Barre d'outils : recherche + groupe + pills */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 9, padding: '11px 13px',
+          borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap',
+        }}>
+          <span style={{
+            display: 'flex', alignItems: 'center', gap: 8, height: 30,
+            padding: '0 11px', borderRadius: 8, flex: 1, minWidth: 180, maxWidth: 280,
+            border: `1px solid ${q ? theme.selEdge : 'rgba(255,255,255,0.07)'}`,
+            background: 'rgba(255,255,255,0.02)', transition: 'border-color .16s ease',
+          }}>
+            <span style={{ display: 'flex', color: q ? theme.accentSoft : '#52525B' }}>
+              <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-4.35-4.35" size={13} sw={2} />
+            </span>
+            <input
+              type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Filtrer…"
+              style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#F4F4F6', fontSize: 12 }}
+            />
+          </span>
+
+          {/* Groupe */}
+          <select
+            value={group} onChange={e => setGroup(e.target.value)}
+            style={{
+              height: 30, padding: '0 8px', borderRadius: 8, cursor: 'pointer',
+              border: `1px solid ${group !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`,
+              background: '#101015', color: group !== 'Tous' ? theme.accentText : '#A1A1AA',
+              fontSize: 11.5, fontWeight: 700, outline: 'none',
+            }}
+          >
+            {groups.map(g => <option key={g} value={g} style={{ background: '#16161C', color: '#E4E4E7' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
+          </select>
+
+          {/* Pills */}
+          <span style={{
+            display: 'flex', gap: 2, padding: 2, borderRadius: 8,
+            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            {FILTERS.map(f => {
+              const on = filter === f.k
+              return (
+                <button key={f.k} onClick={() => setFilter(f.k)} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5, height: 24,
+                  padding: '0 9px', border: 'none', borderRadius: 6, cursor: 'pointer',
+                  background: on ? `rgba(${theme.tone},0.16)` : 'transparent',
+                  color: on ? theme.accentText : '#71717A',
+                  fontSize: 11, fontWeight: 700, transition: 'all .14s ease',
+                }}>
+                  {f.l}
+                  <span style={{ opacity: 0.55, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{f.n}</span>
+                </button>
+              )
+            })}
+          </span>
+
+          <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#52525B' }}>
+            {loading ? el : `${shown.length} / ${total}`}
+          </span>
+        </div>
+
+        {/* En-tête de table */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
+          padding: '9px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)',
+        }}>
+          <span><Check on={allOn} mid={someOn} onClick={toggleAll} /></span>
+          <span style={TH}>Compte</span>
+          <span style={TH}>Groupe</span>
+          <span style={TH}>Statut</span>
+          <span style={{ ...TH, textAlign: 'right' }} />
+        </div>
+
+        {/* Corps */}
+        {loading ? (
+          <div style={{ padding: '48px 15px', textAlign: 'center', fontSize: 13, color: '#52525B' }}>{el}</div>
+        ) : error ? (
+          <div style={{ padding: '40px 15px', textAlign: 'center', fontSize: 12.5, color: '#F87171' }}>{error}</div>
+        ) : total === 0 ? (
+          <Empty
+            icon="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01"
+            title="Aucun appareil"
+            text={isCloud
+              ? 'Aucun appareil pour le moment. Crée ton premier appareil cloud pour commencer.'
+              : 'Aucun téléphone pour le moment. Connecte GeeLark et synchronise pour importer tes cloud phones.'}
+            action={<Btn label={isCloud ? 'Créer un appareil' : (syncing ? 'Synchro…' : 'Sync GeeLark')} theme={theme} tone="primary" disabled={!isCloud && syncing} onClick={isCloud ? undefined : syncFromGeelark} />}
+          />
+        ) : shown.length === 0 ? (
+          <Empty
+            icon="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M8 12h8"
+            title="Aucun résultat"
+            text="Aucun appareil ne correspond à ce filtre."
+            action={<Btn label="Réinitialiser" theme={theme} sm onClick={() => { setQ(''); setFilter('all'); setGroup('Tous') }} />}
+          />
+        ) : (
+          <div>
+            {shown.map((p, i) => {
+              const on = selSet.has(p.id)
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => toggle(p.id)}
+                  style={{
+                    display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
+                    padding: '9px 15px', fontSize: 12, cursor: 'pointer',
+                    borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none',
+                    background: on ? `rgba(${theme.tone},0.06)` : 'transparent',
+                    transition: 'background .14s ease',
+                  }}
+                  onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = on ? `rgba(${theme.tone},0.06)` : 'transparent' }}
+                >
+                  <span><Check on={on} onClick={() => toggle(p.id)} /></span>
+
+                  {/* Appareil : avatar + NOM DU TÉLÉPHONE (GeeLark) en avant + @compte en dessous */}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                    {p.pp_url ? (
+                      <img src={p.pp_url} alt="" referrerPolicy="no-referrer" style={{
+                        width: 24, height: 24, borderRadius: 6, objectFit: 'cover', flexShrink: 0,
+                        border: '1px solid rgba(255,255,255,0.08)',
+                      }} />
+                    ) : (
+                      <span style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                        background: 'linear-gradient(140deg,#3F3F46,#27272A)',
+                        border: '1px solid rgba(255,255,255,0.07)', fontSize: 10, fontWeight: 800, color: '#D4D4D8',
+                      }}>{(p.phone_name || p.ig_username || '?').charAt(0).toUpperCase()}</span>
+                    )}
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.phone_name || 'Appareil'}
+                      </span>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.ig_username ? `@${p.ig_username}` : 'sans compte lié'}
+                      </span>
+                    </span>
+                  </span>
+
+                  {/* Groupe */}
+                  <span style={{ fontSize: 11.5, color: '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.group_name ?? <span style={{ color: '#3F3F46' }}>—</span>}
+                  </span>
+
+                  {/* Statut */}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <StatusDot kind={dotKind(p.status)} />
+                    <span style={{ fontSize: 11.5, color: '#A1A1AA' }}>{STATUS_LABEL[p.status] ?? p.status}</span>
+                  </span>
+
+                  {/* Actions : GeeLark sert à l'automatisation — pas de démarrage manuel. */}
+                  <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 5 }} onClick={e => e.stopPropagation()}>
+                    <Btn theme={theme} sm tone="quiet" icon="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M4 12h2|M18 12h2|M12 4v2|M12 18v2" label="Réglages" onClick={() => setSettingsPhone(p)} />
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </Panel>
+
+      {/* Barre d'actions groupées */}
+      {sel.size > 0 && (
+        <div style={{
+          position: 'sticky', bottom: 14, marginTop: 14, display: 'flex',
+          alignItems: 'center', gap: 10, padding: '9px 10px 9px 14px', borderRadius: 10,
+          background: '#16161C', border: `1px solid rgba(${theme.tone},0.3)`,
+          boxShadow: '0 18px 44px -16px rgba(0,0,0,0.9)', flexWrap: 'wrap',
+          animation: 'aPop .22s cubic-bezier(0.16,1,0.3,1) both',
+        }}>
+          <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: theme.accentText }}>{sel.size}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A1A1AA' }}>sélectionné{sel.size > 1 ? 's' : ''}</span>
+          </span>
+          <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
+          <Btn label="Publier" theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
+          <Btn label="Chauffer" theme={theme} sm icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" onClick={() => onNavigate?.('warmup')} />
+          <Btn label="Groupe" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setGroupModal(true)} />
+          {!isCloud && <Btn label="Retirer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />}
+          <span style={{ marginLeft: 'auto' }}>
+            <Btn label="Tout désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
+          </span>
+        </div>
+      )}
+
+      {createOpen && (
+        <Modal theme={theme} title={infra === 'cloud' ? 'Créer un appareil ScaleFlow Cloud' : 'Ajouter un téléphone GeeLark'}
+          icon="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01"
+          onClose={() => setCreateOpen(false)}
+          footer={infra === 'cloud'
+            ? <Btn theme={theme} tone="quiet" label="Fermer" onClick={() => setCreateOpen(false)} />
+            : <><Btn theme={theme} tone="quiet" label="Fermer" onClick={() => setCreateOpen(false)} /><Btn theme={theme} tone="primary" label="Synchroniser" onClick={() => { setCreateOpen(false); load() }} /></>}>
+          {infra === 'cloud' ? (
+            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+              Les appareils ScaleFlow Cloud tournent sur <b>tes propres serveurs</b> auto-hébergés. Le provisionnement automatique arrive avec l'infra Cloud — pour l'instant, ajoute tes appareils côté GeeLark et bascule d'infra pour les gérer.
+            </p>
+          ) : (
+            <div style={{ fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+              <p style={{ margin: '0 0 10px' }}>Les téléphones sont créés dans ton <b>tableau de bord GeeLark</b> (cloud phones). Une fois créés :</p>
+              <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <li>Crée / loue tes cloud phones sur geelark.com</li>
+                <li>Assure-toi que ton token GeeLark est configuré (Réglages app web)</li>
+                <li>Clique <b>Synchroniser</b> ci-dessous — ils apparaîtront ici</li>
+              </ol>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {settingsPhone && (
+        <PhoneSettings theme={theme} phone={settingsPhone} groups={groups.filter(g => g !== 'Tous')}
+          onClose={() => setSettingsPhone(null)}
+          onSaved={() => { setSettingsPhone(null); load() }} />
+      )}
+
+      {confirmDel && (
+        <Modal theme={theme} title={`Retirer ${confirmDel.length} téléphone(s) ?`}
+          icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClose={() => setConfirmDel(null)}
+          footer={<>
+            <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDel(null)} />
+            <Btn theme={theme} tone="danger" label={deleting ? 'Suppression…' : 'Retirer'} disabled={deleting} onClick={() => deletePhones(confirmDel)} />
+          </>}>
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+            Ces téléphones sont retirés de <b>ScaleFlow</b> uniquement. Ils <b>restent dans ton compte GeeLark</b> — un « Sync GeeLark » les ferait réapparaître. Les @comptes/liens associés dans l'app seront perdus.
+          </p>
+        </Modal>
+      )}
+
+      {groupModal && (
+        <GroupAssign theme={theme} count={sel.size} groups={groups.filter(g => g !== 'Tous')}
+          onClose={() => setGroupModal(false)}
+          onApply={async (name) => {
+            const ids = [...sel]
+            await supabase.from('phones').update({ group_name: name || null }).in('id', ids)
+            setGroupModal(false); setSel(new Set()); load()
+          }} />
+      )}
+    </div>
+  )
+}
+
+// ── Réglages d'un appareil : @compte, groupe, et lien CTA (sticker story) ──────
+function PhoneSettings({ theme, phone, groups, onClose, onSaved }: {
+  theme: Theme; phone: Phone; groups: string[]; onClose: () => void; onSaved: () => void
+}) {
+  const [username, setUsername] = useState(phone.ig_username ?? '')
+  const [grp, setGrp] = useState(phone.group_name ?? '')
+  // Lien CTA : source de vérité = colonne DB `phones.link` (persiste entre appareils
+  // et membres) ; localStorage n'est qu'un miroir pour le pré-remplissage de l'onglet Story.
+  const [cta, setCta] = useState<string>(() => {
+    if (phone.link) return phone.link
+    try { return localStorage.getItem(ctaKey(phone)) ?? '' } catch { return '' }
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function save() {
+    setSaving(true); setErr(null)
+    const link = cta.trim() || null
+    const { error } = await supabase.from('phones').update({
+      ig_username: username.trim() || null,
+      group_name: grp.trim() || null,
+      link,
+    }).eq('id', phone.id)
+    if (error) { setErr(error.message); setSaving(false); return }
+    try { if (link) localStorage.setItem(ctaKey(phone), link); else localStorage.removeItem(ctaKey(phone)) } catch { /* ignore */ }
+    setSaving(false); onSaved()
+  }
+
+  const lbl: CSSProperties = { fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
+
+  return (
+    <Modal theme={theme} title={phone.phone_name || 'Appareil'} sub="Compte, groupe et lien CTA de la story"
+      icon="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M4 12h2|M18 12h2|M12 4v2|M12 18v2" onClose={onClose} width={480}
+      footer={<>
+        <Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} />
+        <Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={save} />
+      </>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+        <div>
+          <label style={lbl}>Compte Instagram (@)</label>
+          <input value={username} onChange={e => setUsername(e.target.value)} placeholder="mon.compte" style={inp} />
+        </div>
+        <div>
+          <label style={lbl}>Groupe</label>
+          <input value={grp} onChange={e => setGrp(e.target.value)} placeholder="ex. Luna-Posting" list="phone-groups" style={inp} />
+          <datalist id="phone-groups">{groups.map(g => <option key={g} value={g} />)}</datalist>
+        </div>
+        <div>
+          <label style={lbl}>Lien CTA (sticker story)</label>
+          <input value={cta} onChange={e => setCta(e.target.value)} placeholder="https://mon-lien.com" style={inp} />
+          <p style={{ margin: '6px 0 0', fontSize: 11, color: '#52525B', lineHeight: 1.5 }}>Le lien utilisé pour le sticker de cet appareil quand tu postes une story. Pré-rempli automatiquement dans l'onglet Story.</p>
+        </div>
+        {err && <p style={{ margin: 0, fontSize: 11.5, color: '#F87171' }}>{err}</p>}
+      </div>
+    </Modal>
+  )
+}
+
+// ── Assignation de groupe en masse ────────────────────────────────────────────
+function GroupAssign({ theme, count, groups, onClose, onApply }: {
+  theme: Theme; count: number; groups: string[]; onClose: () => void; onApply: (name: string) => void
+}) {
+  const [name, setName] = useState('')
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
+  return (
+    <Modal theme={theme} title="Assigner un groupe" sub={`${count} appareil${count > 1 ? 's' : ''} sélectionné${count > 1 ? 's' : ''}`}
+      icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClose={onClose} width={440}
+      footer={<>
+        <Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} />
+        <Btn theme={theme} tone="primary" label="Appliquer" onClick={() => onApply(name.trim())} />
+      </>}>
+      <label style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }}>Nom du groupe</label>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="ex. Luna-Posting (vide = retirer du groupe)" list="grp-list" style={inp} autoFocus />
+      <datalist id="grp-list">{groups.map(g => <option key={g} value={g} />)}</datalist>
+    </Modal>
+  )
+}

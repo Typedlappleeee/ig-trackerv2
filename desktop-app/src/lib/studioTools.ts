@@ -1,0 +1,517 @@
+// Traitements Studio (ffmpeg.wasm côté client). Chaque outil prend une vidéo
+// source (banque ou PC) et produit un mp4 prêt à poster, enregistré dans la banque.
+import { supabase } from './supabase'
+import { runFfmpeg, fetchInput } from './ffmpeg'
+import { transcribeWordsGroq, type Segment } from './subtitles'
+import piexif from 'piexifjs'
+
+export interface SourceRef { id?: string; title: string; storage_path?: string | null; file_url?: string | null }
+
+// Récupère les octets d'une source (URL signée banque OU fichier PC).
+export async function resolveSourceBytes(v: SourceRef, file?: File): Promise<Uint8Array> {
+  if (file) return fetchInput(file)
+  if (v.storage_path) {
+    const { data } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600)
+    if (data?.signedUrl) return fetchInput(data.signedUrl)
+  }
+  if (v.file_url) return fetchInput(v.file_url)
+  throw new Error('Source introuvable')
+}
+
+// Enregistre un mp4 de sortie dans la banque (bucket content + content_bank).
+export async function saveOutputToBank(userId: string, orgId: string | null, bytes: Uint8Array, title: string, ext = 'mp4', folder: string | null = null): Promise<string | null> {
+  const scopeFolder = orgId ? `orgs/${orgId}` : `users/${userId}`
+  const id = crypto.randomUUID()
+  const storagePath = `videos/${scopeFolder}/${id}.${ext}`
+  const mime = ext === 'mov' ? 'video/quicktime' : ext === 'mp4' ? 'video/mp4' : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'application/octet-stream'
+  const blob = new Blob([bytes as BlobPart], { type: mime })
+  const up = await supabase.storage.from('content').upload(storagePath, blob, { contentType: blob.type, upsert: false })
+  if (up.error) return null
+  await supabase.from('content_bank').insert({
+    user_id: userId, org_id: orgId, title, storage_path: storagePath,
+    file_url: null, folder: folder || null, duration: null, tags: [], notes: null, used_count: 0,
+  })
+  return storagePath
+}
+
+// Encodage h264/aac rapide (wasm). '-c:a aac' est ignoré s'il n'y a pas d'audio.
+const H264 = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart']
+// Garantit des dimensions paires (libx264 yuv420p l'exige).
+const EVEN = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
+
+type Hooks = { onProgress?: (r: number) => void; onLog?: (m: string) => void }
+
+// ── Spoof : micro-variations + nettoyage métadonnées → unique pour l'algo ──────
+// Pas de changement de vitesse (éviterait un désync A/V sur vidéos sans piste audio).
+export type SpoofIntensity = 'subtle' | 'normal' | 'strong'
+export interface SpoofOpts { gps?: { lat: number; lon: number } | null; intensity?: SpoofIntensity; device?: string | null }
+
+// Amplitude des micro-variations selon l'intensité choisie.
+function intensityRanges(i: SpoofIntensity) {
+  if (i === 'subtle') return { b: 0.02, c: [0.99, 1.02], s: [0.99, 1.02], z: [1.01, 1.025] } as const
+  if (i === 'strong') return { b: 0.07, c: [0.94, 1.07], s: [0.93, 1.08], z: [1.03, 1.08] } as const
+  return { b: 0.04, c: [0.97, 1.04], s: [0.97, 1.05], z: [1.02, 1.05] } as const
+}
+// Spoof visuel = UNIQUEMENT le zoom/recadrage (pas de brightness/contrast/saturation).
+// L'unicité vient du zoom + des métadonnées effacées/réécrites (voir runSpoof).
+// Facteur de zoom du spoof (exposé pour l'afficher à l'utilisateur).
+export function spoofZoomFactor(seed: number, intensity: SpoofIntensity = 'normal'): number {
+  const r = intensityRanges(intensity)
+  return r.z[0] + ((Math.sin(seed * 197.5) + 1) / 2) * (r.z[1] - r.z[0])
+}
+export function spoofFilter(seed: number, intensity: SpoofIntensity = 'normal'): string {
+  const z = spoofZoomFactor(seed, intensity).toFixed(3)
+  return `scale=iw*${z}:ih*${z},crop=iw/${z}:ih/${z},${EVEN}`
+}
+// Localisations GPS proposées (écrites dans les métadonnées mp4 par le spoof).
+// Source unique partagée par Studio et Auto-contenu.
+export interface GpsCity { k: string; label: string; lat: number; lon: number }
+export const GPS_CITIES: GpsCity[] = [
+  { k: 'none', label: 'Aucune (par défaut)', lat: 0, lon: 0 },
+  { k: 'france', label: '🇫🇷 France (aléatoire)', lat: 46.6, lon: 2.2 },
+  { k: 'paris', label: 'Paris', lat: 48.8566, lon: 2.3522 },
+  { k: 'lyon', label: 'Lyon', lat: 45.7640, lon: 4.8357 },
+  { k: 'marseille', label: 'Marseille', lat: 43.2965, lon: 5.3698 },
+  { k: 'bordeaux', label: 'Bordeaux', lat: 44.8378, lon: -0.5792 },
+  { k: 'lille', label: 'Lille', lat: 50.6292, lon: 3.0573 },
+  { k: 'bruxelles', label: 'Bruxelles', lat: 50.8503, lon: 4.3517 },
+  { k: 'geneve', label: 'Genève', lat: 46.2044, lon: 6.1432 },
+  { k: 'montreal', label: 'Montréal', lat: 45.5017, lon: -73.5673 },
+  { k: 'londres', label: 'Londres', lat: 51.5074, lon: -0.1278 },
+  { k: 'newyork', label: 'New York', lat: 40.7128, lon: -74.0060 },
+  { k: 'losangeles', label: 'Los Angeles', lat: 34.0522, lon: -118.2437 },
+  { k: 'dubai', label: 'Dubaï', lat: 25.2048, lon: 55.2708 },
+]
+// Grandes villes FR pour la localisation « France (aléatoire) » : chaque variante
+// reçoit une position différente (jitter léger pour ne pas répéter la coordonnée exacte).
+const FRANCE_CITIES: { lat: number; lon: number }[] = [
+  { lat: 48.8566, lon: 2.3522 },   // Paris
+  { lat: 45.7640, lon: 4.8357 },   // Lyon
+  { lat: 43.2965, lon: 5.3698 },   // Marseille
+  { lat: 44.8378, lon: -0.5792 },  // Bordeaux
+  { lat: 50.6292, lon: 3.0573 },   // Lille
+  { lat: 43.6047, lon: 1.4442 },   // Toulouse
+  { lat: 43.7102, lon: 7.2620 },   // Nice
+  { lat: 47.2184, lon: -1.5536 },  // Nantes
+  { lat: 48.5734, lon: 7.7521 },   // Strasbourg
+  { lat: 43.6108, lon: 3.8767 },   // Montpellier
+  { lat: 47.3220, lon: 5.0415 },   // Dijon
+  { lat: 48.1173, lon: -1.6778 },  // Rennes
+]
+// Position FR aléatoire (ville + léger décalage ~±0.03° ≈ quelques km).
+export function randomFranceGps(): { lat: number; lon: number } {
+  const c = FRANCE_CITIES[Math.floor(Math.random() * FRANCE_CITIES.length)]
+  const j = () => (Math.random() - 0.5) * 0.06
+  return { lat: +(c.lat + j()).toFixed(4), lon: +(c.lon + j()).toFixed(4) }
+}
+// Résout une clé de ville en coordonnées GPS pour runSpoof (null si « none »).
+// 'france' → une position française aléatoire (différente à chaque appel).
+export function gpsFor(key: string): { lat: number; lon: number } | null {
+  if (key === 'france') return randomFranceGps()
+  const c = GPS_CITIES.find(x => x.k === key)
+  return !c || c.k === 'none' ? null : { lat: c.lat, lon: c.lon }
+}
+
+// Appareils proposés pour le spoof : on réécrit les métadonnées « fabricant/modèle »
+// du mp4 pour faire passer la vidéo pour une capture native (iPhone, etc.), au lieu
+// de simplement les effacer. Apple encode ces infos sous com.apple.quicktime.*.
+export interface SpoofDevice { k: string; label: string; apple: boolean; make: string; model: string; software: string }
+export const SPOOF_DEVICES: SpoofDevice[] = [
+  { k: 'none', label: 'Aucun (métadonnées effacées)', apple: false, make: '', model: '', software: '' },
+  { k: 'iphone15pro', label: 'iPhone 15 Pro', apple: true, make: 'Apple', model: 'iPhone 15 Pro', software: '17.4.1' },
+  { k: 'iphone15', label: 'iPhone 15', apple: true, make: 'Apple', model: 'iPhone 15', software: '17.3' },
+  { k: 'iphone14pro', label: 'iPhone 14 Pro', apple: true, make: 'Apple', model: 'iPhone 14 Pro', software: '17.2' },
+  { k: 'iphone14', label: 'iPhone 14', apple: true, make: 'Apple', model: 'iPhone 14', software: '16.6' },
+  { k: 'iphone13', label: 'iPhone 13', apple: true, make: 'Apple', model: 'iPhone 13', software: '16.5' },
+  { k: 'iphone12', label: 'iPhone 12', apple: true, make: 'Apple', model: 'iPhone 12', software: '16.3' },
+  { k: 'iphone11', label: 'iPhone 11', apple: true, make: 'Apple', model: 'iPhone 11', software: '15.7' },
+  { k: 'iphonese', label: 'iPhone SE', apple: true, make: 'Apple', model: 'iPhone SE', software: '16.5' },
+  { k: 's23', label: 'Samsung Galaxy S23', apple: false, make: 'samsung', model: 'SM-S911B', software: '' },
+  { k: 's22', label: 'Samsung Galaxy S22', apple: false, make: 'samsung', model: 'SM-S901B', software: '' },
+  { k: 'pixel8', label: 'Google Pixel 8', apple: false, make: 'Google', model: 'Pixel 8', software: '' },
+]
+// Args ffmpeg -metadata pour écrire fabricant/modèle. [] si « none » (on garde alors
+// juste -map_metadata -1 = métadonnées effacées).
+export function deviceMetaArgs(key: string | null | undefined): string[] {
+  if (!key || key === 'none') return []
+  const d = SPOOF_DEVICES.find(x => x.k === key)
+  if (!d || !d.make) return []
+  const out = ['-metadata', `make=${d.make}`, '-metadata', `model=${d.model}`]
+  if (d.apple) {
+    out.push('-metadata', `com.apple.quicktime.make=${d.make}`)
+    out.push('-metadata', `com.apple.quicktime.model=${d.model}`)
+    if (d.software) out.push('-metadata', `com.apple.quicktime.software=${d.software}`)
+  }
+  return out
+}
+
+// Localisation GPS au format ISO 6709 (mp4 `location` metadata) — ex. +48.8566+002.3522/
+function iso6709(lat: number, lon: number): string {
+  const f = (v: number, w: number) => (v >= 0 ? '+' : '-') + Math.abs(v).toFixed(4).padStart(w + 5, '0')
+  return `${f(lat, 2)}${f(lon, 3)}/`
+}
+export async function runSpoof(input: Uint8Array, seed: number, h?: Hooks, opts?: SpoofOpts): Promise<Uint8Array> {
+  const intensity = opts?.intensity ?? 'normal'
+  // -map_metadata -1 : on efface toutes les métadonnées d'origine (anti-empreinte),
+  // puis on (ré)écrit une localisation GPS choisie si demandée.
+  const meta: string[] = ['-map_metadata', '-1']
+  if (opts?.gps) { const loc = iso6709(opts.gps.lat, opts.gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
+  meta.push(...deviceMetaArgs(opts?.device))
+  return runFfmpeg({
+    input, args: ['-vf', spoofFilter(seed, intensity), ...meta, ...H264],
+    onProgress: h?.onProgress, onLog: h?.onLog,
+  })
+}
+
+// ── Remix : plusieurs variantes uniques (spoof plus prononcé, seeds différents) ─
+export async function runRemixVariant(input: Uint8Array, seed: number, h?: Hooks, opts?: SpoofOpts): Promise<Uint8Array> {
+  return runSpoof(input, seed * 7.3 + 1.1, h, opts)
+}
+
+// ── Variante Auto-contenu : coupe + vitesse + spoof + légende en UNE passe ────
+// Combine timing (trim début/fin), micro-vitesse (0,98–1,02×), spoof (image + GPS
+// + métadonnées effacées) et légende incrustée (style outline ou snapchat).
+export interface AutoVariantOpts {
+  seed: number
+  intensity?: SpoofIntensity
+  gps?: { lat: number; lon: number } | null
+  device?: string | null               // clé SPOOF_DEVICES (fabricant/modèle mp4)
+  trimStart?: number | null            // s (null/0 = début)
+  trimEnd?: number | null              // s (null = fin)
+  speed?: number | null                // ex. 0.99 (null/1 = inchangé)
+  caption?: { text: string; pos: CaptionPos; style: CaptionStyle } | null
+}
+export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: Hooks): Promise<Uint8Array> {
+  const intensity = o.intensity ?? 'normal'
+  const speed = o.speed && Math.abs(o.speed - 1) > 1e-3 ? o.speed : null
+  // Trim en options de sortie (comme runMontage) → garde l'audio et la vidéo synchros.
+  const pre: string[] = []
+  if (o.trimStart && o.trimStart > 0) pre.push('-ss', String(o.trimStart))
+  if (o.trimEnd != null && o.trimEnd > (o.trimStart ?? 0)) pre.push('-to', String(o.trimEnd))
+  // Chaîne vidéo : spoof (+ accélération éventuelle via setpts).
+  let vchain = spoofFilter(o.seed, intensity)
+  if (speed) vchain += `,setpts=PTS/${speed.toFixed(4)}`
+  // Métadonnées : effacées, puis GPS réécrit si demandé.
+  const meta: string[] = ['-map_metadata', '-1']
+  if (o.gps) { const loc = iso6709(o.gps.lat, o.gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
+  meta.push(...deviceMetaArgs(o.device))
+  // Audio : atempo pour rester synchro quand on change la vitesse.
+  const aFilter: string[] = speed ? ['-af', `atempo=${speed.toFixed(4)}`] : []
+
+  if (!o.caption || !o.caption.text.trim()) {
+    return runFfmpeg({
+      input, inputName: 'in.mp4',
+      args: [...pre, '-vf', `${vchain},${EVEN}`, ...meta, ...aFilter, ...H264],
+      onProgress: h?.onProgress, onLog: h?.onLog,
+    })
+  }
+  // Légende incrustée → filter_complex (2e entrée = PNG texte).
+  const png = await textToPng(o.caption.text, 1080, false, o.caption.style)
+  const pos = o.caption.pos
+  let x = '(W-w)/2', y: string
+  if (typeof pos === 'object') { x = `(W*${(pos.x / 100).toFixed(4)})-(w/2)`; y = `(H*${(pos.y / 100).toFixed(4)})-(h/2)` }
+  else y = pos === 'top' ? 'H*0.08' : pos === 'center' ? '(H-h)/2' : 'H-h-H*0.12'
+  if (o.caption.style === 'snapchat') x = '0'   // bande pleine largeur → collée aux bords
+  // On met la vidéo à 1080 de large (= largeur du PNG) AVANT l'overlay, sinon la
+  // légende est décalée/surdimensionnée sur les vidéos qui ne font pas 1080 px.
+  const fc = `[0:v]${vchain},scale=1080:-2[vb];[vb][1:v]overlay=${x}:${y},${EVEN}[v]`
+  // `pre` (trim -ss/-to) placé APRÈS les entrées → option de sortie (comme runMontage) ;
+  // sinon il s'appliquerait par erreur comme option d'entrée du PNG (2e -i).
+  return runFfmpeg({
+    input, inputName: 'in.mp4',
+    extra: [{ name: 'cap.png', data: png }],
+    args: ['-i', 'cap.png', '-filter_complex', fc, '-map', '[v]', '-map', '0:a?', ...pre, ...aFilter, ...meta, ...H264],
+    onProgress: h?.onProgress, onLog: h?.onLog,
+  })
+}
+
+// ── Spoof IMAGE : micro zoom/recadrage + ré-encodage JPEG → sortie .jpg ────────
+// 100 % client (canvas, pas de ffmpeg). Le ré-encodage JPEG efface TOUT l'EXIF
+// d'origine (anti-empreinte) ; on réécrit ensuite un device/GPS EXIF si demandé.
+// Chaque seed → zoom + qualité légèrement différents ⇒ hash de fichier unique.
+export interface ImageSpoofOpts { seed: number; intensity?: SpoofIntensity; gps?: { lat: number; lon: number } | null; device?: string | null }
+
+function dataUrlToBytes(u: string): Uint8Array {
+  const bin = atob(u.slice(u.indexOf(',') + 1))
+  const arr = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+  return arr
+}
+// Construit un bloc EXIF (fabricant/modèle + GPS) prêt pour piexif.insert. null si rien à écrire.
+function buildImageExif(deviceKey?: string | null, gps?: { lat: number; lon: number } | null): string | null {
+  const zeroth: Record<number, unknown> = {}
+  const d = deviceKey && deviceKey !== 'none' ? SPOOF_DEVICES.find(x => x.k === deviceKey) : null
+  if (d && d.make) {
+    zeroth[piexif.ImageIFD.Make] = d.make
+    zeroth[piexif.ImageIFD.Model] = d.model
+    if (d.software) zeroth[piexif.ImageIFD.Software] = d.software
+  }
+  const gpsIfd: Record<number, unknown> = {}
+  if (gps) {
+    gpsIfd[piexif.GPSIFD.GPSLatitudeRef] = gps.lat >= 0 ? 'N' : 'S'
+    gpsIfd[piexif.GPSIFD.GPSLatitude] = piexif.GPSHelper.degToDmsRational(Math.abs(gps.lat))
+    gpsIfd[piexif.GPSIFD.GPSLongitudeRef] = gps.lon >= 0 ? 'E' : 'W'
+    gpsIfd[piexif.GPSIFD.GPSLongitude] = piexif.GPSHelper.degToDmsRational(Math.abs(gps.lon))
+  }
+  if (!Object.keys(zeroth).length && !Object.keys(gpsIfd).length) return null
+  return piexif.dump({ '0th': zeroth, 'Exif': {}, 'GPS': gpsIfd, '1st': {}, thumbnail: null })
+}
+export async function runImageSpoof(input: Uint8Array, o: ImageSpoofOpts): Promise<Uint8Array> {
+  const r = intensityRanges(o.intensity ?? 'normal')
+  const rnd = (mul: number, min: number, max: number) => min + ((Math.sin(o.seed * mul) + 1) / 2) * (max - min)
+  const z = rnd(197.5, r.z[0], r.z[1])
+  const bmp = await createImageBitmap(new Blob([input as BlobPart]))
+  const W = bmp.width, H = bmp.height
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H
+  const ctx = canvas.getContext('2d')!
+  // Fenêtre centrée 1/z de la source, étirée au format d'origine (zoom/recadrage léger).
+  const cw = W / z, ch = H / z
+  ctx.drawImage(bmp, (W - cw) / 2, (H - ch) / 2, cw, ch, 0, 0, W, H)
+  bmp.close?.()
+  const q = +(0.90 + ((Math.sin(o.seed * 13.7) + 1) / 2) * 0.06).toFixed(3)  // 0.90–0.96 (jitter → hash différent)
+  let dataUrl = canvas.toDataURL('image/jpeg', q)  // ré-encodage = EXIF d'origine effacé
+  const exif = buildImageExif(o.device, o.gps)
+  if (exif) { try { dataUrl = piexif.insert(exif, dataUrl) } catch { /* on garde le jpg sans EXIF si l'insert échoue */ } }
+  return dataUrlToBytes(dataUrl)
+}
+
+// ── Montage : coupe (début/fin) → mp4 ré-encodé ───────────────────────────────
+export async function runMontage(input: Uint8Array, start: number, end: number | null, h?: Hooks): Promise<Uint8Array> {
+  const args = ['-ss', String(Math.max(0, start))]
+  if (end != null && end > start) args.push('-to', String(end))
+  args.push(...H264)
+  return runFfmpeg({ input, args, onProgress: h?.onProgress, onLog: h?.onLog })
+}
+
+// ── Incrustation photo : overlay d'une image (largeur fixe) centrée sur la vidéo ─
+export async function runOverlay(input: Uint8Array, image: Uint8Array, imageExt: string, opts: { widthPx: number; from: number; to: number | null }, h?: Hooks): Promise<Uint8Array> {
+  const enable = opts.to != null ? `:enable='between(t,${opts.from},${opts.to})'` : (opts.from > 0 ? `:enable='gte(t,${opts.from})'` : '')
+  const filter = `[1:v]scale=${Math.round(opts.widthPx)}:-1[ov];[0:v][ov]overlay=(W-w)/2:(H-h)/2${enable},${EVEN}[v]`
+  return runFfmpeg({
+    input, inputName: 'in.mp4',
+    extra: [{ name: `ov.${imageExt}`, data: image }],
+    args: ['-i', `ov.${imageExt}`, '-filter_complex', filter, '-map', '[v]', '-map', '0:a?', ...H264],
+    onProgress: h?.onProgress, onLog: h?.onLog,
+  })
+}
+
+// ── Mixer : incruste une légende (PNG canvas 1080px) sur la vidéo ──────────────
+export type CaptionPos = 'top' | 'center' | 'bottom' | { x: number; y: number }
+export async function runCaption(input: Uint8Array, text: string, pos: CaptionPos, h?: Hooks): Promise<Uint8Array> {
+  const png = await textToPng(text, 1080)
+  // Placement : preset (top/center/bottom) OU manuel (x,y en % de l'image, centre du PNG).
+  let x = '(W-w)/2', y: string
+  if (typeof pos === 'object') {
+    x = `(W*${(pos.x / 100).toFixed(4)})-(w/2)`
+    y = `(H*${(pos.y / 100).toFixed(4)})-(h/2)`
+  } else {
+    y = pos === 'top' ? 'H*0.06' : pos === 'center' ? '(H-h)/2' : 'H-h-H*0.06'
+  }
+  const filter = `[0:v][1:v]overlay=${x}:${y},${EVEN}[v]`
+  return runFfmpeg({
+    input, inputName: 'in.mp4',
+    extra: [{ name: 'cap.png', data: png }],
+    args: ['-i', 'cap.png', '-filter_complex', filter, '-map', '[v]', '-map', '0:a?', ...H264],
+    onProgress: h?.onProgress, onLog: h?.onLog,
+  })
+}
+
+// ── Sous-titres : audio → Groq Whisper (au MOT) → groupes de 2–4 mots → overlay ──
+// Position centre-bas (~75 % de hauteur), texte gros qui défile groupe par groupe.
+const SUB_MAX_WORDS = 2       // 1–2 mots par groupe (défilé rapide, gros texte)
+const SUB_Y_FRAC    = 0.75    // hauteur du centre du sous-titre (0 = haut, 1 = bas)
+const SUB_PAUSE_GAP = 0.45    // silence (s) qui force une coupure de groupe
+const SUB_HOLD_MAX  = 0.6     // s : prolongation max d'un groupe pour éviter le clignotement
+
+// Regroupe les mots en blocs de 2–4 mots, en coupant aussi sur les pauses et la
+// ponctuation forte. Chaque bloc porte le start du 1er mot et le end du dernier.
+function groupWords(words: Segment[], maxWords = SUB_MAX_WORDS): Segment[] {
+  const blocks: Segment[] = []
+  let cur: Segment[] = []
+  const flush = () => {
+    if (!cur.length) return
+    blocks.push({ start: cur[0].start, end: cur[cur.length - 1].end, text: cur.map(w => w.text).join(' ') })
+    cur = []
+  }
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]
+    cur.push(w)
+    const next = words[i + 1]
+    const endsSentence = /[.!?…:]$/.test(w.text)
+    const bigPause = next ? (next.start - w.end) > SUB_PAUSE_GAP : false
+    if (cur.length >= maxWords || endsSentence || bigPause) flush()
+  }
+  flush()
+  return blocks
+}
+
+// spoof=false → sous-titres seuls. Sinon (défaut), la sortie est AUSSI spoofée :
+// métadonnées effacées + localisation GPS + fabricant/modèle + micro-zoom unique →
+// chaque vidéo qui sort du sous-titre est une copie unique (anti-empreinte / anti-repost).
+export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks, spoof: SpoofOpts | false = {}): Promise<Uint8Array> {
+  h?.onLog?.('🎧 Extraction audio…')
+  const audio = await runFfmpeg({ input, args: ['-vn', '-ar', '16000', '-ac', '1', '-c:a', 'libmp3lame', '-q:a', '5'], outName: 'a.mp3' })
+  // Pas (ou quasi pas) d'octets audio → la vidéo n'a pas de piste son (ou elle est muette).
+  if (!audio || audio.length < 2000) {
+    throw new Error('Cette vidéo n’a pas de piste audio (ou le son est muet) — rien à transcrire.')
+  }
+  h?.onLog?.(`📝 Transcription au mot (Groq Whisper)… (${(audio.length / 1048576).toFixed(1)} Mo audio)`)
+  const words = await transcribeWordsGroq(groqKey, new Blob([audio as BlobPart], { type: 'audio/mpeg' }))
+  if (words.length === 0) {
+    throw new Error('Aucune parole détectée dans l’audio (musique/bruit seul, ou voix inaudible). Essaie une vidéo avec de la voix claire.')
+  }
+  const blocks = groupWords(words)
+  h?.onLog?.(`🖊 ${blocks.length} groupes (2–4 mots) — incrustation…`)
+  // Spoof de la sortie (unique par vidéo) : micro-zoom léger (n'empiète pas sur les
+  // sous-titres à 75 %) + métadonnées effacées + GPS + appareil aléatoires.
+  const doSpoof = spoof !== false
+  const spOpts: SpoofOpts = doSpoof ? (spoof as SpoofOpts) : {}
+  const seed = Math.random() * 1000 + 1
+  const gps = doSpoof ? (spOpts.gps ?? randomFranceGps()) : null
+  const device = doSpoof ? (spOpts.device ?? SPOOF_DEVICES[1 + Math.floor(Math.random() * (SPOOF_DEVICES.length - 1))].k) : null
+  const intensity: SpoofIntensity = spOpts.intensity ?? 'subtle'
+  // Zoom spoof appliqué à la base AVANT l'incrustation → les sous-titres restent nets
+  // et jamais rognés (ils sont dessinés par-dessus la vidéo déjà zoomée, en 1080 de large).
+  const spoofChain = doSpoof ? ',' + spoofFilter(seed, intensity) : ''
+  if (doSpoof) {
+    // On AFFICHE précisément ce qui est spoofé (preuve visible).
+    const devLabel = SPOOF_DEVICES.find(x => x.k === device)?.label ?? 'aucun'
+    const zPct = ((spoofZoomFactor(seed, intensity) - 1) * 100).toFixed(1)
+    h?.onLog?.('🎭 Spoof appliqué à la sortie :')
+    h?.onLog?.('   🧹 Métadonnées d’origine effacées')
+    if (gps) h?.onLog?.(`   📍 Localisation GPS réécrite : ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)} (France)`)
+    h?.onLog?.(`   📱 Appareil simulé : ${devLabel}`)
+    h?.onLog?.(`   🔍 Recadrage/zoom unique : +${zPct}%`)
+  }
+  // Un PNG (1080px) par groupe, overlay activé entre ses timecodes. Chaîne d'overlays.
+  // IMPORTANT : on met d'abord la vidéo à 1080 de large (= largeur du PNG). Sinon, sur une
+  // vidéo qui ne fait pas 1080 px, une ligne pleine largeur dépasse des bords (hors écran).
+  const extra: { name: string; data: Uint8Array }[] = []
+  let chain = `[0:v]scale=1080:-2,setsar=1${spoofChain}[base];`
+  let cursor = '[base]'
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i]
+    // Prolonge l'affichage jusqu'au groupe suivant (max SUB_HOLD_MAX) → pas de clignotement.
+    const nextStart = blocks[i + 1]?.start ?? (b.end + SUB_HOLD_MAX)
+    const end = Math.min(nextStart, b.end + SUB_HOLD_MAX)
+    // On retire les virgules du texte affiché (rendu plus propre).
+    const shown = b.text.replace(/,/g, '').replace(/\s+/g, ' ').trim()
+    extra.push({ name: `s${i}.png`, data: await textToPng(shown, 1080, true) })
+    const out = i === blocks.length - 1 ? '[vv]' : `[v${i}]`
+    // Centre vertical à SUB_Y_FRAC de la hauteur (le PNG est centré sur ce point).
+    const y = `(H*${SUB_Y_FRAC.toFixed(3)})-(h/2)`
+    chain += `${cursor}[${i + 1}:v]overlay=(W-w)/2:${y}:enable='between(t,${b.start.toFixed(2)},${end.toFixed(2)})'${out};`
+    cursor = `[v${i}]`
+  }
+  chain += `[vv]${EVEN}[v]`
+  const inputs = extra.flatMap(e => ['-i', e.name])
+  // Métadonnées : effacées puis (si spoof) GPS + fabricant/modèle réécrits.
+  const meta: string[] = doSpoof ? ['-map_metadata', '-1'] : []
+  if (doSpoof && gps) { const loc = iso6709(gps.lat, gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
+  if (doSpoof) meta.push(...deviceMetaArgs(device))
+  const output = await runFfmpeg({
+    input, inputName: 'in.mp4', extra,
+    args: [...inputs, '-filter_complex', chain, '-map', '[v]', '-map', '0:a?', ...meta, ...H264],
+    onProgress: h?.onProgress, onLog: h?.onLog,
+  })
+  if (doSpoof) {
+    // Preuve d'unicité : SHA-256 de la vidéo de sortie (différent à chaque export).
+    const sig = await sha256Hex(output)
+    h?.onLog?.(`   🔑 Empreinte unique (SHA-256) : ${sig.slice(0, 16)}…`)
+  }
+  return output
+}
+
+// SHA-256 (hex) d'un buffer — via l'API Web Crypto (dispo navigateur + Electron).
+async function sha256Hex(data: Uint8Array): Promise<string> {
+  try {
+    const src = new Uint8Array(data)
+    const buf = await crypto.subtle.digest('SHA-256', src.buffer as ArrayBuffer)
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+  } catch { return '(indisponible)' }
+}
+
+// ── Réglages du style des sous-titres AUTO (faciles à ajuster) ─────────────────
+// Taille = fraction de la largeur vidéo (0.058 ≈ gros, style viral). Police : très
+// grasse et arrondie ; on tombe sur Arial Black si la 1re n'est pas installée.
+const SUB_FONT_FRAC   = 0.085
+const SUB_FONT_FAMILY = `"Arial Black", system-ui, Arial, sans-serif`
+
+// ── Texte → PNG transparent via canvas (pas besoin de police côté ffmpeg) ──────
+// style 'outline' : texte blanc contour noir (par défaut). 'snapchat' : bande noire
+// translucide pleine largeur + texte blanc centré (rendu story/Snapchat).
+export type CaptionStyle = 'outline' | 'snapchat'
+export async function textToPng(text: string, width: number, subtitle = false, style: CaptionStyle = 'outline'): Promise<Uint8Array> {
+  const snap = style === 'snapchat'
+  const padX = Math.round(width * (snap ? 0.05 : 0.04))
+  // Sous-titres auto : plus gros (groupes de 2–4 mots, style viral centre-bas).
+  let fontSize = subtitle ? Math.round(width * SUB_FONT_FRAC) : Math.round(width * (snap ? 0.034 : 0.052))
+  // Snapchat : Helvetica régulier. Sous-titres auto : très gras arrondi. Sinon Arial gras.
+  const buildFont = (px: number) => snap
+    ? `400 ${px}px Helvetica, "Helvetica Neue", Arial, sans-serif`
+    : subtitle
+      ? `800 ${px}px ${SUB_FONT_FAMILY}`
+      : `700 ${px}px system-ui, Arial, sans-serif`
+  let font = buildFont(fontSize)
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')!
+  ctx.font = font
+  // Découpe en lignes.
+  const maxW = width - padX * 2
+  const words = text.split(/\s+/)
+  const lines: string[] = []
+  let cur = ''
+  for (const w of words) {
+    const t = cur ? cur + ' ' + w : w
+    if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w } else cur = t
+  }
+  if (cur) lines.push(cur)
+  // Sécurité anti-débordement : si une ligne (ex. un mot très long) dépasse encore la
+  // largeur utile, on réduit la police pour la faire tenir (jamais de texte hors écran).
+  const widest = Math.max(...lines.map(ln => ctx.measureText(ln).width), 1)
+  if (widest > maxW) {
+    fontSize = Math.max(12, Math.floor(fontSize * (maxW / widest)))
+    font = buildFont(fontSize)
+    ctx.font = font
+  }
+  // Sous-titres : padding vertical plus grand pour ne pas rogner l'ombre portée.
+  const vpad = Math.round(fontSize * (snap ? 0.42 : subtitle ? 0.6 : 0.4))
+  const lineH = Math.round(fontSize * (snap ? 1.05 : subtitle ? 1.22 : 1.32))
+  const height = lines.length * lineH + vpad * 2
+  canvas.width = width; canvas.height = height
+  ctx.font = font
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  if (snap) {
+    // Bande gris foncé translucide (#303030 ~50 %) pleine largeur, texte blanc centré.
+    ctx.fillStyle = 'rgba(48,48,48,0.5)'
+    ctx.fillRect(0, 0, width, height)
+    ctx.fillStyle = '#fff'
+    lines.forEach((ln, i) => ctx.fillText(ln, width / 2, vpad + i * lineH + lineH / 2))
+  } else {
+    lines.forEach((ln, i) => {
+      const cy = vpad + i * lineH + lineH / 2
+      if (subtitle) {
+        // Sous-titre auto : ombre portée douce + contour noir net + blanc pur (rendu « propre »).
+        ctx.save()
+        ctx.shadowColor = 'rgba(0,0,0,0.55)'
+        ctx.shadowBlur = Math.round(fontSize * 0.22)
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = Math.round(fontSize * 0.05)
+        ctx.lineJoin = 'round'
+        ctx.lineWidth = Math.round(fontSize * 0.14); ctx.strokeStyle = 'rgba(0,0,0,0.92)'
+        ctx.strokeText(ln, width / 2, cy)
+        ctx.restore()
+        ctx.fillStyle = '#fff'; ctx.fillText(ln, width / 2, cy)
+      } else {
+        // Contour noir + remplissage blanc (lisible sur toute vidéo).
+        ctx.lineWidth = Math.round(fontSize * 0.16); ctx.strokeStyle = 'rgba(0,0,0,0.9)'
+        ctx.strokeText(ln, width / 2, cy)
+        ctx.fillStyle = '#fff'; ctx.fillText(ln, width / 2, cy)
+      }
+    })
+  }
+  const blob: Blob = await new Promise(res => canvas.toBlob(b => res(b!), 'image/png'))
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
+export type { Segment }

@@ -11,6 +11,7 @@
 
 import { decode } from 'https://deno.land/x/imagescript@1.2.17/mod.ts'
 import { encodeBase64 as base64Encode } from 'https://deno.land/std@0.224.0/encoding/base64.ts'
+import storyFlowDef from './storyFlow.ts'
 
 // ── GeeLark API helper ───────────────────────────────────────────────────────
 const GEELARK = 'https://openapi.geelark.com/open/v1'
@@ -927,4 +928,114 @@ export async function postStoryServer(
 
   log('✅ Story publiée !')
   return { ok: true }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  VARIANTE FLOW RPA GEELARK (« Story post 2.0 ») — même chemin que le CLIENT
+//  web. Au lieu de piloter l'UI en ADB (postStoryServer), on lance le flow RPA
+//  2.0 (fix story + CTA sticker lien) via /task/rpa/add. C'est CE flow que le
+//  web utilise partout (immédiat + programmé) → les tâches auto l'utilisent aussi.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Import du flow story (mis en cache par bearer, comme le client). L'import crée
+// un flow chez GeeLark et renvoie son flowId, réutilisé pour toutes les stories.
+const _storyFlowIdCache = new Map<string, string>()
+async function ensureStoryFlow(bearer: string, log: (m: string) => void): Promise<string | null> {
+  const key = bearer.slice(-14)
+  const cached = _storyFlowIdCache.get(key)
+  if (cached) return cached
+  try {
+    const res = await gFetch(bearer, '/task/flow/import', { gal: JSON.stringify(storyFlowDef) })
+    const id = res?.data?.id as string | undefined
+    if (Number(res?.code) === 0 && id) { _storyFlowIdCache.set(key, id); return id }
+    log(`⚠ Import flow Story : code=${res?.code} msg=${res?.msg ?? '?'}`)
+    return null
+  } catch (e) { log(`⚠ Import flow Story : ${e instanceof Error ? e.message : String(e)}`); return null }
+}
+
+// Upload une image (URL https) vers GeeLark et renvoie le resourceUrl hébergé.
+// Les images GARDENT leur vraie extension (le flow encode le type dans l'URL).
+async function uploadImageGeelark(bearer: string, imageUrl: string, log: (m: string) => void): Promise<string | null> {
+  try {
+    let ext = 'jpg'
+    try {
+      const p = new URL(imageUrl).pathname
+      const m = /\.(png|gif|webp|bmp|heic|heif|jpe?g)$/i.exec(p)
+      if (m) ext = m[1].toLowerCase().replace('jpeg', 'jpg')
+    } catch { /* défaut jpg */ }
+    const urlRes = await gFetch(bearer, '/upload/getUrl', { fileType: ext })
+    if (Number(urlRes?.code) !== 0) { log(`⚠ getUrl image : ${urlRes?.msg ?? urlRes?.code}`); return null }
+    const uploadUrl = urlRes.data?.uploadUrl as string | undefined
+    const resourceUrl = urlRes.data?.resourceUrl as string | undefined
+    if (!uploadUrl || !resourceUrl) return null
+    const dl = await fetch(imageUrl)
+    if (!dl.ok) { log(`⚠ Téléchargement image HTTP ${dl.status}`); return null }
+    const bytes = await dl.arrayBuffer()
+    const put = await fetch(uploadUrl, { method: 'PUT', body: bytes })
+    if (!put.ok) { log(`⚠ PUT image HTTP ${put.status}`); return null }
+    return resourceUrl
+  } catch (e) { log(`⚠ Upload image : ${e instanceof Error ? e.message : String(e)}`); return null }
+}
+
+// Suit une tâche RPA jusqu'à son état final (3=succès, 4/7/8=échec).
+async function pollRpaTask(bearer: string, taskId: string, log: (m: string) => void, timeoutMs: number): Promise<{ ok: boolean; error?: string }> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    await sleep(8000)
+    try {
+      const q = await gFetch(bearer, '/task/query', { ids: [taskId] })
+      const items: Array<Record<string, any>> = q?.data?.items ?? q?.data?.list ?? []
+      const st = Number(items[0]?.status)
+      if (st === 3) return { ok: true }
+      if ([4, 7, 8].includes(st)) return { ok: false, error: `tâche GeeLark en échec (status ${st})` }
+    } catch { /* réseau — on réessaie */ }
+  }
+  return { ok: false, error: 'timeout tâche story' }
+}
+
+export interface StoryFlowConfig {
+  imageUrl: string
+  linkUrl: string
+  linkText?: string
+  rotationUrls?: string[]
+}
+
+// Publie une story via le flow RPA 2.0 (même mécanique que le client web) :
+// rotation IP → boot → upload image GeeLark → import flow → /task/rpa/add → poll.
+// N'éteint PAS le téléphone : la boucle appelante gère l'extinction.
+export async function postStoryFlowServer(
+  bearer: string,
+  phoneId: string,
+  config: StoryFlowConfig,
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    if (config.rotationUrls?.length) await rotateProxies(config.rotationUrls, log)
+    const flowId = await ensureStoryFlow(bearer, log)
+    if (!flowId) return { ok: false, error: 'Flow story indisponible' }
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    log('⬆ Hébergement de l\'image sur GeeLark…')
+    const resourceUrl = await uploadImageGeelark(bearer, config.imageUrl, log)
+    if (!resourceUrl) return { ok: false, error: 'Upload image GeeLark échoué' }
+    const paramMap = {
+      Media: [resourceUrl],
+      Link: config.linkUrl ?? '',
+      NameLink: config.linkText ?? '',
+      AddtoHighlights: false, CreateHighlights: '', AddtoHighlightName: '',
+    }
+    log('📸 Lancement du flow story 2.0…')
+    const res = await gFetch(bearer, '/task/rpa/add', {
+      id: phoneId, flowId, scheduleAt: Math.floor(Date.now() / 1000) + 3, name: 'Story Scaleflow', paramMap,
+    })
+    if (Number(res?.code) !== 0) return { ok: false, error: `GeeLark : ${res?.msg ?? res?.code}` }
+    const taskId = res?.data?.taskId as string | undefined
+    if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
+    log('   Tâche créée — story en cours…')
+    // Poll borné pour tenir dans le budget serverless (~230s, ~130s réservés/téléphone,
+    // exécution en parallèle des comptes). Au-delà, le watchdog éteint le téléphone.
+    return await pollRpaTask(bearer, taskId, log, 150_000)
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
+  }
 }
