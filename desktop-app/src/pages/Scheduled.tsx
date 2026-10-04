@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { cancelGeelarkTask } from '@/lib/geelark'
@@ -38,41 +38,63 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState<Sched | null>(null)
 
   useEffect(() => { if (notice) { const t = setTimeout(() => setNotice(null), 3500); return () => clearTimeout(t) } }, [notice])
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  // background = rafraîchissement silencieux (pas de clignotement « Chargement »).
+  const load = useCallback(async (background = false) => {
+    if (!background) setLoading(true)
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('scheduled_posts').select('id,type,status,scheduled_at,caption,phones,created_by_name,executed_at,error_msg,result'))
+    const { data, error } = await scope(supabase.from('scheduled_posts').select('id,type,status,scheduled_at,caption,phones,created_by_name,executed_at,error_msg,result'))
       .order('scheduled_at', { ascending: false }).limit(200)
-    setRows((data ?? []) as Sched[])
+    if (error) setLoadError(error.message)
+    else { setLoadError(null); setRows((data ?? []) as Sched[]) }
     setLoading(false)
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
 
-  // Rafraîchissement live (une programmation créée ailleurs apparaît).
+  // Rafraîchissement live, limité à MES programmations et regroupé (le serveur met
+  // à jour la progression des stories à chaque tick → rafale d'événements).
+  const liveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
+    const filter = currentOrg ? `org_id=eq.${currentOrg.id}` : `user_id=eq.${user.id}`
     const ch = supabase.channel('scheduled-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_posts' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_posts', filter }, () => {
+        if (liveTimer.current) clearTimeout(liveTimer.current)
+        liveTimer.current = setTimeout(() => load(true), 1500)
+      })
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [load])
+    return () => { if (liveTimer.current) clearTimeout(liveTimer.current); supabase.removeChannel(ch) }
+  }, [load, currentOrg?.id, user.id])
 
+  // Annulation sûre :
+  // 1) la ligne est « réclamée » de façon conditionnelle (statut inchangé) → deux
+  //    clics / deux onglets ne peuvent pas rembourser deux fois ;
+  // 2) on ne rembourse QUE les tâches GeeLark réellement annulées (une tâche déjà
+  //    partie publie quand même → pas de post gratuit).
   async function cancel(s: Sched) {
+    setConfirmCancel(null)
+    const ids = s.result?.geelark_task_ids ?? []
+    if (s.status === 'geelark' && ids.length && !conns.bearer) { setNotice('Connexion GeeLark en cours de chargement — réessaie dans un instant.'); return }
     setBusy(s.id)
     try {
-      // 1) Annule les tâches GeeLark programmées (si elles ne sont pas déjà parties).
-      const ids = s.result?.geelark_task_ids ?? []
-      if (conns.bearer && ids.length) { for (const tid of ids) await cancelGeelarkTask(conns.bearer, tid) }
-      // 2) Rembourse les crédits (débités à la programmation).
+      const claim = s.status === 'geelark'
+        ? await supabase.from('scheduled_posts').delete().eq('id', s.id).eq('status', 'geelark').select('id')
+        : await supabase.from('scheduled_posts').update({ status: 'cancelled' }).eq('id', s.id).eq('status', 'pending').select('id')
+      if (claim.error) throw new Error(claim.error.message)
+      if (!claim.data?.length) { setNotice('Déjà annulé ou déjà parti — rien à rembourser.'); load(true); return }
+      let okC = ids.length
+      if (s.status === 'geelark' && ids.length) okC = (await Promise.all(ids.map(t => cancelGeelarkTask(conns.bearer!, t)))).filter(Boolean).length
       const owner = s.result?.owner_id, total = s.result?.credits_total ?? 0
-      if (owner && total > 0) { await refundCredits(owner, total); }
-      // 3) Retire la ligne (ou marque annulée pour les posts serveur).
-      if (s.status === 'geelark') await supabase.from('scheduled_posts').delete().eq('id', s.id)
-      else await supabase.from('scheduled_posts').update({ status: 'cancelled' }).eq('id', s.id)
-      setNotice(total > 0 ? `Annulé — ${total} crédits remboursés.` : 'Annulé.')
-      load()
+      const refund = ids.length ? Math.round(total * okC / ids.length) : total
+      if (owner && refund > 0) await refundCredits(owner, refund)
+      const lost = ids.length - okC
+      setNotice(lost > 0
+        ? `Annulé — ${refund} crédits remboursés. ${lost} post(s) déjà parti(s) chez GeeLark, non remboursé(s).`
+        : refund > 0 ? `Annulé — ${refund} crédits remboursés.` : 'Annulé.')
+      load(true)
     } catch (e) { setNotice(`Échec de l'annulation : ${e instanceof Error ? e.message : ''}`) }
     setBusy(null)
   }
@@ -96,7 +118,7 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
         <span style={{ ...cell, minWidth: 150 }}>{new Date(s.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}</span>
         <span style={{ flex: 1, minWidth: 120, fontSize: 11.5, color: '#8B8898', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.caption || '—'}</span>
         <Chip text={st.label} tone={st.tone} />
-        {(cancellable || cancelServer) && <Btn theme={theme} sm tone="danger" label={busy === s.id ? '…' : 'Annuler'} disabled={busy === s.id} onClick={() => cancel(s)} />}
+        {(cancellable || cancelServer) && <Btn theme={theme} sm tone="danger" label={busy === s.id ? '…' : 'Annuler'} disabled={busy === s.id} onClick={() => setConfirmCancel(s)} />}
       </div>
     )
   }
@@ -104,7 +126,15 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Programmé" sub="Toutes tes publications programmées (PC éteint, via GeeLark). Annule ici pour récupérer les crédits."
-        actions={<Btn theme={theme} sm tone="quiet" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Rafraîchir" onClick={load} />} />
+        actions={<Btn theme={theme} sm tone="quiet" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Rafraîchir" onClick={() => load()} />} />
+      {loadError && <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 9, background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.22)', color: '#FCA5A5', fontSize: 12 }}>Impossible de charger les programmations : {loadError}</div>}
+      {confirmCancel && (
+        <Modal theme={theme} title="Annuler cette programmation ?" sub={`${confirmCancel.phones?.length ?? 0} compte(s) · ${new Date(confirmCancel.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}`} icon="M18 6L6 18|M6 6l12 12" width={460}
+          onClose={() => setConfirmCancel(null)}
+          footer={<><Btn theme={theme} tone="ghost" label="Garder" onClick={() => setConfirmCancel(null)} /><Btn theme={theme} tone="danger" label="Annuler la programmation" onClick={() => cancel(confirmCancel)} /></>}>
+          <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA' }}>Les tâches sont annulées chez GeeLark et les crédits remboursés{(confirmCancel.result?.credits_total ?? 0) > 0 ? ` (jusqu'à ${confirmCancel.result?.credits_total} crédits)` : ''}. Un post déjà parti ne peut plus être annulé ni remboursé.</div>
+        </Modal>
+      )}
       {notice && <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 9, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.3)`, color: theme.accentText, fontSize: 12.5 }}>{notice}</div>}
 
       {loading ? <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 13 }}>…</div></Panel>

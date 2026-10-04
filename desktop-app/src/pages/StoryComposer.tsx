@@ -163,7 +163,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
       if (ru) resByImg.set(m.id, ru)
     }
     const usableImgs = chosenImgs.filter(m => resByImg.has(m.id))
-    if (usableImgs.length === 0) { push('❌ Aucune image hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
+    if (usableImgs.length === 0) { push('❌ Aucune image hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); R.finish('error'); setRunning(false); return }
 
     const shuffle = <T,>(a: T[]): T[] => { const b = [...a]; for (let k = b.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1));[b[k], b[j]] = [b[j], b[k]] } return b }
     const imgOrder = imgMode === 'random' ? shuffle(usableImgs) : usableImgs
@@ -229,7 +229,9 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     const finals = [...results.values()]
     const okN = finals.filter(r => r.ok).length
     const errN = finals.filter(r => !r.ok).length
-    for (let i = 0; i < errN; i++) run.markFailed()
+    // Remboursement : échecs définitifs + comptes jamais lancés (annulation).
+    const refundN = jobs.filter(j => results.get(j.p.id)?.ok !== true).length
+    for (let i = 0; i < refundN; i++) run.markFailed()
     R.finish()
     if (jobs.length > 0) {
       const { error: prErr } = await supabase.from('post_runs').insert({

@@ -78,7 +78,7 @@ export async function refundCredits(userId: string, amount: number): Promise<boo
 export interface CreditRun {
   markFailed: () => void
   abort: () => void
-  settle: () => Promise<{ refunded: number }>
+  settle: () => Promise<{ refunded: number; error?: string }>
 }
 export interface CreditRunError { insufficient: true; error: string }
 
@@ -92,12 +92,15 @@ export async function startCreditRun(ownerId: string, costPerUnit: number, unitC
     abort: () => { aborted = true },
     settle: async () => {
       if (settled) return { refunded: 0 }
-      settled = true
       const units = aborted ? unitCount : failed
-      if (units <= 0) return { refunded: 0 }
+      if (units <= 0) { settled = true; return { refunded: 0 } }
       const amount = Math.min(units, unitCount) * costPerUnit
-      const ok = await refundCredits(ownerId, amount)
-      return { refunded: ok ? amount : 0 }
+      // Un remboursement raté était perdu en silence : on retente une fois, et on ne
+      // marque « réglé » qu'après succès (un nouvel appel peut alors réessayer).
+      let ok = await refundCredits(ownerId, amount)
+      if (!ok) { await new Promise(r => setTimeout(r, 1500)); ok = await refundCredits(ownerId, amount) }
+      if (ok) settled = true
+      return ok ? { refunded: amount } : { refunded: 0, error: 'Remboursement échoué — contacte le support' }
     },
   }
 }

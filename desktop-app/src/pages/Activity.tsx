@@ -81,8 +81,8 @@ export default function Activity({ theme, infra, user, org }: {
     }
   }
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (background = false) => {
+    if (!background) setLoading(true)
     setError(null)
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [prRes, spRes] = await Promise.all([
@@ -150,14 +150,19 @@ export default function Activity({ theme, infra, user, org }: {
   // Rafraîchissement live : dès qu'un run est enregistré (post_runs) ou qu'un post
   // programmé passe done/failed (scheduled_posts), on recharge. + repli au refocus.
   useEffect(() => {
+    // Limité à MES lignes et regroupé : le serveur met à jour les stories à chaque
+    // tick (rafales d'événements) → un seul rechargement silencieux toutes les 1,5 s.
+    const filter = currentOrg ? `org_id=eq.${currentOrg.id}` : `user_id=eq.${user.id}`
+    let t: ReturnType<typeof setTimeout> | null = null
+    const soon = () => { if (t) clearTimeout(t); t = setTimeout(() => load(true), 1500) }
     const ch = supabase.channel('activity-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_runs' }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_posts' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_runs', filter }, soon)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduled_posts', filter }, soon)
       .subscribe()
-    const onFocus = () => { if (document.visibilityState === 'visible') load() }
+    const onFocus = () => { if (document.visibilityState === 'visible') load(true) }
     document.addEventListener('visibilitychange', onFocus)
     window.addEventListener('focus', onFocus)
-    return () => { supabase.removeChannel(ch); document.removeEventListener('visibilitychange', onFocus); window.removeEventListener('focus', onFocus) }
+    return () => { if (t) clearTimeout(t); supabase.removeChannel(ch); document.removeEventListener('visibilitychange', onFocus); window.removeEventListener('focus', onFocus) }
   }, [load])
 
   const filters: { k: Filter; l: string; n: number }[] = useMemo(() => [

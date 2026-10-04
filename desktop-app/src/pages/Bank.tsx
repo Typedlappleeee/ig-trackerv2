@@ -126,15 +126,15 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
       }}
     >
       {thumb
-        ? <img src={thumb} alt="" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        ? <img src={thumb} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : type === 'video'
           // Vidéo : aperçu (1re image) monté SEULEMENT si la tuile est visible → limite
           // le nombre de <video> décodés en même temps. Hors écran → placeholder.
           ? (media && inView
               ? <video src={`${media}#t=0.1`} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
               : <span style={placeholder} />)
-          : media
-            ? <img src={media} alt="" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          : media && inView
+            ? <img src={media} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={placeholder} />}
 
       <TileCheck on={on} onToggle={onToggle} />
