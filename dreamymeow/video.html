@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/umd/ffmpeg.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/umd/index.js"></script>
+<script src="/ffmpeg/ffmpeg.js"></script>
+<script src="/ffmpeg/util.js"></script>
 <style>
   :root{
     --bg:#0A0B0E; --edge:rgba(255,255,255,.08); --edge2:rgba(255,255,255,.14);
@@ -179,10 +179,10 @@
 (() => {
   const $=s=>document.querySelector(s);
   // ffmpeg.wasm 0.12 (même version que l'app ScaleFlow) — cœur mono-thread :
-  // pas besoin de SharedArrayBuffer / COOP-COEP. Chargé depuis jsdelivr, enveloppé
-  // en blob same-origin (worker + cœur + wasm) via toBlobURL.
-  const FF_LIB='https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/umd';
-  const FF_CORE='https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/umd';
+  // pas besoin de SharedArrayBuffer / COOP-COEP. Fichiers AUTO-HÉBERGÉS dans
+  // /ffmpeg/ (même origine) → aucune dépendance CDN ; on enveloppe tout en blob
+  // same-origin via toBlobURL (worker de classe + cœur + wasm).
+  const FF='/ffmpeg';
 
   /* ══ Données identiques au spoofer du projet (studioTools.ts) ══ */
   const GPS_CITIES=[
@@ -268,9 +268,9 @@
     ffmpeg.on('progress',({progress})=>{ if(progress>=0&&progress<=1) setBar(baseRatio + progress/totalN); });
     $('#count').textContent='Chargement du moteur vidéo (~32 Mo, une seule fois)…';
     await ffmpeg.load({
-      classWorkerURL: await toBlobURL(`${FF_LIB}/814.ffmpeg.js`, 'text/javascript'),
-      coreURL:        await toBlobURL(`${FF_CORE}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL:        await toBlobURL(`${FF_CORE}/ffmpeg-core.wasm`, 'application/wasm'),
+      classWorkerURL: await toBlobURL(`${FF}/814.ffmpeg.js`, 'text/javascript'),
+      coreURL:        await toBlobURL(`${FF}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL:        await toBlobURL(`${FF}/ffmpeg-core.wasm`, 'application/wasm'),
     });
   }
   async function sha(blob){ const h=await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()); return [...new Uint8Array(h)].slice(0,6).map(b=>b.toString(16).padStart(2,'0')).join(''); }
