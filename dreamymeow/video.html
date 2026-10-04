@@ -9,7 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/ffmpeg.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/umd/ffmpeg.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/umd/index.js"></script>
 <style>
   :root{
     --bg:#0A0B0E; --edge:rgba(255,255,255,.08); --edge2:rgba(255,255,255,.14);
@@ -168,7 +169,11 @@
 <script>
 (() => {
   const $=s=>document.querySelector(s);
-  const CORE='https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/ffmpeg-core.js';
+  // ffmpeg.wasm 0.12 (même version que l'app ScaleFlow) — cœur mono-thread :
+  // pas besoin de SharedArrayBuffer / COOP-COEP. Chargé depuis jsdelivr, enveloppé
+  // en blob same-origin (worker + cœur + wasm) via toBlobURL.
+  const FF_LIB='https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/umd';
+  const FF_CORE='https://cdn.jsdelivr.net/npm/@ffmpeg/[email protected]/dist/umd';
 
   /* ══ Données identiques au spoofer du projet (studioTools.ts) ══ */
   const GPS_CITIES=[
@@ -247,18 +252,24 @@
   function setBar(r){ $('#progbar').style.width=Math.max(0,Math.min(1,r))*100+'%'; }
   async function ensure(){
     if(ffmpeg) return;
-    if(!window.FFmpeg){ throw new Error('moteur ffmpeg non chargé (réseau ?)'); }
-    const { createFFmpeg }=window.FFmpeg;
-    ffmpeg=createFFmpeg({ corePath:CORE, log:false });
-    ffmpeg.setProgress(({ratio})=>{ if(ratio>=0&&ratio<=1) setBar(baseRatio + ratio/totalN); });
-    $('#count').textContent='Chargement du moteur vidéo (~25 Mo, une seule fois)…';
-    await ffmpeg.load();
+    if(!window.FFmpegWASM || !window.FFmpegUtil){ throw new Error('moteur ffmpeg non chargé (réseau ?)'); }
+    const { FFmpeg }=window.FFmpegWASM;
+    const { toBlobURL }=window.FFmpegUtil;
+    ffmpeg=new FFmpeg();
+    ffmpeg.on('progress',({progress})=>{ if(progress>=0&&progress<=1) setBar(baseRatio + progress/totalN); });
+    $('#count').textContent='Chargement du moteur vidéo (~32 Mo, une seule fois)…';
+    await ffmpeg.load({
+      classWorkerURL: await toBlobURL(`${FF_LIB}/814.ffmpeg.js`, 'text/javascript'),
+      coreURL:        await toBlobURL(`${FF_CORE}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL:        await toBlobURL(`${FF_CORE}/ffmpeg-core.wasm`, 'application/wasm'),
+    });
   }
   async function sha(blob){ const h=await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()); return [...new Uint8Array(h)].slice(0,6).map(b=>b.toString(16).padStart(2,'0')).join(''); }
 
   async function spoofOne(data, seed, opts){
-    const { fetchFile }=window.FFmpeg;
-    ffmpeg.FS('writeFile','in.bin', await fetchFile(new Blob([data])));
+    // .slice() = copie : writeFile DÉTACHE le buffer passé ; sans copie, réutiliser
+    // la même source (N variantes) planterait sur « ArrayBuffer detached ».
+    await ffmpeg.writeFile('in.mp4', data.slice());
     let vf=spoofFilter(seed, opts.intensity);
     let af=null;
     if(opts.speed){ const s=(0.98+Math.random()*0.04); vf+=`,setpts=${(1/s).toFixed(4)}*PTS`; af=`atempo=${s.toFixed(4)}`; }
@@ -274,15 +285,17 @@
     meta.push(...deviceMeta(opts.device));
     const H264=['-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart'];
     const runFf=(withAudioFilter)=>{
-      const a=[...trim,'-i','in.bin','-vf',vf,...(withAudioFilter&&af?['-af',af]:[]),...meta,...H264,'out.mp4'];
-      return ffmpeg.run(...a);
+      const a=['-i','in.mp4',...trim,'-vf',vf,...(withAudioFilter&&af?['-af',af]:[]),...meta,...H264,'out.mp4'];
+      return ffmpeg.exec(a);
     };
-    try{ await runFf(true); }
-    catch(e){ if(af){ log('   (pas de piste audio → vitesse appliquée à la vidéo seule)'); try{ffmpeg.FS('unlink','out.mp4');}catch(_){} await runFf(false); } else throw e; }
-    const out=ffmpeg.FS('readFile','out.mp4');
-    try{ffmpeg.FS('unlink','out.mp4');}catch(_){}
-    try{ffmpeg.FS('unlink','in.bin');}catch(_){}
-    return new Blob([out.buffer], {type:'video/mp4'});
+    let code=await runFf(true);
+    if(code!==0 && af){ log('   (pas de piste audio → vitesse appliquée à la vidéo seule)'); try{await ffmpeg.deleteFile('out.mp4');}catch(_){} code=await runFf(false); }
+    if(code!==0) throw new Error(`ffmpeg (code ${code})`);
+    const out=await ffmpeg.readFile('out.mp4');
+    try{await ffmpeg.deleteFile('out.mp4');}catch(_){}
+    try{await ffmpeg.deleteFile('in.mp4');}catch(_){}
+    const u8 = out instanceof Uint8Array ? out : new Uint8Array(out);
+    return new Blob([u8.buffer], {type:'video/mp4'});
   }
 
   const urls=[];
