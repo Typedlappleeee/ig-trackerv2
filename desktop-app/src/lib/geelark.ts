@@ -5,13 +5,8 @@
 // Porté fidèlement des primitives de electron-app/src/lib/geelark.ts (warmup natif,
 // démarrage/arrêt de téléphone, sonde de tâche RPA). Best-effort, jamais de secret loggé.
 
-import storyFlowDef from './geelarkStoryFlow.json'
-import photoFlowDef from './geelarkPhotoFlow.json'
-import warmupFlowDef from './geelarkWarmupFlow.json'
-import loginFlowDef from './geelarkLoginFlow.json'
-import reelsFlowDef from './geelarkReelsFlow.json'
-import trialFlowDef from './geelarkTrialFlow.json'
 import { IS_WEB } from './platform'
+import { leasePhone, heartbeatPhone, releasePhone, escalatePhoneStop } from './phoneWatch'
 
 const BASE = 'https://openapi.geelark.com/open/v1'
 
@@ -166,13 +161,15 @@ export async function stopPhoneSurely(bearer: string, phoneId: string, log?: (m:
       const data = (res['data'] as Record<string, unknown>) ?? {}
       const success = Number(data['successAmount'] ?? (code === 0 ? 1 : 0))
       const failed = Number(data['failAmount'] ?? 0)
-      if ((code === 0 && failed === 0) || success > 0) { log?.('📴 Téléphone éteint.'); return true }
+      if ((code === 0 && failed === 0) || success > 0) { log?.('📴 Téléphone éteint.'); void releasePhone(phoneId); return true }
     } catch { /* réseau — on vérifie quand même l'état */ }
     // Déjà arrêté par GeeLark (auto-stop après tâche) ? → OK, pas d'alarme.
-    if (await isStopped()) { log?.('📴 Téléphone éteint.'); return true }
+    if (await isStopped()) { log?.('📴 Téléphone éteint.'); void releasePhone(phoneId); return true }
     if (attempt < 4) await sleep(4000)
   }
-  log?.('⚠️ Arrêt non confirmé — le watchdog serveur éteindra le téléphone.')
+  // Le serveur prend le relais dès son prochain tick (≤ 1 min), même app fermée.
+  void escalatePhoneStop(phoneId)
+  log?.('⚠️ Arrêt non confirmé — le serveur va éteindre le téléphone d\'ici 1 min.')
   return false
 }
 
@@ -242,6 +239,9 @@ export async function ensurePhoneRunning(bearer: string, phoneId: string, log: (
   // Téléphone piloté par un flow : déjà démarré par le moteur. GeeLark l'éteint
   // parfois tout seul après une tâche RPA → on vérifie, et on ne le relance que
   // s'il s'est arrêté (sans re-roter l'IP : le compte garde la même IP sur le flow).
+  // Bail anti-coût : ce téléphone sera éteint par le serveur si plus aucun signe
+  // de vie n'arrive (onglet fermé, plantage…). Prolongé pendant les tâches.
+  void leasePhone(phoneId)
   if (_managedPhones.has(phoneId)) {
     const st = await phoneStatus(bearer, phoneId, true)
     if (st === 0) return { ok: true }
@@ -269,9 +269,11 @@ export async function ensurePhoneRunning(bearer: string, phoneId: string, log: (
 }
 
 // Sonde une tâche RPA jusqu'à complétion. Statuts GeeLark : 3=Done, 4=Failed, 7/8=annulé/erreur.
-async function pollRpaTask(bearer: string, taskId: string, log: (m: string) => void, timeoutMs: number): Promise<{ ok: boolean; error?: string }> {
+async function pollRpaTask(bearer: string, phoneId: string, taskId: string, log: (m: string) => void, timeoutMs: number): Promise<{ ok: boolean; error?: string }> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
+    // Signe de vie : la tâche tourne → le watchdog serveur ne coupe pas le téléphone.
+    heartbeatPhone(phoneId)
     await sleep(15000)
     let q: Record<string, unknown>
     try { q = await geelarkFetch('/task/query', { ids: [taskId] }, bearer) } catch { continue }
@@ -287,8 +289,11 @@ async function pollRpaTask(bearer: string, taskId: string, log: (m: string) => v
       return { ok: false, error: fd ?? `statut ${st}` }
     }
   }
-  log('   ⏳ Délai dépassé — la tâche peut continuer côté GeeLark.')
-  return { ok: true }
+  // Délai dépassé : on ne sait pas si la tâche a abouti, et le `finally` de
+  // l'appelant éteint le téléphone (donc la coupe). On le signale comme un échec
+  // plutôt qu'un faux succès (crédits remboursés, média non mis à la corbeille).
+  log('   ⏳ Délai dépassé — tâche non confirmée, téléphone éteint.')
+  return { ok: false, error: 'Délai dépassé (tâche non confirmée)' }
 }
 
 // Warmup via flow RPA GeeLark CUSTOM (fourni) : recherche mot-clé + Reels, avec
@@ -306,7 +311,7 @@ async function ensureWarmupFlowId(bearer: string, log: (m: string) => void): Pro
     if (stored && ver === WARMUP_FLOW_VERSION) return stored
     log(stored ? '🔄 Mise à jour du flow « Warmup »…' : '📥 Import du flow « Warmup » dans GeeLark…')
     try {
-      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(warmupFlowDef) }, bearer)
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify((await import('./geelarkWarmupFlow.json')).default) }, bearer)
       if (Number(res['code']) !== 0) { log(`⚠ Import flow warmup : ${res['msg'] ?? res['code']}`); return null }
       const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
       if (id) { try { localStorage.setItem(lsK, id); localStorage.setItem(lsV, WARMUP_FLOW_VERSION) } catch { /* ignore */ } return id }
@@ -331,6 +336,11 @@ export async function warmupAccountNative(
     const ready = await ensurePhoneRunning(bearer, phoneId, log, config.rotationUrls)
     if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
     const n = Math.max(1, Math.min(100, Math.round(config.browseVideo)))
+    // Warmup = exception à la règle des 10 min : une session dure longtemps et la
+    // tâche tourne côté GeeLark même si l'onglet se ferme. Bail = durée prévue
+    // (≈ 2 vidéos/min) + 20 min de marge ; la sonde suit la même durée.
+    const plannedMin = Math.ceil(n / 2)
+    await leasePhone(phoneId, plannedMin + 20, 'warmup')
     const kw = config.keyword?.trim()
     log(`🔥 Lancement du warmup (${n} vidéos${kw ? `, mot-clé « ${kw} »` : ''})…`)
     // Sans mot-clé : on N'ENVOIE PAS SearchKeyword → le flow prend la branche
@@ -343,7 +353,7 @@ export async function warmupAccountNative(
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
     log('   Tâche créée — warmup en cours…')
-    return await pollRpaTask(bearer, taskId, log, 25 * 60_000)
+    return await pollRpaTask(bearer, phoneId, taskId, log, (plannedMin + 15) * 60_000)
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
@@ -363,7 +373,7 @@ async function ensureLoginFlowId(bearer: string, log: (m: string) => void): Prom
     if (stored && ver === LOGIN_FLOW_VERSION) return stored
     log('📥 Import du flow « Login » dans GeeLark…')
     try {
-      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(loginFlowDef) }, bearer)
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify((await import('./geelarkLoginFlow.json')).default) }, bearer)
       if (Number(res['code']) !== 0) { log(`⚠ Import flow login : ${res['msg'] ?? res['code']}`); return null }
       const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
       if (id) { try { localStorage.setItem(`sf-login-flowid:${bearer.slice(-14)}`, id); localStorage.setItem(`sf-login-flowver:${bearer.slice(-14)}`, LOGIN_FLOW_VERSION) } catch { /* ignore */ } return id }
@@ -395,7 +405,7 @@ export async function loginInstagramOnPhone(
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
     log('   Tâche créée — connexion en cours…')
     attempted = true
-    const r = await pollRpaTask(bearer, taskId, log, 10 * 60_000)
+    const r = await pollRpaTask(bearer, phoneId, taskId, log, 10 * 60_000)
     return r
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
@@ -447,7 +457,7 @@ export async function crossPostToPhone(
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
     log('   Tâche créée — publication en cours…')
-    return await pollRpaTask(bearer, taskId, log, 8 * 60_000)
+    return await pollRpaTask(bearer, phoneId, taskId, log, 8 * 60_000)
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
@@ -491,7 +501,9 @@ export async function editProfileOnPhone(
     const res = await geelarkFetch('/rpa/task/instagramEdit', {
       id: phoneId, scheduleAt: Math.floor(Date.now() / 1000) + 5, name: 'ScaleFlow profile edit',
       ...(fields.nickname?.trim() ? { nickname: fields.nickname.trim() } : {}),
-      ...(fields.biography != null ? { biography: fields.biography } : {}),
+      // Bio vide = « ne pas toucher » (sinon on effacerait la bio de chaque compte
+      // quand on n'édite que le nom ou le lien).
+      ...(fields.biography?.trim() ? { biography: fields.biography } : {}),
       ...(fields.linkURL?.trim() ? { linkURL: fields.linkURL.trim() } : {}),
       ...(fields.linkTitle?.trim() ? { linkTitle: fields.linkTitle.trim() } : {}),
     }, bearer)
@@ -499,7 +511,7 @@ export async function editProfileOnPhone(
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
     log('   Tâche créée — édition en cours…')
-    return await pollRpaTask(bearer, taskId, log, 8 * 60_000)
+    return await pollRpaTask(bearer, phoneId, taskId, log, 8 * 60_000)
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
@@ -575,7 +587,7 @@ async function ensureStoryFlowId(bearer: string, log: (m: string) => void): Prom
     if (stored && ver === STORY_FLOW_VERSION) return stored
     log(stored ? '🔄 Mise à jour du flow « Story »…' : '📥 Import du flow « Story » dans GeeLark…')
     try {
-      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(storyFlowDef) }, bearer)
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify((await import('./geelarkStoryFlow.json')).default) }, bearer)
       if (Number(res['code']) !== 0) { log(`⚠ Import flow story : ${res['msg'] ?? res['code']}`); return null }
       const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
       if (id) { try { localStorage.setItem(storyFlowLsKey(bearer), id); localStorage.setItem(storyFlowVerKey(bearer), STORY_FLOW_VERSION) } catch { /* ignore */ } return id }
@@ -606,7 +618,7 @@ async function ensureReelsFlowId(bearer: string, log: (m: string) => void): Prom
     if (stored && ver === REELS_FLOW_VERSION) return stored
     log(stored ? '🔄 Mise à jour du flow « Reels »…' : '📥 Import du flow « Reels » dans GeeLark…')
     try {
-      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(reelsFlowDef) }, bearer)
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify((await import('./geelarkReelsFlow.json')).default) }, bearer)
       if (Number(res['code']) !== 0) { log(`⚠ Import flow Reels : ${res['msg'] ?? res['code']}`); return null }
       const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
       if (id) { try { localStorage.setItem(reelsFlowLsKey(bearer), id); localStorage.setItem(reelsFlowVerKey(bearer), REELS_FLOW_VERSION) } catch { /* ignore */ } return id }
@@ -637,7 +649,7 @@ async function ensureTrialFlowId(bearer: string, log: (m: string) => void): Prom
     if (stored && ver === TRIAL_FLOW_VERSION) return stored
     log(stored ? '🔄 Mise à jour du flow « Trial »…' : '📥 Import du flow « Trial » dans GeeLark…')
     try {
-      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(trialFlowDef) }, bearer)
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify((await import('./geelarkTrialFlow.json')).default) }, bearer)
       if (Number(res['code']) !== 0) { log(`⚠ Import flow Trial : ${res['msg'] ?? res['code']}`); return null }
       const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
       if (id) { try { localStorage.setItem(trialFlowLsKey(bearer), id); localStorage.setItem(trialFlowVerKey(bearer), TRIAL_FLOW_VERSION) } catch { /* ignore */ } return id }
@@ -723,7 +735,7 @@ export async function postStoryToPhone(
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
     log('   Tâche créée — story en cours…')
-    return await pollRpaTask(bearer, taskId, log, 15 * 60_000)
+    return await pollRpaTask(bearer, phoneId, taskId, log, 15 * 60_000)
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
@@ -771,7 +783,7 @@ async function ensurePhotoFlowId(bearer: string, log: (m: string) => void): Prom
     if (stored && ver === PHOTO_FLOW_VERSION) return stored
     log(stored ? '🔄 Mise à jour du flow « Photo »…' : '📥 Import du flow « Photo » dans GeeLark…')
     try {
-      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify(photoFlowDef) }, bearer)
+      const res = await geelarkFetch('/task/flow/import', { gal: JSON.stringify((await import('./geelarkPhotoFlow.json')).default) }, bearer)
       if (Number(res['code']) !== 0) { log(`⚠ Import flow photo : ${res['msg'] ?? res['code']}`); return null }
       const id = (res['data'] as Record<string, unknown>)?.['id'] as string | undefined
       if (id) { try { localStorage.setItem(photoFlowLsKey(bearer), id); localStorage.setItem(photoFlowVerKey(bearer), PHOTO_FLOW_VERSION) } catch { /* ignore */ } return id }
@@ -806,7 +818,7 @@ export async function postPhotoToPhone(
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé' }
     log('   Tâche créée — publication en cours…')
-    return await pollRpaTask(bearer, taskId, log, 15 * 60_000)
+    return await pollRpaTask(bearer, phoneId, taskId, log, 15 * 60_000)
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Erreur réseau' }
   } finally {
@@ -921,7 +933,7 @@ export async function postReelToPhone(
           const taskId = (d?.['taskId'] ?? d?.['id']) as string | undefined
           if (taskId) {
             log('   Tâche créée — publication en cours…')
-            const r = await pollRpaTask(bearer, taskId, log, 20 * 60_000)
+            const r = await pollRpaTask(bearer, phoneId, taskId, log, 20 * 60_000)
             // Le flow jette « TRIAL_UNAVAILABLE » si le toggle « Trial » n'apparaît pas
             // (compte non éligible) → post NON publié → on remonte un message clair
             // (échec → crédit remboursé par la phase settle).
@@ -950,7 +962,7 @@ export async function postReelToPhone(
         if (Number(res['code']) === 0) {
           const d = res['data'] as Record<string, unknown> | undefined
           const taskId = (d?.['taskId'] ?? d?.['id']) as string | undefined
-          if (taskId) { log('   Tâche créée — publication en cours…'); return await pollRpaTask(bearer, taskId, log, 20 * 60_000) }
+          if (taskId) { log('   Tâche créée — publication en cours…'); return await pollRpaTask(bearer, phoneId, taskId, log, 20 * 60_000) }
         }
         log(`   ⚠ Flow miniature indisponible (${res['msg'] ?? res['code']}) — repli publication simple.`)
       } else {
@@ -975,7 +987,7 @@ export async function postReelToPhone(
         const tidC = (dC?.['taskId'] ?? dC?.['id']) as string | undefined
         if (tidC) {
           log('   Tâche créée — publication en cours…')
-          const rC = await pollRpaTask(bearer, tidC, log, 20 * 60_000)
+          const rC = await pollRpaTask(bearer, phoneId, tidC, log, 20 * 60_000)
           if (rC.ok) return rC
           // Compte réellement déconnecté → aucun flow ne peut publier : message clair, pas de repli.
           if (/not logged in|login wall|sign in before|needhuman|déconnect/i.test(rC.error ?? '')) {
@@ -1001,7 +1013,7 @@ export async function postReelToPhone(
     const taskId = (res['data'] as Record<string, unknown>)?.['taskId'] as string
     if (!taskId) return { ok: false, error: 'Pas de taskId renvoyé par GeeLark' }
     log('   Tâche créée — publication en cours…')
-    const nat = await pollRpaTask(bearer, taskId, log, 20 * 60_000)
+    const nat = await pollRpaTask(bearer, phoneId, taskId, log, 20 * 60_000)
     if (!nat.ok && /not logged in|login wall|sign in before|needhuman|déconnect/i.test(nat.error ?? '')) {
       log('   ⛔ Compte DÉCONNECTÉ sur ce téléphone — reconnecte-le (onglet Connexion) avant de reposter.')
       return { ok: false, error: 'Compte déconnecté sur ce téléphone — reconnexion nécessaire avant de reposter.' }

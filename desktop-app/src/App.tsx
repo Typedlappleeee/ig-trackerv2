@@ -18,6 +18,7 @@ import Recipes from '@/pages/Recipes'
 import Publish from '@/pages/Publish'
 import Warmup from '@/pages/Warmup'
 import FlowBuilder from '@/pages/FlowBuilder'
+import { setLeaseOwner } from '@/lib/phoneWatch'
 import Studio from '@/pages/Studio'
 import Connections from '@/pages/Connections'
 import Automation from '@/pages/Automation'
@@ -85,6 +86,9 @@ function AppInner({ user }: { user: User }) {
   const license = useLicense(user, org)
   const { data, loading, reload } = useHubData(user, org, infra)
   const theme = themeFor(infra)
+
+  // Baux anti-coût des téléphones (phoneWatch) : inscrits au nom de l'utilisateur / org courants.
+  useEffect(() => { setLeaseOwner({ userId: user.id, orgId: org.currentOrg?.id ?? null }) }, [user.id, org.currentOrg?.id])
 
   // Garde-fou : si l'accès Blowsome n'est pas (ou plus) accordé, on ne reste jamais
   // sur cette infra VIP — retour GeeLark. (Même logique de porte que le web.)
