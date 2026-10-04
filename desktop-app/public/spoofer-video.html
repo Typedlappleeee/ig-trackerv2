@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spoofer Vidéo</title>
+<style>
+  /* Layout : une colonne centrée, carte sombre, accent violet ScaleFlow. */
+  :root{
+    --bg:#07060B; --panel:#120f20; --panel2:#1a1630; --line:rgba(216,180,254,.14);
+    --ink:#ECEAF5; --mut:#9a93b5; --dim:#6a6386; --accent:#A855F7; --accent2:#7C3AED;
+    --ok:#34D399; --bad:#F87171; --gold:#E9C46A;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Manrope',system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
+  body{padding:env(safe-area-inset-top,0) 16px calc(env(safe-area-inset-bottom,0) + 40px)}
+  a{color:var(--accent)}
+  .wrap{max-width:720px;margin:0 auto;padding-block:34px}
+  .bar{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(145deg,#A855F7,#7C3AED);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-shadow:0 8px 22px -8px rgba(168,85,247,.8), inset 0 1px 0 rgba(255,255,255,.3);flex-shrink:0}
+  .logo span{width:13px;height:3px;border-radius:9px;background:#fff}
+  .logo span:first-child{transform:skewX(-14deg)}.logo span:last-child{transform:skewX(14deg)}
+  h1{font-size:clamp(22px,4vw,30px);font-weight:800;letter-spacing:-.03em;margin:0}
+  .sub{margin:2px 0 0;font-size:13px;color:var(--mut)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+  .eyebrow{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+  .drop{border:1.5px dashed rgba(216,180,254,.35);border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+  .drop.hot{border-color:var(--accent);background:rgba(168,85,247,.07)}
+  .drop b{color:var(--ink)} .drop small{display:block;margin-top:5px;color:var(--mut);font-size:12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  label.fld{display:block;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);margin:0 0 6px}
+  select,input[type=number]{width:100%;height:40px;padding:0 11px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:14px;font-family:inherit}
+  .segs{display:inline-flex;gap:4px;padding:3px;border-radius:10px;background:rgba(0,0,0,.35)}
+  .segs button{height:34px;padding:0 14px;border:none;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:800;background:transparent;color:var(--mut);font-family:inherit}
+  .segs button.on{background:var(--accent);color:#1a1206}
+  .toggles{display:flex;flex-wrap:wrap;gap:16px;margin-top:4px}
+  .tg{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);cursor:pointer}
+  .tg input{width:17px;height:17px;accent-color:var(--accent)}
+  .go{width:100%;height:52px;margin-top:4px;border:none;border-radius:13px;cursor:pointer;font-size:13px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#1a1206;background:linear-gradient(135deg,#A855F7,#7C3AED);box-shadow:0 16px 40px -16px rgba(168,85,247,.85)}
+  .go:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  .note{font-size:12px;color:var(--mut);margin:10px 0 0}
+  .outs{display:flex;flex-direction:column;gap:9px}
+  .out{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:11px;background:var(--panel2);border:1px solid var(--line)}
+  .out .nm{font-weight:800;font-size:13.5px}
+  .out .meta{font-size:11px;color:var(--mut);font-family:'JetBrains Mono',ui-monospace,monospace;margin-top:2px;word-break:break-all}
+  .out .dl{margin-left:auto;flex-shrink:0;height:34px;padding:0 14px;display:inline-flex;align-items:center;border-radius:9px;background:var(--accent);color:#1a1206;font-weight:800;font-size:12.5px;text-decoration:none}
+  .prog{height:7px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:12px}
+  .prog>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#A855F7,#67E8F9);transition:width .2s}
+  .log{margin-top:10px;max-height:160px;overflow:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;line-height:1.6;color:var(--mut);white-space:pre-wrap;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:9px;padding:10px}
+  .spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;flex-shrink:0}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .foot{margin-top:18px;text-align:center;font-size:11px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="logo" aria-hidden="true"><span></span><span></span></div>
+    <div>
+      <h1>Spoofer Vidéo</h1>
+      <p class="sub">Rend chaque vidéo unique : métadonnées effacées, GPS &amp; appareil réécrits, micro-recadrage, ré-encodage H.264. Tout se passe dans ton navigateur — aucune vidéo n'est envoyée en ligne.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow">1 · Vidéo source</div>
+    <div class="drop" id="drop">
+      <b>Dépose une vidéo ici</b> ou clique pour choisir
+      <small id="dropInfo">MP4 / MOV / WebM — traité localement</small>
+    </div>
+    <input id="file" type="file" accept="video/*" hidden>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow">2 · Réglages du spoof</div>
+    <div style="margin-bottom:14px">
+      <label class="fld">Intensité (recadrage)</label>
+      <div class="segs" id="intensity">
+        <button data-v="subtle">Subtil</button>
+        <button data-v="normal" class="on">Normal</button>
+        <button data-v="strong">Fort</button>
+      </div>
+    </div>
+    <div class="grid">
+      <div>
+        <label class="fld" for="gps">Localisation GPS</label>
+        <select id="gps"></select>
+      </div>
+      <div>
+        <label class="fld" for="device">Appareil (métadonnées)</label>
+        <select id="device"></select>
+      </div>
+      <div>
+        <label class="fld" for="count">Nombre de variantes</label>
+        <input id="count" type="number" min="1" max="12" value="3">
+      </div>
+    </div>
+    <div class="toggles">
+      <label class="tg"><input type="checkbox" id="speed"> Micro-vitesse (0,98–1,02×)</label>
+      <label class="tg"><input type="checkbox" id="trim"> Couper un bout (début &amp; fin)</label>
+    </div>
+  </div>
+
+  <button class="go" id="go" disabled>Spoofer la vidéo</button>
+  <div class="prog" id="progWrap" hidden><i id="prog"></i></div>
+  <p class="note" id="status"></p>
+
+  <div class="card" id="outCard" hidden>
+    <div class="eyebrow">3 · Variantes spoofées</div>
+    <div class="outs" id="outs"></div>
+    <div class="log" id="log" hidden></div>
+  </div>
+
+  <p class="foot">Le moteur vidéo (~25 Mo) se charge une seule fois au premier lancement.</p>
+</div>
+
+<script src="https://unpkg.com/@ffmpeg/[email protected]/dist/ffmpeg.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const CORE = 'https://unpkg.com/@ffmpeg/[email protected]/dist/ffmpeg-core.js';
+
+  // ── Données identiques au spoofer du projet (studioTools.ts) ──────────────
+  const GPS_CITIES = [
+    {k:'none',label:'Aucune (effacée)',lat:0,lon:0},
+    {k:'france',label:'🇫🇷 France (aléatoire)',lat:46.6,lon:2.2},
+    {k:'paris',label:'Paris',lat:48.8566,lon:2.3522},
+    {k:'lyon',label:'Lyon',lat:45.7640,lon:4.8357},
+    {k:'marseille',label:'Marseille',lat:43.2965,lon:5.3698},
+    {k:'bordeaux',label:'Bordeaux',lat:44.8378,lon:-0.5792},
+    {k:'lille',label:'Lille',lat:50.6292,lon:3.0573},
+    {k:'bruxelles',label:'Bruxelles',lat:50.8503,lon:4.3517},
+    {k:'geneve',label:'Genève',lat:46.2044,lon:6.1432},
+    {k:'montreal',label:'Montréal',lat:45.5017,lon:-73.5673},
+    {k:'londres',label:'Londres',lat:51.5074,lon:-0.1278},
+    {k:'newyork',label:'New York',lat:40.7128,lon:-74.0060},
+    {k:'losangeles',label:'Los Angeles',lat:34.0522,lon:-118.2437},
+    {k:'dubai',label:'Dubaï',lat:25.2048,lon:55.2708},
+  ];
+  const FRANCE = [[48.8566,2.3522],[45.7640,4.8357],[43.2965,5.3698],[44.8378,-0.5792],[50.6292,3.0573],[43.6047,1.4442],[43.7102,7.2620],[47.2184,-1.5536],[48.5734,7.7521],[43.6108,3.8767],[47.3220,5.0415],[48.1173,-1.6778]];
+  const DEVICES = [
+    {k:'none',label:'Aucun (effacées)',apple:false,make:'',model:'',sw:''},
+    {k:'iphone15pro',label:'iPhone 15 Pro',apple:true,make:'Apple',model:'iPhone 15 Pro',sw:'17.4.1'},
+    {k:'iphone15',label:'iPhone 15',apple:true,make:'Apple',model:'iPhone 15',sw:'17.3'},
+    {k:'iphone14pro',label:'iPhone 14 Pro',apple:true,make:'Apple',model:'iPhone 14 Pro',sw:'17.2'},
+    {k:'iphone14',label:'iPhone 14',apple:true,make:'Apple',model:'iPhone 14',sw:'16.6'},
+    {k:'iphone13',label:'iPhone 13',apple:true,make:'Apple',model:'iPhone 13',sw:'16.5'},
+    {k:'iphone12',label:'iPhone 12',apple:true,make:'Apple',model:'iPhone 12',sw:'16.3'},
+    {k:'iphone11',label:'iPhone 11',apple:true,make:'Apple',model:'iPhone 11',sw:'15.7'},
+    {k:'iphonese',label:'iPhone SE',apple:true,make:'Apple',model:'iPhone SE',sw:'16.5'},
+    {k:'s23',label:'Samsung Galaxy S23',apple:false,make:'samsung',model:'SM-S911B',sw:''},
+    {k:'s22',label:'Samsung Galaxy S22',apple:false,make:'samsung',model:'SM-S901B',sw:''},
+    {k:'pixel8',label:'Google Pixel 8',apple:false,make:'Google',model:'Pixel 8',sw:''},
+  ];
+  function ranges(i){ if(i==='subtle')return{z:[1.01,1.025]}; if(i==='strong')return{z:[1.03,1.08]}; return{z:[1.02,1.05]}; }
+  function zoomFactor(seed,i){ const z=ranges(i).z; return z[0]+((Math.sin(seed*197.5)+1)/2)*(z[1]-z[0]); }
+  function spoofFilter(seed,i){ const z=zoomFactor(seed,i).toFixed(3); return `scale=iw*${z}:ih*${z},crop=iw/${z}:ih/${z},scale=trunc(iw/2)*2:trunc(ih/2)*2`; }
+  function iso6709(lat,lon){ const f=(v,w)=>(v>=0?'+':'-')+Math.abs(v).toFixed(4).padStart(w+5,'0'); return `${f(lat,2)}${f(lon,3)}/`; }
+  function gpsFor(k){ if(k==='none')return null; if(k==='france'){ const c=FRANCE[Math.floor(Math.random()*FRANCE.length)]; const j=()=> (Math.random()-.5)*.06; return {lat:+(c[0]+j()).toFixed(4),lon:+(c[1]+j()).toFixed(4)}; } const c=GPS_CITIES.find(x=>x.k===k); return c?{lat:c.lat,lon:c.lon}:null; }
+  function deviceMeta(k){ const d=DEVICES.find(x=>x.k===k); if(!d||!d.make)return[]; const o=['-metadata',`make=${d.make}`,'-metadata',`model=${d.model}`]; if(d.apple){o.push('-metadata',`com.apple.quicktime.make=${d.make}`,'-metadata',`com.apple.quicktime.model=${d.model}`); if(d.sw)o.push('-metadata',`com.apple.quicktime.software=${d.sw}`);} return o; }
+
+  // Remplir les selects
+  $('gps').innerHTML = GPS_CITIES.map(c=>`<option value="${c.k}">${c.label}</option>`).join('');
+  $('device').innerHTML = DEVICES.map(d=>`<option value="${d.k}">${d.label}</option>`).join('');
+
+  // Intensité (segmented)
+  let intensity='normal';
+  $('intensity').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; intensity=b.dataset.v; [...e.currentTarget.children].forEach(x=>x.classList.toggle('on',x===b)); });
+
+  // ── Fichier ───────────────────────────────────────────────────────────────
+  let file=null, duration=0;
+  const drop=$('drop');
+  drop.addEventListener('click',()=>$('file').click());
+  drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('hot');});
+  drop.addEventListener('dragleave',()=>drop.classList.remove('hot'));
+  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('hot'); if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0]);});
+  $('file').addEventListener('change',e=>{ if(e.target.files[0])setFile(e.target.files[0]); });
+  function setFile(f){
+    if(!f.type.startsWith('video/')&&!/\.(mp4|mov|webm|m4v)$/i.test(f.name)){ $('dropInfo').textContent='Ce fichier ne semble pas être une vidéo.'; return; }
+    file=f; duration=0;
+    $('dropInfo').textContent = `${f.name} · ${(f.size/1048576).toFixed(1)} Mo`;
+    $('go').disabled=false;
+    const v=document.createElement('video'); v.preload='metadata';
+    v.onloadedmetadata=()=>{ duration=v.duration||0; URL.revokeObjectURL(v.src); };
+    v.src=URL.createObjectURL(f);
+  }
+
+  // ── ffmpeg ──────────────────────────────────────────────────────────────
+  let ffmpeg=null;
+  function log(m){ const el=$('log'); el.hidden=false; el.textContent+=m+'\n'; el.scrollTop=el.scrollHeight; }
+  async function ensure(){
+    if(ffmpeg) return;
+    if(!window.FFmpeg){ throw new Error('moteur ffmpeg non chargé (réseau ?)'); }
+    const { createFFmpeg } = window.FFmpeg;
+    ffmpeg = createFFmpeg({ corePath: CORE, log:false });
+    ffmpeg.setProgress(({ratio})=>{ if(ratio>=0&&ratio<=1) setBar(baseRatio + ratio/totalN); });
+    $('status').textContent='Chargement du moteur vidéo (~25 Mo, une seule fois)…';
+    await ffmpeg.load();
+  }
+  async function sha(blob){ const h=await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()); return [...new Uint8Array(h)].slice(0,6).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+
+  let baseRatio=0, totalN=1;
+  function setBar(r){ $('prog').style.width=Math.max(0,Math.min(1,r))*100+'%'; }
+
+  async function spoofOne(data, seed, opts){
+    const { fetchFile } = window.FFmpeg;
+    ffmpeg.FS('writeFile','in.bin', await fetchFile(new Blob([data])));
+    let vf = spoofFilter(seed, opts.intensity);
+    let af = null;
+    if(opts.speed){ const s=(0.98 + Math.random()*0.04); vf += `,setpts=${(1/s).toFixed(4)}*PTS`; af = `atempo=${s.toFixed(4)}`; }
+    const trim=[];
+    if(opts.trim && duration>2){
+      const start=+(0.1+Math.random()*1.4).toFixed(2);
+      const end=+(0.1+Math.random()*0.2).toFixed(2);
+      const dur=Math.max(0.5, duration-start-end);
+      trim.push('-ss', String(start), '-t', dur.toFixed(2));
+    }
+    const meta=['-map_metadata','-1'];
+    const g=opts.gps; if(g){ const loc=iso6709(g.lat,g.lon); meta.push('-metadata',`location=${loc}`,'-metadata',`location-eng=${loc}`); }
+    meta.push(...deviceMeta(opts.device));
+    const H264=['-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart'];
+    const run = (withAudioFilter)=>{
+      const a=[...trim,'-i','in.bin','-vf',vf,...(withAudioFilter&&af?['-af',af]:[]),...meta,...H264,'out.mp4'];
+      return ffmpeg.run(...a);
+    };
+    try { await run(true); }
+    catch(e){ if(af){ log('   (pas de piste audio → vitesse appliquée à la vidéo seule)'); try{ffmpeg.FS('unlink','out.mp4');}catch(_){} await run(false); } else throw e; }
+    const out=ffmpeg.FS('readFile','out.mp4');
+    try{ffmpeg.FS('unlink','out.mp4');}catch(_){}
+    try{ffmpeg.FS('unlink','in.bin');}catch(_){}
+    return new Blob([out.buffer], {type:'video/mp4'});
+  }
+
+  const urls=[];
+  $('go').addEventListener('click', async ()=>{
+    if(!file) return;
+    const n=Math.max(1,Math.min(12, parseInt($('count').value)||1));
+    const opts={ intensity, gps:gpsFor($('gps').value), device:$('device').value, speed:$('speed').checked, trim:$('trim').checked };
+    const baseName=(file.name.replace(/\.[^.]+$/,'')||'video');
+    $('go').disabled=true; $('progWrap').hidden=false; setBar(0);
+    $('outCard').hidden=false; $('outs').innerHTML=''; $('log').hidden=true; $('log').textContent='';
+    urls.forEach(u=>URL.revokeObjectURL(u)); urls.length=0;
+    totalN=n;
+    try{
+      await ensure();
+      const data=new Uint8Array(await file.arrayBuffer());
+      for(let i=0;i<n;i++){
+        baseRatio=i/n; setBar(baseRatio);
+        $('status').textContent=`Spoof en cours… variante ${i+1}/${n}`;
+        const seed=Math.random()*1000+i*13.37;
+        let blob;
+        try{ blob=await spoofOne(data, seed, opts); }
+        catch(err){ log(`❌ variante ${i+1} : ${err.message||err}`); continue; }
+        const url=URL.createObjectURL(blob); urls.push(url);
+        const hash=await sha(blob);
+        const row=document.createElement('div'); row.className='out';
+        row.innerHTML=`<div style="min-width:0"><div class="nm">Variante ${i+1}</div><div class="meta">${(blob.size/1048576).toFixed(2)} Mo · sha ${hash}</div></div>`;
+        const a=document.createElement('a'); a.className='dl'; a.href=url; a.download=`${baseName}_spoof${i+1}.mp4`; a.textContent='Télécharger';
+        row.appendChild(a); $('outs').appendChild(row);
+        setBar((i+1)/n);
+      }
+      $('status').textContent=`✓ ${$('outs').children.length}/${n} variante(s) prête(s). Chaque fichier a une empreinte différente.`;
+    }catch(e){
+      $('status').textContent='❌ '+(e.message||e);
+    }finally{
+      setBar(1); setTimeout(()=>{$('progWrap').hidden=true;},600); $('go').disabled=false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
