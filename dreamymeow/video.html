@@ -145,7 +145,7 @@
         <div class="grid">
           <div><label class="f">Appareil (métadonnées)</label><select id="device"></select></div>
           <div><label class="f">Localisation GPS</label><select id="gps"></select></div>
-          <div><label class="f">Variantes</label><input id="copies" type="number" min="1" max="12" value="3" /></div>
+          <div><label class="f">Variantes</label><input id="copies" type="number" min="1" max="12" value="1" /></div>
         </div>
         <div style="margin-top:14px"><label class="f">Intensité (recadrage)</label>
           <div class="seg" id="intensity">
@@ -256,7 +256,10 @@
   }
 
   /* ══ ffmpeg ══ */
-  let ffmpeg=null, baseRatio=0, totalN=1;
+  let ffmpeg=null, baseRatio=0, totalN=1, mtActive=false;
+  // Multi-thread si la page est isolée cross-origin (COOP+COEP sur /video) →
+  // encodage bien plus rapide (plusieurs CPU). Sinon repli mono-thread (marche partout).
+  const MT = (self.crossOriginIsolated===true);
   function log(m){ const el=$('#log'); el.classList.add('show'); el.textContent+=m+'\n'; el.scrollTop=el.scrollHeight; }
   function setBar(r){ $('#progbar').style.width=Math.max(0,Math.min(1,r))*100+'%'; }
   async function ensure(){
@@ -267,11 +270,27 @@
     ffmpeg=new FFmpeg();
     ffmpeg.on('progress',({progress})=>{ if(progress>=0&&progress<=1) setBar(baseRatio + progress/totalN); });
     $('#count').textContent='Chargement du moteur vidéo (~32 Mo, une seule fois)…';
-    await ffmpeg.load({
-      classWorkerURL: await toBlobURL(`${FF}/814.ffmpeg.js`, 'text/javascript'),
-      coreURL:        await toBlobURL(`${FF}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL:        await toBlobURL(`${FF}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
+    const cfg={ classWorkerURL: await toBlobURL(`${FF}/814.ffmpeg.js`, 'text/javascript') };
+    if(MT){
+      cfg.coreURL   = await toBlobURL(`${FF}/mt/ffmpeg-core.js`, 'text/javascript');
+      cfg.wasmURL   = await toBlobURL(`${FF}/mt/ffmpeg-core.wasm`, 'application/wasm');
+      cfg.workerURL = await toBlobURL(`${FF}/mt/ffmpeg-core.worker.js`, 'text/javascript');
+    }else{
+      cfg.coreURL   = await toBlobURL(`${FF}/ffmpeg-core.js`, 'text/javascript');
+      cfg.wasmURL   = await toBlobURL(`${FF}/ffmpeg-core.wasm`, 'application/wasm');
+    }
+    try{ await ffmpeg.load(cfg); mtActive=MT; }
+    catch(e){
+      // Repli mono-thread si le cœur multi-thread échoue (rare).
+      if(MT){ log('   (multi-thread indisponible → mono-thread)'); mtActive=false;
+        const ff2=new FFmpeg();
+        ff2.on('progress',({progress})=>{ if(progress>=0&&progress<=1) setBar(baseRatio + progress/totalN); });
+        await ff2.load({ classWorkerURL: await toBlobURL(`${FF}/814.ffmpeg.js`, 'text/javascript'),
+          coreURL: await toBlobURL(`${FF}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${FF}/ffmpeg-core.wasm`, 'application/wasm') });
+        ffmpeg=ff2;
+      } else throw e;
+    }
   }
   async function sha(blob){ const h=await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()); return [...new Uint8Array(h)].slice(0,6).map(b=>b.toString(16).padStart(2,'0')).join(''); }
 
@@ -292,7 +311,7 @@
     const meta=['-map_metadata','-1'];
     const g=opts.gps; if(g){ const loc=iso6709(g.lat,g.lon); meta.push('-metadata',`location=${loc}`,'-metadata',`location-eng=${loc}`); }
     meta.push(...deviceMeta(opts.device));
-    const H264=['-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart'];
+    const H264=['-threads','0','-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart'];
     const runFf=(withAudioFilter)=>{
       const a=['-i','in.mp4',...trim,'-vf',vf,...(withAudioFilter&&af?['-af',af]:[]),...meta,...H264,'out.mp4'];
       return ffmpeg.exec(a);
@@ -337,7 +356,7 @@
         row.appendChild(a); $('#results').appendChild(row);
         setBar((i+1)/n);
       }
-      $('#count').textContent=`✅ ${okCount}/${n} variante(s) prête(s) — chaque fichier a une empreinte différente`;
+      $('#count').textContent=`✅ ${okCount}/${n} variante(s) prête(s)${mtActive?' ⚡ turbo':''} — chaque fichier a une empreinte différente`;
     }catch(e){
       $('#count').textContent='❌ '+(e.message||e);
     }finally{
