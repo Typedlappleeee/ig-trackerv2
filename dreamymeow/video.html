@@ -99,6 +99,10 @@
   .tab{flex:1; text-align:center; padding:11px 0; border-radius:9px; font-weight:800; font-size:14px; color:var(--mut); text-decoration:none; transition:.12s}
   .tab:hover{color:var(--txt)}
   .tab.on{background:linear-gradient(135deg,#c084fc,#7c3aed); color:#fff}
+  .right{margin-left:auto; display:flex; align-items:center; gap:10px}
+  .lang{display:inline-flex; gap:2px; padding:3px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--edge)}
+  .lang button{border:none; background:transparent; color:var(--mut); font-family:inherit; font-weight:800; font-size:11px; padding:4px 8px; border-radius:6px; cursor:pointer}
+  .lang button.on{background:var(--acc); color:#1a1206}
   @media(max-width:480px){ .hero h2{font-size:25px} .grid{grid-template-columns:1fr} }
 </style>
 </head>
@@ -106,57 +110,60 @@
 <div class="wrap">
   <header>
     <span class="logo"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></span>
-    <h1>Spoof <span>Vidéo</span></h1>
-    <span class="brand">dreamymeow.com</span>
+    <h1 data-i18n-html="h1">Spoof <span>Vidéo</span></h1>
+    <div class="right">
+      <span class="brand">dreamymeow.com</span>
+      <div class="lang" id="lang"><button data-l="fr">FR</button><button data-l="en">EN</button></div>
+    </div>
   </header>
 
   <nav class="tabs">
-    <a class="tab" href="/">📷 Image</a>
-    <a class="tab on" href="/video">🎬 Vidéo</a>
+    <a class="tab" href="/" data-i18n="tabImage">📷 Image</a>
+    <a class="tab on" href="/video" data-i18n="tabVideo">🎬 Vidéo</a>
   </nav>
 
   <div class="hero">
-    <h2>Rends tes vidéos <span class="g">uniques</span> en un clic</h2>
-    <p>Dépose une vidéo, clique sur Spoofer, télécharge. Métadonnées effacées, GPS &amp; appareil réécrits, micro-recadrage et ré-encodage — tout dans ton navigateur, rien n'est envoyé.</p>
+    <h2 data-i18n-html="heroH">Rends tes vidéos <span class="g">uniques</span> en un clic</h2>
+    <p data-i18n="heroP">Dépose une vidéo, clique sur Spoofer, télécharge. Métadonnées effacées, GPS &amp; appareil réécrits, micro-recadrage et ré-encodage — tout dans ton navigateur, rien n'est envoyé.</p>
   </div>
 
   <div class="card">
     <div id="drop" class="drop">
       <div class="ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg></div>
-      <b>Dépose ta vidéo <em>ou clique</em></b>
-      <small>MP4 · MOV · WEBM — traitée localement</small>
+      <b data-i18n-html="dropB">Dépose ta vidéo <em>ou clique</em></b>
+      <small data-i18n="dropS">MP4 · MOV · WEBM — traitée localement</small>
       <input id="file" type="file" accept="video/*" hidden />
     </div>
 
     <div id="picked" class="picked">
       <span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#052e16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
       <span class="txt" id="pickedTxt"></span>
-      <span class="clr" id="clr">effacer</span>
+      <span class="clr" id="clr" data-i18n="clear">effacer</span>
     </div>
 
     <button id="go" class="go" disabled>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
-      Spoofer
+      <span data-i18n="spoof">Spoofer</span>
     </button>
 
     <details class="adv">
-      <summary><svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>Options avancées</summary>
+      <summary><svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg><span data-i18n="advOpts">Options avancées</span></summary>
       <div class="advbody">
         <div class="grid">
-          <div><label class="f">Appareil (métadonnées)</label><select id="device"></select></div>
-          <div><label class="f">Localisation GPS</label><select id="gps"></select></div>
-          <div><label class="f">Variantes</label><input id="copies" type="number" min="1" max="12" value="1" /></div>
+          <div><label class="f" data-i18n="lblDevice">Appareil (métadonnées)</label><select id="device"></select></div>
+          <div><label class="f" data-i18n="lblGps">Localisation GPS</label><select id="gps"></select></div>
+          <div><label class="f" data-i18n="lblVariants">Variantes</label><input id="copies" type="number" min="1" max="12" value="1" /></div>
         </div>
-        <div style="margin-top:14px"><label class="f">Intensité (recadrage)</label>
+        <div style="margin-top:14px"><label class="f" data-i18n="lblIntensity">Intensité (recadrage)</label>
           <div class="seg" id="intensity">
-            <button data-v="subtle">Subtile</button>
-            <button data-v="normal" class="on">Normale</button>
-            <button data-v="strong">Forte</button>
+            <button data-v="subtle" data-i18n="iSubtle">Subtile</button>
+            <button data-v="normal" class="on" data-i18n="iNormal">Normale</button>
+            <button data-v="strong" data-i18n="iStrong">Forte</button>
           </div>
         </div>
         <div class="toggles" id="toggles">
-          <span class="chip" data-k="speed" title="Change légèrement la vitesse (0,98–1,02×)"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Micro-vitesse</span>
-          <span class="chip" data-k="trim" title="Coupe un court bout au début et à la fin"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Couper un bout</span>
+          <span class="chip" data-k="speed" data-i18n-title="tSpeed" title="Change légèrement la vitesse (0,98–1,02×)"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cSpeed">Micro-vitesse</span></span>
+          <span class="chip" data-k="trim" data-i18n-title="tTrim" title="Coupe un court bout au début et à la fin"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cTrim">Couper un bout</span></span>
         </div>
       </div>
     </details>
@@ -170,14 +177,76 @@
   </div>
 
   <footer>
-    100 % local — aucune vidéo n'est envoyée en ligne. Le moteur vidéo (~25 Mo) se charge une seule fois.<br>
-    <a class="link" href="/">← Spoofer image</a>
+    <span data-i18n="foot">100 % local — aucune vidéo n'est envoyée en ligne. Le moteur vidéo (~32 Mo) se charge une seule fois.</span><br>
+    <a class="link" href="/" data-i18n="footLink">← Spoofer image</a>
   </footer>
 </div>
 
 <script>
 (() => {
   const $=s=>document.querySelector(s);
+
+  /* ══ i18n FR / EN ══ */
+  const I18N = {
+    fr:{
+      h1:'Spoof <span>Vidéo</span>', tabImage:'📷 Image', tabVideo:'🎬 Vidéo',
+      heroH:'Rends tes vidéos <span class="g">uniques</span> en un clic',
+      heroP:"Dépose une vidéo, clique sur Spoofer, télécharge. Métadonnées effacées, GPS &amp; appareil réécrits, micro-recadrage et ré-encodage — tout dans ton navigateur, rien n'est envoyé.",
+      dropB:'Dépose ta vidéo <em>ou clique</em>', dropS:'MP4 · MOV · WEBM — traitée localement',
+      clear:'effacer', spoof:'Spoofer', advOpts:'Options avancées',
+      lblDevice:'Appareil (métadonnées)', lblGps:'Localisation GPS', lblVariants:'Variantes',
+      lblIntensity:'Intensité (recadrage)', iSubtle:'Subtile', iNormal:'Normale', iStrong:'Forte',
+      cSpeed:'Micro-vitesse', cTrim:'Couper un bout',
+      tSpeed:'Change légèrement la vitesse (0,98–1,02×)', tTrim:'Coupe un court bout au début et à la fin',
+      foot:"100 % local — aucune vidéo n'est envoyée en ligne. Le moteur vidéo (~32 Mo) se charge une seule fois.",
+      footLink:'← Spoofer image',
+      notVideo:"Ce fichier ne semble pas être une vidéo.",
+      engFail:'moteur ffmpeg non chargé (réseau ?)',
+      loading:'Chargement du moteur vidéo (~32 Mo, une seule fois)…',
+      noAudio:'   (pas de piste audio → vitesse appliquée à la vidéo seule)',
+      stMono:'   (multi-thread indisponible → mono-thread)',
+      processing:'Traitement…', spoofing:'Spoof en cours…', variant:'variante', variantC:'Variante',
+      download:'Télécharger', mb:'Mo',
+      ready:(ok,n,t)=>`✅ ${ok}/${n} variante(s) prête(s)${t?' ⚡ turbo':''} — chaque fichier a une empreinte différente`,
+      devRandom:'iPhone aléatoire (recommandé)', devNone:'Aucun (effacées)',
+      gpsNone:'Aucune (effacée)', gpsFrance:'🇫🇷 France (aléatoire)',
+    },
+    en:{
+      h1:'Spoof <span>Video</span>', tabImage:'📷 Image', tabVideo:'🎬 Video',
+      heroH:'Make your videos <span class="g">unique</span> in one click',
+      heroP:"Drop a video, click Spoof, download. Metadata wiped, GPS &amp; device rewritten, micro-crop and re-encode — all in your browser, nothing is uploaded.",
+      dropB:'Drop your video <em>or click</em>', dropS:'MP4 · MOV · WEBM — processed locally',
+      clear:'clear', spoof:'Spoof', advOpts:'Advanced options',
+      lblDevice:'Device (metadata)', lblGps:'GPS location', lblVariants:'Variants',
+      lblIntensity:'Intensity (crop)', iSubtle:'Subtle', iNormal:'Normal', iStrong:'Strong',
+      cSpeed:'Micro-speed', cTrim:'Trim a bit',
+      tSpeed:'Slightly changes the speed (0.98–1.02×)', tTrim:'Cuts a short bit at the start and end',
+      foot:'100% local — no video is uploaded. The video engine (~32 MB) loads once.',
+      footLink:'← Image spoofer',
+      notVideo:"This file doesn't look like a video.",
+      engFail:'video engine not loaded (network?)',
+      loading:'Loading the video engine (~32 MB, once)…',
+      noAudio:'   (no audio track → speed applied to video only)',
+      stMono:'   (multi-thread unavailable → single-thread)',
+      processing:'Processing…', spoofing:'Spoofing…', variant:'variant', variantC:'Variant',
+      download:'Download', mb:'MB',
+      ready:(ok,n,t)=>`✅ ${ok}/${n} variant(s) ready${t?' ⚡ turbo':''} — each file has a different fingerprint`,
+      devRandom:'Random iPhone (recommended)', devNone:'None (cleared)',
+      gpsNone:'None (cleared)', gpsFrance:'🇫🇷 France (random)',
+    },
+  };
+  let LANG = (()=>{ try{ return localStorage.getItem('dreamymeow-lang'); }catch(_){ return null; } })()
+            || ((navigator.language||'fr').toLowerCase().startsWith('fr') ? 'fr' : 'en');
+  const tr = k => (I18N[LANG] && I18N[LANG][k]!=null) ? I18N[LANG][k] : (I18N.fr[k] ?? k);
+  function applyLang(){
+    document.documentElement.lang = LANG;
+    document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = tr(el.getAttribute('data-i18n')); });
+    document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML = tr(el.getAttribute('data-i18n-html')); });
+    document.querySelectorAll('[data-i18n-title]').forEach(el=>{ el.title = tr(el.getAttribute('data-i18n-title')); });
+    document.querySelectorAll('#lang button').forEach(b=> b.classList.toggle('on', b.dataset.l===LANG));
+    if(typeof fillSelects==='function') fillSelects();
+  }
+
   // ffmpeg.wasm 0.12 (même version que l'app ScaleFlow) — cœur mono-thread :
   // pas besoin de SharedArrayBuffer / COOP-COEP. Fichiers AUTO-HÉBERGÉS dans
   // /ffmpeg/ (même origine) → aucune dépendance CDN ; on enveloppe tout en blob
@@ -227,14 +296,23 @@
   function gpsFor(k){ if(k==='none')return null; if(k==='france'){ const c=FRANCE[Math.floor(Math.random()*FRANCE.length)]; const j=()=>(Math.random()-.5)*.06; return {lat:+(c[0]+j()).toFixed(4),lon:+(c[1]+j()).toFixed(4)}; } const c=GPS_CITIES.find(x=>x.k===k); return c&&c.lat!=null?{lat:c.lat,lon:c.lon}:null; }
   function deviceMeta(k){ const d=DEVICES.find(x=>x.k===k); if(!d||!d.make)return[]; const o=['-metadata',`make=${d.make}`,'-metadata',`model=${d.model}`]; if(d.apple){o.push('-metadata',`com.apple.quicktime.make=${d.make}`,'-metadata',`com.apple.quicktime.model=${d.model}`); if(d.sw)o.push('-metadata',`com.apple.quicktime.software=${d.sw}`);} return o; }
 
-  /* ══ UI : selects ══ */
-  DEVICES.forEach(d=>{ const o=document.createElement('option'); o.value=d.k; o.textContent=d.label; $('#device').appendChild(o); });
-  GPS_CITIES.forEach(c=>{ const o=document.createElement('option'); o.value=c.k; o.textContent=c.label; $('#gps').appendChild(o); });
-  $('#device').value='randomiphone'; $('#gps').value='france';
+  /* ══ UI : selects (libellés spéciaux traduits, noms propres inchangés) ══ */
+  function fillSelects(){
+    const dv=$('#device').value||'randomiphone', gv=$('#gps').value||'france';
+    const devLbl=k=> k==='randomiphone'?tr('devRandom'): k==='none'?tr('devNone'): null;
+    const gpsLbl=k=> k==='none'?tr('gpsNone'): k==='france'?tr('gpsFrance'): null;
+    $('#device').innerHTML=DEVICES.map(d=>`<option value="${d.k}">${devLbl(d.k)??d.label}</option>`).join('');
+    $('#gps').innerHTML=GPS_CITIES.map(c=>`<option value="${c.k}">${gpsLbl(c.k)??c.label}</option>`).join('');
+    $('#device').value=dv; $('#gps').value=gv;
+  }
   let intensity='normal';
   $('#intensity').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; intensity=b.dataset.v; [...$('#intensity').children].forEach(x=>x.classList.toggle('on',x===b)); });
   const tf={ speed:false, trim:false };
   $('#toggles').addEventListener('click',e=>{ const c=e.target.closest('.chip'); if(!c)return; const k=c.dataset.k; tf[k]=!tf[k]; c.classList.toggle('on',tf[k]); });
+
+  /* ══ Bascule de langue ══ */
+  $('#lang').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; LANG=b.dataset.l; try{ localStorage.setItem('dreamymeow-lang',LANG); }catch(_){} applyLang(); });
+  applyLang();
 
   /* ══ Fichier ══ */
   let file=null, duration=0;
@@ -246,7 +324,7 @@
   input.addEventListener('change',()=>{ if(input.files[0]) setFile(input.files[0]); });
   $('#clr').addEventListener('click',e=>{ e.stopPropagation(); file=null; input.value=''; duration=0; $('#picked').classList.remove('show'); $('#go').disabled=true; });
   function setFile(f){
-    if(!f.type.startsWith('video/') && !/\.(mp4|mov|webm|m4v)$/i.test(f.name)){ alert('Ce fichier ne semble pas être une vidéo.'); return; }
+    if(!f.type.startsWith('video/') && !/\.(mp4|mov|webm|m4v)$/i.test(f.name)){ alert(tr('notVideo')); return; }
     file=f; duration=0;
     $('#pickedTxt').textContent=`${f.name} · ${(f.size/1048576).toFixed(1)} Mo`;
     $('#picked').classList.add('show'); $('#go').disabled=false;
@@ -264,12 +342,12 @@
   function setBar(r){ $('#progbar').style.width=Math.max(0,Math.min(1,r))*100+'%'; }
   async function ensure(){
     if(ffmpeg) return;
-    if(!window.FFmpegWASM || !window.FFmpegUtil){ throw new Error('moteur ffmpeg non chargé (réseau ?)'); }
+    if(!window.FFmpegWASM || !window.FFmpegUtil){ throw new Error(tr('engFail')); }
     const { FFmpeg }=window.FFmpegWASM;
     const { toBlobURL }=window.FFmpegUtil;
     ffmpeg=new FFmpeg();
     ffmpeg.on('progress',({progress})=>{ if(progress>=0&&progress<=1) setBar(baseRatio + progress/totalN); });
-    $('#count').textContent='Chargement du moteur vidéo (~32 Mo, une seule fois)…';
+    $('#count').textContent=tr('loading');
     const cfg={ classWorkerURL: await toBlobURL(`${FF}/814.ffmpeg.js`, 'text/javascript') };
     if(MT){
       cfg.coreURL   = await toBlobURL(`${FF}/mt/ffmpeg-core.js`, 'text/javascript');
@@ -282,7 +360,7 @@
     try{ await ffmpeg.load(cfg); mtActive=MT; }
     catch(e){
       // Repli mono-thread si le cœur multi-thread échoue (rare).
-      if(MT){ log('   (multi-thread indisponible → mono-thread)'); mtActive=false;
+      if(MT){ log(tr('stMono')); mtActive=false;
         const ff2=new FFmpeg();
         ff2.on('progress',({progress})=>{ if(progress>=0&&progress<=1) setBar(baseRatio + progress/totalN); });
         await ff2.load({ classWorkerURL: await toBlobURL(`${FF}/814.ffmpeg.js`, 'text/javascript'),
@@ -332,7 +410,7 @@
     const n=Math.max(1,Math.min(12, parseInt($('#copies').value)||1));
     const opts={ intensity, gps:gpsFor($('#gps').value), device:resolveDevice($('#device').value), speed:tf.speed, trim:tf.trim };
     const baseName=(file.name.replace(/\.[^.]+$/,'')||'video');
-    const go=$('#go'); go.disabled=true; go.innerHTML='<span class="spin"></span> Traitement…';
+    const go=$('#go'); go.disabled=true; go.innerHTML=`<span class="spin"></span> ${tr('processing')}`;
     $('#out').style.display='block'; $('#results').innerHTML=''; $('#log').classList.remove('show'); $('#log').textContent=''; setBar(0);
     urls.forEach(u=>URL.revokeObjectURL(u)); urls.length=0;
     totalN=n;
@@ -342,26 +420,26 @@
       let okCount=0;
       for(let i=0;i<n;i++){
         baseRatio=i/n; setBar(baseRatio);
-        $('#count').textContent=`Spoof en cours… variante ${i+1}/${n}`;
+        $('#count').textContent=`${tr('spoofing')} ${tr('variant')} ${i+1}/${n}`;
         const seed=Math.random()*1000+i*13.37;
         let blob;
         try{ blob=await spoofOne(data, seed, opts); }
-        catch(err){ log(`❌ variante ${i+1} : ${err.message||err}`); continue; }
+        catch(err){ log(`❌ ${tr('variant')} ${i+1} : ${err.message||err}`); continue; }
         const url=URL.createObjectURL(blob); urls.push(url);
         const hash=await sha(blob); okCount++;
         const row=document.createElement('div'); row.className='res';
-        row.innerHTML=`<div style="min-width:0"><div class="nm">Variante ${i+1}</div><div class="mt">${(blob.size/1048576).toFixed(2)} Mo · sha <code>${hash}</code></div></div>`;
+        row.innerHTML=`<div style="min-width:0"><div class="nm">${tr('variantC')} ${i+1}</div><div class="mt">${(blob.size/1048576).toFixed(2)} ${tr('mb')} · sha <code>${hash}</code></div></div>`;
         const a=document.createElement('a'); a.className='dl'; a.href=url; a.download=`${baseName}_spoof${i+1}.mp4`;
-        a.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Télécharger';
+        a.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>'+tr('download');
         row.appendChild(a); $('#results').appendChild(row);
         setBar((i+1)/n);
       }
-      $('#count').textContent=`✅ ${okCount}/${n} variante(s) prête(s)${mtActive?' ⚡ turbo':''} — chaque fichier a une empreinte différente`;
+      $('#count').textContent=tr('ready')(okCount,n,mtActive);
     }catch(e){
       $('#count').textContent='❌ '+(e.message||e);
     }finally{
       setBar(1); go.disabled=false;
-      go.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg> Spoofer';
+      go.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg> '+tr('spoof');
     }
   });
 })();

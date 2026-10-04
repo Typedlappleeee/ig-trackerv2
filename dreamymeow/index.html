@@ -113,6 +113,10 @@
   .tab{flex:1; text-align:center; padding:11px 0; border-radius:9px; font-weight:800; font-size:14px; color:var(--mut); text-decoration:none; transition:.12s}
   .tab:hover{color:var(--txt)}
   .tab.on{background:linear-gradient(135deg,#c084fc,#7c3aed); color:#fff}
+  .right{margin-left:auto; display:flex; align-items:center; gap:10px}
+  .lang{display:inline-flex; gap:2px; padding:3px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--edge)}
+  .lang button{border:none; background:transparent; color:var(--mut); font-family:inherit; font-weight:800; font-size:11px; padding:4px 8px; border-radius:6px; cursor:pointer}
+  .lang button.on{background:var(--acc); color:#1a1206}
   @media(max-width:480px){ .hero h2{font-size:25px} .mcols{grid-template-columns:1fr} .mcol:first-child{border-right:none;border-bottom:1px solid var(--edge)} }
 </style>
 </head>
@@ -120,68 +124,71 @@
 <div class="wrap">
   <header>
     <span class="logo"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></span>
-    <h1>Spoof <span>Image</span></h1>
-    <span class="brand">dreamymeow.com · build 5</span>
+    <h1 data-i18n-html="h1">Spoof <span>Image</span></h1>
+    <div class="right">
+      <span class="brand">dreamymeow.com · build 5</span>
+      <div class="lang" id="lang"><button data-l="fr">FR</button><button data-l="en">EN</button></div>
+    </div>
   </header>
 
   <nav class="tabs">
-    <a class="tab on" href="/">📷 Image</a>
-    <a class="tab" href="/video">🎬 Vidéo</a>
+    <a class="tab on" href="/" data-i18n="tabImage">📷 Image</a>
+    <a class="tab" href="/video" data-i18n="tabVideo">🎬 Vidéo</a>
   </nav>
 
   <div class="hero">
-    <h2>Rends tes photos <span class="g">uniques</span> en un clic</h2>
-    <p>Dépose tes photos, clique sur Spoofer, télécharge. Métadonnées et pixels modifiés — tout dans ton navigateur, rien n'est envoyé.</p>
+    <h2 data-i18n-html="heroH">Rends tes photos <span class="g">uniques</span> en un clic</h2>
+    <p data-i18n="heroP">Dépose tes photos, clique sur Spoofer, télécharge. Métadonnées et pixels modifiés — tout dans ton navigateur, rien n'est envoyé.</p>
   </div>
 
   <div class="card">
     <div id="drop" class="drop">
       <div class="ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg></div>
-      <b>Dépose tes photos <em>ou clique</em></b>
-      <small>JPG · PNG · WEBP — plusieurs à la fois</small>
+      <b data-i18n-html="dropB">Dépose tes photos <em>ou clique</em></b>
+      <small data-i18n="dropS">JPG · PNG · WEBP — plusieurs à la fois</small>
       <input id="file" type="file" accept="image/*" multiple hidden />
     </div>
 
     <div id="picked" class="picked">
       <span class="ck"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#052e16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
       <span class="txt" id="pickedTxt"></span>
-      <span class="clr" id="clr">effacer</span>
+      <span class="clr" id="clr" data-i18n="clear">effacer</span>
     </div>
 
     <button id="go" class="go" disabled>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
-      Spoofer
+      <span data-i18n="spoof">Spoofer</span>
     </button>
 
     <details class="adv">
-      <summary><svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>Options avancées</summary>
+      <summary><svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg><span data-i18n="advOpts">Options avancées</span></summary>
       <div class="advbody">
         <div class="grid">
-          <div><label class="f">Appareil</label><select id="device"></select></div>
-          <div><label class="f">Localisation GPS</label><select id="gps"></select></div>
-          <div><label class="f">Date de prise</label>
+          <div><label class="f" data-i18n="lblDevice">Appareil</label><select id="device"></select></div>
+          <div><label class="f" data-i18n="lblGps">Localisation GPS</label><select id="gps"></select></div>
+          <div><label class="f" data-i18n="lblDate">Date de prise</label>
             <select id="date">
-              <option value="now">Maintenant</option>
-              <option value="7">Il y a ~1 semaine</option>
-              <option value="30">Il y a ~1 mois</option>
-              <option value="keep">Ne pas écrire</option>
+              <option value="now" data-i18n="dNow">Maintenant</option>
+              <option value="7" data-i18n="dWeek">Il y a ~1 semaine</option>
+              <option value="30" data-i18n="dMonth">Il y a ~1 mois</option>
+              <option value="keep" data-i18n="dKeep">Ne pas écrire</option>
             </select>
           </div>
-          <div><label class="f">Variantes / image</label><input id="copies" type="number" min="1" max="20" value="1" /></div>
+          <div><label class="f" data-i18n="lblVariants">Variantes / image</label><input id="copies" type="number" min="1" max="20" value="1" /></div>
         </div>
-        <div style="margin-top:14px"><label class="f">Intensité</label>
+        <div style="margin-top:14px"><label class="f" data-i18n="lblIntensity">Intensité</label>
           <div class="seg" id="intensity">
-            <button data-v="subtle">Subtile</button>
-            <button data-v="normal" class="on">Normale</button>
-            <button data-v="strong">Forte</button>
+            <button data-v="subtle" data-i18n="iSubtle">Subtile</button>
+            <button data-v="normal" class="on" data-i18n="iNormal">Normale</button>
+            <button data-v="strong" data-i18n="iStrong">Forte</button>
           </div>
         </div>
         <div class="toggles" id="toggles">
-          <span class="chip on" data-k="zoom"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Zoom</span>
-          <span class="chip on" data-k="rotate"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Rotation</span>
-          <span class="chip on" data-k="light"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Luminosité</span>
-          <span class="chip on" data-k="noise" title="Micro-grain imperceptible à l'œil — change l'empreinte du fichier"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Grain invisible</span>
-          <span class="chip" data-k="flip"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Miroir</span>
+          <span class="chip on" data-k="zoom"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cZoom">Zoom</span></span>
+          <span class="chip on" data-k="rotate"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cRotate">Rotation</span></span>
+          <span class="chip on" data-k="light"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cLight">Luminosité</span></span>
+          <span class="chip on" data-k="noise" data-i18n-title="tNoise" title="Micro-grain imperceptible à l'œil — change l'empreinte du fichier"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cNoise">Grain invisible</span></span>
+          <span class="chip" data-k="flip"><span class="dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span data-i18n="cFlip">Miroir</span></span>
         </div>
       </div>
     </details>
@@ -191,27 +198,90 @@
     <div class="prog"><i id="progbar"></i></div>
     <div class="bar">
       <span class="count" id="count"></span>
-      <button id="dlall" class="dlall"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Tout télécharger</button>
+      <button id="dlall" class="dlall"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg><span data-i18n="dlAll">Tout télécharger</span></button>
     </div>
     <div class="results" id="results"></div>
     <div class="meta" id="meta">
-      <div class="mh"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg><span id="metaTitle">Métadonnées</span><span class="x" id="metaClose">×</span></div>
+      <div class="mh"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg><span id="metaTitle" data-i18n="metaTitleBase">Métadonnées</span><span class="x" id="metaClose">×</span></div>
       <div class="mcols">
-        <div class="mcol a"><p class="t">📷 Avant</p><div id="metaBefore"></div></div>
-        <div class="mcol b"><p class="t">✨ Après</p><div id="metaAfter"></div></div>
+        <div class="mcol a"><p class="t" data-i18n="metaBefore">📷 Avant</p><div id="metaBefore"></div></div>
+        <div class="mcol b"><p class="t" data-i18n="metaAfter">✨ Après</p><div id="metaAfter"></div></div>
       </div>
       <div class="hashrow" id="hashrow"></div>
     </div>
   </div>
 
   <footer>
-    100 % local — aucune image n'est envoyée en ligne.<br>
-    <a class="link" href="/video">Spoofer vidéo →</a>
+    <span data-i18n="foot">100 % local — aucune image n'est envoyée en ligne.</span><br>
+    <a class="link" href="/video" data-i18n="footLink">Spoofer vidéo →</a>
   </footer>
 
 </div>
 
 <script>
+/* ══ i18n FR / EN ══ */
+const I18N = {
+  fr:{
+    h1:'Spoof <span>Image</span>', tabImage:'📷 Image', tabVideo:'🎬 Vidéo',
+    heroH:'Rends tes photos <span class="g">uniques</span> en un clic',
+    heroP:"Dépose tes photos, clique sur Spoofer, télécharge. Métadonnées et pixels modifiés — tout dans ton navigateur, rien n'est envoyé.",
+    dropB:'Dépose tes photos <em>ou clique</em>', dropS:'JPG · PNG · WEBP — plusieurs à la fois',
+    clear:'effacer', spoof:'Spoofer', advOpts:'Options avancées',
+    lblDevice:'Appareil', lblGps:'Localisation GPS', lblDate:'Date de prise',
+    lblVariants:'Variantes / image', lblIntensity:'Intensité',
+    dNow:'Maintenant', dWeek:'Il y a ~1 semaine', dMonth:'Il y a ~1 mois', dKeep:'Ne pas écrire',
+    iSubtle:'Subtile', iNormal:'Normale', iStrong:'Forte',
+    cZoom:'Zoom', cRotate:'Rotation', cLight:'Luminosité', cNoise:'Grain invisible', cFlip:'Miroir',
+    tNoise:"Micro-grain imperceptible à l'œil — change l'empreinte du fichier",
+    dlAll:'Tout télécharger', metaBefore:'📷 Avant', metaAfter:'✨ Après', metaTitleBase:'Métadonnées',
+    foot:"100 % local — aucune image n'est envoyée en ligne.", footLink:'Spoofer vidéo →',
+    processing:'Traitement…', download:'Télécharger', viewMeta:'Voir les métadonnées', dims:'Dimensions',
+    picked:n=>`${n} image${n>1?'s':''} prête${n>1?'s':''}`,
+    generated:(d,t)=>`${d}/${t} générée(s)`, readyImg:n=>`✅ ${n} image(s) prête(s)`,
+    exifNone:'aucune (ou nettoyée)', exifWiped:'effacé',
+    hashLabel:'Empreinte SHA-256 :', uniqueFile:'fichier unique ✓',
+    devRandom:'iPhone aléatoire (recommandé)', devNone:'Aucun (métadonnées effacées)',
+    gpsNone:'Aucune', gpsFrance:'🇫🇷 France (aléatoire)',
+    metaMap:{},
+  },
+  en:{
+    h1:'Spoof <span>Image</span>', tabImage:'📷 Image', tabVideo:'🎬 Video',
+    heroH:'Make your photos <span class="g">unique</span> in one click',
+    heroP:"Drop your photos, click Spoof, download. Metadata and pixels modified — all in your browser, nothing is uploaded.",
+    dropB:'Drop your photos <em>or click</em>', dropS:'JPG · PNG · WEBP — several at once',
+    clear:'clear', spoof:'Spoof', advOpts:'Advanced options',
+    lblDevice:'Device', lblGps:'GPS location', lblDate:'Capture date',
+    lblVariants:'Variants / image', lblIntensity:'Intensity',
+    dNow:'Now', dWeek:'~1 week ago', dMonth:'~1 month ago', dKeep:"Don't write",
+    iSubtle:'Subtle', iNormal:'Normal', iStrong:'Strong',
+    cZoom:'Zoom', cRotate:'Rotation', cLight:'Brightness', cNoise:'Invisible grain', cFlip:'Mirror',
+    tNoise:'Micro-grain invisible to the eye — changes the file fingerprint',
+    dlAll:'Download all', metaBefore:'📷 Before', metaAfter:'✨ After', metaTitleBase:'Metadata',
+    foot:'100% local — no image is uploaded.', footLink:'Video spoofer →',
+    processing:'Processing…', download:'Download', viewMeta:'View metadata', dims:'Dimensions',
+    picked:n=>`${n} image${n>1?'s':''} ready`,
+    generated:(d,t)=>`${d}/${t} generated`, readyImg:n=>`✅ ${n} image(s) ready`,
+    exifNone:'none (or cleaned)', exifWiped:'wiped',
+    hashLabel:'SHA-256 fingerprint:', uniqueFile:'unique file ✓',
+    devRandom:'Random iPhone (recommended)', devNone:'None (metadata cleared)',
+    gpsNone:'None', gpsFrance:'🇫🇷 France (random)',
+    metaMap:{ 'Appareil':'Device','Logiciel':'Software','Date':'Date','ISO':'ISO','Ouverture':'Aperture','GPS':'GPS','Altitude':'Altitude','Vitesse':'Shutter speed','Dimensions':'Dimensions','EXIF':'EXIF' },
+  },
+};
+let LANG = (()=>{ try{ return localStorage.getItem('dreamymeow-lang'); }catch(_){ return null; } })()
+          || ((navigator.language||'fr').toLowerCase().startsWith('fr') ? 'fr' : 'en');
+const tr = k => (I18N[LANG] && I18N[LANG][k]!=null) ? I18N[LANG][k] : (I18N.fr[k] ?? k);
+const metaLabel = k => (LANG==='en' && I18N.en.metaMap[k]) ? I18N.en.metaMap[k] : k;
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = tr(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML = tr(el.getAttribute('data-i18n-html')); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{ el.title = tr(el.getAttribute('data-i18n-title')); });
+  document.querySelectorAll('#lang button').forEach(b=> b.classList.toggle('on', b.dataset.l===LANG));
+  if(typeof fillSelects==='function') fillSelects();
+  if(typeof refreshPicked==='function') refreshPicked();
+}
+
 /* ══ Données appareils ══ */
 const DEVICES = [
   { k:'randomiphone', label:'iPhone aléatoire (recommandé)', make:'', model:'' },
@@ -356,9 +426,14 @@ async function spoofImage(file, opts){
 /* ══ UI ══ */
 const $=s=>document.querySelector(s);
 const dsel=$('#device'), gsel=$('#gps');
-DEVICES.forEach(d=>{ const o=document.createElement('option'); o.value=d.k; o.textContent=d.label; dsel.appendChild(o); });
-GPS_CITIES.forEach(c=>{ const o=document.createElement('option'); o.value=c.k; o.textContent=c.label; gsel.appendChild(o); });
-dsel.value='randomiphone'; gsel.value='france';
+function fillSelects(){
+  const dv=dsel.value||'randomiphone', gv=gsel.value||'france';
+  const devLbl=k=> k==='randomiphone'?tr('devRandom'): k==='none'?tr('devNone'): null;
+  const gpsLbl=k=> k==='none'?tr('gpsNone'): k==='france'?tr('gpsFrance'): null;
+  dsel.innerHTML=DEVICES.map(d=>`<option value="${d.k}">${devLbl(d.k)??d.label}</option>`).join('');
+  gsel.innerHTML=GPS_CITIES.map(c=>`<option value="${c.k}">${gpsLbl(c.k)??c.label}</option>`).join('');
+  dsel.value=dv; gsel.value=gv;
+}
 let intensity='normal';
 $('#intensity').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; intensity=b.dataset.v; [...$('#intensity').children].forEach(x=>x.classList.toggle('on',x===b)); });
 const tf={ zoom:true, rotate:true, light:true, noise:true, flip:false };
@@ -376,7 +451,7 @@ function addFiles(list){ files=files.concat([...list].filter(f=>f.type.startsWit
 function refreshPicked(){
   const n=files.length;
   $('#picked').classList.toggle('show', n>0);
-  $('#pickedTxt').textContent = n? `${n} image${n>1?'s':''} prête${n>1?'s':''}` : '';
+  $('#pickedTxt').textContent = n? tr('picked')(n) : '';
   $('#go').disabled = n===0;
 }
 
@@ -384,7 +459,7 @@ const outputs=[];
 $('#go').addEventListener('click', run);
 async function run(){
   if(!files.length) return;
-  const go=$('#go'); go.disabled=true; go.innerHTML='Traitement…';
+  const go=$('#go'); go.disabled=true; go.innerHTML=tr('processing');
   outputs.length=0;
   $('#results').innerHTML=''; $('#out').style.display='block'; $('#meta').classList.remove('open'); $('#progbar').style.width='0';
   const copies=Math.max(1,Math.min(20,parseInt($('#copies').value)||1));
@@ -403,22 +478,22 @@ async function run(){
       const name=`dreamymeow${idx+1}.jpg`;
       outputs.push({dataUrl:res.dataUrl,name,summary:res.summary,before,hbefore,hafter,dims:res.dims});
       addResult(res.dataUrl,name,idx);
-      done++; $('#count').textContent=`${done}/${total} générée(s)`; $('#progbar').style.width=(done/total*100)+'%';
+      done++; $('#count').textContent=tr('generated')(done,total); $('#progbar').style.width=(done/total*100)+'%';
       await new Promise(r=>setTimeout(r,0));
     }
   }
-  go.disabled=false; go.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg> Spoofer';
-  $('#count').textContent=`✅ ${outputs.length} image(s) prête(s)`;
+  go.disabled=false; go.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg> '+tr('spoof');
+  $('#count').textContent=tr('readyImg')(outputs.length);
 }
 function addResult(dataUrl,name,idx){
   const div=document.createElement('div'); div.className='thumb';
   const img=document.createElement('img'); img.src=dataUrl; img.alt=name;
   const t=document.createElement('span'); t.className='tag'; t.textContent='#'+(idx+1);
   const ov=document.createElement('div'); ov.className='ov';
-  const info=document.createElement('button'); info.className='ib'; info.title='Voir les métadonnées';
+  const info=document.createElement('button'); info.className='ib'; info.title=tr('viewMeta');
   info.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>';
   info.addEventListener('click',()=>showMeta(idx));
-  const a=document.createElement('a'); a.className='ib'; a.href=dataUrl; a.download=name; a.title='Télécharger';
+  const a=document.createElement('a'); a.className='ib'; a.href=dataUrl; a.download=name; a.title=tr('download');
   a.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
   ov.appendChild(info); ov.appendChild(a);
   div.appendChild(img); div.appendChild(t); div.appendChild(ov);
@@ -427,18 +502,22 @@ function addResult(dataUrl,name,idx){
 function kvRow(k,v,cls){ return `<div class="kv"><span class="k">${k}</span><span class="v ${cls||''}">${v}</span></div>`; }
 function showMeta(idx){
   const o=outputs[idx]; if(!o) return;
-  $('#metaTitle').textContent='Métadonnées — '+o.name;
-  let bHtml=''; if(o.before){ for(const [k,v] of Object.entries(o.before)) bHtml+=kvRow(k,v); } else bHtml=kvRow('EXIF','aucune (ou nettoyée)','none');
+  $('#metaTitle').textContent=tr('metaTitleBase')+' — '+o.name;
+  let bHtml=''; if(o.before){ for(const [k,v] of Object.entries(o.before)) bHtml+=kvRow(metaLabel(k),v); } else bHtml=kvRow('EXIF',tr('exifNone'),'none');
   $('#metaBefore').innerHTML=bHtml;
-  let aHtml=kvRow('Dimensions', o.dims?`${o.dims.W}×${o.dims.H}`:'—'); const s=o.summary||{};
-  for(const [k,v] of Object.entries(s)){ const ch=!o.before||String((o.before[k]||'')).trim()!==String(v).trim(); aHtml+=kvRow(k,v,ch?'chg':''); }
-  if(!Object.keys(s).length) aHtml+=kvRow('EXIF','effacé','none');
+  let aHtml=kvRow(tr('dims'), o.dims?`${o.dims.W}×${o.dims.H}`:'—'); const s=o.summary||{};
+  for(const [k,v] of Object.entries(s)){ const ch=!o.before||String((o.before[k]||'')).trim()!==String(v).trim(); aHtml+=kvRow(metaLabel(k),v,ch?'chg':''); }
+  if(!Object.keys(s).length) aHtml+=kvRow('EXIF',tr('exifWiped'),'none');
   $('#metaAfter').innerHTML=aHtml;
-  $('#hashrow').innerHTML=`<span>Empreinte SHA-256 :</span> <code>${o.hbefore}…</code> → <code>${o.hafter}…</code> <span style="color:var(--ok);font-weight:700">fichier unique ✓</span>`;
+  $('#hashrow').innerHTML=`<span>${tr('hashLabel')}</span> <code>${o.hbefore}…</code> → <code>${o.hafter}…</code> <span style="color:var(--ok);font-weight:700">${tr('uniqueFile')}</span>`;
   $('#meta').classList.add('open'); $('#meta').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 $('#metaClose').addEventListener('click',()=>$('#meta').classList.remove('open'));
 $('#dlall').addEventListener('click',async()=>{ for(const o of outputs){ const a=document.createElement('a'); a.href=o.dataUrl; a.download=o.name; document.body.appendChild(a); a.click(); a.remove(); await new Promise(r=>setTimeout(r,150)); } });
+
+/* ══ Bascule de langue ══ */
+$('#lang').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; LANG=b.dataset.l; try{ localStorage.setItem('dreamymeow-lang',LANG); }catch(_){} applyLang(); });
+applyLang();
 </script>
 </body>
 </html>
