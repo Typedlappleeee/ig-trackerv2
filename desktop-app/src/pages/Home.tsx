@@ -108,7 +108,6 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
       {/* Lancer */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '26px 0 11px' }}>
         <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52525B' }}>Lancer</span>
-        <span style={{ fontSize: 11, color: '#3F3F46' }}>Tout est prêt</span>
       </div>
       <div data-rows="" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10 }}>
         {TILES.map(a => <LaunchTile key={a.id} a={a} onClick={() => onNavigate(a.page)} />)}
@@ -121,7 +120,7 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
           <PanelHead title="Programmé aujourd’hui" right={
             <Btn label="Voir le calendrier" theme={theme} sm tone="quiet"
               icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
-              onClick={() => onNavigate('flows')} />
+              onClick={() => onNavigate('scheduled')} />
           } />
           {loading ? (
             <div style={{ padding: '24px 15px', fontSize: 12, color: '#52525B' }}>…</div>

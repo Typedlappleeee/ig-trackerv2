@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { themeFor, type InfraKey } from '@/lib/theme'
@@ -6,30 +6,43 @@ import { useOrg, useHubData, firstNameFrom } from '@/lib/data'
 import { useLicense } from '@/lib/license'
 import Shell, { type PageKey } from '@/Shell'
 import Home from '@/pages/Home'
-import BlowsomeHome from '@/pages/BlowsomeHome'
-import { BlowParc, BlowContent } from '@/pages/BlowsomePages'
-import { BlowAutoPilot } from '@/pages/BlowAutoPilot'
-import Phones from '@/pages/Phones'
-import Bank from '@/pages/Bank'
-import Proxies from '@/pages/Proxies'
-import Activity from '@/pages/Activity'
-import Health from '@/pages/Health'
-import Recipes from '@/pages/Recipes'
-import Publish from '@/pages/Publish'
-import Warmup from '@/pages/Warmup'
-import FlowBuilder from '@/pages/FlowBuilder'
 import { setLeaseOwner } from '@/lib/phoneWatch'
-import Studio from '@/pages/Studio'
-import Connections from '@/pages/Connections'
-import Automation from '@/pages/Automation'
-import Flows from '@/pages/Flows'
-import Settings from '@/pages/Settings'
 import RunWidget from '@/components/RunWidget'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
-import { SiteLanding } from '@/pages/SiteLanding'
-import Admin from '@/pages/Admin'
-import Scheduled from '@/pages/Scheduled'
 import LicenseGate from '@/pages/LicenseGate'
+
+// Pages chargées À LA DEMANDE : le premier écran ne télécharge plus toute l'app
+// (Bank, Studio, iRemoTech, composers… ne sont récupérés que quand on les ouvre).
+const BlowsomeHome = lazy(() => import('@/pages/BlowsomeHome'))
+const BlowParc = lazy(() => import('@/pages/BlowsomePages').then(m => ({ default: m.BlowParc })))
+const BlowContent = lazy(() => import('@/pages/BlowsomePages').then(m => ({ default: m.BlowContent })))
+const BlowAutoPilot = lazy(() => import('@/pages/BlowAutoPilot').then(m => ({ default: m.BlowAutoPilot })))
+const Phones = lazy(() => import('@/pages/Phones'))
+const Bank = lazy(() => import('@/pages/Bank'))
+const Proxies = lazy(() => import('@/pages/Proxies'))
+const Activity = lazy(() => import('@/pages/Activity'))
+const Health = lazy(() => import('@/pages/Health'))
+const Recipes = lazy(() => import('@/pages/Recipes'))
+const Publish = lazy(() => import('@/pages/Publish'))
+const Warmup = lazy(() => import('@/pages/Warmup'))
+const FlowBuilder = lazy(() => import('@/pages/FlowBuilder'))
+const Studio = lazy(() => import('@/pages/Studio'))
+const Connections = lazy(() => import('@/pages/Connections'))
+const Automation = lazy(() => import('@/pages/Automation'))
+const Flows = lazy(() => import('@/pages/Flows'))
+const Settings = lazy(() => import('@/pages/Settings'))
+const SiteLanding = lazy(() => import('@/pages/SiteLanding').then(m => ({ default: m.SiteLanding })))
+const Admin = lazy(() => import('@/pages/Admin'))
+const Scheduled = lazy(() => import('@/pages/Scheduled'))
+
+// Repli pendant le chargement d'une page (bref, discret, sans saut de mise en page).
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 280 }}>
+      <div style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid rgba(139,92,246,0.25)', borderTopColor: '#A78BFA', animation: 'aSpin 0.7s linear infinite' }} />
+    </div>
+  )
+}
 
 // Spécifications des écrans encore en placeholder (gabarit PageHead + état vide).
 const SPECS: Partial<Record<PageKey, PlaceholderSpec>> = {
@@ -73,7 +86,7 @@ export default function App() {
   if (checking) return <Loader />
   // Pas connecté → l'ancienne devanture commerciale (page publique scaleflow.company).
   // Le CTA « Commencer » mène au login.
-  if (!user) return <SiteLanding onStudio={() => window.location.assign('./login.dc.html')} />
+  if (!user) return <Suspense fallback={<Loader />}><SiteLanding onStudio={() => window.location.assign('./login.dc.html')} /></Suspense>
   return <AppInner user={user} />
 }
 
@@ -185,7 +198,7 @@ function AppInner({ user }: { user: User }) {
       onSwitchOrg={org.switchOrg}
       onSignOut={signOut}
     >
-      {content}
+      <Suspense fallback={<PageLoader />}>{content}</Suspense>
       <RunWidget theme={theme} />
     </Shell>
   )

@@ -148,6 +148,9 @@ export default function CrossComposer({ theme, user, org, onBack }: {
       await Promise.all(batch.map(doPhone))
       await unregisterPhoneWatch(batchIds)
     }
+    // Annulation : chaque (compte × plateforme) jamais joué est remboursé.
+    const unplayed = targets.length * platList.length - results.size
+    for (let i = 0; i < unplayed; i++) run.markFailed()
     R.finish()
     const totalCross = targets.length * platList.length
     if (totalCross > 0) {

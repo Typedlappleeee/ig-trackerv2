@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Chip, Icon, PageHead } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
-import ReelsComposer from './ReelsComposer'
-import StoryComposer from './StoryComposer'
-import CrossComposer from './CrossComposer'
-import PhotoComposer from './PhotoComposer'
+// Chaque composer n'est chargé qu'à l'ouverture de son format.
+const ReelsComposer = lazy(() => import('./ReelsComposer'))
+const StoryComposer = lazy(() => import('./StoryComposer'))
+const CrossComposer = lazy(() => import('./CrossComposer'))
+const PhotoComposer = lazy(() => import('./PhotoComposer'))
+const Wait = () => <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><div style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid rgba(139,92,246,0.25)', borderTopColor: '#A78BFA', animation: 'aSpin 0.7s linear infinite' }} /></div>
 
 // Hub de publication : choix du format. Le contenu et les comptes se règlent à
 // l'étape suivante (wizards Reels/Story — branchés à la phase actions).
@@ -26,10 +28,10 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
   // ne doit PAS y avoir accès automatiquement).
   const isAdmin = isSuperAdmin
 
-  if (mode === 'reels') return <ReelsComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
-  if (mode === 'story') return <StoryComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
-  if (mode === 'photo' && isAdmin) return <PhotoComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
-  if (mode === 'cross' && isAdmin) return <CrossComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} />
+  if (mode === 'reels') return <Suspense fallback={<Wait />}><ReelsComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
+  if (mode === 'story') return <Suspense fallback={<Wait />}><StoryComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
+  if (mode === 'photo' && isAdmin) return <Suspense fallback={<Wait />}><PhotoComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
+  if (mode === 'cross' && isAdmin) return <Suspense fallback={<Wait />}><CrossComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>

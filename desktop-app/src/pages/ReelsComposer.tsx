@@ -161,7 +161,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       currentOrg ? fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : fetchBalance(user.id),
     ])
     setPhones((phRes.data ?? []) as Phone[])
-    const all = ((vRes.data ?? []) as Video[]).filter(v => !(SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url))
+    // Exclut la corbeille (vidéos « usage unique » déjà publiées) : sinon elles
+    // restaient sélectionnables et pouvaient être repostées au lancement suivant.
+    const all = ((vRes.data ?? []) as (Video & { deleted_at?: string | null })[]).filter(v => !v.deleted_at && !(SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url))
     const vids = all.filter(isVideo)
     setVideos(vids.length > 0 ? vids : all)
     setBalance(typeof bal === 'number' ? bal : null)
@@ -234,7 +236,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       const ru = await geelarkUploadVideo(bearer, url, push)
       if (ru) resourceByVid.set(v.id, ru)
     }
-    if (resourceByVid.size === 0) { push('❌ Aucune vidéo hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); setRunning(false); return }
+    if (resourceByVid.size === 0) { push('❌ Aucune vidéo hébergée.'); run.abort(); await run.settle(); push('↩︎ Crédits remboursés.'); R.finish('error'); setRunId(null); setRunning(false); return }
 
     // 2b) Miniatures PAR vidéo (frame capturée) → chacune hébergée une fois via base64.
     const coverByVid = new Map<string, string>()
@@ -324,6 +326,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       // Lot terminé (tels déjà éteints par postReelToPhone) → on retire du watchdog.
       await unregisterPhoneWatch(batchIds)
     }
+    // Annulation : les comptes jamais lancés n'ont rien consommé → remboursés.
+    const notRun = jobs.filter(j => !results.has(j.p.id))
+    if (notRun.length) {
+      notRun.forEach(() => run.markFailed())
+      setRunItems(items => items.map(it => notRun.some(j => j.p.id === it.id) ? { ...it, phase: 'failed', detail: 'annulé' } : it))
+    }
     R.finish()
     // Historique (page Activité) + compteur : on enregistre TOUJOURS le run. On AWAIT
     // et on log l'échec éventuel (avant, fire-and-forget → des runs manquaient en silence).
@@ -347,6 +355,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
         // SOFT-DELETE : corbeille (restaurable 7 j), on garde le fichier.
         await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).in('id', ids)
         push(`🗑 ${ids.length} vidéo(s) → corbeille (usage unique, restaurable 7 j).`)
+        setVidSel(cur => new Set([...cur].filter(id => !postedVidIds.has(id))))
       } catch { push('⚠ Mise en corbeille (usage unique) échouée — à faire manuellement.') }
     } else if (!autoRemove && postedVidIds.size > 0) {
       // Usage unique désactivé → on garde les vidéos mais on incrémente leur compteur

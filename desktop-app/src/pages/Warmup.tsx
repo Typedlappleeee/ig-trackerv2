@@ -16,13 +16,10 @@ type RunPhase = 'pending' | 'running' | 'done' | 'failed'
 interface RunItem { id: string; name: string; phase: RunPhase; detail?: string }
 type WTab = 'login' | 'edit' | 'warm'
 
+// Le flow GeeLark parcourt ≈ 2 vidéos/min, plafonné à 100 vidéos (~50 min) : au-delà,
+// une session plus longue serait identique — on ne propose donc que des durées réelles.
 const DURATIONS: { v: number; h: string }[] = [
-  { v: 15, h: 'échauffement' }, { v: 30, h: 'recommandé' }, { v: 60, h: 'session longue' }, { v: 120, h: 'compte mûr' },
-]
-const ACTIONS: { k: string; l: string; h: string; rate: number }[] = [
-  { k: 'like', l: 'Liker des posts', h: 'espacé sur toute la session', rate: 80 },
-  { k: 'reels', l: 'Regarder des Reels', h: 'défilement du feed', rate: 120 },
-  { k: 'follow', l: 'Suivre les suggestions', h: 'comptes proposés par Instagram', rate: 50 },
+  { v: 15, h: 'échauffement' }, { v: 30, h: 'recommandé' }, { v: 45, h: 'session longue' },
 ]
 
 export default function Warmup({ theme, infra, user, org }: {
@@ -36,7 +33,7 @@ export default function Warmup({ theme, infra, user, org }: {
   const [error, setError] = useState<string | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [dur, setDur] = useState(30)
-  const [acts, setActs] = useState<Set<string>>(new Set(['like', 'reels', 'follow']))
+  const [keyword, setKeyword] = useState('')
 
   // État d'exécution réelle du warmup (GeeLark).
   const [running, setRunning] = useState(false)
@@ -87,7 +84,7 @@ export default function Warmup({ theme, infra, user, org }: {
     for (const p of targets) {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       pushLog(`— @${p.ig_username ?? p.geelark_id} —`)
-      const r = await warmupAccountNative(bearer, p.geelark_id!, { browseVideo, rotationUrls: rot }, pushLog)
+      const r = await warmupAccountNative(bearer, p.geelark_id!, { browseVideo, keyword: keyword.trim() || undefined, rotationUrls: rot }, pushLog)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
     pushLog('✔ Warmup terminé.')
@@ -135,7 +132,6 @@ export default function Warmup({ theme, infra, user, org }: {
   }
 
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const toggleAct = (k: string) => setActs(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const nSel = sel.size
   const durLabel = dur < 60 ? `${dur} min` : `${dur / 60} h`
   const groups = ['Tous', ...[...new Set(phones.map(p => p.group_name).filter(Boolean) as string[])].sort()]
@@ -332,26 +328,18 @@ export default function Warmup({ theme, infra, user, org }: {
             </div>
           </Panel>
 
-          {/* Actions */}
+          {/* Ce que fait la session (réel, pas de réglage factice) */}
           <Panel theme={theme}>
-            <PanelHead title="Actions pendant la session" sub="Rythme humain, réparti sur la durée" />
-            {ACTIONS.map((a, i) => {
-              const act = acts.has(a.k)
-              const total = Math.round(a.rate * (dur / 60))
-              return (
-                <div key={a.k} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 15px', borderBottom: i < ACTIONS.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none' }}>
-                  <span onClick={() => toggleAct(a.k)} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: act ? 'flex-end' : 'flex-start', width: 32, height: 18, padding: 2, borderRadius: 99, flexShrink: 0,
-                    background: act ? '#D97706' : 'rgba(255,255,255,0.1)', cursor: 'pointer', transition: 'background .2s ease',
-                  }}><span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} /></span>
-                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: act ? '#F4F4F6' : '#71717A' }}>{a.l}</span>
-                    <span style={{ fontSize: 11, color: '#52525B' }}>{a.h}</span>
-                  </span>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 700, color: act ? '#FBBF24' : '#3F3F46', minWidth: 96, textAlign: 'right' }}>{act ? `≈ ${total} au total` : 'désactivé'}</span>
-                </div>
-              )
-            })}
+            <PanelHead title="Pendant la session" sub="Ce que fait réellement l'automatisation GeeLark" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '13px 15px' }}>
+              <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA' }}>
+                Parcourt <b style={{ color: '#FBBF24' }}>≈ {Math.min(100, dur * 2)} Reels</b>{keyword.trim() ? <> trouvés avec « <b style={{ color: '#E4E4E7' }}>{keyword.trim()}</b> »</> : <> du fil</>}, avec des likes, commentaires et abonnements aléatoires dosés par le flow, puis éteint le téléphone.
+              </div>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Mot-clé de recherche (optionnel)</span>
+                <input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="ex. fashion, fitness… — vide = fil Reels" style={{ height: 32, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+              </label>
+            </div>
           </Panel>
 
           {/* Lancement */}
