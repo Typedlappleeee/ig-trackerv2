@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react'
 import type { ReactNode } from 'react'
 import { INFRAS, themeFor, type InfraKey, type Theme } from '@/lib/theme'
 import { Icon } from '@/lib/ui'
+import { UpdateBanner, UpdateChip } from '@/components/AppUpdate'
 import { fmtNumber } from '@/lib/data'
 
 export type PageKey =
@@ -393,6 +394,7 @@ export default function Shell({
           </div>
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <UpdateChip theme={T} />
             {/* pastille de run (visuelle) */}
             <button onClick={() => setPage('activity')} style={{
               position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 9, height: 28, padding: '0 12px',
@@ -428,6 +430,7 @@ export default function Shell({
             </button>
           </div>
         </header>
+        <UpdateBanner theme={T} />
 
         {/* contenu */}
         <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', position: 'relative', background: T.mainWash }}>
