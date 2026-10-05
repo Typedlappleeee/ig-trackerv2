@@ -89,17 +89,17 @@ export const BLOCKS: BlockDef[] = [
     icon: 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4|M10 17l5-5-5-5|M15 12H3',
     hint: 'Connecte le compte Instagram (2FA supportée). Identifiants demandés au lancement, jamais enregistrés.',
     defaults: () => ({}), estimate: () => [3, 6] },
-  { type: 'username', label: 'Changer le pseudo', group: 'Compte', color: '167,139,250', credits: 0,
+  { type: 'username', label: 'Nom d\'utilisateur (@)', group: 'Compte', color: '167,139,250', credits: 0,
     icon: 'M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8|M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
-    hint: 'Change le @ via le Centre de comptes. Un pseudo par compte.',
+    hint: 'Change le @username (pas le nom affiché) via le Centre de comptes. Un par compte.',
     defaults: () => ({ usernames: '' }), estimate: () => [2, 4] },
   { type: 'avatar', label: 'Photo de profil', group: 'Compte', color: '244,114,182', credits: 0, media: 'image',
     icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
     hint: 'Met une photo de ta banque en photo de profil.',
     defaults: () => ({ source: 'pick', imageIds: [], mode: 'seq' }), estimate: () => [3, 5] },
-  { type: 'bio', label: 'Bio & lien', group: 'Compte', color: '45,212,191', credits: 0,
+  { type: 'bio', label: 'Nom, bio & lien', group: 'Compte', color: '45,212,191', credits: 0,
     icon: 'M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z',
-    hint: 'Bio, nom affiché et lien du profil (RPA natif GeeLark).',
+    hint: 'Nom affiché (name), bio et lien du profil (RPA natif GeeLark). Ne change pas le @.',
     defaults: () => ({ bios: '', names: '', link: '', mode: 'random' }), estimate: () => [2, 4] },
   { type: 'warmup', label: 'Chauffe', group: 'Activité', color: '251,191,36', credits: 0,
     icon: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z',
@@ -161,7 +161,7 @@ export const TEMPLATES: { name: string; desc: string; types: BlockType[] }[] = [
 // ── Textes multi-lignes & pseudos ────────────────────────────────────────────
 export const lines = (s?: string) => (s ?? '').split('\n').map(l => l.trim()).filter(Boolean)
 const hasRandom = (s: string) => /\{\d{1,2}\}/.test(s)
-function expandUsername(tpl: string): string {
+export function expandUsername(tpl: string): string {
   return tpl.replace(/\{(\d{1,2})\}/g, (_, n) => Array.from({ length: Math.min(12, +n) }, () => Math.floor(Math.random() * 10)).join(''))
 }
 function pick<T>(arr: T[], i: number, mode: PoolMode | undefined): T | undefined {
@@ -253,7 +253,7 @@ export function validateFlow(f: Flow, nPhones: number, creds?: Record<string, Cr
         else if (nPhones > 0 && ls.length < nPhones) issues.push(`${n} : ${ls.length} lien(s) pour ${nPhones} compte(s) — un lien par compte.`)
       }
     }
-    if (b.type === 'bio' && lines(p.bios).length === 0 && lines(p.names).length === 0 && !p.link?.trim()) issues.push(`${n} : renseigne une bio, un nom ou un lien.`)
+    if (b.type === 'bio' && lines(p.bios).length === 0 && lines(p.names).length === 0 && !p.link?.trim()) issues.push(`${n} : renseigne un nom affiché, une bio ou un lien.`)
     if ((b.type === 'warmup' || b.type === 'pause') && (p.maxMin ?? 0) < (p.minMin ?? 0)) issues.push(`${n} : la durée maxi doit être ≥ la durée mini.`)
     if ((p.delayMax ?? 0) < (p.delayMin ?? 0)) issues.push(`${n} : le délai maxi doit être ≥ le délai mini.`)
   })
@@ -320,7 +320,7 @@ export async function deleteFlow(id: string, userId: string): Promise<void> {
 
 // URL signées longues : un post peut partir des heures après le lancement
 // (chauffe + pauses avant), l'URL doit rester valide jusque-là.
-async function bankUrls(ids: string[]): Promise<Map<string, string>> {
+export async function bankUrls(ids: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>()
   if (ids.length === 0) return out
   const { data } = await supabase.from('content_bank').select('id,storage_path,file_url').in('id', ids)
@@ -378,7 +378,7 @@ export function getFlowRun(id: string): FlowRun | undefined { return runs.get(id
 export function waitFlowRun(id: string): Promise<void> { return finished.get(id) ?? Promise.resolve() }
 
 // ── Exécution ────────────────────────────────────────────────────────────────
-export interface RunTarget { key: string; geelarkId: string; name: string }
+export interface RunTarget { key: string; geelarkId: string; name: string; username?: string }
 export interface RunOptions {
   bearer: string
   flow: Flow
@@ -631,7 +631,12 @@ async function execBlock(ctx: Ctx, b: FlowBlock, i: number, gid: string, log: (m
     }
     case 'username':
       if (!a.username) return { ok: false, error: 'Aucun pseudo attribué' }
-      return changeUsernameOnPhone(o.bearer, gid, a.username, log)
+    {
+      const r = await changeUsernameOnPhone(o.bearer, gid, a.username, log, o.targets[i].username)
+      // Garde le @ à jour dans ScaleFlow (sert aussi de repère au prochain changement).
+      if (r.ok) { o.targets[i].username = a.username; void Promise.resolve(supabase.from('phones').update({ ig_username: a.username }).eq('id', o.targets[i].key)).catch(() => {}) }
+      return r
+    }
     case 'avatar': {
       if (!a.media) return { ok: false, error: emptyPoolMsg(b) }
       const u = ctx.urls.get(a.media)

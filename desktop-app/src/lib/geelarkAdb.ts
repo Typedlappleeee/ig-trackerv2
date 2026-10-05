@@ -249,9 +249,52 @@ async function saveField(bearer: string, phoneId: string, s: Screen, log: Log): 
 // Messages d'Instagram quand le pseudo est refusé (pris, invalide, trop de changements).
 const USERNAME_REFUSED = /not available|isn't available|is not available|n'est pas disponible|already taken|déjà pris|can't change|ne pouvez pas|try again later|réessayez plus tard|only use letters|uniquement des lettres/i
 
+// Libellé de la ligne / de l'écran « pseudo ». Ancré au DÉBUT du texte : la ligne
+// peut être « Username » seule ou « Username, lea_123 » (content-desc groupé), mais
+// jamais « Name » / « Nom » (le nom affiché, une ligne au-dessus).
+const USERNAME_LABEL = /^(Username|Nom d['’]utilisateur|Pseudo|Nombre de usuario)\b/i
+const NAME_LABEL = /^(Name|Nom|Nombre)$/i
+
+/** Centre du 1er nœud dont le text/content-desc vérifie `re`. */
+export function findByTextRe(xml: string, re: RegExp): Pt | null {
+  for (const m of xml.matchAll(/<node\b[^>]*>/g)) {
+    const el = m[0]
+    const t = el.match(/\btext="([^"]*)"/)?.[1] ?? ''
+    const d = el.match(/\bcontent-desc="([^"]*)"/)?.[1] ?? ''
+    if ((t && re.test(t)) || (d && re.test(d))) { const p = centerOf(el); if (p) return p }
+  }
+  return null
+}
+
+/** Centre du 1er champ de saisie (EditText) à l'écran. */
+export function findEditText(xml: string): Pt | null {
+  const m = xml.match(/<node\b[^>]*class="android\.widget\.EditText"[^>]*>/)
+  return m ? centerOf(m[0]) : null
+}
+
+/**
+ * Ligne « pseudo » de l'écran Profil du Centre de comptes. Jamais de coordonnée
+ * au hasard : taper à côté ouvrirait le NOM affiché (bug « le pseudo modifie le nom »).
+ */
+export function findUsernameRow(xml: string, current?: string): Pt | null {
+  const cur = current?.trim().replace(/^@/, '')
+  return findByTextRe(xml, USERNAME_LABEL) ??
+    (cur ? findByTextRe(xml, new RegExp(`^@?${esc(cur)}$`, 'i')) : null) ??
+    findByResourceId(xml, 'username_row', 'handle_row')
+}
+
+/** L'écran ouvert est-il bien l'éditeur du pseudo (et pas celui du nom) ? */
+export function isUsernameEditor(xml: string): boolean {
+  return !!findByTextRe(xml, USERNAME_LABEL) || !!findByResourceId(xml, 'username_field', 'handle_field')
+}
+export function isNameEditor(xml: string): boolean {
+  return !!findByTextRe(xml, NAME_LABEL) && !isUsernameEditor(xml)
+}
+
 // ── Bloc : changer le @pseudo ────────────────────────────────────────────────
+// `current` : pseudo actuel connu (sert de repère pour trouver la bonne ligne).
 export async function changeUsernameOnPhone(
-  bearer: string, phoneId: string, username: string, log: Log,
+  bearer: string, phoneId: string, username: string, log: Log, current?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const handle = username.trim().replace(/^@/, '')
   if (!/^[a-zA-Z0-9._]{1,30}$/.test(handle)) return { ok: false, error: `Pseudo invalide « ${handle} » (lettres, chiffres, . et _ ; 30 max)` }
@@ -261,13 +304,24 @@ export async function changeUsernameOnPhone(
     const s = await prepareScreen(bearer, phoneId)
     let xml = await openAccountCenterEditor(bearer, phoneId, s, log)
     log(`📝 Pseudo → @${handle}`)
-    await tap(bearer, phoneId,
-      findByText(xml, 'Username', 'Nom d\'utilisateur', 'Pseudo') ??
-      findByResourceId(xml, 'username_row', 'handle_row') ??
-      [s.cx, Math.floor(s.sh * 0.32)])
+    let row = findUsernameRow(xml, current)
+    if (!row) {   // la ligne peut être sous le pli
+      await shellExec(bearer, phoneId, `input swipe ${s.cx} ${Math.floor(s.sh * 0.7)} ${s.cx} ${Math.floor(s.sh * 0.4)} 500`)
+      await sleep(1200)
+      xml = await dumpXml(bearer, phoneId)
+      row = findUsernameRow(xml, current)
+    }
+    if (!row) return { ok: false, error: 'Ligne « Nom d\'utilisateur » introuvable — rien n\'a été modifié' }
+    await tap(bearer, phoneId, row)
     await sleep(2500)
     xml = await dumpXml(bearer, phoneId)
-    const field = findByResourceId(xml, 'username', 'username_field', 'edit_text', 'text_input', 'handle_field') ?? [s.cx, Math.floor(s.sh * 0.35)] as Pt
+    // Garde-fou : si c'est l'éditeur du NOM qui s'est ouvert, on ressort sans rien toucher.
+    if (!isUsernameEditor(xml) || isNameEditor(xml)) {
+      await shellExec(bearer, phoneId, 'input keyevent 4')
+      return { ok: false, error: 'L\'écran ouvert n\'est pas celui du nom d\'utilisateur — rien n\'a été modifié' }
+    }
+    const field = findByResourceId(xml, 'username_field', 'handle_field', 'username') ?? findEditText(xml)
+    if (!field) return { ok: false, error: 'Champ du nom d\'utilisateur introuvable' }
     await clearAndType(bearer, phoneId, field, handle, log)
     await sleep(2500)  // Instagram vérifie la disponibilité pendant la frappe
     const refusedBefore = screenHas(await dumpXml(bearer, phoneId), USERNAME_REFUSED)
@@ -275,7 +329,7 @@ export async function changeUsernameOnPhone(
     const after = await saveField(bearer, phoneId, s, log)
     const refused = screenHas(after, USERNAME_REFUSED)
     if (refused) return { ok: false, error: `Instagram refuse « @${handle} » : ${refused}` }
-    log('   ✅ Pseudo changé')
+    log('   ✅ Nom d\'utilisateur changé')
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }

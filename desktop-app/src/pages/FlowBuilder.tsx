@@ -812,7 +812,7 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
       break
     case 'username': {
       const n = lines(p.usernames).length
-      body = <Field label={`Pseudos (${n})`} hint={<>Un pseudo par ligne, attribués dans l'ordre aux comptes. <code style={{ fontFamily: MONO, color: '#A1A1AA' }}>{'{4}'}</code> = 4 chiffres aléatoires (ex. <code style={{ fontFamily: MONO, color: '#A1A1AA' }}>lea.mode{'{4}'}</code>). Lettres, chiffres, « . » et « _ » uniquement.</>}>
+      body = <Field label={`Noms d'utilisateur · @username (${n})`} hint={<>Un pseudo par ligne, attribués dans l'ordre aux comptes. <code style={{ fontFamily: MONO, color: '#A1A1AA' }}>{'{4}'}</code> = 4 chiffres aléatoires (ex. <code style={{ fontFamily: MONO, color: '#A1A1AA' }}>lea.mode{'{4}'}</code>). Lettres, chiffres, « . » et « _ » uniquement. Pour le nom affiché, utilise le bloc « Nom, bio &amp; lien ».</>}>
         <textarea rows={7} value={p.usernames ?? ''} onChange={e => onChange({ usernames: e.target.value })} placeholder={'lea.mode{4}\nclara.paris{3}'} style={{ ...areaStyle, fontFamily: MONO, fontSize: 12 }} />
       </Field>
       break
@@ -822,11 +822,11 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
       break
     case 'bio':
       body = <>
-        <Field label={`Bios (${lines(p.bios).length})`} hint="Une bio par ligne — une est choisie pour chaque compte.">
-          <textarea rows={4} value={p.bios ?? ''} onChange={e => onChange({ bios: e.target.value })} placeholder={'✨ Mode & lifestyle · Paris\n🌸 Daily outfits'} style={areaStyle} />
-        </Field>
-        <Field label="Nom affiché (optionnel)" hint="Un par ligne. Vide = inchangé.">
+        <Field label="Nom affiché · name (optionnel)" hint="Le nom en gras sur le profil, pas le @. Un par ligne. Vide = inchangé.">
           <textarea rows={2} value={p.names ?? ''} onChange={e => onChange({ names: e.target.value })} placeholder="Léa M." style={areaStyle} />
+        </Field>
+        <Field label={`Bios (${lines(p.bios).length})`} hint="Une bio par ligne — une est choisie pour chaque compte. Vide = inchangée.">
+          <textarea rows={4} value={p.bios ?? ''} onChange={e => onChange({ bios: e.target.value })} placeholder={'✨ Mode & lifestyle · Paris\n🌸 Daily outfits'} style={areaStyle} />
         </Field>
         <Field label="Lien du profil (optionnel)"><input value={p.link ?? ''} onChange={e => onChange({ link: e.target.value })} placeholder="https://…" style={inputStyle} /></Field>
         {p.link?.trim() && <Field label="Titre du lien (optionnel)"><input value={p.linkTitle ?? ''} onChange={e => onChange({ linkTitle: e.target.value })} placeholder="Mon shop" style={inputStyle} /></Field>}
@@ -1043,7 +1043,7 @@ function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId
     await runFlow({
       bearer, flow, creds, concurrency: conc, creditOwnerId: ownerId, scope: { orgId, userId },
       rotationUrls: rot.length ? rot : undefined,
-      targets: chosen.map(p => ({ key: p.id, geelarkId: p.geelark_id!, name: phoneLabel(p) })),
+      targets: chosen.map(p => ({ key: p.id, geelarkId: p.geelark_id!, name: phoneLabel(p), username: p.ig_username ?? undefined })),
     })
     setBusy(false)
     onLaunched()
