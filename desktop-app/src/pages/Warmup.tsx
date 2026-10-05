@@ -6,7 +6,10 @@ import { Btn, Chip, Empty, StatusDot, Panel, PanelHead, PageHead } from '@/lib/u
 import type { OrgState } from '@/lib/data'
 import { scopeInfra, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
-import { warmupAccountNative, editProfileOnPhone, loginInstagramOnPhone } from '@/lib/geelark'
+import { warmupAccountNative, editProfileOnPhone, loginInstagramOnPhone, ensurePhoneRunning, setPhoneManaged, stopPhoneSurely } from '@/lib/geelark'
+import { changeUsernameOnPhone, changeProfilePicOnPhone } from '@/lib/geelarkAdb'
+import { bankUrls, expandUsername, lines } from '@/lib/flowEngine'
+import BankPicker from '@/components/BankPicker'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null; group_name: string | null }
@@ -44,6 +47,12 @@ export default function Warmup({ theme, infra, user, org }: {
   const [rotationConfigured, setRotationConfigured] = useState(false)
   const [rotationOn, setRotationOn] = useState(false)
   const [edit, setEdit] = useState({ nickname: '', biography: '', linkURL: '', linkTitle: '' })
+  // Nom d'utilisateur (@) : un par ligne, attribués dans l'ordre ; {4} = 4 chiffres aléatoires.
+  const [usernames, setUsernames] = useState('')
+  // Photo(s) de profil depuis la banque : distribuées dans l'ordre aux comptes.
+  const [avatarIds, setAvatarIds] = useState<string[]>([])
+  const [avatarPicker, setAvatarPicker] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
   const [creds, setCreds] = useState<Record<string, { email: string; password: string; totp: string }>>({})
 
   const load = useCallback(async () => {
@@ -91,21 +100,68 @@ export default function Warmup({ theme, infra, user, org }: {
     setRunning(false)
   }
 
-  // Édition de profil en masse (RÉELLE) : instagramEdit par téléphone.
+  // Édition de profil en masse (RÉELLE), par téléphone : nom d'utilisateur et photo
+  // (ADB, Centre de comptes) puis nom affiché / bio / lien (RPA instagramEdit).
+  // Le téléphone démarre UNE fois pour tout, puis est éteint à la fin (même en échec).
+  const userLines = lines(usernames)
+  const hasRpaEdit = !!(edit.nickname.trim() || edit.biography.trim() || edit.linkURL.trim())
+  const hasEdit = hasRpaEdit || userLines.length > 0 || avatarIds.length > 0
+  function editIssue(n: number): string | null {
+    const bad = userLines.find(u => !/^@?[a-zA-Z0-9._{}]{1,30}$/.test(u.replace(/\{\d{1,2}\}/g, '0')))
+    if (bad) return `Nom d'utilisateur invalide « ${bad} » (lettres, chiffres, . et _ uniquement).`
+    if (userLines.length > 0 && userLines.length < n && !userLines.some(u => /\{\d{1,2}\}/.test(u)))
+      return `Il faut un nom d'utilisateur différent par compte (${userLines.length}/${n}) — ou ajoute {4} pour des chiffres aléatoires.`
+    return null
+  }
+
   async function launchEdit() {
     const targets = phones.filter(p => sel.has(p.id) && p.geelark_id)
-    if (targets.length === 0 || !bearer || running) return
-    if (!edit.nickname.trim() && !edit.biography.trim() && !edit.linkURL.trim()) return
+    if (targets.length === 0 || !bearer || running || !hasEdit) return
+    const issue = editIssue(targets.length)
+    setEditError(issue)
+    if (issue) return
     setRunning(true); setLogs([])
     setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as RunPhase })))
     const push = (m: string) => setLogs(l => [...l.slice(-200), m])
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
     const rotU = resolveRotationUrls(); const rot = (rotationOn && rotU.length) ? rotU : undefined
-    for (const p of targets) {
+    const urls = avatarIds.length ? await bankUrls(avatarIds) : new Map<string, string>()
+    if (avatarIds.length && urls.size === 0) push('⚠ Photos de profil introuvables dans la banque — ignorées.')
+    const avatars = avatarIds.map(id => urls.get(id)).filter((u): u is string => !!u)
+
+    for (const [i, p] of targets.entries()) {
+      const gid = p.geelark_id!
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       push(`— ${phoneLabel(p)} —`)
-      const r = await editProfileOnPhone(bearer, p.geelark_id!, edit, push, rot)
-      setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
+      const errors: string[] = []
+      setPhoneManaged(gid, true)
+      try {
+        const ready = await ensurePhoneRunning(bearer, gid, push, rot)
+        if (!ready.ok) { errors.push(ready.reason ?? 'Téléphone non démarré'); continue }
+        if (userLines.length) {
+          const handle = expandUsername(userLines[i % userLines.length]).replace(/^@/, '')
+          const r = await changeUsernameOnPhone(bearer, gid, handle, push, p.ig_username ?? undefined)
+          if (r.ok) {
+            await supabase.from('phones').update({ ig_username: handle }).eq('id', p.id)
+            setPhones(ps => ps.map(x => x.id === p.id ? { ...x, ig_username: handle } : x))
+          } else errors.push(`nom d'utilisateur : ${r.error}`)
+        }
+        if (avatars.length) {
+          const r = await changeProfilePicOnPhone(bearer, gid, avatars[i % avatars.length], push)
+          if (!r.ok) errors.push(`photo : ${r.error}`)
+        }
+        if (hasRpaEdit) {
+          const r = await editProfileOnPhone(bearer, gid, edit, push, rot)
+          if (!r.ok) errors.push(`profil : ${r.error}`)
+        }
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : String(e))
+      } finally {
+        setPhoneManaged(gid, false)
+        await stopPhoneSurely(bearer, gid, push)
+        if (errors.length) push(`❌ ${errors.join(' · ')}`)
+        setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: errors.length ? 'failed' : 'done', detail: errors.join(' · ') || undefined } : it))
+      }
     }
     push('✔ Édition terminée.')
     setRunning(false)
@@ -205,22 +261,45 @@ export default function Warmup({ theme, infra, user, org }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {wtab === 'edit' ? (
               <Panel theme={theme}>
-                <PanelHead title="Nouveau profil" sub="Appliqué à tous les comptes sélectionnés (RPA instagramEdit)" />
-                <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {([['nickname', 'Nom affiché'], ['linkURL', 'Lien (URL)'], ['linkTitle', 'Titre du lien']] as [keyof typeof edit, string][]).map(([k, l]) => (
-                    <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{l}</span>
-                      <input value={edit[k]} onChange={e => setEdit(v => ({ ...v, [k]: e.target.value }))} placeholder={l} style={{ height: 32, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+                <PanelHead title="Nouveau profil" sub="Laisse vide ce que tu ne veux pas changer" />
+                <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Nom affiché <span style={{ color: '#52525B', fontWeight: 600 }}>· name</span></span>
+                      <input value={edit.nickname} onChange={e => setEdit(v => ({ ...v, nickname: e.target.value }))} placeholder="Léa ✨" style={fieldStyle} />
+                      <span style={{ fontSize: 10.5, color: '#52525B' }}>Le nom en gras sur le profil. Ne touche pas au @.</span>
                     </label>
-                  ))}
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Nom d'utilisateur <span style={{ color: '#52525B', fontWeight: 600 }}>· @username</span></span>
+                      <textarea value={usernames} onChange={e => { setUsernames(e.target.value); setEditError(null) }} rows={2} placeholder={'lea.officiel{4}\nlea_backup'} style={{ ...fieldStyle, height: 'auto', padding: 9, resize: 'vertical', fontFamily: 'inherit' }} />
+                      <span style={{ fontSize: 10.5, color: '#52525B' }}>Un par ligne, attribués dans l'ordre. {'{4}'} = 4 chiffres aléatoires.</span>
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Photo de profil</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Btn theme={theme} sm tone="ghost" icon="M3 5h18v14H3z|M3 16l5-5 4 4 3-3 6 6" label={avatarIds.length ? `${avatarIds.length} photo${avatarIds.length > 1 ? 's' : ''} choisie${avatarIds.length > 1 ? 's' : ''}` : 'Choisir dans la banque'} onClick={() => setAvatarPicker(true)} />
+                      {avatarIds.length > 0 && <Btn theme={theme} sm tone="quiet" label="Retirer" onClick={() => setAvatarIds([])} />}
+                      <span style={{ fontSize: 10.5, color: '#52525B' }}>{avatarIds.length > 1 ? 'Distribuées dans l\'ordre aux comptes.' : 'Plusieurs photos = une différente par compte.'}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {([['linkURL', 'Lien (URL)'], ['linkTitle', 'Titre du lien']] as [keyof typeof edit, string][]).map(([k, l]) => (
+                      <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{l}</span>
+                        <input value={edit[k]} onChange={e => setEdit(v => ({ ...v, [k]: e.target.value }))} placeholder={l} style={fieldStyle} />
+                      </label>
+                    ))}
+                  </div>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Bio</span>
                     <textarea value={edit.biography} onChange={e => setEdit(v => ({ ...v, biography: e.target.value }))} rows={3} placeholder="Bio…" style={{ resize: 'vertical', padding: 11, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, fontFamily: 'inherit', outline: 'none' }} />
                   </label>
+                  {editError && <div role="alert" style={{ padding: '8px 11px', borderRadius: 8, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', color: '#FCA5A5', fontSize: 12 }}>{editError}</div>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ flex: 1, fontSize: 12, color: '#71717A' }}>Édite <b style={{ color: '#E4E4E7' }}>{nSel}</b> compte{nSel > 1 ? 's' : ''}.</span>
-                  <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running || (!edit.nickname.trim() && !edit.biography.trim() && !edit.linkURL.trim())} icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" label={running ? 'Édition…' : 'Lancer l\'édition'} onClick={launchEdit} />
+                  <span style={{ flex: 1, fontSize: 12, color: '#71717A' }}>Édite <b style={{ color: '#E4E4E7' }}>{nSel}</b> compte{nSel > 1 ? 's' : ''}. Le téléphone s'éteint à la fin.</span>
+                  <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running || !hasEdit} icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" label={running ? 'Édition…' : 'Lancer l\'édition'} onClick={launchEdit} />
                 </div>
               </Panel>
             ) : (
@@ -381,6 +460,13 @@ export default function Warmup({ theme, infra, user, org }: {
         </div>
       </div>
       )}
+      {avatarPicker && (
+        <BankPicker theme={theme} user={user} org={org} kind="images" multi initialIds={avatarIds} title="Photos de profil"
+          onClose={() => setAvatarPicker(false)}
+          onApply={r => { if (r.kind === 'images') setAvatarIds(r.ids); setAvatarPicker(false) }} />
+      )}
     </div>
   )
 }
+
+const fieldStyle = { height: 32, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none', boxSizing: 'border-box' } as const
