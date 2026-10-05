@@ -12,7 +12,9 @@ import BankPicker from '@/components/BankPicker'
 import {
   BLOCKS, BLOCK, TEMPLATES, newBlock, newFlow, estimateFlow, flowCredits, fmtMinutes, validateFlow, lines,
   loadFlows, saveFlow, deleteFlow, runFlow, useFlowRuns, dismissFlowRun, BOOT_ESTIMATE,
+  blockName, blockEstimate, isActive, retriesOf, loadBankSummary,
   type Flow, type FlowBlock, type BlockType, type BlockParams, type Creds, type FlowRun, type StepStatus, type PoolMode,
+  type BankSummary, type MediaSource, type BlockOnError, type FlowDefaults,
 } from '@/lib/flowEngine'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null; group_name: string | null }
@@ -24,8 +26,8 @@ const areaStyle: CSSProperties = { ...inputStyle, height: 'auto', padding: 10, r
 
 // Mise en page responsive (les styles inline n'ont pas de media queries).
 const LAYOUT_CSS = `
-.fb-grid{display:grid;grid-template-columns:236px minmax(0,1fr) 320px;gap:10px;align-items:start}
-@media (max-width:1180px){.fb-grid{grid-template-columns:minmax(0,1fr) 300px}.fb-palette{grid-column:1 / -1}}
+.fb-grid{display:grid;grid-template-columns:236px minmax(0,1fr) 344px;gap:10px;align-items:start}
+@media (max-width:1180px){.fb-grid{grid-template-columns:minmax(0,1fr) 330px}.fb-palette{grid-column:1 / -1}}
 @media (max-width:860px){.fb-grid{grid-template-columns:minmax(0,1fr)}}
 .fb-card .fb-actions{opacity:0;transition:opacity .12s ease}
 .fb-card:hover .fb-actions,.fb-card.sel .fb-actions{opacity:1}
@@ -34,6 +36,10 @@ const LAYOUT_CSS = `
 .fb-lib-row .fb-lib-actions{opacity:0;transition:opacity .12s ease}
 .fb-lib-row:hover .fb-lib-actions,.fb-lib-row.on .fb-lib-actions{opacity:1}
 .fb-lib-row:hover{background:rgba(255,255,255,0.03)}
+.fb-adv > summary::-webkit-details-marker{display:none}
+.fb-adv > summary svg{transition:transform .15s ease}
+.fb-adv[open] > summary svg{transform:rotate(90deg)}
+.fb-adv > summary:hover{color:#E4E4E7}
 `
 
 export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme; infra: InfraKey; user: User; org: OrgState }) {
@@ -49,7 +55,9 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
   const [drag, setDrag] = useState<Drag | null>(null)
   const [overSlot, setOverSlot] = useState<number | null>(null)
   const [insertMenu, setInsertMenu] = useState<number | null>(null)
-  const [picker, setPicker] = useState<{ blockId: string; kind: 'videos' | 'images' } | null>(null)
+  const [picker, setPicker] = useState<{ blockId: string; kind: 'videos' | 'images' | 'captions' } | null>(null)
+  const [bank, setBank] = useState<BankSummary | null>(null)
+  const [rotationConfigured, setRotationConfigured] = useState(false)
   const [launchOpen, setLaunchOpen] = useState(false)
   const [newOpen, setNewOpen] = useState<number | null>(null)   // null = fermé, -1 = vide, i = modèle
   const [confirmDel, setConfirmDel] = useState<Flow | null>(null)
@@ -83,6 +91,14 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
     setPhones(((data ?? []) as Phone[]).filter(p => p.geelark_id))
   }, [currentOrg?.id, user.id, infra])
   useEffect(() => { loadPhones() }, [loadPhones])
+  // Résumé de la banque (dossiers + nombre de vidéos/images) pour les sources « dossier ».
+  const loadBank = useCallback(() => {
+    loadBankSummary({ orgId: currentOrg?.id ?? null, userId: user.id }).then(setBank).catch(() => setBank(null))
+  }, [currentOrg?.id, user.id])
+  useEffect(() => { loadBank() }, [loadBank])
+  useEffect(() => {
+    loadProxyRotation(currentOrg?.id ?? null, user.id).then(c => setRotationConfigured(c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim())))).catch(() => {})
+  }, [currentOrg?.id, user.id])
 
   // ── Sauvegarde automatique (anti-rebond) ───────────────────────────────────
   const persist = useCallback((f: Flow, immediate = false) => {
@@ -216,9 +232,9 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
   const selBlock = flow?.blocks.find(b => b.id === sel) ?? null
   const est = flow ? estimateFlow(flow) : BOOT_ESTIMATE
   const credits = flow ? flowCredits(flow) : 0
-  const issues = useMemo(() => flow ? validateFlow(flow, 0) : [], [flow])
+  const issues = useMemo(() => flow ? validateFlow(flow, 0, undefined, undefined, bank ?? undefined) : [], [flow, bank])
   const blockIssue = (b: FlowBlock) => {
-    const s = flow ? validateFlow({ ...flow, blocks: [b] }, 0)[0]?.replace(/^Bloc 1 \([^)]*\) : /, '') : undefined
+    const s = flow ? validateFlow({ ...flow, blocks: [{ ...b, params: { ...b.params, disabled: false } }] }, 0, undefined, undefined, bank ?? undefined)[0]?.replace(/^Bloc 1 \([^)]*\) : /, '') : undefined
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined
   }
 
@@ -328,7 +344,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
                   ))}
                   <span style={{ padding: '0 6px', fontFamily: MONO, fontSize: 10, color: '#71717A' }}>{Math.round(view.z * 100)}%</span>
                 </div>
-                <div style={{ position: 'absolute', bottom: 14, right: 14, fontSize: 10.5, color: '#71717A', pointerEvents: 'none' }}>
+                <div style={{ position: 'absolute', top: 10, right: 14, fontSize: 10.5, color: '#71717A', pointerEvents: 'none' }}>
                   Glisse le fond pour te déplacer · Ctrl + molette pour zoomer
                 </div>
               </>
@@ -339,13 +355,14 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
         {/* ── Inspecteur ── */}
         <Panel theme={theme}>
           {selBlock && flow ? (
-            <Inspector theme={theme} block={selBlock} index={flow.blocks.indexOf(selBlock)}
+            <Inspector theme={theme} block={selBlock} index={flow.blocks.indexOf(selBlock)} bank={bank}
               onChange={patch => setParams(selBlock.id, patch)}
               onPick={kind => setPicker({ blockId: selBlock.id, kind })}
               onRemove={() => removeBlock(selBlock.id)} />
           ) : flow ? (
-            <FlowSettings theme={theme} flow={flow} issues={issues}
-              onError={v => update(f => ({ ...f, onError: v }))}
+            <FlowSettings theme={theme} flow={flow} issues={issues} rotationConfigured={rotationConfigured}
+              groups={[...new Set(phones.map(p => p.group_name).filter(Boolean) as string[])].sort()}
+              onPatch={patch => update(f => ({ ...f, ...patch }))}
               onDelete={() => setConfirmDel(flow)} />
           ) : (
             <div style={{ padding: 22, fontSize: 12, color: '#71717A', lineHeight: 1.6 }}>Crée un flow (bouton « Nouveau » à gauche) ou choisis un modèle pour commencer.</div>
@@ -378,21 +395,27 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
       {picker && flow && (() => {
         const b = flow.blocks.find(x => x.id === picker.blockId)
         if (!b) return null
-        const ids = picker.kind === 'videos' ? b.params.videoIds ?? [] : b.params.imageIds ?? []
+        const ids = picker.kind === 'videos' ? b.params.videoIds ?? [] : picker.kind === 'images' ? b.params.imageIds ?? [] : []
         return (
           <BankPicker theme={theme} user={user} org={org} kind={picker.kind} multi initialIds={ids}
-            title={picker.kind === 'videos' ? 'Vidéos à publier' : 'Images'}
-            onClose={() => setPicker(null)}
+            title={picker.kind === 'videos' ? 'Vidéos à publier' : picker.kind === 'images' ? 'Images' : 'Légendes à importer'}
+            onClose={() => { setPicker(null); loadBank() }}
             onApply={r => {
               if (r.kind === 'videos') setParams(b.id, { videoIds: r.ids })
               else if (r.kind === 'images') setParams(b.id, { imageIds: r.ids })
-              setPicker(null)
+              else if (r.kind === 'captions') {
+                // Ajoutées aux légendes existantes (une par ligne, sans doublon).
+                const cur = lines(b.params.captions)
+                const add = r.texts.map(t => t.replace(/\s*\n\s*/g, ' ').trim()).filter(t => t && !cur.includes(t))
+                setParams(b.id, { captions: [...cur, ...add].join('\n') })
+              }
+              setPicker(null); loadBank()
             }} />
         )
       })()}
 
       {launchOpen && flow && bearer && (
-        <LaunchModal theme={theme} flow={flow} phones={phones} bearer={bearer}
+        <LaunchModal theme={theme} flow={flow} phones={phones} bearer={bearer} bank={bank}
           ownerId={currentOrg?.owner_id ?? user.id} orgId={currentOrg?.id ?? null} userId={user.id}
           onClose={() => setLaunchOpen(false)}
           onLaunched={() => { setLaunchOpen(false); setTimeout(() => runsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80) }} />
@@ -461,19 +484,39 @@ function Slot({ index, theme, drag, over, menuOpen, onOver, onDrop, onPlus, onPi
   )
 }
 
+function sourceLabel(b: FlowBlock): string {
+  const p = b.params, src = p.source ?? 'pick'
+  const w = BLOCK[b.type].media === 'video' ? 'vidéo' : 'image'
+  if (src === 'folder') return `📁 ${p.folder || 'dossier ?'}`
+  if (src === 'all') return 'toute la banque'
+  const n = (BLOCK[b.type].media === 'video' ? p.videoIds : p.imageIds)?.length ?? 0
+  return `${n} ${w}${n > 1 ? 's' : ''}`
+}
+
 function summary(b: FlowBlock): string {
   const p = b.params
   const mode = p.mode === 'random' ? 'aléatoire' : 'dans l\'ordre'
+  let s = ''
   switch (b.type) {
-    case 'login': return 'Identifiants demandés au lancement'
-    case 'username': { const l = lines(p.usernames); return l.length === 0 ? 'Aucun pseudo' : l.length === 1 ? `@${l[0]}` : `${l.length} pseudos` }
-    case 'avatar': return `${p.imageIds?.length ?? 0} image(s) · ${mode}`
-    case 'bio': { const n = lines(p.bios).length; return [n ? `${n} bio(s)` : '', lines(p.names).length ? 'nom' : '', p.link?.trim() ? 'lien' : ''].filter(Boolean).join(' · ') || 'Vide' }
-    case 'warmup': return `${p.minMin ?? 0}–${p.maxMin ?? 0} min${p.keyword?.trim() ? ` · « ${p.keyword.trim()} »` : ''}`
-    case 'pause': return `${p.minMin ?? 0}–${p.maxMin ?? 0} min${(p.minMin ?? 0) >= 3 ? ' · tél. éteint' : ''}`
-    case 'post': return `${p.videoIds?.length ?? 0} vidéo(s) · ${lines(p.captions).length} légende(s)${p.trial ? ' · essai' : ''}`
-    case 'story': { let host = ''; try { host = p.link ? new URL(p.link).host : '' } catch { host = p.link ?? '' } return `${p.imageIds?.length ?? 0} image(s)${host ? ` · ${host}` : ' · sans lien'}` }
+    case 'login': s = 'Identifiants demandés au lancement'; break
+    case 'username': { const l = lines(p.usernames); s = l.length === 0 ? 'Aucun pseudo' : l.length === 1 ? `@${l[0]}` : `${l.length} pseudos`; break }
+    case 'avatar': s = `${sourceLabel(b)} · ${mode}`; break
+    case 'bio': { const n = lines(p.bios).length; s = [n ? `${n} bio(s)` : '', lines(p.names).length ? 'nom' : '', p.link?.trim() ? 'lien' : ''].filter(Boolean).join(' · ') || 'Vide'; break }
+    case 'warmup': { const k = lines(p.keyword); s = `${p.minMin ?? 0}–${p.maxMin ?? 0} min${k.length ? ` · ${k.length === 1 ? `« ${k[0]} »` : `${k.length} mots-clés`}` : ''}`; break }
+    case 'pause': s = `${p.minMin ?? 0}–${p.maxMin ?? 0} min${(p.minMin ?? 0) >= 3 ? ' · tél. éteint' : ''}`; break
+    case 'post': s = `${sourceLabel(b)} · ${lines(p.captions).length} légende(s)${p.trial ? ' · essai' : ''}${p.removeAfter ? ' · usage unique' : ''}`; break
+    case 'story': {
+      let host = ''
+      try { host = p.link ? new URL(p.link).host : '' } catch { host = p.link ?? '' }
+      s = `${sourceLabel(b)} · ${p.linkMode === 'perAccount' ? `${lines(p.links).length} liens` : host || 'sans lien'}`
+      break
+    }
   }
+  const extra = [
+    (p.delayMax ?? 0) > 0 ? `⏱ ${p.delayMin ?? 0}–${p.delayMax} min avant` : '',
+    retriesOf(p) > 0 ? `↻ ${retriesOf(p)}` : '',
+  ].filter(Boolean)
+  return [s, ...extra].join(' · ')
 }
 
 function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart, onDragEnd, onUp, onDown, onDuplicate, onRemove }: {
@@ -482,9 +525,10 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
   onUp?: () => void; onDown?: () => void; onDuplicate: () => void; onRemove: () => void
 }) {
   const def = BLOCK[block.type]
+  const off = !isActive(block)
   const act = (d: string, fn: (() => void) | undefined, t: string, danger = false) => (
     <button onClick={e => { e.stopPropagation(); fn?.() }} disabled={!fn} title={t} aria-label={t}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: danger ? '#F87171' : '#71717A', cursor: fn ? 'pointer' : 'default', opacity: fn ? 1 : 0.3, padding: 0 }}>
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: danger ? '#F87171' : '#A1A1AA', cursor: fn ? 'pointer' : 'default', opacity: fn ? 1 : 0.3, padding: 0 }}>
       <Icon d={d} size={12} />
     </button>
   )
@@ -494,23 +538,23 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
       onDragEnd={onDragEnd}
       onClick={e => { e.stopPropagation(); onSelect() }}
       style={{
-        width: 290, borderRadius: 12, cursor: 'pointer', background: '#15151B',
-        border: `1px solid ${selected ? `rgba(${def.color},0.55)` : issue ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.08)'}`,
+        width: 290, borderRadius: 12, cursor: 'pointer', background: off ? '#111116' : '#15151B', opacity: off && !selected ? 0.6 : 1,
+        border: `1px ${off ? 'dashed' : 'solid'} ${selected ? `rgba(${def.color},0.55)` : issue && !off ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.1)'}`,
         boxShadow: selected ? `0 0 0 3px rgba(${def.color},0.12), 0 14px 30px -18px rgba(0,0,0,0.9)` : '0 10px 24px -18px rgba(0,0,0,0.9)',
-        transition: 'border-color .12s ease, box-shadow .12s ease',
+        transition: 'border-color .12s ease, box-shadow .12s ease, opacity .12s ease',
       }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 10px 10px 12px' }}>
         <BlockIcon def={block.type} size={30} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase', color: `rgba(${def.color},0.85)` }}>⚡ Automatisation · Instagram</div>
-          <div style={{ marginTop: 2, fontSize: 13.5, fontWeight: 700, color: '#F4F4F6' }}>{def.label}</div>
-          <div style={{ marginTop: 1, fontFamily: MONO, fontSize: 10.5, color: '#71717A' }}>{fmtMinutes(def.estimate(block.params))}{def.credits > 0 ? ` · ${def.credits} cr` : ''}</div>
+          <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase', color: off ? '#71717A' : `rgba(${def.color},0.85)` }}>{off ? '⏸ Désactivé' : `⚡ ${def.label}`}</div>
+          <div style={{ marginTop: 2, fontSize: 13.5, fontWeight: 700, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: off ? 'line-through' : undefined }}>{blockName(block)}</div>
+          <div style={{ marginTop: 1, fontFamily: MONO, fontSize: 10.5, color: '#8B8898' }}>{fmtMinutes(blockEstimate(block))}{def.credits > 0 ? ` · ${def.credits} cr` : ''}</div>
         </div>
-        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: '#3F3F46' }}>{index + 1}</span>
+        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: '#52525B' }}>{index + 1}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px 7px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: issue ? '#F87171' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={issue ?? summary(block)}>
-          {issue ? `⚠ ${issue}` : summary(block)}
+        <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: issue && !off ? '#F87171' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={issue && !off ? issue : summary(block)}>
+          {issue && !off ? `⚠ ${issue}` : summary(block)}
         </span>
         <span className="fb-actions" style={{ display: 'flex', gap: 1 }}>
           {act('M18 15l-6-6-6 6', onUp, 'Monter')}
@@ -678,7 +722,7 @@ function Seg<T extends string | number>({ theme, value, options, onChange }: { t
     <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
       {options.map(([v, l]) => (
         <button key={String(v)} onClick={e => { e.preventDefault(); onChange(v) }} style={{
-          flex: 1, height: 26, border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
+          flex: 1, height: 26, padding: '0 6px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
           background: value === v ? `rgba(${theme.tone},0.16)` : 'transparent', color: value === v ? theme.accentText : '#71717A',
         }}>{l}</button>
       ))}
@@ -714,13 +758,51 @@ function MediaPick({ theme, count, kind, onPick }: { theme: Theme; count: number
   )
 }
 
-function Inspector({ theme, block, index, onChange, onPick, onRemove }: {
-  theme: Theme; block: FlowBlock; index: number
-  onChange: (p: Partial<BlockParams>) => void; onPick: (k: 'videos' | 'images') => void; onRemove: () => void
+// Interrupteur accessible (bouton, clavier, lecteur d'écran).
+function Toggle({ theme, on, onChange, label, hint, disabled }: { theme: Theme; on: boolean; onChange: (v: boolean) => void; label: string; hint?: string; disabled?: boolean }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} disabled={disabled} onClick={() => onChange(!on)}
+      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: 0, border: 'none', background: 'transparent', cursor: disabled ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: disabled ? 0.45 : 1 }}>
+      <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#E4E4E7' }}>{label}</span>
+        {hint && <span style={{ fontSize: 10.5, lineHeight: 1.45, color: '#8B8898' }}>{hint}</span>}
+      </span>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 36, height: 21, padding: 2, borderRadius: 99, flexShrink: 0, background: on ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+        <span style={{ width: 17, height: 17, borderRadius: 99, background: '#fff' }} />
+      </span>
+    </button>
+  )
+}
+
+function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
+  theme: Theme; block: FlowBlock; index: number; bank: BankSummary | null
+  onChange: (p: Partial<BlockParams>) => void; onPick: (k: 'videos' | 'images' | 'captions') => void; onRemove: () => void
 }) {
   const def = BLOCK[block.type]
   const p = block.params
-  const modeSeg = <Field label="Répartition entre les comptes"><Seg<PoolMode> theme={theme} value={p.mode ?? 'seq'} options={[['seq', 'Dans l\'ordre'], ['random', 'Aléatoire']]} onChange={v => onChange({ mode: v })} /></Field>
+  const media = def.media
+  const w = media === 'video' ? 'vidéo' : 'image'
+  const src = p.source ?? 'pick'
+  const modeSeg = (label = 'Répartition entre les comptes') => <Field label={label}><Seg<PoolMode> theme={theme} value={p.mode ?? 'seq'} options={[['seq', 'Dans l\'ordre'], ['random', 'Aléatoire']]} onChange={v => onChange({ mode: v })} /></Field>
+  const num = (v: string) => Math.max(0, Math.min(1440, Number(v) || 0))
+
+  const sourceField = media ? (
+    <>
+      <Field label={media === 'video' ? 'Source des vidéos' : 'Source des images'} hint={src === 'folder' ? `Au lancement, toutes les ${w}s du dossier sont utilisées (y compris celles ajoutées après).` : src === 'all' ? `Toutes les ${w}s de ta banque (${bank ? bank[media] : '…'}).` : undefined}>
+        <Seg<MediaSource> theme={theme} value={src} options={[['pick', 'Choisir'], ['folder', 'Dossier'], ['all', 'Toute la banque']]} onChange={v => onChange({ source: v })} />
+      </Field>
+      {src === 'pick' && <MediaPick theme={theme} count={(media === 'video' ? p.videoIds : p.imageIds)?.length ?? 0} kind={media === 'video' ? 'videos' : 'images'} onPick={() => onPick(media === 'video' ? 'videos' : 'images')} />}
+      {src === 'folder' && (
+        <select value={p.folder ?? ''} onChange={e => onChange({ folder: e.target.value || undefined })} aria-label="Dossier de la banque"
+          style={{ ...inputStyle, cursor: 'pointer', background: '#101015', borderColor: p.folder ? 'rgba(255,255,255,0.08)' : 'rgba(248,113,113,0.35)' }}>
+          <option value="" style={{ background: '#16161C' }}>— Choisir un dossier —</option>
+          {(bank?.folders ?? []).map(f => <option key={f.name} value={f.name} style={{ background: '#16161C' }}>{f.name} · {f[media]} {w}{f[media] > 1 ? 's' : ''}</option>)}
+          {p.folder && bank && !bank.folders.some(f => f.name === p.folder) && <option value={p.folder}>{p.folder} (introuvable)</option>}
+        </select>
+      )}
+    </>
+  ) : null
+
   let body: ReactNode = null
   switch (block.type) {
     case 'login':
@@ -736,7 +818,7 @@ function Inspector({ theme, block, index, onChange, onPick, onRemove }: {
       break
     }
     case 'avatar':
-      body = <><Field label="Photos"><MediaPick theme={theme} count={p.imageIds?.length ?? 0} kind="images" onPick={() => onPick('images')} /></Field>{modeSeg}</>
+      body = <>{sourceField}{modeSeg()}</>
       break
     case 'bio':
       body = <>
@@ -747,14 +829,15 @@ function Inspector({ theme, block, index, onChange, onPick, onRemove }: {
           <textarea rows={2} value={p.names ?? ''} onChange={e => onChange({ names: e.target.value })} placeholder="Léa M." style={areaStyle} />
         </Field>
         <Field label="Lien du profil (optionnel)"><input value={p.link ?? ''} onChange={e => onChange({ link: e.target.value })} placeholder="https://…" style={inputStyle} /></Field>
-        {modeSeg}
+        {p.link?.trim() && <Field label="Titre du lien (optionnel)"><input value={p.linkTitle ?? ''} onChange={e => onChange({ linkTitle: e.target.value })} placeholder="Mon shop" style={inputStyle} /></Field>}
+        {modeSeg()}
       </>
       break
     case 'warmup':
       body = <>
         <Range p={p} onChange={onChange} presets={[['Léger', 5, 8], ['Normal', 8, 15], ['Long', 20, 40]]} />
-        <Field label="Mot-clé (optionnel)" hint="Vide = parcourt le fil Reels. Sinon recherche ce mot-clé.">
-          <input value={p.keyword ?? ''} onChange={e => onChange({ keyword: e.target.value })} placeholder="ex. fashion" style={inputStyle} />
+        <Field label={`Mots-clés (${lines(p.keyword).length})`} hint="Optionnel. Un par ligne : chaque compte en tire un au hasard. Vide = parcourt le fil Reels.">
+          <textarea rows={3} value={p.keyword ?? ''} onChange={e => onChange({ keyword: e.target.value })} placeholder={'fashion\noutfit\nstreetwear'} style={areaStyle} />
         </Field>
       </>
       break
@@ -763,62 +846,125 @@ function Inspector({ theme, block, index, onChange, onPick, onRemove }: {
       break
     case 'post':
       body = <>
-        <Field label="Vidéos"><MediaPick theme={theme} count={p.videoIds?.length ?? 0} kind="videos" onPick={() => onPick('videos')} /></Field>
+        {sourceField}
+        {modeSeg('Répartition des vidéos')}
         <Field label={`Légendes (${lines(p.captions).length})`} hint="Une légende par ligne. Vide = sans légende.">
           <textarea rows={4} value={p.captions ?? ''} onChange={e => onChange({ captions: e.target.value })} placeholder="Nouvelle vidéo 🔥 #fyp" style={areaStyle} />
         </Field>
-        {modeSeg}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
-          <input type="checkbox" checked={!!p.trial} onChange={e => onChange({ trial: e.target.checked })} style={{ accentColor: theme.accent }} />
-          <span style={{ fontSize: 12, color: '#D4D4D8' }}>Reel d'essai (montré aux non-abonnés)</span>
-        </label>
+        <Btn theme={theme} sm tone="ghost" icon="M4 19.5A2.5 2.5 0 0 1 6.5 17H20|M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" label="Importer depuis la banque de légendes" onClick={() => onPick('captions')} />
+        <Field label="Répartition des légendes"><Seg<PoolMode> theme={theme} value={p.captionMode ?? p.mode ?? 'seq'} options={[['seq', 'Dans l\'ordre'], ['random', 'Aléatoire']]} onChange={v => onChange({ captionMode: v })} /></Field>
+        <Toggle theme={theme} on={!!p.trial} onChange={v => onChange({ trial: v })} label="Reel d'essai" hint="Montré d'abord aux non-abonnés." />
+        <Toggle theme={theme} on={!!p.removeAfter} onChange={v => onChange({ removeAfter: v })} label="Usage unique" hint="Chaque vidéo publiée part à la corbeille de la banque (restaurable 7 j) pour ne jamais être reposté." />
       </>
       break
     case 'story':
       body = <>
-        <Field label="Images"><MediaPick theme={theme} count={p.imageIds?.length ?? 0} kind="images" onPick={() => onPick('images')} /></Field>
-        <Field label="Lien du sticker"><input value={p.link ?? ''} onChange={e => onChange({ link: e.target.value })} placeholder="https://…" style={{ ...inputStyle, borderColor: p.link?.trim() ? 'rgba(255,255,255,0.08)' : 'rgba(248,113,113,0.3)' }} /></Field>
+        {sourceField}
+        <Field label="Lien du sticker">
+          <Seg<'same' | 'perAccount'> theme={theme} value={p.linkMode ?? 'same'} options={[['same', 'Même lien pour tous'], ['perAccount', 'Un lien par compte']]} onChange={v => onChange({ linkMode: v })} />
+        </Field>
+        {(p.linkMode ?? 'same') === 'same'
+          ? <input value={p.link ?? ''} onChange={e => onChange({ link: e.target.value })} placeholder="https://…" aria-label="Lien du sticker" style={{ ...inputStyle, borderColor: p.link?.trim() ? 'rgba(255,255,255,0.08)' : 'rgba(248,113,113,0.3)' }} />
+          : <Field label={`Liens (${lines(p.links).length})`} hint="Un lien par ligne, dans l'ordre des comptes sélectionnés au lancement.">
+              <textarea rows={4} value={p.links ?? ''} onChange={e => onChange({ links: e.target.value })} placeholder={'https://lien-compte-1\nhttps://lien-compte-2'} style={{ ...areaStyle, fontFamily: MONO, fontSize: 11.5 }} />
+            </Field>}
         <Field label="Texte du sticker (optionnel)"><input value={p.linkText ?? ''} onChange={e => onChange({ linkText: e.target.value })} placeholder="Voir l'offre" style={inputStyle} /></Field>
-        {modeSeg}
+        {modeSeg('Répartition des images')}
       </>
       break
   }
+  const hasAdvanced = (p.delayMax ?? 0) > 0 || retriesOf(p) > 0 || (p.onError ?? 'inherit') !== 'inherit'
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '14px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <BlockIcon def={block.type} size={34} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#F4F4F6' }}><span style={{ color: '#52525B' }}>{index + 1}.</span> {def.label}</div>
-          <div style={{ marginTop: 3, fontSize: 11.5, lineHeight: 1.5, color: '#71717A' }}>{def.hint}</div>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#71717A' }}>{index + 1}.</span>
+            <input value={p.label ?? ''} onChange={e => onChange({ label: e.target.value })} placeholder={def.label} aria-label="Nom du bloc" maxLength={40}
+              style={{ flex: 1, minWidth: 0, height: 28, padding: '0 8px', marginLeft: -4, borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#F4F4F6', fontSize: 13.5, fontWeight: 700, outline: 'none' }} />
+          </div>
+          <div style={{ fontSize: 11.5, lineHeight: 1.5, color: '#8B8898' }}>{def.hint}</div>
         </div>
       </div>
+      <div style={{ padding: '11px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <Toggle theme={theme} on={isActive(block)} onChange={v => onChange({ disabled: !v })} label="Bloc activé" hint={isActive(block) ? undefined : 'Désactivé : gardé dans le flow mais sauté à l\'exécution (aucun crédit).'} />
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 13, padding: 15 }}>{body}</div>
+      <details className="fb-adv" open={hasAdvanced} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 15px', cursor: 'pointer', listStyle: 'none', fontSize: 12, fontWeight: 700, color: '#A1A1AA', userSelect: 'none' }}>
+          <Icon d="M9 18l6-6-6-6" size={12} /> Options avancées
+          {hasAdvanced && <span style={{ marginLeft: 'auto', fontSize: 10.5, color: theme.accentText }}>personnalisé</span>}
+        </summary>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 13, padding: '2px 15px 15px' }}>
+          <Field label="Délai aléatoire avant ce bloc (min)" hint="0 = aucun. Si le délai dépasse 3 min, le téléphone est éteint pendant l'attente.">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <input type="number" min={0} value={p.delayMin ?? 0} onChange={e => onChange({ delayMin: num(e.target.value) })} aria-label="Délai minimum" style={inputStyle} />
+              <input type="number" min={0} value={p.delayMax ?? 0} onChange={e => onChange({ delayMax: num(e.target.value) })} aria-label="Délai maximum" style={inputStyle} />
+            </div>
+          </Field>
+          <Field label="Nouvelles tentatives si échec">
+            <Seg<number> theme={theme} value={retriesOf(p)} options={[[0, 'Aucune'], [1, '1'], [2, '2'], [3, '3']]} onChange={v => onChange({ retries: v })} />
+          </Field>
+          <Field label="Si ce bloc échoue malgré tout">
+            <Seg<BlockOnError> theme={theme} value={p.onError ?? 'inherit'} options={[['inherit', 'Comme le flow'], ['stop', 'Arrêter'], ['continue', 'Continuer']]} onChange={v => onChange({ onError: v })} />
+          </Field>
+        </div>
+      </details>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <span style={{ flex: 1, fontFamily: MONO, fontSize: 10.5, color: '#52525B' }}>{fmtMinutes(def.estimate(p))}{def.credits ? ` · ${def.credits} crédit(s)/compte` : ''}</span>
+        <span style={{ flex: 1, fontFamily: MONO, fontSize: 10.5, color: '#71717A' }}>{fmtMinutes(blockEstimate(block))}{def.credits ? ` · ${def.credits} crédit(s)/compte` : ''}</span>
         <Btn theme={theme} sm tone="danger" label="Supprimer" onClick={onRemove} />
       </div>
     </>
   )
 }
 
-function FlowSettings({ theme, flow, issues, onError, onDelete }: {
-  theme: Theme; flow: Flow; issues: string[]; onError: (v: 'stop' | 'continue') => void; onDelete: () => void
+function FlowSettings({ theme, flow, issues, groups, rotationConfigured, onPatch, onDelete }: {
+  theme: Theme; flow: Flow; issues: string[]; groups: string[]; rotationConfigured: boolean
+  onPatch: (p: Partial<Flow>) => void; onDelete: () => void
 }) {
+  const d = flow.defaults ?? {}
+  const setD = (x: Partial<FlowDefaults>) => onPatch({ defaults: { ...d, ...x } })
+  const sel = new Set(d.groups ?? [])
   return (
     <>
       <PanelHead title="Réglages du flow" sub="Clique un bloc pour le configurer" />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 13, padding: 15 }}>
-        <Field label="Si un bloc échoue sur un compte" hint={flow.onError === 'stop' ? 'Les blocs suivants sont sautés pour ce compte (recommandé : inutile de poster si la connexion a échoué).' : 'Les blocs suivants sont quand même joués.'}>
-          <Seg<'stop' | 'continue'> theme={theme} value={flow.onError} options={[['stop', 'Arrêter ce compte'], ['continue', 'Continuer']]} onChange={onError} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 15 }}>
+        <Field label="Description (optionnel)">
+          <textarea rows={2} value={flow.description ?? ''} onChange={e => onPatch({ description: e.target.value })} placeholder="À quoi sert ce flow…" style={areaStyle} />
         </Field>
+        <Field label="Si un bloc échoue sur un compte" hint={flow.onError === 'stop' ? 'Les blocs suivants sont sautés pour ce compte (chaque bloc peut avoir son propre réglage).' : 'Les blocs suivants sont quand même joués (chaque bloc peut avoir son propre réglage).'}>
+          <Seg<'stop' | 'continue'> theme={theme} value={flow.onError} options={[['stop', 'Arrêter ce compte'], ['continue', 'Continuer']]} onChange={v => onPatch({ onError: v })} />
+        </Field>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#8B8898' }}>Lancement par défaut</span>
+          <Field label="Comptes en parallèle">
+            <Seg<number> theme={theme} value={d.concurrency ?? 3} options={[[1, '1'], [3, '3'], [5, '5'], [10, '10'], [20, '20']]} onChange={v => setD({ concurrency: v })} />
+          </Field>
+          <Toggle theme={theme} on={!!d.rotation && rotationConfigured} disabled={!rotationConfigured} onChange={v => setD({ rotation: v })} label="Rotation d'IP proxy"
+            hint={rotationConfigured ? 'IP changée avant chaque compte (un compte à la fois).' : 'Aucun proxy rotatif configuré (Réglages).'} />
+          {groups.length > 0 && (
+            <Field label="Groupes présélectionnés" hint="Les comptes de ces groupes sont cochés à l'ouverture de « Lancer ».">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {groups.map(g => {
+                  const on = sel.has(g)
+                  return (
+                    <button key={g} type="button" aria-pressed={on} onClick={() => { const n = new Set(sel); on ? n.delete(g) : n.add(g); setD({ groups: [...n] }) }}
+                      style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.08)'}`, background: on ? `rgba(${theme.tone},0.14)` : 'transparent', color: on ? theme.accentText : '#A1A1AA' }}>{on ? '✓ ' : ''}{g}</button>
+                  )
+                })}
+              </div>
+            </Field>
+          )}
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Vérification</span>
           {issues.length === 0 ? (
             <span style={{ fontSize: 12, color: '#34D399' }}>✓ Prêt à lancer</span>
           ) : issues.map((s, i) => <span key={i} style={{ fontSize: 11.5, lineHeight: 1.5, color: '#F87171' }}>• {s}</span>)}
         </div>
-        <div style={{ fontSize: 11.5, lineHeight: 1.6, color: '#52525B' }}>
-          Chaque compte démarre <b style={{ color: '#A1A1AA' }}>une seule fois</b>, enchaîne tous les blocs, puis s'éteint. Raccourcis : <b style={{ color: '#A1A1AA' }}>Suppr</b> retire le bloc sélectionné, <b style={{ color: '#A1A1AA' }}>Échap</b> désélectionne.
+        <div style={{ fontSize: 11.5, lineHeight: 1.6, color: '#8B8898' }}>
+          Chaque compte démarre <b style={{ color: '#D4D4D8' }}>une seule fois</b>, enchaîne tous les blocs actifs, puis s'éteint — même en cas d'échec ou d'annulation. Raccourcis : <b style={{ color: '#D4D4D8' }}>Suppr</b> retire le bloc sélectionné, <b style={{ color: '#D4D4D8' }}>Échap</b> désélectionne.
         </div>
       </div>
       <div style={{ padding: '11px 15px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'flex-end' }}>
@@ -848,22 +994,27 @@ function parseCredLine(l: string): Creds | null {
   return email && password ? { email, password, totp } : null
 }
 
-function LaunchModal({ theme, flow, phones, bearer, ownerId, orgId, userId, onClose, onLaunched }: {
-  theme: Theme; flow: Flow; phones: Phone[]; bearer: string; ownerId: string; orgId: string | null; userId: string
+function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId, onClose, onLaunched }: {
+  theme: Theme; flow: Flow; phones: Phone[]; bearer: string; bank: BankSummary | null; ownerId: string; orgId: string | null; userId: string
   onClose: () => void; onLaunched: () => void
 }) {
-  const [sel, setSel] = useState<Set<string>>(new Set())
+  // Pré-rempli avec les réglages par défaut du flow (groupes, parallèle, rotation).
+  const defaults = flow.defaults ?? {}
+  const [sel, setSel] = useState<Set<string>>(() => new Set(defaults.groups?.length ? phones.filter(p => p.group_name && defaults.groups!.includes(p.group_name)).map(p => p.id) : []))
   const [group, setGroup] = useState('Tous')
   const [q, setQ] = useState('')
-  const [conc, setConc] = useState(3)
+  const [conc, setConc] = useState(defaults.concurrency ?? 3)
   const [rotationConfigured, setRotationConfigured] = useState(false)
   const [rotationOn, setRotationOn] = useState(false)
   const [credText, setCredText] = useState('')
   const [busy, setBusy] = useState(false)
-  const needsLogin = flow.blocks.some(b => b.type === 'login')
+  const needsLogin = flow.blocks.some(b => isActive(b) && b.type === 'login')
 
   useEffect(() => {
-    loadProxyRotation(orgId, userId).then(c => setRotationConfigured(c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim()))))
+    loadProxyRotation(orgId, userId).then(c => {
+      const ok = c.enabled && c.urls.some(u => /^https?:\/\//i.test(u.trim()))
+      setRotationConfigured(ok); setRotationOn(ok && !!defaults.rotation)
+    })
   }, [orgId, userId])
 
   const groups = ['Tous', ...[...new Set(phones.map(p => p.group_name).filter(Boolean) as string[])].sort()]
@@ -873,7 +1024,7 @@ function LaunchModal({ theme, flow, phones, bearer, ownerId, orgId, userId, onCl
   const creds: Record<string, Creds> = {}
   chosen.forEach((p, i) => { const c = credLines[i] ? parseCredLine(credLines[i]) : null; if (c) creds[p.id] = c })
   const nCreds = Object.keys(creds).length
-  const issues = validateFlow(flow, chosen.length, needsLogin ? creds : undefined, chosen.map(p => p.id))
+  const issues = validateFlow(flow, chosen.length, needsLogin ? creds : undefined, chosen.map(p => p.id), bank ?? undefined)
   if (chosen.length === 0) issues.unshift('Sélectionne au moins un compte.')
   const perAcc = flowCredits(flow)
   const est = estimateFlow(flow)
@@ -890,7 +1041,7 @@ function LaunchModal({ theme, flow, phones, bearer, ownerId, orgId, userId, onCl
     await loadProxyRotation(orgId, userId)
     const rot = rotationOn ? resolveRotationUrls() : []
     await runFlow({
-      bearer, flow, creds, concurrency: conc, creditOwnerId: ownerId,
+      bearer, flow, creds, concurrency: conc, creditOwnerId: ownerId, scope: { orgId, userId },
       rotationUrls: rot.length ? rot : undefined,
       targets: chosen.map(p => ({ key: p.id, geelarkId: p.geelark_id!, name: phoneLabel(p) })),
     })
@@ -1018,7 +1169,7 @@ function RunCard({ theme, run }: { theme: Theme; run: FlowRun }) {
       <div style={{ maxHeight: 380, overflowY: 'auto' }}>
         {list.slice(0, LIMIT).map(p => {
           const isOpen = open === p.key
-          const curLabel = p.status === 'booting' ? 'Démarrage du téléphone' : p.current >= 0 && p.status === 'running' ? BLOCK[run.blocks[p.current].type].label : ''
+          const curLabel = p.status === 'booting' ? 'Démarrage du téléphone' : p.current >= 0 && p.status === 'running' ? blockName(run.blocks[p.current]) : ''
           const err = p.errors.find(Boolean)
           return (
             <div key={p.key} style={{ borderTop: '1px solid rgba(255,255,255,0.035)' }}>
@@ -1026,7 +1177,7 @@ function RunCard({ theme, run }: { theme: Theme; run: FlowRun }) {
                 <span style={{ width: 150, flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
                 <span style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
                   {p.steps.map((s, i) => (
-                    <span key={i} title={`${i + 1}. ${BLOCK[run.blocks[i].type].label} — ${s}${p.errors[i] ? ` : ${p.errors[i]}` : ''}`}
+                    <span key={i} title={`${i + 1}. ${blockName(run.blocks[i])} — ${s}${p.errors[i] ? ` : ${p.errors[i]}` : ''}`}
                       style={{ width: 16, height: 6, borderRadius: 99, background: STEP_COLOR[s], boxShadow: s === 'running' ? '0 0 8px rgba(251,191,36,0.6)' : 'none', animation: s === 'running' ? 'aPulse 1.4s ease-in-out infinite' : undefined }} />
                   ))}
                 </span>
