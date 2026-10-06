@@ -110,6 +110,13 @@
   .lang{display:inline-flex; gap:2px; padding:3px; border-radius:9px; background:rgba(255,255,255,.04); border:1px solid var(--edge)}
   .lang button{border:none; background:transparent; color:var(--mut); font-family:inherit; font-weight:800; font-size:11px; padding:4px 8px; border-radius:6px; cursor:pointer}
   .lang button.on{background:var(--acc); color:#1a1206}
+  .flist{display:none; flex-direction:column; gap:4px; margin-top:8px; max-height:190px; overflow:auto}
+  .flist.show{display:flex}
+  .flist .fi{display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:9px; background:rgba(255,255,255,.03); border:1px solid var(--edge); font-size:12px; color:var(--mut)}
+  .flist .fi b{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--txt); font-weight:600}
+  .flist .fi button{border:none; background:transparent; color:var(--mut); cursor:pointer; font-size:14px; padding:0 4px}
+  .grp{margin:14px 0 6px; font-size:12px; font-weight:800; color:var(--mut); text-transform:uppercase; letter-spacing:.06em}
+  .bar .bkall + .bkall{margin-left:8px}
   @media(max-width:480px){ .hero h2{font-size:25px} .grid{grid-template-columns:1fr} }
 </style>
 </head>
@@ -140,7 +147,7 @@
       <div class="ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg></div>
       <b data-i18n-html="dropB">Dépose ta vidéo <em>ou clique</em></b>
       <small data-i18n="dropS">MP4 · MOV · WEBM — traitée localement</small>
-      <input id="file" type="file" accept="video/*" hidden />
+      <input id="file" type="file" accept="video/*" multiple hidden />
     </div>
 
     <div id="picked" class="picked">
@@ -148,6 +155,7 @@
       <span class="txt" id="pickedTxt"></span>
       <span class="clr" id="clr" data-i18n="clear">effacer</span>
     </div>
+    <div id="flist" class="flist"></div>
 
     <button id="go" class="go" disabled>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
@@ -160,7 +168,7 @@
         <div class="grid">
           <div><label class="f" data-i18n="lblDevice">Appareil (métadonnées)</label><select id="device"></select></div>
           <div><label class="f" data-i18n="lblGps">Localisation GPS</label><select id="gps"></select></div>
-          <div><label class="f" data-i18n="lblVariants">Variantes</label><input id="copies" type="number" min="1" max="12" value="1" /></div>
+          <div><label class="f" data-i18n="lblVariants">Variantes</label><input id="copies" type="number" min="1" max="50" value="1" /></div>
         </div>
         <div style="margin-top:14px"><label class="f" data-i18n="lblIntensity">Intensité (recadrage)</label>
           <div class="seg" id="intensity">
@@ -180,7 +188,7 @@
 
   <div id="out">
     <div class="prog"><i id="progbar"></i></div>
-    <div class="bar"><span class="count" id="count"></span><button class="bkall" id="bkall" data-i18n="saveAll">☁ Tout mettre en banque</button></div>
+    <div class="bar"><span class="count" id="count"></span><button class="bkall" id="dlall" data-i18n="dlAll">⬇ Tout télécharger</button><button class="bkall" id="bkall" data-i18n="saveAll">☁ Tout mettre en banque</button></div>
     <div class="results" id="results"></div>
     <div class="log" id="log"></div>
   </div>
@@ -200,10 +208,12 @@
     fr:{
       h1:'Spoof <span>Vidéo</span>', tabImage:'📷 Image', tabVideo:'🎬 Vidéo',
       heroH:'Rends tes vidéos <span class="g">uniques</span> en un clic',
-      heroP:"Dépose une vidéo, clique sur Spoofer, télécharge. Métadonnées effacées, GPS &amp; appareil réécrits, micro-recadrage et ré-encodage — tout dans ton navigateur, rien n'est envoyé.",
-      dropB:'Dépose ta vidéo <em>ou clique</em>', dropS:'MP4 · MOV · WEBM — traitée localement',
+      heroP:"Dépose une ou plusieurs vidéos, clique sur Spoofer, télécharge. Métadonnées effacées, GPS & appareil réécrits, micro-recadrage et ré-encodage — tout dans ton navigateur, rien n'est envoyé.",
+      dropB:'Dépose tes vidéos <em>ou clique</em>', dropS:'MP4 · MOV · WEBM — traitée localement',
       clear:'effacer', spoof:'Spoofer', advOpts:'Options avancées',
-      lblDevice:'Appareil (métadonnées)', lblGps:'Localisation GPS', lblVariants:'Variantes',
+      lblDevice:'Appareil (métadonnées)', lblGps:'Localisation GPS', lblVariants:'Variantes / vidéo', dlAll:'⬇ Tout télécharger',
+      picked:(n,mb)=>n===1?'':`${n} vidéos · ${mb} Mo`, tooMany:(t,m)=>`${t} fichiers demandés : maximum ${m} par lancement. Réduis le nombre de vidéos ou de variantes.`,
+      videoN:(i,n)=>`vidéo ${i}/${n}`, fileFail:'cette vidéo a échoué, on passe à la suivante', remove:'retirer',
       lblIntensity:'Intensité (recadrage)', iSubtle:'Subtile', iNormal:'Normale', iStrong:'Forte',
       cSpeed:'Micro-vitesse', cTrim:'Couper un bout', cFlip:'Miroir',
       tSpeed:'Change légèrement la vitesse (0,98–1,02×)', tTrim:'Coupe un court bout au début et à la fin',
@@ -221,17 +231,19 @@
       stMono:'   (multi-thread indisponible → mono-thread)',
       processing:'Traitement…', spoofing:'Spoof en cours…', variant:'variante', variantC:'Variante',
       download:'Télécharger', mb:'Mo',
-      ready:(ok,n,t)=>`✅ ${ok}/${n} variante(s) prête(s)${t?' ⚡ turbo':''} — chaque fichier a une empreinte différente`,
+      ready:(ok,n,t)=>`✅ ${ok}/${n} fichier(s) prêt(s)${t?' ⚡ turbo':''} — tous différents (image + empreinte)`,
       devRandom:'iPhone aléatoire (recommandé)', devNone:'Aucun (effacées)',
       gpsNone:'Aucune (effacée)', gpsFrance:'🇫🇷 France (aléatoire)',
     },
     en:{
       h1:'Spoof <span>Video</span>', tabImage:'📷 Image', tabVideo:'🎬 Video',
       heroH:'Make your videos <span class="g">unique</span> in one click',
-      heroP:"Drop a video, click Spoof, download. Metadata wiped, GPS &amp; device rewritten, micro-crop and re-encode — all in your browser, nothing is uploaded.",
-      dropB:'Drop your video <em>or click</em>', dropS:'MP4 · MOV · WEBM — processed locally',
+      heroP:"Drop one or more videos, click Spoof, download. Metadata wiped, GPS & device rewritten, micro-crop and re-encode — all in your browser, nothing is uploaded.",
+      dropB:'Drop your videos <em>or click</em>', dropS:'MP4 · MOV · WEBM — processed locally',
       clear:'clear', spoof:'Spoof', advOpts:'Advanced options',
-      lblDevice:'Device (metadata)', lblGps:'GPS location', lblVariants:'Variants',
+      lblDevice:'Device (metadata)', lblGps:'GPS location', lblVariants:'Variants / video', dlAll:'⬇ Download all',
+      picked:(n,mb)=>n===1?'':`${n} videos · ${mb} MB`, tooMany:(t,m)=>`${t} files requested: max ${m} per run. Use fewer videos or variants.`,
+      videoN:(i,n)=>`video ${i}/${n}`, fileFail:'this video failed, moving to the next one', remove:'remove',
       lblIntensity:'Intensity (crop)', iSubtle:'Subtle', iNormal:'Normal', iStrong:'Strong',
       cSpeed:'Micro-speed', cTrim:'Trim a bit', cFlip:'Mirror',
       tSpeed:'Slightly changes the speed (0.98–1.02×)', tTrim:'Cuts a short bit at the start and end',
@@ -249,7 +261,7 @@
       stMono:'   (multi-thread unavailable → single-thread)',
       processing:'Processing…', spoofing:'Spoofing…', variant:'variant', variantC:'Variant',
       download:'Download', mb:'MB',
-      ready:(ok,n,t)=>`✅ ${ok}/${n} variant(s) ready${t?' ⚡ turbo':''} — each file has a different fingerprint`,
+      ready:(ok,n,t)=>`✅ ${ok}/${n} file(s) ready${t?' ⚡ turbo':''} — all different (picture + fingerprint)`,
       devRandom:'Random iPhone (recommended)', devNone:'None (cleared)',
       gpsNone:'None (cleared)', gpsFrance:'🇫🇷 France (random)',
     },
@@ -311,7 +323,18 @@
   function resolveDevice(k){ return k==='randomiphone' ? IPHONES[Math.floor(Math.random()*IPHONES.length)] : k; }
   function ranges(i){ if(i==='subtle')return{z:[1.01,1.025]}; if(i==='strong')return{z:[1.03,1.08]}; return{z:[1.02,1.05]}; }
   function zoomFactor(seed,i){ const z=ranges(i).z; return z[0]+((Math.sin(seed*197.5)+1)/2)*(z[1]-z[0]); }
-  function spoofFilter(seed,i){ const z=zoomFactor(seed,i).toFixed(3); return `scale=iw*${z}:ih*${z},crop=iw/${z}:ih/${z},scale=trunc(iw/2)*2:trunc(ih/2)*2`; }
+  // Chaque variante = zoom (4 décimales) + position du cadrage tirés au hasard, jamais
+  // deux fois les mêmes dans un lancement → image réellement différente à chaque fois.
+  const usedParams=new Set();
+  function pickParams(i){
+    for(let t=0;t<200;t++){
+      const z=zoomFactor(Math.random()*1e6,i).toFixed(4), fx=Math.random().toFixed(3), fy=Math.random().toFixed(3);
+      const key=`${z}|${fx}|${fy}`;
+      if(!usedParams.has(key)){ usedParams.add(key); return {z,fx,fy}; }
+    }
+    return {z:zoomFactor(Math.random()*1e6,i).toFixed(4), fx:Math.random().toFixed(4), fy:Math.random().toFixed(4)};
+  }
+  function spoofFilter(p){ return `scale=iw*${p.z}:ih*${p.z},crop=iw/${p.z}:ih/${p.z}:(iw-ow)*${p.fx}:(ih-oh)*${p.fy},scale=trunc(iw/2)*2:trunc(ih/2)*2`; }
   function iso6709(lat,lon){ const f=(v,w)=>(v>=0?'+':'-')+Math.abs(v).toFixed(4).padStart(w+5,'0'); return `${f(lat,2)}${f(lon,3)}/`; }
   function gpsFor(k){ if(k==='none')return null; if(k==='france'){ const c=FRANCE[Math.floor(Math.random()*FRANCE.length)]; const j=()=>(Math.random()-.5)*.06; return {lat:+(c[0]+j()).toFixed(4),lon:+(c[1]+j()).toFixed(4)}; } const c=GPS_CITIES.find(x=>x.k===k); return c&&c.lat!=null?{lat:c.lat,lon:c.lon}:null; }
   function deviceMeta(k){ const d=DEVICES.find(x=>x.k===k); if(!d||!d.make)return[]; const o=['-metadata',`make=${d.make}`,'-metadata',`model=${d.model}`]; if(d.apple){o.push('-metadata',`com.apple.quicktime.make=${d.make}`,'-metadata',`com.apple.quicktime.model=${d.model}`); if(d.sw)o.push('-metadata',`com.apple.quicktime.software=${d.sw}`);} return o; }
@@ -334,23 +357,44 @@
   $('#lang').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; LANG=b.dataset.l; try{ localStorage.setItem('dreamymeow-lang',LANG); }catch(_){} applyLang(); });
   applyLang();
 
-  /* ══ Fichier ══ */
-  let file=null, duration=0;
+  /* ══ Fichiers (plusieurs vidéos d'un coup) ══ */
+  let files=[];
   const drop=$('#drop'), input=$('#file');
   drop.addEventListener('click',()=>input.click());
   ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hot');}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hot');}));
-  drop.addEventListener('drop',e=>{ if(e.dataTransfer?.files[0]) setFile(e.dataTransfer.files[0]); });
-  input.addEventListener('change',()=>{ if(input.files[0]) setFile(input.files[0]); });
-  $('#clr').addEventListener('click',e=>{ e.stopPropagation(); file=null; input.value=''; duration=0; $('#picked').classList.remove('show'); $('#go').disabled=true; });
-  function setFile(f){
-    if(!f.type.startsWith('video/') && !/\.(mp4|mov|webm|m4v)$/i.test(f.name)){ alert(tr('notVideo')); return; }
-    file=f; duration=0;
-    $('#pickedTxt').textContent=`${f.name} · ${(f.size/1048576).toFixed(1)} Mo`;
-    $('#picked').classList.add('show'); $('#go').disabled=false;
-    const v=document.createElement('video'); v.preload='metadata';
-    v.onloadedmetadata=()=>{ duration=v.duration||0; URL.revokeObjectURL(v.src); };
-    v.src=URL.createObjectURL(f);
+  drop.addEventListener('drop',e=>{ if(e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); });
+  input.addEventListener('change',()=>{ if(input.files.length) addFiles(input.files); input.value=''; });
+  $('#clr').addEventListener('click',e=>{ e.stopPropagation(); files=[]; renderFiles(); });
+  const isVideo=f=> f.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name);
+  function addFiles(list){
+    const arr=[...list];
+    const ok=arr.filter(isVideo);
+    if(ok.length<arr.length) alert(tr('notVideo'));
+    for(const f of ok) if(!files.some(x=>x.name===f.name && x.size===f.size)) files.push(f);
+    renderFiles();
+  }
+  function renderFiles(){
+    const n=files.length, mb=(files.reduce((a,f)=>a+f.size,0)/1048576).toFixed(1);
+    $('#pickedTxt').textContent = n===1 ? `${files[0].name} · ${(files[0].size/1048576).toFixed(1)} ${tr('mb')}` : tr('picked')(n,mb);
+    $('#picked').classList.toggle('show', n>0); $('#go').disabled = n===0;
+    const fl=$('#flist'); fl.classList.toggle('show', n>1); fl.innerHTML='';
+    if(n>1) files.forEach((f,i)=>{
+      const row=document.createElement('div'); row.className='fi';
+      const b=document.createElement('b'); b.textContent=f.name; row.appendChild(b);
+      row.appendChild(document.createTextNode(`${(f.size/1048576).toFixed(1)} ${tr('mb')}`));
+      const x=document.createElement('button'); x.type='button'; x.textContent='×'; x.title=tr('remove');
+      x.addEventListener('click',()=>{ files.splice(i,1); renderFiles(); }); row.appendChild(x);
+      fl.appendChild(row);
+    });
+  }
+  window.addEventListener('dm-lang', renderFiles);
+  // Durée via le lecteur du navigateur (repli si ffmpeg ne la lit pas).
+  function browserDuration(f){
+    return new Promise(res=>{ const v=document.createElement('video'); v.preload='metadata';
+      const done=d=>{ URL.revokeObjectURL(v.src); res(d||0); };
+      v.onloadedmetadata=()=>done(v.duration); v.onerror=()=>done(0); setTimeout(()=>done(0),4000);
+      v.src=URL.createObjectURL(f); });
   }
 
   /* ══ ffmpeg ══ */
@@ -422,13 +466,13 @@
 
   // Une variante. Le fichier source « in.mp4 » est déjà dans le moteur (écrit une
   // seule fois pour toutes les variantes).
-  async function spoofOne(seed, opts, info){
+  async function spoofOne(opts, info){
     let vf='';
     if(info.w && info.h && Math.max(info.w,info.h)>MAX_SIDE){
       const k=MAX_SIDE/Math.max(info.w,info.h);
       vf+=`scale=${even(info.w*k)}:${even(info.h*k)},`;
     }
-    vf+=spoofFilter(seed, opts.intensity);
+    vf+=spoofFilter(pickParams(opts.intensity));
     if(opts.flip) vf+=',hflip';
     let af=null;
     if(opts.speed){ const s=(0.98+Math.random()*0.04); vf+=`,setpts=${(1/s).toFixed(4)}*PTS`; af=`atempo=${s.toFixed(4)}`; }
@@ -438,7 +482,8 @@
       const end=+(0.1+Math.random()*0.2).toFixed(2);
       trim.push('-ss', String(start), '-t', Math.max(0.5, info.dur-start-end).toFixed(2));
     }
-    const meta=['-map_metadata','-1'];
+    const created=new Date(Date.now()-Math.floor(Math.random()*20*86400000)).toISOString().replace(/\.\d+Z$/,'Z');
+    const meta=['-map_metadata','-1','-metadata',`creation_time=${created}`];
     const g=opts.gps; if(g){ const loc=iso6709(g.lat,g.lon); meta.push('-metadata',`location=${loc}`,'-metadata',`location-eng=${loc}`); }
     meta.push(...deviceMeta(opts.device));
     const H264=['-threads','0','-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart'];
@@ -477,64 +522,92 @@
   }
   $('#bkall').addEventListener('click', async ()=>{ for(const d of done) await toBank(d.btn, d.blob, d.name); });
   const urls=[];
+  const MAX_TOTAL=200;
+  $('#dlall').addEventListener('click', async ()=>{
+    for(const a of document.querySelectorAll('#results a.dl')){ a.click(); await new Promise(r=>setTimeout(r,350)); }
+  });
   $('#go').addEventListener('click', async ()=>{
-    if(!file) return;
+    if(!files.length) return;
     if(!hasAccess()){ if(window.dm) dm.gate(); return; }
-    const n=Math.max(1,Math.min(12, parseInt($('#copies').value)||1));
-    const opts={ intensity, gps:gpsFor($('#gps').value), device:resolveDevice($('#device').value), speed:tf.speed, trim:tf.trim, flip:tf.flip };
-    const baseName=(file.name.replace(/\.[^.]+$/,'')||'video');
+    const n=Math.max(1,Math.min(50, parseInt($('#copies').value)||1));
+    $('#copies').value=n;
+    const queue=files.slice(), F=queue.length, total=F*n;
+    if(total>MAX_TOTAL){ alert(tr('tooMany')(total, MAX_TOTAL)); return; }
     const go=$('#go'); go.disabled=true; go.innerHTML=`<span class="spin"></span> ${tr('processing')}`;
     $('#out').style.display='block'; $('#results').innerHTML=''; $('#log').classList.remove('show'); $('#log').textContent=''; setBar(0);
-    urls.forEach(u=>URL.revokeObjectURL(u)); urls.length=0; done.length=0; $('#bkall').style.display='none';
-    totalN=n;
+    urls.forEach(u=>URL.revokeObjectURL(u)); urls.length=0; done.length=0; $('#bkall').style.display='none'; $('#dlall').style.display='none';
+    usedParams.clear();
+    const hashes=new Set();
+    totalN=total;
+    let okCount=0, step=0;
     try{
-      const data=new Uint8Array(await file.arrayBuffer());
-      let info;
-      try{ info=await prepare(data); }
-      catch(e){
-        if(String(e&&e.message)!=='STALL' && !mtActive) throw e;
-        log(tr('stall')); resetEngine(); forceST=true; info=await prepare(data);
-      }
-      if(!info.dur && duration) info.dur=duration;
-      if(info.w && info.h && Math.max(info.w,info.h)>MAX_SIDE){ const k=MAX_SIDE/Math.max(info.w,info.h); log(tr('downscale')(even(info.w*k), even(info.h*k))); }
-      let okCount=0;
-      for(let i=0;i<n;i++){
-        baseRatio=i/n; setBar(baseRatio);
-        $('#count').textContent=`${tr('spoofing')} ${tr('variant')} ${i+1}/${n}`;
-        const seed=Math.random()*1000+i*13.37;
-        let blob=null;
-        for(let attempt=0; attempt<2 && !blob; attempt++){
-          try{ blob=await spoofOne(seed, opts, info); }
-          catch(err){
-            const msg=String(err&&err.message||err);
-            const engineDied = msg==='STALL' || /terminat|abort|memory|RuntimeError|unreachable/i.test(msg);
-            if(engineDied && attempt===0){
-              // Moteur bloqué/planté : on repart à neuf en mono-thread (le plus robuste).
-              log(tr('stall')); resetEngine(); forceST=true;
-              try{ info=await prepare(data); continue; }catch(e2){ log(`❌ ${e2.message||e2}`); break; }
-            }
-            log(`❌ ${tr('variant')} ${i+1} : ${msg==='STALL' ? tr('stallFail') : msg}`);
-            break;
+      for(let fi=0; fi<F; fi++){
+        const file=queue[fi];
+        const baseName=(file.name.replace(/\.[^.]+$/,'')||'video');
+        const tag = F>1 ? `${tr('videoN')(fi+1,F)} · ` : '';
+        if(F>1){ const h=document.createElement('div'); h.className='grp'; h.textContent=`${fi+1}. ${file.name}`; $('#results').appendChild(h); }
+        let data, info;
+        try{
+          data=new Uint8Array(await file.arrayBuffer());
+          try{ info=await prepare(data); }
+          catch(e){
+            if(String(e&&e.message)!=='STALL' && !mtActive) throw e;
+            log(tr('stall')); resetEngine(); forceST=true; info=await prepare(data);
           }
+          if(!info.w && !info.dur) throw new Error(tr('notVideo'));
+          if(!info.dur) info.dur=await browserDuration(file);
+          if(info.w && info.h && Math.max(info.w,info.h)>MAX_SIDE){ const k=MAX_SIDE/Math.max(info.w,info.h); log(tr('downscale')(even(info.w*k), even(info.h*k))); }
+        }catch(e){
+          log(`❌ ${file.name} : ${e.message||e} — ${tr('fileFail')}`);
+          step+=n; setBar(step/total); resetEngine(); continue;
         }
-        if(!blob) continue;
-        const url=URL.createObjectURL(blob); urls.push(url);
-        const hash=await sha(blob); okCount++;
-        const row=document.createElement('div'); row.className='res';
-        row.innerHTML=`<div style="min-width:0"><div class="nm">${tr('variantC')} ${i+1}</div><div class="mt">${(blob.size/1048576).toFixed(2)} ${tr('mb')} · sha <code>${hash}</code></div></div>`;
-        const a=document.createElement('a'); a.className='dl'; a.href=url; a.download=`${baseName}_spoof${i+1}.mp4`;
-        a.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>'+tr('download');
-        const fname=`${baseName}_spoof${i+1}.mp4`;
-        if(window.dm && dm.installed && dm.me){
-          const bk=document.createElement('button'); bk.className='bk'; bk.type='button'; bk.textContent='☁ '+dm.t('save'); bk.title=dm.t('keep');
-          bk.addEventListener('click', ()=>toBank(bk, blob, fname));
-          row.appendChild(bk); done.push({ btn:bk, blob, name:fname }); $('#bkall').style.display='inline-flex';
+        for(let i=0;i<n;i++){
+          baseRatio=step/total; setBar(baseRatio);
+          $('#count').textContent=`${tr('spoofing')} ${tag}${tr('variant')} ${i+1}/${n}`;
+          let blob=null, hash=null;
+          for(let attempt=0; attempt<3 && !blob; attempt++){
+            try{
+              const b=await spoofOne(opts(), info);
+              const h=await sha(b);
+              if(hashes.has(h)){ log(`   ↻ ${tr('variant')} ${i+1} : doublon → refaite`); continue; }
+              blob=b; hash=h;
+            }
+            catch(err){
+              const msg=String(err&&err.message||err);
+              const engineDied = msg==='STALL' || /terminat|abort|memory|RuntimeError|unreachable/i.test(msg);
+              if(engineDied && attempt===0){
+                log(tr('stall')); resetEngine(); forceST=true;
+                try{ info=await prepare(data); continue; }catch(e2){ log(`❌ ${e2.message||e2}`); break; }
+              }
+              log(`❌ ${file.name} · ${tr('variant')} ${i+1} : ${msg==='STALL' ? tr('stallFail') : msg}`);
+              break;
+            }
+          }
+          step++;
+          if(!blob){ setBar(step/total); continue; }
+          hashes.add(hash); okCount++;
+          const url=URL.createObjectURL(blob); urls.push(url);
+          const fname = n===1 ? `${baseName}_spoof.mp4` : `${baseName}_spoof${i+1}.mp4`;
+          const row=document.createElement('div'); row.className='res';
+          const info2=document.createElement('div'); info2.style.minWidth='0';
+          info2.innerHTML=`<div class="nm"></div><div class="mt">${(blob.size/1048576).toFixed(2)} ${tr('mb')} · sha <code>${hash}</code></div>`;
+          info2.querySelector('.nm').textContent = F>1 ? `${baseName} · ${tr('variantC')} ${i+1}` : `${tr('variantC')} ${i+1}`;
+          row.appendChild(info2);
+          const a=document.createElement('a'); a.className='dl'; a.href=url; a.download=fname;
+          a.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>'+tr('download');
+          if(window.dm && dm.installed && dm.me){
+            const bk=document.createElement('button'); bk.className='bk'; bk.type='button'; bk.textContent='☁ '+dm.t('save'); bk.title=dm.t('keep');
+            bk.addEventListener('click', ()=>toBank(bk, blob, fname));
+            row.appendChild(bk); done.push({ btn:bk, blob, name:fname }); $('#bkall').style.display='inline-flex';
+          }
+          row.appendChild(a); $('#results').appendChild(row);
+          if(okCount>1) $('#dlall').style.display='inline-flex';
+          setBar(step/total);
         }
-        row.appendChild(a); $('#results').appendChild(row);
-        setBar((i+1)/n);
+        try{ await ffmpeg.deleteFile('in.mp4'); }catch(_){}
+        data=null;
       }
-      try{ await ffmpeg.deleteFile('in.mp4'); }catch(_){}
-      $('#count').textContent=tr('ready')(okCount,n,mtActive);
+      $('#count').textContent=tr('ready')(okCount,total,mtActive);
     }catch(e){
       $('#count').textContent='❌ '+(e.message||e);
       log('❌ '+(e.message||e));
@@ -543,6 +616,8 @@
       go.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg> '+tr('spoof');
     }
   });
+  // Options tirées PAR variante (GPS « France » et « iPhone aléatoire » changent à chaque fichier).
+  function opts(){ return { intensity, gps:gpsFor($('#gps').value), device:resolveDevice($('#device').value), speed:tf.speed, trim:tf.trim, flip:tf.flip }; }
 })();
 </script>
 </body>
