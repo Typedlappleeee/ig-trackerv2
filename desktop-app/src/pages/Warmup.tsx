@@ -10,6 +10,8 @@ import { warmupAccountNative, editProfileOnPhone, loginInstagramOnPhone, ensureP
 import { changeUsernameOnPhone, changeProfilePicOnPhone } from '@/lib/geelarkAdb'
 import { bankUrls, expandUsername, lines } from '@/lib/flowEngine'
 import BankPicker from '@/components/BankPicker'
+import ComingSoon from '@/components/ComingSoon'
+import { isReleased, releaseLabel } from '@/lib/releases'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null; group_name: string | null }
@@ -25,9 +27,11 @@ const DURATIONS: { v: number; h: string }[] = [
   { v: 15, h: 'échauffement' }, { v: 30, h: 'recommandé' }, { v: 45, h: 'session longue' },
 ]
 
-export default function Warmup({ theme, infra, user, org }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState
+export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; isSuperAdmin?: boolean
 }) {
+  // Édition en masse en maintenance jusqu'à sa date de retour (le super-admin garde l'accès).
+  const editLocked = !isReleased('massEdit') && !isSuperAdmin
   const { currentOrg } = org
   const conns = useConnections(user, org)
   const bearer = conns.bearer
@@ -116,7 +120,7 @@ export default function Warmup({ theme, infra, user, org }: {
 
   async function launchEdit() {
     const targets = phones.filter(p => sel.has(p.id) && p.geelark_id)
-    if (targets.length === 0 || !bearer || running || !hasEdit) return
+    if (editLocked || targets.length === 0 || !bearer || running || !hasEdit) return
     const issue = editIssue(targets.length)
     setEditError(issue)
     if (issue) return
@@ -193,7 +197,7 @@ export default function Warmup({ theme, infra, user, org }: {
   const groups = ['Tous', ...[...new Set(phones.map(p => p.group_name).filter(Boolean) as string[])].sort()]
   const shownWarm = phones.filter(p => wgroup === 'Tous' || p.group_name === wgroup)
 
-  const TABS: [WTab, string][] = [['login', 'Connexion'], ['edit', 'Édition en masse'], ['warm', 'Warmup']]
+  const TABS: [WTab, string][] = [['login', 'Connexion'], ['edit', isReleased('massEdit') ? 'Édition en masse' : `Édition en masse · ${releaseLabel('massEdit')}`], ['warm', 'Warmup']]
   const subFor: Record<WTab, string> = {
     login: 'Connecte automatiquement tes comptes Instagram sur les appareils (auto-login).',
     edit: 'Édite en masse le profil de tes comptes (nom, bio, lien, photo).',
@@ -259,7 +263,13 @@ export default function Warmup({ theme, infra, user, org }: {
 
           {/* Config */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {wtab === 'edit' ? (
+            {wtab === 'edit' && editLocked ? (
+              <Panel theme={theme}>
+                <ComingSoon theme={theme} icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" badge={`De retour le ${releaseLabel('massEdit')}`}
+                  title="Édition en masse en maintenance"
+                  text={<>On améliore l'édition de profil en masse (nom affiché, @username, photo de profil, bio, lien). Elle revient le <b style={{ color: '#E4E4E7' }}>{releaseLabel('massEdit')}</b>.</>} />
+              </Panel>
+            ) : wtab === 'edit' ? (
               <Panel theme={theme}>
                 <PanelHead title="Nouveau profil" sub="Laisse vide ce que tu ne veux pas changer" />
                 <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
