@@ -10,6 +10,9 @@ import { setLeaseOwner } from '@/lib/phoneWatch'
 import RunWidget from '@/components/RunWidget'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 import LicenseGate from '@/pages/LicenseGate'
+import ComingSoon from '@/components/ComingSoon'
+import { Btn } from '@/lib/ui'
+import { isReleased, releaseLabel } from '@/lib/releases'
 
 // Pages chargées À LA DEMANDE : le premier écran ne télécharge plus toute l'app
 // (Bank, Studio, iRemoTech, composers… ne sont récupérés que quand on les ouvre).
@@ -160,9 +163,14 @@ function AppInner({ user }: { user: User }) {
         : page === 'publish'
         ? <Publish theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} />
         : page === 'warmup'
-        ? <Warmup theme={theme} infra={infra} user={user} org={org} />
+        ? <Warmup theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} />
         : page === 'flowBuilder'
-        ? <FlowBuilder theme={theme} infra={infra} user={user} org={org} />
+        ? (isReleased('flowBuilder') || license.isSuperAdmin
+          ? <FlowBuilder theme={theme} infra={infra} user={user} org={org} />
+          : <ComingSoon theme={theme} icon="M5 3h4v4H5z|M15 17h4v4h-4z|M7 7v4a2 2 0 0 0 2 2h6a2 2 0 0 1 2 2v2"
+              badge={`Sortie le ${releaseLabel('flowBuilder')}`} title="Flow Builder arrive bientôt"
+              text={<>Construis tes automatisations bloc par bloc — connexion, pseudo, photo, bio, chauffe, posts, stories, pauses — et lance-les sur tous tes comptes en un clic. Disponible le <b style={{ color: '#E4E4E7' }}>{releaseLabel('flowBuilder')}</b>.</>}
+              action={<Btn theme={theme} tone="ghost" label="Aller à la publication" onClick={() => setPage('publish')} />} />)
         : page === 'studio'
         ? <Studio theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'blowContent'

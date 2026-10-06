@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { INFRAS, themeFor, type InfraKey, type Theme } from '@/lib/theme'
 import { Icon } from '@/lib/ui'
 import { UpdateBanner, UpdateChip } from '@/components/AppUpdate'
+import { isReleased, releaseLabel } from '@/lib/releases'
 import { fmtNumber } from '@/lib/data'
 
 export type PageKey =
@@ -17,7 +18,7 @@ export type PageKey =
   | 'admin'
   | 'settings'
 
-interface NavItem { k: PageKey; l: string; i: string; n?: number }
+interface NavItem { k: PageKey; l: string; i: string; n?: number; soon?: string }
 interface NavSection { g: string | null; items: NavItem[] }
 
 function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number | null): NavSection[] {
@@ -74,7 +75,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
         { k: 'recipes', l: 'Mes séquences', i: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6' },
       ] : [
         { k: 'publish', l: 'Publication', i: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
-        { k: 'flowBuilder', l: 'Flow Builder', i: 'M5 3h4v4H5z|M15 17h4v4h-4z|M7 7v4a2 2 0 0 0 2 2h6a2 2 0 0 1 2 2v2' },
+        { k: 'flowBuilder', l: 'Flow Builder', i: 'M5 3h4v4H5z|M15 17h4v4h-4z|M7 7v4a2 2 0 0 0 2 2h6a2 2 0 0 1 2 2v2', soon: isReleased('flowBuilder') ? undefined : releaseLabel('flowBuilder') },
         { k: 'scheduled', l: 'Programmé', i: 'M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z' },
         { k: 'warmup', l: 'Warmup', i: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z' },
       ],
@@ -297,6 +298,7 @@ export default function Shell({
                     {on && <span style={{ position: 'absolute', left: -10, top: 7, bottom: 7, width: 2, borderRadius: 99, background: T.accent }} />}
                     <span style={{ display: 'flex', flexShrink: 0 }}><Icon d={it.i} size={15} /></span>
                     {navOpen && <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.l}</span>}
+                    {navOpen && it.soon && <span style={{ padding: '1px 6px', borderRadius: 99, fontSize: 9.5, fontWeight: 800, color: T.accentText, background: `rgba(${T.tone},0.14)`, border: `1px solid rgba(${T.tone},0.28)` }}>{it.soon}</span>}
                     {navOpen && it.n != null && <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: on ? 'rgba(196,181,253,0.7)' : '#3F3F46' }}>{fmtNumber(it.n)}</span>}
                   </button>
                 )
