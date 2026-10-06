@@ -337,7 +337,22 @@
   function spoofFilter(p){ return `scale=iw*${p.z}:ih*${p.z},crop=iw/${p.z}:ih/${p.z}:(iw-ow)*${p.fx}:(ih-oh)*${p.fy},scale=trunc(iw/2)*2:trunc(ih/2)*2`; }
   function iso6709(lat,lon){ const f=(v,w)=>(v>=0?'+':'-')+Math.abs(v).toFixed(4).padStart(w+5,'0'); return `${f(lat,2)}${f(lon,3)}/`; }
   function gpsFor(k){ if(k==='none')return null; if(k==='france'){ const c=FRANCE[Math.floor(Math.random()*FRANCE.length)]; const j=()=>(Math.random()-.5)*.06; return {lat:+(c[0]+j()).toFixed(4),lon:+(c[1]+j()).toFixed(4)}; } const c=GPS_CITIES.find(x=>x.k===k); return c&&c.lat!=null?{lat:c.lat,lon:c.lon}:null; }
-  function deviceMeta(k){ const d=DEVICES.find(x=>x.k===k); if(!d||!d.make)return[]; const o=['-metadata',`make=${d.make}`,'-metadata',`model=${d.model}`]; if(d.apple){o.push('-metadata',`com.apple.quicktime.make=${d.make}`,'-metadata',`com.apple.quicktime.model=${d.model}`); if(d.sw)o.push('-metadata',`com.apple.quicktime.software=${d.sw}`);} return o; }
+  // Métadonnées comme un vrai téléphone. iPhone : clés « com.apple.quicktime.* » (format
+  // utilisé par l'appareil photo d'iOS) ; autres : make/model. Écrites grâce à
+  // -movflags use_metadata_tags (sinon le MP4 les ignore silencieusement).
+  function deviceMeta(k, created, loc){
+    const d=DEVICES.find(x=>x.k===k);
+    if(d && d.apple){
+      const o=['-metadata',`com.apple.quicktime.make=${d.make}`,'-metadata',`com.apple.quicktime.model=${d.model}`];
+      if(d.sw) o.push('-metadata',`com.apple.quicktime.software=${d.sw}`);
+      o.push('-metadata',`com.apple.quicktime.creationdate=${created}`);
+      if(loc) o.push('-metadata',`com.apple.quicktime.location.ISO6709=${loc}`);
+      return o;
+    }
+    const o=[]; if(d && d.make) o.push('-metadata',`make=${d.make}`,'-metadata',`model=${d.model}`);
+    if(loc) o.push('-metadata',`location=${loc}`);
+    return o;
+  }
 
   /* ══ UI : selects (libellés spéciaux traduits, noms propres inchangés) ══ */
   function fillSelects(){
@@ -483,13 +498,21 @@
       trim.push('-ss', String(start), '-t', Math.max(0.5, info.dur-start-end).toFixed(2));
     }
     const created=new Date(Date.now()-Math.floor(Math.random()*20*86400000)).toISOString().replace(/\.\d+Z$/,'Z');
-    const meta=['-map_metadata','-1','-metadata',`creation_time=${created}`];
-    const g=opts.gps; if(g){ const loc=iso6709(g.lat,g.lon); meta.push('-metadata',`location=${loc}`,'-metadata',`location-eng=${loc}`); }
-    meta.push(...deviceMeta(opts.device));
-    const H264=['-threads','0','-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart'];
-    const run=(withAf)=>execGuarded(['-hide_banner','-y','-i','in.mp4',...trim,'-vf',vf,...(withAf&&af?['-af',af]:[]),...meta,...H264,'out.mp4']);
+    const g=opts.gps, loc=g ? iso6709(g.lat,g.lon) : null;
+    // Pas de trace du logiciel : bitexact retire « Lavf… » (©too), les pistes prennent les
+    // noms d'un iPhone, et le filtre retire le bloc SEI où x264 écrit sa signature.
+    const meta=['-map_metadata','-1','-map_chapters','-1','-metadata',`creation_time=${created}`,
+      '-metadata:s:v','handler_name=Core Media Video','-metadata:s:a','handler_name=Core Media Audio',
+      '-metadata:s:v','encoder=','-metadata:s:a','encoder=',
+      ...deviceMeta(opts.device, created, loc)];
+    const H264=['-threads','0','-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k',
+      '-fflags','+bitexact','-flags:v','+bitexact','-flags:a','+bitexact','-movflags','+faststart+use_metadata_tags'];
+    let strip=true;   // filtre anti-signature x264 (désactivé si le moteur ne le connaît pas)
+    const run=(withAf)=>execGuarded(['-hide_banner','-y','-i','in.mp4',...trim,'-vf',vf,...(withAf&&af?['-af',af]:[]),...meta,...H264,
+      ...(strip?['-bsf:v','filter_units=remove_types=6']:[]),'out.mp4']);
     ring=[];
     let code=await run(true);
+    if(code!==0 && strip && ring.some(l=>/filter_units|bitstream filter/i.test(l))){ strip=false; try{await ffmpeg.deleteFile('out.mp4');}catch(_){} ring=[]; code=await run(true); }
     if(code!==0 && af){ log(tr('noAudio')); try{await ffmpeg.deleteFile('out.mp4');}catch(_){} ring=[]; code=await run(false); }
     if(code!==0){
       const why=ring.filter(l=>/error|invalid|failed|cannot|unsupported|not found|no such/i.test(l)).slice(-2).join(' · ') || ring.slice(-2).join(' · ');
