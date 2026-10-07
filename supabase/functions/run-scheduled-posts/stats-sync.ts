@@ -2,14 +2,15 @@
 //
 // Appelé chaque minute par le cron. Pour les comptes (phones avec ig_username)
 // dont le dernier snapshot date de > STALE_HOURS, récupère followers / following
-// / posts via une API Instagram (RapidAPI, clé = secret serveur RAPIDAPI_KEY),
+// / posts via une API Instagram (HikerAPI puis RapidAPI en secours — secrets HIKERAPI_KEY / RAPIDAPI_KEY),
 // met à jour `phones` et insère un snapshot dans `account_stats_history`.
 //
 // → throttle naturel à ~1×/jour/compte (on ne retraite pas un compte tant que
 //   son dernier snapshot a < STALE_HOURS). Batché pour tenir 1000+ comptes.
 // Best-effort : ne jette jamais, no-op si pas de clé.
 
-import { igPost, parseProfile, parseReels } from './ig-rapidapi.ts'
+import { parseProfile, parseReels } from './ig-rapidapi.ts'
+import { igProfile, igReels, hasIgProvider } from './ig-provider.ts'
 import { notifyOwner } from './notify.ts'
 
 const STALE_HOURS = 22
@@ -19,8 +20,7 @@ const MAX_PER_INVOCATION = 40
 export async function runStatsSync(db: any, nowIso: string, deadlineMs: number): Promise<number> {
   let done = 0
   try {
-    const key = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
-    if (!key) return 0   // pas de clé → on laisse le poller client gérer
+    if (!hasIgProvider()) return 0   // aucune clé (HikerAPI / RapidAPI) → le poller client gère
 
     const now = new Date(nowIso)
     const staleBefore = new Date(now.getTime() - STALE_HOURS * 3600_000).toISOString()
@@ -43,11 +43,10 @@ export async function runStatsSync(db: any, nowIso: string, deadlineMs: number):
     for (const p of pending) {
       if (done >= MAX_PER_INVOCATION || Date.now() > deadlineMs) break
       const username = String(p.ig_username)
-      // Profil (pp + compteurs) : `profile` puis repli `userInfo`.
-      let prof = parseProfile(await igPost(key, 'profile', username))
-      if (!prof) prof = parseProfile(await igPost(key, 'userInfo', username))
+      // Profil (pp + compteurs) puis reels — HikerAPI, sinon RapidAPI en secours.
+      const prof = parseProfile(await igProfile(username))
       // Reels : dernier post + heuristique de portée.
-      const reels = parseReels(await igPost(key, 'reels', username, { maxId: '' }), 15)
+      const reels = parseReels(await igReels(username), 15)
       const lastPost = reels.reduce<string | null>((m, r) => (r.postedAt && (!m || r.postedAt > m)) ? r.postedAt : m, null)
       const avgViews = reels.length ? Math.round(reels.reduce((s, r) => s + r.views, 0) / reels.length) : 0
 

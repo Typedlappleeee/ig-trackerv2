@@ -25,7 +25,8 @@ function isForced(cfg: TrackingConfig, now: Date): boolean {
   return !!cfg.force_run && (now.getTime() - new Date(cfg.force_run).getTime()) < 90 * 60 * 1000
 }
 
-import { igPost, deepArray, reelInfo, type ReelInfo } from './ig-rapidapi.ts'
+import { deepArray, reelInfo, type ReelInfo } from './ig-rapidapi.ts'
+import { igReels, hasIgProvider } from './ig-provider.ts'
 
 const MAX_PER_INVOCATION = 60   // comptes traités par passage (≈ 1 tick / minute)
 
@@ -39,8 +40,8 @@ function parisHHMM(d: Date): string {
 
 // Renvoie le dernier reel + le nombre de reels postés "aujourd'hui" (Paris).
 async function fetchReels(cfg: TrackingConfig, username: string, today: string): Promise<{ latest: ReelInfo | null; postsToday: number }> {
-  if (!cfg.rapidapi_key) return { latest: null, postsToday: 0 }
-  const j = await igPost(cfg.rapidapi_key, 'reels', username, { maxId: '' })
+  if (!hasIgProvider(cfg.rapidapi_key)) return { latest: null, postsToday: 0 }
+  const j = await igReels(username, cfg.rapidapi_key)
   const items = deepArray(j, ['items', 'reels', 'edges', 'data'])
   if (!items || !items.length) return { latest: null, postsToday: 0 }
   let best = reelInfo(items[0])

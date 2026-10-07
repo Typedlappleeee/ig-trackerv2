@@ -69,7 +69,7 @@ Scheduled posts and recurring tasks run in the Supabase Edge Function **`supabas
 
 - Serverless proxies under `api/` are intentionally **plain JS**, return `{ ok, ... }` and generally HTTP 200 even on logical failure (error in the body).
 - 16+ digit GeeLark IDs are wrapped as strings in proxy JSON to avoid float precision loss.
-- Secrets: Groq key only via `VITE_DEFAULT_GROQ_KEY`; RapidAPI key only as a Supabase secret — never hardcode.
+- Secrets: Groq key only via `VITE_DEFAULT_GROQ_KEY`; Instagram data keys (`HIKERAPI_KEY` primary, `RAPIDAPI_KEY` fallback — see `ig-provider.ts`) only as Supabase secrets — never hardcode.
 - Story flow is fragile on Android 13+/16 (MediaStore indexing, locale changes restart Instagram). Avoid `cmd locale set-app-locales` on the posting path (documented in `geelark.ts`).
 
 ---

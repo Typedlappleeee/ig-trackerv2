@@ -261,6 +261,23 @@ Deno.serve(async (req) => {
   {
     let body: Record<string, unknown> | null = null
     try { body = await req.clone().json() } catch { /* pas de body (cron) */ }
+    // Diagnostic HikerAPI : { diag: 'hikerapi', username } → clé présente, solde,
+    // et valeurs réellement extraites du profil et des reels.
+    if (body?.diag === 'hikerapi') {
+      const { hikerKey, hikerProfile, hikerReels, hikerBalance } = await import('./ig-hikerapi.ts')
+      const { parseProfile, parseReels } = await import('./ig-rapidapi.ts')
+      const uname = String(body.username ?? 'instagram').replace(/^@/, '')
+      const key = hikerKey()
+      const out: Record<string, unknown> = { keyPresent: !!key, username: uname }
+      if (key) {
+        out.balance = await hikerBalance()
+        const prof = await hikerProfile(uname)
+        out.parsedProfile = parseProfile(prof)
+        const reels = prof?.pk ? parseReels(await hikerReels(String(prof.pk)), 15) : []
+        out.parsedReels = { count: reels.length, latest: reels[0] ?? null }
+      }
+      return new Response(JSON.stringify(out, null, 2), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
     if (body?.diag === 'rapidapi') {
       const key = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
       const host = (Deno.env.get('RAPIDAPI_HOST') ?? '').trim() || 'instagram120.p.rapidapi.com'
@@ -315,16 +332,12 @@ Deno.serve(async (req) => {
 
     // ── Détail d'un compte (modal Rapports) : profil + 15 derniers reels ───
     if (body?.detail === 'account') {
-      const key = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
       const uname = String(body.username ?? '').replace(/^@/, '')
-      const { igPost, parseProfile, parseReels } = await import('./ig-rapidapi.ts')
-      const [profJson, infoJson, reelsJson] = await Promise.all([
-        igPost(key, 'profile', uname),
-        igPost(key, 'userInfo', uname),
-        igPost(key, 'reels', uname, { maxId: '' }),
-      ])
-      const profile = parseProfile(profJson) ?? parseProfile(infoJson)
-      const reels = parseReels(reelsJson, 15)
+      const { parseProfile, parseReels } = await import('./ig-rapidapi.ts')
+      const { igProfile, igReels } = await import('./ig-provider.ts')
+      const profJson = await igProfile(uname)
+      const profile = parseProfile(profJson)
+      const reels = parseReels(await igReels(uname), 15)
       // Images : le CDN Instagram bloque les <img> directs côté navigateur. On
       // récupère pp + miniatures CÔTÉ SERVEUR et on les renvoie en data-URL
       // (s'affichent partout, sans dépendre d'un proxy Vercel).
@@ -365,17 +378,17 @@ Deno.serve(async (req) => {
     // ── Courbe des vues : vues des reels regroupées par DATE DE PUBLICATION ──
     // (sur les derniers reels de chaque compte du périmètre).
     if (body?.trend === 'posting-views') {
-      const key = (Deno.env.get('RAPIDAPI_KEY') ?? '').trim()
       const orgId = (body.org_id as string) ?? null
       const uid = (body.user_id as string) ?? null
       let pq = db.from('phones').select('ig_username').not('ig_username', 'is', null)
       pq = orgId ? pq.eq('org_id', orgId) : pq.eq('user_id', uid).is('org_id', null)
       const { data: phones } = await pq
-      const { igPost, parseReels } = await import('./ig-rapidapi.ts')
+      const { parseReels } = await import('./ig-rapidapi.ts')
+      const { igReels } = await import('./ig-provider.ts')
       const buckets: Record<string, number> = {}
       const list = (phones ?? []).slice(0, 60)
       await Promise.all(list.map(async (ph: { ig_username: string }) => {
-        const reels = parseReels(await igPost(key, 'reels', ph.ig_username, { maxId: '' }), 15)
+        const reels = parseReels(await igReels(ph.ig_username), 15)
         for (const r of reels) {
           if (!r.postedAt) continue
           const d = new Date(r.postedAt).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' })
@@ -409,7 +422,7 @@ Deno.serve(async (req) => {
   } catch { /* ignore */ }
 
   // ── Étape 0-stats : sync serveur des stats (followers/posts) par lots ──
-  // Plafonné à ~40s. No-op si RAPIDAPI_KEY absent (le poller client prend le relais).
+  // Plafonné à ~40s. No-op si ni HIKERAPI_KEY ni RAPIDAPI_KEY (le poller client prend le relais).
   try {
     const n = await runStatsSync(db, nowIso, Date.now() + 40_000)
     if (n > 0) summary['stats_sync'] = `${n} compte(s) stats`
