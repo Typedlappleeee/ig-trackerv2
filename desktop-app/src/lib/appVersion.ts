@@ -3,6 +3,7 @@
 // (publié à chaque build) et on propose de rafraîchir quand l'identifiant a changé.
 import { useEffect, useState } from 'react'
 import { IS_WEB } from './platform'
+import type { ChangelogEntry } from './changelog'
 
 export const APP_BUILD = {
   id: typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev',
@@ -19,7 +20,7 @@ export function fmtBuild(iso: string = APP_BUILD.builtAt): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]} · ${hm}`
 }
 
-export interface RemoteBuild { id: string; builtAt: string }
+export interface RemoteBuild { id: string; builtAt: string; changes?: ChangelogEntry[] }
 
 /** Lit la version publiée. null si indisponible (réseau, dev, fichier absent). */
 export async function fetchRemoteBuild(): Promise<RemoteBuild | null> {
@@ -28,7 +29,7 @@ export async function fetchRemoteBuild(): Promise<RemoteBuild | null> {
     if (!r.ok) return null
     const j = await r.json()
     if (!j || typeof j.id !== 'string' || !j.id) return null
-    return { id: j.id, builtAt: typeof j.builtAt === 'string' ? j.builtAt : '' }
+    return { id: j.id, builtAt: typeof j.builtAt === 'string' ? j.builtAt : '', changes: Array.isArray(j.changes) ? j.changes : undefined }
   } catch { return null }
 }
 

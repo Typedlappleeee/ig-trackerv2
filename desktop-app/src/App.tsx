@@ -13,6 +13,12 @@ import LicenseGate from '@/pages/LicenseGate'
 import ComingSoon from '@/components/ComingSoon'
 import { Btn } from '@/lib/ui'
 import { isReleased, releaseLabel } from '@/lib/releases'
+import { LangSwitch } from '@/components/AppUpdate'
+
+// Sélecteur FR / EN flottant pour les écrans hors application (accueil public, licence).
+function FloatingLang() {
+  return <div style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 200, padding: 4, borderRadius: 10, background: 'rgba(12,12,18,0.85)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}><LangSwitch theme={themeFor('geelark')} /></div>
+}
 
 // Pages chargées À LA DEMANDE : le premier écran ne télécharge plus toute l'app
 // (Bank, Studio, iRemoTech, composers… ne sont récupérés que quand on les ouvre).
@@ -89,7 +95,7 @@ export default function App() {
   if (checking) return <Loader />
   // Pas connecté → l'ancienne devanture commerciale (page publique scaleflow.company).
   // Le CTA « Commencer » mène au login.
-  if (!user) return <Suspense fallback={<Loader />}><SiteLanding onStudio={() => window.location.assign('./login.dc.html')} /></Suspense>
+  if (!user) return <Suspense fallback={<Loader />}><SiteLanding onStudio={() => window.location.assign('./login.dc.html')} /><FloatingLang /></Suspense>
   return <AppInner user={user} />
 }
 
@@ -123,7 +129,7 @@ function AppInner({ user }: { user: User }) {
   // d'accès à l'app (comme l'ancien web). On attend la fin du check pour ne pas
   // afficher la porte pendant le chargement. Fail-open géré dans checkLicense.
   if (!license.loading && !license.valid) {
-    return <LicenseGate user={user} expired={license.expired} onActivated={() => window.location.reload()} onSignOut={signOut} />
+    return <><LicenseGate user={user} expired={license.expired} onActivated={() => window.location.reload()} onSignOut={signOut} /><FloatingLang /></>
   }
 
   const userName = firstNameFrom(data?.displayName ?? null, user.email)

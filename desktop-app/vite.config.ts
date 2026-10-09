@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
+import { CHANGELOG } from './src/lib/changelog'
 
 // Tampon de version : identifiant du build (commit Vercel, sinon horodatage) + date.
 // Injecté dans le code (__BUILD_ID__/__BUILD_TIME__) et publié dans dist/version.json :
@@ -13,7 +14,7 @@ function versionFile(): Plugin {
     name: 'sf-version-file',
     apply: 'build',
     generateBundle() {
-      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ id: BUILD_ID, builtAt: BUILD_TIME }) })
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ id: BUILD_ID, builtAt: BUILD_TIME, changes: CHANGELOG.slice(0, 3) }) })
     },
   }
 }

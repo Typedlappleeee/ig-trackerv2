@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import ProxyRotationPanel from '@/components/ProxyRotationPanel'
+import { LangSwitch } from '@/components/AppUpdate'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty } from '@/lib/ui'
 import { supabase, type OrgRole } from '@/lib/supabase'
@@ -218,6 +219,9 @@ function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInp
           </Field>
           <Field label="Adresse e-mail" hint="Identifiant de connexion">
             <ReadValue value={user.email ?? DASH} />
+          </Field>
+          <Field label="Langue" hint="Langue de l’interface">
+            <LangSwitch theme={theme} />
           </Field>
         </div>
       </Panel>
