@@ -21,6 +21,7 @@ import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, 
 import { startRun, cancelRun } from '@/lib/runStore'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { themeFor } from '@/lib/theme'
+import { confirmDialog } from '@/lib/ui'
 
 const BLOW_THEME = themeFor('blowsome')
 
@@ -853,7 +854,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <button style={{ ...btn, height: 32 }} onClick={copyAll}>Copier tout ({filtered.length})</button>
                 <button style={{ ...btn, height: 32 }} onClick={exportCsv}>Exporter CSV</button>
-                <button style={{ ...btn, height: 32, background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => { if (window.confirm('Vider TOUS les comptes enregistrés ? (irréversible)')) { clearCreatedAccounts(); setCreatedAccts([]) } }}>Vider</button>
+                <button style={{ ...btn, height: 32, background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={async () => { if (await confirmDialog({ title: 'Vider TOUS les comptes enregistrés ? (irréversible)', confirmLabel: 'Vider', danger: true })) { clearCreatedAccounts(); setCreatedAccts([]) } }}>Vider</button>
               </div>
             )}
           </div>

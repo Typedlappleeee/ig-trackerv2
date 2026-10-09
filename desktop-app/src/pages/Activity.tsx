@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ScheduledPost, type PostRun } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PageHead, Kpi, Empty, Modal } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PageHead, Kpi, Empty, Modal, SkeletonRows } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 
 // ── Un « run » unifié (post_runs directs + scheduled_posts exécutés) ────────────
@@ -207,7 +207,7 @@ export default function Activity({ theme, infra, user, org }: {
         </div>
 
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div>
+          <SkeletonRows rows={5} avatar />
         ) : error ? (
           <Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} />
         ) : shown.length === 0 ? (

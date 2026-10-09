@@ -1,6 +1,9 @@
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Icon, Panel, PanelHead, PageHead } from '@/lib/ui'
+import { useState } from 'react'
+import { Btn, Icon, Panel, PanelHead, PageHead, Skeleton, SkeletonRows } from '@/lib/ui'
+import { useConnections } from '@/lib/connections'
+import type { OrgState } from '@/lib/data'
 import {
   type HubData, firstNameFrom, fmtNumber, fmtTime, fmtDay, phoneCountOf,
 } from '@/lib/data'
@@ -55,7 +58,7 @@ function Kpi({ theme, label, value, color, hint, hintColor }: {
       <div style={{
         marginTop: 8, fontSize: 24, fontWeight: 600,
         letterSpacing: '-0.03em', color: color || '#EDEDEF', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
-      }}>{value}</div>
+      }}>{value === '…' ? <Skeleton w={56} h={22} r={5} /> : value}</div>
       {hint ? (
         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, color: hintColor || '#71717A' }}>{hint}</div>
       ) : null}
@@ -63,12 +66,57 @@ function Kpi({ theme, label, value, color, hint, hintColor }: {
   )
 }
 
-export default function Home({ theme, infra, user, data, loading, reload, onNavigate }: {
-  theme: Theme; infra: InfraKey; user: User
+// ── « Bien démarrer » : les 4 étapes pour être opérationnel, cochées automatiquement ──
+const ONBOARD_KEY = 'sf-onboarding-hidden'
+function Onboarding({ theme, steps, onNavigate, onHide }: {
+  theme: Theme; onHide: () => void; onNavigate: (p: PageKey) => void
+  steps: { done: boolean; title: string; text: string; cta: string; page: PageKey }[]
+}) {
+  const done = steps.filter(s => s.done).length
+  const next = steps.findIndex(s => !s.done)
+  return (
+    <Panel theme={theme} style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>Bien démarrer avec ScaleFlow</span>
+          <span style={{ fontSize: 12.5, color: '#8B8B94' }}>{done}/{steps.length} étapes terminées — suis-les dans l’ordre, ça prend 5 minutes.</span>
+        </span>
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ width: 120, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+            <span style={{ display: 'block', height: '100%', width: `${(done / steps.length) * 100}%`, background: theme.accent, transition: 'width .3s ease' }} />
+          </span>
+          <Btn theme={theme} sm tone="quiet" label="Masquer" onClick={onHide} />
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
+        {steps.map((s, i) => {
+          const current = i === next
+          return (
+            <div key={s.title} style={{ display: 'flex', gap: 12, padding: 16, borderRight: '1px solid rgba(255,255,255,0.05)', background: current ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box', fontSize: 11, fontWeight: 600,
+                background: s.done ? 'rgba(74,222,128,0.12)' : current ? '#EDEDEF' : 'transparent', color: s.done ? '#4ADE80' : current ? '#0A0A0B' : '#71717A',
+                border: s.done ? '1px solid rgba(74,222,128,0.3)' : current ? 'none' : '1px solid rgba(255,255,255,0.14)' }}>{s.done ? '✓' : i + 1}</span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: s.done ? '#8B8B94' : '#EDEDEF', textDecoration: s.done ? 'line-through' : 'none' }}>{s.title}</span>
+                <span style={{ fontSize: 12, lineHeight: 1.5, color: '#71717A' }}>{s.text}</span>
+                {!s.done && <span style={{ marginTop: 6 }}><Btn theme={theme} sm tone={current ? 'primary' : 'ghost'} label={s.cta} onClick={() => onNavigate(s.page)} /></span>}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </Panel>
+  )
+}
+
+export default function Home({ theme, infra, user, org, data, loading, reload, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState
   data: HubData | null; loading: boolean; reload: () => void
   onNavigate: (p: PageKey) => void
 }) {
   const el = '…'
+  const conns = useConnections(user, org)
+  const [hideOnboard, setHideOnboard] = useState(() => { try { return localStorage.getItem(ONBOARD_KEY) === '1' } catch { return false } })
   const firstName = firstNameFrom(data?.displayName ?? null, user.email)
   const balance = data?.balance ?? null
   const now = new Date()
@@ -86,7 +134,14 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
     },
   ]
 
-  const TILES = launchTiles(infra)
+  const TILES = launchTiles(infra).map(t => t.id === 'reels' && data && !loading ? { ...t, hint: `${fmtNumber(data.phoneCount)} comptes prêts` } : t)
+  const STEPS = [
+    { done: !!conns.bearer, title: 'Connecter GeeLark', text: 'Colle ton token GeeLark (OpenAPI) pour piloter tes téléphones.', cta: 'Ouvrir les réglages', page: 'settings' as PageKey },
+    { done: (data?.phoneCount ?? 0) > 0, title: 'Synchroniser tes téléphones', text: 'Récupère tes cloud phones et associe chaque compte Instagram.', cta: 'Voir mes téléphones', page: 'phones' as PageKey },
+    { done: (data?.videoCount ?? 0) > 0, title: 'Importer du contenu', text: 'Ajoute tes vidéos et images dans la banque, rangées par dossier.', cta: 'Ouvrir la banque', page: 'bank' as PageKey },
+    { done: (data?.weekPosts ?? 0) > 0 || (data?.recent?.length ?? 0) > 0, title: 'Publier ton premier Reel', text: 'Choisis des comptes, une vidéo, une légende — et lance.', cta: 'Publier', page: 'publish' as PageKey },
+  ]
+  const showOnboard = infra !== 'cloud' && !hideOnboard && !loading && !conns.loading && !!data && STEPS.some(s => !s.done)
   const upcoming = data?.upcoming ?? []
   const recent = data?.recent ?? []
 
@@ -97,6 +152,8 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
         sub={`${cap} · infrastructure ${infra === 'cloud' ? 'ScaleFlow Cloud' : 'GeeLark'}.`}
         actions={<Btn label="Actualiser" theme={theme} onClick={reload} icon="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.7-3|M21 3v6h-6|M3 21v-6h6" />}
       />
+
+      {showOnboard && <Onboarding theme={theme} steps={STEPS} onNavigate={onNavigate} onHide={() => { setHideOnboard(true); try { localStorage.setItem(ONBOARD_KEY, '1') } catch { /* ignore */ } }} />}
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
@@ -123,7 +180,7 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
               onClick={() => onNavigate('scheduled')} />
           } />
           {loading ? (
-            <div style={{ padding: '24px 16px', fontSize: 12, color: '#5A5A63' }}>…</div>
+            <SkeletonRows rows={3} />
           ) : upcoming.length === 0 ? (
             <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: '#8B8B94' }}>Rien de programmé aujourd’hui.</div>
           ) : (
@@ -154,7 +211,7 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
             <Btn label="Historique" theme={theme} sm tone="quiet" onClick={() => onNavigate('activity')} />
           } />
           {loading ? (
-            <div style={{ padding: '24px 16px', fontSize: 12, color: '#5A5A63' }}>…</div>
+            <SkeletonRows rows={3} avatar />
           ) : recent.length === 0 ? (
             <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: '#8B8B94' }}>Aucune activité récente.</div>
           ) : (

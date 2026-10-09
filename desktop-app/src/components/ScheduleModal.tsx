@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Theme } from '@/lib/theme'
-import { Btn, Modal } from '@/lib/ui'
+import { Btn, Modal, toast } from '@/lib/ui'
 
 // Modale de programmation « PC éteint » : la tâche est créée maintenant sur GeeLark
 // avec un scheduleAt futur → GeeLark l'exécute dans son cloud à l'heure prévue.
@@ -18,8 +18,8 @@ export default function ScheduleModal({ theme, count, kind, onClose, onSchedule 
   const [val, setVal] = useState(localVal(60))
   function confirm() {
     const ms = new Date(val).getTime()
-    if (!isFinite(ms) || ms < Date.now() + 60_000) { alert('Choisis une heure future (au moins +1 min).'); return }
-    if (ms > Date.now() + 29 * 86_400_000) { alert('Max ~29 jours : l\'hébergement média GeeLark expire après 30 jours.'); return }
+    if (!isFinite(ms) || ms < Date.now() + 60_000) { toast('Choisis une heure future (au moins +1 min).', 'bad'); return }
+    if (ms > Date.now() + 29 * 86_400_000) { toast('Max ~29 jours : l\'hébergement média GeeLark expire après 30 jours.', 'bad'); return }
     onSchedule(Math.floor(ms / 1000))
   }
   return (

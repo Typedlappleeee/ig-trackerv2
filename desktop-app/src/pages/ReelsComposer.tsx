@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon, Modal } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon, Modal, toast, confirmDialog } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub, fetchBalance, fetchOrgBalance } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -132,9 +132,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     const p = presets.find(x => x.name === name)
     if (p) { applyCfg(p.config, rotationConfigured); setPresetSel(name) }
   }
-  const doDeletePreset = () => {
+  const doDeletePreset = async () => {
     if (!presetSel) return
-    if (!window.confirm(`Supprimer le preset « ${presetSel} » ?`)) return
+    if (!(await confirmDialog({ title: `Supprimer le preset « ${presetSel} » ?`, confirmLabel: 'Supprimer', danger: true }))) return
     setPresets(deletePreset<ReelsCfg>(COMPOSER, orgId, presetSel)); setPresetSel('')
   }
 
@@ -187,6 +187,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const nVid = vidSel.size
   const cost = nSel * CREDIT_COSTS.mass_posting
   const canLaunch = nSel > 0 && nVid > 0 && !!bearer && !running
+  // Ce qui manque pour passer à l'étape suivante (affiché dans la barre du bas).
+  const nextBlock = step === 1 && nSel === 0 ? 'Coche au moins un compte pour continuer.'
+    : step === 2 && nVid === 0 ? 'Choisis au moins une vidéo pour continuer.' : null
 
   async function resolveVideoUrl(v: Video): Promise<string | null> {
     if (v.storage_path) {
@@ -402,8 +405,6 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
         sub={`Instagram · ${nSel} compte${nSel > 1 ? 's' : ''} · ${nVid} vidéo${nVid > 1 ? 's' : ''}`}
         actions={<>
           <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
-          {step > 1 && <Btn theme={theme} tone="ghost" label="Précédent" onClick={() => setStep(s => s - 1)} />}
-          {step < 4 && <Btn theme={theme} tone="primary" icon="M9 18l6-6-6-6" label="Suivant" onClick={() => setStep(s => s + 1)} />}
         </>}
       />
 
@@ -681,8 +682,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             <Btn theme={theme} tone="primary" label={`Programmer sur ${nSel} compte${nSel > 1 ? 's' : ''}`} disabled={!schedVal}
               onClick={() => {
                 const ms = new Date(schedVal).getTime()
-                if (!isFinite(ms) || ms < Date.now() + 60_000) { alert('Choisis une heure future (au moins +1 min).'); return }
-                if (ms > Date.now() + 29 * 86_400_000) { alert('Max ~29 jours : les vidéos hébergées chez GeeLark expirent après 30 jours.'); return }
+                if (!isFinite(ms) || ms < Date.now() + 60_000) { toast('Choisis une heure future (au moins +1 min).', 'bad'); return }
+                if (ms > Date.now() + 29 * 86_400_000) { toast('Max ~29 jours : les vidéos hébergées chez GeeLark expirent après 30 jours.', 'bad'); return }
                 setSchedOpen(false); launch(Math.floor(ms / 1000))
               }} />
           </>}>
@@ -698,6 +699,22 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
           </div>
         </Modal>
       )}
+
+      {/* ── Barre d'action fixe : récap + navigation entre étapes ── */}
+      <div style={{ position: 'sticky', bottom: 0, zIndex: 5, marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 0', background: '#0A0A0B', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>
+            {nSel} compte{nSel > 1 ? 's' : ''} · {nVid} vidéo{nVid > 1 ? 's' : ''} · {cost} crédits
+          </span>
+          {nextBlock
+            ? <span style={{ fontSize: 12, color: '#FBBF24' }}>{nextBlock}</span>
+            : <span style={{ fontSize: 12, color: '#71717A' }}>Étape {step} sur 4 · {STEPS[step - 1]}</span>}
+        </span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          {step > 1 && <Btn theme={theme} tone="ghost" label="Précédent" onClick={() => setStep(s => s - 1)} />}
+          {step < 4 && <Btn theme={theme} tone="primary" icon="M9 18l6-6-6-6" label="Suivant" disabled={!!nextBlock} onClick={() => setStep(s => s + 1)} />}
+        </span>
+      </div>
     </div>
   )
 }

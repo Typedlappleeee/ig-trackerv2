@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Panel, Modal } from '@/lib/ui'
+import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -692,7 +692,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#8B8B94' }}>Médias supprimés — restaurables 7 jours puis purgés définitivement.</p>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               <Btn theme={theme} sm tone="primary" label="Tout restaurer" onClick={() => { restoreMedia(trash.map(t => t.id)); setShowTrash(false) }} />
-              <Btn theme={theme} sm tone="quiet" label="Vider définitivement" onClick={() => { if (confirm('Supprimer DÉFINITIVEMENT tous les médias de la corbeille ?')) { purgeMedia(trash); setShowTrash(false) } }} />
+              <Btn theme={theme} sm tone="quiet" label="Vider définitivement" onClick={async () => { if (await confirmDialog({ title: 'Supprimer DÉFINITIVEMENT tous les médias de la corbeille ?', confirmLabel: 'Vider définitivement', danger: true })) { purgeMedia(trash); setShowTrash(false) } }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {trash.map(t => {
@@ -702,7 +702,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                     <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
                     <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>purge dans {days}j</span>
                     <Btn theme={theme} sm tone="quiet" label="Restaurer" onClick={() => restoreMedia([t.id])} />
-                    <button onClick={() => { if (confirm('Supprimer définitivement ce média ?')) purgeMedia([t]) }} title="Supprimer définitivement" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: 'none', border: 'none', color: '#F87171', fontWeight: 500, fontSize: 16, cursor: 'pointer' }}>×</button>
+                    <button onClick={async () => { if (await confirmDialog({ title: 'Supprimer définitivement ce média ?', confirmLabel: 'Supprimer', danger: true })) purgeMedia([t]) }} title="Supprimer définitivement" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: 'none', border: 'none', color: '#F87171', fontWeight: 500, fontSize: 16, cursor: 'pointer' }}>×</button>
                   </div>
                 )
               })}
@@ -874,7 +874,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               )}
             </div>
           ) : loading ? (
-            <div style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13, color: '#71717A' }}>{el}</div>
+            <div aria-busy="true" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(112px,132px))', gap: 12, padding: 16 }}>
+              {Array.from({ length: 10 }, (_, i) => <Skeleton key={i} h={196} r={8} />)}
+            </div>
           ) : error ? (
             <div style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, color: '#F87171' }}>{error}</div>
           ) : total === 0 ? (

@@ -19,6 +19,7 @@ import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
 import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
+import { confirmDialog } from '@/lib/ui'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -731,8 +732,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     const p = presets.find(x => x.name === name)
     if (p) { applyAutoCfg(p.config); setPresetSel(name) }
   }
-  const doDeletePreset = () => {
-    if (!presetSel || !window.confirm(`Supprimer le preset « ${presetSel} » ?`)) return
+  const doDeletePreset = async () => {
+    if (!presetSel || !(await confirmDialog({ title: `Supprimer le preset « ${presetSel} » ?`, confirmLabel: 'Supprimer', danger: true }))) return
     setPresets(deletePreset<AutoCfg>(AUTO_COMPOSER, autoOrgId, presetSel)); setPresetSel('')
   }
 

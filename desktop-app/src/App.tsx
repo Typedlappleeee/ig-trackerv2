@@ -11,7 +11,7 @@ import RunWidget from '@/components/RunWidget'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 import LicenseGate from '@/pages/LicenseGate'
 import ComingSoon from '@/components/ComingSoon'
-import { Btn } from '@/lib/ui'
+import { Btn, Toaster, DialogHost } from '@/lib/ui'
 import { isReleased, releaseLabel } from '@/lib/releases'
 import { LangSwitch } from '@/components/AppUpdate'
 
@@ -153,7 +153,7 @@ function AppInner({ user }: { user: User }) {
       : page === 'insights' ? <Placeholder theme={theme} spec={SPECS.insights!} />
       : <BlowsomeHome user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />)
     : page === 'hub'
-    ? <Home theme={theme} infra={infra} user={user} data={data} loading={loading} reload={reload} onNavigate={setPage} />
+    ? <Home theme={theme} infra={infra} user={user} org={org} data={data} loading={loading} reload={reload} onNavigate={setPage} />
     : (page === 'cloud' || page === 'phones')
       ? <Phones theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'bank'
@@ -192,7 +192,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'automation'
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
         : page === 'admin'
-        ? (license.isSuperAdmin ? <Admin theme={theme} user={user} /> : <Home theme={theme} infra={infra} user={user} data={data} loading={loading} reload={reload} onNavigate={setPage} />)
+        ? (license.isSuperAdmin ? <Admin theme={theme} user={user} /> : <Home theme={theme} infra={infra} user={user} org={org} data={data} loading={loading} reload={reload} onNavigate={setPage} />)
         : page === 'settings'
         ? <Settings theme={theme} user={user} org={org} onSignOut={signOut} onNavigate={(p) => setPage(p as PageKey)} />
         : <Placeholder theme={theme} spec={SPECS[page] ?? SPECS.settings!} />
@@ -214,6 +214,8 @@ function AppInner({ user }: { user: User }) {
     >
       <Suspense fallback={<PageLoader />}>{content}</Suspense>
       <RunWidget theme={theme} />
+      <Toaster />
+      <DialogHost theme={theme} />
     </Shell>
   )
 }
