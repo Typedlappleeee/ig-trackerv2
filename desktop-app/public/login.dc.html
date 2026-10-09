@@ -426,10 +426,59 @@ class Component extends DCLogic {
 }
 </script>
 <script>
+// FR / EN pour la page de connexion (même réglage « sf-lang » que l'application).
+(function(){
+  var EN={
+    'Le Studio':'The Studio',"Toute l'automatisation":'All your automation','à un seul endroit.':'in one place.',
+    'Publication, cloud phones, contenu, IA — un seul poste de pilotage pour toute ta ferme.':'Publishing, cloud phones, content, AI — one control center for your whole farm.',
+    'Connexion':'Log in','Bon retour.':'Welcome back.',"Le Studio t'attend.":'The Studio is waiting for you.',
+    'Mot de passe':'Password','Mot de passe oublié ?':'Forgot password?','Pas encore de compte ?':"Don't have an account yet?",
+    "S'inscrire":'Sign up','Entrer au Studio':'Enter the Studio','Retour':'Back','Fermer':'Close',
+    'Connexion chiffrée · accès sur invitation':'Encrypted connection · invite-only access','Afficher le mot de passe':'Show password',
+    'vous@exemple.com':'you@example.com','comptes touchés':'accounts reached','Faible':'Weak','Moyen':'Fair','Bon':'Good','Solide':'Strong',
+    'Instagram & TikTok, en parallèle':'Instagram & TikTok, in parallel','Ta ferme, pilotée d’un écran':'Your farm, run from one screen',
+    'Banque de contenu':'Content library','Vidéos, images, captions':'Videos, images, captions','Remix, sous-titres, descriptions':'Remix, subtitles, descriptions',
+    'Entre ton email et ton mot de passe.':'Enter your email and password.','Connexion…':'Logging in…','Identifiants incorrects.':'Wrong email or password.',
+    'Erreur réseau — vérifie ta connexion internet.':'Network error — check your internet connection.',
+    'Entre un email et un mot de passe pour créer ton compte.':'Enter an email and a password to create your account.',
+    'Mot de passe : 6 caractères minimum.':'Password: 6 characters minimum.','Création du compte…':'Creating your account…',
+    'Compte créé — connexion…':'Account created — logging in…','Compte créé ✅ — confirme ton email puis connecte-toi.':'Account created ✅ — confirm your email, then log in.'
+  };
+  var lang=null; try{ lang=localStorage.getItem('sf-lang'); }catch(e){}
+  if(lang!=='fr'&&lang!=='en') lang=((navigator.language||'fr').toLowerCase().indexOf('fr')===0)?'fr':'en';
+  var ORIG=new WeakMap(), SET=new WeakMap();
+  function tr(s){ var m=s.match(/^(\s*)([\s\S]*?)(\s*)$/); var t=m&&EN[m[2]]; return t?m[1]+t+m[3]:s; }
+  function text(n){ var v=n.nodeValue||''; if(SET.get(n)===v){ if(lang==='fr'&&ORIG.has(n)){ n.nodeValue=ORIG.get(n); SET.delete(n);} return; }
+    ORIG.set(n,v); SET.delete(n); if(lang!=='en'||(n.parentElement&&n.parentElement.closest('script,style,textarea'))) return;
+    var t=tr(v); if(t!==v){ SET.set(n,t); n.nodeValue=t; } }
+  function attrs(el){ ['placeholder','aria-label','title'].forEach(function(a){ var v=el.getAttribute(a); if(v==null) return;
+    var k='data-fr-'+a; var o=el.getAttribute(k);
+    if(o!=null&&(lang==='fr')){ el.setAttribute(a,o); el.removeAttribute(k); return; }
+    if(lang==='en'&&o==null){ var t=tr(v); if(t!==v){ el.setAttribute(k,v); el.setAttribute(a,t); } } }); }
+  function walk(r){ if(r.nodeType===3){ text(r); return; } if(r.nodeType!==1) return; attrs(r);
+    var w=document.createTreeWalker(r,5), n; while((n=w.nextNode())){ if(n.nodeType===3) text(n); else attrs(n); } }
+  window.sfTr=function(s){ return lang==='en'?tr(s):s; };
+  function start(){
+    walk(document.body);
+    new MutationObserver(function(rs){ rs.forEach(function(r){ if(r.type==='characterData') text(r.target); else if(r.type==='attributes') attrs(r.target); else r.addedNodes.forEach(walk); }); })
+      .observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['placeholder','aria-label','title']});
+    var box=document.createElement('div'); box.style.cssText='position:fixed;right:16px;bottom:16px;z-index:99998;display:flex;gap:2px;padding:3px;border-radius:9px;background:rgba(12,10,22,.85);border:1px solid rgba(255,255,255,.1)';
+    ['fr','en'].forEach(function(l){ var b=document.createElement('button'); b.type='button'; b.textContent=l.toUpperCase(); b.setAttribute('data-lang',l);
+      b.style.cssText='border:none;border-radius:6px;padding:4px 8px;font:800 11px Manrope,sans-serif;cursor:pointer;background:'+(l===lang?'rgba(168,85,247,.25)':'transparent')+';color:'+(l===lang?'#E9D5FF':'#8B87A0');
+      b.addEventListener('click',function(e){ e.stopPropagation(); lang=l; try{ localStorage.setItem('sf-lang',l); }catch(_){} document.documentElement.lang=l; walk(document.body);
+        box.querySelectorAll('button').forEach(function(x){ var on=x.getAttribute('data-lang')===lang; x.style.background=on?'rgba(168,85,247,.25)':'transparent'; x.style.color=on?'#E9D5FF':'#8B87A0'; }); });
+      box.appendChild(b); });
+    document.body.appendChild(box);
+    document.documentElement.lang=lang;
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
+</script>
+<script>
 (function(){
   var SUPA='https://fvmkmkspfksscgqyvysl.supabase.co';
   var KEY='sb_publishable_hip63djbBYnu3EsSx2gA4w_0tgjweEo';
-  function msg(m,bad){ var el=document.getElementById('sf-msg'); if(!el){el=document.createElement('div');el.id='sf-msg';el.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:99999;padding:11px 20px;border-radius:11px;font:600 13px Manrope,sans-serif;box-shadow:0 20px 50px -16px rgba(0,0,0,.7)';document.body.appendChild(el);} el.style.background=bad?'rgba(40,12,20,.96)':'rgba(20,16,34,.96)'; el.style.border='1px solid '+(bad?'rgba(248,113,113,.45)':'rgba(168,85,247,.45)'); el.style.color=bad?'#FCA5A5':'#ECEAF5'; el.textContent=m; }
+  function msg(m,bad){ var el=document.getElementById('sf-msg'); if(!el){el=document.createElement('div');el.id='sf-msg';el.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:99999;padding:11px 20px;border-radius:11px;font:600 13px Manrope,sans-serif;box-shadow:0 20px 50px -16px rgba(0,0,0,.7)';document.body.appendChild(el);} el.style.background=bad?'rgba(40,12,20,.96)':'rgba(20,16,34,.96)'; el.style.border='1px solid '+(bad?'rgba(248,113,113,.45)':'rgba(168,85,247,.45)'); el.style.color=bad?'#FCA5A5':'#ECEAF5'; el.textContent=(window.sfTr?window.sfTr(m):m); }
   function val(sel){ var e=document.querySelector(sel); return e?e.value.trim():''; }
   async function login(){
     var email=val('input[type=email]')||val('input[autocomplete="username"]')||val('input:not([type=password]):not([type=checkbox]):not([type=button])');
@@ -487,9 +536,9 @@ class Component extends DCLogic {
     // Repli texte si les ids manquent : « inscrire » AVANT « entrer au studio », et on ne
     // matche que le libellé exact du contrôle (pas un conteneur qui mélange les deux textes).
     for(var i=0;i<5&&t;i++){var tx=((t.textContent||'')+'').trim().toLowerCase();
-      if(tx==="s'inscrire"||tx==='inscrire'){e.preventDefault();signup();return;}
-      if(tx.indexOf('entrer au studio')>=0||(t.getAttribute&&t.getAttribute('type')==='submit')){e.preventDefault();login();return;}
-      if(tx==='retour'||tx.indexOf('fermer')>=0){e.preventDefault();goBack();return;}
+      if(tx==="s'inscrire"||tx==='inscrire'||tx==='sign up'){e.preventDefault();signup();return;}
+      if(tx.indexOf('entrer au studio')>=0||tx.indexOf('enter the studio')>=0||(t.getAttribute&&t.getAttribute('type')==='submit')){e.preventDefault();login();return;}
+      if(tx==='retour'||tx==='back'||tx.indexOf('fermer')>=0||tx.indexOf('close')>=0){e.preventDefault();goBack();return;}
       t=t.parentElement;}
   },true);
   document.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();login();}else if(e.key==='Escape'){e.preventDefault();goBack();}});

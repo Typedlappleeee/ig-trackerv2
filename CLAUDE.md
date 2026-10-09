@@ -63,7 +63,8 @@ Scheduled posts and recurring tasks run in the Supabase Edge Function **`supabas
 - **Supabase** (`src/lib/supabase.ts`) is the DB/auth/storage backend. Migrations in `supabase/migrations/`; the various `electron-app/schema*.sql` are snapshots. Key tables: `phones`, `content_bank`, `caption_bank`, `scheduled_posts`, `recurring_tasks`, `post_runs`, org/license tables.
 - **Orgs & permissions**: `src/lib/orgContext.tsx` + `permissions.ts`. Queries are org‑scoped (`org_id`) or personal (`user_id` + `org_id is null`). Roles: owner/admin/member/viewer (e.g. Subtitles is owner/admin‑only).
 - **Credits**: `src/lib/credits.ts` (`CREDIT_COSTS`), `withCredits.ts` — debit‑upfront lifecycle (`startCreditRun` → `settle` refunds failed phones). Superadmin is `tintin.aunea@gmail.com`.
-- **i18n**: `src/lib/i18n.tsx` (`useT`), FR/EN.
+- **i18n**: `src/lib/i18n.tsx` (`useT`), FR/EN (electron-app). In **`desktop-app`** (the prod app), the UI is written in French and translated **at display time**: `src/lib/i18n.ts` applies the FR→EN dictionary `src/lib/i18n.en.ts` to the DOM (text + placeholder/title/aria-label), with `{0}` templates. **Any new French UI string must be added to `i18n.en.ts`** (or to `scripts/i18n-reviewed.json` if it must not be translated); `npm test` fails otherwise (`node scripts/i18n-extract.cjs` lists what's missing). Wrap user content (captions, bios, raw logs) in `data-no-tr`. New bilingual code can use `pick({ fr, en })`.
+- **Release notes** (`desktop-app/src/lib/changelog.ts`): every user-visible update gets a new entry at the top (FR + EN). The latest one shows once as a "ScaleFlow updated" bar; the "MAJ / Updated" pill lists the last 3.
 
 ## Conventions
 
