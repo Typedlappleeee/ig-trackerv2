@@ -25,16 +25,10 @@ function ViewsCurve({ points, theme }: { points: { label: string; v: number }[];
   const area = `${line} L${x(n - 1).toFixed(1)},${H} L${x(0).toFixed(1)},${H} Z`
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 150, display: 'block' }}>
-      <defs>
-        <linearGradient id="vc" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={`rgba(${theme.tone},0.35)`} />
-          <stop offset="100%" stopColor={`rgba(${theme.tone},0)`} />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#vc)" />
-      <path d={line} fill="none" stroke={theme.accent} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={area} fill={`rgba(${theme.tone},0.08)`} />
+      <path d={line} fill="none" stroke={theme.accent} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       {points.map((p, i) => i === n - 1 && (
-        <circle key={i} cx={x(i)} cy={y(p.v)} r={3.5} fill={theme.accentSoft} />
+        <circle key={i} cx={x(i)} cy={y(p.v)} r={3} fill={theme.accent} />
       ))}
     </svg>
   )
@@ -91,8 +85,9 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
   }
 
   const seg = (on: boolean): CSSProperties => ({
-    height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer',
-    background: on ? `rgba(${theme.tone},0.16)` : 'transparent', color: on ? theme.accentText : '#71717A', fontSize: 11.5, fontWeight: 600,
+    height: 26, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
+    background: on ? 'rgba(255,255,255,0.08)' : 'transparent', color: on ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500,
+    transition: 'background .12s ease, color .12s ease',
   })
 
   return (
@@ -101,7 +96,7 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
         title="Performances"
         sub="Tes vraies stats Instagram (vues, likes, engagement) via l'API officielle — filtrables par période."
         actions={<>
-          <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <span style={{ display: 'flex', flexWrap: 'wrap', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
             {RANGES.map(([l, d]) => <button key={l} onClick={() => setRangeDays(d)} style={seg(rangeDays === d)}>{l}</button>)}
           </span>
           <Btn theme={theme} tone="ghost" icon="M12 15V3|M7 10l5 5 5-5|M4 21h16" label="Exporter" disabled={reels.length === 0} onClick={exportCsv} />
@@ -111,7 +106,7 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
       {!connected && <ConnectBanner theme={theme} onConnect={() => onNavigate?.('connections')} />}
 
       {loading ? (
-        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div></Panel>
+        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div></Panel>
       ) : !connected ? (
         <Panel theme={theme}>
           <Empty icon="M3 3v18h18|M7 15l4-6 4 3 5-8" title="Connecte tes comptes pour voir tes stats"
@@ -125,11 +120,11 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
         </Panel>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 12 }}>
-            <Kpi theme={theme} label="Vues" value={fmt(totalViews)} color={theme.accentText} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 12 }}>
+            <Kpi theme={theme} label="Vues" value={fmt(totalViews)} />
             <Kpi theme={theme} label="Meilleur Reel" value={best ? fmt(best.views) : '—'} hint={best ? `@${best.ig_username ?? ''}` : undefined} />
             <Kpi theme={theme} label="Vues moy. / Reel" value={fmt(avg)} />
-            <Kpi theme={theme} label="Engagement" value={`${engRate.toFixed(1)} %`} color="#34D399" />
+            <Kpi theme={theme} label="Engagement" value={`${engRate.toFixed(1)} %`} color="#4ADE80" />
           </div>
 
           {/* Courbe des vues par jour */}
@@ -137,7 +132,7 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
             <PanelHead title="Vues par jour" right={<Chip text={RANGES.find(r => r[1] === rangeDays)?.[0] ?? ''} tone="mute" />} />
             <div style={{ padding: '16px 16px 12px' }}>
               <ViewsCurve points={curve} theme={theme} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#3F3F46' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11.5, color: '#71717A' }}>
                 <span>−{RANGES.find(r => r[1] === rangeDays)?.[0]}</span><span>aujourd'hui</span>
               </div>
             </div>
@@ -147,17 +142,19 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
           <Panel theme={theme}>
             <PanelHead title="Meilleurs Reels" sub="Classés par vues sur la période" right={<Chip text={`${reels.length} Reels`} tone="mute" />} />
             {reels.slice(0, 12).map((r, i) => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 15px', borderBottom: i < 11 ? '1px solid rgba(255,255,255,0.035)' : 'none' }}>
-                <span style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: i === 0 ? '#FBBF24' : i < 3 ? '#A1A1AA' : '#3F3F46', width: 20 }}>{i + 1}</span>
-                <span style={{ width: 34, height: 44, borderRadius: 6, flexShrink: 0, overflow: 'hidden', background: `rgba(${theme.tone},0.1)`, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', borderBottom: i < 11 ? '1px solid rgba(255,255,255,0.05)' : 'none', transition: 'background .12s ease' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                <span style={{ fontSize: 12, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: i === 0 ? '#FBBF24' : i < 3 ? '#A1A1AA' : '#5A5A63', width: 20 }}>{i + 1}</span>
+                <span style={{ width: 34, height: 44, borderRadius: 6, flexShrink: 0, overflow: 'hidden', background: '#18181B', border: '1px solid rgba(255,255,255,0.08)' }}>
                   {r.thumbnail_url && <img src={r.thumbnail_url} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                 </span>
                 <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.caption?.trim() || 'Sans légende'}</span>
-                  <span style={{ fontSize: 10.5, color: '#52525B' }}>@{r.ig_username ?? '—'}{r.taken_at ? ' · ' + new Date(r.taken_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.caption?.trim() || 'Sans légende'}</span>
+                  <span style={{ fontSize: 12, color: '#71717A' }}>@{r.ig_username ?? '—'}{r.taken_at ? ' · ' + new Date(r.taken_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}</span>
                 </span>
-                <span style={{ display: 'flex', gap: 14, fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5 }}>
-                  <span style={{ color: theme.accentText, fontWeight: 600, minWidth: 52, textAlign: 'right' }}>{fmt(r.views)} <span style={{ color: '#52525B', fontWeight: 500 }}>vues</span></span>
+                <span style={{ display: 'flex', gap: 16, fontSize: 12, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                  <span style={{ color: '#EDEDEF', fontWeight: 500, minWidth: 52, textAlign: 'right' }}>{fmt(r.views)} <span style={{ color: '#71717A', fontWeight: 400 }}>vues</span></span>
                   <span style={{ color: '#A1A1AA', minWidth: 44, textAlign: 'right' }}>♥ {fmt(r.likes)}</span>
                 </span>
               </div>

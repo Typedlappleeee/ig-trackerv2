@@ -191,14 +191,14 @@ export function Modal({ title, sub, icon, theme, onClose, footer, width, childre
 export function ConnectBanner({ theme, onConnect }: { theme: Theme; onConnect: () => void }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 13, padding: '12px 15px', marginBottom: 14, borderRadius: 10,
-      background: `rgba(${theme.tone},0.06)`, border: `1px solid rgba(${theme.tone},0.22)`,
+      display: 'flex', alignItems: 'center', gap: 13, padding: '12px 16px', marginBottom: 16, borderRadius: 8,
+      background: '#111113', border: '1px solid rgba(255,255,255,0.07)', boxShadow: `inset 2px 0 0 ${theme.accent}`,
     }}>
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.28)`, color: theme.accentText }}>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
         <Icon d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1" size={16} />
       </span>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>Connecte tes comptes pour des stats officielles</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>Connecte tes comptes pour des stats officielles</span>
         <span style={{ fontSize: 11.5, color: '#71717A' }}>Vues, abonnés et engagement natifs via l'API Meta — remplit ces écrans automatiquement.</span>
       </span>
       <Btn theme={theme} tone="primary" sm icon="M12 5v14|M5 12h14" label="Connecter" onClick={onConnect} />

@@ -99,24 +99,26 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
     setBusy(null)
   }
 
-  const cell: CSSProperties = { fontSize: 12.5, color: '#D4D4D8' }
+  const cell: CSSProperties = { fontSize: 13, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }
   const upcoming = rows.filter(r => new Date(r.scheduled_at).getTime() > Date.now())
   const past = rows.filter(r => new Date(r.scheduled_at).getTime() <= Date.now())
 
-  const rowView = (s: Sched) => {
+  const rowView = (s: Sched, i = 0) => {
     const st = statusInfo(s)
     const n = s.phones?.length ?? 0
     const cancellable = s.status === 'geelark' && new Date(s.scheduled_at).getTime() > Date.now()
     const cancelServer = s.status === 'pending'
     return (
-      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderTop: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap' }}>
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.22)`, color: theme.accentText }}><Icon d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" size={15} /></span>
-        <span style={{ minWidth: 130 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ fontSize: 13, fontWeight: 600, color: '#F4F4F6' }}>{TYPE_LABEL[s.type] ?? s.type}</span>{s.result?.platform && s.result.platform !== 'instagram' && <Chip text={s.result.platform} tone="mute" />}</div>
-          <div style={{ fontSize: 11, color: '#71717A' }}>{n} compte{n > 1 ? 's' : ''}</div>
+      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', minHeight: 52, boxSizing: 'border-box', borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none', flexWrap: 'wrap', transition: 'background .12s ease' }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}><Icon d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" size={14} /></span>
+        <span style={{ minWidth: 130, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{TYPE_LABEL[s.type] ?? s.type}</span>{s.result?.platform && s.result.platform !== 'instagram' && <Chip text={s.result.platform} tone="mute" />}</div>
+          <div style={{ fontSize: 12, color: '#71717A' }}>{n} compte{n > 1 ? 's' : ''}</div>
         </span>
         <span style={{ ...cell, minWidth: 150 }}>{new Date(s.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}</span>
-        <span style={{ flex: 1, minWidth: 120, fontSize: 11.5, color: '#8B8898', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.caption || '—'}</span>
+        <span style={{ flex: 1, minWidth: 120, fontSize: 12, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.caption || '—'}</span>
         <Chip text={st.label} tone={st.tone} />
         {(cancellable || cancelServer) && <Btn theme={theme} sm tone="danger" label={busy === s.id ? '…' : 'Annuler'} disabled={busy === s.id} onClick={() => setConfirmCancel(s)} />}
       </div>
@@ -127,17 +129,17 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Programmé" sub="Toutes tes publications programmées (PC éteint, via GeeLark). Annule ici pour récupérer les crédits."
         actions={<Btn theme={theme} sm tone="quiet" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Rafraîchir" onClick={() => load()} />} />
-      {loadError && <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 9, background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.22)', color: '#FCA5A5', fontSize: 12 }}>Impossible de charger les programmations : {loadError}</div>}
+      {loadError && <div style={{ padding: '10px 12px', marginBottom: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(248,113,113,0.25)', color: '#F87171', fontSize: 13 }}>Impossible de charger les programmations : {loadError}</div>}
       {confirmCancel && (
         <Modal theme={theme} title="Annuler cette programmation ?" sub={`${confirmCancel.phones?.length ?? 0} compte(s) · ${new Date(confirmCancel.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}`} icon="M18 6L6 18|M6 6l12 12" width={460}
           onClose={() => setConfirmCancel(null)}
           footer={<><Btn theme={theme} tone="ghost" label="Garder" onClick={() => setConfirmCancel(null)} /><Btn theme={theme} tone="danger" label="Annuler la programmation" onClick={() => cancel(confirmCancel)} /></>}>
-          <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA' }}>Les tâches sont annulées chez GeeLark et les crédits remboursés{(confirmCancel.result?.credits_total ?? 0) > 0 ? ` (jusqu'à ${confirmCancel.result?.credits_total} crédits)` : ''}. Un post déjà parti ne peut plus être annulé ni remboursé.</div>
+          <div style={{ fontSize: 13, lineHeight: 1.6, color: '#A1A1AA' }}>Les tâches sont annulées chez GeeLark et les crédits remboursés{(confirmCancel.result?.credits_total ?? 0) > 0 ? ` (jusqu'à ${confirmCancel.result?.credits_total} crédits)` : ''}. Un post déjà parti ne peut plus être annulé ni remboursé.</div>
         </Modal>
       )}
-      {notice && <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 9, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.3)`, color: theme.accentText, fontSize: 12.5 }}>{notice}</div>}
+      {notice && <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', color: '#A1A1AA', fontSize: 13 }}>{notice}</div>}
 
-      {loading ? <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 13 }}>…</div></Panel>
+      {loading ? <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#5A5A63', fontSize: 13 }}>…</div></Panel>
         : rows.length === 0 ? (
           <Panel theme={theme}><Empty icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
             title="Aucune publication programmée" text="Depuis Posting / Story / Cross-post, clique « Programmer (PC éteint) » — elles apparaîtront ici." /></Panel>
@@ -145,12 +147,12 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Panel theme={theme}>
               <PanelHead title="À venir" sub={`${upcoming.length}`} />
-              {upcoming.length === 0 ? <div style={{ padding: 20, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Rien de programmé pour l'instant.</div> : upcoming.map(rowView)}
+              {upcoming.length === 0 ? <div style={{ padding: '24px 16px', textAlign: 'center', color: '#8B8B94', fontSize: 13 }}>Rien de programmé pour l'instant.</div> : upcoming.map((s, i) => rowView(s, i))}
             </Panel>
             {past.length > 0 && (
               <Panel theme={theme}>
                 <PanelHead title="Passées" sub={`${past.length}`} />
-                {past.slice(0, 60).map(rowView)}
+                {past.slice(0, 60).map((s, i) => rowView(s, i))}
               </Panel>
             )}
           </div>

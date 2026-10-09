@@ -26,21 +26,21 @@ function LaunchTile({ a, onClick }: { a: ReturnType<typeof launchTiles>[number];
     <button
       onClick={onClick}
       style={{
-        display: 'flex', flexDirection: 'column', gap: 11, padding: 15, borderRadius: 10,
-        background: '#101015', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer',
-        textAlign: 'left', transition: 'all .18s ease', boxSizing: 'border-box',
+        display: 'flex', flexDirection: 'column', gap: 10, padding: 16, borderRadius: 8,
+        background: '#111113', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer',
+        textAlign: 'left', transition: 'background .12s ease, border-color .12s ease', boxSizing: 'border-box',
       }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = `rgba(${a.tone},0.4)`; e.currentTarget.style.background = '#13131A' }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.background = '#101015' }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#141416' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}
     >
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8,
-          background: `rgba(${a.tone},0.12)`, border: `1px solid rgba(${a.tone},0.24)`, color: `rgb(${a.tone})`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6,
+          background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: `rgb(${a.tone})`,
         }}><Icon d={a.icon} size={15} /></span>
       </span>
-      <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>{a.label}</span>
-      <span style={{ fontSize: 11, color: '#71717A' }}>{a.hint}</span>
+      <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{a.label}</span>
+      <span style={{ fontSize: 12, color: '#8B8B94' }}>{a.hint}</span>
     </button>
   )
 }
@@ -50,14 +50,14 @@ function Kpi({ theme, label, value, color, hint, hintColor }: {
   theme: Theme; label: string; value: string; color?: string; hint?: string; hintColor?: string
 }) {
   return (
-    <Panel theme={theme} style={{ padding: 15 }}>
-      <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#52525B' }}>{label}</div>
+    <Panel theme={theme} style={{ padding: '14px 16px' }}>
+      <div style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{label}</div>
       <div style={{
-        marginTop: 9, fontFamily: 'inherit', fontSize: 25, fontWeight: 600,
-        letterSpacing: '-0.03em', color: color || '#F4F4F6', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+        marginTop: 8, fontSize: 24, fontWeight: 600,
+        letterSpacing: '-0.03em', color: color || '#EDEDEF', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
       }}>{value}</div>
       {hint ? (
-        <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: hintColor || '#71717A' }}>{hint}</div>
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, color: hintColor || '#71717A' }}>{hint}</div>
       ) : null}
     </Panel>
   )
@@ -99,22 +99,22 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
       />
 
       {/* KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
         {KPI.map(k => (
           <Kpi key={k.label} theme={theme} label={k.label} value={k.value} color={k.color} hint={k.hint} hintColor={k.hintColor} />
         ))}
       </div>
 
       {/* Lancer */}
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '26px 0 11px' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52525B' }}>Lancer</span>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '24px 0 12px' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>Lancer</span>
       </div>
-      <div data-rows="" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10 }}>
+      <div data-rows="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
         {TILES.map(a => <LaunchTile key={a.id} a={a} onClick={() => onNavigate(a.page)} />)}
       </div>
 
       {/* Deux colonnes */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10, marginTop: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 12, marginTop: 12 }}>
         {/* Programmé aujourd'hui */}
         <Panel theme={theme}>
           <PanelHead title="Programmé aujourd’hui" right={
@@ -123,24 +123,24 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
               onClick={() => onNavigate('scheduled')} />
           } />
           {loading ? (
-            <div style={{ padding: '24px 15px', fontSize: 12, color: '#52525B' }}>…</div>
+            <div style={{ padding: '24px 16px', fontSize: 12, color: '#5A5A63' }}>…</div>
           ) : upcoming.length === 0 ? (
-            <div style={{ padding: '32px 15px', textAlign: 'center', fontSize: 12, color: '#71717A' }}>Rien de programmé aujourd’hui.</div>
+            <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: '#8B8B94' }}>Rien de programmé aujourd’hui.</div>
           ) : (
             <div data-rows="">
               {upcoming.map((r, i) => (
                 <div key={r.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 11, padding: '11px 15px',
-                  borderBottom: i < upcoming.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', minHeight: 48, boxSizing: 'border-box',
+                  borderBottom: i < upcoming.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600, color: theme.accentSoft, minWidth: 58, flexShrink: 0 }}>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 500, color: theme.accentText, minWidth: 58, flexShrink: 0 }}>
                     {fmtTime(r.scheduled_at)}
                   </span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#E4E4E7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {phoneCountOf(r)} compte{phoneCountOf(r) > 1 ? 's' : ''}{r.caption ? ` · ${r.caption.slice(0, 38)}${r.caption.length > 38 ? '…' : ''}` : ''}
                     </span>
-                    <span style={{ fontSize: 10.5, color: '#52525B' }}>{fmtDay(r.scheduled_at)}</span>
+                    <span style={{ fontSize: 11.5, color: '#71717A' }}>{fmtDay(r.scheduled_at)}</span>
                   </span>
                 </div>
               ))}
@@ -154,9 +154,9 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
             <Btn label="Historique" theme={theme} sm tone="quiet" onClick={() => onNavigate('activity')} />
           } />
           {loading ? (
-            <div style={{ padding: '24px 15px', fontSize: 12, color: '#52525B' }}>…</div>
+            <div style={{ padding: '24px 16px', fontSize: 12, color: '#5A5A63' }}>…</div>
           ) : recent.length === 0 ? (
-            <div style={{ padding: '32px 15px', textAlign: 'center', fontSize: 12, color: '#71717A' }}>Aucune activité récente.</div>
+            <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: '#8B8B94' }}>Aucune activité récente.</div>
           ) : (
             <div data-rows="">
               {recent.map((item, i) => {
@@ -171,20 +171,20 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
                 const key = item.kind === 'scheduled' ? `sp-${item.data.id}` : `pr-${item.data.id}`
                 return (
                   <div key={key} style={{
-                    display: 'flex', alignItems: 'center', gap: 11, padding: '11px 15px',
-                    borderBottom: i < recent.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', minHeight: 48, boxSizing: 'border-box',
+                    borderBottom: i < recent.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                   }}>
                     <span style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                      background: ok ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: ok ? '#34D399' : '#FBBF24',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                      background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: ok ? '#4ADE80' : '#FBBF24',
                     }}>
                       <Icon d={ok ? 'M20 6L9 17l-5-5' : 'M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'} size={12} />
                     </span>
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#E4E4E7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-                      <span style={{ fontSize: 10.5, color: '#52525B' }}>{date}</span>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+                      <span style={{ fontSize: 11.5, color: '#71717A' }}>{date}</span>
                     </span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600, color: ok ? '#34D399' : '#FBBF24', flexShrink: 0 }}>{stat}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 500, color: ok ? '#4ADE80' : '#FBBF24', flexShrink: 0 }}>{stat}</span>
                   </div>
                 )
               })}
