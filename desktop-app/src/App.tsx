@@ -6,7 +6,9 @@ import { useOrg, useHubData, firstNameFrom } from '@/lib/data'
 import { useLicense } from '@/lib/license'
 import Shell, { type PageKey } from '@/Shell'
 import Home from '@/pages/Home'
-import { setLeaseOwner } from '@/lib/phoneWatch'
+import { setLeaseOwner, runClientWatchguard } from '@/lib/phoneWatch'
+import { fetchAllPhones, stopPhones } from '@/lib/geelark'
+import { useConnections } from '@/lib/connections'
 import RunWidget from '@/components/RunWidget'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 import LicenseGate from '@/pages/LicenseGate'
@@ -112,6 +114,19 @@ function AppInner({ user }: { user: User }) {
   // Baux anti-coût des téléphones (phoneWatch) : inscrits au nom de l'utilisateur / org courants.
   useEffect(() => { setLeaseOwner({ userId: user.id, orgId: org.currentOrg?.id ?? null }) }, [user.id, org.currentOrg?.id])
 
+  // Watchguard client (toutes les 2 min tant que l'app est ouverte) : tout téléphone
+  // allumé reçoit un bail de 10 min, et s'il dépasse sans que le serveur l'éteigne,
+  // l'app l'éteint elle-même. Le serveur fait la même chose app fermée.
+  const { bearer } = useConnections(user, org)
+  useEffect(() => {
+    if (!bearer) return
+    let stop = false
+    const tick = () => { if (!stop) void runClientWatchguard({ listPhones: () => fetchAllPhones(bearer), stopPhones: ids => stopPhones(bearer, ids) }).catch(() => {}) }
+    const first = setTimeout(tick, 15_000)
+    const iv = setInterval(tick, 2 * 60_000)
+    return () => { stop = true; clearTimeout(first); clearInterval(iv) }
+  }, [bearer])
+
   // Garde-fou : si l'accès Blowsome n'est pas (ou plus) accordé, on ne reste jamais
   // sur cette infra VIP — retour GeeLark. (Même logique de porte que le web.)
   useEffect(() => {
@@ -155,7 +170,7 @@ function AppInner({ user }: { user: User }) {
     : page === 'hub'
     ? <Home theme={theme} infra={infra} user={user} org={org} data={data} loading={loading} reload={reload} onNavigate={setPage} />
     : (page === 'cloud' || page === 'phones')
-      ? <Phones theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
+      ? <Phones theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'bank'
         ? <Bank theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'proxies'

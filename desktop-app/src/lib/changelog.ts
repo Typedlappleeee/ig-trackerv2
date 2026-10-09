@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-09g',
+    date: '2026-10-09',
+    title: { fr: 'Téléphones éteints automatiquement + historique fiable', en: 'Phones turned off automatically + reliable history' },
+    items: {
+      fr: [
+        'Garde-fou : un téléphone allumé sans tâche en cours est éteint au bout de 10 min, même si l’app est fermée (warmup respecté).',
+        'Téléphones : bouton d’alimentation au début de chaque ligne pour éteindre un téléphone, et « Tout éteindre ».',
+        'Activité : chaque post apparaît dès son lancement (« En cours », puis « Interrompu » si l’app a été fermée) et le vrai résultat est retrouvé chez GeeLark.',
+        'Activité : « Récupérer les dernières 24 h » reconstitue les runs qui n’avaient pas été enregistrés.',
+      ],
+      en: [
+        'Safeguard: a phone left on with no running task is turned off after 10 min, even when the app is closed (Warmup is respected).',
+        'Phones: power button at the start of each row to turn a phone off, plus “Turn all off”.',
+        'Activity: every post shows up as soon as it starts (“In progress”, then “Interrupted” if the app was closed) and its real result is fetched from GeeLark.',
+        'Activity: “Recover the last 24 h” rebuilds runs that were never saved.',
+      ],
+    },
+  },
+  {
     id: '2026-10-09f',
     date: '2026-10-09',
     title: { fr: 'Banque : sélection rapide', en: 'Library: quick selection' },

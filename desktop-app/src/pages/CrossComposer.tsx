@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { startRunHistory } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
@@ -123,6 +124,11 @@ export default function CrossComposer({ theme, user, org, onBack }: {
       return
     }
 
+    // Historique écrit DÈS MAINTENANT (une entrée par compte × plateforme).
+    const hist = await startRunHistory({
+      userId: user.id, orgId: currentOrg?.id ?? null, type: 'mass_posting',
+      accounts: targets.flatMap(p => platList.map(pl => ({ key: `${p.id}:${pl}`, name: `${phoneLabel(p)} · ${pl}`, geelarkId: p.geelark_id }))),
+    })
     const concurrency = rot ? 1 : targets.length   // sans proxy rotatif → comptes en parallèle
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${targets.length} compte(s) en parallèle.`)
     let okN = 0, errN = 0
@@ -136,6 +142,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
         const r = await crossPostToPhone(bearer, p.geelark_id!, pl, { mediaResourceUrl: resourceUrl, caption, rotationUrls: rot }, push)
         if (r.ok) okN++; else { run.markFailed(); errN++ }
         results.set(key, { name: `${phoneLabel(p)} · ${pl}`, ok: r.ok, error: r.ok ? undefined : r.error })
+        hist.set(key, { ok: r.ok, error: r.ok ? undefined : r.error })
         R.tick(r.ok)
         setRunItems(items => items.map(it => it.id === key ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
       }
@@ -152,15 +159,8 @@ export default function CrossComposer({ theme, user, org, onBack }: {
     const unplayed = targets.length * platList.length - results.size
     for (let i = 0; i < unplayed; i++) run.markFailed()
     R.finish()
-    const totalCross = targets.length * platList.length
-    if (totalCross > 0) {
-      const { error: prErr } = await supabase.from('post_runs').insert({
-        user_id: user.id, org_id: currentOrg?.id ?? null,
-        type: 'mass_posting', ok_count: okN, err_count: errN, total: totalCross,
-        details: [...results.values()],
-      })
-      if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr.message}`)
-    }
+    const prErr = await hist.finish('annulé')
+    if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr}`)
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés.`)
     push('✔ Cross-posting terminé.'); setRunning(false)

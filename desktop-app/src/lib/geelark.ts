@@ -268,8 +268,35 @@ export async function ensurePhoneRunning(bearer: string, phoneId: string, log: (
   return { ok: true }
 }
 
+// Tâche RPA créée sur un téléphone → abonnés (historique des runs : chaque compte
+// garde son taskId, pour retrouver le vrai résultat même si l'onglet se ferme).
+const _taskListeners = new Set<(phoneId: string, taskId: string) => void>()
+export function onGeelarkTask(cb: (phoneId: string, taskId: string) => void): () => void {
+  _taskListeners.add(cb)
+  return () => { _taskListeners.delete(cb) }
+}
+
+// Résultat de tâches RPA déjà créées (/task/query, par 100). 3 = terminée, 4/7/8 = échec ;
+// toute autre valeur = encore en attente / en cours. Tâche absente = inconnue.
+export async function queryTaskResults(bearer: string, ids: string[]): Promise<Record<string, { status: number; error?: string }>> {
+  const out: Record<string, { status: number; error?: string }> = {}
+  for (let i = 0; i < ids.length; i += 100) {
+    const q = await geelarkFetch('/task/query', { ids: ids.slice(i, i + 100) }, bearer)
+    const d = (q['data'] ?? q) as Record<string, unknown>
+    const list = ((d['items'] ?? d['list'] ?? d['tasks'] ?? d['records'] ?? []) as Array<Record<string, unknown>>)
+    for (const it of list) {
+      const id = String(it['id'] ?? it['taskId'] ?? '')
+      if (!id) continue
+      const fd = (it['failDesc'] ?? it['failMsg'] ?? it['msg']) as string | undefined
+      out[id] = { status: Number(it['status']), error: fd || undefined }
+    }
+  }
+  return out
+}
+
 // Sonde une tâche RPA jusqu'à complétion. Statuts GeeLark : 3=Done, 4=Failed, 7/8=annulé/erreur.
 async function pollRpaTask(bearer: string, phoneId: string, taskId: string, log: (m: string) => void, timeoutMs: number): Promise<{ ok: boolean; error?: string }> {
+  _taskListeners.forEach(f => { try { f(phoneId, taskId) } catch { /* abonné défaillant */ } })
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     // Signe de vie : la tâche tourne → le watchdog serveur ne coupe pas le téléphone.

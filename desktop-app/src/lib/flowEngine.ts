@@ -13,6 +13,7 @@
 //
 // L'état des runs vit hors React (singleton) → la progression survit à la
 // navigation, et le run apparaît dans la pastille globale (runStore).
+import { startRunHistory, type RunHistory } from './runHistory'
 import { useSyncExternalStore } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
@@ -419,6 +420,7 @@ async function execute(run: FlowRun, handle: RunHandle, flow: Flow, o: RunOption
   const glog = (m: string) => { run.log.push(m); if (run.log.length > 300) run.log.shift(); emit() }
   const credit = new Map<string, CreditRun>()
   const active = flow.blocks.filter(isActive)
+  let hist: RunHistory | null = null
   try {
     // 1. Crédits : un débit par bloc payant ACTIF (2/compte pour un post, 1 pour une
     //    story), remboursé compte par compte si le bloc ne réussit pas.
@@ -485,12 +487,19 @@ async function execute(run: FlowRun, handle: RunHandle, flow: Flow, o: RunOption
     const conc = o.rotationUrls?.length ? 1 : Math.max(1, Math.min(o.concurrency, n))
     glog(`▶ ${n} compte(s), ${conc} à la fois — ${active.length} bloc(s) actif(s)`)
     const ctx: Ctx = { run, flow, o, handle, assign, urls, hosted, credit, posted: new Map() }
+    // Historique (page Activité) écrit dès le lancement, compte par compte.
+    hist = await startRunHistory({
+      userId: o.scope.userId, orgId: o.scope.orgId, type: 'flow',
+      accounts: o.targets.map(t => ({ key: t.key, name: t.name, geelarkId: t.geelarkId })),
+    }).catch(() => null)
     let next = 0
     const worker = async () => {
       while (next < n) {
         const i = next++
         await runPhone(ctx, i)
-        handle.tick(run.phones[i].status === 'done')
+        const ph = run.phones[i]
+        if (ph.status !== 'cancelled') hist?.set(ph.key, { ok: ph.status === 'done', error: ph.status === 'done' ? undefined : (ph.errors.find(Boolean) ?? 'échec') })
+        handle.tick(ph.status === 'done')
       }
     }
     await Promise.all(Array.from({ length: conc }, worker))
@@ -513,6 +522,7 @@ async function execute(run: FlowRun, handle: RunHandle, flow: Flow, o: RunOption
     run.phones.forEach(p => { if (p.status === 'pending') { p.status = 'failed'; p.steps = p.steps.map(s => s === 'pending' ? 'skipped' : s) } })
     run.status = 'error'
   }
+  await hist?.finish('annulé').catch(() => null)
   run.endedAt = Date.now(); emit()
   handle.finish(run.status === 'error' ? 'error' : run.status === 'cancelled' ? 'cancelled' : 'done')
 }
