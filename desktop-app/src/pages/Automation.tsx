@@ -138,10 +138,10 @@ export default function Automation({ theme, infra, user, org, embedded }: {
   }, [posts])
 
   const segStyle = (k: Tab): CSSProperties => ({
-    display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 14px',
-    border: 'none', borderRadius: 6, cursor: 'pointer',
-    background: tab === k ? `rgba(${theme.tone},0.16)` : 'transparent',
-    color: tab === k ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 600, transition: 'all .14s ease',
+    display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px',
+    border: 'none', borderRadius: 5, cursor: 'pointer',
+    background: tab === k ? 'rgba(255,255,255,0.08)' : 'transparent',
+    color: tab === k ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
   })
 
   return (
@@ -158,30 +158,30 @@ export default function Automation({ theme, infra, user, org, embedded }: {
 
       {/* segmented Programmé / Récurrent */}
       <div style={{
-        display: 'flex', gap: 2, padding: 2, borderRadius: 8, marginBottom: 14,
-        background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content',
+        display: 'flex', gap: 2, padding: 2, borderRadius: 7, marginBottom: 16,
+        background: '#111113', border: '1px solid rgba(255,255,255,0.07)', width: 'fit-content',
       }}>
         {([['sched', 'Programmé', schedCount], ['rec', 'Récurrent', tasks.length]] as [Tab, string, number][]).map(([k, l, n]) => (
           <button key={k} onClick={() => setTab(k)} style={segStyle(k)}>
             {l}
-            <span style={{ opacity: 0.55, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{n}</span>
+            <span style={{ color: '#71717A', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{n}</span>
           </button>
         ))}
       </div>
 
       {loading ? (
-        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div></Panel>
+        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div></Panel>
       ) : error ? (
         <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} /></Panel>
       ) : tab === 'sched' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 12 }}>
           {/* File d'attente */}
           <Panel theme={theme}>
             <PanelHead title="File d'attente" sub="Exécutés côté serveur — ton PC peut être éteint"
               right={
-                <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', flexWrap: 'wrap' }}>
                   {['Tous', 'Instagram', 'TikTok', 'Threads'].map(n => (
-                    <button key={n} onClick={() => setNet(n)} style={{ height: 22, padding: '0 8px', border: 'none', borderRadius: 5, cursor: 'pointer', background: net === n ? `rgba(${theme.tone},0.16)` : 'transparent', color: net === n ? theme.accentText : '#71717A', fontSize: 10.5, fontWeight: 600 }}>{n}</button>
+                    <button key={n} onClick={() => setNet(n)} style={{ height: 22, padding: '0 8px', border: 'none', borderRadius: 5, cursor: 'pointer', background: net === n ? 'rgba(255,255,255,0.08)' : 'transparent', color: net === n ? '#EDEDEF' : '#8B8B94', fontSize: 11.5, fontWeight: 500 }}>{n}</button>
                   ))}
                 </span>
               } />
@@ -197,16 +197,16 @@ export default function Automation({ theme, infra, user, org, embedded }: {
               const title = `${n} compte${n > 1 ? 's' : ''} · ${r.caption?.trim() || typeLabel(r.type)}`
               return (
                 <div key={r.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 11, padding: '11px 15px',
-                  borderBottom: i < queue.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none',
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', minHeight: 48, boxSizing: 'border-box',
+                  borderBottom: i < queue.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                 }}>
                   <span style={{
-                    fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600,
-                    color: done || failed ? '#52525B' : theme.accentText, minWidth: 84, flexShrink: 0,
+                    fontSize: 12, fontWeight: 500, fontVariantNumeric: 'tabular-nums',
+                    color: done || failed ? '#71717A' : '#EDEDEF', minWidth: 84, flexShrink: 0,
                   }}>{when}</span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: done || failed ? '#71717A' : '#E4E4E7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
-                    <span style={{ fontSize: 10.5, color: '#52525B' }}>{typeLabel(r.type)}{running ? ' · en cours' : ''}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: done || failed ? '#A1A1AA' : '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+                    <span style={{ fontSize: 11.5, color: '#71717A' }}>{typeLabel(r.type)}{running ? ' · en cours' : ''}</span>
                   </span>
                   <Chip
                     text={done ? 'publié' : failed ? 'échec' : running ? 'en cours' : 'programmé'}
@@ -220,10 +220,10 @@ export default function Automation({ theme, infra, user, org, embedded }: {
           {/* Calendrier du mois */}
           <Panel theme={theme}>
             <PanelHead title={`${MONTHS[cal.m]} ${cal.y}`} sub={`${cal.planned} jour${cal.planned > 1 ? 's' : ''} avec activité`} />
-            <div style={{ padding: 13 }}>
+            <div style={{ padding: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 6 }}>
                 {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
-                  <span key={i} style={{ textAlign: 'center', fontSize: 9.5, fontWeight: 600, color: '#3F3F46' }}>{d}</span>
+                  <span key={i} style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, color: '#71717A' }}>{d}</span>
                 ))}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
@@ -235,20 +235,20 @@ export default function Automation({ theme, infra, user, org, embedded }: {
                   return (
                     <span key={day} style={{
                       aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      borderRadius: 5, fontSize: 10, fontWeight: 600, fontFamily: "'JetBrains Mono',monospace",
-                      background: sched ? 'rgba(139,92,246,0.16)' : pub ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.02)',
-                      border: '1px solid ' + (sched ? 'rgba(139,92,246,0.32)' : pub ? 'rgba(16,185,129,0.24)' : 'rgba(255,255,255,0.04)'),
-                      color: sched ? '#C4B5FD' : pub ? '#34D399' : '#3F3F46',
+                      borderRadius: 5, fontSize: 11.5, fontWeight: sched || pub ? 600 : 400, fontVariantNumeric: 'tabular-nums',
+                      background: sched || pub ? 'rgba(255,255,255,0.06)' : 'transparent',
+                      border: '1px solid ' + (sched || pub ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)'),
+                      color: sched ? theme.accentText : pub ? '#4ADE80' : '#5A5A63',
                     }}>{day}</span>
                   )
                 })}
               </div>
-              <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 10.5, fontWeight: 600, color: '#52525B' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: 2, background: 'rgba(139,92,246,0.5)' }} />Programmé
+              <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 99, background: theme.accent }} />Programmé
                 </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: 2, background: 'rgba(16,185,129,0.5)' }} />Publié
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 99, background: '#4ADE80' }} />Publié
                 </span>
               </div>
             </div>
@@ -263,46 +263,46 @@ export default function Automation({ theme, infra, user, org, embedded }: {
               action={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Nouvelle tâche" onClick={() => setCreateMode('recurring')} />} />
           </Panel>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {tasks.map(t => {
               const active = t.status === 'active'
               const n = phoneCount(t.phones)
               const cadence = t.recur_hours ? `${n} téléphone${n > 1 ? 's' : ''} · toutes les ${t.recur_hours}h` : `${n} téléphone${n > 1 ? 's' : ''}`
               return (
                 <Panel key={t.id} theme={theme}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 15px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
                     <span
                       onClick={() => { if (busy !== t.id) toggleTask(t) }}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: active ? 'flex-end' : 'flex-start',
-                        width: 34, height: 19, padding: 2, borderRadius: 99, flexShrink: 0,
-                        background: active ? '#10B981' : 'rgba(255,255,255,0.1)',
-                        cursor: busy === t.id ? 'wait' : 'pointer', opacity: busy === t.id ? 0.6 : 1, transition: 'background .2s ease',
+                        width: 32, height: 18, padding: 2, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box',
+                        background: active ? theme.accent : 'rgba(255,255,255,0.1)',
+                        cursor: busy === t.id ? 'wait' : 'pointer', opacity: busy === t.id ? 0.6 : 1, transition: 'background .12s ease',
                       }}>
-                      <span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} />
+                      <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
                     </span>
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: active ? '#F4F4F6' : '#71717A' }}>{t.name || 'Tâche automatique'}</span>
-                      <span style={{ fontSize: 11, color: '#52525B' }}>{cadence}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: active ? '#EDEDEF' : '#A1A1AA' }}>{t.name || 'Tâche automatique'}</span>
+                      <span style={{ fontSize: 12, color: '#8B8B94' }}>{cadence}</span>
                     </span>
                     <Chip text={active ? 'active' : 'en pause'} tone={active ? 'ok' : 'mute'} />
                   </div>
                   <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '11px 15px',
-                    borderTop: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap',
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
+                    borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap',
                   }}>
                     {taskSteps(t).map((sp, k) => (
                       <span key={k} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 9px', borderRadius: 6,
-                        background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)',
-                        fontSize: 11, fontWeight: 600, color: '#A1A1AA',
+                        display: 'inline-flex', alignItems: 'center', gap: 6, height: 22, padding: '0 8px', borderRadius: 5, boxSizing: 'border-box',
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                        fontSize: 11.5, fontWeight: 500, color: '#A1A1AA',
                       }}>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: '#52525B' }}>{k + 1}</span>{sp}
+                        <span style={{ fontSize: 11, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{k + 1}</span>{sp}
                       </span>
                     ))}
-                    <span style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontSize: 11 }}>
-                      <span style={{ color: '#52525B' }}>Prochaine : <span style={{ color: '#D4D4D8', fontWeight: 600 }}>{active ? whenLabel(t.next_run_at) : 'En pause'}</span></span>
-                      <span style={{ color: '#52525B' }}>Crédits/jour : <span style={{ color: '#FBBF24', fontWeight: 600 }}>{active ? taskCredits(t) : '—'}</span></span>
+                    <span style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontSize: 12, flexWrap: 'wrap' }}>
+                      <span style={{ color: '#8B8B94' }}>Prochaine : <span style={{ color: '#EDEDEF', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{active ? whenLabel(t.next_run_at) : 'En pause'}</span></span>
+                      <span style={{ color: '#8B8B94' }}>Crédits/jour : <span style={{ color: '#FBBF24', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{active ? taskCredits(t) : '—'}</span></span>
                     </span>
                   </div>
                 </Panel>

@@ -143,63 +143,65 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
   const counts: Record<Filter, number> = { all: keys.length, active: 0, used: 0, expired: 0, revoked: 0 }
   keys.forEach(k => { counts[keyStatus(k)]++ })
 
-  const inp: CSSProperties = { height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
+  const inp: CSSProperties = { height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }
   const sel: CSSProperties = { ...inp, cursor: 'pointer' }
-  const opt: CSSProperties = { background: '#16161C' }
+  const opt: CSSProperties = { background: '#161618' }
   const mono: CSSProperties = { fontFamily: "'JetBrains Mono',monospace" }
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Admin · Licences" sub="Création et historique des clés de licence et des codes de crédits. Réservé au superadmin." actions={<Chip text="Superadmin" tone="violet" />} />
 
-      {notice && <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 9, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', color: '#E9D5FF', fontSize: 12.5 }}>{notice}</div>}
+      {notice && <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', color: '#EDEDEF', fontSize: 13 }}>{notice}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
         {/* ── Colonne gauche : liste des clés ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title="Clés de licence" sub={`${keys.length} au total`} right={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-3.5-3.5" size={12} />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (clé, email, note)…" style={{ width: 200, border: 'none', background: 'transparent', color: '#E4E4E7', fontSize: 12, outline: 'none' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#71717A' }}>
+                <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-3.5-3.5" size={13} />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (clé, email, note)…" style={{ width: 200, maxWidth: '40vw', border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, outline: 'none' }} />
               </div>} />
-            <div style={{ display: 'flex', gap: 4, padding: '0 13px 12px', flexWrap: 'wrap' }}>
-              {(['all', 'active', 'used', 'expired', 'revoked'] as Filter[]).map(f => (
-                <button key={f} onClick={() => setFilter(f)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', border: 'none', borderRadius: 7, cursor: 'pointer', background: filter === f ? `rgba(${theme.tone},0.16)` : 'rgba(255,255,255,0.03)', color: filter === f ? theme.accentText : '#A1A1AA', fontSize: 12, fontWeight: 600 }}>
-                  {STATUS_LABEL[f]}<span style={{ opacity: 0.6, ...mono, fontSize: 10 }}>{counts[f]}</span>
-                </button>
-              ))}
+            <div style={{ padding: '12px 16px' }}>
+              <div style={{ display: 'inline-flex', gap: 2, padding: 2, maxWidth: '100%', flexWrap: 'wrap', boxSizing: 'border-box', borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+                {(['all', 'active', 'used', 'expired', 'revoked'] as Filter[]).map(f => (
+                  <button type="button" key={f} onClick={() => setFilter(f)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', background: filter === f ? 'rgba(255,255,255,0.08)' : 'transparent', color: filter === f ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500 }}>
+                    {STATUS_LABEL[f]}<span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: filter === f ? '#A1A1AA' : '#71717A' }}>{counts[f]}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 13 }}>…</div>
+            {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>…</div>
               : shownKeys.length === 0 ? <Empty icon="M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z" title="Aucune clé" text="Crée ta première clé de licence à droite." />
               : (
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {shownKeys.map(k => {
                     const st = keyStatus(k)
                     return (
-                      <div key={k.id} style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '12px 15px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div key={k.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span style={{ ...mono, fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>{k.key}</span>
-                          <button onClick={() => copy(k.key)} title="Copier" style={{ display: 'flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: copied === k.key ? '#34D399' : '#71717A', cursor: 'pointer' }}><Icon d={copied === k.key ? 'M20 6 9 17l-5-5' : 'M9 9h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z|M5 15H4a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1'} size={12} /></button>
+                          <span style={{ ...mono, fontSize: 12.5, fontWeight: 500, color: '#EDEDEF' }}>{k.key}</span>
+                          <button type="button" onClick={() => copy(k.key)} title="Copier" style={{ display: 'flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: 'transparent', color: copied === k.key ? '#4ADE80' : '#71717A', cursor: 'pointer' }}><Icon d={copied === k.key ? 'M20 6 9 17l-5-5' : 'M9 9h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z|M5 15H4a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1'} size={12} /></button>
                           <Chip text={STATUS_LABEL[st]} tone={STATUS_TONE[st]} />
                           <Chip text={k.plan} tone="mute" />
                           {k.blowsome && <Chip text="Blowsome ✦" tone="violet" />}
-                          <span style={{ marginLeft: 'auto', fontSize: 11, color: st === 'expired' ? '#FBBF24' : '#71717A' }}>{daysLeft(k.expires_at)}</span>
+                          <span style={{ marginLeft: 'auto', fontSize: 12, fontVariantNumeric: 'tabular-nums', color: st === 'expired' ? '#FBBF24' : '#8B8B94' }}>{daysLeft(k.expires_at)}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: '#71717A', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#8B8B94', flexWrap: 'wrap' }}>
                           <span>{k.user_email ? `👤 ${k.user_email}` : 'Non activée'}</span>
-                          <span style={{ opacity: 0.4 }}>·</span>
+                          <span style={{ color: '#5A5A63' }}>·</span>
                           <span>créée {new Date(k.created_at).toLocaleDateString('fr-FR')}</span>
-                          {k.notes && <><span style={{ opacity: 0.4 }}>·</span><span style={{ fontStyle: 'italic' }}>{k.notes}</span></>}
+                          {k.notes && <><span style={{ color: '#5A5A63' }}>·</span><span style={{ color: '#A1A1AA' }}>{k.notes}</span></>}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginLeft: -10 }}>
                           <Btn theme={theme} sm tone="quiet" label={k.blowsome ? 'Retirer Blowsome' : 'Ajouter Blowsome'} onClick={() => toggleBlowsome(k)} />
                           {k.expires_at && <Btn theme={theme} sm tone="quiet" label="+ durée" onClick={() => setExtendFor(extendFor === k.id ? null : k.id)} />}
                           {k.is_active && <Btn theme={theme} sm tone="quiet" label="Révoquer" onClick={() => revokeKey(k.id)} />}
                           <Btn theme={theme} sm tone="danger" label="Supprimer" onClick={() => setDelTarget(k)} />
                           {extendFor === k.id && (
                             <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
-                              {[7, 30, 90, 365].map(d => <button key={d} onClick={() => extendKey(k, d)} style={{ height: 26, padding: '0 9px', borderRadius: 6, border: `1px solid rgba(${theme.tone},0.3)`, background: 'transparent', color: theme.accentText, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>+{d}j</button>)}
+                              {[7, 30, 90, 365].map(d => <button type="button" key={d} onClick={() => extendKey(k, d)} style={{ height: 28, padding: '0 9px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#EDEDEF', fontSize: 12, fontWeight: 500, fontVariantNumeric: 'tabular-nums', cursor: 'pointer' }}>+{d}j</button>)}
                             </span>
                           )}
                         </div>
@@ -213,15 +215,15 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
           {/* ── Codes de crédits ── */}
           <Panel theme={theme}>
             <PanelHead title="Codes de crédits" sub={`${codes.length} au total`} />
-            {codes.length === 0 ? <div style={{ padding: 22, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun code.</div> : (
+            {codes.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#8B8B94', fontSize: 13 }}>Aucun code.</div> : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {codes.map(c => (
-                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 15px', borderTop: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap' }}>
-                    <span style={{ ...mono, fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>{c.code}</span>
-                    <button onClick={() => copy(c.code)} title="Copier" style={{ display: 'flex', width: 22, height: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: copied === c.code ? '#34D399' : '#71717A', cursor: 'pointer' }}><Icon d="M9 9h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z" size={11} /></button>
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 48, boxSizing: 'border-box', padding: '8px 16px', borderTop: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+                    <span style={{ ...mono, fontSize: 12.5, fontWeight: 500, color: '#EDEDEF' }}>{c.code}</span>
+                    <button type="button" onClick={() => copy(c.code)} title="Copier" style={{ display: 'flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: 'transparent', color: copied === c.code ? '#4ADE80' : '#71717A', cursor: 'pointer' }}><Icon d="M9 9h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z" size={12} /></button>
                     <Chip text={`${c.amount} cr`} tone="ok" />
                     {c.used_by ? <Chip text="Utilisé" tone="info" /> : c.is_active ? <Chip text="Actif" tone="ok" /> : <Chip text="Révoqué" tone="bad" />}
-                    {c.notes && <span style={{ fontSize: 11, color: '#71717A', fontStyle: 'italic' }}>{c.notes}</span>}
+                    {c.notes && <span style={{ fontSize: 12, color: '#8B8B94' }}>{c.notes}</span>}
                     <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                       {c.is_active && !c.used_by && <Btn theme={theme} sm tone="quiet" label="Révoquer" onClick={() => revokeCode(c.id)} />}
                     </span>
@@ -236,12 +238,12 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title="Nouvelle clé" />
-            <div style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={lbl}>Clé générée</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={gk} onChange={e => setGk(e.target.value.toUpperCase())} style={{ ...inp, ...mono, flex: 1, fontWeight: 600 }} />
-                  <Btn theme={theme} sm tone="quiet" label="↻" onClick={() => setGk(genKey())} />
+                  <input value={gk} onChange={e => setGk(e.target.value.toUpperCase())} style={{ ...inp, ...mono, flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 500 }} />
+                  <Btn theme={theme} tone="ghost" label="↻" onClick={() => setGk(genKey())} />
                 </div>
               </div>
               <div>
@@ -256,8 +258,8 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
                   {PLANS.map(p => <option key={p} value={p} style={opt}>{p}</option>)}
                 </select>
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: '#E4E4E7', cursor: 'pointer' }}>
-                <span onClick={() => setBlowsome(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: blowsome ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: blowsome ? theme.accentBtn : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#EDEDEF', cursor: 'pointer' }}>
+                <span onClick={() => setBlowsome(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: blowsome ? 'flex-end' : 'flex-start', width: 32, height: 18, padding: 2, boxSizing: 'border-box', flexShrink: 0, borderRadius: 99, background: blowsome ? theme.accent : 'rgba(255,255,255,0.12)', transition: 'background .12s ease' }}><span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} /></span>
                 Add-on Blowsome ✦ (accès infra VIP)
               </label>
               <div>
@@ -270,12 +272,12 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
 
           <Panel theme={theme}>
             <PanelHead title="Nouveau code de crédits" />
-            <div style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={lbl}>Code généré</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={gc} onChange={e => setGc(e.target.value.toUpperCase())} style={{ ...inp, ...mono, flex: 1, fontWeight: 600 }} />
-                  <Btn theme={theme} sm tone="quiet" label="↻" onClick={() => setGc(genCode())} />
+                  <input value={gc} onChange={e => setGc(e.target.value.toUpperCase())} style={{ ...inp, ...mono, flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 500 }} />
+                  <Btn theme={theme} tone="ghost" label="↻" onClick={() => setGc(genCode())} />
                 </div>
               </div>
               <div>
@@ -295,11 +297,11 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
       {delTarget && (
         <Modal theme={theme} title="Supprimer cette clé ?" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClose={() => setDelTarget(null)}
           footer={<><Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setDelTarget(null)} /><Btn theme={theme} tone="danger" label="Supprimer" onClick={deleteKey} /></>}>
-          <p style={{ margin: 0, fontSize: 12.5, color: '#A1A1AA', lineHeight: 1.6 }}>La clé <b style={mono}>{delTarget.key}</b> sera définitivement supprimée. Pour juste la désactiver, utilise « Révoquer ».</p>
+          <p style={{ margin: 0, fontSize: 13, color: '#A1A1AA', lineHeight: 1.6 }}>La clé <b style={{ ...mono, fontWeight: 600, color: '#EDEDEF' }}>{delTarget.key}</b> sera définitivement supprimée. Pour juste la désactiver, utilise « Révoquer ».</p>
         </Modal>
       )}
     </div>
   )
 }
 
-const lbl: CSSProperties = { display: 'block', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6 }
+const lbl: CSSProperties = { display: 'block', fontSize: 12, fontWeight: 500, color: '#8B8B94', marginBottom: 6 }

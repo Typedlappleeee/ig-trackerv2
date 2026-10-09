@@ -65,8 +65,8 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
   const others = rest.filter(f => !favs.includes(f.k))
 
   const seg = (on: boolean): CSSProperties => ({
-    display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 14px', border: 'none', borderRadius: 6, cursor: 'pointer',
-    background: on ? `rgba(${theme.tone},0.16)` : 'transparent', color: on ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 600,
+    display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer',
+    background: on ? 'rgba(255,255,255,0.08)' : 'transparent', color: on ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500,
   })
 
   const Star = ({ k, big }: { k: string; big?: boolean }) => {
@@ -74,40 +74,40 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
     return (
       <button onClick={e => { e.stopPropagation(); toggleFav(k) }} title={on ? 'Retirer des favoris' : 'Ajouter aux favoris'} style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', width: big ? 26 : 22, height: big ? 26 : 22, borderRadius: 6, cursor: 'pointer', flexShrink: 0, border: 'none',
-        background: on ? 'rgba(245,158,11,0.13)' : 'transparent', color: on ? '#FBBF24' : '#3F3F46',
+        background: 'transparent', color: on ? '#FBBF24' : '#5A5A63',
       }}>
         <svg viewBox="0 0 24 24" width={big ? 14 : 13} height={big ? 14 : 13} fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
       </button>
     )
   }
   const IconBtn = ({ d, title, onClick, disabled }: { d: string; title: string; onClick?: (e: any) => void; disabled?: boolean }) => (
-    <button onClick={onClick} title={title} disabled={disabled} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', color: '#71717A', opacity: disabled ? 0.4 : 1 }}><Icon d={d} size={13} /></button>
+    <button onClick={onClick} title={title} disabled={disabled} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#A1A1AA', opacity: disabled ? 0.4 : 1 }}><Icon d={d} size={13} /></button>
   )
 
   // Carte de flux, deux tailles (fidèle au ZIP : big = ligne, small = colonne).
   const card = (f: Flow, big?: boolean): ReactNode => (
     <div key={f.k} onClick={() => openFlow(f)} style={{
-      position: 'relative', display: 'flex', flexDirection: big ? 'row' : 'column', alignItems: big ? 'center' : 'stretch', gap: big ? 15 : 11,
-      padding: big ? 17 : 15, borderRadius: 10, cursor: f.ok ? 'pointer' : 'default',
-      background: big ? `linear-gradient(120deg, rgba(${f.tone},0.09), ${theme.cloud ? 'rgba(14,22,27,0.9)' : 'rgba(16,16,21,0.9)'})` : theme.panelBg,
-      border: '1px solid ' + (big ? `rgba(${f.tone},0.3)` : f.ok ? theme.panelEdge : 'rgba(245,158,11,0.18)'),
-      transition: 'all .16s ease', boxSizing: 'border-box',
+      position: 'relative', display: 'flex', flexDirection: big ? 'row' : 'column', alignItems: big ? 'center' : 'stretch', gap: big ? 14 : 12,
+      padding: 16, borderRadius: 8, cursor: f.ok ? 'pointer' : 'default',
+      background: theme.panelBg, flexWrap: big ? 'wrap' : undefined,
+      border: '1px solid ' + theme.panelEdge,
+      transition: 'background .12s ease, border-color .12s ease', boxSizing: 'border-box',
     }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = `rgba(${f.tone},0.5)`; e.currentTarget.style.transform = 'translateY(-1px)' }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = big ? `rgba(${f.tone},0.3)` : f.ok ? theme.panelEdge : 'rgba(245,158,11,0.18)'; e.currentTarget.style.transform = 'none' }}>
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: big ? 40 : 30, height: big ? 40 : 30, borderRadius: big ? 11 : 8, flexShrink: 0, background: `rgba(${f.tone},0.14)`, border: `1px solid rgba(${f.tone},0.26)`, color: `rgb(${f.tone})` }}><Icon d={f.i} size={big ? 18 : 15} /></span>
-      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: big ? 4 : 7 }}>
+      onMouseEnter={e => { if (!f.ok) return; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#141416' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = theme.panelEdge; e.currentTarget.style.background = theme.panelBg }}>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: big ? 32 : 28, height: big ? 32 : 28, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: `rgb(${f.tone})` }}><Icon d={f.i} size={big ? 15 : 14} /></span>
+      <span style={{ flex: 1, minWidth: big ? 200 : 0, display: 'flex', flexDirection: 'column', gap: big ? 4 : 6 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: big ? 14.5 : 13, fontWeight: 600, color: '#F4F4F6' }}>{f.t}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>{f.t}</span>
           {f.beta && <Chip text="Beta" tone="warn" />}
         </span>
-        <span style={{ fontSize: big ? 12 : 11.5, lineHeight: 1.55, color: '#71717A' }}>{f.d}</span>
-        {!big && <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', paddingTop: 9, borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 10.5, fontWeight: 600, color: '#52525B' }}>{f.p}<span style={{ opacity: 0.4 }}>·</span>{f.n} étapes</span>}
+        <span style={{ fontSize: 12, lineHeight: 1.55, color: '#8B8B94' }}>{f.d}</span>
+        {!big && <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 11.5, fontWeight: 500, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{f.p}<span style={{ opacity: 0.4 }}>·</span>{f.n} étapes</span>}
       </span>
       <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
         {big && <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, marginRight: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>{f.p}</span>
-          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#3F3F46' }}>{f.n} étapes</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#A1A1AA' }}>{f.p}</span>
+          <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{f.n} étapes</span>
         </span>}
         <Star k={f.k} big={big} />
         <IconBtn d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" title="Programmer" onClick={(e) => { e.stopPropagation(); openFlow(f, 'sched') }} disabled={!f.ok} />
@@ -119,16 +119,16 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
   )
 
   const section = (label: string, items: Flow[], hint?: string): ReactNode => items.length === 0 ? null : (
-    <div key={label} style={{ marginBottom: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
-        {label === 'Recommandés' && <span style={{ color: '#FBBF24', display: 'flex', alignSelf: 'center' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={13} /></span>}
-        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: label === 'Recommandés' ? '#FBBF24' : '#52525B' }}>{label}</span>
-        {hint && <span style={{ fontSize: 11, color: '#3F3F46' }}>{hint}</span>}
-        <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#3F3F46' }}>{items.length}</span>
+    <div key={label} style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        {label === 'Recommandés' && <span style={{ color: '#FBBF24', display: 'flex', alignSelf: 'center' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={12} /></span>}
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>{label}</span>
+        {hint && <span style={{ fontSize: 12, color: '#71717A' }}>{hint}</span>}
+        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
       </div>
       {label === 'Recommandés'
-        ? <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{items.map(f => card(f, true))}</div>
-        : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(272px,1fr))', gap: 10 }}>{items.map(f => card(f))}</div>}
+        ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{items.map(f => card(f, true))}</div>
+        : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 12 }}>{items.map(f => card(f))}</div>}
     </div>
   )
 
@@ -137,9 +137,9 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
       <PageHead title="Automatisation" sub="Flux exécutés par ton agent, en natif. Marque tes favoris, lance à la demande ou programme-les."
         actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Créer un flux" onClick={() => setCreateOpen(true)} />} />
 
-      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, marginBottom: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, marginBottom: 16, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', width: 'fit-content' }}>
         {([['catalog', 'Catalogue', FLOWS.length], ['sched', 'Planifié', null]] as [Tab, string, number | null][]).map(([k, l, n]) => (
-          <button key={k} onClick={() => setTab(k)} style={seg(tab === k)}>{l}{n != null && <span style={{ opacity: 0.55, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{n}</span>}</button>
+          <button key={k} onClick={() => setTab(k)} style={seg(tab === k)}>{l}{n != null && <span style={{ color: '#71717A', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{n}</span>}</button>
         ))}
       </div>
 
@@ -149,19 +149,19 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
         <>
           {section('Recommandés', reco, 'les deux flux que 90 % des agences utilisent')}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 11px', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, background: 'rgba(255,255,255,0.02)', minWidth: 220 }}>
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#52525B" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.35-4.35" /></svg>
-              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Chercher un flux…" style={{ flex: 1, border: 'none', background: 'transparent', color: '#E4E4E7', fontSize: 12, outline: 'none' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 10px', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 6, background: '#161618', minWidth: 220, boxSizing: 'border-box' }}>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#71717A" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.35-4.35" /></svg>
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Chercher un flux…" style={{ flex: 1, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, outline: 'none' }} />
             </div>
-            <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              {PLATFORMS.map(pl => <button key={pl} onClick={() => setPlat(pl)} style={{ ...seg(plat === pl), height: 26, fontSize: 11.5 }}>{pl}</button>)}
+            <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {PLATFORMS.map(pl => <button key={pl} onClick={() => setPlat(pl)} style={{ ...seg(plat === pl), height: 26 }}>{pl}</button>)}
             </div>
           </div>
 
           {section('Favoris', favList)}
           {section('Tous les flux', others)}
-          {favList.length === 0 && others.length === 0 && <div style={{ padding: '40px 15px', textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun flux ne correspond.</div>}
+          {favList.length === 0 && others.length === 0 && <div style={{ padding: '40px 16px', textAlign: 'center', color: '#71717A', fontSize: 13 }}>Aucun flux ne correspond.</div>}
         </>
       )}
 

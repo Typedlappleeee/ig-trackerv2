@@ -20,14 +20,23 @@ import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/li
 import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
 import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
 
-// ── Design system Blowsome (mauve/or) ────────────────────────────────────────
-const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
+// ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
+const ACCENT = '#A855F7'
+const ACCENT_TXT = '#D8B4FE'
 const GOLD = '#E9C46A'
-const INK = '#ECE9F5'
-const MUTED = '#A79FBD'
-const SERIF = 'inherit'
-const selStyle: CSSProperties = { height: 32, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', cursor: 'pointer' }
-const optStyle: CSSProperties = { background: '#17111F' }
+const INK = '#EDEDEF'
+const MUTED = '#8B8B94'
+const EDGE = 'rgba(255,255,255,0.07)'
+const FIELD_EDGE = 'rgba(255,255,255,0.09)'
+const FIELD_BG = '#161618'
+const MONO = "'JetBrains Mono',monospace"
+// Boutons (alignés sur <Btn> de lib/ui) : primary = clair, ghost = bordé.
+const BTN_PRIMARY: CSSProperties = { background: '#EDEDEF', border: '1px solid #EDEDEF', color: '#0A0A0B' }
+const BTN_GHOST: CSSProperties = { background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: '#E4E4E7' }
+const fieldStyle: CSSProperties = { height: 32, padding: '0 10px', borderRadius: 6, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 13, outline: 'none', boxSizing: 'border-box' }
+const logStyle: CSSProperties = { padding: 10, borderRadius: 6, background: '#0D0D0F', border: `1px solid ${EDGE}`, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap' }
+const selStyle: CSSProperties = { ...fieldStyle, padding: '0 8px', cursor: 'pointer' }
+const optStyle: CSSProperties = { background: FIELD_BG }
 
 // Durée d'une vidéo (secondes) depuis ses octets — via un <video> caché (rapide, natif).
 function videoDurationFromBytes(bytes: Uint8Array): Promise<number> {
@@ -44,13 +53,13 @@ function videoDurationFromBytes(bytes: Uint8Array): Promise<number> {
     } catch { resolve(0) }
   })
 }
-const numInp: CSSProperties = { width: 62, height: 30, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', textAlign: 'right' }
+const numInp: CSSProperties = { ...fieldStyle, width: 62, height: 28, padding: '0 8px', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }
 
 // ── Composants d'options réutilisables (Auto-contenu) ────────────────────────
 function Grp({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div style={{ borderRadius: 14, border: '1px solid rgba(216,180,254,0.1)', background: 'rgba(255,255,255,0.015)', padding: 15, marginTop: 12 }}>
-      <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: '#C9A9F0' }}>{title}</p>
+    <div style={{ borderRadius: 8, border: `1px solid ${EDGE}`, background: 'transparent', padding: 16, marginTop: 12 }}>
+      <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: INK }}>{title}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>
     </div>
   )
@@ -58,21 +67,21 @@ function Grp({ title, children }: { title: string; children: ReactNode }) {
 function Sw({ on, onChange, label, sub, disabled }: { on: boolean; onChange: (v: boolean) => void; label: ReactNode; sub?: ReactNode; disabled?: boolean }) {
   return (
     <div onClick={() => !disabled && onChange(!on)} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}>
-      <span style={{ flexShrink: 0, marginTop: 1, display: 'inline-flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 38, height: 22, padding: 2, borderRadius: 99, background: on ? GRAD : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
-        <span style={{ width: 18, height: 18, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.45)' }} />
+      <span style={{ flexShrink: 0, marginTop: 1, display: 'inline-flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 38, height: 22, padding: 2, borderRadius: 99, background: on ? ACCENT : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+        <span style={{ width: 18, height: 18, borderRadius: 99, background: '#fff' }} />
       </span>
       <span style={{ minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>{label}</span>
-        {sub && <span style={{ display: 'block', fontSize: 11, color: MUTED, marginTop: 2, lineHeight: 1.4 }}>{sub}</span>}
+        <span style={{ fontSize: 13, fontWeight: 500, color: INK }}>{label}</span>
+        {sub && <span style={{ display: 'block', fontSize: 12, color: MUTED, marginTop: 2, lineHeight: 1.45 }}>{sub}</span>}
       </span>
     </div>
   )
 }
 function Seg<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[] }) {
   return (
-    <span style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 9, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(216,180,254,0.14)' }}>
+    <span style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: `1px solid ${EDGE}` }}>
       {options.map(o => (
-        <button key={o.v} onClick={() => onChange(o.v)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, background: value === o.v ? GRAD : 'transparent', color: value === o.v ? '#fff' : MUTED }}>{o.label}</button>
+        <button key={o.v} onClick={() => onChange(o.v)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: value === o.v ? 'rgba(255,255,255,0.08)' : 'transparent', color: value === o.v ? INK : MUTED }}>{o.label}</button>
       ))}
     </span>
   )
@@ -80,22 +89,24 @@ function Seg<T extends string>({ value, onChange, options }: { value: T; onChang
 function Fld({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 12, color: MUTED, minWidth: 96 }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 500, color: MUTED, minWidth: 96 }}>{label}</span>
       {children}
     </div>
   )
 }
 
 function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <div style={{ borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.12)', boxShadow: '0 20px 50px -30px rgba(168,85,247,0.5)', ...style }}>{children}</div>
+  return <div style={{ borderRadius: 8, background: '#111113', border: `1px solid ${EDGE}`, ...style }}>{children}</div>
 }
+const tileHoverOn = (e: { currentTarget: HTMLElement }) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#141416' }
+const tileHoverOff = (e: { currentTarget: HTMLElement }) => { e.currentTarget.style.borderColor = EDGE; e.currentTarget.style.background = '#111113' }
 function Head({ title, sub, right }: { title: string; sub?: string; right?: ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
       <div style={{ minWidth: 0 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 7, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.4)', color: '#D8B4FE', fontSize: 10, fontWeight: 600, marginBottom: 10 }}>✦ Blowsome VIP</span>
-        <h1 style={{ margin: 0, fontFamily: SERIF, fontSize: 24, fontWeight: 600, letterSpacing: '-0.03em', color: INK }}>{title}</h1>
-        {sub && <p style={{ margin: '7px 0 0', fontSize: 13, lineHeight: 1.55, color: MUTED, maxWidth: 560 }}>{sub}</p>}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: ACCENT_TXT, fontSize: 11, fontWeight: 500, marginBottom: 10 }}>✦ Blowsome VIP</span>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', color: INK }}>{title}</h1>
+        {sub && <p style={{ margin: '6px 0 0', fontSize: 13, lineHeight: 1.55, color: '#A1A1AA', maxWidth: 560 }}>{sub}</p>}
       </div>
       {right && <div style={{ marginLeft: 'auto' }}>{right}</div>}
     </div>
@@ -103,19 +114,18 @@ function Head({ title, sub, right }: { title: string; sub?: string; right?: Reac
 }
 function BlowBtn({ label, onClick, ghost }: { label: string; onClick?: () => void; ghost?: boolean }) {
   return (
-    <button onClick={onClick} className={ghost ? 'blow-tap' : 'blow-cta'} style={{
-      height: 38, padding: '0 18px', borderRadius: 11, cursor: 'pointer', fontSize: 13, fontWeight: 600,
-      background: ghost ? 'rgba(255,255,255,0.03)' : GRAD, color: ghost ? '#D8B4FE' : '#fff',
-      border: ghost ? '1px solid rgba(216,180,254,0.2)' : 'none', boxShadow: ghost ? 'none' : '0 12px 30px -12px rgba(168,85,247,0.8)',
+    <button onClick={onClick} style={{
+      height: 32, padding: '0 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap',
+      ...(ghost ? BTN_GHOST : BTN_PRIMARY),
     }}>{label}</button>
   )
 }
 function ConnectIrt({ title }: { title: string }) {
   return (
-    <Card style={{ padding: 34, textAlign: 'center' }}>
-      <div style={{ fontSize: 34 }}>📱</div>
-      <div style={{ marginTop: 14, fontSize: 15, fontWeight: 600, color: INK }}>{title}</div>
-      <p style={{ margin: '8px auto 0', maxWidth: 460, fontSize: 12.5, lineHeight: 1.6, color: MUTED }}>
+    <Card style={{ padding: 32, textAlign: 'center' }}>
+      <div style={{ fontSize: 28 }}>📱</div>
+      <div style={{ marginTop: 12, fontSize: 14, fontWeight: 600, color: INK }}>{title}</div>
+      <p style={{ margin: '6px auto 0', maxWidth: 460, fontSize: 13, lineHeight: 1.6, color: MUTED }}>
         Le Parc VIP pilote tes vrais iPhones via iRemoTech. Renseigne ta clé API iRemoTech dans <code>iremotech_config</code> (app_config/org_config) et le parc apparaîtra ici — comme la connexion Meta, c'est prêt côté app.
       </p>
     </Card>
@@ -295,43 +305,43 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
     setTesting(false)
   }
 
-  const btn: CSSProperties = { height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(216,180,254,0.14)', color: INK }
+  const btn: CSSProperties = { height: 32, padding: '0 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500, ...BTN_GHOST }
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <Head title="Phone Farm" sub="Tes vrais iPhones pilotés à distance. Clique un appareil pour le contrôler en direct, enregistre une séquence, puis publie sur tout le parc."
-        right={budget?.budget != null ? <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: GOLD }}>{budget.remaining ?? '—'} / {budget.budget ?? '—'} actions</span> : undefined} />
+        right={budget?.budget != null ? <span style={{ fontFamily: MONO, fontSize: 12, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }}>{budget.remaining ?? '—'} / {budget.budget ?? '—'} actions</span> : undefined} />
 
-      {irt.loading ? <Card style={{ padding: 34, textAlign: 'center', color: MUTED, fontSize: 13 }}>Chargement…</Card>
+      {irt.loading ? <Card style={{ padding: 32, textAlign: 'center', color: MUTED, fontSize: 13 }}>Chargement…</Card>
         : !irt.key ? <ConnectIrt title="iRemoTech pas encore branché" />
-        : err ? <Card style={{ padding: 30, textAlign: 'center', color: '#F87171', fontSize: 13 }}>{err}</Card>
-        : loading ? <Card style={{ padding: 34, textAlign: 'center', color: MUTED, fontSize: 13 }}>Connexion à iRemoTech…</Card>
-        : devices.length === 0 ? <Card style={{ padding: 34, textAlign: 'center', color: MUTED, fontSize: 13 }}>Aucun iPhone renvoyé par ton compte iRemoTech.</Card>
+        : err ? <Card style={{ padding: 32, textAlign: 'center', color: '#F87171', fontSize: 13 }}>{err}</Card>
+        : loading ? <Card style={{ padding: 32, textAlign: 'center', color: MUTED, fontSize: 13 }}>Connexion à iRemoTech…</Card>
+        : devices.length === 0 ? <Card style={{ padding: 32, textAlign: 'center', color: MUTED, fontSize: 13 }}>Aucun iPhone renvoyé par ton compte iRemoTech.</Card>
         : (
           <>
             {/* Posting : rejeu de séquence sur le parc */}
-            <Card style={{ padding: 18, marginBottom: 16 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: INK, marginBottom: 10 }}>Publier sur le parc</div>
+            <Card style={{ padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginBottom: 10 }}>Publier sur le parc</div>
               {sequences.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 12, color: MUTED, lineHeight: 1.55 }}>Aucune séquence enregistrée. Ouvre un iPhone ci-dessous, clique <b style={{ color: GOLD }}>● Rec</b>, fais une publication à la main une fois, puis enregistre-la — tu pourras la rejouer sur tout le parc.</p>
+                <p style={{ margin: 0, fontSize: 12, color: MUTED, lineHeight: 1.55 }}>Aucune séquence enregistrée. Ouvre un iPhone ci-dessous, clique <b style={{ color: INK, fontWeight: 600 }}>● Rec</b>, fais une publication à la main une fois, puis enregistre-la — tu pourras la rejouer sur tout le parc.</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {sequences.map(s => (
-                      <button key={s.id} onClick={() => setRunSeq(s)} style={{ ...btn, background: runSeq?.id === s.id ? GOLD : 'rgba(255,255,255,0.04)', color: runSeq?.id === s.id ? '#1a1206' : INK, border: 'none' }}>{s.name} · {s.steps.length}</button>
+                      <button key={s.id} onClick={() => setRunSeq(s)} style={{ ...btn, background: runSeq?.id === s.id ? 'rgba(255,255,255,0.08)' : FIELD_BG, color: runSeq?.id === s.id ? INK : '#A1A1AA', border: `1px solid ${runSeq?.id === s.id ? 'rgba(255,255,255,0.16)' : FIELD_EDGE}` }}>{s.name} · {s.steps.length}</button>
                     ))}
                     {runSeq?.id && <button style={{ ...btn, color: '#F87171' }} onClick={() => { deleteSequence(runSeq.id!); setRunSeq(null); loadSeq() }}>Supprimer</button>}
                   </div>
                   {runSeq && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(216,180,254,0.12)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 8, background: 'transparent', border: `1px solid ${EDGE}` }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <button style={btn} onClick={() => setPicker(true)}>{runVid ? `Vidéo : ${runVid.title}` : 'Choisir une vidéo'}</button>
-                        <span style={{ fontSize: 11, color: MUTED }}>{runSel.size} iPhone(s) coché(s)</span>
-                        <button style={{ ...btn, marginLeft: 'auto', background: GOLD, color: '#1a1206', border: 'none', opacity: runSel.size && !running ? 1 : 0.5 }} disabled={!runSel.size || running} onClick={launchRun}>{running ? 'Envoi…' : 'Lancer la publication'}</button>
+                        <span style={{ fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{runSel.size} iPhone(s) coché(s)</span>
+                        <button style={{ ...btn, ...BTN_PRIMARY, marginLeft: 'auto', opacity: runSel.size && !running ? 1 : 0.4 }} disabled={!runSel.size || running} onClick={launchRun}>{running ? 'Envoi…' : 'Lancer la publication'}</button>
                       </div>
                       <input value={runCaption} onChange={e => setRunCaption(e.target.value)} placeholder="Légende (remplace l'étape marquée « comme légende »)"
-                        style={{ width: '100%', boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-                      {logs.length > 0 && <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 180, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
+                        style={{ ...fieldStyle, width: '100%' }} />
+                      {logs.length > 0 && <div style={{ ...logStyle, maxHeight: 180 }}>{logs.join('\n')}</div>}
                     </div>
                   )}
                 </div>
@@ -342,19 +352,19 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
                 (bouton « 📦 Publier » sur chaque carte iPhone → panneau dédié). */}
 
             {/* Test : sélection de container par VISION (OCR du sélecteur Crane) */}
-            <Card style={{ padding: 18, marginBottom: 16 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: INK, marginBottom: 4 }}>🧪 Test — aller à un container (vision)</div>
-              <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Ouvre Instagram, lit le sélecteur Crane à l'écran et tape le bon container (scroll auto). Vérifie la fiabilité sur 1 iPhone avant qu'on construise la boucle de post.</p>
+            <Card style={{ padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginBottom: 4 }}>🧪 Test — aller à un container (vision)</div>
+              <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED, lineHeight: 1.55 }}>Ouvre Instagram, lit le sélecteur Crane à l'écran et tape le bon container (scroll auto). Vérifie la fiabilité sur 1 iPhone avant qu'on construise la boucle de post.</p>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <select value={testDev || devices[0]?.public_id || ''} onChange={e => setTestDev(e.target.value)}
-                  style={{ height: 34, padding: '0 10px', borderRadius: 8, background: '#171410', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
-                  {devices.map(d => <option key={d.public_id} value={d.public_id} style={{ background: '#171410' }}>{d.name || d.public_id}</option>)}
+                  style={{ ...selStyle, padding: '0 10px' }}>
+                  {devices.map(d => <option key={d.public_id} value={d.public_id} style={optStyle}>{d.name || d.public_id}</option>)}
                 </select>
                 <input value={testTarget} onChange={e => setTestTarget(e.target.value)} placeholder="Container (ex. 12 ou Default)"
-                  style={{ height: 34, width: 200, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-                <button style={{ ...btn, background: GOLD, color: '#1a1206', border: 'none', opacity: testTarget.trim() && !testing ? 1 : 0.5 }} disabled={!testTarget.trim() || testing} onClick={runVisionTest}>{testing ? 'Test en cours…' : 'Tester'}</button>
+                  style={{ ...fieldStyle, width: 200, maxWidth: '100%' }} />
+                <button style={{ ...btn, ...BTN_PRIMARY, opacity: testTarget.trim() && !testing ? 1 : 0.4 }} disabled={!testTarget.trim() || testing} onClick={runVisionTest}>{testing ? 'Test en cours…' : 'Tester'}</button>
               </div>
-              {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
+              {logs.length > 0 && <div style={{ ...logStyle, marginTop: 12, maxHeight: 200 }}>{logs.join('\n')}</div>}
             </Card>
 
             {/* Grille des appareils */}
@@ -365,17 +375,17 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
                 return (
                   <Card key={d.public_id} style={{ padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ position: 'relative', width: 40, height: 40, borderRadius: 12, display: 'grid', placeItems: 'center', color: '#D8B4FE', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)' }}>📱
-                        <span style={{ position: 'absolute', right: -2, bottom: -2, width: 10, height: 10, borderRadius: 99, background: on ? '#34D399' : '#EF4444', boxShadow: '0 0 0 2px #17111F' }} /></span>
+                      <span style={{ position: 'relative', width: 32, height: 32, borderRadius: 6, display: 'grid', placeItems: 'center', fontSize: 15, color: ACCENT_TXT, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)' }}>📱
+                        <span style={{ position: 'absolute', right: -2, bottom: -2, width: 8, height: 8, borderRadius: 99, background: on ? '#4ADE80' : '#F87171', boxShadow: '0 0 0 2px #111113' }} /></span>
                       <span style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name ?? d.public_id}</div>
-                        <div style={{ fontSize: 11, color: MUTED }}>{d.model ?? 'iPhone'}</div>
+                        <div style={{ fontSize: 12, color: MUTED }}>{d.model ?? 'iPhone'}</div>
                       </span>
-                      {runSeq && <span onClick={() => toggleRun(d.public_id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 5, cursor: 'pointer', flexShrink: 0, background: checked ? GOLD : 'transparent', border: checked ? 'none' : '1px solid rgba(216,180,254,0.3)', color: '#1a1206', fontSize: 11, fontWeight: 900 }}>{checked ? '✓' : ''}</span>}
+                      {runSeq && <span onClick={() => toggleRun(d.public_id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 5, cursor: 'pointer', flexShrink: 0, background: checked ? ACCENT : 'transparent', border: checked ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{checked ? '✓' : ''}</span>}
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                      <button onClick={() => setLive(d)} style={{ ...btn, flex: 1, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.3)', color: '#D8B4FE' }}>Contrôler</button>
-                      <button onClick={() => openPublish(d)} style={{ ...btn, flex: 1, background: GOLD, border: 'none', color: '#1a1206', fontWeight: 600 }}>📦 Publier</button>
+                      <button onClick={() => setLive(d)} style={{ ...btn, flex: 1 }}>Contrôler</button>
+                      <button onClick={() => openPublish(d)} style={{ ...btn, ...BTN_PRIMARY, flex: 1 }}>📦 Publier</button>
                     </div>
                   </Card>
                 )
@@ -390,19 +400,19 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
       )}
 
       {publishDev && !picker && createPortal(
-        <div onClick={() => !runningMulti && setPublishDev(null)} style={{ position: 'fixed', inset: 0, zIndex: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(4,3,8,0.8)', backdropFilter: 'blur(6px)' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.16)' }}>
+        <div onClick={() => !runningMulti && setPublishDev(null)} style={{ position: 'fixed', inset: 0, zIndex: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(0,0,0,0.6)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', padding: 20, borderRadius: 10, background: '#111113', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: INK }}>📦 Publier — {publishDev.name ?? publishDev.public_id}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>📦 Publier — {publishDev.name ?? publishDev.public_id}</div>
               <button style={{ ...btn, marginLeft: 'auto', padding: '0 10px' }} onClick={() => !runningMulti && setPublishDev(null)}>Fermer</button>
             </div>
-            <p style={{ margin: '0 0 14px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Définis les containers de cet iPhone (une fois), coche ceux à publier, assigne une vidéo + une légende à chacun. Pour chaque container coché : ouverture (vision) → injection de sa vidéo → publication du Reel (OCR).</p>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: MUTED, lineHeight: 1.55 }}>Définis les containers de cet iPhone (une fois), coche ceux à publier, assigne une vidéo + une légende à chacun. Pour chaque container coché : ouverture (vision) → injection de sa vidéo → publication du Reel (OCR).</p>
 
             {/* Gestion des noms de containers */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
               <input value={newContainer} onChange={e => setNewContainer(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addContainer() }} placeholder="Nom du container (ex. 6, Default…)"
-                style={{ flex: 1, minWidth: 180, boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
-              <button style={{ ...btn, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.3)', color: '#D8B4FE' }} onClick={addContainer}>+ Ajouter</button>
+                style={{ ...fieldStyle, flex: 1, minWidth: 180 }} />
+              <button style={btn} onClick={addContainer}>+ Ajouter</button>
             </div>
 
             {jobs.length === 0 ? (
@@ -410,14 +420,14 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                 {jobs.map((j, i) => (
-                  <div key={j.container} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: 10, borderRadius: 10, background: j.on ? 'rgba(233,196,106,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${j.on ? 'rgba(233,196,106,0.28)' : 'rgba(216,180,254,0.12)'}` }}>
+                  <div key={j.container} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: 10, borderRadius: 8, background: j.on ? 'rgba(255,255,255,0.03)' : 'transparent', border: `1px solid ${j.on ? 'rgba(255,255,255,0.12)' : EDGE}` }}>
                     <span onClick={() => setJobs(js => js.map((x, k) => k === i ? { ...x, on: !x.on } : x))}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, cursor: 'pointer', flexShrink: 0, background: j.on ? GOLD : 'transparent', border: j.on ? 'none' : '1px solid rgba(216,180,254,0.3)', color: '#1a1206', fontSize: 12, fontWeight: 900 }}>{j.on ? '✓' : ''}</span>
-                    <span style={{ minWidth: 60, fontSize: 12.5, fontWeight: 600, color: GOLD }}>{j.container}</span>
-                    <button style={{ ...btn, background: j.vid ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)', border: j.vid ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(216,180,254,0.14)' }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 5, cursor: 'pointer', flexShrink: 0, background: j.on ? ACCENT : 'transparent', border: j.on ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{j.on ? '✓' : ''}</span>
+                    <span style={{ minWidth: 60, fontSize: 13, fontWeight: 500, color: INK, fontFamily: MONO }}>{j.container}</span>
+                    <button style={{ ...btn, color: j.vid ? '#4ADE80' : '#E4E4E7' }}
                       onClick={() => { setPickingFor(i); setPicker(true) }}>{j.vid ? `🎞 ${j.vid.title.slice(0, 18)}` : 'Vidéo'}</button>
                     <input value={j.caption} onChange={e => { const v = e.target.value; setJobs(js => js.map((x, k) => k === i ? { ...x, caption: v } : x)) }} placeholder="Légende"
-                      style={{ flex: 1, minWidth: 120, boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12, outline: 'none' }} />
+                      style={{ ...fieldStyle, flex: 1, minWidth: 120 }} />
                     <button style={{ ...btn, color: '#F87171', padding: '0 9px' }} title="Retirer ce container" onClick={() => removeContainer(j.container)}>✕</button>
                   </div>
                 ))}
@@ -425,28 +435,28 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
             )}
 
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, color: MUTED }}>{jobs.filter(j => j.on && j.vid).length} container(s) prêt(s)</span>
-              <button style={{ ...btn, marginLeft: 'auto', background: GOLD, color: '#1a1206', border: 'none', fontWeight: 600, opacity: jobs.some(j => j.on && j.vid) && !runningMulti ? 1 : 0.5 }}
+              <span style={{ fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{jobs.filter(j => j.on && j.vid).length} container(s) prêt(s)</span>
+              <button style={{ ...btn, ...BTN_PRIMARY, marginLeft: 'auto', opacity: jobs.some(j => j.on && j.vid) && !runningMulti ? 1 : 0.4 }}
                 disabled={!jobs.some(j => j.on && j.vid) || runningMulti} onClick={runContainerJobs}>
                 {runningMulti ? 'Publication…' : `Publier ${jobs.filter(j => j.on && j.vid).length} container(s)`}
               </button>
             </div>
-            {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 240, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
+            {logs.length > 0 && <div style={{ ...logStyle, marginTop: 12, maxHeight: 240 }}>{logs.join('\n')}</div>}
           </div>
         </div>,
         document.body,
       )}
 
       {pendingSteps && createPortal(
-        <div onClick={() => setPendingSteps(null)} style={{ position: 'fixed', inset: 0, zIndex: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4,3,8,0.78)', backdropFilter: 'blur(6px)' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: 380, maxWidth: '92vw', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.14)' }}>
+        <div onClick={() => setPendingSteps(null)} style={{ position: 'fixed', inset: 0, zIndex: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 380, maxWidth: '92vw', padding: 20, borderRadius: 10, background: '#111113', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>Enregistrer la séquence</div>
-            <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED }}>{pendingSteps.length} étapes capturées.</p>
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>{pendingSteps.length} étapes capturées.</p>
             <input value={seqName} onChange={e => setSeqName(e.target.value)} placeholder="Nom (ex. Publier Reel Insta)" autoFocus
-              style={{ width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12.5, outline: 'none', marginBottom: 12 }} />
+              style={{ ...fieldStyle, width: '100%', marginBottom: 12 }} />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button style={btn} onClick={() => setPendingSteps(null)}>Annuler</button>
-              <button style={{ ...btn, background: GOLD, color: '#1a1206', border: 'none' }} onClick={saveRecorded}>Enregistrer</button>
+              <button style={{ ...btn, ...BTN_PRIMARY }} onClick={saveRecorded}>Enregistrer</button>
             </div>
           </div>
         </div>,
@@ -738,27 +748,27 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         right={<BlowBtn label={running ? `Génération… ${Math.round(progress * 100)}%` : 'Générer'} onClick={generate} />} />
 
       {/* Presets : réglages + légendes mémorisés, rechargeables en 1 clic */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12, padding: '9px 13px', borderRadius: 12, background: 'rgba(233,196,106,0.05)', border: '1px solid rgba(233,196,106,0.18)' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: GOLD }}>Presets</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: '#111113', border: `1px solid ${EDGE}` }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: MUTED }}>Presets</span>
         <select value={presetSel} onChange={e => { const v = e.target.value; if (v) doLoadPreset(v); else setPresetSel('') }}
-          style={{ height: 30, padding: '0 8px', borderRadius: 8, border: '1px solid rgba(233,196,106,0.28)', background: '#171410', color: INK, fontSize: 12, fontWeight: 600, outline: 'none', minWidth: 180, cursor: 'pointer' }}>
-          <option value="" style={{ background: '#171410' }}>{presets.length ? '— Charger un preset —' : 'Aucun preset enregistré'}</option>
-          {presets.map(p => <option key={p.name} value={p.name} style={{ background: '#171410' }}>{p.name}</option>)}
+          style={{ ...selStyle, minWidth: 180 }}>
+          <option value="" style={optStyle}>{presets.length ? '— Charger un preset —' : 'Aucun preset enregistré'}</option>
+          {presets.map(p => <option key={p.name} value={p.name} style={optStyle}>{p.name}</option>)}
         </select>
         <BlowBtn label="Enregistrer" onClick={doSavePreset} />
         {presetSel && <BlowBtn label="Supprimer" ghost onClick={doDeletePreset} />}
-        <span style={{ marginLeft: 'auto', fontSize: 10.5, color: MUTED }}>Tes réglages sont mémorisés automatiquement</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#71717A' }}>Tes réglages sont mémorisés automatiquement</span>
       </div>
 
-      <Card style={{ padding: 18, marginBottom: 12 }}>
+      <Card style={{ padding: 16, marginBottom: 12 }}>
         {/* Source */}
         <Grp title="Source">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <BlowBtn ghost label={sources.length ? `${sources.length} vidéo(s)` : 'Choisir dans la banque'} onClick={() => setPicker(true)} />
-            <button onClick={() => fileRef.current?.click()} disabled={!!uploading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 11, cursor: uploading ? 'default' : 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.2)', color: '#D8B4FE', fontSize: 13, fontWeight: 600, opacity: uploading ? 0.6 : 1 }}>⬆ Mon PC</button>
+            <button onClick={() => fileRef.current?.click()} disabled={!!uploading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 6, cursor: uploading ? 'default' : 'pointer', ...BTN_GHOST, fontSize: 13, fontWeight: 500, opacity: uploading ? 0.4 : 1 }}>⬆ Mon PC</button>
             <input ref={fileRef} type="file" accept="video/*" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files) importFromPC(e.target.files); e.target.value = '' }} />
-            {uploading && <span style={{ fontSize: 11, color: GOLD }}>Envoi : {uploading}</span>}
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
+            {uploading && <span style={{ fontSize: 12, color: '#FBBF24' }}>Envoi : {uploading}</span>}
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
           </div>
           <Fld label="Variantes / vidéo"><input type="number" min={1} max={12} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
           <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
@@ -777,7 +787,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                     const v = e.currentTarget.querySelector('video'); if (!v) return
                     if (v.paused) { e.currentTarget.parentElement?.querySelectorAll('video').forEach(o => { if (o !== v) o.pause() }); v.muted = false; v.play() } else v.pause()
                   }}
-                    style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 10, overflow: 'hidden', background: '#0d0913', border: '1px solid rgba(216,180,254,0.14)', cursor: url ? 'pointer' : 'default' }}>
+                    style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 6, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${EDGE}`, cursor: url ? 'pointer' : 'default' }}>
                     {url
                       ? <video src={url + '#t=0.3'} playsInline loop preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
@@ -800,17 +810,17 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           {burnCap && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginLeft: 49 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'rgba(255,255,255,0.03)', color: INK, fontSize: 12, fontWeight: 600 }}>📁 Choisir dans la banque</button>
-                {capPool.trim() && <button onClick={() => setCapPool('')} style={{ padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: MUTED, fontSize: 12, fontWeight: 600 }}>Vider</button>}
+                <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', ...BTN_GHOST, fontSize: 12, fontWeight: 500 }}>📁 Choisir dans la banque</button>
+                {capPool.trim() && <button onClick={() => setCapPool('')} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid transparent', background: 'transparent', color: '#A1A1AA', fontSize: 12, fontWeight: 500 }}>Vider</button>}
               </div>
-              <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne (distribuées entre les variantes)…\nEx : Sérieux là ?'} style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
+              <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne (distribuées entre les variantes)…\nEx : Sérieux là ?'} style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 6, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }} />
               <Fld label="Format"><Seg value={capStyle} onChange={setCapStyle} options={[{ v: 'snapchat', label: 'Snapchat' }, { v: 'outline', label: 'Contour' }]} /></Fld>
               <Fld label="Distribution"><Seg value={capMode} onChange={setCapMode} options={[{ v: 'seq', label: 'Séquentiel' }, { v: 'random', label: 'Aléatoire' }]} /></Fld>
               <Fld label="Position">
                 {!capManual ? <Seg value={capPos} onChange={setCapPos} options={[{ v: 'top', label: 'Haut' }, { v: 'center', label: 'Centre' }, { v: 'bottom', label: 'Bas' }]} />
                   : <span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>X <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ width: 90, accentColor: '#A855F7' }} /><span style={{ width: 30, color: INK }}>{capX}%</span></label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>Y <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ width: 90, accentColor: '#A855F7' }} /><span style={{ width: 30, color: INK }}>{capY}%</span></label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>X <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ width: 90, accentColor: ACCENT }} /><span style={{ width: 30, color: INK }}>{capX}%</span></label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>Y <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ width: 90, accentColor: ACCENT }} /><span style={{ width: 30, color: INK }}>{capY}%</span></label>
                   </span>}
               </Fld>
               <Sw on={capManual} onChange={setCapManual} label="Placement manuel" />
@@ -848,14 +858,14 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             </span>
           )}
         </Grp>
-        {running && <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 14 }}><div className="blow-prog" style={{ height: '100%', width: `${Math.round(progress * 100)}%`, backgroundImage: 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1,#EC4899)', transition: 'width .2s ease' }} /></div>}
-        {logs.length > 0 && <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 150, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>}
+        {running && <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 14 }}><div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: ACCENT, transition: 'width .2s ease' }} /></div>}
+        {logs.length > 0 && <div style={{ ...logStyle, marginTop: 12, maxHeight: 150 }}>{logs.join('\n')}</div>}
       </Card>
 
       <div className="blow-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
         {shortcuts.map(s => (
-          <button key={s.t} className="blow-card blow-tap" onClick={() => onNavigate?.(s.go)} style={{ textAlign: 'left', cursor: 'pointer', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.12)', boxShadow: '0 20px 50px -30px rgba(168,85,247,0.5)' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 6 }}>{s.t}</div>
+          <button key={s.t} onClick={() => onNavigate?.(s.go)} onMouseEnter={tileHoverOn} onMouseLeave={tileHoverOff} style={{ textAlign: 'left', cursor: 'pointer', padding: 16, borderRadius: 8, background: '#111113', border: `1px solid ${EDGE}`, transition: 'background .12s ease, border-color .12s ease' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginBottom: 4 }}>{s.t}</div>
             <div style={{ fontSize: 12, lineHeight: 1.55, color: MUTED }}>{s.d}</div>
           </button>
         ))}
@@ -900,15 +910,15 @@ function CaptionBankPicker({ user, org, onSelect, onClose }: {
   const toggle = (id: string) => setSelected(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   return createPortal(
     <div onClick={e => { if (e.target === e.currentTarget) onClose() }}
-      style={{ position: 'fixed', inset: 0, zIndex: 9600, background: 'rgba(6,6,8,0.92)', backdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: 'calc(100vh - 80px)', background: '#120C19', border: '1px solid rgba(216,180,254,0.16)', borderRadius: 16, display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(216,180,254,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: INK }}>Choisir des captions</span>
+      style={{ position: 'fixed', inset: 0, zIndex: 9600, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: 'calc(100vh - 80px)', background: '#111113', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, display: 'flex', flexDirection: 'column', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: INK }}>Choisir des captions</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 20 }}>×</button>
         </div>
         <div style={{ padding: '12px 20px' }}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…"
-            style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 13, outline: 'none' }} />
+            style={{ ...fieldStyle, width: '100%' }} />
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
           {loading ? <p style={{ fontSize: 12.5, color: MUTED }}>Chargement…</p>
@@ -916,17 +926,17 @@ function CaptionBankPicker({ user, org, onSelect, onClose }: {
             : filtered.map(it => {
               const on = selected.has(it.id)
               return (
-                <button key={it.id} onClick={() => toggle(it.id)} style={{ textAlign: 'left', padding: '9px 11px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${on ? 'rgba(168,85,247,0.6)' : 'rgba(216,180,254,0.12)'}`, background: on ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.02)' }}>
-                  {it.title && <div style={{ fontSize: 11, fontWeight: 600, color: on ? '#E9D5FF' : MUTED, marginBottom: 2 }}>{it.title}</div>}
-                  <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.45 }}>{it.content}</div>
+                <button key={it.id} onClick={() => toggle(it.id)} style={{ textAlign: 'left', padding: '9px 11px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${on ? 'rgba(168,85,247,0.45)' : EDGE}`, background: on ? 'rgba(255,255,255,0.05)' : 'transparent' }}>
+                  {it.title && <div style={{ fontSize: 11.5, fontWeight: 500, color: on ? ACCENT_TXT : MUTED, marginBottom: 2 }}>{it.title}</div>}
+                  <div style={{ fontSize: 13, color: INK, lineHeight: 1.45 }}>{it.content}</div>
                 </button>
               )
             })}
         </div>
-        <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(216,180,254,0.12)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: INK, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Annuler</button>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ height: 32, padding: '0 12px', borderRadius: 6, ...BTN_GHOST, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>Annuler</button>
           <button onClick={() => onSelect(items.filter(it => selected.has(it.id)).map(it => it.content).filter(Boolean))}
-            style={{ padding: '9px 16px', borderRadius: 10, border: 'none', background: GRAD, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: selected.size ? 1 : 0.5, pointerEvents: selected.size ? 'auto' : 'none' }}>
+            style={{ height: 32, padding: '0 12px', borderRadius: 6, ...BTN_PRIMARY, cursor: 'pointer', fontSize: 13, fontWeight: 500, opacity: selected.size ? 1 : 0.4, pointerEvents: selected.size ? 'auto' : 'none' }}>
             Ajouter {selected.size || ''}
           </button>
         </div>
@@ -947,14 +957,14 @@ export function BlowTools() {
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <Head title="Outils VIP" sub="Tous tes outils vidéo premium, au même endroit — gratuits." />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 12 }}>
         {TOOLS.map(t => (
-          <Card key={t.t} style={{ padding: 20 }}>
+          <Card key={t.t} style={{ padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: INK }}>{t.t}</span>
-              <span style={{ marginLeft: 'auto', padding: '3px 9px', borderRadius: 6, background: 'rgba(233,196,106,0.14)', border: `1px solid rgba(233,196,106,0.4)`, color: GOLD, fontSize: 10.5, fontWeight: 600 }}>{t.tag}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>{t.t}</span>
+              <span style={{ marginLeft: 'auto', padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: GOLD, fontSize: 11, fontWeight: 500 }}>{t.tag}</span>
             </div>
-            <p style={{ margin: '9px 0 0', fontSize: 12.5, lineHeight: 1.6, color: MUTED }}>{t.d}</p>
+            <p style={{ margin: '6px 0 0', fontSize: 12.5, lineHeight: 1.55, color: MUTED }}>{t.d}</p>
           </Card>
         ))}
       </div>

@@ -206,35 +206,35 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
         <PageHead title="Studio vidéo" sub="Une vidéo source, tous tes outils VIP — incrustation, montage, mixer, remix, spoof, sous-titres. Tout est gratuit, aucun crédit consommé." />
         {onNavigate && (
           <button onClick={() => onNavigate('blowContent')} style={{
-            display: 'flex', alignItems: 'center', gap: 15, width: '100%', padding: 18, marginBottom: 12, borderRadius: 12, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
-            background: 'linear-gradient(120deg, rgba(52,211,153,0.14), rgba(139,92,246,0.1))', border: '1px solid rgba(52,211,153,0.3)', transition: 'all .18s ease',
+            display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: 16, marginBottom: 12, borderRadius: 8, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
+            background: '#111113', border: '1px solid rgba(255,255,255,0.07)', transition: 'background .12s ease, border-color .12s ease',
           }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.6)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.3)'; e.currentTarget.style.transform = 'none' }}>
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: 'rgba(52,211,153,0.16)', border: '1px solid rgba(52,211,153,0.3)', color: '#34D399' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={19} /></span>
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#141416' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: '#4ADE80' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={15} /></span>
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 15, fontWeight: 600, color: '#F4F4F6' }}>Auto-contenu</span><Chip text="Recommandé" tone="ok" /></span>
-              <span style={{ fontSize: 12, lineHeight: 1.55, color: '#9C99AA' }}>Une source → X variantes uniques en un clic : légende (pool + style), coupe, micro-vitesse, mode Tendance et spoof (device/GPS).</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>Auto-contenu</span><Chip text="Recommandé" tone="ok" /></span>
+              <span style={{ fontSize: 12.5, lineHeight: 1.55, color: '#8B8B94' }}>Une source → X variantes uniques en un clic : légende (pool + style), coupe, micro-vitesse, mode Tendance et spoof (device/GPS).</span>
             </span>
-            <span style={{ display: 'flex', color: '#34D399' }}><Icon d="M9 18l6-6-6-6" size={17} /></span>
+            <span style={{ display: 'flex', color: '#71717A' }}><Icon d="M9 18l6-6-6-6" size={16} /></span>
           </button>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 12 }}>
           {TOOLS.map(t => (
             <button key={t.k} onClick={() => { setTool(t.k); setSrc(new Set()); setResults([]); setLogs([]); setOverlayImgs([]) }} style={{
-              display: 'flex', flexDirection: 'column', gap: 12, padding: 18, borderRadius: 10, background: '#101015', textAlign: 'left',
-              border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', transition: 'all .18s ease', boxSizing: 'border-box',
+              display: 'flex', flexDirection: 'column', gap: 12, padding: 16, borderRadius: 8, background: '#111113', textAlign: 'left',
+              border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', transition: 'background .12s ease, border-color .12s ease', boxSizing: 'border-box',
             }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = `rgba(${t.tone},0.4)`; e.currentTarget.style.background = '#13131A' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.background = '#101015' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, background: `rgba(${t.tone},0.12)`, border: `1px solid rgba(${t.tone},0.24)`, color: `rgb(${t.tone})` }}>
-                  <Icon d={t.i} size={16} />
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#141416' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: `rgb(${t.tone})` }}>
+                  <Icon d={t.i} size={15} />
                 </span>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#F4F4F6' }}>{t.t}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{t.t}</span>
                 <span style={{ marginLeft: 'auto' }}><Chip text={t.tag} tone="mute" /></span>
               </span>
-              <span style={{ fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>{t.d}</span>
+              <span style={{ fontSize: 12.5, lineHeight: 1.55, color: '#8B8B94' }}>{t.d}</span>
             </button>
           ))}
         </div>
@@ -251,7 +251,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
   const folders = [...new Set(videos.map(v => v.folder).filter((f): f is string => !!f))].sort()
   const per = hasSpoofOpts ? copies : 1
   const output = `${nSrc * per} fichier${nSrc * per > 1 ? 's' : ''}`
-  const numInp: React.CSSProperties = { width: 80, height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none', textAlign: 'right' }
+  const numInp: React.CSSProperties = { width: 80, height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', textAlign: 'right', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
@@ -259,8 +259,8 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
         <Chip text="Gratuit · 0 crédit" tone="ok" />
         <Btn theme={theme} tone="quiet" label="Retour" onClick={() => setTool(null)} />
       </>} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title={isImgTool ? 'Photos sources' : 'Vidéos sources'} sub={uploading ? `Import : ${uploading}` : `${nSrc} sélectionnée${nSrc > 1 ? 's' : ''}`} right={<>
               <Btn theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Banque" onClick={() => setPickerOpen(true)} />
@@ -268,20 +268,20 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
               <input ref={fileRef} type="file" accept="video/*,image/*" multiple style={{ display: 'none' }}
                 onChange={e => { if (e.target.files) importFromPC(e.target.files); e.target.value = '' }} />
             </>} />
-            {nSrc === 0 ? <div style={{ padding: 28, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>{isImgTool ? 'Aucune photo choisie.' : 'Aucune vidéo choisie.'}<br />Clique « Banque » ou « Mon PC ».</div> : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 13, maxHeight: 300, overflowY: 'auto' }}>
+            {nSrc === 0 ? <div style={{ padding: 28, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>{isImgTool ? 'Aucune photo choisie.' : 'Aucune vidéo choisie.'}<br />Clique « Banque » ou « Mon PC ».</div> : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 16, maxHeight: 300, overflowY: 'auto' }}>
                 {videos.filter(v => src.has(v.id)).map((v) => {
                   const on = src.has(v.id); const prev = thumbFor(v); const vid = isVid(v)
                   return (
                     <button key={v.id} onClick={() => toggleSrc(v.id)} title={v.title} style={{
-                      position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden',
-                      border: '1.5px solid ' + (on ? `rgb(${T.tone})` : 'rgba(255,255,255,0.07)'),
-                      background: `linear-gradient(160deg, rgba(${T.tone},0.16), rgba(${T.tone},0.035))`,
+                      position: 'relative', aspectRatio: '9 / 16', borderRadius: 6, padding: 0, cursor: 'pointer', overflow: 'hidden',
+                      border: '1px solid ' + (on ? theme.accent : 'rgba(255,255,255,0.07)'),
+                      background: '#161618',
                     }}>
                       {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
                         ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
-                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? `rgb(${T.tone})` : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accent : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     </button>
                   )
                 })}
@@ -290,31 +290,31 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
           </Panel>
           <Panel theme={theme}>
             <PanelHead title="Réglages" />
-            <div style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {hasSpoofOpts && (
                 <>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>{isImgTool ? 'Variantes par photo' : 'Variantes par vidéo'}</span>
+                    <span style={{ flex: 1, fontSize: 13, color: '#A1A1AA' }}>{isImgTool ? 'Variantes par photo' : 'Variantes par vidéo'}</span>
                     <input type="number" min={1} max={24} value={copies} onChange={e => setCopies(Number(e.target.value))} style={numInp} />
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Intensité anti-détection</span>
+                    <span style={{ flex: 1, fontSize: 13, color: '#A1A1AA' }}>Intensité anti-détection</span>
                     <select value={intensity} onChange={e => setIntensity(e.target.value as any)} style={{ ...numInp, width: 130, textAlign: 'left', cursor: 'pointer' }}>
-                      <option value="subtle" style={{ background: '#16161C' }}>Subtile</option>
-                      <option value="normal" style={{ background: '#16161C' }}>Normale</option>
-                      <option value="strong" style={{ background: '#16161C' }}>Forte</option>
+                      <option value="subtle" style={{ background: '#161618' }}>Subtile</option>
+                      <option value="normal" style={{ background: '#161618' }}>Normale</option>
+                      <option value="strong" style={{ background: '#161618' }}>Forte</option>
                     </select>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Localisation GPS</span>
+                    <span style={{ flex: 1, fontSize: 13, color: '#A1A1AA' }}>Localisation GPS</span>
                     <select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={{ ...numInp, width: 150, textAlign: 'left', cursor: 'pointer' }}>
-                      {GPS_CITIES.map(c => <option key={c.k} value={c.k} style={{ background: '#16161C' }}>{c.label}</option>)}
+                      {GPS_CITIES.map(c => <option key={c.k} value={c.k} style={{ background: '#161618' }}>{c.label}</option>)}
                     </select>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Appareil (spoof)</span>
+                    <span style={{ flex: 1, fontSize: 13, color: '#A1A1AA' }}>Appareil (spoof)</span>
                     <select value={device} onChange={e => setDevice(e.target.value)} style={{ ...numInp, width: 150, textAlign: 'left', cursor: 'pointer' }}>
-                      {SPOOF_DEVICES.map(d => <option key={d.k} value={d.k} style={{ background: '#16161C' }}>{d.label}</option>)}
+                      {SPOOF_DEVICES.map(d => <option key={d.k} value={d.k} style={{ background: '#161618' }}>{d.label}</option>)}
                     </select>
                   </label>
                 </>
@@ -322,11 +322,11 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
               {tool === 'montage' && (
                 <>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Début (s)</span>
+                    <span style={{ flex: 1, fontSize: 13, color: '#A1A1AA' }}>Début (s)</span>
                     <input type="number" min={0} step={0.1} value={trimStart} onChange={e => setTrimStart(Number(e.target.value))} style={numInp} />
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ flex: 1, fontSize: 12.5, color: '#A1A1AA' }}>Fin (s, vide = fin)</span>
+                    <span style={{ flex: 1, fontSize: 13, color: '#A1A1AA' }}>Fin (s, vide = fin)</span>
                     <input type="number" min={0} step={0.1} value={trimEnd} onChange={e => setTrimEnd(e.target.value)} placeholder="—" style={numInp} />
                   </label>
                 </>
@@ -334,30 +334,30 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
               {tool === 'mixer' && (
                 <>
                   <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={2} placeholder="Ta légende à incruster…"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }} />
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#A1A1AA', cursor: 'pointer' }}>
-                    <span onClick={() => setCapManual(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: capManual ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: capManual ? theme.accentBtn : 'rgba(255,255,255,0.1)' }}><span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} /></span>
+                    <span onClick={() => setCapManual(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: capManual ? 'flex-end' : 'flex-start', width: 30, height: 18, padding: 2, boxSizing: 'border-box', borderRadius: 99, background: capManual ? theme.accent : 'rgba(255,255,255,0.12)', transition: 'background .12s ease' }}><span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} /></span>
                     Placement manuel
                   </label>
                   {!capManual ? (
-                    <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
                       {(['top', 'center', 'bottom'] as const).map(p => (
-                        <button key={p} onClick={() => setCapPos(p)} style={{ flex: 1, height: 30, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, background: capPos === p ? theme.accentBtn : 'transparent', color: capPos === p ? '#fff' : '#A1A1AA' }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
+                        <button key={p} onClick={() => setCapPos(p)} style={{ flex: 1, height: 28, border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: capPos === p ? 'rgba(255,255,255,0.08)' : 'transparent', color: capPos === p ? '#EDEDEF' : '#8B8B94' }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
                       ))}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#A1A1AA' }}>
                         <span style={{ width: 78 }}>Horizontal</span>
-                        <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ flex: 1, accentColor: `rgb(${T.tone})` }} />
-                        <span style={{ width: 38, textAlign: 'right', color: '#E4E4E7' }}>{capX}%</span>
+                        <input type="range" min={0} max={100} value={capX} onChange={e => setCapX(Number(e.target.value))} style={{ flex: 1, accentColor: theme.accent }} />
+                        <span style={{ width: 38, textAlign: 'right', color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{capX}%</span>
                       </label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#A1A1AA' }}>
                         <span style={{ width: 78 }}>Vertical</span>
-                        <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ flex: 1, accentColor: `rgb(${T.tone})` }} />
-                        <span style={{ width: 38, textAlign: 'right', color: '#E4E4E7' }}>{capY}%</span>
+                        <input type="range" min={0} max={100} value={capY} onChange={e => setCapY(Number(e.target.value))} style={{ flex: 1, accentColor: theme.accent }} />
+                        <span style={{ width: 38, textAlign: 'right', color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{capY}%</span>
                       </label>
-                      <span style={{ fontSize: 10.5, color: '#52525B' }}>0 % = haut/gauche · 100 % = bas/droite. La légende est centrée sur ce point.</span>
+                      <span style={{ fontSize: 11.5, color: '#71717A' }}>0 % = haut/gauche · 100 % = bas/droite. La légende est centrée sur ce point.</span>
                     </div>
                   )}
                 </>
@@ -367,13 +367,13 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
                   <Btn theme={theme} sm tone="primary" icon="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" label={overlayImgs.length ? `${overlayImgs.length} photo(s)` : 'Choisir des photos'} onClick={() => setImgPicker(true)} />
                   {overlayImgs.map(im => <Chip key={im.id} text={im.title} tone="violet" />)}
                   {overlayImgs.length > 1 && (
-                    <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', marginLeft: 'auto' }}>
+                    <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', marginLeft: 'auto' }}>
                       {(['seq', 'random'] as const).map(mm => (
-                        <button key={mm} onClick={() => setOvMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: ovMode === mm ? theme.accentBtn : 'transparent', color: ovMode === mm ? '#fff' : '#71717A' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                        <button key={mm} onClick={() => setOvMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: ovMode === mm ? 'rgba(255,255,255,0.08)' : 'transparent', color: ovMode === mm ? '#EDEDEF' : '#8B8B94' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
                       ))}
                     </span>
                   )}
-                  <span style={{ width: '100%', fontSize: 11, color: '#52525B' }}>Photo incrustée au centre. Plusieurs photos → réparties entre les vidéos (séquentiel/aléatoire).</span>
+                  <span style={{ width: '100%', fontSize: 11.5, color: '#71717A' }}>Photo incrustée au centre. Plusieurs photos → réparties entre les vidéos (séquentiel/aléatoire).</span>
                 </div>
               )}
               {tool === 'subs' && (
@@ -387,42 +387,42 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
 
         <Panel theme={theme}>
           <PanelHead title="Sortie" />
-          <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 11 }}>
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {([[isImgTool ? 'Photos sources' : 'Vidéos sources', String(nSrc)], ['Sortie', output], ['Coût', 'Gratuit']] as [string, string][]).map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 600, color: k === 'Coût' ? '#34D399' : '#E4E4E7' }}>{v}</span>
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                <span style={{ color: '#8B8B94' }}>{k}</span><span style={{ fontWeight: 500, color: k === 'Coût' ? '#4ADE80' : '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{v}</span>
               </div>
             ))}
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
-              <span style={{ color: '#71717A' }}>Dossier de destination</span>
-              <select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={{ marginLeft: 'auto', height: 30, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12, outline: 'none', cursor: 'pointer', maxWidth: 150 }}>
-                <option value="" style={{ background: '#16161C' }}>Racine (aucun)</option>
-                {folders.map(f => <option key={f} value={f} style={{ background: '#16161C' }}>{f}</option>)}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
+              <span style={{ color: '#8B8B94' }}>Dossier de destination</span>
+              <select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={{ marginLeft: 'auto', height: 28, padding: '0 8px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12.5, outline: 'none', cursor: 'pointer', maxWidth: 150 }}>
+                <option value="" style={{ background: '#161618' }}>Racine (aucun)</option>
+                {folders.map(f => <option key={f} value={f} style={{ background: '#161618' }}>{f}</option>)}
               </select>
             </label>
 
             {running && (
-              <div style={{ height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: theme.accentBtn, transition: 'width .2s ease' }} />
+              <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: theme.accent, transition: 'width .2s ease' }} />
               </div>
             )}
 
             <Btn theme={theme} tone="primary" disabled={nSrc === 0 || running} icon="M5 3l14 9-14 9z"
               label={running ? `Traitement… ${Math.round(progress * 100)}%` : nSrc === 0 ? 'Choisis des sources' : 'Générer'} onClick={generate} />
-            <div style={{ fontSize: 10.5, color: '#52525B', textAlign: 'center', lineHeight: 1.5 }}>{isImgTool ? 'Traitement local instantané (aucun moteur à charger).' : 'Traitement local (ffmpeg) — le premier lancement charge le moteur (~30 Mo).'}</div>
+            <div style={{ fontSize: 11.5, color: '#71717A', textAlign: 'center', lineHeight: 1.5 }}>{isImgTool ? 'Traitement local instantané (aucun moteur à charger).' : 'Traitement local (ffmpeg) — le premier lancement charge le moteur (~30 Mo).'}</div>
 
             {logs.length > 0 && (
-              <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', maxHeight: 140, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>
+              <div style={{ padding: 10, borderRadius: 6, background: '#0E0E10', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 140, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>
             )}
 
             {results.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#34D399' }}>{results.length} sortie(s) · enregistrées dans la banque</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: '#4ADE80' }}>{results.length} sortie(s) · enregistrées dans la banque</span>
                 {results.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
-                    <a href={r.url} download={`${r.title}.${r.ext ?? 'mp4'}`} style={{ fontSize: 11, fontWeight: 600, color: theme.accentText, textDecoration: 'none' }}>Télécharger</a>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', height: 32, borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                    <a href={r.url} download={`${r.title}.${r.ext ?? 'mp4'}`} style={{ fontSize: 12, fontWeight: 500, color: theme.accentText, textDecoration: 'none' }}>Télécharger</a>
                   </div>
                 ))}
               </div>

@@ -65,17 +65,17 @@ interface Caption { id: string; title: string | null; content: string; used_coun
 type SortKey = 'recent' | 'name' | 'used'
 
 // ── Case à cocher de vignette (portée du prototype _tile) — cliquable ──────────
-function TileCheck({ on, onToggle }: { on: boolean; onToggle: (e: React.MouseEvent) => void }) {
+function TileCheck({ on, onToggle, accent = '#8B7CF6' }: { on: boolean; onToggle: (e: React.MouseEvent) => void; accent?: string }) {
   return (
     <span
       onClick={e => { e.stopPropagation(); onToggle(e) }}
       title="Sélectionner · Maj+clic pour sélectionner un intervalle"
       style={{
         position: 'absolute', top: 6, right: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 20, height: 20, borderRadius: 6, cursor: 'pointer', zIndex: 3,
-        background: on ? '#7C3AED' : 'rgba(11,11,15,0.72)',
+        width: 18, height: 18, borderRadius: 4, cursor: 'pointer', zIndex: 3,
+        background: on ? accent : 'rgba(10,10,11,0.7)',
         border: on ? 'none' : '1px solid rgba(255,255,255,0.22)',
-        color: '#fff', fontSize: 10, fontWeight: 900,
+        color: '#fff', fontSize: 10, fontWeight: 600,
       }}>{on ? '✓' : ''}</span>
   )
 }
@@ -101,14 +101,13 @@ function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin = '400px
 function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu }: {
   item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: (e: React.MouseEvent) => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
 }) {
-  const h = hueFor(item.id)
   const fresh = (item.used_count ?? 0) === 0
   const dur = type === 'video' ? fmtDuration(item.duration) : ''
   const btnRef = useRef<HTMLButtonElement>(null)
   const inView = useInView(btnRef)
   const placeholder: CSSProperties = {
     position: 'absolute', inset: 0,
-    background: `repeating-linear-gradient(135deg, rgba(${h},0.20), rgba(${h},0.20) 7px, rgba(${h},0.05) 7px, rgba(${h},0.05) 14px)`,
+    background: '#161618',
   }
   return (
     <button
@@ -119,10 +118,10 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
       onDragStart={onDragStart}
       title="Clic pour lire · clic droit pour les actions · carré pour sélectionner"
       style={{
-        position: 'relative', aspectRatio: type === 'image' ? '4 / 5' : '9 / 16', borderRadius: 9, padding: 0,
-        cursor: 'pointer', overflow: 'hidden', transition: 'all .14s ease',
-        border: `1.5px solid ${on ? theme.accentBtnEdge : 'rgba(255,255,255,0.07)'}`,
-        background: `linear-gradient(160deg, rgba(${h},0.17), rgba(${h},0.035))`,
+        position: 'relative', aspectRatio: type === 'image' ? '4 / 5' : '9 / 16', borderRadius: 6, padding: 0,
+        cursor: 'pointer', overflow: 'hidden', transition: 'border-color .12s ease',
+        border: `1px solid ${on ? theme.accent : 'rgba(255,255,255,0.07)'}`,
+        background: '#161618',
       }}
     >
       {thumb
@@ -137,25 +136,25 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
             ? <img src={media} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={placeholder} />}
 
-      <TileCheck on={on} onToggle={onToggle} />
+      <TileCheck on={on} onToggle={onToggle} accent={theme.accent} />
 
       {fresh && (
         <span style={{
-          position: 'absolute', top: 6, left: 6, padding: '2px 6px', borderRadius: 4,
-          background: 'rgba(16,185,129,0.9)', color: '#04140C', fontSize: 8, fontWeight: 600, letterSpacing: '0.05em',
+          position: 'absolute', top: 6, left: 6, display: 'inline-flex', alignItems: 'center', height: 16, padding: '0 5px', boxSizing: 'border-box', borderRadius: 4,
+          background: 'rgba(10,10,11,0.75)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ADE80', fontSize: 9.5, fontWeight: 500,
         }}>NEUF</span>
       )}
 
       <span style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, padding: '14px 7px 6px',
-        display: 'flex', alignItems: 'center', gap: 5,
-        background: 'linear-gradient(180deg, transparent, rgba(8,8,12,0.9))',
+        position: 'absolute', left: 0, right: 0, bottom: 0, padding: '16px 8px 6px',
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'linear-gradient(180deg, transparent, rgba(10,10,11,0.85))',
       }}>
         <span style={{
-          flex: 1, minWidth: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: 8.5,
-          color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          flex: 1, minWidth: 0, fontSize: 11, fontWeight: 500, textAlign: 'left',
+          color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>{item.title}</span>
-        {dur && <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 8, color: 'rgba(255,255,255,0.42)' }}>{dur}</span>}
+        {dur && <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{dur}</span>}
       </span>
     </button>
   )
@@ -654,18 +653,18 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   function Seg({ children }: { children: React.ReactNode }) {
     return (
       <span style={{
-        display: 'flex', gap: 2, padding: 2, borderRadius: 8,
-        background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', gap: 2, padding: 2, borderRadius: 7,
+        background: '#111113', border: '1px solid rgba(255,255,255,0.07)',
       }}>{children}</span>
     )
   }
   function SegBtn({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
     return (
       <button onClick={onClick} style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 10px',
-        border: 'none', borderRadius: 6, cursor: 'pointer',
-        background: on ? `rgba(${theme.tone},0.16)` : 'transparent',
-        color: on ? theme.accentText : '#71717A', fontSize: 11, fontWeight: 600, transition: 'all .14s ease',
+        display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px',
+        border: 'none', borderRadius: 5, cursor: 'pointer',
+        background: on ? 'rgba(255,255,255,0.08)' : 'transparent',
+        color: on ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
       }}>{children}</button>
     )
   }
@@ -684,14 +683,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         else setNotice('Dépose des vidéos ou des images.')
       }}>
       {showTrash && (
-        <div onClick={() => setShowTrash(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px,96vw)', maxHeight: '82vh', overflowY: 'auto', borderRadius: 16, background: theme.panelBg, border: `1px solid ${theme.panelEdge}`, padding: 18 }}>
+        <div onClick={() => setShowTrash(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px,96vw)', maxHeight: '82vh', overflowY: 'auto', borderRadius: 10, background: '#111113', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.7)', padding: 18, boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <span style={{ fontSize: 16, fontWeight: 600, color: theme.accentText }}>🗑 Corbeille ({trash.length})</span>
-              <button onClick={() => setShowTrash(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: theme.accentText, fontSize: 20, cursor: 'pointer' }}>×</button>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.015em' }}>🗑 Corbeille ({trash.length})</span>
+              <button onClick={() => setShowTrash(false)} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: 'none', border: 'none', color: '#8B8B94', fontSize: 18, cursor: 'pointer' }}>×</button>
             </div>
-            <p style={{ margin: '0 0 12px', fontSize: 12, opacity: 0.7 }}>Médias supprimés — restaurables 7 jours puis purgés définitivement.</p>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#8B8B94' }}>Médias supprimés — restaurables 7 jours puis purgés définitivement.</p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               <Btn theme={theme} sm tone="primary" label="Tout restaurer" onClick={() => { restoreMedia(trash.map(t => t.id)); setShowTrash(false) }} />
               <Btn theme={theme} sm tone="quiet" label="Vider définitivement" onClick={() => { if (confirm('Supprimer DÉFINITIVEMENT tous les médias de la corbeille ?')) { purgeMedia(trash); setShowTrash(false) } }} />
             </div>
@@ -699,11 +698,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               {trash.map(t => {
                 const days = t.deleted_at ? Math.max(0, 7 - Math.floor((Date.now() - new Date(t.deleted_at).getTime()) / 86400000)) : 7
                 return (
-                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: `1px solid ${theme.panelEdge}` }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
-                    <span style={{ fontSize: 10.5, opacity: 0.6 }}>purge dans {days}j</span>
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px 6px 12px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                    <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>purge dans {days}j</span>
                     <Btn theme={theme} sm tone="quiet" label="Restaurer" onClick={() => restoreMedia([t.id])} />
-                    <button onClick={() => { if (confirm('Supprimer définitivement ce média ?')) purgeMedia([t]) }} title="Supprimer définitivement" style={{ background: 'none', border: 'none', color: '#F87171', fontWeight: 900, fontSize: 16, cursor: 'pointer' }}>×</button>
+                    <button onClick={() => { if (confirm('Supprimer définitivement ce média ?')) purgeMedia([t]) }} title="Supprimer définitivement" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: 'none', border: 'none', color: '#F87171', fontWeight: 500, fontSize: 16, cursor: 'pointer' }}>×</button>
                   </div>
                 )
               })}
@@ -714,23 +713,23 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {dragFiles && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          borderRadius: 14, border: `2px dashed rgba(${theme.tone},0.7)`, background: 'rgba(11,11,15,0.82)', pointerEvents: 'none',
+          borderRadius: 8, border: `1px dashed rgba(${theme.tone},0.6)`, background: 'rgba(10,10,11,0.85)', pointerEvents: 'none',
         }}>
-          <div style={{ textAlign: 'center', color: '#F4F4F6' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, color: theme.accentText }}><Icon d="M12 3v12|M7 10l5 5 5-5|M4 21h16" size={34} /></div>
-            <div style={{ fontFamily: 'inherit', fontSize: 17, fontWeight: 600 }}>Dépose pour importer</div>
-            <div style={{ fontSize: 12.5, color: '#A1A1AA', marginTop: 4 }}>Vidéos et images{folder !== 'Tous' && folder !== 'Jamais publiées' ? ` → dossier « ${folder} »` : ''}</div>
+          <div style={{ textAlign: 'center', color: '#EDEDEF' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, color: theme.accentText }}><Icon d="M12 3v12|M7 10l5 5 5-5|M4 21h16" size={24} /></div>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.015em' }}>Dépose pour importer</div>
+            <div style={{ fontSize: 13, color: '#8B8B94', marginTop: 4 }}>Vidéos et images{folder !== 'Tous' && folder !== 'Jamais publiées' ? ` → dossier « ${folder} »` : ''}</div>
           </div>
         </div>
       )}
       {/* En-tête */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
           <h1 style={{
-            margin: 0, fontFamily: 'inherit', fontSize: 22,
-            fontWeight: 600, letterSpacing: '-0.025em', color: '#F4F4F6',
+            margin: 0, fontSize: 22, lineHeight: 1.2,
+            fontWeight: 600, letterSpacing: '-0.025em', color: '#EDEDEF',
           }}>Banque de contenu</h1>
-          <p style={{ margin: '6px 0 0', fontSize: 12.5, lineHeight: 1.55, color: '#71717A', maxWidth: 620 }}>
+          <p style={{ margin: '6px 0 0', fontSize: 13, lineHeight: 1.55, color: '#8B8B94', maxWidth: 620 }}>
             {loading
               ? 'Toutes tes vidéos et images, organisées par dossier.'
               : total === 0
@@ -746,14 +745,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       </div>
 
       {/* Corps : colonne Dossiers + grille */}
-      <div style={{ display: 'grid', gridTemplateColumns: '196px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '196px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         {/* Dossiers */}
         <Panel theme={theme}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 8px 8px 16px', minHeight: 48, boxSizing: 'border-box',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
           }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#F4F4F6' }}>Dossiers</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>Dossiers</span>
             <span style={{ marginLeft: 'auto' }}>
               <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Nouveau dossier" onClick={() => { setFolderName(''); setFolderModal(true) }} />
             </span>
@@ -770,25 +769,25 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   onDragLeave={() => setDragOver(d => d === f.n ? null : d)}
                   onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDragOver(null); if (id) dropOnFolder(f.n, id) }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 13px',
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 34, padding: '0 16px',
                     border: 'none', cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
-                    borderLeft: `2px solid ${dragOver === f.n ? theme.accent : on ? theme.accentBtnEdge : 'transparent'}`,
-                    background: dragOver === f.n ? `rgba(${theme.tone},0.16)` : on ? `rgba(${theme.tone},0.07)` : 'transparent', transition: 'all .14s ease',
+                    outline: dragOver === f.n ? `1px dashed ${theme.selEdge}` : 'none', outlineOffset: -3,
+                    background: dragOver === f.n ? theme.selBg : on ? 'rgba(255,255,255,0.06)' : 'transparent', transition: 'background .12s ease',
                   }}
-                  onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.025)' }}
-                  onMouseLeave={e => { if (dragOver !== f.n) e.currentTarget.style.background = on ? `rgba(${theme.tone},0.07)` : 'transparent' }}
+                  onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+                  onMouseLeave={e => { if (dragOver !== f.n) e.currentTarget.style.background = on ? 'rgba(255,255,255,0.06)' : 'transparent' }}
                 >
-                  <span style={{ display: 'flex', color: f.special ? '#34D399' : on ? theme.accentSoft : '#52525B' }}>
+                  <span style={{ display: 'flex', color: f.special ? '#4ADE80' : on ? theme.accentText : '#71717A' }}>
                     <Icon d={f.special ? 'M12 2v20|M2 12h20' : 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z'} size={13} />
                   </span>
                   <span style={{
-                    flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: on ? 700 : 600,
-                    color: on ? '#F4F4F6' : f.special ? '#A7F3D0' : '#A1A1AA',
+                    flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500,
+                    color: on ? '#EDEDEF' : '#A1A1AA',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>{f.n}</span>
                   <span style={{
-                    fontFamily: "'JetBrains Mono',monospace", fontSize: 10,
-                    color: on ? 'rgba(196,181,253,0.7)' : '#3F3F46',
+                    fontSize: 11.5, fontVariantNumeric: 'tabular-nums',
+                    color: on ? '#A1A1AA' : '#5A5A63',
                   }}>{f.c}</span>
                 </button>
               )
@@ -800,32 +799,32 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         <Panel theme={theme}>
           {/* Barre d'outils : onglets de type + recherche + tri */}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 9, padding: '11px 13px',
-            borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap',
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', minHeight: 48, boxSizing: 'border-box',
+            borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap',
           }}>
             <Seg>
               {TABS.map(t => (
                 <SegBtn key={t.k} on={tab === t.k} onClick={() => { setTab(t.k); setFolder('Tous') }}>
                   {t.l}
-                  <span style={{ opacity: 0.55, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{loading ? '' : t.n}</span>
+                  <span style={{ color: '#71717A', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{loading ? '' : t.n}</span>
                 </SegBtn>
               ))}
             </Seg>
 
-            <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)' }} />
+            <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.08)' }} />
 
             <span style={{
-              display: 'flex', alignItems: 'center', gap: 8, height: 28, padding: '0 11px', borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: 8, height: 28, padding: '0 10px', borderRadius: 6, boxSizing: 'border-box',
               flex: '0 1 200px', minWidth: 132,
-              border: `1px solid ${q ? theme.selEdge : 'rgba(255,255,255,0.07)'}`,
-              background: 'rgba(255,255,255,0.02)', transition: 'border-color .16s ease',
+              border: `1px solid ${q ? theme.selEdge : 'rgba(255,255,255,0.09)'}`,
+              background: '#161618', transition: 'border-color .12s ease',
             }}>
-              <span style={{ display: 'flex', color: q ? theme.accentSoft : '#52525B', flexShrink: 0 }}>
+              <span style={{ display: 'flex', color: q ? theme.accentText : '#71717A', flexShrink: 0 }}>
                 <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-4.35-4.35" size={12} sw={2} />
               </span>
               <input
                 type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…"
-                style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#F4F4F6', fontSize: 11.5 }}
+                style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#EDEDEF', fontSize: 12.5 }}
               />
             </span>
 
@@ -839,45 +838,45 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               const allSel = shown.every(m => sel.has(m.id))
               return (
                 <button onClick={() => setSel(allSel ? new Set() : new Set(shown.map(m => m.id)))}
-                  style={{ marginLeft: 'auto', height: 28, padding: '0 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${allSel ? theme.selEdge : 'rgba(255,255,255,0.09)'}`, background: allSel ? `rgba(${theme.tone},0.14)` : 'rgba(255,255,255,0.03)', color: allSel ? theme.accentText : '#D4D4D8', fontSize: 11.5, fontWeight: 600 }}>
+                  style={{ marginLeft: 'auto', height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${allSel ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.09)'}`, background: allSel ? 'rgba(255,255,255,0.07)' : '#161618', color: allSel ? '#EDEDEF' : '#E4E4E7', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' }}>
                   {allSel ? 'Tout désélectionner' : `Tout sélectionner (${shown.length})`}
                 </button>
               )
             })()}
 
-            <span style={{ marginLeft: (tab !== 'caption' && shown.length > 0) ? 12 : 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#52525B' }}>
+            <span style={{ marginLeft: (tab !== 'caption' && shown.length > 0) ? 12 : 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
               {loading ? el : sel.size ? `${sel.size} sélectionnée${sel.size > 1 ? 's' : ''}` : `${folder} · ${shown.length} affichée${shown.length > 1 ? 's' : ''}`}
             </span>
           </div>
 
           {/* Contenu */}
           {tab === 'caption' ? (
-            <div style={{ padding: 13 }}>
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: '#71717A' }}>Des légendes réutilisables pour tes posts et stories.</span>
+            <div style={{ padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, color: '#8B8B94' }}>Des légendes réutilisables pour tes posts et stories.</span>
                 <span style={{ marginLeft: 'auto' }}><Btn label="Nouvelle légende" theme={theme} sm tone="primary" icon="M12 5v14|M5 12h14" onClick={() => { setCapTitle(''); setCapContent(''); setCapOpen(true) }} /></span>
               </div>
               {captions.length === 0 ? (
                 <Empty icon="M4 7V4h16v3|M9 20h6|M12 4v16" title="Aucune légende" text="Crée des légendes prêtes à coller dans tes publications." action={<Btn label="Nouvelle légende" theme={theme} sm tone="primary" onClick={() => setCapOpen(true)} />} />
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(280px,100%),1fr))', gap: 12 }}>
                   {captions.map(c => (
-                    <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 10, background: theme.panelBg, border: `1px solid ${theme.panelEdge}` }}>
+                    <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.07)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'Légende'}</span>
-                        <button onClick={() => deleteCaption(c.id)} title="Supprimer" style={{ marginLeft: 'auto', display: 'flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={13} /></button>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'Légende'}</span>
+                        <button onClick={() => deleteCaption(c.id)} title="Supprimer" style={{ marginLeft: 'auto', display: 'flex', width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={13} /></button>
                       </div>
-                      <div style={{ fontSize: 11.5, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap', maxHeight: 110, overflow: 'hidden' }}>{c.content}</div>
-                      <button onClick={() => { navigator.clipboard?.writeText(c.content); setNotice('Légende copiée.') }} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#A1A1AA', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Copier</button>
+                      <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap', maxHeight: 110, overflow: 'hidden' }}>{c.content}</div>
+                      <button onClick={() => { navigator.clipboard?.writeText(c.content); setNotice('Légende copiée.') }} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#1C1C1F', color: '#E4E4E7', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>Copier</button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
           ) : loading ? (
-            <div style={{ padding: '48px 15px', textAlign: 'center', fontSize: 13, color: '#52525B' }}>{el}</div>
+            <div style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13, color: '#71717A' }}>{el}</div>
           ) : error ? (
-            <div style={{ padding: '40px 15px', textAlign: 'center', fontSize: 12.5, color: '#F87171' }}>{error}</div>
+            <div style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, color: '#F87171' }}>{error}</div>
           ) : total === 0 ? (
             <Empty
               icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
@@ -895,7 +894,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           ) : (
             <div style={{
               display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(112px,132px))',
-              gap: 9, padding: 13,
+              gap: 8, padding: 16,
             }}>
               {shown.map((i, idx) => (
                 <Tile
@@ -915,16 +914,16 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {sel.size > 0 && (
         <div style={{
           position: 'sticky', bottom: 14, marginTop: 14, zIndex: 40, display: 'flex',
-          alignItems: 'center', gap: 10, padding: '9px 10px 9px 14px', borderRadius: 10,
-          background: '#16161C', border: `1px solid rgba(${theme.tone},0.3)`,
-          boxShadow: '0 18px 44px -16px rgba(0,0,0,0.9)', flexWrap: 'wrap',
+          alignItems: 'center', gap: 8, padding: '8px 8px 8px 16px', borderRadius: 8,
+          background: '#161618', border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)', flexWrap: 'wrap',
           animation: 'aPop .22s cubic-bezier(0.16,1,0.3,1) both',
         }}>
           <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: theme.accentText }}>{sel.size}</span>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#A1A1AA' }}>sélectionnée{sel.size > 1 ? 's' : ''}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{sel.size}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 400, color: '#8B8B94' }}>sélectionnée{sel.size > 1 ? 's' : ''}</span>
           </span>
-          <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
+          <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
           <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
           {sel.size === 1 && <Btn label="Description" theme={theme} sm icon="M4 7V4h16v3|M9 20h6|M12 4v16" onClick={openDesc} />}
           <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => onNavigate?.('studio')} />
@@ -938,7 +937,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
 
       {notice && (
-        <div style={{ marginTop: 12, padding: '9px 13px', borderRadius: 8, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 12, color: '#E4E4E7' }}>{notice}</div>
+        <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', fontSize: 12.5, color: '#EDEDEF' }}>{notice}</div>
       )}
 
       {moveOpen && (
@@ -950,12 +949,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {moveFolders.map(f => (
-              <button key={f} onClick={() => doMove(f)} disabled={moving} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#E4E4E7', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ color: theme.accentText, display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={15} /></span>{f}
+              <button key={f} onClick={() => doMove(f)} disabled={moving} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 36, padding: '0 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#161618', color: '#EDEDEF', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ color: '#8B8B94', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={14} /></span>{f}
               </button>
             ))}
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="Nouveau dossier…" style={{ flex: 1, height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+              <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="Nouveau dossier…" style={{ flex: 1, minWidth: 0, height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
             </div>
           </div>
         </Modal>
@@ -968,8 +967,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="primary" label={savingCap ? 'Enregistrement…' : 'Enregistrer'} disabled={savingCap || !capContent.trim()} onClick={addCaption} />
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input value={capTitle} onChange={e => setCapTitle(e.target.value)} placeholder="Titre (optionnel)" style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
-            <textarea value={capContent} onChange={e => setCapContent(e.target.value)} rows={6} placeholder="Ta légende…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
+            <input value={capTitle} onChange={e => setCapTitle(e.target.value)} placeholder="Titre (optionnel)" style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            <textarea value={capContent} onChange={e => setCapContent(e.target.value)} rows={6} placeholder="Ta légende…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
           </div>
         </Modal>
       )}
@@ -978,7 +977,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {ctx && createPortal(
         <>
           <div onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
-          <div style={{ position: 'fixed', top: Math.min(ctx.y, window.innerHeight - 230), left: Math.min(ctx.x, window.innerWidth - 190), zIndex: 61, width: 180, borderRadius: 10, overflow: 'hidden', background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)' }}>
+          <div style={{ position: 'fixed', top: Math.min(ctx.y, window.innerHeight - 230), left: Math.min(ctx.x, window.innerWidth - 190), zIndex: 61, width: 180, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
             {[
               { l: 'Lire', d: 'M5 3l14 9-14 9z', fn: () => openPlayer(ctx.item) },
               { l: 'Renommer', d: 'M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z', fn: () => openRename(ctx.item) },
@@ -986,12 +985,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               { l: 'Déplacer', d: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z', fn: () => { setSel(new Set([ctx.item.id])); setMoveOpen(true) } },
               { l: 'Télécharger', d: 'M12 3v12|M7 10l5 5 5-5|M4 21h16', fn: () => downloadMedia([ctx.item.id]) },
             ].map(o => (
-              <button key={o.l} onClick={() => { o.fn(); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', background: 'transparent', color: '#D4D4D8', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <button key={o.l} onClick={() => { o.fn(); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#E4E4E7', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <span style={{ color: '#71717A', display: 'flex' }}><Icon d={o.d} size={14} /></span>{o.l}
               </button>
             ))}
-            <button onClick={() => { setConfirmDel([ctx.item.id]); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
+            <button onClick={() => { setConfirmDel([ctx.item.id]); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginTop: 4, borderRadius: 5, border: 'none', boxShadow: '0 -1px 0 rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ display: 'flex' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={14} /></span>Supprimer
             </button>
@@ -1004,12 +1003,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {folderCtx && createPortal(
         <>
           <div onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
-          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 110), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 10, overflow: 'hidden', background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)' }}>
-            <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', background: 'transparent', color: '#D4D4D8', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 110), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
+            <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#E4E4E7', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" size={14} /></span>Renommer
             </button>
-            <button onClick={() => { setConfirmDelFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 12px', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
+            <button onClick={() => { setConfirmDelFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginTop: 4, borderRadius: 5, border: 'none', boxShadow: '0 -1px 0 rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ display: 'flex' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={14} /></span>Supprimer le dossier
             </button>
@@ -1021,8 +1020,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {confirmDelFolder && (
         <Modal theme={theme} title="Supprimer ce dossier ?" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClose={() => setConfirmDelFolder(null)}
           footer={<><Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDelFolder(null)} /><Btn theme={theme} tone="danger" label="Supprimer le dossier" onClick={() => { deleteFolder(confirmDelFolder); setConfirmDelFolder(null) }} /></>}>
-          <p style={{ margin: 0, fontSize: 12.5, color: '#A1A1AA', lineHeight: 1.6 }}>
-            Le dossier <b style={{ color: '#F4F4F6' }}>{confirmDelFolder}</b> sera supprimé, mais <b style={{ color: '#34D399' }}>tes vidéos ne sont PAS supprimées</b> : elles sont simplement retirées du dossier et restent dans « Tous ». Tu pourras les regrouper dans un nouveau dossier.
+          <p style={{ margin: 0, fontSize: 13, color: '#A1A1AA', lineHeight: 1.6 }}>
+            Le dossier <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{confirmDelFolder}</b> sera supprimé, mais <b style={{ color: '#4ADE80', fontWeight: 600 }}>tes vidéos ne sont PAS supprimées</b> : elles sont simplement retirées du dossier et restent dans « Tous ». Tu pourras les regrouper dans un nouveau dossier.
           </p>
         </Modal>
       )}
@@ -1034,7 +1033,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="primary" label="Renommer" disabled={!renameFolderVal.trim()} onClick={() => { renameFolder(renameFolderOf, renameFolderVal); setRenameFolderOf(null) }} />
           </>}>
           <input autoFocus value={renameFolderVal} onChange={e => setRenameFolderVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && renameFolderVal.trim()) { renameFolder(renameFolderOf, renameFolderVal); setRenameFolderOf(null) } }}
-            style={{ width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 13, outline: 'none' }} />
+            style={{ width: '100%', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
         </Modal>
       )}
 
@@ -1042,8 +1041,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {player && (
         <Modal theme={theme} title={player.title} onClose={() => setPlayer(null)} width={420}>
           {player.type === 'video'
-            ? <video src={player.url} controls autoPlay style={{ width: '100%', maxHeight: '70vh', borderRadius: 8, background: '#000' }} />
-            : <img src={player.url} alt="" style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 8 }} />}
+            ? <video src={player.url} controls autoPlay style={{ display: 'block', width: '100%', maxHeight: '70vh', borderRadius: 6, background: '#000' }} />
+            : <img src={player.url} alt="" style={{ display: 'block', width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 6 }} />}
         </Modal>
       )}
 
@@ -1055,7 +1054,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDel(null)} />
             <Btn theme={theme} tone="danger" label={deleting ? 'Suppression…' : 'Supprimer'} disabled={deleting} onClick={() => deleteMedia(confirmDel)} />
           </>}>
-          <p style={{ margin: 0, fontSize: 12.5, color: '#A1A1AA' }}>Les médias sélectionnés seront définitivement supprimés de ta banque.</p>
+          <p style={{ margin: 0, fontSize: 13, color: '#A1A1AA', lineHeight: 1.6 }}>Les médias sélectionnés seront définitivement supprimés de ta banque.</p>
         </Modal>
       )}
 
@@ -1067,13 +1066,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="primary" label={savingRename ? '…' : 'Enregistrer'} disabled={savingRename} onClick={saveRename} />
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Nom</span>
-              <input value={renameVal} onChange={e => setRenameVal(e.target.value)} style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom</span>
+              <input value={renameVal} onChange={e => setRenameVal(e.target.value)} style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Tags (séparés par des virgules)</span>
-              <input value={tagsVal} onChange={e => setTagsVal(e.target.value)} placeholder="motivation, produit…" style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Tags (séparés par des virgules)</span>
+              <input value={tagsVal} onChange={e => setTagsVal(e.target.value)} placeholder="motivation, produit…" style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
             </label>
           </div>
         </Modal>
@@ -1086,7 +1085,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="primary" label="Créer" disabled={!folderName.trim()} onClick={createFolder} />
           </>}>
           <input autoFocus value={folderName} onChange={e => setFolderName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && folderName.trim()) createFolder() }} placeholder="Nom du dossier"
-            style={{ width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 13, outline: 'none' }} />
+            style={{ width: '100%', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
         </Modal>
       )}
 
@@ -1102,9 +1101,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setDescItem(null)} />
             <Btn theme={theme} tone="primary" label={savingDesc ? 'Enregistrement…' : 'Enregistrer'} disabled={savingDesc} onClick={saveDesc} />
           </>}>
-          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#71717A', lineHeight: 1.5 }}>Cette description pré-remplira la légende quand tu publieras ce média.</p>
+          <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#8B8B94', lineHeight: 1.55 }}>Cette description pré-remplira la légende quand tu publieras ce média.</p>
           <textarea value={descVal} onChange={e => setDescVal(e.target.value)} rows={6} placeholder="Écris la légende / description…"
-            style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
+            style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
         </Modal>
       )}
     </div>

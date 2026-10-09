@@ -134,18 +134,18 @@ export default function Proxies({ theme, infra, user, org }: {
   const toggleAll = () => setSel(allSel ? new Set() : new Set(filtered.map(r => r.id)))
 
   const Checkbox = ({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) => (
-    <button onClick={onClick} aria-label={label} style={{
+    <button type="button" onClick={onClick} aria-label={label} style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-      width: 15, height: 15, borderRadius: 4, cursor: 'pointer',
-      background: on ? '#7C3AED' : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)',
-      color: '#fff', fontSize: 9, fontWeight: 900,
+      width: 14, height: 14, boxSizing: 'border-box', borderRadius: 4, cursor: 'pointer',
+      background: on ? theme.accent : 'transparent', border: on ? `1px solid ${theme.accent}` : '1px solid rgba(255,255,255,0.2)',
+      color: '#fff', fontSize: 9, fontWeight: 600, lineHeight: 1,
     }}>{on ? '✓' : ''}</button>
   )
 
   const th: CSSProperties = {
     display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
-    padding: '9px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)',
-    fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B',
+    height: 36, boxSizing: 'border-box', padding: '0 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+    fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#71717A',
   }
 
   return (
@@ -159,15 +159,15 @@ export default function Proxies({ theme, infra, user, org }: {
         </>}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12, marginBottom: 16 }}>
         <Kpi theme={theme} label="Total" value={rows.length} />
         <Kpi theme={theme} label="Groupes" value={groups.length} />
-        <Kpi theme={theme} label="SOCKS5" value={nSocks} color="#34D399" />
+        <Kpi theme={theme} label="SOCKS5" value={nSocks} />
         <Kpi theme={theme} label="HTTP" value={nHttp} />
       </div>
 
       {loading ? (
-        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div></Panel>
+        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div></Panel>
       ) : error ? (
         <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} /></Panel>
       ) : rows.length === 0 ? (
@@ -189,24 +189,26 @@ export default function Proxies({ theme, infra, user, org }: {
           />
 
           {/* Pools */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 13px', flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B', marginRight: 3 }}>Pools</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94', marginRight: 4 }}>Pools</span>
             {pools.map(o => {
               const on = pool === o.g
               return (
-                <button key={o.g} onClick={() => setPool(o.g)} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 99, cursor: 'pointer',
-                  background: on ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.02)',
-                  border: '1px solid ' + (on ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'),
-                  color: on ? '#C4B5FD' : '#A1A1AA', fontSize: 11.5, fontWeight: 600, transition: 'all .14s ease',
+                <button type="button" key={o.g} onClick={() => setPool(o.g)} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, boxSizing: 'border-box', padding: '0 9px', borderRadius: 6, cursor: 'pointer',
+                  background: on ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  border: '1px solid ' + (on ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)'),
+                  color: on ? '#EDEDEF' : '#A1A1AA', fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
                 }}>
                   <span>{o.g}</span>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: on ? 'rgba(255,255,255,0.5)' : '#3F3F46' }}>{o.n}</span>
+                  <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: on ? '#A1A1AA' : '#71717A' }}>{o.n}</span>
                 </button>
               )
             })}
           </div>
 
+          <div style={{ overflowX: 'auto' }}>
+          <div style={{ minWidth: 760 }}>
           {/* header */}
           <div style={th}>
             <span><Checkbox on={allSel} onClick={toggleAll} label="Tout sélectionner" /></span>
@@ -219,29 +221,31 @@ export default function Proxies({ theme, infra, user, org }: {
               const on = sel.has(r.id)
               return (
                 <div key={r.id} style={{
-                  display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '10px 15px', fontSize: 12,
-                  background: on ? 'rgba(139,92,246,0.05)' : 'transparent',
-                  borderBottom: i < filtered.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none', transition: 'background .14s ease',
-                }}>
+                  display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', minHeight: 48, boxSizing: 'border-box', padding: '6px 16px', fontSize: 13,
+                  background: on ? 'rgba(255,255,255,0.03)' : 'transparent',
+                  borderBottom: i < filtered.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', transition: 'background .12s ease',
+                }}
+                  onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+                  onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent' }}>
                   <span><Checkbox on={on} onClick={() => toggle(r.id)} label="Sélectionner" /></span>
-                  <span>{r.group_name ? <Chip text={r.group_name} tone="mute" /> : <span style={{ fontSize: 11, color: '#3F3F46' }}>—</span>}</span>
+                  <span>{r.group_name ? <Chip text={r.group_name} tone="mute" /> : <span style={{ fontSize: 12, color: '#5A5A63' }}>—</span>}</span>
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyName(r)}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyEndpoint(r)}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyName(r)}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyEndpoint(r)}</span>
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: '#52525B' }} />
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: '#71717A' }}>Non testé</span>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Non testé</span>
                   </span>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#3F3F46' }}>—</span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#5A5A63' }}>—</span>
                   <span>
                     <span style={{
-                      display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 6,
-                      background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
-                      color: '#52525B', fontSize: 11, fontWeight: 600,
+                      display: 'inline-flex', alignItems: 'center', height: 20, boxSizing: 'border-box', padding: '0 7px', borderRadius: 5,
+                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                      color: '#8B8B94', fontSize: 11, fontWeight: 500,
                     }}>libre</span>
                   </span>
-                  <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 3 }}>
+                  <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
                     <Btn theme={theme} sm tone="quiet" label="Tester" onClick={testInfo} />
                     <Btn theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" label="Supprimer" onClick={() => doDelete(r.id)} />
                   </span>
@@ -249,14 +253,16 @@ export default function Proxies({ theme, infra, user, org }: {
               )
             })}
             {filtered.length === 0 && (
-              <div style={{ padding: '28px 15px', textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun proxy dans ce pool.</div>
+              <div style={{ padding: '28px 16px', textAlign: 'center', color: '#8B8B94', fontSize: 13 }}>Aucun proxy dans ce pool.</div>
             )}
+          </div>
+          </div>
           </div>
         </Panel>
       )}
 
       {notice && (
-        <div style={{ marginTop: 12, padding: '9px 13px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, color: '#D4D4D8' }}>{notice}</div>
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', fontSize: 13, lineHeight: 1.55, color: '#A1A1AA' }}>{notice}</div>
       )}
 
       {addOpen && (
@@ -268,18 +274,18 @@ export default function Proxies({ theme, infra, user, org }: {
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#A1A1AA' }}>Type par défaut</span>
-              <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Type par défaut</span>
+              <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
                 {(['socks5', 'http'] as const).map(t => (
-                  <button key={t} onClick={() => setAddType(t)} style={{ height: 24, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', background: addType === t ? `rgba(${theme.tone},0.16)` : 'transparent', color: addType === t ? theme.accentText : '#71717A', fontSize: 11.5, fontWeight: 600 }}>{t.toUpperCase()}</button>
+                  <button type="button" key={t} onClick={() => setAddType(t)} style={{ height: 24, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer', background: addType === t ? 'rgba(255,255,255,0.08)' : 'transparent', color: addType === t ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500 }}>{t.toUpperCase()}</button>
                 ))}
               </span>
               <input value={addGroup} onChange={e => setAddGroup(e.target.value)} placeholder="Groupe (optionnel)"
-                style={{ marginLeft: 'auto', height: 30, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12, outline: 'none' }} />
+                style={{ marginLeft: 'auto', height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }} />
             </div>
             <textarea value={addText} onChange={e => setAddText(e.target.value)} rows={8}
               placeholder={'host:port\nhost:port:user:pass\nuser:pass@host:port\nsocks5://user:pass@host:port'}
-              style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 12, borderRadius: 8, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", lineHeight: 1.7, outline: 'none' }} />
+              style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", lineHeight: 1.7, outline: 'none' }} />
           </div>
         </Modal>
       )}
