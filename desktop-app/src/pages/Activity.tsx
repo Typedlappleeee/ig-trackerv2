@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ScheduledPost, type PostRun } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Chip, Icon, Panel, PageHead, Kpi, Empty, Modal, SkeletonRows } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { useConnections } from '@/lib/connections'
+import { queryTaskResults } from '@/lib/geelark'
+import { counts, runState, type HistoryEntry } from '@/lib/runHistory'
+import { recoverLast24h } from '@/lib/recoverHistory'
 
 // ── Un « run » unifié (post_runs directs + scheduled_posts exécutés) ────────────
-interface AccountResult { name: string; ok: boolean; error?: string }
+interface AccountResult { name: string; ok: boolean; error?: string; pending?: boolean }
 interface RunItem {
   id: string
   ok: number
@@ -16,6 +20,9 @@ interface RunItem {
   ts: number       // pour tri
   when: string     // libellé relatif
   accounts?: AccountResult[]   // détail par compte (qui a posté, qui a échoué)
+  state?: 'running' | 'interrupted'   // run client pas encore conclu (cf. runHistory.ts)
+  pending?: number                    // comptes dont le résultat n'est pas encore connu
+  recovered?: boolean                 // reconstitué depuis l'historique GeeLark
 }
 
 function asArray(v: unknown): any[] {
@@ -43,6 +50,7 @@ function runMeta(type: string): string {
   if (type === 'story') return 'Story · Instagram'
   if (type === 'warmup') return 'Warmup'
   if (type === 'mass_posting') return 'Mass Posting · Instagram'
+  if (type === 'flow') return 'Flow Builder'
   return 'Publication · Instagram'
 }
 function schedMeta(p: ScheduledPost): string {
@@ -67,6 +75,10 @@ export default function Activity({ theme, infra, user, org }: {
   const [filter, setFilter] = useState<Filter>('all')
   const [detail, setDetail] = useState<RunItem | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const { bearer } = useConnections(user, org)
+  // Lignes post_runs brutes : sert à retrouver le résultat des comptes « en attente ».
+  const rawRef = useRef<{ id: string; created_at: string; details: HistoryEntry[] }[]>([])
+  const [recovering, setRecovering] = useState(false)
 
   // Relancer : un post programmé échoué repasse en 'pending' (le serveur le relance).
   // Un run client (id 'run-…') ne peut pas être relancé côté serveur → message.
@@ -94,18 +106,29 @@ export default function Activity({ theme, infra, user, org }: {
     if (prRes.error && spRes.error) { setError('Impossible de charger ton activité.'); setLoading(false); return }
 
     const items: (RunItem & { type: string })[] = []
+    const raw: typeof rawRef.current = []
     for (const r of ((prRes.data ?? []) as (PostRun & { details?: unknown })[])) {
       const total = r.total ?? 0
       const ok = r.ok_count ?? 0
-      const accounts = asArray(r.details)
-        .map((d: any) => ({ name: String(d?.name ?? '—'), ok: !!d?.ok, error: d?.error ? String(d.error) : undefined }))
+      const det = asArray(r.details) as HistoryEntry[]
+      raw.push({ id: r.id, created_at: r.created_at, details: det })
+      const state = runState(det, new Date(r.created_at).getTime())
+      const accounts = det
+        .map((d: any) => ({
+          name: String(d?.name ?? '—'), ok: !!d?.ok, pending: !!d?.pending,
+          error: d?.pending ? (state === 'interrupted' ? 'interrompu (résultat inconnu)' : 'en cours…') : d?.error ? String(d.error) : undefined,
+        }))
       items.push({
         id: 'run-' + r.id, type: r.type, ok, total,
         title: `${total} compte${total > 1 ? 's' : ''}`,
         meta: runMeta(r.type), ts: new Date(r.created_at).getTime(), when: relLabel(r.created_at),
         accounts: accounts.length ? accounts : undefined,
+        state: state === 'done' ? undefined : state,
+        pending: state === 'running' ? det.filter(d => d?.pending).length : 0,
+        recovered: det.some(d => d?.recovered),
       })
     }
+    rawRef.current = raw
     for (const p of ((spRes.data ?? []) as ScheduledPost[])) {
       const phoneArr = asArray(p.phones)
       const total = phoneArr.length
@@ -133,7 +156,7 @@ export default function Activity({ theme, infra, user, org }: {
     const recent = items.filter(i => i.ts >= weekAgo)
     const okSum = recent.reduce((s, i) => s + i.ok, 0)
     const totSum = recent.reduce((s, i) => s + i.total, 0)
-    const failed = recent.reduce((s, i) => s + Math.max(0, i.total - i.ok), 0)
+    const failed = recent.reduce((s, i) => s + Math.max(0, i.total - i.ok - (i.pending ?? 0)), 0)
     const credits = recent.reduce((s, i) => s + runCost(i.type, i.total), 0)
     setKpi({
       count7: recent.length,
@@ -146,6 +169,60 @@ export default function Activity({ theme, infra, user, org }: {
   }, [currentOrg?.id, user.id])
 
   useEffect(() => { load() }, [load])
+
+  // Comptes « en attente » dont la tâche GeeLark est connue : on va chercher le vrai
+  // résultat (/task/query) — utile quand l'onglet a été fermé en plein run.
+  const checkedAt = useRef(0)
+  useEffect(() => {
+    if (!bearer || loading || Date.now() - checkedAt.current < 60_000) return
+    const rows = rawRef.current.filter(r => r.details.some(d => d?.pending && d.taskId))
+    if (!rows.length) return
+    checkedAt.current = Date.now()
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await queryTaskResults(bearer, [...new Set(rows.flatMap(r => r.details.filter(d => d?.pending && d.taskId).map(d => d.taskId!)))])
+        let changed = false
+        for (const r of rows) {
+          let touched = false
+          const details = r.details.map(d => {
+            const t = d?.pending && d.taskId ? res[d.taskId] : undefined
+            if (!t) return d
+            if (t.status === 3) { touched = true; return { ...d, ok: true, pending: false } }
+            if ([4, 7, 8].includes(t.status)) { touched = true; return { ...d, ok: false, pending: false, error: t.error ?? `statut ${t.status}` } }
+            return d
+          })
+          if (!touched || cancelled) continue
+          const c = counts(details)
+          const { error } = await supabase.from('post_runs').update({ details, ok_count: c.ok, err_count: c.err }).eq('id', r.id)
+          if (!error) changed = true
+        }
+        if (changed && !cancelled) load(true)
+      } catch { /* GeeLark indisponible : on réessaiera au prochain chargement */ }
+    })()
+    return () => { cancelled = true }
+  }, [bearer, loading, runs, load])
+
+  // Récupération des dernières 24 h depuis GeeLark (runs interrompus avant cette
+  // mise à jour, jamais enregistrés). Lancée une fois automatiquement par compte.
+  const recover = useCallback(async (auto: boolean) => {
+    if (!bearer || recovering) return
+    setRecovering(true)
+    try {
+      const r = await recoverLast24h({ bearer, userId: user.id, orgId: currentOrg?.id ?? null })
+      if (r.ok && r.runs > 0) { setNotice(`${r.runs} run(s) des dernières 24 h récupéré(s) depuis GeeLark (${r.tasks} tâche(s)).`); load(true) }
+      else if (!auto) setNotice(r.ok ? 'Rien à récupérer : tout ce que GeeLark a fait ces dernières 24 h est déjà dans l’historique.' : `Récupération impossible : ${r.error}`)
+    } catch (e) {
+      if (!auto) setNotice(`Récupération impossible : ${e instanceof Error ? e.message : String(e)}`)
+    } finally { setRecovering(false) }
+  }, [bearer, recovering, user.id, currentOrg?.id, load])
+  useEffect(() => {
+    if (!bearer) return
+    const key = `sf-recover24:${currentOrg?.id ?? user.id}`
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, String(Date.now())) } catch { return }
+    void recover(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bearer, currentOrg?.id, user.id])
 
   // Rafraîchissement live : dès qu'un run est enregistré (post_runs) ou qu'un post
   // programmé passe done/failed (scheduled_posts), on recharge. + repli au refocus.
@@ -204,6 +281,9 @@ export default function Activity({ theme, infra, user, org }: {
               </button>
             ))}
           </span>
+          <span style={{ flex: 1 }} />
+          <Btn theme={theme} sm tone="ghost" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={recovering ? 'Récupération…' : 'Récupérer les dernières 24 h'}
+            disabled={!bearer || recovering} onClick={() => recover(false)} />
         </div>
 
         {loading ? (
@@ -235,6 +315,9 @@ export default function Activity({ theme, infra, user, org }: {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 18, padding: '0 6px', boxSizing: 'border-box', borderRadius: 4, flexShrink: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 500, color: '#A1A1AA' }}>
                     <span style={{ width: 5, height: 5, borderRadius: 99, background: '#A78BFA' }} />GeeLark
                   </span>
+                  {r.state === 'running' && <Chip text="En cours" tone="info" />}
+                  {r.state === 'interrupted' && <Chip text="Interrompu" tone="warn" />}
+                  {r.recovered && <Chip text="Récupéré" />}
                 </span>
                 <span style={{ fontSize: 12, color: '#71717A' }}>{r.meta}</span>
               </span>
@@ -247,7 +330,7 @@ export default function Activity({ theme, infra, user, org }: {
               <span style={{ fontSize: 12, color: '#71717A', minWidth: 84, textAlign: 'right', flexShrink: 0 }}>{r.when}</span>
               <span style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                 <Btn theme={theme} sm tone="quiet" icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6" label="Détails" onClick={() => setDetail(r)} />
-                {!ok && <Btn theme={theme} sm icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={`Relancer ${r.total - r.ok}`} onClick={() => relancer(r)} />}
+                {!ok && r.state !== 'running' && <Btn theme={theme} sm icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={`Relancer ${r.total - r.ok}`} onClick={() => relancer(r)} />}
               </span>
             </div>
           )

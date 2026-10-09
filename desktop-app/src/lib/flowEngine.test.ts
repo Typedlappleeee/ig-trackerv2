@@ -83,6 +83,7 @@ vi.mock('@/lib/runStore', () => ({
   }),
 }))
 vi.mock('@/lib/phoneWatch', () => ({ heartbeatPhone: () => {} }))
+vi.mock('./runHistory', () => ({ startRunHistory: async () => ({ set: () => {}, finish: async () => null }) }))
 // Supabase simulé : constructeur de requêtes chaînable, juste ce que le moteur utilise.
 vi.mock('@/lib/supabase', () => {
   const builder = (table: string) => {

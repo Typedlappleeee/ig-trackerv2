@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { startRunHistory } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon, Modal, toast, confirmDialog } from '@/lib/ui'
@@ -283,6 +284,11 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       return
     }
 
+    // Historique écrit DÈS MAINTENANT (avant : seulement à la fin → rien si l'onglet se fermait).
+    const hist = await startRunHistory({
+      userId: user.id, orgId: currentOrg?.id ?? null, type: 'mass_posting',
+      accounts: jobs.map(j => ({ key: j.p.id, name: phoneLabel(j.p), geelarkId: j.p.geelark_id })),
+    })
     const concurrency = rot ? 1 : (simulPhones === 'all' ? jobs.length : Math.max(1, Number(simulPhones)))
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : concurrency >= jobs.length ? `⚡ ${jobs.length} téléphone(s) en parallèle.` : `⚡ Par lots de ${concurrency} téléphone(s).`)
 
@@ -295,11 +301,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     const postOne = async ({ p, v, cap }: (typeof jobs)[number], skipStart: boolean) => {
       const ru = resourceByVid.get(v.id)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
-      if (!ru) { run.markFailed(); errN++; R.tick(false); results.set(p.id, { name: phoneLabel(p), ok: false, error: 'vidéo non hébergée' }); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
+      if (!ru) { run.markFailed(); errN++; R.tick(false); results.set(p.id, { name: phoneLabel(p), ok: false, error: 'vidéo non hébergée' }); hist.set(p.id, { ok: false, error: 'vidéo non hébergée' }); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
       push(`— ${phoneLabel(p)} · ${v.title}${cap ? ' · légende' : ''} —`)
       const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id), skipStart)
       if (r.ok) { postedVidIds.add(v.id); okN++ } else { run.markFailed(); errN++ }
       results.set(p.id, { name: phoneLabel(p), ok: r.ok, error: r.ok ? undefined : r.error })
+      hist.set(p.id, { ok: r.ok, error: r.ok ? undefined : r.error })
       R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
@@ -335,16 +342,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       setRunItems(items => items.map(it => notRun.some(j => j.p.id === it.id) ? { ...it, phase: 'failed', detail: 'annulé' } : it))
     }
     R.finish()
-    // Historique (page Activité) + compteur : on enregistre TOUJOURS le run. On AWAIT
-    // et on log l'échec éventuel (avant, fire-and-forget → des runs manquaient en silence).
-    if (jobs.length > 0) {
-      const { error: prErr } = await supabase.from('post_runs').insert({
-        user_id: user.id, org_id: currentOrg?.id ?? null,
-        type: 'mass_posting', ok_count: okN, err_count: errN, total: jobs.length,
-        details: [...results.values()],
-      })
-      if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr.message}`)
-    }
+    // Historique (page Activité) : clôture du run déjà enregistré au lancement.
+    const prErr = await hist.finish('annulé')
+    if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr}`)
     setRunId(null)
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)

@@ -16,6 +16,7 @@ import { postStoryFlowServer } from './geelark-story.ts'
 import { notifyOwner } from './notify.ts'
 import { runAccountSync } from './tracking-report.ts'
 import { runStatsSync } from './stats-sync.ts'
+import { planWatchguard, isPhoneOn, SEEN_RUNNING, WATCHGUARD_MIN, type WatchLease, type WatchPhone } from './watchguard.ts'
 
 const GEELARK = 'https://openapi.geelark.com/open/v1'
 
@@ -399,6 +400,155 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Résout le bearer GeeLark d'un (org_id, user_id) avec cache mémoire.
+  const _bearerCache = new Map<string, string>()
+  async function resolveBearer(orgId: string | null, userId: string | null): Promise<string> {
+    const key = `${orgId ?? ''}|${userId ?? ''}`
+    if (_bearerCache.has(key)) return _bearerCache.get(key)!
+    let bearer = ''
+    if (orgId) {
+      const { data } = await db.from('org_config').select('bearer_token').eq('org_id', orgId).maybeSingle()
+      bearer = data?.bearer_token ?? ''
+    }
+    if (!bearer && userId) {
+      const { data } = await db.from('app_config').select('bearer_token').eq('user_id', userId).maybeSingle()
+      bearer = data?.bearer_token ?? ''
+    }
+    _bearerCache.set(key, bearer)
+    return bearer
+  }
+
+  // ── 0. WATCHDOG ANTI-COÛT ───────────────────────────────────────────────────
+  // Éteint tout téléphone inscrit dans phone_power_watch dont l'heure-limite stop_at
+  // est dépassée — même si l'app cliente est fermée. Exécuté EN PREMIER (avant purge
+  // et synchros) pour ne jamais être privé de temps par une invocation lente.
+  // Les téléphones allumés sans bail sont inscrits par le watchguard (étape 0-bis).
+  try {
+    let dueWatch = db.from('phone_power_watch').select('geelark_id, org_id, user_id, stop_at').lt('stop_at', nowIso).limit(300)
+    if (filterUserId) dueWatch = dueWatch.eq('user_id', filterUserId)
+    const { data: due } = await dueWatch
+    if (due && due.length > 0) {
+      // Regroupe par bearer pour minimiser les appels /phone/stop
+      const byBearer = new Map<string, string[]>()
+      for (const row of due) {
+        const bearer = await resolveBearer(row.org_id, row.user_id)
+        if (!bearer) continue
+        if (!byBearer.has(bearer)) byBearer.set(bearer, [])
+        byBearer.get(bearer)!.push(row.geelark_id)
+      }
+      const stoppedIds: string[] = []
+      for (const [bearer, ids] of byBearer) {
+        try {
+          const r = await gPost(bearer, '/phone/stop', { ids })
+          // On ne considère « traité » (→ supprimable) QUE si GeeLark a répondu OK.
+          if (r && (r.code === 0 || r.code === undefined)) stoppedIds.push(...ids)
+          else if (ids.length > 1) {
+            // Lot refusé (souvent UN id invalide/supprimé bloque tout le lot) → un par un,
+            // pour que les autres téléphones s'éteignent quand même.
+            for (const id of ids) {
+              const r1 = await gPost(bearer, '/phone/stop', { ids: [id] }).catch(() => null)
+              if (r1 && (r1.code === 0 || r1.code === undefined)) stoppedIds.push(id)
+            }
+          }
+        } catch { /* réseau : on GARDE la ligne → réessai au prochain tick */ }
+      }
+      // ⚠️ On ne supprime QUE les lignes réellement éteintes. Avant, on supprimait
+      // TOUTES les lignes dues même si le bearer était introuvable ou le stop en
+      // échec → le téléphone restait allumé pour toujours (jamais réessayé). C'est
+      // ce qui laissait des tél allumés très longtemps.
+      if (stoppedIds.length > 0) {
+        await db.from('phone_power_watch').delete().in('geelark_id', stoppedIds)
+      }
+      // Les lignes dont le bearer est introuvable depuis > 1 h sont abandonnées
+      // (compte supprimé/token retiré) pour ne pas boucler indéfiniment.
+      const orphanCutoff = new Date(Date.now() - 60 * 60_000).toISOString()
+      await db.from('phone_power_watch').delete().lt('stop_at', orphanCutoff)
+      summary['watchdog'] = `éteint ${stoppedIds.length}/${due.length} téléphone(s) en dépassement`
+    }
+  } catch (err) {
+    summary['watchdog'] = `error: ${err instanceof Error ? err.message : String(err)}`
+  }
+
+  // ── 0-bis. WATCHGUARD : tout téléphone allumé finit éteint ───────────────────
+  // Le watchdog ci-dessus n'éteint que les téléphones qui ont un bail. Ici on liste
+  // les téléphones RÉELLEMENT allumés chez chaque propriétaire (jeton GeeLark) et on
+  // pose un bail « seen_running » de WATCHGUARD_MIN minutes sur ceux qui n'en ont pas
+  // (allumés à la main, tâche GeeLark, onglet fermé avant d'écrire le bail…). Le
+  // watchdog les éteint à expiration — même app fermée. Les baux existants (warmup,
+  // tâche en cours prolongée par battement) ne sont jamais raccourcis.
+  // Cron : une fois toutes les 2 min (budget 25 s). Appel client (JWT) : ses téléphones seulement.
+  if (filterUserId || new Date().getUTCMinutes() % 2 === 0) {
+    try {
+      const deadline = Date.now() + 25_000
+      // Propriétaires = (bearer, org_id, user_id), dédoublonnés par bearer (l'org prime).
+      const owners = new Map<string, { org_id: string | null; user_id: string | null }>()
+      if (filterUserId) {
+        const { data: mem } = await db.from('org_members').select('org_id').eq('user_id', filterUserId)
+        for (const m of (mem ?? []) as { org_id: string }[]) {
+          const b = await resolveBearer(m.org_id, null)
+          if (b && !owners.has(b)) owners.set(b, { org_id: m.org_id, user_id: null })
+        }
+        const b = await resolveBearer(null, filterUserId)
+        if (b && !owners.has(b)) owners.set(b, { org_id: null, user_id: filterUserId })
+      } else {
+        const { data: orgs } = await db.from('org_config').select('org_id, bearer_token').neq('bearer_token', '').not('bearer_token', 'is', null).limit(2000)
+        for (const o of (orgs ?? []) as { org_id: string; bearer_token: string }[]) {
+          if (o.bearer_token && !owners.has(o.bearer_token)) owners.set(o.bearer_token, { org_id: o.org_id, user_id: null })
+        }
+        const { data: users } = await db.from('app_config').select('user_id, bearer_token').neq('bearer_token', '').not('bearer_token', 'is', null).limit(5000)
+        for (const u of (users ?? []) as { user_id: string; bearer_token: string }[]) {
+          if (u.bearer_token && !owners.has(u.bearer_token)) owners.set(u.bearer_token, { org_id: null, user_id: u.user_id })
+        }
+      }
+
+      let seen = 0, leased = 0, dropped = 0, scanned = 0
+      const entries = [...owners.entries()]
+      const sweepOne = async ([bearer, own]: [string, { org_id: string | null; user_id: string | null }]) => {
+        if (Date.now() > deadline) return
+        const phones: WatchPhone[] = []
+        for (let page = 1; page <= 30 && Date.now() < deadline; page++) {
+          const d = await gPost(bearer, '/phone/list', { page, pageSize: 100 }).catch(() => ({} as Record<string, any>))
+          if (Number(d?.code ?? -1) !== 0) return          // jeton refusé / réseau : propriétaire ignoré
+          const items = (d?.data?.items ?? []) as { id: unknown; status: unknown }[]
+          phones.push(...items.map(p => ({ id: String(p.id), status: Number(p.status) })))
+          if (items.length === 0 || phones.length >= Number(d?.data?.total ?? 0)) break
+        }
+        scanned++
+        const on = phones.filter(p => isPhoneOn(p.status))
+        seen += on.length
+        const ids = phones.map(p => p.id)
+        const leases: WatchLease[] = []
+        for (let i = 0; i < ids.length; i += 200) {
+          const { data } = await db.from('phone_power_watch').select('geelark_id, reason, stop_at').in('geelark_id', ids.slice(i, i + 200))
+          leases.push(...((data ?? []) as WatchLease[]))
+        }
+        const plan = planWatchguard(phones, leases)
+        if (plan.add.length) {
+          const stopAt = new Date(Date.now() + WATCHGUARD_MIN * 60_000).toISOString()
+          const { error } = await db.from('phone_power_watch').upsert(
+            plan.add.map(geelark_id => ({ geelark_id, org_id: own.org_id, user_id: own.user_id, reason: SEEN_RUNNING, stop_at: stopAt })),
+            { onConflict: 'geelark_id', ignoreDuplicates: true },
+          )
+          if (!error) leased += plan.add.length
+        }
+        if (plan.drop.length) {
+          // Re-filtre côté base : un bail de tâche posé entre-temps (upsert client) n'est pas touché.
+          await db.from('phone_power_watch').delete().in('geelark_id', plan.drop)
+            .or(`reason.eq.${SEEN_RUNNING},stop_at.lt.${new Date().toISOString()}`)
+          dropped += plan.drop.length
+        }
+      }
+      for (let i = 0; i < entries.length && Date.now() < deadline; i += 6) {
+        await Promise.all(entries.slice(i, i + 6).map(e => sweepOne(e).catch(() => {})))
+      }
+      if (seen || leased || dropped) {
+        summary['watchguard'] = `${scanned}/${owners.size} compte(s) GeeLark · ${seen} tél. allumé(s) · ${leased} nouveau(x) bail(s) ${WATCHGUARD_MIN} min · ${dropped} bail(s) levé(s)`
+      }
+    } catch (err) {
+      summary['watchguard'] = `error: ${err instanceof Error ? err.message : String(err)}`
+    }
+  }
+
   // ── Purge corbeille banque : supprime DÉFINITIVEMENT les médias en corbeille > 7 jours.
   try {
     const cutoff = new Date(Date.now() - 7 * 86400000).toISOString()
@@ -428,65 +578,6 @@ Deno.serve(async (req) => {
     if (n > 0) summary['stats_sync'] = `${n} compte(s) stats`
   } catch { /* ignore */ }
 
-  // Résout le bearer GeeLark d'un (org_id, user_id) avec cache mémoire.
-  const _bearerCache = new Map<string, string>()
-  async function resolveBearer(orgId: string | null, userId: string | null): Promise<string> {
-    const key = `${orgId ?? ''}|${userId ?? ''}`
-    if (_bearerCache.has(key)) return _bearerCache.get(key)!
-    let bearer = ''
-    if (orgId) {
-      const { data } = await db.from('org_config').select('bearer_token').eq('org_id', orgId).maybeSingle()
-      bearer = data?.bearer_token ?? ''
-    }
-    if (!bearer && userId) {
-      const { data } = await db.from('app_config').select('bearer_token').eq('user_id', userId).maybeSingle()
-      bearer = data?.bearer_token ?? ''
-    }
-    _bearerCache.set(key, bearer)
-    return bearer
-  }
-
-  // ── 0. WATCHDOG ANTI-COÛT ───────────────────────────────────────────────────
-  // Éteint tout téléphone démarré par l'AUTOMATION (inscrit dans phone_power_watch)
-  // dont l'heure-limite stop_at est dépassée — même si l'app cliente est fermée.
-  // Les téléphones démarrés à la main ne sont jamais inscrits → jamais touchés.
-  try {
-    let dueWatch = db.from('phone_power_watch').select('geelark_id, org_id, user_id, stop_at').lt('stop_at', nowIso).limit(300)
-    if (filterUserId) dueWatch = dueWatch.eq('user_id', filterUserId)
-    const { data: due } = await dueWatch
-    if (due && due.length > 0) {
-      // Regroupe par bearer pour minimiser les appels /phone/stop
-      const byBearer = new Map<string, string[]>()
-      for (const row of due) {
-        const bearer = await resolveBearer(row.org_id, row.user_id)
-        if (!bearer) continue
-        if (!byBearer.has(bearer)) byBearer.set(bearer, [])
-        byBearer.get(bearer)!.push(row.geelark_id)
-      }
-      const stoppedIds: string[] = []
-      for (const [bearer, ids] of byBearer) {
-        try {
-          const r = await gPost(bearer, '/phone/stop', { ids })
-          // On ne considère « traité » (→ supprimable) QUE si GeeLark a répondu OK.
-          if (r && (r.code === 0 || r.code === undefined)) stoppedIds.push(...ids)
-        } catch { /* réseau : on GARDE la ligne → réessai au prochain tick */ }
-      }
-      // ⚠️ On ne supprime QUE les lignes réellement éteintes. Avant, on supprimait
-      // TOUTES les lignes dues même si le bearer était introuvable ou le stop en
-      // échec → le téléphone restait allumé pour toujours (jamais réessayé). C'est
-      // ce qui laissait des tél allumés très longtemps.
-      if (stoppedIds.length > 0) {
-        await db.from('phone_power_watch').delete().in('geelark_id', stoppedIds)
-      }
-      // Les lignes dont le bearer est introuvable depuis > 1 h sont abandonnées
-      // (compte supprimé/token retiré) pour ne pas boucler indéfiniment.
-      const orphanCutoff = new Date(Date.now() - 60 * 60_000).toISOString()
-      await db.from('phone_power_watch').delete().lt('stop_at', orphanCutoff)
-      summary['watchdog'] = `éteint ${stoppedIds.length}/${due.length} téléphone(s) en dépassement`
-    }
-  } catch (err) {
-    summary['watchdog'] = `error: ${err instanceof Error ? err.message : String(err)}`
-  }
 
   // 1. Auto-heal : posts "running" trop vieux (> 30 min).
   // Avant de marquer "failed", on RE-INTERROGE GeeLark avec les task_ids persistés :

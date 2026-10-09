@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { startRunHistory } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
@@ -193,6 +194,11 @@ export default function StoryComposer({ theme, user, org, onBack }: {
       return
     }
 
+    // Historique écrit DÈS MAINTENANT (avant : seulement à la fin → rien si l'onglet se fermait).
+    const hist = await startRunHistory({
+      userId: user.id, orgId: currentOrg?.id ?? null, type: 'story',
+      accounts: jobs.map(j => ({ key: j.p.id, name: phoneLabel(j.p), geelarkId: j.p.geelark_id })),
+    })
     const concurrency = rot ? 1 : jobs.length
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${jobs.length} compte(s) en parallèle.`)
     const results = new Map<string, { name: string; ok: boolean; error?: string }>()
@@ -202,6 +208,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
       const r = await postStoryToPhone(bearer, p.geelark_id!, { imageResourceUrl: resByImg.get(img.id)!, linkUrl: links[p.id], linkText: st, rotationUrls: rot }, push)
       const already = results.get(p.id)?.ok === true
       results.set(p.id, { name: phoneLabel(p), ok: r.ok || already, error: r.ok ? undefined : r.error })
+      hist.set(p.id, { ok: r.ok || already, error: r.ok ? undefined : r.error })
       if (!already) R.tick(r.ok)
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.error } : it))
     }
@@ -233,14 +240,8 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     const refundN = jobs.filter(j => results.get(j.p.id)?.ok !== true).length
     for (let i = 0; i < refundN; i++) run.markFailed()
     R.finish()
-    if (jobs.length > 0) {
-      const { error: prErr } = await supabase.from('post_runs').insert({
-        user_id: user.id, org_id: currentOrg?.id ?? null,
-        type: 'story', ok_count: okN, err_count: errN, total: jobs.length,
-        details: [...results.values()],
-      })
-      if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr.message}`)
-    }
+    const prErr = await hist.finish('annulé')
+    if (prErr) push(`⚠ Historique Activité non enregistré : ${prErr}`)
     const { refunded } = await run.settle()
     if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (comptes échoués).`)
     push('✔ Stories terminées.')

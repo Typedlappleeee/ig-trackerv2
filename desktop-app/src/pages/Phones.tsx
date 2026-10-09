@@ -3,11 +3,12 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Kpi, Panel, PageHead, StatusDot, Modal, SkeletonRows } from '@/lib/ui'
+import { Btn, Empty, Icon, Kpi, Panel, PageHead, StatusDot, Modal, SkeletonRows, toast, confirmDialog } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
-import { fetchAllPhones, geelarkStatusLabel } from '@/lib/geelark'
+import { fetchAllPhones, geelarkStatusLabel, stopPhones } from '@/lib/geelark'
+import { releasePhone, isPhoneOn, onWatchguard } from '@/lib/phoneWatch'
 import { useConnections } from '@/lib/connections'
 
 // ── Type Phone (sous-ensemble réel de la table `phones`, aligné sur
@@ -44,7 +45,32 @@ function fmtViews(n: number | null): string {
   return String(n)
 }
 
-const COLS = '30px minmax(0,1.4fr) 110px 96px 210px'
+const COLS = '28px 30px minmax(0,1.4fr) 110px 96px 210px'
+
+const POWER_ICON = 'M18.36 6.64a9 9 0 1 1-12.73 0|M12 2v10'
+
+// Bouton d'alimentation en tête de ligne : vert = allumé (clic → éteindre), gris = éteint.
+function PowerBtn({ on, busy, onClick }: { on: boolean; busy: boolean; onClick: () => void }) {
+  const [hover, setHover] = useState(false)
+  const color = busy ? '#A1A1AA' : !on ? '#5A5A63' : hover ? '#F87171' : '#4ADE80'
+  return (
+    <button
+      type="button" disabled={!on || busy}
+      title={busy ? 'Extinction…' : on ? 'Éteindre le téléphone' : 'Téléphone éteint'}
+      aria-label={on ? 'Éteindre le téléphone' : 'Téléphone éteint'}
+      onClick={e => { e.stopPropagation(); onClick() }}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, padding: 0,
+        borderRadius: 6, cursor: on && !busy ? 'pointer' : 'default', color,
+        background: on && hover && !busy ? 'rgba(248,113,113,0.08)' : 'transparent',
+        border: `1px solid ${on && !busy ? (hover ? 'rgba(248,113,113,0.35)' : 'rgba(74,222,128,0.25)') : 'rgba(255,255,255,0.07)'}`,
+        transition: 'color .12s ease, border-color .12s ease, background .12s ease',
+        animation: busy ? 'aPulse 1s ease-in-out infinite' : undefined,
+      }}
+    ><Icon d={POWER_ICON} size={12} sw={2} /></button>
+  )
+}
 
 
 // ── Case à cocher (portée du prototype) ────────────────────────────────────────
@@ -69,8 +95,8 @@ const TH: CSSProperties = {
 
 function ctaKey(p: { geelark_id: string | null; id: string }): string { return `sf-story-link-${p.geelark_id ?? p.id}` }
 
-export default function Phones({ theme, infra, user, org, onNavigate }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
+export default function Phones({ theme, infra, user, org, isSuperAdmin, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; isSuperAdmin?: boolean; onNavigate?: (p: string) => void
 }) {
   const { currentOrg, role, perms } = org
   const [phones, setPhones] = useState<Phone[]>([])
@@ -89,6 +115,40 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
   const conns = useConnections(user, org)
   const bearer = conns.bearer
   const [syncing, setSyncing] = useState(false)
+
+  // Statut RÉEL chez GeeLark (geelark_id → 0 allumé, 1 éteint, 2 démarrage, 3 arrêt) :
+  // la colonne `phones.status` n'est mise à jour qu'à la synchro, trop vieille pour
+  // savoir quel téléphone consomme maintenant.
+  const [live, setLive] = useState<Map<string, number>>(new Map())
+  const [stopping, setStopping] = useState<Set<string>>(new Set())
+  const [serverLate, setServerLate] = useState(false)
+  const refreshLive = useCallback(async () => {
+    if (!bearer || infra === 'cloud') return
+    try { setLive(new Map((await fetchAllPhones(bearer)).map(p => [String(p.id), Number(p.status)]))) } catch { /* garde le dernier état */ }
+  }, [bearer, infra])
+  useEffect(() => {
+    void refreshLive()
+    const iv = setInterval(() => { if (document.visibilityState === 'visible') void refreshLive() }, 30_000)
+    return () => clearInterval(iv)
+  }, [refreshLive])
+  useEffect(() => onWatchguard(r => setServerLate(r.serverLate)), [])
+
+  const stopGeelark = useCallback(async (gids: string[]) => {
+    const ids = [...new Set(gids)]
+    if (!bearer || ids.length === 0) return
+    setStopping(prev => new Set([...prev, ...ids]))
+    try {
+      await stopPhones(bearer, ids)
+      await Promise.all(ids.map(id => releasePhone(id)))
+      setLive(prev => { const n = new Map(prev); ids.forEach(id => n.set(id, 3)); return n })
+      toast(ids.length > 1 ? `${ids.length} téléphones éteints` : 'Téléphone éteint', 'ok')
+      setTimeout(() => { void refreshLive() }, 8000)
+    } catch (e) {
+      toast(`Impossible d'éteindre : ${e instanceof Error ? e.message : String(e)}`, 'bad')
+    } finally {
+      setStopping(prev => { const n = new Set(prev); ids.forEach(id => n.delete(id)); return n })
+    }
+  }, [bearer, refreshLive])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -164,7 +224,20 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
   }
 
   // Rows enrichies d'un score de santé dérivé (déterministe).
-  const rows = useMemo(() => phones.map(p => ({ ...p, health: deriveHealth(p) })), [phones])
+  const rows = useMemo(() => phones.map(p => {
+    const st = p.geelark_id != null ? live.get(String(p.geelark_id)) : undefined
+    const status = st === undefined ? p.status : isPhoneOn(st) ? (p.status === 'warming' ? 'warming' : 'online') : 'offline'
+    return { ...p, status, powered: st === undefined ? p.status === 'online' || p.status === 'warming' : isPhoneOn(st), health: deriveHealth(p) }
+  }), [phones, live])
+  const poweredIds = rows.filter(p => p.powered && p.geelark_id).map(p => String(p.geelark_id))
+  const stopAll = async () => {
+    const ok = await confirmDialog({
+      title: `Éteindre ${poweredIds.length} téléphone(s) ?`,
+      text: 'Les tâches en cours sur ces téléphones seront interrompues.',
+      confirmLabel: 'Tout éteindre', danger: true,
+    })
+    if (ok) await stopGeelark(poweredIds)
+  }
 
   const groups = useMemo(() => {
     const s = new Set<string>()
@@ -219,6 +292,12 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
       <PageHead title={title} sub={sub} actions={isCloud
         ? <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
         : <Btn label={syncing ? 'Synchro…' : 'Sync GeeLark'} theme={theme} tone="primary" disabled={syncing} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={syncFromGeelark} />} />
+
+      {isSuperAdmin && serverLate && (
+        <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(251,191,36,0.25)', fontSize: 13, color: '#FBBF24' }}>
+          Le garde-fou serveur ne répond pas (téléphones éteints par l’app à sa place) : redéploie la fonction run-scheduled-posts et vérifie son cron.
+        </div>
+      )}
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>
@@ -287,8 +366,13 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
             })}
           </span>
 
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
-            {loading ? el : `${shown.length} / ${total}`}
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+            {!isCloud && poweredIds.length > 0 && (
+              <Btn theme={theme} sm tone="danger" icon={POWER_ICON} label={`Tout éteindre (${poweredIds.length})`} onClick={stopAll} />
+            )}
+            <span style={{ fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
+              {loading ? el : `${shown.length} / ${total}`}
+            </span>
           </span>
         </div>
 
@@ -297,6 +381,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
           display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
           padding: '0 16px', height: 36, borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
+          <span />
           <span><Check on={allOn} mid={someOn} accent={theme.accent} onClick={toggleAll} /></span>
           <span style={TH}>Compte</span>
           <span style={TH}>Groupe</span>
@@ -343,6 +428,9 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
                   onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
                   onMouseLeave={e => { e.currentTarget.style.background = on ? 'rgba(255,255,255,0.04)' : 'transparent' }}
                 >
+                  <span>{!isCloud && p.geelark_id && (
+                    <PowerBtn on={p.powered} busy={stopping.has(String(p.geelark_id))} onClick={() => stopGeelark([String(p.geelark_id)])} />
+                  )}</span>
                   <span><Check on={on} accent={theme.accent} onClick={() => toggle(p.id)} /></span>
 
                   {/* Appareil : avatar + NOM DU TÉLÉPHONE (GeeLark) en avant + @compte en dessous */}
@@ -409,6 +497,10 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
           <Btn label="Publier" theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
           <Btn label="Chauffer" theme={theme} sm icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" onClick={() => onNavigate?.('warmup')} />
           <Btn label="Groupe" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setGroupModal(true)} />
+          {!isCloud && (() => {
+            const ids = rows.filter(p => sel.has(p.id) && p.powered && p.geelark_id).map(p => String(p.geelark_id))
+            return ids.length > 0 ? <Btn label={`Éteindre (${ids.length})`} theme={theme} sm icon={POWER_ICON} onClick={() => stopGeelark(ids)} /> : null
+          })()}
           {!isCloud && <Btn label="Retirer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />}
           <span style={{ marginLeft: 'auto' }}>
             <Btn label="Tout désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
