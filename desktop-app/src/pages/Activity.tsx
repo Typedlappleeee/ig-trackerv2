@@ -180,34 +180,34 @@ export default function Activity({ theme, infra, user, org }: {
       <PageHead title="Activité" sub="L'historique de tous tes runs. Relance les comptes échoués sans reconstruire la diffusion." />
 
       {notice && (
-        <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 8, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 12, color: '#E4E4E7' }}>{notice}</div>
+        <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#A1A1AA' }}>{notice}</div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>
         <Kpi theme={theme} label="Runs · 7 jours" value={kpi.count7} />
-        <Kpi theme={theme} label="Taux de succès" value={kpi.count7 ? `${kpi.rate} %` : '—'} color={kpi.count7 ? '#34D399' : undefined} />
+        <Kpi theme={theme} label="Taux de succès" value={kpi.count7 ? `${kpi.rate} %` : '—'} color={kpi.count7 ? '#4ADE80' : undefined} />
         <Kpi theme={theme} label="Comptes échoués" value={kpi.failed7} color={kpi.failed7 ? '#FBBF24' : undefined} hint={kpi.failed7 ? 'relançables en un clic' : undefined} />
         <Kpi theme={theme} label="Crédits · 7 jours" value={kpi.credits7.toLocaleString('fr-FR')} color="#FBBF24" />
       </div>
 
       <Panel theme={theme}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
             {filters.map(f => (
               <button key={f.k} onClick={() => setFilter(f.k)} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer',
-                background: filter === f.k ? `rgba(${theme.tone},0.16)` : 'transparent',
-                color: filter === f.k ? theme.accentText : '#71717A', fontSize: 11, fontWeight: 700, transition: 'all .14s ease',
+                display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
+                background: filter === f.k ? 'rgba(255,255,255,0.08)' : 'transparent',
+                color: filter === f.k ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
               }}>
                 {f.l}
-                <span style={{ opacity: 0.55, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{f.n}</span>
+                <span style={{ color: filter === f.k ? '#A1A1AA' : '#5A5A63', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{f.n}</span>
               </button>
             ))}
           </span>
         </div>
 
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div>
+          <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div>
         ) : error ? (
           <Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} />
         ) : shown.length === 0 ? (
@@ -217,34 +217,34 @@ export default function Activity({ theme, infra, user, org }: {
           const pct = r.total ? Math.round((r.ok / r.total) * 100) : 0
           return (
             <div key={r.id} style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px',
-              borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none', transition: 'background .14s ease',
+              display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', minHeight: 52, boxSizing: 'border-box',
+              borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', transition: 'background .12s ease',
             }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
               <span style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-                background: ok ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
-                border: '1px solid ' + (ok ? 'rgba(16,185,129,0.22)' : 'rgba(245,158,11,0.22)'),
-                color: ok ? '#34D399' : '#FBBF24',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                background: '#18181B',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: ok ? '#4ADE80' : '#FBBF24',
               }}><Icon d={ok ? 'M20 6L9 17l-5-5' : 'M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'} size={13} /></span>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
                   {/* Sticker infra : d'où vient le run. (Tous GeeLark aujourd'hui ; ScaleFlow Cloud se taguera quand l'infra sera active.) */}
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, flexShrink: 0, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.24)', fontSize: 9.5, fontWeight: 800, color: '#C4B5FD' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 18, padding: '0 6px', boxSizing: 'border-box', borderRadius: 4, flexShrink: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 500, color: '#A1A1AA' }}>
                     <span style={{ width: 5, height: 5, borderRadius: 99, background: '#A78BFA' }} />GeeLark
                   </span>
                 </span>
-                <span style={{ fontSize: 11, color: '#52525B' }}>{r.meta}</span>
+                <span style={{ fontSize: 12, color: '#71717A' }}>{r.meta}</span>
               </span>
               <span style={{ width: 90, display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
                 <span style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                  <span style={{ display: 'block', height: '100%', width: `${pct}%`, borderRadius: 99, background: ok ? '#10B981' : '#F59E0B' }} />
+                  <span style={{ display: 'block', height: '100%', width: `${pct}%`, borderRadius: 99, background: ok ? '#4ADE80' : '#FBBF24' }} />
                 </span>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 700, color: ok ? '#34D399' : '#FBBF24' }}>{r.ok} / {r.total}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: ok ? '#4ADE80' : '#FBBF24' }}>{r.ok} / {r.total}</span>
               </span>
-              <span style={{ fontSize: 11, color: '#52525B', minWidth: 84, textAlign: 'right', flexShrink: 0 }}>{r.when}</span>
+              <span style={{ fontSize: 12, color: '#71717A', minWidth: 84, textAlign: 'right', flexShrink: 0 }}>{r.when}</span>
               <span style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                 <Btn theme={theme} sm tone="quiet" icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6" label="Détails" onClick={() => setDetail(r)} />
                 {!ok && <Btn theme={theme} sm icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={`Relancer ${r.total - r.ok}`} onClick={() => relancer(r)} />}
@@ -257,10 +257,10 @@ export default function Activity({ theme, infra, user, org }: {
       {detail && (
         <Modal theme={theme} title={detail.title} sub={detail.meta} icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6"
           onClose={() => setDetail(null)} footer={<Btn theme={theme} tone="quiet" label="Fermer" onClick={() => setDetail(null)} />}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {([['Comptes réussis', `${detail.ok} / ${detail.total}`], ['Taux', `${detail.total ? Math.round((detail.ok / detail.total) * 100) : 0} %`], ['Quand', detail.when], ['Type', detail.meta]] as [string, string][]).map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-                <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: '#E4E4E7' }}>{v}</span>
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+                <span style={{ color: '#8B8B94' }}>{k}</span><span style={{ fontWeight: 500, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{v}</span>
               </div>
             ))}
             <div style={{ marginTop: 4 }}>
@@ -269,18 +269,18 @@ export default function Activity({ theme, infra, user, org }: {
 
             {/* Détail par compte : qui a posté, qui a échoué (et pourquoi). */}
             {detail.accounts && detail.accounts.length > 0 && (
-              <div style={{ marginTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 8 }}>
+              <div style={{ marginTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94', marginBottom: 8 }}>
                   Détail par compte
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 260, overflowY: 'auto', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)' }}>
                   {[...detail.accounts].sort((a, b) => Number(a.ok) - Number(b.ok)).map((a, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', borderRadius: 8, background: a.ok ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.08)', border: `1px solid ${a.ok ? 'rgba(16,185,129,0.18)' : 'rgba(245,158,11,0.22)'}` }}>
-                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 5, flexShrink: 0, color: a.ok ? '#34D399' : '#FBBF24', background: a.ok ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.14)' }}>
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', minHeight: 36, boxSizing: 'border-box', borderTop: idx > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, flexShrink: 0, color: a.ok ? '#4ADE80' : '#FBBF24' }}>
                         <Icon d={a.ok ? 'M20 6L9 17l-5-5' : 'M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'} size={11} />
                       </span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: '#E4E4E7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
-                      {!a.ok && <span style={{ fontSize: 10.5, color: '#FBBF24', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.error || 'échec'}</span>}
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 400, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+                      {!a.ok && <span style={{ fontSize: 11.5, color: '#FBBF24', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.error || 'échec'}</span>}
                     </div>
                   ))}
                 </div>

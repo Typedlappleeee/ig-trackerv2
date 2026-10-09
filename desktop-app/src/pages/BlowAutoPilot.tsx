@@ -24,22 +24,31 @@ import { themeFor } from '@/lib/theme'
 
 const BLOW_THEME = themeFor('blowsome')
 
-const GOLD = '#E9C46A', INK = '#ECE9F5', MUTED = '#A79FBD', DIM = '#6b6478', SERIF = "'Space Grotesk',sans-serif"
+// Style « SaaS épuré » : surfaces plates neutres ; l'or iRemoTech reste un accent discret
+// (sélection, cases cochées, interrupteurs, petites pastilles).
+const GOLD = '#E9C46A', INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#71717A'
+const EDGE = 'rgba(255,255,255,0.07)', FIELD_EDGE = 'rgba(255,255,255,0.09)', FIELD_BG = '#161618'
+const MONO = "'JetBrains Mono',monospace"
+const SEL_BG = 'rgba(255,255,255,0.07)', SEL_EDGE = 'rgba(233,196,106,0.45)'
 type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null }
 export type IrtTab = 'phones' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
 
-const card: CSSProperties = { background: 'linear-gradient(168deg,rgba(24,20,44,0.5),rgba(12,10,22,0.6))', border: '1px solid rgba(216,180,254,0.12)', borderRadius: 16, padding: 18, marginBottom: 14 }
-const btn: CSSProperties = { height: 34, padding: '0 13px', borderRadius: 9, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(216,180,254,0.16)', color: INK }
-const gold: CSSProperties = { ...btn, background: GOLD, color: '#1a1206', border: 'none', fontWeight: 800 }
-const inp: CSSProperties = { height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12.5, outline: 'none', boxSizing: 'border-box' }
+const card: CSSProperties = { background: '#111113', border: `1px solid ${EDGE}`, borderRadius: 8, padding: 16, marginBottom: 12 }
+// Boutons alignés sur <Btn> (lib/ui) : ghost = bordé neutre, `gold` = primaire clair.
+const btn: CSSProperties = { height: 32, padding: '0 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: '#E4E4E7', whiteSpace: 'nowrap' }
+const gold: CSSProperties = { ...btn, background: '#EDEDEF', color: '#0A0A0B', border: '1px solid #EDEDEF' }
+const inp: CSSProperties = { height: 32, padding: '0 10px', borderRadius: 6, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 13, outline: 'none', boxSizing: 'border-box' }
+const lbl: CSSProperties = { fontSize: 12, fontWeight: 500, color: MUTED }
+const seg: CSSProperties = { display: 'inline-flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: `1px solid ${EDGE}` }
+const logBox: CSSProperties = { padding: 10, borderRadius: 6, background: '#0D0D0F', border: `1px solid ${EDGE}`, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap' }
 
 function H({ title, sub, right }: { title: string; sub?: string; right?: ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 7, background: 'rgba(233,196,106,0.12)', border: '1px solid rgba(233,196,106,0.35)', color: GOLD, fontSize: 10, fontWeight: 800, marginBottom: 9 }}>✦ iRemoTech · Studio</div>
-        <h1 style={{ margin: 0, fontFamily: SERIF, fontSize: 24, fontWeight: 700, letterSpacing: '-0.03em', color: INK }}>{title}</h1>
-        {sub && <p style={{ margin: '6px 0 0', fontSize: 12.5, color: MUTED, lineHeight: 1.55, maxWidth: 720 }}>{sub}</p>}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: GOLD, fontSize: 11, fontWeight: 500, marginBottom: 10 }}>✦ iRemoTech · Studio</div>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', color: INK }}>{title}</h1>
+        {sub && <p style={{ margin: '6px 0 0', fontSize: 13, color: '#A1A1AA', lineHeight: 1.55, maxWidth: 720 }}>{sub}</p>}
       </div>
       {right}
     </div>
@@ -47,13 +56,13 @@ function H({ title, sub, right }: { title: string; sub?: string; right?: ReactNo
 }
 function Toggle({ on, onClick, label, sub }: { on: boolean; onClick: () => void; label: string; sub?: string }) {
   return (
-    <div onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 11, cursor: 'pointer', padding: '10px 12px', borderRadius: 11, background: on ? 'rgba(233,196,106,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${on ? 'rgba(233,196,106,0.28)' : 'rgba(216,180,254,0.12)'}` }}>
+    <div onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 11, cursor: 'pointer', padding: '10px 12px', borderRadius: 8, background: on ? 'rgba(255,255,255,0.03)' : 'transparent', border: `1px solid ${on ? 'rgba(255,255,255,0.12)' : EDGE}` }}>
       <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 38, height: 22, padding: 2, borderRadius: 99, background: on ? GOLD : 'rgba(255,255,255,0.12)', transition: 'background .15s' }}>
         <span style={{ width: 18, height: 18, borderRadius: 99, background: '#fff' }} />
       </span>
       <span style={{ minWidth: 0 }}>
-        <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: INK }}>{label}</span>
-        {sub && <span style={{ display: 'block', fontSize: 11, color: DIM, marginTop: 1 }}>{sub}</span>}
+        <span style={{ display: 'block', fontSize: 13, fontWeight: 500, color: INK }}>{label}</span>
+        {sub && <span style={{ display: 'block', fontSize: 12, color: MUTED, marginTop: 2 }}>{sub}</span>}
       </span>
     </div>
   )
@@ -412,7 +421,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         <H title="Studio iRemoTech" />
         {irt.loading
           ? <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>Chargement…</div>
-          : <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>iRemoTech pas encore branché. Colle ta clé API dans <b style={{ color: GOLD }}>Phone Farm → ⚙</b>.</div>}
+          : <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>iRemoTech pas encore branché. Colle ta clé API dans <b style={{ color: INK, fontWeight: 600 }}>Phone Farm → ⚙</b>.</div>}
       </div>
     )
   }
@@ -422,8 +431,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const phonePicker = (opts?: { manage?: boolean }) => (
     <div style={card}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setPhonesOpen(o => !o)}>
-        <span style={{ fontSize: 13.5, fontWeight: 800, color: INK }}>📱 Téléphones & containers</span>
-        <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: totalJobs ? 'rgba(233,196,106,0.16)' : 'rgba(248,113,113,0.14)', color: totalJobs ? GOLD : '#F87171' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>📱 Téléphones & containers</span>
+        <span style={{ fontSize: 11.5, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: totalJobs ? GOLD : '#F87171', fontVariantNumeric: 'tabular-nums' }}>
           {totalJobs ? `${totalJobs} container(s) · ${sel.size} iPhone(s)` : 'aucune sélection'}
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -435,14 +444,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {phonesOpen && (
         <div style={{ marginTop: 12 }}>
           {/* Chips téléphones */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {devices.map(d => {
               const on = sel.has(d.public_id)
               const list = conts[d.public_id] ?? []
               return (
-                <button key={d.public_id} onClick={() => togglePhone(d.public_id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 38, padding: '0 13px', borderRadius: 10, cursor: 'pointer', background: on ? GOLD : 'rgba(255,255,255,0.03)', color: on ? '#1a1206' : INK, border: on ? 'none' : '1px solid rgba(216,180,254,0.16)', fontSize: 13, fontWeight: 700 }}>
-                  <span style={{ display: 'grid', placeItems: 'center', width: 16, height: 16, borderRadius: 4, background: on ? '#1a1206' : 'transparent', color: GOLD, fontSize: 10, fontWeight: 900, border: on ? 'none' : '1px solid rgba(216,180,254,0.3)' }}>{on ? '✓' : ''}</span>
-                  {d.name ?? d.public_id}<span style={{ fontSize: 10.5, opacity: 0.7 }}>· {list.length}c</span>
+                <button key={d.public_id} onClick={() => togglePhone(d.public_id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px', borderRadius: 6, cursor: 'pointer', background: on ? SEL_BG : FIELD_BG, color: on ? INK : '#A1A1AA', border: `1px solid ${on ? SEL_EDGE : FIELD_EDGE}`, fontSize: 13, fontWeight: 500 }}>
+                  <span style={{ display: 'grid', placeItems: 'center', width: 14, height: 14, borderRadius: 4, background: on ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 9.5, fontWeight: 600, border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.18)' }}>{on ? '✓' : ''}</span>
+                  {d.name ?? d.public_id}<span style={{ fontSize: 11.5, color: DIM, fontVariantNumeric: 'tabular-nums' }}>· {list.length}c</span>
                 </button>
               )
             })}
@@ -455,13 +464,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             const list = conts[devId] ?? []
             const picked = selConts[devId] ?? new Set()
             return (
-              <div key={devId} style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(233,196,106,0.04)', border: '1px solid rgba(233,196,106,0.2)' }}>
+              <div key={devId} style={{ marginTop: 10, padding: 12, borderRadius: 8, background: 'transparent', border: `1px solid ${EDGE}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 9 }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 800, color: GOLD }}>📱 {d?.name ?? devId}</span>
-                  <span style={{ fontSize: 11.5, color: MUTED }}>{picked.size}/{list.length}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>📱 {d?.name ?? devId}</span>
+                  <span style={{ fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{picked.size}/{list.length}</span>
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                    <button style={{ ...btn, height: 28 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set(list) }))}>Tout</button>
-                    <button style={{ ...btn, height: 28 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set() }))}>Aucun</button>
+                    <button style={{ ...btn, height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set(list) }))}>Tout</button>
+                    <button style={{ ...btn, height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set() }))}>Aucun</button>
                   </span>
                 </div>
                 {list.length > 0 && (
@@ -469,20 +478,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     {list.map(c => {
                       const cp = picked.has(c)
                       return (
-                        <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 6px 0 11px', borderRadius: 9, fontSize: 13, fontWeight: 800, background: cp ? GOLD : 'rgba(255,255,255,0.04)', color: cp ? '#1a1206' : INK, border: cp ? 'none' : '1px solid rgba(216,180,254,0.16)' }}>
+                        <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 6px 0 10px', borderRadius: 6, fontSize: 12.5, fontWeight: 500, background: cp ? SEL_BG : FIELD_BG, color: cp ? INK : '#A1A1AA', border: `1px solid ${cp ? SEL_EDGE : FIELD_EDGE}` }}>
                           <span onClick={() => toggleCont(devId, c)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ display: 'grid', placeItems: 'center', width: 15, height: 15, borderRadius: 4, background: cp ? '#1a1206' : 'transparent', color: GOLD, fontSize: 10, fontWeight: 900, border: cp ? 'none' : '1px solid rgba(216,180,254,0.3)' }}>{cp ? '✓' : ''}</span>
+                            <span style={{ display: 'grid', placeItems: 'center', width: 14, height: 14, borderRadius: 4, background: cp ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 9.5, fontWeight: 600, border: cp ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.18)' }}>{cp ? '✓' : ''}</span>
                             {c}
                           </span>
-                          {opts?.manage && <span onClick={() => removeC(devId, c)} title="Retirer" style={{ cursor: 'pointer', opacity: 0.5, fontWeight: 900, fontSize: 16, padding: '0 2px' }}>×</span>}
+                          {opts?.manage && <span onClick={() => removeC(devId, c)} title="Retirer" style={{ cursor: 'pointer', color: DIM, fontWeight: 500, fontSize: 15, padding: '0 2px' }}>×</span>}
                         </span>
                       )
                     })}
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 7, maxWidth: 380 }}>
-                  <input value={newC[devId] ?? ''} onChange={e => setNewC(v => ({ ...v, [devId]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(devId) }} placeholder="+ container (ex. 6, Default…)" style={{ ...inp, flex: 1, height: 34 }} />
-                  <button style={{ ...gold, height: 34, padding: '0 14px' }} onClick={() => addC(devId)}>Ajouter</button>
+                  <input value={newC[devId] ?? ''} onChange={e => setNewC(v => ({ ...v, [devId]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(devId) }} placeholder="+ container (ex. 6, Default…)" style={{ ...inp, flex: 1, minWidth: 0 }} />
+                  <button style={gold} onClick={() => addC(devId)}>Ajouter</button>
                 </div>
               </div>
             )
@@ -495,11 +504,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const LogPanel = () => (logs.length > 0 || running) ? (
     <div style={card}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: INK }}>Journal</span>
-        {running && runId && <button style={{ ...btn, marginLeft: 'auto', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
+        <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>Journal</span>
+        {running && runId && <button style={{ ...btn, marginLeft: 'auto', background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
         {!running && logs.length > 0 && <button style={{ ...btn, marginLeft: 'auto' }} onClick={() => setLogs([])}>Effacer</button>}
       </div>
-      <div style={{ padding: 11, borderRadius: 10, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 320, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{logs.join('\n') || 'En cours…'}</div>
+      <div style={{ ...logBox, maxHeight: 320 }}>{logs.join('\n') || 'En cours…'}</div>
     </div>
   ) : null
 
@@ -515,17 +524,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <H title="Studio iRemoTech" sub="Automatise tes vrais iPhones : gère tes téléphones et containers, publie des Reels et des Stories, et crée des comptes — le tout par vision."
-        right={budget?.budget != null ? <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: GOLD }}>{budget.remaining ?? '—'} / {budget.budget ?? '—'} actions</span> : undefined} />
+        right={budget?.budget != null ? <span style={{ fontFamily: MONO, fontSize: 12, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }}>{budget.remaining ?? '—'} / {budget.budget ?? '—'} actions</span> : undefined} />
 
       {/* Barre d'onglets (mode autonome ; en infra, la nav de gauche gère les onglets) */}
       {!onTab && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ ...seg, display: 'flex', flexWrap: 'wrap', width: 'fit-content', maxWidth: '100%', marginBottom: 16 }}>
           {TABS.map(t => {
             const on = curTab === t.k
             return (
-              <button key={t.k} onClick={() => goTab(t.k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 18px', borderRadius: 12, cursor: 'pointer', fontSize: 13.5, fontWeight: 800, background: on ? GOLD : 'rgba(255,255,255,0.03)', color: on ? '#1a1206' : MUTED, border: on ? 'none' : '1px solid rgba(216,180,254,0.14)' }}>
+              <button key={t.k} onClick={() => goTab(t.k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 30, padding: '0 12px', borderRadius: 5, cursor: 'pointer', fontSize: 13, fontWeight: 500, background: on ? 'rgba(255,255,255,0.08)' : 'transparent', color: on ? INK : MUTED, border: 'none' }}>
                 <span>{t.icon}</span>{t.label}
-                {t.k === 'phones' && totalJobs > 0 && <span style={{ fontSize: 11, fontWeight: 900, padding: '1px 7px', borderRadius: 99, background: on ? 'rgba(26,18,6,0.2)' : 'rgba(233,196,106,0.2)', color: on ? '#1a1206' : GOLD }}>{totalJobs}</span>}
+                {t.k === 'phones' && totalJobs > 0 && <span style={{ fontSize: 11, fontWeight: 500, padding: '0 6px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: GOLD, fontVariantNumeric: 'tabular-nums' }}>{totalJobs}</span>}
               </button>
             )
           })}
@@ -537,7 +546,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
       {/* ─────────────── ONGLET TÉLÉPHONES (gestion complète) ─────────────── */}
       {curTab === 'phones' && (<>
-        <p style={{ margin: '0 0 12px', fontSize: 12.5, color: MUTED }}>Gère tes iPhones et leurs containers Crane. Tu peux aussi choisir/lancer directement depuis les onglets Posting, Story et Création de compte.</p>
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: MUTED }}>Gère tes iPhones et leurs containers Crane. Tu peux aussi choisir/lancer directement depuis les onglets Posting, Story et Création de compte.</p>
         {phonePicker({ manage: true })}
         {sel.size > 0 && (
           <div style={{ ...card, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -552,7 +561,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {curTab === 'posting' && (<>
         {phonePicker()}
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 3 }}>🎬 Posting — Reels</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>🎬 Posting — Reels</div>
           <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque container coché reçoit une vidéo tirée <b>au hasard</b> du pool et publie un Reel.</p>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
             <button style={gold} onClick={() => setPicker('reel')}>+ Ajouter des vidéos</button>
@@ -562,14 +571,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           {reelPool.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
               {reelPool.map(v => (
-                <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 9px', borderRadius: 8, fontSize: 11.5, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK }}>
+                <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, fontSize: 12, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK }}>
                   🎞 {v.title.slice(0, 26)}
-                  <span onClick={() => setReelPool(p => p.filter(x => x.id !== v.id))} title="Retirer" style={{ cursor: 'pointer', color: '#F87171', fontWeight: 900 }}>×</span>
+                  <span onClick={() => setReelPool(p => p.filter(x => x.id !== v.id))} title="Retirer" style={{ cursor: 'pointer', color: '#F87171', fontWeight: 500 }}>×</span>
                 </span>
               ))}
             </div>
           )}
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, margin: '0 0 6px' }}>Légendes (une par ligne, tirées au hasard)</div>
+          <div style={{ ...lbl, margin: '0 0 6px' }}>Légendes (une par ligne, tirées au hasard)</div>
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={3} placeholder={'Ma légende 1\nMa légende 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 60, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
         </div>
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />
@@ -581,7 +590,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {curTab === 'story' && (<>
         {phonePicker()}
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 3 }}>📸 Story — photo + lien</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>📸 Story — photo + lien</div>
           <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque container reçoit une photo tirée au hasard, avec son lien sticker (CTA).</p>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
             <button style={gold} onClick={() => setPicker('story')}>+ Ajouter des photos</button>
@@ -591,29 +600,29 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           {storyPool.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
               {storyPool.map(v => (
-                <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 9px', borderRadius: 8, fontSize: 11.5, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK }}>
+                <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, fontSize: 12, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK }}>
                   🖼 {v.title.slice(0, 26)}
-                  <span onClick={() => setStoryPool(p => p.filter(x => x.id !== v.id))} title="Retirer" style={{ cursor: 'pointer', color: '#F87171', fontWeight: 900 }}>×</span>
+                  <span onClick={() => setStoryPool(p => p.filter(x => x.id !== v.id))} title="Retirer" style={{ cursor: 'pointer', color: '#F87171', fontWeight: 500 }}>×</span>
                 </span>
               ))}
             </div>
           )}
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, margin: '0 0 6px' }}>Lien CTA par défaut</div>
-          <input value={storyLink} onChange={e => setStoryLink(e.target.value)} placeholder="https://mon-lien.com" style={{ ...inp, width: '100%', height: 38, marginBottom: 12 }} />
+          <div style={{ ...lbl, margin: '0 0 6px' }}>Lien CTA par défaut</div>
+          <input value={storyLink} onChange={e => setStoryLink(e.target.value)} placeholder="https://mon-lien.com" style={{ ...inp, width: '100%', height: 32, marginBottom: 12 }} />
           {totalJobs > 0 && (
             <>
-              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, margin: '0 0 8px' }}>Lien par container (prioritaire sur le défaut)</div>
+              <div style={{ ...lbl, margin: '0 0 8px' }}>Lien par container (prioritaire sur le défaut)</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {[...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => ({ dev, c }))).map(({ dev, c }) => (
                   <div key={`${dev}::${c}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ minWidth: 130, fontSize: 12, fontWeight: 700, color: GOLD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{devices.find(d => d.public_id === dev)?.name ?? dev} · {c}</span>
-                    <input value={storyLinks[linkKey(dev, c)] ?? ''} onChange={e => setLink(dev, c, e.target.value)} placeholder={storyLink.trim() ? `défaut : ${storyLink.trim()}` : 'https://…'} style={{ ...inp, flex: 1, height: 34, fontSize: 12 }} />
+                    <span style={{ minWidth: 130, fontSize: 12.5, fontWeight: 500, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{devices.find(d => d.public_id === dev)?.name ?? dev} · {c}</span>
+                    <input value={storyLinks[linkKey(dev, c)] ?? ''} onChange={e => setLink(dev, c, e.target.value)} placeholder={storyLink.trim() ? `défaut : ${storyLink.trim()}` : 'https://…'} style={{ ...inp, flex: 1, height: 32, fontSize: 12 }} />
                   </div>
                 ))}
               </div>
             </>
           )}
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, margin: '14px 0 6px' }}>Textes sticker (une par ligne, au hasard — optionnel)</div>
+          <div style={{ ...lbl, margin: '14px 0 6px' }}>Textes sticker (une par ligne, au hasard — optionnel)</div>
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={2} placeholder={'Texte 1\nTexte 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 46, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
         </div>
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />
@@ -625,15 +634,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {curTab === 'warmup' && (<>
         {phonePicker()}
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 3 }}>🔥 Warm-up</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>🔥 Warm-up</div>
           <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Active chaque compte façon humaine (scroll Reels, regard, like…), un conteneur après l'autre, avec <b>rotation d'IP entre chaque</b> (mode avion).</p>
 
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, marginBottom: 7 }}>Intensité</div>
+          <div style={{ ...lbl, marginBottom: 7 }}>Intensité</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
             {([['careful', 'Careful', '5–8 min · 2%'], ['balanced', 'Balanced', '8–12 min · 5%'], ['aggressive', 'Aggressive', '12–15 min · 12%'], ['custom', 'Custom', 'sur mesure']] as const).map(([k, l, sub]) => (
-              <button key={k} onClick={() => setWPreset(k)} style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start', padding: '8px 14px', border: 'none', borderRadius: 10, cursor: 'pointer', background: wPreset === k ? GOLD : 'rgba(255,255,255,0.03)', color: wPreset === k ? '#1a1206' : INK, boxShadow: wPreset === k ? 'none' : 'inset 0 0 0 1px rgba(216,180,254,0.16)' }}>
-                <span style={{ fontSize: 13, fontWeight: 800 }}>{l}</span>
-                <span style={{ fontSize: 10.5, opacity: 0.8 }}>{sub}</span>
+              <button key={k} onClick={() => setWPreset(k)} style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start', padding: '8px 12px', borderRadius: 6, cursor: 'pointer', background: wPreset === k ? SEL_BG : FIELD_BG, color: wPreset === k ? INK : '#A1A1AA', border: `1px solid ${wPreset === k ? SEL_EDGE : FIELD_EDGE}` }}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>{l}</span>
+                <span style={{ fontSize: 11.5, color: MUTED }}>{sub}</span>
               </button>
             ))}
           </div>
@@ -641,18 +650,18 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           {wPreset === 'custom' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 6 }}>
               <label style={{ fontSize: 12, color: MUTED }}>Durée min (min)
-                <input type="number" min={1} max={15} value={wDurMin} onChange={e => setWDurMin(+e.target.value)} style={{ ...inp, width: '100%', height: 34, marginTop: 4 }} /></label>
+                <input type="number" min={1} max={15} value={wDurMin} onChange={e => setWDurMin(+e.target.value)} style={{ ...inp, width: '100%', height: 32, marginTop: 4 }} /></label>
               <label style={{ fontSize: 12, color: MUTED }}>Durée max (min)
-                <input type="number" min={1} max={15} value={wDurMax} onChange={e => setWDurMax(+e.target.value)} style={{ ...inp, width: '100%', height: 34, marginTop: 4 }} /></label>
+                <input type="number" min={1} max={15} value={wDurMax} onChange={e => setWDurMax(+e.target.value)} style={{ ...inp, width: '100%', height: 32, marginTop: 4 }} /></label>
               <label style={{ fontSize: 12, color: MUTED }}>Taux de like (%)
-                <input type="number" min={0} max={100} value={wLikePct} onChange={e => setWLikePct(+e.target.value)} style={{ ...inp, width: '100%', height: 34, marginTop: 4 }} /></label>
+                <input type="number" min={0} max={100} value={wLikePct} onChange={e => setWLikePct(+e.target.value)} style={{ ...inp, width: '100%', height: 32, marginTop: 4 }} /></label>
               <label style={{ fontSize: 12, color: MUTED }}>Taux de comment (%)
-                <input type="number" min={0} max={100} value={wCommentPct} onChange={e => setWCommentPct(+e.target.value)} style={{ ...inp, width: '100%', height: 34, marginTop: 4 }} /></label>
+                <input type="number" min={0} max={100} value={wCommentPct} onChange={e => setWCommentPct(+e.target.value)} style={{ ...inp, width: '100%', height: 32, marginTop: 4 }} /></label>
             </div>
           )}
           {wPreset === 'custom' && (
             <>
-              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, margin: '10px 0 6px' }}>Commentaires (un par ligne, au hasard — laisse vide pour ne pas commenter)</div>
+              <div style={{ ...lbl, margin: '10px 0 6px' }}>Commentaires (un par ligne, au hasard — laisse vide pour ne pas commenter)</div>
               <textarea value={wComments} onChange={e => setWComments(e.target.value)} rows={2} placeholder={'🔥\ntrop bien\n😍'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 46, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
             </>
           )}
@@ -667,22 +676,22 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {curTab === 'account' && (<>
         {phonePicker()}
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 3 }}>🆕 Création de compte Instagram</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>🆕 Création de compte Instagram</div>
           <p style={{ margin: '0 0 14px', fontSize: 12, color: MUTED }}>Ouvre IG sur chaque container « frais » (déconnecté) et crée un compte. Avec un token 5sim : numéro + code SMS automatiques.</p>
 
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, marginBottom: 7 }}>Pays du numéro</div>
-          <div style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 10, background: 'rgba(0,0,0,0.3)', marginBottom: 14 }}>
+          <div style={{ ...lbl, marginBottom: 7 }}>Pays du numéro</div>
+          <div style={{ ...seg, marginBottom: 14 }}>
             {(['uk', 'usa'] as const).map(k => (
-              <button key={k} onClick={() => setAcctCountry(k)} style={{ height: 34, padding: '0 16px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 800, background: acctCountry === k ? GOLD : 'transparent', color: acctCountry === k ? '#1a1206' : MUTED }}>
+              <button key={k} onClick={() => setAcctCountry(k)} style={{ height: 28, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: acctCountry === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: acctCountry === k ? INK : MUTED }}>
                 {k === 'uk' ? '🇬🇧 United Kingdom' : '🇺🇸 United States'}
               </button>
             ))}
           </div>
 
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM, marginBottom: 7 }}>Fournisseur de numéro</div>
-          <div style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 10, background: 'rgba(0,0,0,0.3)', marginBottom: 12 }}>
+          <div style={{ ...lbl, marginBottom: 7 }}>Fournisseur de numéro</div>
+          <div style={{ ...seg, marginBottom: 12 }}>
             {(['herosms', 'smspool', '5sim'] as const).map(p => (
-              <button key={p} onClick={() => { setSmsProvider(p); try { localStorage.setItem('sf-sms-provider', p) } catch { /* noop */ } }} style={{ height: 32, padding: '0 16px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 800, background: smsProvider === p ? GOLD : 'transparent', color: smsProvider === p ? '#1a1206' : MUTED }}>
+              <button key={p} onClick={() => { setSmsProvider(p); try { localStorage.setItem('sf-sms-provider', p) } catch { /* noop */ } }} style={{ height: 28, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: smsProvider === p ? 'rgba(255,255,255,0.08)' : 'transparent', color: smsProvider === p ? INK : MUTED }}>
                 {p === 'herosms' ? 'HeroSMS' : p === 'smspool' ? 'SMSPool' : '5sim'}
               </button>
             ))}
@@ -692,8 +701,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               <input value={heroKey} onChange={e => { const v = e.target.value.trim(); setHeroKey(v); try { localStorage.setItem('sf-herosms-key', v) } catch { /* noop */ } }}
                 placeholder="Token HeroSMS (numéro + code SMS auto)" type="password"
-                style={{ ...inp, flex: 1, height: 40 }} />
-              <button style={{ ...btn, height: 40, padding: '0 14px' }} disabled={!heroKey || running}
+                style={{ ...inp, flex: 1 }} />
+              <button style={{ ...btn, height: 32, padding: '0 14px' }} disabled={!heroKey || running}
                 onClick={async () => {
                   setLogs(['🔑 Test d’authentification HeroSMS (matrice)…'])
                   const r = await herosmsProbe(heroKey)
@@ -705,8 +714,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               <input value={smspoolKey} onChange={e => { const v = e.target.value.trim(); setSmspoolKey(v); try { localStorage.setItem('sf-smspool-key', v) } catch { /* noop */ } }}
                 placeholder="Clé API SMSPool (numéro + code SMS auto)" type="password"
-                style={{ ...inp, flex: 1, height: 40 }} />
-              <button style={{ ...btn, height: 40, padding: '0 14px' }} disabled={!smspoolKey || running}
+                style={{ ...inp, flex: 1 }} />
+              <button style={{ ...btn, height: 32, padding: '0 14px' }} disabled={!smspoolKey || running}
                 onClick={async () => {
                   setLogs(['🔑 Test de la clé SMSPool…'])
                   const r = await smspoolPing(smspoolKey)
@@ -716,11 +725,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           ) : (
             <input value={sim5Key} onChange={e => { setSim5Key(e.target.value); try { localStorage.setItem('sf-5sim-key', e.target.value) } catch { /* noop */ } }}
               placeholder="Token 5sim (numéro + code SMS auto)" type="password"
-              style={{ ...inp, width: '100%', height: 40, marginBottom: 8 }} />
+              style={{ ...inp, width: '100%', height: 32, marginBottom: 8 }} />
           )}
           {smsProvider === 'smspool' && (
             <div style={{ marginTop: 10, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM }}>Prix max $</span>
+              <span style={{ ...lbl }}>Prix max $</span>
               <input value={smspoolMax} onChange={e => setSmspoolMax(e.target.value.replace(',', '.'))} inputMode="decimal"
                 style={{ ...inp, width: 90, height: 32 }} placeholder="0.35" />
               <button style={{ ...btn, height: 30, padding: '0 12px' }} disabled={!smspoolKey}
@@ -729,13 +738,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                   const p = await smspoolPrice(smspoolKey, acctCountry === 'usa' ? 'United States' : 'United Kingdom', 'Instagram')
                   setSmspoolPriceShown(p != null ? `${p}$` : 'indispo')
                 }}>Prix actuel</button>
-              {smspoolPriceShown && <span style={{ fontSize: 12, color: smspoolPriceShown === 'indispo' ? '#F87171' : GOLD }}>prix actuel : {smspoolPriceShown}</span>}
+              {smspoolPriceShown && <span style={{ fontSize: 12, color: smspoolPriceShown === 'indispo' ? '#F87171' : '#A1A1AA', fontVariantNumeric: 'tabular-nums' }}>prix actuel : {smspoolPriceShown}</span>}
             </div>
           )}
           {smsProvider === 'herosms' && (
             <div style={{ marginTop: 10, marginBottom: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
-                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', color: DIM }}>Prix du numéro</span>
+                <span style={{ ...lbl }}>Prix du numéro</span>
                 <button style={{ ...btn, height: 28, padding: '0 12px' }} disabled={!heroKey || offersLoading}
                   onClick={async () => {
                     setOffersLoading(true)
@@ -752,9 +761,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 )}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                <button onClick={() => setHeroPrice(null)} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 800, background: heroPrice === null ? GOLD : 'rgba(0,0,0,0.3)', color: heroPrice === null ? '#1a1206' : MUTED }}>Auto (moins cher)</button>
+                <button onClick={() => setHeroPrice(null)} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500, fontVariantNumeric: 'tabular-nums', background: heroPrice === null ? SEL_BG : FIELD_BG, border: `1px solid ${heroPrice === null ? SEL_EDGE : FIELD_EDGE}`, color: heroPrice === null ? INK : '#A1A1AA' }}>Auto (moins cher)</button>
                 {heroOffers.filter(o => showAllPrices || o.price >= 0.20).map(o => (
-                  <button key={o.price} onClick={() => setHeroPrice(o.price)} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 800, background: heroPrice === o.price ? GOLD : 'rgba(0,0,0,0.3)', color: heroPrice === o.price ? '#1a1206' : INK }}>
+                  <button key={o.price} onClick={() => setHeroPrice(o.price)} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500, fontVariantNumeric: 'tabular-nums', background: heroPrice === o.price ? SEL_BG : FIELD_BG, border: `1px solid ${heroPrice === o.price ? SEL_EDGE : FIELD_EDGE}`, color: heroPrice === o.price ? INK : '#A1A1AA' }}>
                     {o.price.toFixed(2)}$ · {o.count} dispo
                   </button>
                 ))}
@@ -776,19 +785,19 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         {createdAccts.length > 0 && (
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: INK }}>✅ Comptes créés ({createdAccts.length})</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>✅ Comptes créés ({createdAccts.length})</span>
               <button style={{ ...btn, marginLeft: 'auto', height: 28 }} onClick={() => { const t = createdAccts.map(a => `${a.username ?? '?'}\t${a.password ?? ''}\t${a.phone ?? ''}\t${a.deviceName ?? a.device}·${a.container}`).join('\n'); try { navigator.clipboard.writeText(t) } catch { /* noop */ } }}>Copier tout</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto' }}>
               {createdAccts.map(a => (
-                <div key={a.at} style={{ padding: 11, borderRadius: 10, background: a.ok ? 'rgba(233,196,106,0.05)' : 'rgba(248,113,113,0.06)', border: `1px solid ${a.ok ? 'rgba(233,196,106,0.2)' : 'rgba(248,113,113,0.25)'}` }}>
+                <div key={a.at} style={{ padding: 10, borderRadius: 6, background: 'transparent', border: `1px solid ${a.ok ? EDGE : 'rgba(248,113,113,0.25)'}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 800, color: a.ok ? GOLD : '#F87171' }}>@{a.username ?? '—'}</span>
-                    <span style={{ fontSize: 11.5, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 10.5, color: DIM }}>{a.country}{a.price != null ? ` · ${a.price}$` : ''}</span>
-                    <button onClick={() => { removeCreatedAccount(a.at); setCreatedAccts(loadCreatedAccounts()) }} title="Retirer" style={{ cursor: 'pointer', background: 'none', border: 'none', color: '#F87171', fontWeight: 900, fontSize: 16 }}>×</button>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: a.ok ? INK : '#F87171' }}>@{a.username ?? '—'}</span>
+                    <span style={{ fontSize: 12, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11.5, color: DIM, fontVariantNumeric: 'tabular-nums' }}>{a.country}{a.price != null ? ` · ${a.price}$` : ''}</span>
+                    <button onClick={() => { removeCreatedAccount(a.at); setCreatedAccts(loadCreatedAccounts()) }} title="Retirer" style={{ cursor: 'pointer', background: 'none', border: 'none', color: '#F87171', fontWeight: 500, fontSize: 15 }}>×</button>
                   </div>
-                  <div style={{ marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: INK }}>
+                  <div style={{ marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: MONO, fontSize: 11, color: INK }}>
                     <span>🔑 {a.password ?? '—'}</span>
                     <span>📞 {a.phone ?? '—'}</span>
                     {a.fullName && <span style={{ color: MUTED }}>{a.fullName}</span>}
@@ -825,18 +834,18 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         return (<>
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: INK }}>👤 Comptes créés</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>👤 Comptes créés</div>
               <div style={{ display: 'flex', gap: 14, marginLeft: 'auto', fontSize: 12 }}>
                 <span style={{ color: MUTED }}>Total <b style={{ color: INK }}>{createdAccts.length}</b></span>
-                <span style={{ color: '#34D399' }}>Réussis <b>{okN}</b></span>
+                <span style={{ color: '#4ADE80' }}>Réussis <b>{okN}</b></span>
                 <span style={{ color: '#F87171' }}>Échoués <b>{koN}</b></span>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <input value={acctSearch} onChange={e => setAcctSearch(e.target.value)} placeholder="Rechercher (username, numéro, conteneur, téléphone…)" style={{ ...inp, flex: 1, minWidth: 220, height: 38 }} />
-              <div style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 10, background: 'rgba(0,0,0,0.3)' }}>
+              <input value={acctSearch} onChange={e => setAcctSearch(e.target.value)} placeholder="Rechercher (username, numéro, conteneur, téléphone…)" style={{ ...inp, flex: 1, minWidth: 220 }} />
+              <div style={{ ...seg }}>
                 {([['all', 'Tous'], ['ok', 'Réussis'], ['ko', 'Échoués']] as const).map(([k, l]) => (
-                  <button key={k} onClick={() => setAcctFilter(k)} style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 800, background: acctFilter === k ? GOLD : 'transparent', color: acctFilter === k ? '#1a1206' : MUTED }}>{l}</button>
+                  <button key={k} onClick={() => setAcctFilter(k)} style={{ height: 28, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: acctFilter === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: acctFilter === k ? INK : MUTED }}>{l}</button>
                 ))}
               </div>
             </div>
@@ -844,7 +853,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <button style={{ ...btn, height: 32 }} onClick={copyAll}>Copier tout ({filtered.length})</button>
                 <button style={{ ...btn, height: 32 }} onClick={exportCsv}>Exporter CSV</button>
-                <button style={{ ...btn, height: 32, color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => { if (window.confirm('Vider TOUS les comptes enregistrés ? (irréversible)')) { clearCreatedAccounts(); setCreatedAccts([]) } }}>Vider</button>
+                <button style={{ ...btn, height: 32, background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => { if (window.confirm('Vider TOUS les comptes enregistrés ? (irréversible)')) { clearCreatedAccounts(); setCreatedAccts([]) } }}>Vider</button>
               </div>
             )}
           </div>
@@ -854,8 +863,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               {createdAccts.length === 0 ? 'Aucun compte créé pour l’instant — lance une création dans l’onglet « Création de compte ».' : 'Aucun compte ne correspond à ta recherche.'}
             </div>
           ) : (() => {
-            const th: React.CSSProperties = { textAlign: 'left', padding: '8px 14px', fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: DIM, borderBottom: '1px solid rgba(216,180,254,0.16)', whiteSpace: 'nowrap' }
-            const td: React.CSSProperties = { padding: '10px 14px', borderBottom: '1px solid rgba(216,180,254,0.07)', verticalAlign: 'middle', whiteSpace: 'nowrap' }
+            const th: React.CSSProperties = { textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 500, color: DIM, borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }
+            const td: React.CSSProperties = { height: 46, padding: '0 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', verticalAlign: 'middle', whiteSpace: 'nowrap' }
             return (
               <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
@@ -869,28 +878,28 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((a, idx) => (
+                    {filtered.map(a => (
                       <Fragment key={a.at}>
-                        <tr style={{ background: idx % 2 ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
-                          <td style={{ ...td, fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: INK, cursor: 'pointer' }} title="Cliquer pour copier"
+                        <tr>
+                          <td style={{ ...td, fontFamily: MONO, fontSize: 12.5, color: INK, cursor: 'pointer' }} title="Cliquer pour copier"
                             onClick={() => { try { navigator.clipboard.writeText(line(a)) } catch { /* noop */ } }}>
                             {(a.username ?? '?')}<span style={{ color: DIM }}>:</span>{(a.password ?? '?')}
                           </td>
-                          <td style={td}><span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: a.ok ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)', color: a.ok ? '#34D399' : '#F87171' }}>{a.ok ? 'CRÉÉ' : 'ÉCHEC'}</span></td>
+                          <td style={td}><span style={{ fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: a.ok ? '#4ADE80' : '#F87171' }}>{a.ok ? 'CRÉÉ' : 'ÉCHEC'}</span></td>
                           <td style={{ ...td, fontSize: 12, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</td>
-                          <td style={{ ...td, fontSize: 11.5, color: DIM }}>{fmt(a.at)}</td>
+                          <td style={{ ...td, fontSize: 12, color: DIM, fontVariantNumeric: 'tabular-nums' }}>{fmt(a.at)}</td>
                           <td style={{ ...td, textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: 6 }}>
                               <button style={{ ...btn, height: 26, fontSize: 11, padding: '0 10px' }} onClick={() => { try { navigator.clipboard.writeText(line(a)) } catch { /* noop */ } }}>Copier</button>
                               {a.log && a.log.length > 0 && <button style={{ ...btn, height: 26, fontSize: 11, padding: '0 10px' }} onClick={() => setAcctLogOpen(acctLogOpen === a.at ? null : a.at)}>Log</button>}
-                              <button style={{ ...btn, height: 26, fontSize: 11, padding: '0 10px', color: '#F87171', borderColor: 'rgba(248,113,113,0.4)' }} onClick={() => { removeCreatedAccount(a.at); setCreatedAccts(loadCreatedAccounts()) }}>×</button>
+                              <button style={{ ...btn, height: 26, fontSize: 11, padding: '0 10px', background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => { removeCreatedAccount(a.at); setCreatedAccts(loadCreatedAccounts()) }}>×</button>
                             </div>
                           </td>
                         </tr>
                         {acctLogOpen === a.at && a.log && (
                           <tr>
                             <td colSpan={5} style={{ padding: '0 14px 10px' }}>
-                              <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(216,180,254,0.1)', maxHeight: 240, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, lineHeight: 1.6, color: MUTED, whiteSpace: 'pre-wrap' }}>{a.log.join('\n')}</div>
+                              <div style={{ ...logBox, maxHeight: 240 }}>{a.log.join('\n')}</div>
                             </td>
                           </tr>
                         )}
@@ -921,7 +930,7 @@ function OptionsCard({ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, paral
 }) {
   return (
     <div style={card}>
-      <div style={{ fontSize: 13, fontWeight: 800, color: INK, marginBottom: 12 }}>Options</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginBottom: 12 }}>Options</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
         <Toggle on={airplaneOn} onClick={() => setAirplaneOn(v => !v)} label="Rotation d'IP (mode avion)" sub="Cycle avion entre chaque container" />
         {!accountMode && <Toggle on={uniqueUse} onClick={() => setUniqueUse(v => !v)} label="Usage unique" sub="Pas de doublon tant que le pool n'est pas épuisé" />}
@@ -935,7 +944,7 @@ function OptionsCard({ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, paral
 function LaunchBar({ label, disabled, running, onClick }: { label: string; disabled: boolean; running: boolean; onClick: () => void }) {
   return (
     <div style={{ ...card, display: 'flex', justifyContent: 'flex-end' }}>
-      <button style={{ ...gold, height: 46, padding: '0 26px', fontSize: 14.5, opacity: disabled ? 0.5 : 1 }} disabled={disabled} onClick={onClick}>
+      <button style={{ ...gold, height: 32, padding: '0 16px', opacity: disabled ? 0.4 : 1 }} disabled={disabled} onClick={onClick}>
         {running ? 'En cours…' : label}
       </button>
     </div>

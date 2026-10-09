@@ -6,9 +6,10 @@ import { openLiveStream, sendAction, snapshot } from '@/lib/iremotech'
 // Contrôle en direct d'un iPhone (Phone Farm) : flux vidéo WebSocket dessiné sur
 // un canvas, tap/swipe/texte renvoyés à l'appareil, et enregistrement des actions
 // en séquence (macro) rejouable pour poster en masse.
-const GOLD = '#E9C46A', INK = '#ECE9F5', MUTED = '#A79FBD'
-const PANEL = 'linear-gradient(168deg,#17111F,#120C19)'
-const BORDER = '1px solid rgba(216,180,254,0.14)'
+const INK = '#EDEDEF', MUTED = '#8B8B94'
+const PANEL = '#111113'
+const BORDER = '1px solid rgba(255,255,255,0.09)'
+const PRIMARY: React.CSSProperties = { background: '#EDEDEF', color: '#0A0A0B', border: '1px solid #EDEDEF' }
 
 export default function LiveDevice({ apiKey, device, onClose, onSaveSequence }: {
   apiKey: string; device: IrtDevice; onClose: () => void
@@ -106,15 +107,15 @@ export default function LiveDevice({ apiKey, device, onClose, onSaveSequence }: 
   }
   function insertUpload() { if (recording) { stepsRef.current.push({ delay: 800, upload: true }); setStepCount(stepsRef.current.length) } }
 
-  const btn: React.CSSProperties = { height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: BORDER, color: INK }
+  const btn: React.CSSProperties = { height: 32, padding: '0 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: '#161618', border: BORDER, color: '#E4E4E7' }
 
   return createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'rgba(4,3,8,0.78)', backdropFilter: 'blur(6px)' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'rgba(0,0,0,0.6)' }}>
       <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 16, maxWidth: '100%', maxHeight: '92vh' }}>
         {/* Écran live */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
           <canvas ref={canvasRef} onMouseDown={onDown} onMouseUp={onUp}
-            style={{ width: 300, maxWidth: '40vw', aspectRatio: '390 / 844', borderRadius: 20, background: '#000', border: '2px solid rgba(216,180,254,0.25)', cursor: status === 'live' ? 'pointer' : 'default', boxShadow: '0 30px 70px -30px rgba(168,85,247,0.7)' }} />
+            style={{ width: 300, maxWidth: '40vw', aspectRatio: '390 / 844', borderRadius: 20, background: '#000', border: '1px solid rgba(255,255,255,0.1)', cursor: status === 'live' ? 'pointer' : 'default' }} />
           <div style={{ display: 'flex', gap: 8 }}>
             <button style={btn} onClick={() => quick({ type: 'press', name: 'home' })}>⌂ Home</button>
             <button style={btn} onClick={() => quick({ type: 'swipe', x1: 195, y1: 650, x2: 195, y2: 250, duration_ms: 300 })}>↑ Scroll</button>
@@ -123,19 +124,19 @@ export default function LiveDevice({ apiKey, device, onClose, onSaveSequence }: 
         </div>
 
         {/* Panneau contrôle */}
-        <div style={{ width: 320, maxWidth: '46vw', display: 'flex', flexDirection: 'column', gap: 12, padding: 18, borderRadius: 16, background: PANEL, border: BORDER, overflowY: 'auto' }}>
+        <div style={{ width: 320, maxWidth: '46vw', display: 'flex', flexDirection: 'column', gap: 12, padding: 16, borderRadius: 10, background: PANEL, border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.7)', overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 99, background: status === 'live' ? '#34D399' : status === 'offline' ? '#EF4444' : '#F59E0B' }} />
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{device.name ?? device.public_id}</span>
+            <span style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: status === 'live' ? '#4ADE80' : status === 'offline' ? '#F87171' : '#FBBF24' }} />
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{device.name ?? device.public_id}</span>
             <button style={{ ...btn, height: 28, padding: '0 10px' }} onClick={onClose}>Fermer</button>
           </div>
-          <div style={{ fontSize: 11, color: MUTED }}>{status === 'live' ? 'En direct — clique/glisse sur l’écran pour piloter.' : status === 'offline' ? 'Appareil injoignable.' : 'Connexion…'}</div>
+          <div style={{ fontSize: 12, color: MUTED }}>{status === 'live' ? 'En direct — clique/glisse sur l’écran pour piloter.' : status === 'offline' ? 'Appareil injoignable.' : 'Connexion…'}</div>
 
           {/* Saisie texte */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: MUTED }}>Saisir du texte</span>
+            <span style={{ fontSize: 12, fontWeight: 500, color: MUTED }}>Saisir du texte</span>
             <textarea value={text} onChange={e => setText(e.target.value)} rows={2} placeholder="Tape ta légende / recherche…"
-              style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: 9, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: BORDER, color: INK, fontSize: 12.5, outline: 'none', fontFamily: 'inherit' }} />
+              style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: '8px 10px', borderRadius: 6, background: '#161618', border: BORDER, color: INK, fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
             <div style={{ display: 'flex', gap: 6 }}>
               <button style={{ ...btn, flex: 1 }} onClick={() => sendText(false)}>Envoyer</button>
               <button style={{ ...btn, flex: 1 }} onClick={() => sendText(true)} title="Marque ce texte comme « légende » : il sera remplacé par la légende choisie au lancement">↳ comme légende</button>
@@ -143,17 +144,17 @@ export default function LiveDevice({ apiKey, device, onClose, onSaveSequence }: 
           </div>
 
           {/* Enregistrement de séquence */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 12, background: recording ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${recording ? 'rgba(239,68,68,0.35)' : 'rgba(216,180,254,0.12)'}` }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 8, background: '#161618', border: `1px solid ${recording ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.07)'}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: INK }}>{recording ? `Enregistrement… (${stepCount} étapes)` : stepCount > 0 ? `Séquence prête (${stepCount} étapes)` : 'Enregistrer une séquence'}</span>
-              <button style={{ ...btn, background: recording ? '#EF4444' : GOLD, color: recording ? '#fff' : '#1a1206', border: 'none' }} onClick={toggleRec}>{recording ? '■ Stop' : '● Rec'}</button>
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: INK, fontVariantNumeric: 'tabular-nums' }}>{recording ? `Enregistrement… (${stepCount} étapes)` : stepCount > 0 ? `Séquence prête (${stepCount} étapes)` : 'Enregistrer une séquence'}</span>
+              <button style={{ ...btn, ...(recording ? { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' } : PRIMARY) }} onClick={toggleRec}>{recording ? '■ Stop' : '● Rec'}</button>
             </div>
-            <p style={{ margin: 0, fontSize: 10.5, lineHeight: 1.5, color: MUTED }}>
+            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: MUTED }}>
               Enregistre tes gestes une fois (ouvrir Insta → nouvelle pub → sélectionner la vidéo → légende → publier), puis rejoue-les sur tout le parc avec une vidéo + légende différentes.
             </p>
             {recording && <button style={btn} onClick={insertUpload}>+ Insérer « envoyer la vidéo »</button>}
             {!recording && stepCount > 0 && (
-              <button style={{ ...btn, background: GOLD, color: '#1a1206', border: 'none' }} onClick={() => onSaveSequence(stepsRef.current.slice())}>Enregistrer cette séquence</button>
+              <button style={{ ...btn, ...PRIMARY }} onClick={() => onSaveSequence(stepsRef.current.slice())}>Enregistrer cette séquence</button>
             )}
           </div>
         </div>

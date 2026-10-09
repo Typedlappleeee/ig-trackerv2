@@ -21,25 +21,26 @@ interface Phone { id: string; ig_username: string | null; phone_name: string; st
 type Drag = { kind: 'new'; type: BlockType } | { kind: 'move'; from: number }
 
 const MONO = "'JetBrains Mono',monospace"
-const inputStyle: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none', fontFamily: 'inherit' }
+const inputStyle: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
 const areaStyle: CSSProperties = { ...inputStyle, height: 'auto', padding: 10, resize: 'vertical', lineHeight: 1.5 }
 
 // Mise en page responsive (les styles inline n'ont pas de media queries).
 const LAYOUT_CSS = `
-.fb-grid{display:grid;grid-template-columns:236px minmax(0,1fr) 344px;gap:10px;align-items:start}
+.fb-grid{display:grid;grid-template-columns:236px minmax(0,1fr) 344px;gap:12px;align-items:start}
 @media (max-width:1180px){.fb-grid{grid-template-columns:minmax(0,1fr) 330px}.fb-palette{grid-column:1 / -1}}
 @media (max-width:860px){.fb-grid{grid-template-columns:minmax(0,1fr)}}
 .fb-card .fb-actions{opacity:0;transition:opacity .12s ease}
 .fb-card:hover .fb-actions,.fb-card.sel .fb-actions{opacity:1}
-.fb-pal-item:hover{background:rgba(255,255,255,0.04)!important}
+.fb-pal-item:hover{background:rgba(255,255,255,0.05)!important}
 .fb-vp{cursor:grab}.fb-vp:active{cursor:grabbing}
 .fb-lib-row .fb-lib-actions{opacity:0;transition:opacity .12s ease}
 .fb-lib-row:hover .fb-lib-actions,.fb-lib-row.on .fb-lib-actions{opacity:1}
 .fb-lib-row:hover{background:rgba(255,255,255,0.03)}
+.fb-card:not(.sel):hover{background:#141416!important}
 .fb-adv > summary::-webkit-details-marker{display:none}
 .fb-adv > summary svg{transition:transform .15s ease}
 .fb-adv[open] > summary svg{transform:rotate(90deg)}
-.fb-adv > summary:hover{color:#E4E4E7}
+.fb-adv > summary:hover{color:#EDEDEF}
 `
 
 export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme; infra: InfraKey; user: User; org: OrgState }) {
@@ -253,14 +254,14 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
       />
 
       {!bearer && !conns.loading && (
-        <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 9, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', color: '#FBBF24', fontSize: 12 }}>
+        <div style={{ padding: '10px 12px', marginBottom: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', color: '#FBBF24', fontSize: 13 }}>
           Connecte d'abord ton compte GeeLark (token) dans les Réglages pour pouvoir lancer un flow.
         </div>
       )}
 
       <div className="fb-grid">
         {/* ── Colonne gauche : Mes flows + Blocs ── */}
-        <div className="fb-palette" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="fb-palette" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <FlowLibrary theme={theme} flows={flows} activeId={flowId} loading={flowsLoading}
             onOpen={openFlow} onNew={() => setNewOpen(-1)} onDuplicate={duplicateFlow} onDelete={f => setConfirmDel(f)} />
           <Panel theme={theme}>
@@ -268,17 +269,17 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
             <div style={{ padding: '6px 0 8px' }}>
               {(['Compte', 'Activité', 'Contenu'] as const).map(g => (
                 <div key={g}>
-                  <div style={{ padding: '8px 14px 4px', fontSize: 9.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#71717A' }}>{g}</div>
+                  <div style={{ padding: '8px 16px 4px', fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{g}</div>
                   {BLOCKS.filter(b => b.group === g).map(b => (
                     <div key={b.type} className="fb-pal-item" draggable
                       onDragStart={e => { e.dataTransfer.effectAllowed = 'copy'; e.dataTransfer.setData('text/plain', b.type); setDrag({ kind: 'new', type: b.type }) }}
                       onDragEnd={() => { setDrag(null); setOverSlot(null) }}
                       onClick={() => addBlock(b.type)}
                       title={b.hint}
-                      style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px', cursor: 'grab', userSelect: 'none' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px', cursor: 'grab', userSelect: 'none' }}>
                       <BlockIcon def={b.type} size={24} />
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: '#D4D4D8' }}>{b.label}</span>
-                      {b.credits > 0 && <span style={{ fontFamily: MONO, fontSize: 9.5, color: '#71717A' }}>{b.credits}cr</span>}
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{b.label}</span>
+                      {b.credits > 0 && <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{b.credits}cr</span>}
                     </div>
                   ))}
                 </div>
@@ -290,10 +291,10 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
         {/* ── Canvas (déplaçable à la main) ── */}
         <Panel theme={theme} style={{ overflow: 'hidden' }}>
           {flow ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
               <input value={flow.name} onChange={e => update(f => ({ ...f, name: e.target.value }))} aria-label="Nom du flow" title="Clique pour renommer"
-                style={{ flex: 1, minWidth: 140, height: 30, padding: '0 8px', marginLeft: -8, borderRadius: 7, border: '1px solid transparent', background: 'transparent', color: '#F4F4F6', fontSize: 14, fontWeight: 700, outline: 'none' }}
-                onFocus={e => { e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)' }}
+                style={{ flex: 1, minWidth: 140, height: 30, padding: '0 8px', marginLeft: -8, borderRadius: 6, border: '1px solid transparent', background: 'transparent', color: '#EDEDEF', fontSize: 14, fontWeight: 600, outline: 'none' }}
+                onFocus={e => { e.currentTarget.style.border = '1px solid rgba(255,255,255,0.12)' }}
                 onBlur={e => { e.currentTarget.style.border = '1px solid transparent' }} />
               <Chip text={`≈ ${fmtMinutes(est)} / compte`} tone="mute" />
               <Chip text={credits > 0 ? `${credits} crédit${credits > 1 ? 's' : ''} / compte` : 'Gratuit'} tone={credits > 0 ? 'violet' : 'ok'} />
@@ -304,11 +305,11 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
             onPointerDown={onPanStart} onPointerMove={onPanMove} onPointerUp={onPanEnd} onPointerCancel={onPanEnd}
             style={{
               position: 'relative', height: 'max(520px, calc(100vh - 300px))', overflow: 'hidden', touchAction: 'none',
-              backgroundColor: 'rgba(0,0,0,0.18)', backgroundImage: 'radial-gradient(rgba(255,255,255,0.075) 1px, transparent 1px)',
+              backgroundColor: '#0C0C0E', backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)',
               backgroundSize: `${18 * view.z}px ${18 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px`,
             }}>
             {!flow ? (flowsLoading
-              ? <div style={{ padding: 60, textAlign: 'center', color: '#71717A', fontSize: 12 }}>Chargement…</div>
+              ? <div style={{ padding: 60, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div>
               : <EmptyState theme={theme} onTemplate={i => setNewOpen(i)} />
             ) : (
               <div style={{ position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '26px 16px 90px', transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
@@ -334,7 +335,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
             )}
             {flow && (
               <>
-                <div style={{ position: 'absolute', bottom: 10, left: 10, display: 'flex', alignItems: 'center', gap: 2, padding: 3, borderRadius: 8, background: '#16161C', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ position: 'absolute', bottom: 10, left: 10, display: 'flex', alignItems: 'center', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.08)' }}>
                   {([['M12 5v14|M5 12h14', () => zoomAt(1.15), 'Zoom avant'],
                      ['M5 12h14', () => zoomAt(1 / 1.15), 'Zoom arrière'],
                      ['M3 12a9 9 0 1 0 3-6.7L3 8|M3 3v5h5', () => setView({ x: 0, y: 0, z: 1 }), 'Recentrer']] as [string, () => void, string][]).map(([d, fn, t]) => (
@@ -342,9 +343,9 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
                       <Icon d={d} size={13} />
                     </button>
                   ))}
-                  <span style={{ padding: '0 6px', fontFamily: MONO, fontSize: 10, color: '#71717A' }}>{Math.round(view.z * 100)}%</span>
+                  <span style={{ padding: '0 6px', fontSize: 11.5, color: '#8B8B94', fontVariantNumeric: 'tabular-nums' }}>{Math.round(view.z * 100)}%</span>
                 </div>
-                <div style={{ position: 'absolute', top: 10, right: 14, fontSize: 10.5, color: '#71717A', pointerEvents: 'none' }}>
+                <div style={{ position: 'absolute', top: 10, right: 16, fontSize: 11.5, color: '#71717A', pointerEvents: 'none' }}>
                   Glisse le fond pour te déplacer · Ctrl + molette pour zoomer
                 </div>
               </>
@@ -365,7 +366,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
               onPatch={patch => update(f => ({ ...f, ...patch }))}
               onDelete={() => setConfirmDel(flow)} />
           ) : (
-            <div style={{ padding: 22, fontSize: 12, color: '#71717A', lineHeight: 1.6 }}>Crée un flow (bouton « Nouveau » à gauche) ou choisis un modèle pour commencer.</div>
+            <div style={{ padding: 16, fontSize: 13, color: '#8B8B94', lineHeight: 1.6 }}>Crée un flow (bouton « Nouveau » à gauche) ou choisis un modèle pour commencer.</div>
           )}
         </Panel>
       </div>
@@ -383,12 +384,12 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
             <Btn theme={theme} tone="ghost" label="Annuler" onClick={() => setConfirmDel(null)} />
             <Btn theme={theme} tone="danger" label="Supprimer" onClick={() => removeFlow(confirmDel)} />
           </>}>
-          <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA' }}>Les exécutions déjà lancées avec ce flow continuent normalement.</div>
+          <div style={{ fontSize: 13, lineHeight: 1.6, color: '#A1A1AA' }}>Les exécutions déjà lancées avec ce flow continuent normalement.</div>
         </Modal>
       )}
 
       {/* ── Exécutions ── */}
-      <div ref={runsRef} style={{ marginTop: 14 }}>
+      <div ref={runsRef} style={{ marginTop: 16 }}>
         <RunsPanel theme={theme} runs={runs} />
       </div>
 
@@ -429,7 +430,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
 function BlockIcon({ def, size = 28 }: { def: BlockType; size?: number }) {
   const b = BLOCK[def]
   return (
-    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: size, height: size, borderRadius: Math.round(size * 0.3), flexShrink: 0, background: `rgba(${b.color},0.13)`, border: `1px solid rgba(${b.color},0.3)`, color: `rgb(${b.color})` }}>
+    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: size, height: size, borderRadius: size >= 28 ? 6 : 5, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: `rgb(${b.color})` }}>
       <Icon d={b.icon} size={Math.round(size * 0.5)} />
     </span>
   )
@@ -438,14 +439,14 @@ function BlockIcon({ def, size = 28 }: { def: BlockType; size?: number }) {
 function SaveBadge({ state, error }: { state: 'idle' | 'saving' | 'saved' | 'error'; error: string | null }) {
   if (state === 'idle') return null
   const t = state === 'saving' ? 'Enregistrement…' : state === 'saved' ? 'Enregistré' : `Erreur : ${error ?? ''}`
-  return <span style={{ alignSelf: 'center', fontSize: 11.5, fontWeight: 600, color: state === 'error' ? '#F87171' : state === 'saved' ? '#34D399' : '#71717A' }}>{state === 'saved' ? '✓ ' : ''}{t}</span>
+  return <span style={{ alignSelf: 'center', fontSize: 12, fontWeight: 500, color: state === 'error' ? '#F87171' : state === 'saved' ? '#4ADE80' : '#71717A' }}>{state === 'saved' ? '✓ ' : ''}{t}</span>
 }
 
 function Terminal({ label, sub, icon }: { label: string; sub: string; icon: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 14px 0 10px', borderRadius: 99, background: '#141419', border: '1px solid rgba(255,255,255,0.09)', color: '#A1A1AA', fontSize: 11.5, fontWeight: 600 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px 0 10px', borderRadius: 6, background: '#111113', border: '1px solid rgba(255,255,255,0.09)', color: '#A1A1AA', fontSize: 12, fontWeight: 500 }}>
       <span style={{ display: 'flex', color: '#71717A' }}><Icon d={icon} size={11} /></span>
-      {label}<span style={{ fontFamily: MONO, fontSize: 10, color: '#52525B' }}>{sub}</span>
+      {label}<span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{sub}</span>
     </div>
   )
 }
@@ -461,21 +462,21 @@ function Slot({ index, theme, drag, over, menuOpen, onOver, onDrop, onPlus, onPi
       onDragOver={e => { if (!active) return; e.preventDefault(); onOver(index) }}
       onDragLeave={() => onOver(null)}
       onDrop={e => { e.preventDefault(); onDrop(index) }}>
-      <span style={{ flex: 1, width: 0, borderLeft: `1.5px dashed ${over ? theme.accent : 'rgba(255,255,255,0.16)'}` }} />
-      {over && <span style={{ position: 'absolute', top: '50%', left: 20, right: 20, height: 26, marginTop: -13, borderRadius: 8, border: `1.5px dashed ${theme.accent}`, background: `rgba(${theme.tone},0.08)` }} />}
+      <span style={{ flex: 1, width: 0, borderLeft: `1px dashed ${over ? theme.accent : 'rgba(255,255,255,0.14)'}` }} />
+      {over && <span style={{ position: 'absolute', top: '50%', left: 20, right: 20, height: 26, marginTop: -13, borderRadius: 6, border: `1px dashed ${theme.accent}`, background: 'rgba(255,255,255,0.03)' }} />}
       {!active && (
         <button onClick={e => { e.stopPropagation(); onPlus(index) }} aria-label="Insérer un bloc" title="Insérer un bloc ici"
-          style={{ position: 'absolute', top: '50%', marginTop: -10, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 99, border: `1px solid ${menuOpen ? theme.selEdge : 'rgba(255,255,255,0.14)'}`, background: menuOpen ? `rgba(${theme.tone},0.2)` : '#141419', color: menuOpen ? theme.accentText : '#71717A', cursor: 'pointer', padding: 0 }}>
+          style={{ position: 'absolute', top: '50%', marginTop: -10, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 5, border: `1px solid ${menuOpen ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)'}`, background: menuOpen ? '#1C1C1F' : '#111113', color: menuOpen ? '#EDEDEF' : '#8B8B94', cursor: 'pointer', padding: 0 }}>
           <Icon d="M12 5v14|M5 12h14" size={10} sw={2.2} />
         </button>
       )}
       {menuOpen && (
-        <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '50%', left: '50%', marginLeft: 18, marginTop: -14, zIndex: 20, width: 200, padding: 5, borderRadius: 10, background: '#18181F', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 18px 40px -12px rgba(0,0,0,0.7)', animation: 'aPop .14s ease both' }}>
+        <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '50%', left: '50%', marginLeft: 18, marginTop: -14, zIndex: 20, width: 200, padding: 4, borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)', animation: 'aPop .14s ease both' }}>
           {BLOCKS.map(b => (
             <button key={b.type} onClick={() => onPick(b.type, index)} className="fb-pal-item"
-              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 8px', borderRadius: 7, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '5px 8px', borderRadius: 5, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
               <BlockIcon def={b.type} size={20} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#D4D4D8' }}>{b.label}</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{b.label}</span>
             </button>
           ))}
         </div>
@@ -526,6 +527,7 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
 }) {
   const def = BLOCK[block.type]
   const off = !isActive(block)
+  const edge = selected ? `rgba(${theme.tone},0.6)` : issue && !off ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.09)'
   const act = (d: string, fn: (() => void) | undefined, t: string, danger = false) => (
     <button onClick={e => { e.stopPropagation(); fn?.() }} disabled={!fn} title={t} aria-label={t}
       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', color: danger ? '#F87171' : '#A1A1AA', cursor: fn ? 'pointer' : 'default', opacity: fn ? 1 : 0.3, padding: 0 }}>
@@ -538,22 +540,22 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
       onDragEnd={onDragEnd}
       onClick={e => { e.stopPropagation(); onSelect() }}
       style={{
-        width: 290, borderRadius: 12, cursor: 'pointer', background: off ? '#111116' : '#15151B', opacity: off && !selected ? 0.6 : 1,
-        border: `1px ${off ? 'dashed' : 'solid'} ${selected ? `rgba(${def.color},0.55)` : issue && !off ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.1)'}`,
-        boxShadow: selected ? `0 0 0 3px rgba(${def.color},0.12), 0 14px 30px -18px rgba(0,0,0,0.9)` : '0 10px 24px -18px rgba(0,0,0,0.9)',
-        transition: 'border-color .12s ease, box-shadow .12s ease, opacity .12s ease',
+        width: 290, borderRadius: 8, cursor: 'pointer', background: off ? '#0F0F11' : '#111113', opacity: off && !selected ? 0.6 : 1,
+        borderTop: `1px ${off ? 'dashed' : 'solid'} ${edge}`, borderRight: `1px ${off ? 'dashed' : 'solid'} ${edge}`, borderBottom: `1px ${off ? 'dashed' : 'solid'} ${edge}`,
+        borderLeft: `2px ${off ? 'dashed' : 'solid'} ${off ? 'rgba(255,255,255,0.14)' : `rgba(${def.color},0.75)`}`,
+        transition: 'border-color .12s ease, background .12s ease, opacity .12s ease',
       }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 10px 10px 12px' }}>
-        <BlockIcon def={block.type} size={30} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 10px 10px 12px' }}>
+        <BlockIcon def={block.type} size={28} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase', color: off ? '#71717A' : `rgba(${def.color},0.85)` }}>{off ? '⏸ Désactivé' : `⚡ ${def.label}`}</div>
-          <div style={{ marginTop: 2, fontSize: 13.5, fontWeight: 700, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: off ? 'line-through' : undefined }}>{blockName(block)}</div>
-          <div style={{ marginTop: 1, fontFamily: MONO, fontSize: 10.5, color: '#8B8898' }}>{fmtMinutes(blockEstimate(block))}{def.credits > 0 ? ` · ${def.credits} cr` : ''}</div>
+          <div style={{ fontSize: 11.5, fontWeight: 500, color: '#8B8B94' }}>{off ? '⏸ Désactivé' : `⚡ ${def.label}`}</div>
+          <div style={{ marginTop: 2, fontSize: 13, fontWeight: 600, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: off ? 'line-through' : undefined }}>{blockName(block)}</div>
+          <div style={{ marginTop: 2, fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{fmtMinutes(blockEstimate(block))}{def.credits > 0 ? ` · ${def.credits} cr` : ''}</div>
         </div>
-        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: '#52525B' }}>{index + 1}</span>
+        <span style={{ fontSize: 11.5, fontWeight: 500, color: '#5A5A63', fontVariantNumeric: 'tabular-nums' }}>{index + 1}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px 7px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: issue && !off ? '#F87171' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={issue && !off ? issue : summary(block)}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px 6px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: issue && !off ? '#F87171' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={issue && !off ? issue : summary(block)}>
           {issue && !off ? `⚠ ${issue}` : summary(block)}
         </span>
         <span className="fb-actions" style={{ display: 'flex', gap: 1 }}>
@@ -570,22 +572,22 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
 function EmptyState({ theme, onTemplate }: { theme: Theme; onTemplate: (preset: number) => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '56px 20px', textAlign: 'center' }}>
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 13, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.26)`, color: theme.accentText }}>
-        <Icon d="M5 3h4v4H5z|M15 17h4v4h-4z|M7 7v4a2 2 0 0 0 2 2h6a2 2 0 0 1 2 2v2" size={22} />
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 8, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
+        <Icon d="M5 3h4v4H5z|M15 17h4v4h-4z|M7 7v4a2 2 0 0 0 2 2h6a2 2 0 0 1 2 2v2" size={18} />
       </span>
       <div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F6' }}>Crée ton premier flow</div>
-        <div style={{ marginTop: 5, fontSize: 12.5, color: '#71717A' }}>Pars d'un modèle ou glisse des blocs depuis la gauche.</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF' }}>Crée ton premier flow</div>
+        <div style={{ marginTop: 6, fontSize: 13, color: '#8B8B94' }}>Pars d'un modèle ou glisse des blocs depuis la gauche.</div>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
         {TEMPLATES.map((t, ti) => (
-          <button key={t.name} onClick={() => onTemplate(ti)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, width: 190, padding: 12, borderRadius: 11, cursor: 'pointer', textAlign: 'left', background: '#15151B', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <span style={{ display: 'flex', gap: 3 }}>{t.types.map((ty, i) => <BlockIcon key={i} def={ty} size={20} />)}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#E4E4E7' }}>{t.name}</span>
-            <span style={{ fontSize: 11, color: '#71717A' }}>{t.desc}</span>
+          <button key={t.name} onClick={() => onTemplate(ti)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, width: 190, padding: 12, borderRadius: 8, cursor: 'pointer', textAlign: 'left', background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <span style={{ display: 'flex', gap: 4 }}>{t.types.map((ty, i) => <BlockIcon key={i} def={ty} size={20} />)}</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{t.name}</span>
+            <span style={{ fontSize: 12, color: '#8B8B94' }}>{t.desc}</span>
           </button>
         ))}
-        <button onClick={() => onTemplate(-1)} style={{ width: 120, padding: 12, borderRadius: 11, cursor: 'pointer', background: 'transparent', border: '1px dashed rgba(255,255,255,0.14)', color: '#A1A1AA', fontSize: 12, fontWeight: 700 }}>Flow vide</button>
+        <button onClick={() => onTemplate(-1)} style={{ width: 120, padding: 12, borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px dashed rgba(255,255,255,0.14)', color: '#A1A1AA', fontSize: 13, fontWeight: 500 }}>Flow vide</button>
       </div>
     </div>
   )
@@ -621,27 +623,27 @@ function FlowLibrary({ theme, flows, activeId, loading, onOpen, onNew, onDuplica
         right={<Btn theme={theme} sm tone="primary" icon="M12 5v14|M5 12h14" label="Nouveau" onClick={onNew} />} />
       {flows.length > 5 && (
         <div style={{ padding: '8px 12px 2px' }}>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un flow…" style={{ ...inputStyle, height: 28, fontSize: 12 }} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un flow…" style={{ ...inputStyle, height: 28 }} />
         </div>
       )}
       <div style={{ maxHeight: 280, overflowY: 'auto', padding: '4px 0 6px' }}>
         {!loading && flows.length === 0 && (
-          <div style={{ padding: '14px 14px 16px', fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>Aucun flow pour l'instant. Clique sur <b style={{ color: '#D4D4D8' }}>Nouveau</b> pour en créer un — il sera sauvegardé ici.</div>
+          <div style={{ padding: '12px 16px 16px', fontSize: 12, lineHeight: 1.6, color: '#8B8B94' }}>Aucun flow pour l'instant. Clique sur <b style={{ color: '#EDEDEF', fontWeight: 600 }}>Nouveau</b> pour en créer un — il sera sauvegardé ici.</div>
         )}
         {shown.map(f => {
           const on = f.id === activeId
           return (
             <div key={f.id} className={`fb-lib-row${on ? ' on' : ''}`} onClick={() => onOpen(f.id)} role="button" tabIndex={0}
               onKeyDown={e => { if (e.key === 'Enter') onOpen(f.id) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px 8px 12px', cursor: 'pointer', borderLeft: `2px solid ${on ? theme.accent : 'transparent'}`, background: on ? `rgba(${theme.tone},0.08)` : undefined }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px 8px 14px', cursor: 'pointer', borderLeft: `2px solid ${on ? theme.accent : 'transparent'}`, background: on ? 'rgba(255,255,255,0.05)' : undefined }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: on ? '#F4F4F6' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                   <span style={{ display: 'flex', gap: 3 }}>
-                    {f.blocks.slice(0, 7).map(b => <span key={b.id} title={BLOCK[b.type].label} style={{ width: 7, height: 7, borderRadius: 2, background: `rgb(${BLOCK[b.type].color})` }} />)}
-                    {f.blocks.length === 0 && <span style={{ fontSize: 10.5, color: '#71717A' }}>vide</span>}
+                    {f.blocks.slice(0, 7).map(b => <span key={b.id} title={BLOCK[b.type].label} style={{ width: 6, height: 6, borderRadius: 99, background: `rgb(${BLOCK[b.type].color})` }} />)}
+                    {f.blocks.length === 0 && <span style={{ fontSize: 11.5, color: '#71717A' }}>vide</span>}
                   </span>
-                  <span style={{ fontSize: 10.5, color: '#71717A', whiteSpace: 'nowrap' }}>· {ago(f.updatedAt)}</span>
+                  <span style={{ fontSize: 11.5, color: '#71717A', whiteSpace: 'nowrap' }}>· {ago(f.updatedAt)}</span>
                 </div>
               </div>
               <span className="fb-lib-actions" style={{ display: 'flex', gap: 1 }}>
@@ -651,7 +653,7 @@ function FlowLibrary({ theme, flows, activeId, loading, onOpen, onNew, onDuplica
             </div>
           )
         })}
-        {flows.length > 0 && shown.length === 0 && <div style={{ padding: 14, fontSize: 12, color: '#71717A' }}>Aucun flow ne correspond.</div>}
+        {flows.length > 0 && shown.length === 0 && <div style={{ padding: 16, fontSize: 12, color: '#71717A' }}>Aucun flow ne correspond.</div>}
       </div>
     </Panel>
   )
@@ -679,22 +681,22 @@ function NewFlowModal({ theme, preset, names, onClose, onCreate }: {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Field label="Nom du flow" hint={dup ? 'Un flow porte déjà ce nom — tu peux quand même le créer.' : undefined}>
           <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit() }}
-            placeholder="ex. Lancement comptes mode" maxLength={60} style={{ ...inputStyle, height: 36, fontSize: 13.5 }} />
+            placeholder="ex. Lancement comptes mode" maxLength={60} style={inputStyle} />
         </Field>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Point de départ</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Point de départ</span>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
             {options.map(o => {
               const on = tpl === o.i
               return (
                 <button key={o.i} onClick={() => { setTpl(o.i); if (!name.trim() || TEMPLATES.some(t => t.name === name.trim())) setName(o.i >= 0 ? o.title : '') }}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: 11, borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                    background: on ? `rgba(${theme.tone},0.1)` : '#15151B', border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.08)'}` }}>
-                  <span style={{ display: 'flex', gap: 3, minHeight: 18 }}>
-                    {o.types.length ? o.types.map((ty, k) => <BlockIcon key={k} def={ty} size={18} />) : <span style={{ fontSize: 11, color: '#71717A' }}>—</span>}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: 12, borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                    background: on ? 'rgba(255,255,255,0.05)' : '#111113', border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.07)'}` }}>
+                  <span style={{ display: 'flex', gap: 4, minHeight: 18 }}>
+                    {o.types.length ? o.types.map((ty, k) => <BlockIcon key={k} def={ty} size={18} />) : <span style={{ fontSize: 11.5, color: '#71717A' }}>—</span>}
                   </span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? theme.accentText : '#E4E4E7' }}>{o.title}</span>
-                  <span style={{ fontSize: 11, color: '#A1A1AA' }}>{o.desc}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{o.title}</span>
+                  <span style={{ fontSize: 12, color: '#8B8B94' }}>{o.desc}</span>
                 </button>
               )
             })}
@@ -709,21 +711,21 @@ function NewFlowModal({ theme, preset, names, onClose, onCreate }: {
 
 function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{label}</span>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{label}</span>
       {children}
-      {hint && <span style={{ fontSize: 10.5, lineHeight: 1.5, color: '#52525B' }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 11.5, lineHeight: 1.5, color: '#71717A' }}>{hint}</span>}
     </label>
   )
 }
 
 function Seg<T extends string | number>({ theme, value, options, onChange }: { theme: Theme; value: T; options: [T, string][]; onChange: (v: T) => void }) {
   return (
-    <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
       {options.map(([v, l]) => (
         <button key={String(v)} onClick={e => { e.preventDefault(); onChange(v) }} style={{
-          flex: 1, height: 26, padding: '0 6px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
-          background: value === v ? `rgba(${theme.tone},0.16)` : 'transparent', color: value === v ? theme.accentText : '#71717A',
+          flex: 1, height: 26, padding: '0 6px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap',
+          background: value === v ? 'rgba(255,255,255,0.08)' : 'transparent', color: value === v ? '#EDEDEF' : '#8B8B94',
         }}>{l}</button>
       ))}
     </div>
@@ -734,10 +736,10 @@ function Range({ p, onChange, presets }: { p: BlockParams; onChange: (x: Partial
   const num = (v: string) => Math.max(0, Math.min(600, Math.round(Number(v) || 0)))
   return (
     <>
-      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {presets.map(([l, a, b]) => {
           const on = p.minMin === a && p.maxMin === b
-          return <button key={l} onClick={e => { e.preventDefault(); onChange({ minMin: a, maxMin: b }) }} style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: `1px solid ${on ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.07)'}`, background: on ? 'rgba(251,191,36,0.1)' : 'transparent', color: on ? '#FBBF24' : '#A1A1AA' }}>{l} · {a}–{b}</button>
+          return <button key={l} onClick={e => { e.preventDefault(); onChange({ minMin: a, maxMin: b }) }} style={{ height: 26, padding: '0 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500, fontVariantNumeric: 'tabular-nums', border: `1px solid ${on ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.09)'}`, background: on ? 'rgba(255,255,255,0.08)' : 'transparent', color: on ? '#EDEDEF' : '#A1A1AA' }}>{l} · {a}–{b}</button>
         })}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -751,8 +753,8 @@ function Range({ p, onChange, presets }: { p: BlockParams; onChange: (x: Partial
 function MediaPick({ theme, count, kind, onPick }: { theme: Theme; count: number; kind: 'videos' | 'images'; onPick: () => void }) {
   const w = kind === 'videos' ? 'vidéo' : 'image'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: `1px solid ${count ? 'rgba(255,255,255,0.08)' : 'rgba(248,113,113,0.3)'}` }}>
-      <span style={{ flex: 1, fontSize: 12, color: count ? '#E4E4E7' : '#F87171', fontWeight: 600 }}>{count ? `${count} ${w}${count > 1 ? 's' : ''} sélectionnée${count > 1 ? 's' : ''}` : `Aucune ${w}`}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px 8px 12px', borderRadius: 8, background: '#161618', border: `1px solid ${count ? 'rgba(255,255,255,0.09)' : 'rgba(248,113,113,0.3)'}` }}>
+      <span style={{ flex: 1, fontSize: 13, color: count ? '#EDEDEF' : '#F87171', fontWeight: 500 }}>{count ? `${count} ${w}${count > 1 ? 's' : ''} sélectionnée${count > 1 ? 's' : ''}` : `Aucune ${w}`}</span>
       <Btn theme={theme} sm tone="ghost" label={count ? 'Modifier' : 'Choisir'} onClick={onPick} />
     </div>
   )
@@ -764,11 +766,11 @@ function Toggle({ theme, on, onChange, label, hint, disabled }: { theme: Theme; 
     <button type="button" role="switch" aria-checked={on} disabled={disabled} onClick={() => onChange(!on)}
       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: 0, border: 'none', background: 'transparent', cursor: disabled ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: disabled ? 0.45 : 1 }}>
       <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#E4E4E7' }}>{label}</span>
-        {hint && <span style={{ fontSize: 10.5, lineHeight: 1.45, color: '#8B8898' }}>{hint}</span>}
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{label}</span>
+        {hint && <span style={{ fontSize: 11.5, lineHeight: 1.45, color: '#8B8B94' }}>{hint}</span>}
       </span>
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 36, height: 21, padding: 2, borderRadius: 99, flexShrink: 0, background: on ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
-        <span style={{ width: 17, height: 17, borderRadius: 99, background: '#fff' }} />
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 32, height: 18, padding: 2, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accent : 'rgba(255,255,255,0.12)', transition: 'background .12s ease' }}>
+        <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
       </span>
     </button>
   )
@@ -794,9 +796,9 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
       {src === 'pick' && <MediaPick theme={theme} count={(media === 'video' ? p.videoIds : p.imageIds)?.length ?? 0} kind={media === 'video' ? 'videos' : 'images'} onPick={() => onPick(media === 'video' ? 'videos' : 'images')} />}
       {src === 'folder' && (
         <select value={p.folder ?? ''} onChange={e => onChange({ folder: e.target.value || undefined })} aria-label="Dossier de la banque"
-          style={{ ...inputStyle, cursor: 'pointer', background: '#101015', borderColor: p.folder ? 'rgba(255,255,255,0.08)' : 'rgba(248,113,113,0.35)' }}>
-          <option value="" style={{ background: '#16161C' }}>— Choisir un dossier —</option>
-          {(bank?.folders ?? []).map(f => <option key={f.name} value={f.name} style={{ background: '#16161C' }}>{f.name} · {f[media]} {w}{f[media] > 1 ? 's' : ''}</option>)}
+          style={{ ...inputStyle, cursor: 'pointer', borderColor: p.folder ? 'rgba(255,255,255,0.09)' : 'rgba(248,113,113,0.35)' }}>
+          <option value="" style={{ background: '#161618' }}>— Choisir un dossier —</option>
+          {(bank?.folders ?? []).map(f => <option key={f.name} value={f.name} style={{ background: '#161618' }}>{f.name} · {f[media]} {w}{f[media] > 1 ? 's' : ''}</option>)}
           {p.folder && bank && !bank.folders.some(f => f.name === p.folder) && <option value={p.folder}>{p.folder} (introuvable)</option>}
         </select>
       )}
@@ -806,8 +808,8 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
   let body: ReactNode = null
   switch (block.type) {
     case 'login':
-      body = <div style={{ padding: 12, borderRadius: 9, background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.18)', fontSize: 12, lineHeight: 1.6, color: '#7DD3FC' }}>
-        Les identifiants (email / mot de passe / clé 2FA) sont demandés au moment du lancement et ne sont <b>jamais enregistrés</b> dans le flow.
+      body = <div style={{ padding: 12, borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA' }}>
+        Les identifiants (email / mot de passe / clé 2FA) sont demandés au moment du lancement et ne sont <b style={{ color: '#EDEDEF', fontWeight: 600 }}>jamais enregistrés</b> dans le flow.
       </div>
       break
     case 'username': {
@@ -864,7 +866,7 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
           <Seg<'same' | 'perAccount'> theme={theme} value={p.linkMode ?? 'same'} options={[['same', 'Même lien pour tous'], ['perAccount', 'Un lien par compte']]} onChange={v => onChange({ linkMode: v })} />
         </Field>
         {(p.linkMode ?? 'same') === 'same'
-          ? <input value={p.link ?? ''} onChange={e => onChange({ link: e.target.value })} placeholder="https://…" aria-label="Lien du sticker" style={{ ...inputStyle, borderColor: p.link?.trim() ? 'rgba(255,255,255,0.08)' : 'rgba(248,113,113,0.3)' }} />
+          ? <input value={p.link ?? ''} onChange={e => onChange({ link: e.target.value })} placeholder="https://…" aria-label="Lien du sticker" style={{ ...inputStyle, borderColor: p.link?.trim() ? 'rgba(255,255,255,0.09)' : 'rgba(248,113,113,0.3)' }} />
           : <Field label={`Liens (${lines(p.links).length})`} hint="Un lien par ligne, dans l'ordre des comptes sélectionnés au lancement.">
               <textarea rows={4} value={p.links ?? ''} onChange={e => onChange({ links: e.target.value })} placeholder={'https://lien-compte-1\nhttps://lien-compte-2'} style={{ ...areaStyle, fontFamily: MONO, fontSize: 11.5 }} />
             </Field>}
@@ -876,27 +878,27 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
   const hasAdvanced = (p.delayMax ?? 0) > 0 || retriesOf(p) > 0 || (p.onError ?? 'inherit') !== 'inherit'
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '14px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <BlockIcon def={block.type} size={34} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <BlockIcon def={block.type} size={32} />
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#71717A' }}>{index + 1}.</span>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{index + 1}.</span>
             <input value={p.label ?? ''} onChange={e => onChange({ label: e.target.value })} placeholder={def.label} aria-label="Nom du bloc" maxLength={40}
-              style={{ flex: 1, minWidth: 0, height: 28, padding: '0 8px', marginLeft: -4, borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#F4F4F6', fontSize: 13.5, fontWeight: 700, outline: 'none' }} />
+              style={{ flex: 1, minWidth: 0, height: 28, padding: '0 8px', marginLeft: -4, borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#EDEDEF', fontSize: 13, fontWeight: 600, outline: 'none' }} />
           </div>
-          <div style={{ fontSize: 11.5, lineHeight: 1.5, color: '#8B8898' }}>{def.hint}</div>
+          <div style={{ fontSize: 12, lineHeight: 1.5, color: '#8B8B94' }}>{def.hint}</div>
         </div>
       </div>
-      <div style={{ padding: '11px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <Toggle theme={theme} on={isActive(block)} onChange={v => onChange({ disabled: !v })} label="Bloc activé" hint={isActive(block) ? undefined : 'Désactivé : gardé dans le flow mais sauté à l\'exécution (aucun crédit).'} />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 13, padding: 15 }}>{body}</div>
-      <details className="fb-adv" open={hasAdvanced} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 15px', cursor: 'pointer', listStyle: 'none', fontSize: 12, fontWeight: 700, color: '#A1A1AA', userSelect: 'none' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16 }}>{body}</div>
+      <details className="fb-adv" open={hasAdvanced} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', cursor: 'pointer', listStyle: 'none', fontSize: 13, fontWeight: 500, color: '#A1A1AA', userSelect: 'none' }}>
           <Icon d="M9 18l6-6-6-6" size={12} /> Options avancées
-          {hasAdvanced && <span style={{ marginLeft: 'auto', fontSize: 10.5, color: theme.accentText }}>personnalisé</span>}
+          {hasAdvanced && <span style={{ marginLeft: 'auto', fontSize: 11.5, color: theme.accentText }}>personnalisé</span>}
         </summary>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 13, padding: '2px 15px 15px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 16px 16px' }}>
           <Field label="Délai aléatoire avant ce bloc (min)" hint="0 = aucun. Si le délai dépasse 3 min, le téléphone est éteint pendant l'attente.">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <input type="number" min={0} value={p.delayMin ?? 0} onChange={e => onChange({ delayMin: num(e.target.value) })} aria-label="Délai minimum" style={inputStyle} />
@@ -911,8 +913,8 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
           </Field>
         </div>
       </details>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <span style={{ flex: 1, fontFamily: MONO, fontSize: 10.5, color: '#71717A' }}>{fmtMinutes(blockEstimate(block))}{def.credits ? ` · ${def.credits} crédit(s)/compte` : ''}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <span style={{ flex: 1, fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{fmtMinutes(blockEstimate(block))}{def.credits ? ` · ${def.credits} crédit(s)/compte` : ''}</span>
         <Btn theme={theme} sm tone="danger" label="Supprimer" onClick={onRemove} />
       </div>
     </>
@@ -929,15 +931,15 @@ function FlowSettings({ theme, flow, issues, groups, rotationConfigured, onPatch
   return (
     <>
       <PanelHead title="Réglages du flow" sub="Clique un bloc pour le configurer" />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 15 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
         <Field label="Description (optionnel)">
           <textarea rows={2} value={flow.description ?? ''} onChange={e => onPatch({ description: e.target.value })} placeholder="À quoi sert ce flow…" style={areaStyle} />
         </Field>
         <Field label="Si un bloc échoue sur un compte" hint={flow.onError === 'stop' ? 'Les blocs suivants sont sautés pour ce compte (chaque bloc peut avoir son propre réglage).' : 'Les blocs suivants sont quand même joués (chaque bloc peut avoir son propre réglage).'}>
           <Seg<'stop' | 'continue'> theme={theme} value={flow.onError} options={[['stop', 'Arrêter ce compte'], ['continue', 'Continuer']]} onChange={v => onPatch({ onError: v })} />
         </Field>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#8B8898' }}>Lancement par défaut</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>Lancement par défaut</span>
           <Field label="Comptes en parallèle">
             <Seg<number> theme={theme} value={d.concurrency ?? 3} options={[[1, '1'], [3, '3'], [5, '5'], [10, '10'], [20, '20']]} onChange={v => setD({ concurrency: v })} />
           </Field>
@@ -950,7 +952,7 @@ function FlowSettings({ theme, flow, issues, groups, rotationConfigured, onPatch
                   const on = sel.has(g)
                   return (
                     <button key={g} type="button" aria-pressed={on} onClick={() => { const n = new Set(sel); on ? n.delete(g) : n.add(g); setD({ groups: [...n] }) }}
-                      style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.08)'}`, background: on ? `rgba(${theme.tone},0.14)` : 'transparent', color: on ? theme.accentText : '#A1A1AA' }}>{on ? '✓ ' : ''}{g}</button>
+                      style={{ height: 26, padding: '0 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500, border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.09)'}`, background: on ? 'rgba(255,255,255,0.07)' : 'transparent', color: on ? '#EDEDEF' : '#A1A1AA' }}>{on ? '✓ ' : ''}{g}</button>
                   )
                 })}
               </div>
@@ -958,16 +960,16 @@ function FlowSettings({ theme, flow, issues, groups, rotationConfigured, onPatch
           )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Vérification</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Vérification</span>
           {issues.length === 0 ? (
-            <span style={{ fontSize: 12, color: '#34D399' }}>✓ Prêt à lancer</span>
-          ) : issues.map((s, i) => <span key={i} style={{ fontSize: 11.5, lineHeight: 1.5, color: '#F87171' }}>• {s}</span>)}
+            <span style={{ fontSize: 13, color: '#4ADE80' }}>✓ Prêt à lancer</span>
+          ) : issues.map((s, i) => <span key={i} style={{ fontSize: 12, lineHeight: 1.5, color: '#F87171' }}>• {s}</span>)}
         </div>
-        <div style={{ fontSize: 11.5, lineHeight: 1.6, color: '#8B8898' }}>
-          Chaque compte démarre <b style={{ color: '#D4D4D8' }}>une seule fois</b>, enchaîne tous les blocs actifs, puis s'éteint — même en cas d'échec ou d'annulation. Raccourcis : <b style={{ color: '#D4D4D8' }}>Suppr</b> retire le bloc sélectionné, <b style={{ color: '#D4D4D8' }}>Échap</b> désélectionne.
+        <div style={{ fontSize: 12, lineHeight: 1.6, color: '#8B8B94' }}>
+          Chaque compte démarre <b style={{ color: '#EDEDEF', fontWeight: 600 }}>une seule fois</b>, enchaîne tous les blocs actifs, puis s'éteint — même en cas d'échec ou d'annulation. Raccourcis : <b style={{ color: '#EDEDEF', fontWeight: 600 }}>Suppr</b> retire le bloc sélectionné, <b style={{ color: '#EDEDEF', fontWeight: 600 }}>Échap</b> désélectionne.
         </div>
       </div>
-      <div style={{ padding: '11px 15px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'flex-end' }}>
         <Btn theme={theme} sm tone="danger" label="Supprimer le flow" onClick={onDelete} />
       </div>
     </>
@@ -1053,32 +1055,32 @@ function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId
     <Modal theme={theme} title={`Lancer « ${flow.name} »`} sub={`${flow.blocks.length} bloc(s) · ≈ ${fmtMinutes(est)} par compte`} icon="M5 3l14 9-14 9V3z" width={720} onClose={onClose}
       footer={<>
         <span style={{ flex: 1, fontSize: 12, color: issues.length ? '#F87171' : '#71717A' }}>
-          {issues.length ? issues[0] : <>{chosen.length} compte(s) · {perAcc ? <b style={{ color: '#E4E4E7' }}>{perAcc * chosen.length} crédits</b> : 'gratuit'} · fin estimée ≈ {fmtMinutes(total)}</>}
+          {issues.length ? issues[0] : <>{chosen.length} compte(s) · {perAcc ? <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{perAcc * chosen.length} crédits</b> : 'gratuit'} · fin estimée ≈ {fmtMinutes(total)}</>}
         </span>
         <Btn theme={theme} tone="ghost" label="Annuler" onClick={onClose} />
         <Btn theme={theme} tone="primary" icon="M5 3l14 9-14 9V3z" label={busy ? 'Lancement…' : `Lancer sur ${chosen.length} compte(s)`} disabled={issues.length > 0 || busy} onClick={launch} />
       </>}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16 }}>
         {/* Comptes */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 6 }}>
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…" style={{ ...inputStyle, flex: 1 }} />
-            <select value={group} onChange={e => setGroup(e.target.value)} style={{ ...inputStyle, width: 160, cursor: 'pointer', background: '#101015' }}>
-              {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
+            <select value={group} onChange={e => setGroup(e.target.value)} style={{ ...inputStyle, width: 160, cursor: 'pointer' }}>
+              {groups.map(g => <option key={g} value={g} style={{ background: '#161618' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{chosen.length} / {phones.length} sélectionné(s)</span>
-            <button onClick={() => setSel(s => { const n = new Set(s); shown.forEach(p => allShown ? n.delete(p.id) : n.add(p.id)); return n })} style={{ border: 'none', background: 'transparent', color: theme.accentText, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>{allShown ? 'Tout retirer' : 'Tout sélectionner'}</button>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94', fontVariantNumeric: 'tabular-nums' }}>{chosen.length} / {phones.length} sélectionné(s)</span>
+            <button onClick={() => setSel(s => { const n = new Set(s); shown.forEach(p => allShown ? n.delete(p.id) : n.add(p.id)); return n })} style={{ border: 'none', background: 'transparent', color: theme.accentText, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{allShown ? 'Tout retirer' : 'Tout sélectionner'}</button>
           </div>
-          <div style={{ maxHeight: 300, overflowY: 'auto', borderRadius: 9, border: '1px solid rgba(255,255,255,0.06)' }}>
-            {shown.length === 0 ? <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: '#52525B' }}>Aucun téléphone GeeLark.</div> : shown.map(p => {
+          <div style={{ maxHeight: 300, overflowY: 'auto', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)' }}>
+            {shown.length === 0 ? <div style={{ padding: 20, textAlign: 'center', fontSize: 13, color: '#71717A' }}>Aucun téléphone GeeLark.</div> : shown.map(p => {
               const on = sel.has(p.id)
               return (
-                <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 11px', border: 'none', cursor: 'pointer', textAlign: 'left', borderLeft: `2px solid ${on ? theme.accent : 'transparent'}`, background: on ? `rgba(${theme.tone},0.06)` : 'transparent' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 8.5, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px', border: 'none', cursor: 'pointer', textAlign: 'left', borderLeft: `2px solid ${on ? theme.accent : 'transparent'}`, background: on ? 'rgba(255,255,255,0.05)' : 'transparent' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accent : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                   <StatusDot kind={p.status === 'warming' ? 'warmup' : p.status} />
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
                 </button>
               )
             })}
@@ -1086,18 +1088,18 @@ function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId
         </div>
 
         {/* Réglages du run */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 13, minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <Field label="Comptes en parallèle" hint={rotationOn ? 'Rotation d\'IP active → un compte à la fois (sinon la rotation couperait les autres).' : 'Plus = plus rapide. Limité par ton forfait GeeLark (téléphones simultanés).'}>
             <Seg<number> theme={theme} value={rotationOn ? 1 : conc} options={[[1, '1'], [3, '3'], [5, '5'], [10, '10'], [20, '20']]} onChange={v => setConc(v)} />
           </Field>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#E4E4E7' }}>Rotation d'IP proxy</span>
-              <span style={{ fontSize: 10.5, color: '#52525B' }}>{rotationConfigured ? 'IP changée avant le démarrage de chaque compte' : 'Aucun proxy rotatif configuré (Réglages)'}</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Rotation d'IP proxy</span>
+              <span style={{ fontSize: 11.5, color: '#8B8B94' }}>{rotationConfigured ? 'IP changée avant le démarrage de chaque compte' : 'Aucun proxy rotatif configuré (Réglages)'}</span>
             </span>
             <span onClick={() => rotationConfigured && setRotationOn(v => !v)} role="switch" aria-checked={rotationOn}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 38, height: 22, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)' }}>
-              <span style={{ width: 18, height: 18, borderRadius: 99, background: '#fff' }} />
+              style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 32, height: 18, padding: 2, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box', cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accent : 'rgba(255,255,255,0.12)', transition: 'background .12s ease' }}>
+              <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
             </span>
           </div>
           {needsLogin && (
@@ -1112,7 +1114,7 @@ function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId
           )}
           {issues.length > 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {issues.slice(1, 5).map((s, i) => <span key={i} style={{ fontSize: 11, color: '#F87171' }}>• {s}</span>)}
+              {issues.slice(1, 5).map((s, i) => <span key={i} style={{ fontSize: 12, color: '#F87171' }}>• {s}</span>)}
             </div>
           )}
         </div>
@@ -1123,14 +1125,14 @@ function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId
 
 // ── Exécutions en direct ─────────────────────────────────────────────────────
 
-const STEP_COLOR: Record<StepStatus, string> = { pending: 'rgba(255,255,255,0.1)', running: '#FBBF24', ok: '#34D399', failed: '#F87171', skipped: 'rgba(255,255,255,0.04)' }
+const STEP_COLOR: Record<StepStatus, string> = { pending: 'rgba(255,255,255,0.1)', running: '#FBBF24', ok: '#4ADE80', failed: '#F87171', skipped: 'rgba(255,255,255,0.04)' }
 const PHONE_TONE = { pending: 'mute', booting: 'warn', running: 'warn', done: 'ok', failed: 'bad', cancelled: 'mute' } as const
 const PHONE_LABEL = { pending: 'En attente', booting: 'Démarrage', running: 'En cours', done: 'Terminé', failed: 'Échec', cancelled: 'Annulé' } as const
 
 function RunsPanel({ theme, runs }: { theme: Theme; runs: FlowRun[] }) {
   if (runs.length === 0) return null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {runs.map(r => <RunCard key={r.id} theme={theme} run={r} />)}
     </div>
   )
@@ -1157,13 +1159,13 @@ function RunCard({ theme, run }: { theme: Theme; run: FlowRun }) {
         </span>}
       />
       {/* Progression globale */}
-      <div style={{ height: 3, margin: '0 15px', borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex' }}>
-        <span style={{ width: `${(done / Math.max(1, run.phones.length)) * 100}%`, background: '#34D399', transition: 'width .3s ease' }} />
+      <div style={{ height: 3, margin: '12px 16px 0', borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex' }}>
+        <span style={{ width: `${(done / Math.max(1, run.phones.length)) * 100}%`, background: '#4ADE80', transition: 'width .3s ease' }} />
         <span style={{ width: `${(failed / Math.max(1, run.phones.length)) * 100}%`, background: '#F87171', transition: 'width .3s ease' }} />
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '10px 15px 6px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, margin: '12px 16px 8px', padding: 2, width: 'fit-content', borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
         {([['all', 'Tous'], ['active', 'En cours'], ['failed', `Échecs${failed ? ` (${failed})` : ''}`]] as const).map(([k, l]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ height: 24, padding: '0 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, background: filter === k ? `rgba(${theme.tone},0.14)` : 'transparent', color: filter === k ? theme.accentText : '#71717A' }}>{l}</button>
+          <button key={k} onClick={() => setFilter(k)} style={{ height: 24, padding: '0 10px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500, background: filter === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: filter === k ? '#EDEDEF' : '#8B8B94' }}>{l}</button>
         ))}
       </div>
       <div style={{ maxHeight: 380, overflowY: 'auto' }}>
@@ -1172,32 +1174,32 @@ function RunCard({ theme, run }: { theme: Theme; run: FlowRun }) {
           const curLabel = p.status === 'booting' ? 'Démarrage du téléphone' : p.current >= 0 && p.status === 'running' ? blockName(run.blocks[p.current]) : ''
           const err = p.errors.find(Boolean)
           return (
-            <div key={p.key} style={{ borderTop: '1px solid rgba(255,255,255,0.035)' }}>
-              <button onClick={() => setOpen(isOpen ? null : p.key)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 15px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ width: 150, flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+            <div key={p.key} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <button onClick={() => setOpen(isOpen ? null : p.key)} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', minHeight: 44, padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ width: 150, flexShrink: 0, fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
                 <span style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
                   {p.steps.map((s, i) => (
                     <span key={i} title={`${i + 1}. ${blockName(run.blocks[i])} — ${s}${p.errors[i] ? ` : ${p.errors[i]}` : ''}`}
-                      style={{ width: 16, height: 6, borderRadius: 99, background: STEP_COLOR[s], boxShadow: s === 'running' ? '0 0 8px rgba(251,191,36,0.6)' : 'none', animation: s === 'running' ? 'aPulse 1.4s ease-in-out infinite' : undefined }} />
+                      style={{ width: 16, height: 6, borderRadius: 2, background: STEP_COLOR[s], animation: s === 'running' ? 'aPulse 1.4s ease-in-out infinite' : undefined }} />
                   ))}
                 </span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: err && p.status === 'failed' ? '#F87171' : '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: err && p.status === 'failed' ? '#F87171' : '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.status === 'failed' && err ? err : curLabel}
                 </span>
                 <Chip text={PHONE_LABEL[p.status]} tone={PHONE_TONE[p.status]} />
               </button>
               {isOpen && (
-                <div style={{ margin: '0 15px 10px', padding: '9px 11px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', maxHeight: 220, overflowY: 'auto', fontFamily: MONO, fontSize: 10.5, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
+                <div style={{ margin: '0 16px 12px', padding: '8px 12px', borderRadius: 6, background: '#0C0C0E', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 220, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
                   {p.logs.length ? p.logs.join('\n') : 'En attente…'}
                 </div>
               )}
             </div>
           )
         })}
-        {list.length > LIMIT && <div style={{ padding: '9px 15px', fontSize: 11, color: '#52525B', borderTop: '1px solid rgba(255,255,255,0.035)' }}>… et {list.length - LIMIT} autre(s) — filtre « En cours » ou « Échecs » pour les voir.</div>}
+        {list.length > LIMIT && <div style={{ padding: '10px 16px', fontSize: 12, color: '#71717A', borderTop: '1px solid rgba(255,255,255,0.05)' }}>… et {list.length - LIMIT} autre(s) — filtre « En cours » ou « Échecs » pour les voir.</div>}
       </div>
       {run.log.length > 0 && (
-        <div style={{ margin: '4px 15px 13px', padding: '8px 11px', borderRadius: 8, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.04)', maxHeight: 90, overflowY: 'auto', fontFamily: MONO, fontSize: 10.5, lineHeight: 1.6, color: '#71717A', whiteSpace: 'pre-wrap' }}>
+        <div style={{ margin: '4px 16px 16px', padding: '8px 12px', borderRadius: 6, background: '#0C0C0E', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 90, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.6, color: '#71717A', whiteSpace: 'pre-wrap' }}>
           {run.log.join('\n')}
         </div>
       )}

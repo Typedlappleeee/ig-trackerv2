@@ -113,11 +113,11 @@ export default function Recipes({ theme, infra, user, org }: {
       />
 
       {notice && (
-        <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 8, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 12, color: '#E4E4E7' }}>{notice}</div>
+        <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#EDEDEF' }}>{notice}</div>
       )}
 
       {loading ? (
-        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div></Panel>
+        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div></Panel>
       ) : error ? (
         <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} /></Panel>
       ) : tasks.length === 0 ? (
@@ -128,7 +128,7 @@ export default function Recipes({ theme, infra, user, org }: {
             action={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Nouvelle séquence" onClick={() => setCreateOpen(true)} />} />
         </Panel>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 12 }}>
           {tasks.map(t => {
             const tone = toneFor(t.id)
             const chips = stepChips(t)
@@ -136,27 +136,27 @@ export default function Recipes({ theme, infra, user, org }: {
               <Panel key={t.id} theme={theme}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 16px 0' }}>
                   <span style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                    background: `rgba(${tone},0.12)`, border: `1px solid rgba(${tone},0.26)`, color: `rgb(${tone})`,
-                  }}><Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6" size={15} /></span>
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, flexShrink: 0,
+                    background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: `rgb(${tone})`,
+                  }}><Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6" size={14} /></span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: '#F4F4F6' }}>{t.name || 'Séquence'}</span>
-                    <span style={{ fontSize: 11.5, lineHeight: 1.5, color: '#71717A' }}>{describe(t)}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>{t.name || 'Séquence'}</span>
+                    <span style={{ fontSize: 12, lineHeight: 1.5, color: '#8B8B94' }}>{describe(t)}</span>
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '13px 16px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '12px 16px', flexWrap: 'wrap' }}>
                   {chips.map((sp, k) => (
-                    <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10.5, fontWeight: 600, color: '#A1A1AA' }}>{sp}</span>
-                      {k < chips.length - 1 && <span style={{ color: '#3F3F46', fontSize: 10 }}>→</span>}
+                    <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 7px', borderRadius: 5, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 500, color: '#A1A1AA', boxSizing: 'border-box' }}>{sp}</span>
+                      {k < chips.length - 1 && <span style={{ color: '#5A5A63', fontSize: 11 }}>→</span>}
                     </span>
                   ))}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: '#3F3F46' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
                     {(t.run_count ?? 0)} fois · {relDay(t.last_run_at)}
                   </span>
-                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <Btn theme={theme} sm tone="quiet" icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" label="Modifier" onClick={() => setEditTask(t)} />
                     <Btn theme={theme} sm tone="quiet" icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" label="Programmer" onClick={() => scheduleNext(t)} />
                     <Btn theme={theme} sm tone="primary" icon="M5 3l14 9-14 9z" label="Rejouer" onClick={() => replay(t)} />
@@ -190,8 +190,8 @@ function EditSeq({ theme, task, onClose, onSaved }: {
   const [active, setActive] = useState(task.status === 'active')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const inp = { width: '100%', boxSizing: 'border-box' as const, height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
-  const lbl = { fontSize: 10.5, fontWeight: 800 as const, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: '#71717A', marginBottom: 7, display: 'block' as const }
+  const inp = { width: '100%', boxSizing: 'border-box' as const, height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }
+  const lbl = { fontSize: 12, fontWeight: 500 as const, color: '#8B8B94', marginBottom: 6, display: 'block' as const }
 
   async function save() {
     setSaving(true); setErr(null)
@@ -204,23 +204,23 @@ function EditSeq({ theme, task, onClose, onSaved }: {
   return (
     <Modal theme={theme} title="Modifier la séquence" icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" onClose={onClose} width={440}
       footer={<><Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} /><Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={save} /></>}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div><label style={lbl}>Nom</label><input value={name} onChange={e => setName(e.target.value)} style={inp} autoFocus /></div>
         <div>
           <label style={lbl}>Fréquence</label>
           <select value={hours} onChange={e => setHours(Number(e.target.value))} style={{ ...inp, cursor: 'pointer' }}>
             {[[6, 'Toutes les 6 h'], [12, 'Toutes les 12 h'], [24, 'Chaque jour'], [48, 'Tous les 2 jours'], [168, 'Chaque semaine']].map(([h, l]) => (
-              <option key={h} value={h} style={{ background: '#16161C' }}>{l}</option>
+              <option key={h} value={h} style={{ background: '#161618' }}>{l}</option>
             ))}
           </select>
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
-          <span onClick={() => setActive(a => !a)} style={{ display: 'flex', alignItems: 'center', justifyContent: active ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, background: active ? '#10B981' : 'rgba(255,255,255,0.1)' }}>
-            <span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} />
+          <span onClick={() => setActive(a => !a)} style={{ display: 'flex', alignItems: 'center', justifyContent: active ? 'flex-end' : 'flex-start', width: 32, height: 18, padding: 2, borderRadius: 99, background: active ? theme.accent : 'rgba(255,255,255,0.1)', boxSizing: 'border-box', transition: 'background .12s ease' }}>
+            <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
           </span>
-          <span style={{ fontSize: 12.5, color: '#D4D4D8' }}>{active ? 'Active' : 'En pause'}</span>
+          <span style={{ fontSize: 13, color: '#EDEDEF' }}>{active ? 'Active' : 'En pause'}</span>
         </label>
-        {err && <p style={{ margin: 0, fontSize: 11.5, color: '#F87171' }}>{err}</p>}
+        {err && <p style={{ margin: 0, fontSize: 12, color: '#F87171' }}>{err}</p>}
       </div>
     </Modal>
   )

@@ -213,48 +213,48 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
       />
 
       {/* Onglets Connexion / Édition en masse / Warmup */}
-      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, marginBottom: 14, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, marginBottom: 16, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', width: 'fit-content', maxWidth: '100%', flexWrap: 'wrap' }}>
         {TABS.map(([k, l]) => (
           <button key={k} onClick={() => setWtab(k)} style={{
-            height: 28, padding: '0 14px', border: 'none', borderRadius: 6, cursor: 'pointer',
-            background: wtab === k ? `rgba(${theme.tone},0.16)` : 'transparent',
-            color: wtab === k ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 700, transition: 'all .14s ease',
+            height: 28, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer',
+            background: wtab === k ? 'rgba(255,255,255,0.08)' : 'transparent',
+            color: wtab === k ? '#EDEDEF' : '#8B8B94', fontSize: 12.5, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
           }}>{l}</button>
         ))}
       </div>
 
       {/* Rotation d'IP proxy — même toggle que les composers (Reels/Story/Photo…). */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', marginBottom: 12, borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', marginBottom: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
         <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Rotation d’IP proxy</span>
-          <span style={{ fontSize: 11, color: '#52525B' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque téléphone (envoi en série)' : 'Désactivée pour ce run'}</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Rotation d’IP proxy</span>
+          <span style={{ fontSize: 12, color: '#8B8B94' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque téléphone (envoi en série)' : 'Désactivée pour ce run'}</span>
         </span>
         <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
           title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 40, height: 23, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
-          <span style={{ width: 19, height: 19, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+          style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 30, height: 18, padding: 2, boxSizing: 'border-box', borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accent : 'rgba(255,255,255,0.12)', transition: 'background .12s ease' }}>
+          <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
         </span>
       </div>
 
       {wtab !== 'warm' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
           {/* Sélecteur de téléphones (partagé) */}
           <Panel theme={theme}>
             <PanelHead title="Téléphones" right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(shownWarm.map(p => p.id)))} />} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
-              <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`, background: '#101015', color: wgroup !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 700, outline: 'none' }}>
-                {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Groupe</span>
+              <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.09)'}`, background: '#161618', color: wgroup !== 'Tous' ? theme.accentText : '#EDEDEF', fontSize: 12.5, fontWeight: 400, outline: 'none' }}>
+                {groups.map(g => <option key={g} value={g} style={{ background: '#161618' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
               </select>
             </div>
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
               {shownWarm.map(p => {
                 const on = sel.has(p.id)
                 return (
-                  <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 13px', border: 'none', cursor: 'pointer', textAlign: 'left', borderLeft: '2px solid ' + (on ? theme.accent : 'transparent'), background: on ? `rgba(${theme.tone},0.06)` : 'transparent', boxSizing: 'border-box' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 8.5, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                  <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 40, padding: '8px 12px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left', background: on ? 'rgba(255,255,255,0.04)' : 'transparent', boxSizing: 'border-box' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accent : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 8.5, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     <StatusDot kind={dotKind(p.status)} />
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
                   </button>
                 )
               })}
@@ -262,53 +262,53 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
           </Panel>
 
           {/* Config */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {wtab === 'edit' && editLocked ? (
               <Panel theme={theme}>
                 <ComingSoon theme={theme} icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" badge={`De retour le ${releaseLabel('massEdit')}`}
                   title="Édition en masse en maintenance"
-                  text={<>On améliore l'édition de profil en masse (nom affiché, @username, photo de profil, bio, lien). Elle revient le <b style={{ color: '#E4E4E7' }}>{releaseLabel('massEdit')}</b>.</>} />
+                  text={<>On améliore l'édition de profil en masse (nom affiché, @username, photo de profil, bio, lien). Elle revient le <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{releaseLabel('massEdit')}</b>.</>} />
               </Panel>
             ) : wtab === 'edit' ? (
               <Panel theme={theme}>
                 <PanelHead title="Nouveau profil" sub="Laisse vide ce que tu ne veux pas changer" />
-                <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Nom affiché <span style={{ color: '#52525B', fontWeight: 600 }}>· name</span></span>
+                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom affiché <span style={{ color: '#71717A', fontWeight: 400 }}>· name</span></span>
                       <input value={edit.nickname} onChange={e => setEdit(v => ({ ...v, nickname: e.target.value }))} placeholder="Léa ✨" style={fieldStyle} />
-                      <span style={{ fontSize: 10.5, color: '#52525B' }}>Le nom en gras sur le profil. Ne touche pas au @.</span>
+                      <span style={{ fontSize: 11.5, color: '#71717A' }}>Le nom en gras sur le profil. Ne touche pas au @.</span>
                     </label>
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Nom d'utilisateur <span style={{ color: '#52525B', fontWeight: 600 }}>· @username</span></span>
-                      <textarea value={usernames} onChange={e => { setUsernames(e.target.value); setEditError(null) }} rows={2} placeholder={'lea.officiel{4}\nlea_backup'} style={{ ...fieldStyle, height: 'auto', padding: 9, resize: 'vertical', fontFamily: 'inherit' }} />
-                      <span style={{ fontSize: 10.5, color: '#52525B' }}>Un par ligne, attribués dans l'ordre. {'{4}'} = 4 chiffres aléatoires.</span>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom d'utilisateur <span style={{ color: '#71717A', fontWeight: 400 }}>· @username</span></span>
+                      <textarea value={usernames} onChange={e => { setUsernames(e.target.value); setEditError(null) }} rows={2} placeholder={'lea.officiel{4}\nlea_backup'} style={{ ...fieldStyle, height: 'auto', padding: '8px 10px', resize: 'vertical', fontFamily: 'inherit' }} />
+                      <span style={{ fontSize: 11.5, color: '#71717A' }}>Un par ligne, attribués dans l'ordre. {'{4}'} = 4 chiffres aléatoires.</span>
                     </label>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Photo de profil</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Photo de profil</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <Btn theme={theme} sm tone="ghost" icon="M3 5h18v14H3z|M3 16l5-5 4 4 3-3 6 6" label={avatarIds.length ? `${avatarIds.length} photo${avatarIds.length > 1 ? 's' : ''} choisie${avatarIds.length > 1 ? 's' : ''}` : 'Choisir dans la banque'} onClick={() => setAvatarPicker(true)} />
                       {avatarIds.length > 0 && <Btn theme={theme} sm tone="quiet" label="Retirer" onClick={() => setAvatarIds([])} />}
-                      <span style={{ fontSize: 10.5, color: '#52525B' }}>{avatarIds.length > 1 ? 'Distribuées dans l\'ordre aux comptes.' : 'Plusieurs photos = une différente par compte.'}</span>
+                      <span style={{ fontSize: 11.5, color: '#71717A' }}>{avatarIds.length > 1 ? 'Distribuées dans l\'ordre aux comptes.' : 'Plusieurs photos = une différente par compte.'}</span>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
                     {([['linkURL', 'Lien (URL)'], ['linkTitle', 'Titre du lien']] as [keyof typeof edit, string][]).map(([k, l]) => (
                       <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{l}</span>
+                        <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{l}</span>
                         <input value={edit[k]} onChange={e => setEdit(v => ({ ...v, [k]: e.target.value }))} placeholder={l} style={fieldStyle} />
                       </label>
                     ))}
                   </div>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Bio</span>
-                    <textarea value={edit.biography} onChange={e => setEdit(v => ({ ...v, biography: e.target.value }))} rows={3} placeholder="Bio…" style={{ resize: 'vertical', padding: 11, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, fontFamily: 'inherit', outline: 'none' }} />
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Bio</span>
+                    <textarea value={edit.biography} onChange={e => setEdit(v => ({ ...v, biography: e.target.value }))} rows={3} placeholder="Bio…" style={{ resize: 'vertical', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
                   </label>
-                  {editError && <div role="alert" style={{ padding: '8px 11px', borderRadius: 8, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', color: '#FCA5A5', fontSize: 12 }}>{editError}</div>}
+                  {editError && <div role="alert" style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171', fontSize: 12.5 }}>{editError}</div>}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ flex: 1, fontSize: 12, color: '#71717A' }}>Édite <b style={{ color: '#E4E4E7' }}>{nSel}</b> compte{nSel > 1 ? 's' : ''}. Le téléphone s'éteint à la fin.</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+                  <span style={{ flex: 1, minWidth: 200, fontSize: 12.5, color: '#8B8B94' }}>Édite <b style={{ color: '#EDEDEF', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{nSel}</b> compte{nSel > 1 ? 's' : ''}. Le téléphone s'éteint à la fin.</span>
                   <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running || !hasEdit} icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" label={running ? 'Édition…' : 'Lancer l\'édition'} onClick={launchEdit} />
                 </div>
               </Panel>
@@ -316,27 +316,27 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
               <Panel theme={theme}>
                 <PanelHead title="Connexion automatique" sub="Identifiants IG par compte (flow RPA GeeLark, 2FA supporté)" />
                 {nSel === 0 ? (
-                  <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Sélectionne des comptes à gauche pour saisir leurs identifiants.</div>
+                  <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Sélectionne des comptes à gauche pour saisir leurs identifiants.</div>
                 ) : (
                   <div style={{ maxHeight: 340, overflowY: 'auto' }}>
                     {phones.filter(p => sel.has(p.id)).map(p => {
                       const c = creds[p.id] ?? { email: '', password: '', totp: '' }
                       const set = (k: 'email' | 'password' | 'totp', v: string) => setCreds(cr => ({ ...cr, [p.id]: { ...c, [k]: v } }))
                       return (
-                        <div key={p.id} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#E4E4E7', marginBottom: 7 }}>{phoneLabel(p)}</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: 6 }}>
-                            <input value={c.email} onChange={e => set('email', e.target.value)} placeholder="email / identifiant" style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 11.5, outline: 'none' }} />
-                            <input value={c.password} onChange={e => set('password', e.target.value)} type="password" placeholder="mot de passe" style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 11.5, outline: 'none' }} />
-                            <input value={c.totp} onChange={e => set('totp', e.target.value)} placeholder="clé 2FA" style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 11.5, outline: 'none', fontFamily: "'JetBrains Mono',monospace" }} />
+                        <div key={p.id} style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', marginBottom: 8 }}>{phoneLabel(p)}</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(110px,1fr))', gap: 8 }}>
+                            <input value={c.email} onChange={e => set('email', e.target.value)} placeholder="email / identifiant" style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12.5, outline: 'none', boxSizing: 'border-box', minWidth: 0 }} />
+                            <input value={c.password} onChange={e => set('password', e.target.value)} type="password" placeholder="mot de passe" style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12.5, outline: 'none', boxSizing: 'border-box', minWidth: 0 }} />
+                            <input value={c.totp} onChange={e => set('totp', e.target.value)} placeholder="clé 2FA" style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12.5, outline: 'none', boxSizing: 'border-box', minWidth: 0, fontFamily: "'JetBrains Mono',monospace" }} />
                           </div>
                         </div>
                       )
                     })}
                   </div>
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ flex: 1, fontSize: 12, color: '#71717A' }}>Connecte les comptes avec identifiants renseignés.</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+                  <span style={{ flex: 1, minWidth: 200, fontSize: 12.5, color: '#8B8B94' }}>Connecte les comptes avec identifiants renseignés.</span>
                   <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running} icon="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4|M10 17l5-5-5-5|M15 12H3" label={running ? 'Connexion…' : 'Lancer la connexion'} onClick={launchLogin} />
                 </div>
               </Panel>
@@ -344,50 +344,49 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
             {runItems.length > 0 && (
               <Panel theme={theme}>
                 <PanelHead title="En direct" sub={`${runItems.filter(r => r.phase === 'done').length}/${runItems.length} terminés`} />
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '11px 15px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '12px 16px' }}>
                   {runItems.map(it => <Chip key={it.id} text={`${it.phase === 'done' ? '✓' : it.phase === 'failed' ? '✕' : it.phase === 'running' ? '…' : '·'} ${it.name}`} tone={(it.phase === 'done' ? 'ok' : it.phase === 'failed' ? 'bad' : it.phase === 'running' ? 'warn' : 'mute') as any} />)}
                 </div>
-                <div style={{ margin: '0 15px 13px', padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.05)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.length === 0 ? '…' : logs.join('\n')}</div>
+                <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0E0E10', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.length === 0 ? '…' : logs.join('\n')}</div>
               </Panel>
             )}
           </div>
         </div>
       ) : (
-      <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         {/* Téléphones */}
         <Panel theme={theme}>
           <PanelHead title="Téléphones" right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(shownWarm.map(p => p.id)))} />} />
           {/* Filtre groupe (menu déroulant) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
-            <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`, background: '#101015', color: wgroup !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 700, outline: 'none' }}>
-              {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Groupe</span>
+            <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.09)'}`, background: '#161618', color: wgroup !== 'Tous' ? theme.accentText : '#EDEDEF', fontSize: 12.5, fontWeight: 400, outline: 'none' }}>
+              {groups.map(g => <option key={g} value={g} style={{ background: '#161618' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
             </select>
           </div>
           {loading ? (
-            <div style={{ padding: 30, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div>
+            <div style={{ padding: 30, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Chargement…</div>
           ) : error ? (
-            <div style={{ padding: 20, textAlign: 'center', color: '#F87171', fontSize: 12 }}>{error}</div>
+            <div style={{ padding: 20, textAlign: 'center', color: '#F87171', fontSize: 12.5 }}>{error}</div>
           ) : shownWarm.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun téléphone.</div>
+            <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Aucun téléphone.</div>
           ) : (
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
               {shownWarm.map(p => {
                 const on = sel.has(p.id)
                 return (
                   <button key={p.id} onClick={() => toggle(p.id)} style={{
-                    display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 13px', border: 'none', cursor: 'pointer', textAlign: 'left',
-                    borderLeft: '2px solid ' + (on ? '#F59E0B' : 'transparent'),
-                    background: on ? 'rgba(245,158,11,0.06)' : 'transparent', transition: 'all .14s ease', boxSizing: 'border-box',
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 44, padding: '8px 12px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left',
+                    background: on ? 'rgba(255,255,255,0.04)' : 'transparent', transition: 'background .12s ease', boxSizing: 'border-box',
                   }}>
                     <span style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0,
-                      background: on ? '#D97706' : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 8.5, fontWeight: 900,
+                      background: on ? theme.accent : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 8.5, fontWeight: 600,
                     }}>{on ? '✓' : ''}</span>
                     <StatusDot kind={dotKind(p.status)} />
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <span style={{ fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                   </button>
                 )
@@ -396,21 +395,21 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
           )}
         </Panel>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Durée */}
           <Panel theme={theme}>
             <PanelHead title="Durée de la session" sub="Le téléphone démarre, navigue, puis s'éteint" />
-            <div style={{ display: 'flex', gap: 8, padding: 13, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, padding: 16, flexWrap: 'wrap' }}>
               {DURATIONS.map(d => {
                 const act = dur === d.v
                 return (
                   <button key={d.v} onClick={() => setDur(d.v)} style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '11px 20px', borderRadius: 9, cursor: 'pointer',
-                    background: act ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.015)',
-                    border: '1px solid ' + (act ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.06)'), transition: 'all .14s ease',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 20px', minWidth: 104, borderRadius: 8, cursor: 'pointer',
+                    background: act ? 'rgba(255,255,255,0.07)' : '#161618',
+                    border: '1px solid ' + (act ? theme.selEdge : 'rgba(255,255,255,0.08)'), transition: 'background .12s ease, border-color .12s ease',
                   }}>
-                    <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 17, fontWeight: 700, color: act ? '#FBBF24' : '#D4D4D8', letterSpacing: '-0.02em' }}>{d.v < 60 ? `${d.v} min` : `${d.v / 60} h`}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#52525B' }}>{d.h}</span>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: act ? '#EDEDEF' : '#A1A1AA', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{d.v < 60 ? `${d.v} min` : `${d.v / 60} h`}</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 400, color: act ? theme.accentText : '#71717A' }}>{d.h}</span>
                   </button>
                 )
               })}
@@ -420,25 +419,25 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
           {/* Ce que fait la session (réel, pas de réglage factice) */}
           <Panel theme={theme}>
             <PanelHead title="Pendant la session" sub="Ce que fait réellement l'automatisation GeeLark" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '13px 15px' }}>
-              <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA' }}>
-                Parcourt <b style={{ color: '#FBBF24' }}>≈ {Math.min(100, dur * 2)} Reels</b>{keyword.trim() ? <> trouvés avec « <b style={{ color: '#E4E4E7' }}>{keyword.trim()}</b> »</> : <> du fil</>}, avec des likes, commentaires et abonnements aléatoires dosés par le flow, puis éteint le téléphone.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: '#A1A1AA' }}>
+                Parcourt <b style={{ color: '#EDEDEF', fontWeight: 600 }}>≈ {Math.min(100, dur * 2)} Reels</b>{keyword.trim() ? <> trouvés avec « <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{keyword.trim()}</b> »</> : <> du fil</>}, avec des likes, commentaires et abonnements aléatoires dosés par le flow, puis éteint le téléphone.
               </div>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Mot-clé de recherche (optionnel)</span>
-                <input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="ex. fashion, fitness… — vide = fil Reels" style={{ height: 32, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Mot-clé de recherche (optionnel)</span>
+                <input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="ex. fashion, fitness… — vide = fil Reels" style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
               </label>
             </div>
           </Panel>
 
           {/* Lancement */}
           <Panel theme={theme}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 15px', flexWrap: 'wrap' }}>
-              <span style={{ flex: 1, minWidth: 200, fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, flexWrap: 'wrap' }}>
+              <span style={{ flex: 1, minWidth: 200, fontSize: 12.5, lineHeight: 1.6, color: '#8B8B94' }}>
                 {!bearer && !conns.loading ? (
                   <span style={{ color: '#FBBF24' }}>Connecte d'abord ton compte GeeLark (token) dans les Réglages de l'app web, puis reviens ici.</span>
                 ) : (
-                  <>Session de <span style={{ color: '#FBBF24', fontWeight: 700 }}>{durLabel}</span> sur <span style={{ color: '#E4E4E7', fontWeight: 700 }}>{nSel}</span> téléphone{nSel > 1 ? 's' : ''}. Les appareils s'éteignent à la fin.</>
+                  <>Session de <span style={{ color: '#EDEDEF', fontWeight: 500 }}>{durLabel}</span> sur <span style={{ color: '#EDEDEF', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{nSel}</span> téléphone{nSel > 1 ? 's' : ''}. Les appareils s'éteignent à la fin.</>
                 )}
               </span>
               <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running}
@@ -449,8 +448,8 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
 
             {/* Progression + logs en direct */}
             {runItems.length > 0 && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '11px 15px' }}>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '12px 16px' }}>
                   {runItems.map(it => {
                     const c = it.phase === 'done' ? 'ok' : it.phase === 'failed' ? 'bad' : it.phase === 'running' ? 'warn' : 'mute'
                     const label = it.phase === 'done' ? '✓' : it.phase === 'failed' ? '✕' : it.phase === 'running' ? '…' : '·'
@@ -458,8 +457,8 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                   })}
                 </div>
                 <div style={{
-                  margin: '0 15px 13px', padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.28)',
-                  border: '1px solid rgba(255,255,255,0.05)', maxHeight: 220, overflowY: 'auto',
+                  margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0E0E10',
+                  border: '1px solid rgba(255,255,255,0.06)', maxHeight: 220, overflowY: 'auto',
                   fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap',
                 }}>
                   {logs.length === 0 ? '…' : logs.join('\n')}
@@ -479,4 +478,4 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
   )
 }
 
-const fieldStyle = { height: 32, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none', boxSizing: 'border-box' } as const
+const fieldStyle = { height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' } as const

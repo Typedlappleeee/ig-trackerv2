@@ -44,12 +44,12 @@ function initialsFrom(name: string | null, email: string | null): string {
 // ── Ligne de réglage (label + valeur), visuel-only pour les sections statiques ────
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 16px', borderBottom: '1px solid rgba(255,255,255,0.035)' }}>
-      <span style={{ width: 190, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>{label}</span>
-        {hint ? <span style={{ fontSize: 11, color: '#52525B' }}>{hint}</span> : null}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px 24px', flexWrap: 'wrap', minHeight: 60, boxSizing: 'border-box', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <span style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{label}</span>
+        {hint ? <span style={{ fontSize: 12, color: '#8B8B94', lineHeight: 1.4 }}>{hint}</span> : null}
       </span>
-      <span style={{ flex: 1, minWidth: 0 }}>{children}</span>
+      <span style={{ flex: '1 1 240px', minWidth: 0 }}>{children}</span>
     </div>
   )
 }
@@ -58,9 +58,10 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function ReadValue({ value, mono }: { value: ReactNode; mono?: boolean }) {
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', height: 30, padding: '0 11px', borderRadius: 7,
-      background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', maxWidth: 320,
-      fontFamily: mono ? "'JetBrains Mono',monospace" : undefined, fontSize: mono ? 11.5 : 12, color: '#F4F4F6',
+      display: 'inline-block', verticalAlign: 'middle', height: 32, lineHeight: '30px', padding: '0 10px', borderRadius: 6, boxSizing: 'border-box',
+      background: '#161618', border: '1px solid rgba(255,255,255,0.09)', maxWidth: '100%', width: 320,
+      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      fontFamily: mono ? "'JetBrains Mono',monospace" : undefined, fontSize: mono ? 12 : 13, color: '#EDEDEF',
     }}>{value}</span>
   )
 }
@@ -69,15 +70,22 @@ function ReadValue({ value, mono }: { value: ReactNode; mono?: boolean }) {
 function Toggle({ theme, on }: { theme: Theme; on: boolean }) {
   return (
     <span aria-hidden style={{
-      display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 34, height: 19,
-      padding: 2, borderRadius: 99, flexShrink: 0, background: on ? theme.accent : 'rgba(255,255,255,0.1)',
+      display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 32, height: 18,
+      padding: 2, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accent : 'rgba(255,255,255,0.12)',
     }}>
-      <span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} />
+      <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
     </span>
   )
 }
 
-const DASH = <span style={{ color: '#52525B' }}>—</span>
+// Champ de saisie standard (input/select) — guide « SaaS épuré ».
+const FIELD: CSSProperties = {
+  height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6,
+  background: '#161618', border: '1px solid rgba(255,255,255,0.09)',
+  color: '#EDEDEF', fontSize: 13, outline: 'none',
+}
+
+const DASH = <span style={{ color: '#5A5A63' }}>—</span>
 
 export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
   theme: Theme; user: User; org: OrgState; onSignOut: () => void; onNavigate?: (p: string) => void
@@ -151,14 +159,14 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
         const on = tab === x.k
         return (
           <button key={x.k} onClick={() => setTab(x.k)} style={{
-            display: 'flex', alignItems: 'center', gap: 10, height: 34, padding: '0 11px', border: 'none',
-            borderRadius: 8, cursor: 'pointer', textAlign: 'left', width: '100%',
-            background: on ? `rgba(${theme.tone},0.11)` : 'transparent', color: on ? theme.accentText : '#A1A1AA',
-            fontSize: 12.5, fontWeight: on ? 700 : 500, transition: 'all .14s ease',
+            display: 'flex', alignItems: 'center', gap: 10, height: 32, padding: '0 10px', border: 'none',
+            borderRadius: 6, cursor: 'pointer', textAlign: 'left', width: '100%',
+            background: on ? 'rgba(255,255,255,0.07)' : 'transparent', color: on ? '#EDEDEF' : '#A1A1AA',
+            fontSize: 13, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
           }}
-            onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
-            onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent' }}>
-            <span style={{ display: 'flex', flexShrink: 0, opacity: on ? 1 : 0.6 }}><Icon d={x.i} size={15} /></span>
+            onMouseEnter={e => { if (!on) { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#EDEDEF' } }}
+            onMouseLeave={e => { if (!on) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' } }}>
+            <span style={{ display: 'flex', flexShrink: 0, color: on ? theme.accentText : '#71717A' }}><Icon d={x.i} size={15} /></span>
             <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.l}</span>
           </button>
         )
@@ -169,7 +177,7 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Réglages" sub="Ton profil, ton organisation, tes membres et ton abonnement." />
-      <div style={{ display: 'grid', gridTemplateColumns: '208px minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '200px minmax(0,1fr)', gap: 24, alignItems: 'start' }}>
         {menu}
         <div style={{ minWidth: 0 }}>
           {tab === 'account' && <AccountTab theme={theme} user={user} displayName={displayName} onSignOut={onSignOut}
@@ -197,24 +205,24 @@ function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInp
     <>
       <Panel theme={theme}>
         <PanelHead title="Mon profil" sub="Ton compte ScaleFlow" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <span style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-            background: 'linear-gradient(140deg,#3F3F46,#27272A)', border: '1px solid rgba(255,255,255,0.08)',
-            color: '#E4E4E7', fontFamily: "'Space Grotesk',sans-serif", fontSize: 17, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 99, flexShrink: 0,
+            background: '#18181B', border: '1px solid rgba(255,255,255,0.08)',
+            color: '#D4D4D8', fontSize: 14, fontWeight: 600,
           }}>{initial}</span>
           <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#F4F4F6' }}>
-              {displayName?.trim() || <span style={{ fontStyle: 'italic', color: '#71717A' }}>Aucun nom</span>}
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF' }}>
+              {displayName?.trim() || <span style={{ fontWeight: 500, color: '#71717A' }}>Aucun nom</span>}
             </span>
-            <span style={{ fontSize: 12, color: '#71717A' }}>{user.email ?? '—'}</span>
+            <span style={{ fontSize: 12, color: '#8B8B94' }}>{user.email ?? '—'}</span>
           </span>
         </div>
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ marginBottom: -1 }}>
           <Field label="Nom affiché" hint="Visible par les autres membres">
-            <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input value={nameInput} onChange={e => setNameInput(e.target.value)} placeholder="Ton nom" style={{ width: 200, height: 30, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
-              <Btn label={savingName ? '…' : 'Enregistrer'} theme={theme} sm tone="primary" disabled={savingName || nameInput.trim() === (displayName ?? '').trim()} onClick={saveName} />
+            <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input value={nameInput} onChange={e => setNameInput(e.target.value)} placeholder="Ton nom" style={{ ...FIELD, width: 320, maxWidth: '100%' }} />
+              <Btn label={savingName ? '…' : 'Enregistrer'} theme={theme} tone="primary" disabled={savingName || nameInput.trim() === (displayName ?? '').trim()} onClick={saveName} />
             </span>
           </Field>
           <Field label="Adresse e-mail" hint="Identifiant de connexion">
@@ -227,16 +235,16 @@ function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInp
       </Panel>
 
       {notice && (
-        <div style={{ marginTop: 12, padding: '9px 13px', borderRadius: 8, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 12, color: '#E4E4E7' }}>{notice}</div>
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#EDEDEF' }}>{notice}</div>
       )}
 
       <div style={{ marginTop: 12 }}>
         <Panel theme={theme}>
           <PanelHead title="Session" />
-          <Field label="Se déconnecter" hint="Ferme ta session sur cet appareil">
+          <div style={{ marginBottom: -1 }}><Field label="Se déconnecter" hint="Ferme ta session sur cet appareil">
             <Btn label="Se déconnecter" theme={theme} tone="danger" onClick={onSignOut}
               icon="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9" />
-          </Field>
+          </Field></div>
         </Panel>
       </div>
     </>
@@ -285,30 +293,30 @@ function OrgTab({ theme, org, balance, canManage }: {
     return (
       <Panel theme={theme}>
         <PanelHead title="Organisation" />
-        <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ display: 'flex', color: theme.accentText }}><Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={16} /></span>
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}><Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={15} /></span>
             <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>Espace personnel</span>
-              <span style={{ fontSize: 11.5, color: '#71717A' }}>Tu travailles hors organisation. Tes appareils et ton contenu sont privés.</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Espace personnel</span>
+              <span style={{ fontSize: 12, color: '#8B8B94' }}>Tu travailles hors organisation. Tes appareils et ton contenu sont privés.</span>
             </span>
           </div>
 
           {/* Créer son organisation : l'owner devient le « chef » — ses crédits sont
               partagés, et toute dépense d'un membre débite le solde du chef. */}
-          <div style={{ padding: '14px', borderRadius: 10, background: `rgba(${theme.tone},0.06)`, border: `1px solid rgba(${theme.tone},0.2)` }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6', marginBottom: 4 }}>Créer une organisation</div>
-            <div style={{ fontSize: 11.5, color: '#A1A1AA', lineHeight: 1.55, marginBottom: 10 }}>
+          <div style={{ padding: 16, borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', marginBottom: 4 }}>Créer une organisation</div>
+            <div style={{ fontSize: 12, color: '#8B8B94', lineHeight: 1.55, marginBottom: 12 }}>
               Invite des membres et pilote leurs comptes. Les crédits sont ceux du chef d’orga (toi) : chaque publication d’un membre débite <b>ton</b> solde.
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input value={orgName} onChange={e => { setOrgName(e.target.value); setNote(null) }}
                 onKeyDown={e => { if (e.key === 'Enter') createOrg() }}
                 placeholder="Nom de ton organisation" maxLength={60} spellCheck={false}
-                style={{ flex: 1, minWidth: 180, height: 38, padding: '0 12px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#F4F4F6', fontSize: 13, outline: 'none' }} />
+                style={{ ...FIELD, flex: 1, minWidth: 180 }} />
               <Btn theme={theme} tone="primary" label={creating ? 'Création…' : 'Créer'} disabled={creating || !orgName.trim()} onClick={createOrg} />
             </div>
-            {note && <div style={{ marginTop: 8, fontSize: 11.5, color: '#FCA5A5' }}>{note}</div>}
+            {note && <div style={{ marginTop: 8, fontSize: 12, color: '#F87171' }}>{note}</div>}
           </div>
         </div>
       </Panel>
@@ -328,11 +336,11 @@ function OrgTab({ theme, org, balance, canManage }: {
           <Field label="Ton rôle">
             {role ? <Chip text={ROLE_LABEL[role]} tone={ROLE_TONE[role]} /> : DASH}
           </Field>
-          <Field label="Crédits de l’organisation">
-            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#FBBF24' }}>
+          <div style={{ marginBottom: -1 }}><Field label="Crédits de l’organisation">
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>
               {balance === null ? '…' : fmtNumber(balance)}
             </span>
-          </Field>
+          </Field></div>
         </div>
       </Panel>
       {canManage && (
@@ -350,7 +358,7 @@ function OrgTab({ theme, org, balance, canManage }: {
                   </span>
                 : <Btn label="Supprimer" theme={theme} sm tone="danger" onClick={() => setConfirmDel(true)} />}
             </Field>
-            {note && <div style={{ padding: '10px 16px', fontSize: 11.5, color: '#FBBF24', lineHeight: 1.5 }}>{note}</div>}
+            {note && <div style={{ padding: '12px 16px', fontSize: 12, color: '#FBBF24', lineHeight: 1.5 }}>{note}</div>}
           </Panel>
         </div>
       )}
@@ -395,19 +403,19 @@ function InviteBox({ theme, orgId, onReload }: { theme: Theme; orgId: string; on
   return (
     <Panel theme={theme} style={{ marginBottom: 12 }}>
       <PanelHead title="Inviter dans l’organisation" sub="Ajoute un membre par son email de compte ScaleFlow" />
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '15px 16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: 16, flexWrap: 'wrap' }}>
         <span style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#71717A' }}>Adresse e-mail</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 11px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <span style={{ display: 'flex', color: '#52525B' }}><Icon d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z|M22 6l-10 7L2 6" size={13} /></span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Adresse e-mail</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)' }}>
+            <span style={{ display: 'flex', color: '#71717A' }}><Icon d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z|M22 6l-10 7L2 6" size={13} /></span>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="prenom@agence.fr"
               onKeyDown={e => { if (e.key === 'Enter') invite() }}
-              style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#F4F4F6', fontSize: 12 }} />
+              style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#EDEDEF', fontSize: 13 }} />
           </span>
         </span>
         <Btn label={busy ? 'Ajout…' : 'Envoyer l’invitation'} theme={theme} tone="primary" disabled={busy} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={invite} />
       </div>
-      {msg && <div style={{ padding: '0 16px 14px', fontSize: 11.5, color: msg.ok ? '#34D399' : '#FBBF24', lineHeight: 1.5 }}>{msg.t}</div>}
+      {msg && <div style={{ padding: '0 16px 14px', fontSize: 12, color: msg.ok ? '#4ADE80' : '#FBBF24', lineHeight: 1.5 }}>{msg.t}</div>}
     </Panel>
   )
 }
@@ -434,29 +442,28 @@ function MembersTab({ theme, org, members, canManage, currentUserId, onReload }:
       <Panel theme={theme}>
         <PanelHead title="Membres" right={<Chip text={loading ? '…' : String(list.length)} tone="mute" />} />
         {loading ? (
-          <div style={{ padding: '24px 16px', fontSize: 12, color: '#52525B' }}>…</div>
+          <div style={{ padding: '24px 16px', fontSize: 12, color: '#71717A' }}>…</div>
         ) : list.length === 0 ? (
-          <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 12, color: '#71717A' }}>Aucun membre.</div>
+          <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: '#8B8B94' }}>Aucun membre.</div>
         ) : (
           <div data-rows="">
             {list.map((m, i) => {
               const isMe = m.user_id === currentUserId
-              const av = ROLE_AV[m.role]
               return (
                 <div key={m.id} style={{
                   display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) 108px 120px', gap: 12, alignItems: 'center',
-                  padding: '11px 16px', fontSize: 12, borderBottom: i < list.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none',
+                  minHeight: 56, boxSizing: 'border-box', padding: '10px 16px', fontSize: 13, borderBottom: i < list.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                     <span style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 99, flexShrink: 0,
-                      background: `rgba(${av},0.16)`, border: `1px solid rgba(${av},0.3)`, color: `rgb(${av})`, fontSize: 11, fontWeight: 700,
+                      background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8', fontSize: 11, fontWeight: 600,
                     }}>{initialsFrom(m.display_name, m.email)}</span>
                     <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {m.display_name?.trim() || m.email || m.user_id.slice(0, 8)}
                       </span>
-                      <span style={{ fontSize: 11, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 12, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {m.email ?? '—'}
                       </span>
                     </span>
@@ -464,7 +471,7 @@ function MembersTab({ theme, org, members, canManage, currentUserId, onReload }:
                   <span><Chip text={ROLE_LABEL[m.role]} tone={ROLE_TONE[m.role]} /></span>
                   <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 5 }}>
                     {isMe ? (
-                      <span style={{ fontSize: 11, color: '#3F3F46' }}>c’est toi</span>
+                      <span style={{ fontSize: 12, color: '#5A5A63' }}>c’est toi</span>
                     ) : canManage && m.role !== 'owner' ? (
                       <>
                         <Btn label="Changer le rôle" theme={theme} sm tone="quiet" icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" onClick={() => cycleMemberRole(m.id, m.role, onReload)} />
@@ -491,17 +498,17 @@ function MembersTab({ theme, org, members, canManage, currentUserId, onReload }:
             ] as { r: OrgRole; d: string; can: string[] }[]).map((r, i, arr) => {
               const tone = ROLE_AV[r.r]
               return (
-                <div key={r.r} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none' }}>
-                  <span style={{ width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div key={r.r} style={{ display: 'flex', alignItems: 'center', gap: '10px 24px', flexWrap: 'wrap', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                  <span style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: 99, background: `rgb(${tone})` }} />
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>{ROLE_LABEL[r.r]}</span>
+                      <span style={{ width: 6, height: 6, borderRadius: 99, background: `rgb(${tone})` }} />
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{ROLE_LABEL[r.r]}</span>
                     </span>
-                    <span style={{ fontSize: 11, lineHeight: 1.45, color: '#52525B' }}>{r.d}</span>
+                    <span style={{ fontSize: 12, lineHeight: 1.45, color: '#8B8B94' }}>{r.d}</span>
                   </span>
-                  <span style={{ flex: 1, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  <span style={{ flex: '1 1 240px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {r.can.map(c => (
-                      <span key={c} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 10.5, fontWeight: 600, background: `rgba(${tone},0.08)`, border: `1px solid rgba(${tone},0.2)`, color: `rgb(${tone})` }}>{c}</span>
+                      <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 7px', boxSizing: 'border-box', borderRadius: 5, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}>{c}</span>
                     ))}
                   </span>
                 </div>
@@ -539,56 +546,56 @@ function BillingTab({ theme, user, org, balance, canManage, onRedeemed }: {
   return (
     <>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 18, padding: '18px 20px', borderRadius: 11, marginBottom: 12, flexWrap: 'wrap',
-        background: `linear-gradient(120deg, rgba(${theme.tone},0.1), ${theme.panelBg})`, border: `1px solid rgba(${theme.tone},0.3)`,
+        display: 'flex', alignItems: 'center', gap: 24, padding: '16px 20px', borderRadius: 8, marginBottom: 12, flexWrap: 'wrap',
+        background: theme.panelBg, border: `1px solid ${theme.panelEdge}`,
       }}>
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: theme.accentText }}>Plan actuel</span>
-          <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: '#F4F4F6' }}>{planLabel}</span>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Plan actuel</span>
+          <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, color: '#EDEDEF' }}>{planLabel}</span>
         </span>
-        <span style={{ width: 1, height: 52, background: 'rgba(255,255,255,0.08)' }} />
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52525B' }}>Crédits disponibles</span>
-          <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 22, fontWeight: 700, color: '#FBBF24', fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ width: 1, height: 44, background: 'rgba(255,255,255,0.06)' }} />
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Crédits disponibles</span>
+          <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>
             {balance === null ? '…' : fmtNumber(balance)}
           </span>
         </span>
         {canManage && (
-          <span style={{ marginLeft: 'auto', display: 'flex', gap: 7 }}>
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <Btn label="Gérer" theme={theme} sm tone="primary" onClick={() => setNote(true)} />
           </span>
         )}
       </div>
       {note && (
-        <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 9, background: `rgba(${theme.tone},0.08)`, border: `1px solid rgba(${theme.tone},0.22)`, fontSize: 11.5, color: '#E4E4E7', lineHeight: 1.55 }}>
+        <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', fontSize: 12, color: '#A1A1AA', lineHeight: 1.55 }}>
           L’achat de crédits et la gestion de l’abonnement se font sur l’espace web ScaleFlow (paiement sécurisé). Les crédits achetés sont partagés avec l’app de bureau instantanément.
         </div>
       )}
 
       <Panel theme={theme}>
         <PanelHead title="Solde" sub={balance === null ? undefined : `≈ ${fmtNumber(Math.floor(balance / 2))} publications restantes`} />
-        <div style={{ padding: '15px 16px' }}>
-          <span style={{ display: 'block', height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-            <span style={{ display: 'block', height: '100%', width: `${balance === null ? 0 : Math.min(100, Math.round((balance / 5000) * 100))}%`, borderRadius: 99, background: `linear-gradient(90deg,${theme.accent},${theme.accentSoft})` }} />
+        <div style={{ padding: 16 }}>
+          <span style={{ display: 'block', height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+            <span style={{ display: 'block', height: '100%', width: `${balance === null ? 0 : Math.min(100, Math.round((balance / 5000) * 100))}%`, borderRadius: 99, background: theme.accent }} />
           </span>
-          <div style={{ marginTop: 10, fontSize: 11.5, color: '#71717A' }}>
+          <div style={{ marginTop: 12, fontSize: 12, color: '#8B8B94' }}>
             Publication : 2 crédits / appareil · Story : 1 crédit / appareil · Tâches automatiques : 50 crédits / jour.
           </div>
         </div>
       </Panel>
 
-      <Panel theme={theme}>
+      <Panel theme={theme} style={{ marginTop: 12 }}>
         <PanelHead title="Utiliser un code de crédits" sub={currentOrg ? 'Crédité sur le solde de l’organisation.' : 'Crédité sur ton solde personnel.'} />
-        <div style={{ padding: '15px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input value={code} onChange={e => { setCode(e.target.value.toUpperCase()); setRedeemMsg(null) }}
               onKeyDown={e => { if (e.key === 'Enter') redeem() }}
               placeholder="CR-XXXX-XXXX" spellCheck={false} autoComplete="off"
-              style={{ flex: 1, minWidth: 180, height: 38, padding: '0 12px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#F4F4F6', fontSize: 13, fontFamily: "'JetBrains Mono',monospace", letterSpacing: '0.04em', outline: 'none' }} />
+              style={{ ...FIELD, flex: 1, minWidth: 180, fontFamily: "'JetBrains Mono',monospace", letterSpacing: '0.04em' }} />
             <Btn theme={theme} tone="primary" label={redeeming ? 'Validation…' : 'Valider le code'} disabled={redeeming || !code.trim()} onClick={redeem} />
           </div>
           {redeemMsg && (
-            <div style={{ fontSize: 12, fontWeight: 600, color: redeemMsg.ok ? '#34D399' : '#FCA5A5' }}>{redeemMsg.text}</div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: redeemMsg.ok ? '#4ADE80' : '#F87171' }}>{redeemMsg.text}</div>
           )}
         </div>
       </Panel>
@@ -637,12 +644,10 @@ function InfraTab({ theme, user, org, canManage }: { theme: Theme; user: User; o
   }
 
   const inp: CSSProperties = {
-    width: '100%', boxSizing: 'border-box', height: 34, padding: '0 11px', borderRadius: 8,
-    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#F4F4F6', fontSize: 12.5, fontFamily: "'JetBrains Mono',monospace", outline: 'none',
+    ...FIELD, width: '100%', fontSize: 12, fontFamily: "'JetBrains Mono',monospace",
   }
   const eye = (on: boolean, set: (v: boolean) => void) => (
-    <button onClick={() => set(!on)} style={{ flexShrink: 0, height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#A1A1AA', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{on ? 'Cacher' : 'Voir'}</button>
+    <button type="button" onClick={() => set(!on)} style={{ flexShrink: 0, height: 32, minWidth: 64, padding: '0 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#A1A1AA', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{on ? 'Cacher' : 'Voir'}</button>
   )
 
   return (
@@ -650,20 +655,20 @@ function InfraTab({ theme, user, org, canManage }: { theme: Theme; user: User; o
       <PanelHead title="Connexions & clés"
         sub={currentOrg ? `Partagées par l’organisation « ${currentOrg.name} »` : 'Ton espace perso'}
         right={<Chip text={currentOrg ? 'Org' : 'Perso'} tone="violet" />} />
-      <div style={{ padding: 15, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {loading ? <span style={{ fontSize: 12.5, color: '#71717A' }}>Chargement…</span> : (
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {loading ? <span style={{ fontSize: 13, color: '#8B8B94' }}>Chargement…</span> : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Token GeeLark (Bearer)</span>
-              <span style={{ fontSize: 11, color: '#71717A' }}>Indispensable pour piloter les téléphones et publier. Depuis GeeLark → OpenAPI.</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Token GeeLark (Bearer)</span>
+              <span style={{ fontSize: 12, color: '#8B8B94', marginTop: -2, marginBottom: 2 }}>Indispensable pour piloter les téléphones et publier. Depuis GeeLark → OpenAPI.</span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={bearer} onChange={e => setBearer(e.target.value)} type={showBearer ? 'text' : 'password'} placeholder="Bearer token GeeLark…" style={inp} disabled={readOnly} spellCheck={false} autoComplete="off" />
                 {eye(showBearer, setShowBearer)}
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Clé API Groq</span>
-              <span style={{ fontSize: 11, color: '#71717A' }}>Pour les légendes IA et les sous-titres (Whisper). Optionnelle.</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Clé API Groq</span>
+              <span style={{ fontSize: 12, color: '#8B8B94', marginTop: -2, marginBottom: 2 }}>Pour les légendes IA et les sous-titres (Whisper). Optionnelle.</span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={groq} onChange={e => setGroq(e.target.value)} type={showGroq ? 'text' : 'password'} placeholder="gsk_…" style={inp} disabled={readOnly} spellCheck={false} autoComplete="off" />
                 {eye(showGroq, setShowGroq)}
@@ -672,9 +677,9 @@ function InfraTab({ theme, user, org, canManage }: { theme: Theme; user: User; o
             {readOnly
               ? <span style={{ fontSize: 12, color: '#FBBF24' }}>Seuls owner/admin de l’organisation peuvent modifier ces clés.</span>
               : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                   <Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={save} />
-                  {msg && <span style={{ fontSize: 12, color: msg.startsWith('Échec') ? '#F87171' : '#34D399' }}>{msg}</span>}
+                  {msg && <span style={{ fontSize: 12, color: msg.startsWith('Échec') ? '#F87171' : '#4ADE80' }}>{msg}</span>}
                 </div>
               )}
           </>
@@ -724,10 +729,10 @@ function SecurityTab({ theme }: { theme: Theme }) {
           </span>
         </Field>
         <Field label="Sessions actives">
-          <span style={{ fontSize: 12, color: '#A1A1AA' }}>—</span>
+          <span style={{ fontSize: 13, color: '#5A5A63' }}>—</span>
         </Field>
         <Field label="Clés API">
-          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#71717A' }}>—</span>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#5A5A63' }}>—</span>
         </Field>
       </Panel>
       <div style={{ marginTop: 12 }}>

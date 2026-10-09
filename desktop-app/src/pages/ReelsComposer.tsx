@@ -40,7 +40,6 @@ function fmtDur(s: number | null): string {
   if (!s || s <= 0) return ''
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 }
-const HUES = ['139,92,246', '6,182,212', '236,72,153', '16,185,129', '245,158,11', '99,102,241']
 
 type Phase = 'pending' | 'running' | 'done' | 'failed'
 interface RunItem { id: string; name: string; phase: Phase; detail?: string }
@@ -374,16 +373,16 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
   // ── Stepper ─────────────────────────────────────────────────────────────────
   const stepper = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 16 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: 2, borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', marginBottom: 12, overflowX: 'auto' }}>
       {STEPS.map((s, i) => {
         const n = i + 1, active = step === n, past = step > n
         return (
           <button key={s} onClick={() => setStep(n)} style={{
-            display: 'flex', alignItems: 'center', gap: 7, flex: 1, height: 32, padding: '0 12px', border: 'none', borderRadius: 7, cursor: 'pointer', justifyContent: 'center',
-            background: active ? `rgba(${theme.tone},0.16)` : 'transparent',
-            color: active ? theme.accentText : past ? '#A1A1AA' : '#52525B', fontSize: 12, fontWeight: 700, transition: 'all .16s ease',
+            display: 'flex', alignItems: 'center', gap: 8, flex: 1, height: 32, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', justifyContent: 'center', whiteSpace: 'nowrap',
+            background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+            color: active ? '#EDEDEF' : past ? '#A1A1AA' : '#71717A', fontSize: 12.5, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
           }}>
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 17, height: 17, borderRadius: 5, flexShrink: 0, background: active ? theme.accentBtn : past ? 'rgba(16,185,129,0.16)' : 'rgba(255,255,255,0.05)', color: active ? '#fff' : past ? '#34D399' : '#52525B', fontSize: 9.5, fontWeight: 900 }}>{past ? '✓' : n}</span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box', background: active ? '#EDEDEF' : 'transparent', border: active ? 'none' : `1px solid ${past ? 'rgba(74,222,128,0.35)' : 'rgba(255,255,255,0.14)'}`, color: active ? '#0A0A0B' : past ? '#4ADE80' : '#71717A', fontSize: 10, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{past ? '✓' : n}</span>
             {s}
           </button>
         )
@@ -392,8 +391,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   )
 
   const selectStyle: CSSProperties = {
-    height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${group !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`,
-    background: '#101015', color: group !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 700, outline: 'none',
+    height: 28, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${group !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.09)'}`,
+    background: '#161618', color: '#EDEDEF', fontSize: 12.5, fontWeight: 400, outline: 'none',
   }
 
   return (
@@ -409,7 +408,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       />
 
       {!bearer && !conns.loading && (
-        <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 12, color: '#FBBF24' }}>
+        <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(251,191,36,0.22)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>
           Connecte ton compte GeeLark (token) dans les Réglages de l'app web pour publier.
         </div>
       )}
@@ -417,16 +416,16 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       {stepper}
 
       {/* ── Barre de presets (réglages + captions mémorisés) ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px', padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Presets</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px', padding: '8px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Presets</span>
         <select value={presetSel} onChange={e => { const v = e.target.value; if (v) doLoadPreset(v); else setPresetSel('') }}
-          style={{ height: 30, padding: '0 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.09)', background: '#101015', color: '#E4E4E7', fontSize: 12, fontWeight: 600, outline: 'none', minWidth: 170, cursor: 'pointer' }}>
-          <option value="" style={{ background: '#16161C' }}>{presets.length ? '— Charger un preset —' : 'Aucun preset enregistré'}</option>
-          {presets.map(p => <option key={p.name} value={p.name} style={{ background: '#16161C' }}>{p.name}</option>)}
+          style={{ height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#EDEDEF', fontSize: 12.5, outline: 'none', minWidth: 170, cursor: 'pointer' }}>
+          <option value="" style={{ background: '#161618' }}>{presets.length ? '— Charger un preset —' : 'Aucun preset enregistré'}</option>
+          {presets.map(p => <option key={p.name} value={p.name} style={{ background: '#161618' }}>{p.name}</option>)}
         </select>
-        <Btn theme={theme} sm tone="primary" icon="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z|M17 21v-8H7v8|M7 3v5h8" label="Enregistrer" onClick={doSavePreset} />
+        <Btn theme={theme} sm tone="ghost" icon="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z|M17 21v-8H7v8|M7 3v5h8" label="Enregistrer" onClick={doSavePreset} />
         {presetSel && <Btn theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" label="Supprimer" onClick={doDeletePreset} />}
-        <span style={{ marginLeft: 'auto', fontSize: 10.5, color: '#52525B' }}>Tes réglages sont mémorisés automatiquement</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A' }}>Tes réglages sont mémorisés automatiquement</span>
       </div>
 
       {/* ── Étape 1 : Comptes ── */}
@@ -436,36 +435,36 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             <Btn theme={theme} sm label="Tout" onClick={() => setSel(new Set(shownPhones.map(p => p.id)))} />
             <Btn theme={theme} sm tone="quiet" label="Aucun" onClick={() => setSel(new Set())} />
           </>} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Groupe</span>
             <select value={group} onChange={e => setGroup(e.target.value)} style={selectStyle}>
-              {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
+              {groups.map(g => <option key={g} value={g} style={{ background: '#161618' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
             </select>
             <button onClick={() => setHealthy(h => !h)} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 7, height: 28, padding: '0 11px', borderRadius: 8, cursor: 'pointer',
-              background: healthy ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (healthy ? 'rgba(16,185,129,0.32)' : 'rgba(255,255,255,0.07)'),
-              color: healthy ? '#34D399' : '#71717A', fontSize: 11.5, fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', gap: 7, height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer',
+              background: healthy ? 'rgba(255,255,255,0.07)' : '#161618', border: '1px solid ' + (healthy ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.09)'),
+              color: healthy ? '#EDEDEF' : '#A1A1AA', fontSize: 12.5, fontWeight: 400,
             }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 13, height: 13, borderRadius: 4, background: healthy ? '#10B981' : 'transparent', border: healthy ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#04140C', fontSize: 8, fontWeight: 900 }}>{healthy ? '✓' : ''}</span>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, boxSizing: 'border-box', background: healthy ? theme.accentBtn : 'transparent', border: healthy ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{healthy ? '✓' : ''}</span>
               Santé ≥ 70 seulement
             </button>
-            <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#52525B' }}>{shownPhones.length} affichés · {nSel} cochés</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{shownPhones.length} affichés · {nSel} cochés</span>
           </div>
-          {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div>
-            : shownPhones.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun compte.</div>
+          {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Chargement…</div>
+            : shownPhones.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Aucun compte.</div>
             : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(196px,1fr))', gap: 8, padding: 13 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(196px,1fr))', gap: 8, padding: 16 }}>
               {shownPhones.map(p => {
                 const on = sel.has(p.id)
                 return (
                   <button key={p.id} onClick={() => toggle(p.id)} style={{
-                    display: 'flex', alignItems: 'center', gap: 9, padding: '9px 11px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
-                    background: on ? `rgba(${theme.tone},0.09)` : 'rgba(255,255,255,0.015)', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.06)'),
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
+                    background: on ? 'rgba(255,255,255,0.05)' : '#141416', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.07)'), transition: 'background .12s ease, border-color .12s ease',
                   }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
-                    <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <span style={{ fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+                    <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                     <StatusDot kind={dotKind(p.status)} />
                   </button>
@@ -481,30 +480,30 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
         <Panel theme={theme}>
           <PanelHead title="Quel contenu ?" sub="Plusieurs vidéos ? Elles seront réparties entre les comptes." right={<>
             <Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPicker('videos')} />
-            <Chip text={`${nVid} sélectionnée${nVid > 1 ? 's' : ''}`} tone={nVid ? 'violet' : 'mute'} />
+            <Chip text={`${nVid} sélectionnée${nVid > 1 ? 's' : ''}`} tone="mute" />
           </>} />
-          {nVid === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>Aucune vidéo choisie.<br />Clique <b style={{ color: theme.accentText }}>Ouvrir la banque</b> pour en sélectionner.</div> : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(84px,1fr))', gap: 8, padding: 13, maxHeight: 420, overflowY: 'auto' }}>
+          {nVid === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>Aucune vidéo choisie.<br />Clique <b style={{ color: '#EDEDEF', fontWeight: 500 }}>Ouvrir la banque</b> pour en sélectionner.</div> : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(84px,1fr))', gap: 8, padding: 16, maxHeight: 420, overflowY: 'auto' }}>
               {videos.filter(v => vidSel.has(v.id)).map((v, i) => {
-                const on = vidSel.has(v.id); const h = HUES[i % 6]
+                const on = vidSel.has(v.id)
                 const prev = thumbFor(v); const vid = isVideo(v)
                 return (
                   <button key={v.id} onClick={() => toggleVid(v.id)} title={v.title} style={{
                     position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden',
-                    border: '1.5px solid ' + (on ? theme.accent : 'rgba(255,255,255,0.07)'),
-                    background: `linear-gradient(160deg, rgba(${h},0.16), rgba(${h},0.04))`,
+                    border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.08)'),
+                    background: '#161618',
                   }}>
                     {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
                       ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
-                    <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? theme.accentBtn : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                    <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     {/* Miniature par vidéo = une FRAME de la vidéo. Clic → sélecteur d'image (n'active pas le toggle). */}
                     <span role="button" title={covers[v.id] ? 'Miniature choisie — cliquer pour changer' : 'Choisir la miniature (image de la vidéo)'}
                       onClick={async e => { e.stopPropagation(); const url = await resolveVideoUrl(v); setCoverPickerFor({ id: v.id, url: url ?? '' }) }}
-                      style={{ position: 'absolute', bottom: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, overflow: 'hidden', backgroundColor: covers[v.id] ? theme.accentBtn : 'rgba(11,11,15,0.72)', backgroundImage: covers[v.id] ? `url(${covers[v.id]})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', border: covers[v.id] ? `1px solid ${theme.accentBtnEdge}` : '1px solid rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer' }}>
+                      style={{ position: 'absolute', bottom: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 5, overflow: 'hidden', backgroundColor: 'rgba(10,10,11,0.72)', backgroundImage: covers[v.id] ? `url(${covers[v.id]})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', border: covers[v.id] ? '1px solid rgba(255,255,255,0.7)' : '1px solid rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer' }}>
                       {!covers[v.id] && <Icon d="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" size={11} />}
                     </span>
-                    {fmtDur(v.duration) && <span style={{ position: 'absolute', bottom: 5, left: 6, fontFamily: "'JetBrains Mono',monospace", fontSize: 8.5, color: 'rgba(255,255,255,0.7)' }}>{fmtDur(v.duration)}</span>}
+                    {fmtDur(v.duration) && <span style={{ position: 'absolute', bottom: 5, left: 6, fontSize: 10, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: 'rgba(255,255,255,0.85)' }}>{fmtDur(v.duration)}</span>}
                   </button>
                 )
               })}
@@ -515,25 +514,25 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
       {/* ── Étape 3 : Légende ── */}
       {step === 3 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title="Légendes" sub={captions.filter(c => c.trim()).length > 1 ? 'Réparties entre les comptes' : 'Une légende commune (facultatif)'}
-              right={<Btn theme={theme} sm tone="primary" disabled={genning} icon="M9.9 15.5A2 2 0 0 0 8.5 14L2.4 12.5a.5.5 0 0 1 0-1L8.5 10A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0L14.1 8.5A2 2 0 0 0 15.5 9.9l6.1 1.6a.5.5 0 0 1 0 1L15.5 14a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" label={genning ? '…' : 'IA'} onClick={genCaption} />} />
-            <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              right={<Btn theme={theme} sm tone="ghost" disabled={genning} icon="M9.9 15.5A2 2 0 0 0 8.5 14L2.4 12.5a.5.5 0 0 1 0-1L8.5 10A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0L14.1 8.5A2 2 0 0 0 15.5 9.9l6.1 1.6a.5.5 0 0 1 0 1L15.5 14a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" label={genning ? '…' : 'IA'} onClick={genCaption} />} />
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {captions.map((c, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                   <textarea value={c} onChange={e => setCaptionAt(i, e.target.value)} placeholder={`Légende ${i + 1} (facultatif)…`} rows={2}
-                    style={{ flex: 1, minHeight: 52, resize: 'vertical', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', color: '#D4D4D8', fontSize: 12.5, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
-                  {captions.length > 1 && <button onClick={() => removeCaption(i)} title="Retirer" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#71717A', cursor: 'pointer' }}>✕</button>}
+                    style={{ flex: 1, minHeight: 52, resize: 'vertical', boxSizing: 'border-box', padding: 10, borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, lineHeight: 1.55, fontFamily: 'inherit', outline: 'none' }} />
+                  {captions.length > 1 && <button onClick={() => removeCaption(i)} title="Retirer" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#8B8B94', cursor: 'pointer' }}>✕</button>}
                 </div>
               ))}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Ajouter" onClick={() => addCaption()} />
                 <Btn theme={theme} sm tone="quiet" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Depuis la banque" onClick={() => setPicker('captions')} />
                 {captions.filter(c => c.trim()).length > 1 && (
-                  <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', marginLeft: 'auto' }}>
+                  <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', marginLeft: 'auto' }}>
                     {(['seq', 'random'] as const).map(m => (
-                      <button key={m} onClick={() => setCapMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: capMode === m ? theme.accentBtn : 'transparent', color: capMode === m ? '#fff' : '#71717A' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                      <button key={m} onClick={() => setCapMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: capMode === m ? 'rgba(255,255,255,0.08)' : 'transparent', color: capMode === m ? '#EDEDEF' : '#8B8B94' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
                     ))}
                   </span>
                 )}
@@ -542,13 +541,13 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
           </Panel>
           <Panel theme={theme}>
             <PanelHead title="Aperçu" />
-            <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 26, height: 26, borderRadius: 99, background: `linear-gradient(140deg,${theme.accentSoft},${theme.accentBtn})`, flexShrink: 0 }} />
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#E4E4E7' }}>@{phones.find(p => sel.has(p.id))?.ig_username ?? 'compte'}</span>
+                <span style={{ width: 26, height: 26, borderRadius: 99, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', boxSizing: 'border-box', flexShrink: 0 }} />
+                <span style={{ fontSize: 12.5, fontWeight: 500, color: '#EDEDEF' }}>@{phones.find(p => sel.has(p.id))?.ig_username ?? 'compte'}</span>
               </div>
-              <div style={{ aspectRatio: '9 / 14', borderRadius: 8, background: `linear-gradient(160deg, rgba(${theme.tone},0.16), rgba(${theme.tone},0.03))`, border: '1px solid rgba(255,255,255,0.06)' }} />
-              <div style={{ fontSize: 11, lineHeight: 1.6, color: '#71717A' }}>{(() => { const c = captions.find(x => x.trim()); return c ? c.split('\n')[0].slice(0, 62) + (c.length > 62 ? '…' : '') : 'Aucune légende' })()}</div>
+              <div style={{ aspectRatio: '9 / 14', borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.07)' }} />
+              <div style={{ fontSize: 12.5, lineHeight: 1.55, color: '#A1A1AA' }}>{(() => { const c = captions.find(x => x.trim()); return c ? c.split('\n')[0].slice(0, 62) + (c.length > 62 ? '…' : '') : 'Aucune légende' })()}</div>
             </div>
           </Panel>
         </div>
@@ -556,45 +555,45 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
       {/* ── Étape 4 : Lancement ── */}
       {step === 4 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title="Comportement du run" />
             {/* Proxy rotatif — togglable pour CE run (si configuré dans Paramètres) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Proxy rotatif</span>
-                <span style={{ fontSize: 11, color: '#52525B' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque téléphone → envoi en série' : 'Désactivé pour ce run → envoi en parallèle'}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Proxy rotatif</span>
+                <span style={{ fontSize: 12, color: '#8B8B94' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque téléphone → envoi en série' : 'Désactivé pour ce run → envoi en parallèle'}</span>
               </span>
               <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
                 title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 40, height: 23, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
-                <span style={{ width: 19, height: 19, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 28, height: 14, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+                <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
               </span>
             </div>
             {/* Téléphones simultanés (ignoré si proxy rotatif → série) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.04)', opacity: rotationOn ? 0.5 : 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', opacity: rotationOn ? 0.5 : 1 }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Téléphones simultanés</span>
-                <span style={{ fontSize: 11, color: '#52525B' }}>{rotationOn ? 'Forcé à 1 (proxy rotatif)' : 'Combien postent en même temps'}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Téléphones simultanés</span>
+                <span style={{ fontSize: 12, color: '#8B8B94' }}>{rotationOn ? 'Forcé à 1 (proxy rotatif)' : 'Combien postent en même temps'}</span>
               </span>
               <select value={rotationOn ? '1' : String(simulPhones)} disabled={rotationOn}
                 onChange={e => setSimulPhones(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                style={{ height: 30, padding: '0 8px', borderRadius: 8, cursor: rotationOn ? 'default' : 'pointer', border: '1px solid rgba(255,255,255,0.09)', background: '#101015', color: '#E4E4E7', fontSize: 11.5, fontWeight: 700, outline: 'none' }}>
-                {rotationOn ? <option value="1" style={{ background: '#16161C' }}>1 (série)</option> : <>
-                  <option value="all" style={{ background: '#16161C' }}>Tous</option>
-                  {[1, 2, 3, 5, 10].map(n => <option key={n} value={n} style={{ background: '#16161C' }}>{n}</option>)}
+                style={{ height: 28, padding: '0 8px', borderRadius: 6, cursor: rotationOn ? 'default' : 'pointer', border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#EDEDEF', fontSize: 12.5, outline: 'none' }}>
+                {rotationOn ? <option value="1" style={{ background: '#161618' }}>1 (série)</option> : <>
+                  <option value="all" style={{ background: '#161618' }}>Tous</option>
+                  {[1, 2, 3, 5, 10].map(n => <option key={n} value={n} style={{ background: '#161618' }}>{n}</option>)}
                 </>}
               </select>
             </div>
             {/* Répartition vidéo → compte */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Répartition des vidéos</span>
-                <span style={{ fontSize: 11, color: '#52525B' }}>Quelle vidéo va sur quel compte</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Répartition des vidéos</span>
+                <span style={{ fontSize: 12, color: '#8B8B94' }}>Quelle vidéo va sur quel compte</span>
               </span>
-              <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
                 {(['seq', 'random'] as const).map(m => (
-                  <button key={m} onClick={() => setVidMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: vidMode === m ? theme.accentBtn : 'transparent', color: vidMode === m ? '#fff' : '#71717A' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                  <button key={m} onClick={() => setVidMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: vidMode === m ? 'rgba(255,255,255,0.08)' : 'transparent', color: vidMode === m ? '#EDEDEF' : '#8B8B94' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
                 ))}
               </span>
             </div>
@@ -603,33 +602,33 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             {/* Essai Reels */}
             <RunToggle label="Essai Reels" hint="Publie en mode essai (visible non-abonnés)" on={reelsTrial} onToggle={() => setReelsTrial(v => !v)} theme={theme} border />
             {/* Miniatures par vidéo (définies à l'étape Vidéos) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 15px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Miniatures (couverture)</span>
-                <span style={{ fontSize: 11, color: '#52525B' }}>{Object.keys(covers).length > 0 ? `${Object.keys(covers).length} vidéo(s) avec miniature — modifiable à l’étape Vidéos` : 'Optionnel — choisis une miniature par vidéo à l’étape Vidéos (icône 🖼)'}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Miniatures (couverture)</span>
+                <span style={{ fontSize: 12, color: '#8B8B94' }}>{Object.keys(covers).length > 0 ? `${Object.keys(covers).length} vidéo(s) avec miniature — modifiable à l’étape Vidéos` : 'Optionnel — choisis une miniature par vidéo à l’étape Vidéos (icône 🖼)'}</span>
               </span>
             </div>
           </Panel>
           <Panel theme={theme}>
             <PanelHead title="Récapitulatif" />
-            <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 9 }}>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               {([['Comptes', nSel], ['Vidéos', nVid], ['Plateforme', 'Instagram']] as [string, any][]).map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                  <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: '#E4E4E7' }}>{v}</span>
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: '#8B8B94' }}>{k}</span><span style={{ fontWeight: 500, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{v}</span>
                 </div>
               ))}
               <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 12, color: '#71717A' }}>Coût</span>
+                <span style={{ fontSize: 13, color: '#8B8B94' }}>Coût</span>
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                  <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 17, fontWeight: 700, color: '#FBBF24' }}>{cost} crédits</span>
-                  {balance !== null && <span style={{ fontSize: 10.5, color: '#52525B' }}>solde après : {Math.max(0, balance - cost).toLocaleString('fr-FR')}</span>}
+                  <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{cost} crédits</span>
+                  {balance !== null && <span style={{ fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>solde après : {Math.max(0, balance - cost).toLocaleString('fr-FR')}</span>}
                 </span>
               </div>
               <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <Btn theme={theme} tone="primary" disabled={!canLaunch} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z"
                   label={running ? 'Publication…' : nSel === 0 ? 'Sélectionne des comptes' : nVid === 0 ? 'Choisis une vidéo' : `Lancer sur ${nSel} comptes`} onClick={() => launch()} />
-                <Btn theme={theme} tone="quiet" disabled={!canLaunch} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
+                <Btn theme={theme} tone="ghost" disabled={!canLaunch} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
                   label="Programmer (PC éteint)" onClick={() => { setSchedVal(defaultSchedVal()); setSchedOpen(true) }} />
               </div>
             </div>
@@ -640,14 +639,14 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
               <Panel theme={theme}>
                 <PanelHead title="Publication en direct" sub={`${runItems.filter(r => r.phase === 'done').length}/${runItems.length} terminés`}
                   right={runId ? <Btn theme={theme} sm tone="danger" icon="M6 6h12v12H6z" label="Annuler" onClick={() => cancelRun(runId)} /> : undefined} />
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '11px 15px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '12px 16px' }}>
                   {runItems.map(it => {
                     const c = it.phase === 'done' ? 'ok' : it.phase === 'failed' ? 'bad' : it.phase === 'running' ? 'warn' : 'mute'
                     const m = it.phase === 'done' ? '✓' : it.phase === 'failed' ? '✕' : it.phase === 'running' ? '…' : '·'
                     return <Chip key={it.id} text={`${m} @${it.name}`} tone={c as any} />
                   })}
                 </div>
-                <div style={{ margin: '0 15px 13px', padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.05)', maxHeight: 240, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
+                <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 240, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
                   {logs.length === 0 ? '…' : logs.join('\n')}
                 </div>
               </Panel>
@@ -687,12 +686,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                 setSchedOpen(false); launch(Math.floor(ms / 1000))
               }} />
           </>}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <label style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A' }}>Date et heure</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Date et heure</label>
             <input type="datetime-local" value={schedVal} min={schedLocalValue(1)} max={schedLocalValue(29 * 24 * 60)}
               onChange={e => setSchedVal(e.target.value)}
-              style={{ height: 40, padding: '0 12px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.12)', color: '#F4F4F6', fontSize: 13, outline: 'none', colorScheme: 'dark' }} />
-            <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.6, color: '#71717A' }}>
+              style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', colorScheme: 'dark' }} />
+            <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.55, color: '#8B8B94' }}>
               La tâche est créée <b>maintenant</b> sur GeeLark (vidéos hébergées + crédits débités) et s'exécutera <b>toute seule</b> à l'heure prévue. Tu peux la voir/annuler dans les <b>Task Logs</b> de GeeLark. Max ~29 jours (au-delà, l'hébergement vidéo GeeLark expire).
               {reelsTrial ? ' Mode essai activé.' : ''}
             </p>
@@ -706,13 +705,13 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 // Interrupteur d'option de run (on/off).
 function RunToggle({ label, hint, on, onToggle, theme, border }: { label: string; hint: string; on: boolean; onToggle: () => void; theme: Theme; border?: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: border ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: border ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>{label}</span>
-        <span style={{ fontSize: 11, color: '#52525B' }}>{hint}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{label}</span>
+        <span style={{ fontSize: 12, color: '#8B8B94' }}>{hint}</span>
       </span>
-      <span onClick={onToggle} style={{ display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 34, height: 19, padding: 2, borderRadius: 99, flexShrink: 0, cursor: 'pointer', background: on ? theme.accentBtn : 'rgba(255,255,255,0.12)' }}>
-        <span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} />
+      <span onClick={onToggle} style={{ display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 28, height: 14, padding: 2, borderRadius: 99, flexShrink: 0, cursor: 'pointer', background: on ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+        <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
       </span>
     </div>
   )
@@ -759,16 +758,16 @@ function CoverFramePicker({ theme, videoUrl, onClose, onPick }: {
         <Btn theme={theme} tone="primary" label="Utiliser cette image" disabled={!ready} onClick={capture} />
       </>}>
       {err ? <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: '#F87171' }}>{err}</div>
-        : !src ? <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: '#71717A' }}>Chargement de la vidéo…</div>
+        : !src ? <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: '#8B8B94' }}>Chargement de la vidéo…</div>
         : (
           <div>
             <video ref={videoRef} src={src} preload="metadata" playsInline muted
               onLoadedMetadata={e => { setDur(e.currentTarget.duration || 0); setReady(true) }}
-              style={{ width: '100%', maxHeight: 360, borderRadius: 10, background: '#000', objectFit: 'contain' }} />
+              style={{ width: '100%', maxHeight: 360, borderRadius: 8, background: '#000', objectFit: 'contain', display: 'block' }} />
             <input type="range" min={0} max={dur || 0} step={0.05} value={t}
               onChange={e => seek(Number(e.target.value))}
               style={{ width: '100%', marginTop: 12, accentColor: `rgb(${theme.tone})`, cursor: 'pointer' }} />
-            <div style={{ textAlign: 'center', fontSize: 11.5, color: '#71717A', fontFamily: "'JetBrains Mono',monospace" }}>{t.toFixed(1)}s / {dur.toFixed(1)}s</div>
+            <div style={{ textAlign: 'center', fontSize: 12, color: '#8B8B94', fontVariantNumeric: 'tabular-nums' }}>{t.toFixed(1)}s / {dur.toFixed(1)}s</div>
           </div>
         )}
     </Modal>

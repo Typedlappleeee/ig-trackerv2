@@ -35,11 +35,11 @@ function ageLabel(iso: string | null): string {
 function Bar({ v }: { v: number }) {
   const c = healthColor(v)
   return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ flex: 1, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
         <span style={{ display: 'block', height: '100%', width: `${v}%`, borderRadius: 99, background: c }} />
       </span>
-      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 700, color: c, minWidth: 24, textAlign: 'right' }}>{v}</span>
+      <span style={{ fontSize: 12, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: c, minWidth: 24, textAlign: 'right' }}>{v}</span>
     </span>
   )
 }
@@ -97,43 +97,43 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
       <ConnectBanner theme={theme} onConnect={() => onNavigate?.('connections')} />
 
       {/* Comment le score est calculé */}
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 16 }}>
         <Panel theme={theme}>
           <PanelHead title="Comment le score est calculé" sub="Cinq critères, recalculés à chaque exécution" right={<Chip text="sur 100" tone="mute" />} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(0,1fr))', gap: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 0 }}>
             {CRITERIA.map(([l, w, d, c], i) => (
-              <div key={l} style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '14px 15px', borderRight: i < 4 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                  <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 700, color: c }}>{w}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#3F3F46' }}>pts</span>
+              <div key={l} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, borderRight: i < 4 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{w}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: '#71717A' }}>pts</span>
                 </span>
-                <span style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                <span style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                   <span style={{ display: 'block', height: '100%', width: `${(w / 30) * 100}%`, borderRadius: 99, background: c }} />
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#E4E4E7' }}>{l}</span>
-                <span style={{ fontSize: 10.5, lineHeight: 1.5, color: '#52525B' }}>{d}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{l}</span>
+                <span style={{ fontSize: 12, lineHeight: 1.5, color: '#8B8B94' }}>{d}</span>
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '11px 15px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 11, flexWrap: 'wrap' }}>
-            {[['#10B981', '85 à 100 · solide'], ['#F59E0B', '70 à 84 · à surveiller'], ['#EF4444', 'sous 70 · action requise']].map(([c, l]) => (
-              <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#71717A' }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: c }} />{l}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 12, flexWrap: 'wrap' }}>
+            {[['#4ADE80', '85 à 100 · solide'], ['#FBBF24', '70 à 84 · à surveiller'], ['#F87171', 'sous 70 · action requise']].map(([c, l]) => (
+              <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#8B8B94' }}>
+                <span style={{ width: 6, height: 6, borderRadius: 99, background: c }} />{l}
               </span>
             ))}
           </div>
         </Panel>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>
         <Kpi theme={theme} label="Score moyen" value={rows.length ? avg : '—'} color={rows.length ? healthColor(avg) : undefined} />
         <Kpi theme={theme} label="À risque" value={risk.length} color={risk.length ? '#F87171' : undefined} hint={risk.length ? 'sous 70 · action requise' : undefined} hintColor="#F87171" />
         <Kpi theme={theme} label="À surveiller" value={watch.length} color={watch.length ? '#FBBF24' : undefined} />
-        <Kpi theme={theme} label="Comptes bannis" value={banned} color={banned ? '#F87171' : '#34D399'} />
+        <Kpi theme={theme} label="Comptes bannis" value={banned} color={banned ? '#F87171' : '#4ADE80'} />
       </div>
 
       {loading ? (
-        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div></Panel>
+        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div></Panel>
       ) : error ? (
         <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} /></Panel>
       ) : rows.length === 0 ? (
@@ -142,27 +142,27 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
         <>
           {/* Alertes actionnables */}
           {alerts.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
+            <div style={{ marginBottom: 16 }}>
               <Panel theme={theme}>
                 <PanelHead title="Ce qu'il faut faire maintenant" sub={`${alerts.length} compte${alerts.length > 1 ? 's demandent' : ' demande'} une action`} />
                 {alerts.map((p, i) => {
                   const r = healthReason(p)
                   const bad = r.sev === 'bad'
                   return (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderBottom: i < alerts.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none' }}>
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', minHeight: 52, boxSizing: 'border-box', flexWrap: 'wrap', borderBottom: i < alerts.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
                       <span style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-                        background: bad ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
-                        border: '1px solid ' + (bad ? 'rgba(239,68,68,0.24)' : 'rgba(245,158,11,0.24)'),
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                        background: '#18181B',
+                        border: '1px solid rgba(255,255,255,0.08)',
                         color: bad ? '#F87171' : '#FBBF24',
                       }}><Icon d="M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" size={13} /></span>
                       <span style={{ width: 160, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.ig_username ?? 'compte'}</span>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: bad ? '#F87171' : '#FBBF24' }}>santé {p.health}</span>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.ig_username ?? 'compte'}</span>
+                        <span style={{ fontSize: 11.5, fontVariantNumeric: 'tabular-nums', color: bad ? '#F87171' : '#FBBF24' }}>santé {p.health}</span>
                       </span>
                       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span style={{ fontSize: 12, color: '#D4D4D8' }}>{r.why}</span>
-                        <span style={{ fontSize: 11, color: '#52525B' }}>→ {r.fix}</span>
+                        <span style={{ fontSize: 13, color: '#A1A1AA' }}>{r.why}</span>
+                        <span style={{ fontSize: 12, color: '#71717A' }}>→ {r.fix}</span>
                       </span>
                       <Btn theme={theme} sm tone="primary" label="Corriger" onClick={() => onNavigate?.('warmup')} />
                     </div>
@@ -175,20 +175,20 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
           {/* Classement complet */}
           <Panel theme={theme}>
             <PanelHead title="Tous les comptes" sub="Trié du plus fragile au plus solide" />
-            <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '9px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '0 16px', height: 36, borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 11, fontWeight: 500, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#71717A' }}>
               {['Compte', 'Santé', 'Groupe', 'Âge', 'Cadence'].map((h, i) => <span key={i}>{h}</span>)}
             </div>
             {rows.map((p, i) => (
-              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '9px 15px', fontSize: 12, borderBottom: i < rows.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none', transition: 'background .14s ease' }}
+              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '0 16px', minHeight: 44, boxSizing: 'border-box', fontSize: 13, borderBottom: i < rows.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', transition: 'background .12s ease' }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                   <StatusDot kind={dotKind(p.status)} />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.ig_username ?? '—'}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.ig_username ?? '—'}</span>
                 </span>
                 <span><Bar v={p.health} /></span>
-                <span style={{ fontSize: 11.5, color: '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.group_name ?? '—'}</span>
-                <span style={{ fontSize: 11.5, color: '#A1A1AA' }}>{ageLabel(p.created_at)}</span>
+                <span style={{ fontSize: 12, color: '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.group_name ?? '—'}</span>
+                <span style={{ fontSize: 12, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }}>{ageLabel(p.created_at)}</span>
                 <span><Chip text={p.health >= 85 ? 'normale' : p.health >= 70 ? 'à réduire' : 'trop élevée'} tone={p.health >= 85 ? 'ok' : p.health >= 70 ? 'warn' : 'bad'} /></span>
               </div>
             ))}

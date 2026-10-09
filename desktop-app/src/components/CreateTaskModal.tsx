@@ -127,9 +127,9 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
   const [grpFilter, setGrpFilter] = useState('Tous')
   const shownPhones = phones.filter(p => grpFilter === 'Tous' || p.group_name === grpFilter)
 
-  const lbl: CSSProperties = { fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 7, display: 'block' }
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
-  const seg = (on: boolean): CSSProperties => ({ flex: 1, height: 32, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: on ? theme.accentBtn : 'rgba(255,255,255,0.03)', color: on ? '#fff' : '#A1A1AA' })
+  const lbl: CSSProperties = { fontSize: 12, fontWeight: 500, color: '#8B8B94', marginBottom: 6, display: 'block' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', colorScheme: 'dark' }
+  const seg = (on: boolean): CSSProperties => ({ flex: 1, height: 28, border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: on ? 'rgba(255,255,255,0.08)' : 'transparent', color: on ? '#EDEDEF' : '#8B8B94', transition: 'background .12s ease, color .12s ease' })
 
   return (
     <Modal theme={theme} width={560}
@@ -140,7 +140,7 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
         <Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} />
         <Btn theme={theme} tone="primary" disabled={!canSave} label={saving ? 'Création…' : mode === 'recurring' ? 'Créer la tâche' : 'Programmer'} onClick={save} />
       </>}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <label style={lbl}>Nom</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="ex. Reels quotidiens Luna" style={inp} autoFocus />
@@ -148,7 +148,7 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
 
         <div>
           <label style={lbl}>Type</label>
-          <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
             <button style={seg(type === 'publication')} onClick={() => { setType('publication'); setMedia([]) }}>Publication (Reels)</button>
             <button style={seg(type === 'story')} onClick={() => { setType('story'); setMedia([]) }}>Story + lien</button>
           </div>
@@ -157,37 +157,37 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
         <div>
           <label style={lbl}>Comptes ({nSel})</label>
           {groups.length > 0 && (
-            <select value={grpFilter} onChange={e => setGrpFilter(e.target.value)} style={{ ...inp, height: 30, marginBottom: 8, cursor: 'pointer' }}>
-              <option value="Tous" style={{ background: '#16161C' }}>Tous les groupes</option>
-              {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g}</option>)}
+            <select value={grpFilter} onChange={e => setGrpFilter(e.target.value)} style={{ ...inp, height: 28, marginBottom: 8, cursor: 'pointer' }}>
+              <option value="Tous" style={{ background: '#161618' }}>Tous les groupes</option>
+              {groups.map(g => <option key={g} value={g} style={{ background: '#161618' }}>{g}</option>)}
             </select>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
-            {shownPhones.length === 0 ? <span style={{ fontSize: 12, color: '#52525B' }}>{infra === 'cloud' ? 'Aucun appareil ScaleFlow Cloud.' : 'Aucun appareil GeeLark.'}</span> : shownPhones.map(p => {
+            {shownPhones.length === 0 ? <span style={{ fontSize: 12.5, color: '#71717A' }}>{infra === 'cloud' ? 'Aucun appareil ScaleFlow Cloud.' : 'Aucun appareil GeeLark.'}</span> : shownPhones.map(p => {
               const on = sel.has(p.id)
               return (
                 <button key={p.id} onClick={() => toggle(p.id)} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
-                  background: on ? `rgba(${theme.tone},0.09)` : 'rgba(255,255,255,0.015)', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.06)'),
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 6, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
+                  background: on ? 'rgba(255,255,255,0.05)' : '#141416', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.07)'),
                 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 8.5, fontWeight: 900 }}>{on ? '✓' : ''}</span>
-                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: on ? '#F4F4F6' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                   </span>
                 </button>
               )
             })}
           </div>
-          {type === 'story' && <p style={{ margin: '7px 0 0', fontSize: 10.5, color: '#52525B', lineHeight: 1.5 }}>Le lien du sticker de chaque compte vient de ses Réglages (onglet Téléphones).</p>}
+          {type === 'story' && <p style={{ margin: '8px 0 0', fontSize: 12, color: '#8B8B94', lineHeight: 1.5 }}>Le lien du sticker de chaque compte vient de ses Réglages (onglet Téléphones).</p>}
         </div>
 
         <div>
           <label style={lbl}>{type === 'story' ? 'Images' : 'Vidéos'} ({media.length})</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
+            <Btn theme={theme} sm tone="ghost" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
               label="Ouvrir la banque" onClick={() => setPicker(type === 'story' ? 'images' : 'videos')} />
-            {media.map(m => <Chip key={m.id} text={m.title} tone="violet" />)}
+            {media.map(m => <Chip key={m.id} text={m.title} tone="mute" />)}
           </div>
         </div>
 
@@ -195,7 +195,7 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
           <div>
             <label style={lbl}>Légende (facultatif)</label>
             <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={2} placeholder="Légende commune…"
-              style={{ ...inp, height: 'auto', minHeight: 54, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
+              style={{ ...inp, height: 'auto', minHeight: 56, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.55 }} />
             <div style={{ marginTop: 6 }}>
               <Btn theme={theme} sm tone="quiet" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Depuis la banque" onClick={() => setPicker('captions')} />
             </div>
@@ -208,7 +208,7 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
             {mode === 'recurring' ? (
               <select value={recurHours} onChange={e => setRecurHours(Number(e.target.value))} style={{ ...inp, cursor: 'pointer' }}>
                 {[[6, 'Toutes les 6 h'], [12, 'Toutes les 12 h'], [24, 'Chaque jour'], [48, 'Tous les 2 jours'], [168, 'Chaque semaine']].map(([h, l]) => (
-                  <option key={h} value={h} style={{ background: '#16161C' }}>{l}</option>
+                  <option key={h} value={h} style={{ background: '#161618' }}>{l}</option>
                 ))}
               </select>
             ) : (
@@ -218,13 +218,13 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
           <div>
             <label style={lbl}>Répartition</label>
             <select value={distMode} onChange={e => setDistMode(e.target.value as 'seq' | 'random')} style={{ ...inp, cursor: 'pointer' }}>
-              <option value="seq" style={{ background: '#16161C' }}>Séquentielle</option>
-              <option value="random" style={{ background: '#16161C' }}>Aléatoire</option>
+              <option value="seq" style={{ background: '#161618' }}>Séquentielle</option>
+              <option value="random" style={{ background: '#161618' }}>Aléatoire</option>
             </select>
           </div>
         </div>
 
-        {err && <p style={{ margin: 0, fontSize: 11.5, color: '#F87171' }}>{err}</p>}
+        {err && <p style={{ margin: 0, fontSize: 12, color: '#F87171' }}>{err}</p>}
       </div>
 
       {picker && (

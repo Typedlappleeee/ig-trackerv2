@@ -29,64 +29,63 @@ export function StatusDot({ kind }: { kind: string }) {
 }
 
 // ── _chip ──────────────────────────────────────────────────────────────────────
+// Style « SaaS épuré » : pastilles discrètes, fond à peine teinté, texte coloré.
 type ChipTone = 'ok' | 'warn' | 'bad' | 'info' | 'violet' | 'mute'
 const CHIP_T: Record<ChipTone, [string, string, string]> = {
-  ok: ['rgba(16,185,129,0.1)', 'rgba(16,185,129,0.22)', '#34D399'],
-  warn: ['rgba(245,158,11,0.1)', 'rgba(245,158,11,0.22)', '#FBBF24'],
-  bad: ['rgba(239,68,68,0.1)', 'rgba(239,68,68,0.22)', '#F87171'],
-  info: ['rgba(6,182,212,0.1)', 'rgba(6,182,212,0.22)', '#22D3EE'],
-  violet: ['rgba(139,92,246,0.12)', 'rgba(139,92,246,0.26)', '#C4B5FD'],
-  mute: ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.08)', '#A1A1AA'],
+  ok: ['rgba(16,185,129,0.08)', 'rgba(16,185,129,0.18)', '#4ADE80'],
+  warn: ['rgba(245,158,11,0.08)', 'rgba(245,158,11,0.18)', '#FBBF24'],
+  bad: ['rgba(239,68,68,0.08)', 'rgba(239,68,68,0.18)', '#F87171'],
+  info: ['rgba(6,182,212,0.08)', 'rgba(6,182,212,0.18)', '#67E8F9'],
+  violet: ['rgba(139,124,246,0.1)', 'rgba(139,124,246,0.22)', '#C4BBFB'],
+  mute: ['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.08)', '#A1A1AA'],
 }
 export function Chip({ text, tone = 'mute' }: { text: ReactNode; tone?: ChipTone }) {
   const T = CHIP_T[tone] || CHIP_T.mute
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px',
-      borderRadius: 6, background: T[0], border: `1px solid ${T[1]}`, color: T[2],
-      fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap',
+      display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 7px', boxSizing: 'border-box',
+      borderRadius: 5, background: T[0], border: `1px solid ${T[1]}`, color: T[2],
+      fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', lineHeight: 1,
     }}>{text}</span>
   )
 }
 
 // ── _btn ──────────────────────────────────────────────────────────────────────
+// primary = bouton plein clair (façon Vercel) ; ghost = bordé ; quiet = texte ; danger.
 type BtnTone = 'primary' | 'ghost' | 'quiet' | 'danger'
 export function Btn({ label, theme, tone = 'ghost', sm, icon, onClick, disabled }: {
   label?: string; theme: Theme; tone?: BtnTone; sm?: boolean; icon?: string
   onClick?: () => void; disabled?: boolean
 }) {
-  const T = theme
+  void theme
   const base: CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 7, height: sm ? 28 : 32,
-    padding: icon && !label ? '0' : `0 ${sm ? 11 : 13}px`,
+    display: 'inline-flex', alignItems: 'center', gap: 6, height: sm ? 28 : 32,
+    padding: icon && !label ? '0' : `0 ${sm ? 10 : 12}px`,
     width: icon && !label ? (sm ? 28 : 32) : 'auto',
-    justifyContent: 'center', borderRadius: 8, cursor: disabled ? 'not-allowed' : 'pointer',
-    fontSize: sm ? 11.5 : 12.5, fontWeight: 700, whiteSpace: 'nowrap',
-    transition: 'all .16s ease', opacity: disabled ? 0.45 : 1, boxSizing: 'border-box',
+    justifyContent: 'center', borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
+    fontSize: sm ? 12 : 13, fontWeight: 500, whiteSpace: 'nowrap', letterSpacing: '-0.005em',
+    transition: 'background .12s ease, border-color .12s ease, color .12s ease', opacity: disabled ? 0.4 : 1, boxSizing: 'border-box',
   }
   const TONES: Record<BtnTone, CSSProperties> = {
-    primary: { background: T.accentBtn, border: `1px solid ${T.accentBtnEdge}`, color: '#fff', boxShadow: `0 6px 16px -8px rgba(${T.tone},0.9)` },
-    ghost: { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8' },
+    primary: { background: '#EDEDEF', border: '1px solid #EDEDEF', color: '#0A0A0B' },
+    ghost: { background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#E4E4E7' },
     quiet: { background: 'transparent', border: '1px solid transparent', color: '#A1A1AA' },
-    danger: { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', color: '#F87171' },
+    danger: { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' },
+  }
+  const HOVER: Record<BtnTone, CSSProperties> = {
+    primary: { background: '#FFFFFF', borderColor: '#FFFFFF' },
+    ghost: { background: '#1C1C1F', borderColor: 'rgba(255,255,255,0.14)' },
+    quiet: { background: 'rgba(255,255,255,0.05)', color: '#E4E4E7' },
+    danger: { background: 'rgba(239,68,68,0.14)' },
   }
   return (
     <button
-      onClick={onClick} disabled={disabled} aria-label={label}
+      type="button" onClick={onClick} disabled={disabled} aria-label={label}
       style={{ ...base, ...TONES[tone] }}
-      onMouseEnter={e => {
-        if (disabled) return
-        if (tone === 'ghost') e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
-        if (tone === 'quiet') e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
-        if (tone === 'primary') e.currentTarget.style.background = T.accent
-      }}
-      onMouseLeave={e => {
-        if (tone === 'ghost') e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
-        if (tone === 'quiet') e.currentTarget.style.background = 'transparent'
-        if (tone === 'primary') e.currentTarget.style.background = T.accentBtn
-      }}
+      onMouseEnter={e => { if (!disabled) Object.assign(e.currentTarget.style, HOVER[tone]) }}
+      onMouseLeave={e => { Object.assign(e.currentTarget.style, TONES[tone]) }}
     >
-      {icon ? <span style={{ display: 'flex' }}><Icon d={icon} size={sm ? 12 : 13} /></span> : null}
+      {icon ? <span style={{ display: 'flex', opacity: tone === 'primary' ? 0.85 : 1 }}><Icon d={icon} size={sm ? 13 : 14} /></span> : null}
       {label}
     </button>
   )
@@ -96,9 +95,8 @@ export function Btn({ label, theme, tone = 'ghost', sm, icon, onClick, disabled 
 export function Panel({ theme, style, children }: { theme: Theme; style?: CSSProperties; children: ReactNode }) {
   return (
     <div style={{
-      borderRadius: 10, background: theme.panelBg,
+      borderRadius: 8, background: theme.panelBg,
       border: `1px solid ${theme.panelEdge}`, overflow: 'hidden',
-      boxShadow: theme.cloud ? '0 1px 0 rgba(255,255,255,0.03) inset' : 'none',
       ...style,
     }}>{children}</div>
   )
@@ -107,14 +105,14 @@ export function Panel({ theme, style, children }: { theme: Theme; style?: CSSPro
 export function PanelHead({ title, right, sub }: { title: ReactNode; right?: ReactNode; sub?: string }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px',
-      borderBottom: '1px solid rgba(255,255,255,0.05)',
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', minHeight: 48, boxSizing: 'border-box',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
     }}>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6' }}>{title}</span>
-        {sub ? <span style={{ fontSize: 11, color: '#71717A' }}>{sub}</span> : null}
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{title}</span>
+        {sub ? <span style={{ fontSize: 12, color: '#8B8B94', lineHeight: 1.45 }}>{sub}</span> : null}
       </span>
-      {right ? <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 7 }}>{right}</span> : null}
+      {right ? <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>{right}</span> : null}
     </div>
   )
 }
@@ -122,13 +120,10 @@ export function PanelHead({ title, right, sub }: { title: ReactNode; right?: Rea
 // ── _pageHead ────────────────────────────────────────────────────────────────
 export function PageHead({ title, sub, actions }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
       <div style={{ minWidth: 0 }}>
-        <h1 style={{
-          margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 22,
-          fontWeight: 700, letterSpacing: '-0.025em', color: '#F4F4F6',
-        }}>{title}</h1>
-        {sub ? <p style={{ margin: '6px 0 0', fontSize: 12.5, lineHeight: 1.55, color: '#71717A', maxWidth: 560 }}>{sub}</p> : null}
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.2, color: '#EDEDEF' }}>{title}</h1>
+        {sub ? <p style={{ margin: '6px 0 0', fontSize: 13, lineHeight: 1.55, color: '#8B8B94', maxWidth: 620 }}>{sub}</p> : null}
       </div>
       {actions ? <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{actions}</div> : null}
     </div>
@@ -140,15 +135,14 @@ export function Kpi({ theme, label, value, color, hint, hintColor }: {
   theme: Theme; label: string; value: ReactNode; color?: string; hint?: ReactNode; hintColor?: string
 }) {
   return (
-    <Panel theme={theme} style={{ padding: 15 }}>
-      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#52525B' }}>{label}</div>
+    <Panel theme={theme} style={{ padding: '14px 16px' }}>
+      <div style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{label}</div>
       <div style={{
-        marginTop: 9, fontFamily: "'Space Grotesk',sans-serif", fontSize: 25,
-        fontWeight: 700, letterSpacing: '-0.03em', color: color || '#F4F4F6',
+        marginTop: 8, fontSize: 24, fontWeight: 600, letterSpacing: '-0.03em', color: color || '#EDEDEF',
         fontVariantNumeric: 'tabular-nums', lineHeight: 1,
       }}>{value}</div>
       {hint ? (
-        <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: hintColor || '#71717A' }}>{hint}</div>
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, color: hintColor || '#71717A' }}>{hint}</div>
       ) : null}
     </Panel>
   )
@@ -159,30 +153,33 @@ export function Modal({ title, sub, icon, theme, onClose, footer, width, childre
   title: string; sub?: string; icon?: string; theme: Theme; onClose: () => void
   footer?: ReactNode; width?: number; children: ReactNode
 }) {
+  void theme
   // Portal vers <body> : une modale doit être relative à l'écran, pas au conteneur
   // de page (qui a un transform d'animation → il piégeait le position:fixed).
   return createPortal(
     <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, zIndex: 90, display: 'flex', justifyContent: 'center', padding: 28, overflowY: 'auto',
-      background: 'rgba(4,6,8,0.72)', backdropFilter: 'blur(6px)', animation: 'aFade .16s ease both',
+      position: 'fixed', inset: 0, zIndex: 90, display: 'flex', justifyContent: 'center', padding: 24, overflowY: 'auto',
+      background: 'rgba(0,0,0,0.6)', animation: 'aFade .14s ease both',
     }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        display: 'flex', flexDirection: 'column', width: width ?? 560, maxWidth: '100%', maxHeight: 'calc(100vh - 56px)', margin: 'auto', borderRadius: 13, overflow: 'hidden',
-        background: '#131318', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 32px 80px -22px rgba(0,0,0,0.8)',
-        animation: 'aPop .22s cubic-bezier(0.16,1,0.3,1) both',
+      <div role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()} style={{
+        display: 'flex', flexDirection: 'column', width: width ?? 560, maxWidth: '100%', maxHeight: 'calc(100vh - 48px)', margin: 'auto', borderRadius: 10, overflow: 'hidden',
+        background: '#111113', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.7)',
+        animation: 'aPop .18s cubic-bezier(0.16,1,0.3,1) both',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 13, padding: '17px 18px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
-          {icon && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.26)`, color: theme.accentText }}><Icon d={icon} size={16} /></span>}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+          {icon && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 7, flexShrink: 0, background: '#1A1A1D', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8' }}><Icon d={icon} size={15} /></span>}
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 14.5, fontWeight: 700, color: '#F4F4F6' }}>{title}</span>
-            {sub && <span style={{ fontSize: 12, color: '#71717A' }}>{sub}</span>}
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.015em' }}>{title}</span>
+            {sub && <span style={{ fontSize: 12.5, color: '#8B8B94' }}>{sub}</span>}
           </span>
-          <button onClick={onClose} aria-label="Fermer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 7, border: 'none', background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', cursor: 'pointer', flexShrink: 0 }}>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: '#8B8B94', cursor: 'pointer', flexShrink: 0 }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#EDEDEF' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8B8B94' }}>
             <Icon d="M18 6L6 18|M6 6l12 12" size={14} />
           </button>
         </div>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 18 }}>{children}</div>
-        {footer && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '13px 18px', borderTop: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>{footer}</div>}
+        {footer && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0E0E10', flexShrink: 0 }}>{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -194,14 +191,14 @@ export function Modal({ title, sub, icon, theme, onClose, footer, width, childre
 export function ConnectBanner({ theme, onConnect }: { theme: Theme; onConnect: () => void }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 13, padding: '12px 15px', marginBottom: 14, borderRadius: 10,
-      background: `rgba(${theme.tone},0.06)`, border: `1px solid rgba(${theme.tone},0.22)`,
+      display: 'flex', alignItems: 'center', gap: 13, padding: '12px 16px', marginBottom: 16, borderRadius: 8,
+      background: '#111113', border: '1px solid rgba(255,255,255,0.07)', boxShadow: `inset 2px 0 0 ${theme.accent}`,
     }}>
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.28)`, color: theme.accentText }}>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
         <Icon d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1" size={16} />
       </span>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>Connecte tes comptes pour des stats officielles</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>Connecte tes comptes pour des stats officielles</span>
         <span style={{ fontSize: 11.5, color: '#71717A' }}>Vues, abonnés et engagement natifs via l'API Meta — remplit ces écrans automatiquement.</span>
       </span>
       <Btn theme={theme} tone="primary" sm icon="M12 5v14|M5 12h14" label="Connecter" onClick={onConnect} />
@@ -212,14 +209,14 @@ export function ConnectBanner({ theme, onConnect }: { theme: Theme; onConnect: (
 // ── _empty ──────────────────────────────────────────────────────────────────────
 export function Empty({ icon, title, text, action }: { icon: string; title: string; text: ReactNode; action?: ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '56px 24px', textAlign: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '52px 24px', textAlign: 'center' }}>
       <span style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 11,
-        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: '#52525B',
-      }}><Icon d={icon} size={19} /></span>
-      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#E4E4E7' }}>{title}</div>
-      <div style={{ fontSize: 12, lineHeight: 1.6, color: '#71717A', maxWidth: 320 }}>{text}</div>
-      {action ? <div style={{ marginTop: 4 }}>{action}</div> : null}
+        display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 8,
+        background: '#161618', border: '1px solid rgba(255,255,255,0.08)', color: '#8B8B94',
+      }}><Icon d={icon} size={18} /></span>
+      <div style={{ marginTop: 4, fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{title}</div>
+      <div style={{ fontSize: 13, lineHeight: 1.55, color: '#8B8B94', maxWidth: 340 }}>{text}</div>
+      {action ? <div style={{ marginTop: 6 }}>{action}</div> : null}
     </div>
   )
 }

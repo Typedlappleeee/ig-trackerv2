@@ -1,5 +1,6 @@
 // Thèmes portés à l'identique du prototype ScaleFlow.dc.html (_theme()).
-// Le thème suit l'infrastructure choisie : Cloud = cyan premium, GeeLark = violet.
+// Le thème suit l'infrastructure choisie : Cloud = cyan, GeeLark = violet, iRemoTech = ambre.
+// Style « SaaS épuré » : surfaces plates et neutres communes, seul l'accent change.
 
 export type InfraKey = 'geelark' | 'iremotech' | 'cloud' | 'blowsome'
 
@@ -30,12 +31,12 @@ export function themeFor(infra: InfraKey): Theme {
       accentBtn: '#D9A93E', accentBtnEdge: '#E9C46A',
       tone: '233,196,106',
       selBg: 'rgba(233,196,106,0.1)', selEdge: 'rgba(233,196,106,0.45)',
-      navBg: 'linear-gradient(178deg,#17130A,#0F0C07 62%)',
-      appBg: '#0C0A06',
-      panelBg: 'linear-gradient(168deg,#181307,#120E06)',
-      panelEdge: 'rgba(233,196,106,0.14)',
-      mainWash: 'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(233,196,106,0.07), transparent 62%)',
-      rim: 'linear-gradient(180deg, transparent, rgba(233,196,106,0.4) 22%, rgba(233,196,106,0.28) 78%, transparent)',
+      navBg: '#0A0A0B',
+      appBg: '#0A0A0B',
+      panelBg: '#111113',
+      panelEdge: 'rgba(255,255,255,0.07)',
+      mainWash: '#0A0A0B',
+      rim: 'none',
     }
   }
   if (infra === 'blowsome') {
@@ -46,12 +47,12 @@ export function themeFor(infra: InfraKey): Theme {
       accentBtn: '#9333EA', accentBtnEdge: '#A855F7',
       tone: '168,85,247',
       selBg: 'rgba(168,85,247,0.1)', selEdge: 'rgba(168,85,247,0.45)',
-      navBg: 'linear-gradient(178deg,#140E1C,#0E0A14 62%)',
-      appBg: '#0C0910',
-      panelBg: 'linear-gradient(168deg,#16101F,#120C19)',
-      panelEdge: 'rgba(216,180,254,0.12)',
-      mainWash: 'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(168,85,247,0.08), transparent 62%)',
-      rim: 'linear-gradient(180deg, transparent, rgba(233,196,106,0.4) 22%, rgba(216,180,254,0.34) 78%, transparent)',
+      navBg: '#0A0A0B',
+      appBg: '#0A0A0B',
+      panelBg: '#111113',
+      panelEdge: 'rgba(255,255,255,0.07)',
+      mainWash: '#0A0A0B',
+      rim: 'none',
     }
   }
   return infra === 'cloud'
@@ -61,24 +62,24 @@ export function themeFor(infra: InfraKey): Theme {
         accentBtn: '#0891B2', accentBtnEdge: '#06B6D4',
         tone: '6,182,212',
         selBg: 'rgba(6,182,212,0.09)', selEdge: 'rgba(6,182,212,0.4)',
-        navBg: 'linear-gradient(178deg,#0A1216,#080D11 62%)',
-        appBg: '#070C10',
-        panelBg: 'linear-gradient(168deg,#0E161B,#0C1317)',
-        panelEdge: 'rgba(103,232,249,0.09)',
-        mainWash: 'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(6,182,212,0.06), transparent 62%)',
-        rim: 'linear-gradient(180deg, transparent, rgba(103,232,249,0.34) 22%, rgba(103,232,249,0.34) 78%, transparent)',
+        navBg: '#0A0A0B',
+        appBg: '#0A0A0B',
+        panelBg: '#111113',
+        panelEdge: 'rgba(255,255,255,0.07)',
+        mainWash: '#0A0A0B',
+        rim: 'none',
       }
     : {
         cloud: false,
-        accent: '#8B5CF6', accentSoft: '#A78BFA', accentText: '#C4B5FD',
-        accentBtn: '#7C3AED', accentBtnEdge: '#8B5CF6',
+        accent: '#8B7CF6', accentSoft: '#A99CF8', accentText: '#C4BBFB',
+        accentBtn: '#7462E8', accentBtnEdge: '#8B7CF6',
         tone: '139,92,246',
         selBg: 'rgba(139,92,246,0.08)', selEdge: 'rgba(139,92,246,0.4)',
-        navBg: '#0E0E13',
-        appBg: '#0B0B0F',
-        panelBg: '#101015',
-        panelEdge: 'rgba(255,255,255,0.06)',
-        mainWash: 'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(139,92,246,0.045), transparent 62%)',
+        navBg: '#0A0A0B',
+        appBg: '#0A0A0B',
+        panelBg: '#111113',
+        panelEdge: 'rgba(255,255,255,0.07)',
+        mainWash: '#0A0A0B',
         rim: 'none',
       }
 }

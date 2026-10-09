@@ -171,18 +171,18 @@ export default function CrossComposer({ theme, user, org, onBack }: {
       <PageHead title="Cross-posting" sub="Une vidéo sur plusieurs réseaux (TikTok, Threads, Facebook, Shorts, X, Reddit, Pinterest)."
         actions={<>
           <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
-          <Btn theme={theme} tone="quiet" disabled={!ready} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" label="Programmer" onClick={() => setSchedOpen(true)} />
+          <Btn theme={theme} tone="ghost" disabled={!ready} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" label="Programmer" onClick={() => setSchedOpen(true)} />
           <Btn theme={theme} tone="primary" disabled={!ready} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" label={running ? 'Publication…' : ready ? `Publier (${cost} cr.)` : 'Publier'} onClick={() => launch()} />
         </>} />
-      {!bearer && !conns.loading && <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 12, color: '#FBBF24' }}>Connecte ton token GeeLark (Réglages app web) pour publier.</div>}
+      {!bearer && !conns.loading && <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(251,191,36,0.22)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>Connecte ton token GeeLark (Réglages app web) pour publier.</div>}
 
-      <Panel theme={theme} style={{ marginBottom: 10 }}>
+      <Panel theme={theme} style={{ marginBottom: 12 }}>
         <PanelHead title="Réseaux" sub={`${plats.size} sélectionné${plats.size > 1 ? 's' : ''}`} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 13 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 16 }}>
           {CROSS_PLATFORMS.map(pl => {
             const on = plats.has(pl.key)
             return (
-              <button key={pl.key} onClick={() => togglePlat(pl.key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 34, padding: '0 13px', borderRadius: 9, cursor: 'pointer', background: on ? `rgba(${theme.tone},0.12)` : 'rgba(255,255,255,0.02)', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.08)'), color: on ? '#F4F4F6' : '#A1A1AA', fontSize: 12.5, fontWeight: 700 }}>
+              <button key={pl.key} onClick={() => togglePlat(pl.key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px', borderRadius: 6, cursor: 'pointer', background: on ? 'rgba(255,255,255,0.07)' : '#161618', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.09)'), color: on ? '#EDEDEF' : '#A1A1AA', fontSize: 13, fontWeight: 500, transition: 'background .12s ease, border-color .12s ease' }}>
                 <span>{pl.emoji}</span>{pl.label}
               </button>
             )
@@ -190,20 +190,20 @@ export default function CrossComposer({ theme, user, org, onBack }: {
         </div>
       </Panel>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         <Panel theme={theme}>
           <PanelHead title="Comptes" sub={nSel ? `${nSel} × ${plats.size} réseaux` : 'aucun'} right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(phones.map(p => p.id)))} />} />
           <div style={{ maxHeight: 360, overflowY: 'auto' }}>
-            {loading ? <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div>
+            {loading ? <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Chargement…</div>
               : phones.map(p => {
                 const on = sel.has(p.id)
                 return (
-                  <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 13px', border: 'none', cursor: 'pointer', textAlign: 'left', borderLeft: '2px solid ' + (on ? theme.accent : 'transparent'), background: on ? `rgba(${theme.tone},0.06)` : 'transparent', boxSizing: 'border-box' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 8.5, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                  <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 16px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left', background: on ? 'rgba(255,255,255,0.04)' : 'transparent', boxSizing: 'border-box' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     <StatusDot kind={dotKind(p.status)} />
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <span style={{ fontSize: 11.5, fontWeight: 600, color: on ? '#F4F4F6' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, color: '#52525B' }}>{phoneSub(p)}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                   </button>
                 )
@@ -211,21 +211,21 @@ export default function CrossComposer({ theme, user, org, onBack }: {
           </div>
         </Panel>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title="Vidéo" sub={chosen ? chosen.title : 'choisis une vidéo'}
-              right={<Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPickerOpen(true)} />} />
-            {!chosen ? <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12, lineHeight: 1.6 }}>Aucune vidéo choisie.<br />Clique <b style={{ color: theme.accentText }}>Ouvrir la banque</b>.</div> : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 13, maxHeight: 240, overflowY: 'auto' }}>
+              right={<Btn theme={theme} sm tone="ghost" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPickerOpen(true)} />} />
+            {!chosen ? <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>Aucune vidéo choisie.<br />Clique <b style={{ color: '#EDEDEF', fontWeight: 500 }}>Ouvrir la banque</b>.</div> : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 16, maxHeight: 240, overflowY: 'auto' }}>
                 {videos.filter(v => videoId === v.id).map((v, i) => {
-                  const on = videoId === v.id; const hue = ['139,92,246', '6,182,212', '236,72,153', '16,185,129', '245,158,11'][i % 5]
+                  const on = videoId === v.id
                   const prev = thumbFor(v); const vid = isVid(v)
                   return (
-                    <button key={v.id} onClick={() => setVideoId(v.id)} title={v.title} style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden', border: '1.5px solid ' + (on ? theme.accent : 'rgba(255,255,255,0.07)'), background: `linear-gradient(160deg, rgba(${hue},0.16), rgba(${hue},0.035))` }}>
+                    <button key={v.id} onClick={() => setVideoId(v.id)} title={v.title} style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.08)'), background: '#161618' }}>
                       {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
                         ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
-                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 5, background: on ? theme.accentBtn : 'rgba(11,11,15,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     </button>
                   )
                 })}
@@ -234,32 +234,32 @@ export default function CrossComposer({ theme, user, org, onBack }: {
           </Panel>
           <Panel theme={theme}>
             <PanelHead title="Légende" />
-            <div style={{ padding: 13 }}>
-              <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={3} placeholder="Légende (facultatif)…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 11, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, fontFamily: 'inherit', outline: 'none' }} />
+            <div style={{ padding: 16 }}>
+              <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={3} placeholder="Légende (facultatif)…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 10, borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, lineHeight: 1.55, fontFamily: 'inherit', outline: 'none' }} />
             </div>
           </Panel>
           {/* Comportement : tout lancer en parallèle OU rotation IP (série) */}
           <Panel theme={theme}>
             <PanelHead title="Comportement du run" />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>Rotation d’IP proxy</span>
-                <span style={{ fontSize: 11, color: '#52525B' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque compte → envoi en série' : 'Désactivée → tout lancer en même temps (parallèle)'}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Rotation d’IP proxy</span>
+                <span style={{ fontSize: 12, color: '#8B8B94' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque compte → envoi en série' : 'Désactivée → tout lancer en même temps (parallèle)'}</span>
               </span>
               <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
                 title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 40, height: 23, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
-                <span style={{ width: 19, height: 19, borderRadius: 99, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 28, height: 14, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
+                <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
               </span>
             </div>
           </Panel>
           {runItems.length > 0 && (
             <Panel theme={theme}>
               <PanelHead title="En direct" sub={`${runItems.filter(r => r.phase === 'done').length}/${runItems.length}`} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '11px 15px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '12px 16px' }}>
                 {runItems.map(it => <Chip key={it.id} text={`${it.phase === 'done' ? '✓' : it.phase === 'failed' ? '✕' : it.phase === 'running' ? '…' : '·'} ${it.name}`} tone={(it.phase === 'done' ? 'ok' : it.phase === 'failed' ? 'bad' : it.phase === 'running' ? 'warn' : 'mute') as any} />)}
               </div>
-              <div style={{ margin: '0 15px 13px', padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.05)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.length === 0 ? '…' : logs.join('\n')}</div>
+              <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.length === 0 ? '…' : logs.join('\n')}</div>
             </Panel>
           )}
         </div>

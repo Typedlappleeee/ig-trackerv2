@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Kpi, Panel, StatusDot, Modal } from '@/lib/ui'
+import { Btn, Empty, Icon, Kpi, Panel, PageHead, StatusDot, Modal } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -48,23 +48,23 @@ const COLS = '30px minmax(0,1.4fr) 110px 96px 210px'
 
 
 // ── Case à cocher (portée du prototype) ────────────────────────────────────────
-function Check({ on, mid, onClick }: { on: boolean; mid?: boolean; onClick: () => void }) {
+function Check({ on, mid, accent, onClick }: { on: boolean; mid?: boolean; accent?: string; onClick: () => void }) {
   return (
     <span
       onClick={e => { e.stopPropagation(); onClick() }}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 15, height: 15, borderRadius: 4, cursor: 'pointer', flexShrink: 0,
-        background: on || mid ? '#7C3AED' : 'transparent',
+        width: 15, height: 15, borderRadius: 4, cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box',
+        background: on || mid ? (accent || '#8B7CF6') : 'transparent',
         border: on || mid ? 'none' : '1px solid rgba(255,255,255,0.18)',
-        color: '#fff', fontSize: 9, fontWeight: 900, transition: 'all .14s ease',
+        color: '#fff', fontSize: 9, fontWeight: 600, transition: 'background .12s ease, border-color .12s ease',
       }}
     >{mid ? '–' : on ? '✓' : ''}</span>
   )
 }
 
 const TH: CSSProperties = {
-  fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B',
+  fontSize: 11, fontWeight: 500, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#71717A',
 }
 
 function ctaKey(p: { geelark_id: string | null; id: string }): string { return `sf-story-link-${p.geelark_id ?? p.id}` }
@@ -216,50 +216,39 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* En-tête */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
-        <div style={{ minWidth: 0 }}>
-          <h1 style={{
-            margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 22,
-            fontWeight: 700, letterSpacing: '-0.025em', color: '#F4F4F6',
-          }}>{title}</h1>
-          <p style={{ margin: '6px 0 0', fontSize: 12.5, lineHeight: 1.55, color: '#71717A', maxWidth: 620 }}>{sub}</p>
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {isCloud
-            ? <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
-            : <Btn label={syncing ? 'Synchro…' : 'Sync GeeLark'} theme={theme} tone="primary" disabled={syncing} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={syncFromGeelark} />}
-        </div>
-      </div>
+      <PageHead title={title} sub={sub} actions={isCloud
+        ? <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
+        : <Btn label={syncing ? 'Synchro…' : 'Sync GeeLark'} theme={theme} tone="primary" disabled={syncing} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={syncFromGeelark} />} />
 
       {/* KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>
         <Kpi theme={theme} label="Total" value={loading ? el : fmtNumber(total)} />
-        <Kpi theme={theme} label="En ligne" value={loading ? el : fmtNumber(online)} color="#34D399" />
+        <Kpi theme={theme} label="En ligne" value={loading ? el : fmtNumber(online)} color="#4ADE80" />
         <Kpi theme={theme} label="Hors ligne" value={loading ? el : fmtNumber(offline)} color="#A1A1AA" />
         <Kpi theme={theme} label="À risque" value={loading ? el : fmtNumber(atRisk)}
           color={atRisk > 0 ? '#F87171' : undefined}
           hint={loading ? undefined : (atRisk > 0 ? 'santé sous 70 · action requise' : 'tout va bien')}
-          hintColor={atRisk > 0 ? '#F87171' : '#34D399'} />
+          hintColor={atRisk > 0 ? '#F87171' : '#4ADE80'} />
       </div>
 
       <Panel theme={theme}>
         {/* Barre d'outils : recherche + groupe + pills */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 9, padding: '11px 13px',
-          borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap',
+          display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap',
         }}>
           <span style={{
-            display: 'flex', alignItems: 'center', gap: 8, height: 30,
-            padding: '0 11px', borderRadius: 8, flex: 1, minWidth: 180, maxWidth: 280,
-            border: `1px solid ${q ? theme.selEdge : 'rgba(255,255,255,0.07)'}`,
-            background: 'rgba(255,255,255,0.02)', transition: 'border-color .16s ease',
+            display: 'flex', alignItems: 'center', gap: 8, height: 32, boxSizing: 'border-box',
+            padding: '0 10px', borderRadius: 6, flex: 1, minWidth: 180, maxWidth: 280,
+            border: `1px solid ${q ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.09)'}`,
+            background: '#161618', transition: 'border-color .12s ease',
           }}>
-            <span style={{ display: 'flex', color: q ? theme.accentSoft : '#52525B' }}>
+            <span style={{ display: 'flex', color: q ? '#A1A1AA' : '#71717A' }}>
               <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-4.35-4.35" size={13} sw={2} />
             </span>
             <input
               type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Filtrer…"
-              style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#F4F4F6', fontSize: 12 }}
+              style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#EDEDEF', fontSize: 13 }}
             />
           </span>
 
@@ -267,38 +256,38 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
           <select
             value={group} onChange={e => setGroup(e.target.value)}
             style={{
-              height: 30, padding: '0 8px', borderRadius: 8, cursor: 'pointer',
-              border: `1px solid ${group !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`,
-              background: '#101015', color: group !== 'Tous' ? theme.accentText : '#A1A1AA',
-              fontSize: 11.5, fontWeight: 700, outline: 'none',
+              height: 32, padding: '0 10px', borderRadius: 6, cursor: 'pointer',
+              border: `1px solid ${group !== 'Tous' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.09)'}`,
+              background: '#161618', color: group !== 'Tous' ? '#EDEDEF' : '#A1A1AA',
+              fontSize: 13, fontWeight: 400, outline: 'none',
             }}
           >
-            {groups.map(g => <option key={g} value={g} style={{ background: '#16161C', color: '#E4E4E7' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
+            {groups.map(g => <option key={g} value={g} style={{ background: '#161618', color: '#EDEDEF' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
           </select>
 
           {/* Pills */}
           <span style={{
-            display: 'flex', gap: 2, padding: 2, borderRadius: 8,
-            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', gap: 2, padding: 2, borderRadius: 7,
+            background: '#111113', border: '1px solid rgba(255,255,255,0.07)',
           }}>
             {FILTERS.map(f => {
               const on = filter === f.k
               return (
                 <button key={f.k} onClick={() => setFilter(f.k)} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5, height: 24,
-                  padding: '0 9px', border: 'none', borderRadius: 6, cursor: 'pointer',
-                  background: on ? `rgba(${theme.tone},0.16)` : 'transparent',
-                  color: on ? theme.accentText : '#71717A',
-                  fontSize: 11, fontWeight: 700, transition: 'all .14s ease',
+                  display: 'inline-flex', alignItems: 'center', gap: 6, height: 26,
+                  padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
+                  background: on ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  color: on ? '#EDEDEF' : '#8B8B94',
+                  fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
                 }}>
                   {f.l}
-                  <span style={{ opacity: 0.55, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{f.n}</span>
+                  <span style={{ color: on ? '#A1A1AA' : '#5A5A63', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{f.n}</span>
                 </button>
               )
             })}
           </span>
 
-          <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#52525B' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
             {loading ? el : `${shown.length} / ${total}`}
           </span>
         </div>
@@ -306,9 +295,9 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
         {/* En-tête de table */}
         <div style={{
           display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
-          padding: '9px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)',
+          padding: '0 16px', height: 36, borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
-          <span><Check on={allOn} mid={someOn} onClick={toggleAll} /></span>
+          <span><Check on={allOn} mid={someOn} accent={theme.accent} onClick={toggleAll} /></span>
           <span style={TH}>Compte</span>
           <span style={TH}>Groupe</span>
           <span style={TH}>Statut</span>
@@ -317,9 +306,9 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
 
         {/* Corps */}
         {loading ? (
-          <div style={{ padding: '48px 15px', textAlign: 'center', fontSize: 13, color: '#52525B' }}>{el}</div>
+          <div style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13, color: '#5A5A63' }}>{el}</div>
         ) : error ? (
-          <div style={{ padding: '40px 15px', textAlign: 'center', fontSize: 12.5, color: '#F87171' }}>{error}</div>
+          <div style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, color: '#F87171' }}>{error}</div>
         ) : total === 0 ? (
           <Empty
             icon="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01"
@@ -346,18 +335,18 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
                   onClick={() => toggle(p.id)}
                   style={{
                     display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
-                    padding: '9px 15px', fontSize: 12, cursor: 'pointer',
-                    borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none',
-                    background: on ? `rgba(${theme.tone},0.06)` : 'transparent',
-                    transition: 'background .14s ease',
+                    padding: '0 16px', minHeight: 48, boxSizing: 'border-box', fontSize: 13, cursor: 'pointer',
+                    borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                    background: on ? 'rgba(255,255,255,0.04)' : 'transparent',
+                    transition: 'background .12s ease',
                   }}
                   onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = on ? `rgba(${theme.tone},0.06)` : 'transparent' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = on ? 'rgba(255,255,255,0.04)' : 'transparent' }}
                 >
-                  <span><Check on={on} onClick={() => toggle(p.id)} /></span>
+                  <span><Check on={on} accent={theme.accent} onClick={() => toggle(p.id)} /></span>
 
                   {/* Appareil : avatar + NOM DU TÉLÉPHONE (GeeLark) en avant + @compte en dessous */}
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     {p.pp_url ? (
                       <img src={p.pp_url} alt="" referrerPolicy="no-referrer" style={{
                         width: 24, height: 24, borderRadius: 6, objectFit: 'cover', flexShrink: 0,
@@ -367,29 +356,29 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
                       <span style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                        background: 'linear-gradient(140deg,#3F3F46,#27272A)',
-                        border: '1px solid rgba(255,255,255,0.07)', fontSize: 10, fontWeight: 800, color: '#D4D4D8',
+                        background: '#18181B',
+                        border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 500, color: '#A1A1AA',
                       }}>{(p.phone_name || p.ig_username || '?').charAt(0).toUpperCase()}</span>
                     )}
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.phone_name || 'Appareil'}
                       </span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 11.5, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.ig_username ? `@${p.ig_username}` : 'sans compte lié'}
                       </span>
                     </span>
                   </span>
 
                   {/* Groupe */}
-                  <span style={{ fontSize: 11.5, color: '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.group_name ?? <span style={{ color: '#3F3F46' }}>—</span>}
+                  <span style={{ fontSize: 12, color: '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.group_name ?? <span style={{ color: '#5A5A63' }}>—</span>}
                   </span>
 
                   {/* Statut */}
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <StatusDot kind={dotKind(p.status)} />
-                    <span style={{ fontSize: 11.5, color: '#A1A1AA' }}>{STATUS_LABEL[p.status] ?? p.status}</span>
+                    <span style={{ fontSize: 12, color: '#A1A1AA' }}>{STATUS_LABEL[p.status] ?? p.status}</span>
                   </span>
 
                   {/* Actions : GeeLark sert à l'automatisation — pas de démarrage manuel. */}
@@ -406,17 +395,17 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
       {/* Barre d'actions groupées */}
       {sel.size > 0 && (
         <div style={{
-          position: 'sticky', bottom: 14, marginTop: 14, display: 'flex',
-          alignItems: 'center', gap: 10, padding: '9px 10px 9px 14px', borderRadius: 10,
-          background: '#16161C', border: `1px solid rgba(${theme.tone},0.3)`,
-          boxShadow: '0 18px 44px -16px rgba(0,0,0,0.9)', flexWrap: 'wrap',
+          position: 'sticky', bottom: 16, marginTop: 16, display: 'flex',
+          alignItems: 'center', gap: 8, padding: '8px 10px 8px 14px', borderRadius: 8,
+          background: '#161618', border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)', flexWrap: 'wrap',
           animation: 'aPop .22s cubic-bezier(0.16,1,0.3,1) both',
         }}>
           <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: theme.accentText }}>{sel.size}</span>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A1A1AA' }}>sélectionné{sel.size > 1 ? 's' : ''}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{sel.size}</span>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#A1A1AA' }}>sélectionné{sel.size > 1 ? 's' : ''}</span>
           </span>
-          <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
+          <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)', margin: '0 2px' }} />
           <Btn label="Publier" theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
           <Btn label="Chauffer" theme={theme} sm icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" onClick={() => onNavigate?.('warmup')} />
           <Btn label="Groupe" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setGroupModal(true)} />
@@ -435,11 +424,11 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
             ? <Btn theme={theme} tone="quiet" label="Fermer" onClick={() => setCreateOpen(false)} />
             : <><Btn theme={theme} tone="quiet" label="Fermer" onClick={() => setCreateOpen(false)} /><Btn theme={theme} tone="primary" label="Synchroniser" onClick={() => { setCreateOpen(false); load() }} /></>}>
           {infra === 'cloud' ? (
-            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: '#A1A1AA' }}>
               Les appareils ScaleFlow Cloud tournent sur <b>tes propres serveurs</b> auto-hébergés. Le provisionnement automatique arrive avec l'infra Cloud — pour l'instant, ajoute tes appareils côté GeeLark et bascule d'infra pour les gérer.
             </p>
           ) : (
-            <div style={{ fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+            <div style={{ fontSize: 13, lineHeight: 1.6, color: '#A1A1AA' }}>
               <p style={{ margin: '0 0 10px' }}>Les téléphones sont créés dans ton <b>tableau de bord GeeLark</b> (cloud phones). Une fois créés :</p>
               <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <li>Crée / loue tes cloud phones sur geelark.com</li>
@@ -464,7 +453,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDel(null)} />
             <Btn theme={theme} tone="danger" label={deleting ? 'Suppression…' : 'Retirer'} disabled={deleting} onClick={() => deletePhones(confirmDel)} />
           </>}>
-          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: '#A1A1AA' }}>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: '#A1A1AA' }}>
             Ces téléphones sont retirés de <b>ScaleFlow</b> uniquement. Ils <b>restent dans ton compte GeeLark</b> — un « Sync GeeLark » les ferait réapparaître. Les @comptes/liens associés dans l'app seront perdus.
           </p>
         </Modal>
@@ -511,8 +500,8 @@ function PhoneSettings({ theme, phone, groups, onClose, onSaved }: {
     setSaving(false); onSaved()
   }
 
-  const lbl: CSSProperties = { fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
+  const lbl: CSSProperties = { fontSize: 12, fontWeight: 500, color: '#8B8B94', marginBottom: 6, display: 'block' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }
 
   return (
     <Modal theme={theme} title={phone.phone_name || 'Appareil'} sub="Compte, groupe et lien CTA de la story"
@@ -521,7 +510,7 @@ function PhoneSettings({ theme, phone, groups, onClose, onSaved }: {
         <Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} />
         <Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={save} />
       </>}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <label style={lbl}>Compte Instagram (@)</label>
           <input value={username} onChange={e => setUsername(e.target.value)} placeholder="mon.compte" style={inp} />
@@ -534,9 +523,9 @@ function PhoneSettings({ theme, phone, groups, onClose, onSaved }: {
         <div>
           <label style={lbl}>Lien CTA (sticker story)</label>
           <input value={cta} onChange={e => setCta(e.target.value)} placeholder="https://mon-lien.com" style={inp} />
-          <p style={{ margin: '6px 0 0', fontSize: 11, color: '#52525B', lineHeight: 1.5 }}>Le lien utilisé pour le sticker de cet appareil quand tu postes une story. Pré-rempli automatiquement dans l'onglet Story.</p>
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: '#71717A', lineHeight: 1.5 }}>Le lien utilisé pour le sticker de cet appareil quand tu postes une story. Pré-rempli automatiquement dans l'onglet Story.</p>
         </div>
-        {err && <p style={{ margin: 0, fontSize: 11.5, color: '#F87171' }}>{err}</p>}
+        {err && <p style={{ margin: 0, fontSize: 12, color: '#F87171' }}>{err}</p>}
       </div>
     </Modal>
   )
@@ -547,7 +536,7 @@ function GroupAssign({ theme, count, groups, onClose, onApply }: {
   theme: Theme; count: number; groups: string[]; onClose: () => void; onApply: (name: string) => void
 }) {
   const [name, setName] = useState('')
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }
   return (
     <Modal theme={theme} title="Assigner un groupe" sub={`${count} appareil${count > 1 ? 's' : ''} sélectionné${count > 1 ? 's' : ''}`}
       icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClose={onClose} width={440}
@@ -555,7 +544,7 @@ function GroupAssign({ theme, count, groups, onClose, onApply }: {
         <Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} />
         <Btn theme={theme} tone="primary" label="Appliquer" onClick={() => onApply(name.trim())} />
       </>}>
-      <label style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }}>Nom du groupe</label>
+      <label style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94', marginBottom: 6, display: 'block' }}>Nom du groupe</label>
       <input value={name} onChange={e => setName(e.target.value)} placeholder="ex. Luna-Posting (vide = retirer du groupe)" list="grp-list" style={inp} autoFocus />
       <datalist id="grp-list">{groups.map(g => <option key={g} value={g} />)}</datalist>
     </Modal>
