@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-09c',
+    date: '2026-10-09',
+    title: { fr: 'Correctif : fin des stories', en: 'Fix: finishing Stories' },
+    items: {
+      fr: [
+        'La story se publie maintenant même quand Instagram affiche une flèche « Suivant » puis « Partager » au lieu de « Your story ».',
+        'Fonctionne aussi quand Instagram est en français sur le téléphone (« Votre story », « Ta story »).',
+        'Aucun risque de double publication : l’app n’agit que si la story n’est pas encore partie.',
+      ],
+      en: [
+        'Stories now get published even when Instagram shows a “Next” arrow then “Share” instead of “Your story”.',
+        'Also works when Instagram is in French on the phone (“Votre story”, “Ta story”).',
+        'No risk of posting twice: the app only acts if the Story hasn’t gone out yet.',
+      ],
+    },
+  },
+  {
     id: '2026-10-09b',
     date: '2026-10-09',
     title: { fr: 'Correctif : proxy rotatif', en: 'Fix: rotating proxy' },
