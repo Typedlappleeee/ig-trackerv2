@@ -58,23 +58,47 @@ function serialize(cfg: ProxyRotationConfig): string {
   return JSON.stringify({ enabled: cfg.enabled, urls, names })
 }
 
+// Lecture : perso = app_config.user_id (la table n'a PAS de colonne org_id — l'ancien
+// filtre `.is('org_id', null)` faisait échouer la requête → config vide au rechargement
+// et rotation jamais appliquée). En cas d'erreur on garde la dernière config connue.
 export async function loadProxyRotation(orgId: string | null, userId: string): Promise<ProxyRotationConfig> {
+  const r = await readProxyRotation(orgId, userId)
+  if (r.ok) _cache = r.cfg
+  return { ..._cache }
+}
+async function readProxyRotation(orgId: string | null, userId: string): Promise<{ ok: true; cfg: ProxyRotationConfig } | { ok: false; error: string }> {
   try {
     const q = orgId
       ? supabase.from('org_config').select('proxy').eq('org_id', orgId).maybeSingle()
-      : supabase.from('app_config').select('proxy').eq('user_id', userId).is('org_id', null).maybeSingle()
-    const { data } = await q
-    _cache = parse((data as { proxy?: string } | null)?.proxy)
-    return _cache
-  } catch { return { ..._cache } }
+      : supabase.from('app_config').select('proxy').eq('user_id', userId).maybeSingle()
+    const { data, error } = await q
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, cfg: parse((data as { proxy?: string } | null)?.proxy) }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'Lecture impossible' } }
 }
+
+// Écriture + relecture : « Enregistré » seulement si la base contient bien la config.
 export async function saveProxyRotation(orgId: string | null, userId: string, cfg: ProxyRotationConfig): Promise<{ ok: boolean; error?: string }> {
   const { urls, names } = cleanPairs(cfg)
-  _cache = { enabled: cfg.enabled, urls, names }
-  const proxy = serialize(_cache)
+  const next = { enabled: cfg.enabled, urls, names }
+  const proxy = serialize(next)
   try {
-    if (orgId) { const { error } = await supabase.from('org_config').update({ proxy }).eq('org_id', orgId); if (error) return { ok: false, error: error.message } }
-    else { const { error } = await supabase.from('app_config').upsert({ user_id: userId, proxy }, { onConflict: 'user_id' }); if (error) return { ok: false, error: error.message } }
+    const { data, error } = orgId
+      // upsert : crée la ligne org_config si l'organisation n'en a pas encore.
+      ? await supabase.from('org_config').upsert({ org_id: orgId, proxy }, { onConflict: 'org_id' }).select('org_id')
+      : await supabase.from('app_config').upsert({ user_id: userId, proxy }, { onConflict: 'user_id' }).select('user_id')
+    if (error) {
+      return { ok: false, error: /row-level security|permission|42501/i.test(error.message)
+        ? (orgId ? "Seul le propriétaire ou un admin de l'organisation peut modifier les proxys." : 'Enregistrement refusé par le serveur.')
+        : error.message }
+    }
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      return { ok: false, error: orgId ? "Seul le propriétaire ou un admin de l'organisation peut modifier les proxys." : 'Rien n’a été enregistré.' }
+    }
+    const check = await readProxyRotation(orgId, userId)
+    if (!check.ok) return { ok: false, error: `Enregistré mais relecture impossible : ${check.error}` }
+    if (serialize(check.cfg) !== proxy) return { ok: false, error: 'La sauvegarde n’a pas été prise en compte — réessaie.' }
+    _cache = check.cfg
     return { ok: true }
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'Échec' } }
 }
