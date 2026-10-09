@@ -2,7 +2,7 @@
 // Clé = texte français exact tel qu'affiché (espaces normalisés). Gabarits : {0}, {1}…
 // = valeurs dynamiques ; l'anglais peut les réordonner ou omettre un « s » de pluriel.
 // Nouvelle chaîne FR dans l'UI → l'ajouter ici (ou dans scripts/i18n-reviewed.json si
-// elle ne se traduit pas). Vérif : node scripts/i18n-extract.cjs
+// elle ne se traduit pas). Ajout : node scripts/i18n-add.cjs ; vérif : node scripts/i18n-extract.cjs
 import type { Dict } from './i18n'
 
 export const EN: Dict = {
@@ -1774,6 +1774,12 @@ export const EN: Dict = {
     "Zone sensible": "Danger zone",
     "Zoom arrière": "Zoom out",
     "Zoom avant": "Zoom in",
+    "Échec de l’enregistrement": "Save failed",
+    "Lecture impossible": "Could not read",
+    "Seul le propriétaire ou un admin de l'organisation peut modifier les proxys.": "Only the organization owner or an admin can change the proxies.",
+    "Enregistrement refusé par le serveur.": "The server refused to save.",
+    "Rien n’a été enregistré.": "Nothing was saved.",
+    "La sauvegarde n’a pas été prise en compte — réessaie.": "The save didn’t go through — try again.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -2114,5 +2120,6 @@ export const EN: Dict = {
     ["ZIP : récupération {0}/{1}…", "ZIP: fetching {0}/{1}…"],
     ["ZIP enregistré — {0} fichier(s).", "ZIP saved — {0} file(s)."],
     ["ZIP téléchargé — {0} fichier(s).", "ZIP downloaded — {0} file(s)."],
+    ["Enregistré mais relecture impossible : {0}", "Saved, but could not read it back: {0}"],
   ],
 }

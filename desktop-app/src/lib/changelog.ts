@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-09b',
+    date: '2026-10-09',
+    title: { fr: 'Correctif : proxy rotatif', en: 'Fix: rotating proxy' },
+    items: {
+      fr: [
+        'Les proxys rotatifs restent bien enregistrés après un rechargement (ils semblaient s’effacer sur les comptes perso).',
+        'La rotation d’IP est de nouveau appliquée avant chaque téléphone (posting, story, warmup).',
+        'Message clair si tu n’as pas le droit de modifier les proxys de ton organisation.',
+      ],
+      en: [
+        'Rotating proxies now stay saved after a reload (they seemed to disappear on personal accounts).',
+        'IP rotation is applied again before each phone (posting, Story, Warmup).',
+        'Clear message if you’re not allowed to change your organization’s proxies.',
+      ],
+    },
+  },
+  {
     id: '2026-10-09',
     date: '2026-10-09',
     title: { fr: 'ScaleFlow en anglais + nouveautés', en: 'ScaleFlow in English + release notes' },

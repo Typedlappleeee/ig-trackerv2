@@ -25,7 +25,8 @@ export default function ProxyRotationPanel({ theme, user, org }: { theme: Theme;
     const r = await testRotationUrl(url)
     setTests(t => ({ ...t, [i]: { ok: r.ok, msg: r.ok ? 'Proxy joignable — IP changée ✓' : `Échec : ${r.detail}` } }))
   }
-  async function doSave() { setSaving(true); const r = await save(cfg); setSaving(false); if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) } }
+  const [saveErr, setSaveErr] = useState<string | null>(null)
+  async function doSave() { setSaving(true); setSaveErr(null); const r = await save(cfg); setSaving(false); if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) } else setSaveErr(r.error ?? 'Échec de l’enregistrement') }
 
   const inp: CSSProperties = { flex: 1, minWidth: 0, height: 32, padding: '0 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12, outline: 'none' }
   const rows = cfg.urls.length ? cfg.urls : ['']
@@ -57,6 +58,7 @@ export default function ProxyRotationPanel({ theme, user, org }: { theme: Theme;
           <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Ajouter un proxy" onClick={addRow} />
           <span style={{ flex: 1 }} />
           {saved && <span style={{ fontSize: 11.5, color: '#34D399' }}>Enregistré ✓</span>}
+          {saveErr && <span role="alert" style={{ fontSize: 11.5, color: '#F87171', maxWidth: 420, textAlign: 'right' }}>{saveErr}</span>}
           <Btn theme={theme} sm tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={doSave} />
         </div>
         <p style={{ margin: '4px 0 0', fontSize: 11, color: '#52525B', lineHeight: 1.5 }}>
