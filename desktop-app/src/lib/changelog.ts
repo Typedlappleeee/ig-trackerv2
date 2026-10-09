@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-09e',
+    date: '2026-10-09',
+    title: { fr: 'Plus simple à prendre en main', en: 'Easier to get started' },
+    items: {
+      fr: [
+        'Nouveau guide « Bien démarrer » sur l’accueil : 4 étapes cochées automatiquement (GeeLark, téléphones, contenu, 1er Reel).',
+        'Publier un Reel : barre en bas avec le récap (comptes, vidéos, crédits) et ce qu’il manque pour continuer.',
+        'Chargements plus fluides, confirmations et messages intégrés à l’app (plus de fenêtres du navigateur).',
+      ],
+      en: [
+        'New “Get started” guide on Home: 4 steps checked off automatically (GeeLark, phones, content, first Reel).',
+        'Post a Reel: bottom bar with the summary (accounts, videos, credits) and what’s missing to continue.',
+        'Smoother loading, built-in confirmations and messages (no more browser pop-ups).',
+      ],
+    },
+  },
+  {
     id: '2026-10-09d',
     date: '2026-10-09',
     title: { fr: 'Nouvelle interface', en: 'New interface' },

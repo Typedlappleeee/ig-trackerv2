@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Kpi, Panel, PageHead, StatusDot, Modal } from '@/lib/ui'
+import { Btn, Empty, Icon, Kpi, Panel, PageHead, StatusDot, Modal, SkeletonRows } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -306,7 +306,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
 
         {/* Corps */}
         {loading ? (
-          <div style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13, color: '#5A5A63' }}>{el}</div>
+          <SkeletonRows rows={6} avatar />
         ) : error ? (
           <div style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, color: '#F87171' }}>{error}</div>
         ) : total === 0 ? (

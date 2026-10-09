@@ -1,5 +1,6 @@
 // Fabriques d'éléments portées à l'identique du prototype ScaleFlow.dc.html.
 // _icon / _statusDot / _chip / _btn / _panel / _panelHead / _pageHead / _kpi / _empty
+import { useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Theme } from './theme'
@@ -140,7 +141,7 @@ export function Kpi({ theme, label, value, color, hint, hintColor }: {
       <div style={{
         marginTop: 8, fontSize: 24, fontWeight: 600, letterSpacing: '-0.03em', color: color || '#EDEDEF',
         fontVariantNumeric: 'tabular-nums', lineHeight: 1,
-      }}>{value}</div>
+      }}>{value === '…' ? <Skeleton w={56} h={22} r={5} /> : value}</div>
       {hint ? (
         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, color: hintColor || '#71717A' }}>{hint}</div>
       ) : null}
@@ -218,5 +219,82 @@ export function Empty({ icon, title, text, action }: { icon: string; title: stri
       <div style={{ fontSize: 13, lineHeight: 1.55, color: '#8B8B94', maxWidth: 340 }}>{text}</div>
       {action ? <div style={{ marginTop: 6 }}>{action}</div> : null}
     </div>
+  )
+}
+
+// ── Squelette de chargement (remplace les « … ») ─────────────────────────────
+export function Skeleton({ w = '100%', h = 12, r = 4, style }: { w?: number | string; h?: number; r?: number; style?: CSSProperties }) {
+  return <span aria-hidden style={{ display: 'block', width: w, height: h, borderRadius: r, background: 'linear-gradient(90deg,#161618 0%,#1D1D20 50%,#161618 100%)', backgroundSize: '200% 100%', animation: 'aShimmer 1.4s ease-in-out infinite', ...style }} />
+}
+export function SkeletonRows({ rows = 3, avatar = false }: { rows?: number; avatar?: boolean }) {
+  return (
+    <div aria-busy="true">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', minHeight: 48, borderBottom: i < rows - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+          {avatar && <Skeleton w={24} h={24} r={6} />}
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Skeleton w={`${55 + ((i * 17) % 30)}%`} h={10} />
+            <Skeleton w={`${25 + ((i * 11) % 20)}%`} h={8} />
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Toasts : retour visuel discret après une action (remplace alert()) ───────
+type ToastTone = 'ok' | 'bad' | 'info'
+interface ToastItem { id: number; text: string; tone: ToastTone }
+let _toasts: ToastItem[] = []
+let _toastId = 0
+const _toastL = new Set<() => void>()
+const _emitToasts = () => _toastL.forEach(f => f())
+export function toast(text: string, tone: ToastTone = 'info', ms = 4200): void {
+  const id = ++_toastId
+  _toasts = [..._toasts.slice(-3), { id, text, tone }]
+  _emitToasts()
+  setTimeout(() => { _toasts = _toasts.filter(t => t.id !== id); _emitToasts() }, ms)
+}
+export function Toaster() {
+  const [, force] = useState(0)
+  useEffect(() => { const f = () => force(n => n + 1); _toastL.add(f); return () => { _toastL.delete(f) } }, [])
+  if (!_toasts.length) return null
+  const C: Record<ToastTone, string> = { ok: '#4ADE80', bad: '#F87171', info: '#A1A1AA' }
+  const I: Record<ToastTone, string> = { ok: 'M20 6L9 17l-5-5', bad: 'M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', info: 'M12 16v-4|M12 8h.01|M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z' }
+  return createPortal(
+    <div role="status" aria-live="polite" style={{ position: 'fixed', right: 16, bottom: 16, zIndex: 120, display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 'min(380px, calc(100vw - 32px))' }}>
+      {_toasts.map(t => (
+        <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)', fontSize: 13, lineHeight: 1.45, color: '#EDEDEF', animation: 'aIn .2s cubic-bezier(0.16,1,0.3,1) both' }}>
+          <span style={{ display: 'flex', marginTop: 2, color: C[t.tone] }}><Icon d={I[t.tone]} size={14} /></span>
+          <span>{t.text}</span>
+        </div>
+      ))}
+    </div>,
+    document.body,
+  )
+}
+
+// ── Confirmation (remplace window.confirm) : const ok = await confirmDialog({…}) ─
+interface ConfirmReq { title: string; text?: string; confirmLabel?: string; danger?: boolean; resolve: (v: boolean) => void }
+let _confirm: ConfirmReq | null = null
+const _confirmL = new Set<() => void>()
+export function confirmDialog(o: { title: string; text?: string; confirmLabel?: string; danger?: boolean }): Promise<boolean> {
+  return new Promise(resolve => {
+    _confirm?.resolve(false)
+    _confirm = { ...o, resolve }
+    _confirmL.forEach(f => f())
+  })
+}
+export function DialogHost({ theme }: { theme: Theme }) {
+  const [, force] = useState(0)
+  useEffect(() => { const f = () => force(n => n + 1); _confirmL.add(f); return () => { _confirmL.delete(f) } }, [])
+  if (!_confirm) return null
+  const c = _confirm
+  const close = (v: boolean) => { c.resolve(v); _confirm = null; force(n => n + 1) }
+  return (
+    <Modal theme={theme} title={c.title} onClose={() => close(false)} width={440}
+      footer={<><Btn theme={theme} tone="ghost" label="Annuler" onClick={() => close(false)} /><Btn theme={theme} tone={c.danger ? 'danger' : 'primary'} label={c.confirmLabel ?? 'Confirmer'} onClick={() => close(true)} /></>}>
+      {c.text ? <div style={{ fontSize: 13, lineHeight: 1.55, color: '#A1A1AA' }}>{c.text}</div> : null}
+    </Modal>
   )
 }

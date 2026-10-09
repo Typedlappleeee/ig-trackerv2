@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal, SkeletonRows } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { cancelGeelarkTask } from '@/lib/geelark'
@@ -139,7 +139,7 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
       )}
       {notice && <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', color: '#A1A1AA', fontSize: 13 }}>{notice}</div>}
 
-      {loading ? <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#5A5A63', fontSize: 13 }}>…</div></Panel>
+      {loading ? <Panel theme={theme}><SkeletonRows rows={4} avatar /></Panel>
         : rows.length === 0 ? (
           <Panel theme={theme}><Empty icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
             title="Aucune publication programmée" text="Depuis Posting / Story / Cross-post, clique « Programmer (PC éteint) » — elles apparaîtront ici." /></Panel>
