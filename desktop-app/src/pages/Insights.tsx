@@ -92,7 +92,7 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
 
   const seg = (on: boolean): CSSProperties => ({
     height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer',
-    background: on ? `rgba(${theme.tone},0.16)` : 'transparent', color: on ? theme.accentText : '#71717A', fontSize: 11.5, fontWeight: 700,
+    background: on ? `rgba(${theme.tone},0.16)` : 'transparent', color: on ? theme.accentText : '#71717A', fontSize: 11.5, fontWeight: 600,
   })
 
   return (
@@ -148,7 +148,7 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
             <PanelHead title="Meilleurs Reels" sub="Classés par vues sur la période" right={<Chip text={`${reels.length} Reels`} tone="mute" />} />
             {reels.slice(0, 12).map((r, i) => (
               <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 15px', borderBottom: i < 11 ? '1px solid rgba(255,255,255,0.035)' : 'none' }}>
-                <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 700, color: i === 0 ? '#FBBF24' : i < 3 ? '#A1A1AA' : '#3F3F46', width: 20 }}>{i + 1}</span>
+                <span style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: i === 0 ? '#FBBF24' : i < 3 ? '#A1A1AA' : '#3F3F46', width: 20 }}>{i + 1}</span>
                 <span style={{ width: 34, height: 44, borderRadius: 6, flexShrink: 0, overflow: 'hidden', background: `rgba(${theme.tone},0.1)`, border: '1px solid rgba(255,255,255,0.06)' }}>
                   {r.thumbnail_url && <img src={r.thumbnail_url} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                 </span>
@@ -157,7 +157,7 @@ export default function Insights({ theme, infra, user, org, onNavigate }: {
                   <span style={{ fontSize: 10.5, color: '#52525B' }}>@{r.ig_username ?? '—'}{r.taken_at ? ' · ' + new Date(r.taken_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}</span>
                 </span>
                 <span style={{ display: 'flex', gap: 14, fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5 }}>
-                  <span style={{ color: theme.accentText, fontWeight: 700, minWidth: 52, textAlign: 'right' }}>{fmt(r.views)} <span style={{ color: '#52525B', fontWeight: 500 }}>vues</span></span>
+                  <span style={{ color: theme.accentText, fontWeight: 600, minWidth: 52, textAlign: 'right' }}>{fmt(r.views)} <span style={{ color: '#52525B', fontWeight: 500 }}>vues</span></span>
                   <span style={{ color: '#A1A1AA', minWidth: 44, textAlign: 'right' }}>♥ {fmt(r.likes)}</span>
                 </span>
               </div>

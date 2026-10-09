@@ -183,7 +183,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
             const on = folder === f
             return (
               <button key={f} onClick={() => setFolder(f)} style={{
-                height: 26, padding: '0 10px', borderRadius: 99, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                height: 26, padding: '0 10px', borderRadius: 99, cursor: 'pointer', fontSize: 11, fontWeight: 600,
                 background: on ? `rgba(${theme.tone},0.16)` : 'rgba(255,255,255,0.03)',
                 border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.08)'), color: on ? theme.accentText : '#A1A1AA',
               }}>{f === 'Tous' ? 'Tous' : `📁 ${f}`}</button>
@@ -191,7 +191,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
           })}
           {multi && filteredMedia.length > 0 && (
             <button onClick={() => setSel(cur => [...new Set([...cur, ...filteredMedia.map(m => m.id)])])} style={{
-              marginLeft: 'auto', height: 26, padding: '0 11px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+              marginLeft: 'auto', height: 26, padding: '0 11px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600,
               background: theme.accentBtn, border: 'none', color: '#fff',
             }}>{folder === 'Tous' ? `Tout ajouter (${filteredMedia.length})` : `Ajouter le dossier (${filteredMedia.length})`}</button>
           )}
@@ -203,7 +203,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
         onDragLeave={() => setDrag(false)}
         onDrop={kind !== 'captions' ? (e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files?.length) importFiles(e.dataTransfer.files) } : undefined}
         style={{ position: 'relative', padding: 15, maxHeight: 380, overflowY: 'auto', outline: drag ? `2px dashed rgba(${theme.tone},0.6)` : 'none', outlineOffset: -6, borderRadius: 8 }}>
-        {drag && <div style={{ position: 'absolute', inset: 6, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: `rgba(${theme.tone},0.12)`, color: theme.accentText, fontSize: 13, fontWeight: 700, pointerEvents: 'none' }}>Dépose tes fichiers ici</div>}
+        {drag && <div style={{ position: 'absolute', inset: 6, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: `rgba(${theme.tone},0.12)`, color: theme.accentText, fontSize: 13, fontWeight: 600, pointerEvents: 'none' }}>Dépose tes fichiers ici</div>}
         {uploading && <div style={{ marginBottom: 10, fontSize: 11.5, color: theme.accentText }}>Import en cours : {uploading}</div>}
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Chargement…</div>
@@ -217,7 +217,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
                     display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
                     background: on ? `rgba(${theme.tone},0.09)` : 'rgba(255,255,255,0.015)', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.06)'),
                   }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: on ? '#F4F4F6' : '#D4D4D8' }}>{c.title || 'Légende'}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: on ? '#F4F4F6' : '#D4D4D8' }}>{c.title || 'Légende'}</span>
                     <span style={{ fontSize: 11.5, lineHeight: 1.55, color: '#71717A', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.content}</span>
                   </button>
                 )

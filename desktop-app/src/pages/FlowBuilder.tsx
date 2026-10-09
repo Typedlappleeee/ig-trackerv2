@@ -268,7 +268,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
             <div style={{ padding: '6px 0 8px' }}>
               {(['Compte', 'Activité', 'Contenu'] as const).map(g => (
                 <div key={g}>
-                  <div style={{ padding: '8px 14px 4px', fontSize: 9.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#71717A' }}>{g}</div>
+                  <div style={{ padding: '8px 14px 4px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#71717A' }}>{g}</div>
                   {BLOCKS.filter(b => b.group === g).map(b => (
                     <div key={b.type} className="fb-pal-item" draggable
                       onDragStart={e => { e.dataTransfer.effectAllowed = 'copy'; e.dataTransfer.setData('text/plain', b.type); setDrag({ kind: 'new', type: b.type }) }}
@@ -292,7 +292,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
           {flow ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
               <input value={flow.name} onChange={e => update(f => ({ ...f, name: e.target.value }))} aria-label="Nom du flow" title="Clique pour renommer"
-                style={{ flex: 1, minWidth: 140, height: 30, padding: '0 8px', marginLeft: -8, borderRadius: 7, border: '1px solid transparent', background: 'transparent', color: '#F4F4F6', fontSize: 14, fontWeight: 700, outline: 'none' }}
+                style={{ flex: 1, minWidth: 140, height: 30, padding: '0 8px', marginLeft: -8, borderRadius: 7, border: '1px solid transparent', background: 'transparent', color: '#F4F4F6', fontSize: 14, fontWeight: 600, outline: 'none' }}
                 onFocus={e => { e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)' }}
                 onBlur={e => { e.currentTarget.style.border = '1px solid transparent' }} />
               <Chip text={`≈ ${fmtMinutes(est)} / compte`} tone="mute" />
@@ -546,11 +546,11 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 10px 10px 12px' }}>
         <BlockIcon def={block.type} size={30} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase', color: off ? '#71717A' : `rgba(${def.color},0.85)` }}>{off ? '⏸ Désactivé' : `⚡ ${def.label}`}</div>
-          <div style={{ marginTop: 2, fontSize: 13.5, fontWeight: 700, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: off ? 'line-through' : undefined }}>{blockName(block)}</div>
+          <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: off ? '#71717A' : `rgba(${def.color},0.85)` }}>{off ? '⏸ Désactivé' : `⚡ ${def.label}`}</div>
+          <div style={{ marginTop: 2, fontSize: 13.5, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: off ? 'line-through' : undefined }}>{blockName(block)}</div>
           <div style={{ marginTop: 1, fontFamily: MONO, fontSize: 10.5, color: '#8B8898' }}>{fmtMinutes(blockEstimate(block))}{def.credits > 0 ? ` · ${def.credits} cr` : ''}</div>
         </div>
-        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: '#52525B' }}>{index + 1}</span>
+        <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 600, color: '#52525B' }}>{index + 1}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px 7px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: issue && !off ? '#F87171' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={issue && !off ? issue : summary(block)}>
@@ -574,18 +574,18 @@ function EmptyState({ theme, onTemplate }: { theme: Theme; onTemplate: (preset: 
         <Icon d="M5 3h4v4H5z|M15 17h4v4h-4z|M7 7v4a2 2 0 0 0 2 2h6a2 2 0 0 1 2 2v2" size={22} />
       </span>
       <div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F6' }}>Crée ton premier flow</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: '#F4F4F6' }}>Crée ton premier flow</div>
         <div style={{ marginTop: 5, fontSize: 12.5, color: '#71717A' }}>Pars d'un modèle ou glisse des blocs depuis la gauche.</div>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
         {TEMPLATES.map((t, ti) => (
           <button key={t.name} onClick={() => onTemplate(ti)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, width: 190, padding: 12, borderRadius: 11, cursor: 'pointer', textAlign: 'left', background: '#15151B', border: '1px solid rgba(255,255,255,0.08)' }}>
             <span style={{ display: 'flex', gap: 3 }}>{t.types.map((ty, i) => <BlockIcon key={i} def={ty} size={20} />)}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#E4E4E7' }}>{t.name}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#E4E4E7' }}>{t.name}</span>
             <span style={{ fontSize: 11, color: '#71717A' }}>{t.desc}</span>
           </button>
         ))}
-        <button onClick={() => onTemplate(-1)} style={{ width: 120, padding: 12, borderRadius: 11, cursor: 'pointer', background: 'transparent', border: '1px dashed rgba(255,255,255,0.14)', color: '#A1A1AA', fontSize: 12, fontWeight: 700 }}>Flow vide</button>
+        <button onClick={() => onTemplate(-1)} style={{ width: 120, padding: 12, borderRadius: 11, cursor: 'pointer', background: 'transparent', border: '1px dashed rgba(255,255,255,0.14)', color: '#A1A1AA', fontSize: 12, fontWeight: 600 }}>Flow vide</button>
       </div>
     </div>
   )
@@ -635,7 +635,7 @@ function FlowLibrary({ theme, flows, activeId, loading, onOpen, onNew, onDuplica
               onKeyDown={e => { if (e.key === 'Enter') onOpen(f.id) }}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px 8px 12px', cursor: 'pointer', borderLeft: `2px solid ${on ? theme.accent : 'transparent'}`, background: on ? `rgba(${theme.tone},0.08)` : undefined }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: on ? '#F4F4F6' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: on ? '#F4F4F6' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                   <span style={{ display: 'flex', gap: 3 }}>
                     {f.blocks.slice(0, 7).map(b => <span key={b.id} title={BLOCK[b.type].label} style={{ width: 7, height: 7, borderRadius: 2, background: `rgb(${BLOCK[b.type].color})` }} />)}
@@ -682,7 +682,7 @@ function NewFlowModal({ theme, preset, names, onClose, onCreate }: {
             placeholder="ex. Lancement comptes mode" maxLength={60} style={{ ...inputStyle, height: 36, fontSize: 13.5 }} />
         </Field>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Point de départ</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Point de départ</span>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
             {options.map(o => {
               const on = tpl === o.i
@@ -693,7 +693,7 @@ function NewFlowModal({ theme, preset, names, onClose, onCreate }: {
                   <span style={{ display: 'flex', gap: 3, minHeight: 18 }}>
                     {o.types.length ? o.types.map((ty, k) => <BlockIcon key={k} def={ty} size={18} />) : <span style={{ fontSize: 11, color: '#71717A' }}>—</span>}
                   </span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? theme.accentText : '#E4E4E7' }}>{o.title}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: on ? theme.accentText : '#E4E4E7' }}>{o.title}</span>
                   <span style={{ fontSize: 11, color: '#A1A1AA' }}>{o.desc}</span>
                 </button>
               )
@@ -710,7 +710,7 @@ function NewFlowModal({ theme, preset, names, onClose, onCreate }: {
 function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>{label}</span>
       {children}
       {hint && <span style={{ fontSize: 10.5, lineHeight: 1.5, color: '#52525B' }}>{hint}</span>}
     </label>
@@ -722,7 +722,7 @@ function Seg<T extends string | number>({ theme, value, options, onChange }: { t
     <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
       {options.map(([v, l]) => (
         <button key={String(v)} onClick={e => { e.preventDefault(); onChange(v) }} style={{
-          flex: 1, height: 26, padding: '0 6px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
+          flex: 1, height: 26, padding: '0 6px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
           background: value === v ? `rgba(${theme.tone},0.16)` : 'transparent', color: value === v ? theme.accentText : '#71717A',
         }}>{l}</button>
       ))}
@@ -737,7 +737,7 @@ function Range({ p, onChange, presets }: { p: BlockParams; onChange: (x: Partial
       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
         {presets.map(([l, a, b]) => {
           const on = p.minMin === a && p.maxMin === b
-          return <button key={l} onClick={e => { e.preventDefault(); onChange({ minMin: a, maxMin: b }) }} style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: `1px solid ${on ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.07)'}`, background: on ? 'rgba(251,191,36,0.1)' : 'transparent', color: on ? '#FBBF24' : '#A1A1AA' }}>{l} · {a}–{b}</button>
+          return <button key={l} onClick={e => { e.preventDefault(); onChange({ minMin: a, maxMin: b }) }} style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 600, border: `1px solid ${on ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.07)'}`, background: on ? 'rgba(251,191,36,0.1)' : 'transparent', color: on ? '#FBBF24' : '#A1A1AA' }}>{l} · {a}–{b}</button>
         })}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -880,9 +880,9 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
         <BlockIcon def={block.type} size={34} />
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#71717A' }}>{index + 1}.</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#71717A' }}>{index + 1}.</span>
             <input value={p.label ?? ''} onChange={e => onChange({ label: e.target.value })} placeholder={def.label} aria-label="Nom du bloc" maxLength={40}
-              style={{ flex: 1, minWidth: 0, height: 28, padding: '0 8px', marginLeft: -4, borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#F4F4F6', fontSize: 13.5, fontWeight: 700, outline: 'none' }} />
+              style={{ flex: 1, minWidth: 0, height: 28, padding: '0 8px', marginLeft: -4, borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#F4F4F6', fontSize: 13.5, fontWeight: 600, outline: 'none' }} />
           </div>
           <div style={{ fontSize: 11.5, lineHeight: 1.5, color: '#8B8898' }}>{def.hint}</div>
         </div>
@@ -892,7 +892,7 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 13, padding: 15 }}>{body}</div>
       <details className="fb-adv" open={hasAdvanced} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 15px', cursor: 'pointer', listStyle: 'none', fontSize: 12, fontWeight: 700, color: '#A1A1AA', userSelect: 'none' }}>
+        <summary style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 15px', cursor: 'pointer', listStyle: 'none', fontSize: 12, fontWeight: 600, color: '#A1A1AA', userSelect: 'none' }}>
           <Icon d="M9 18l6-6-6-6" size={12} /> Options avancées
           {hasAdvanced && <span style={{ marginLeft: 'auto', fontSize: 10.5, color: theme.accentText }}>personnalisé</span>}
         </summary>
@@ -937,7 +937,7 @@ function FlowSettings({ theme, flow, issues, groups, rotationConfigured, onPatch
           <Seg<'stop' | 'continue'> theme={theme} value={flow.onError} options={[['stop', 'Arrêter ce compte'], ['continue', 'Continuer']]} onChange={v => onPatch({ onError: v })} />
         </Field>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#8B8898' }}>Lancement par défaut</span>
+          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#8B8898' }}>Lancement par défaut</span>
           <Field label="Comptes en parallèle">
             <Seg<number> theme={theme} value={d.concurrency ?? 3} options={[[1, '1'], [3, '3'], [5, '5'], [10, '10'], [20, '20']]} onChange={v => setD({ concurrency: v })} />
           </Field>
@@ -950,7 +950,7 @@ function FlowSettings({ theme, flow, issues, groups, rotationConfigured, onPatch
                   const on = sel.has(g)
                   return (
                     <button key={g} type="button" aria-pressed={on} onClick={() => { const n = new Set(sel); on ? n.delete(g) : n.add(g); setD({ groups: [...n] }) }}
-                      style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.08)'}`, background: on ? `rgba(${theme.tone},0.14)` : 'transparent', color: on ? theme.accentText : '#A1A1AA' }}>{on ? '✓ ' : ''}{g}</button>
+                      style={{ height: 26, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.08)'}`, background: on ? `rgba(${theme.tone},0.14)` : 'transparent', color: on ? theme.accentText : '#A1A1AA' }}>{on ? '✓ ' : ''}{g}</button>
                   )
                 })}
               </div>
@@ -958,7 +958,7 @@ function FlowSettings({ theme, flow, issues, groups, rotationConfigured, onPatch
           )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Vérification</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Vérification</span>
           {issues.length === 0 ? (
             <span style={{ fontSize: 12, color: '#34D399' }}>✓ Prêt à lancer</span>
           ) : issues.map((s, i) => <span key={i} style={{ fontSize: 11.5, lineHeight: 1.5, color: '#F87171' }}>• {s}</span>)}
@@ -1068,8 +1068,8 @@ function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{chosen.length} / {phones.length} sélectionné(s)</span>
-            <button onClick={() => setSel(s => { const n = new Set(s); shown.forEach(p => allShown ? n.delete(p.id) : n.add(p.id)); return n })} style={{ border: 'none', background: 'transparent', color: theme.accentText, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>{allShown ? 'Tout retirer' : 'Tout sélectionner'}</button>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>{chosen.length} / {phones.length} sélectionné(s)</span>
+            <button onClick={() => setSel(s => { const n = new Set(s); shown.forEach(p => allShown ? n.delete(p.id) : n.add(p.id)); return n })} style={{ border: 'none', background: 'transparent', color: theme.accentText, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>{allShown ? 'Tout retirer' : 'Tout sélectionner'}</button>
           </div>
           <div style={{ maxHeight: 300, overflowY: 'auto', borderRadius: 9, border: '1px solid rgba(255,255,255,0.06)' }}>
             {shown.length === 0 ? <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: '#52525B' }}>Aucun téléphone GeeLark.</div> : shown.map(p => {
@@ -1163,7 +1163,7 @@ function RunCard({ theme, run }: { theme: Theme; run: FlowRun }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '10px 15px 6px' }}>
         {([['all', 'Tous'], ['active', 'En cours'], ['failed', `Échecs${failed ? ` (${failed})` : ''}`]] as const).map(([k, l]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ height: 24, padding: '0 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, background: filter === k ? `rgba(${theme.tone},0.14)` : 'transparent', color: filter === k ? theme.accentText : '#71717A' }}>{l}</button>
+          <button key={k} onClick={() => setFilter(k)} style={{ height: 24, padding: '0 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, background: filter === k ? `rgba(${theme.tone},0.14)` : 'transparent', color: filter === k ? theme.accentText : '#71717A' }}>{l}</button>
         ))}
       </div>
       <div style={{ maxHeight: 380, overflowY: 'auto' }}>

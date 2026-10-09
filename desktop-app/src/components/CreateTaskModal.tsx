@@ -127,9 +127,9 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
   const [grpFilter, setGrpFilter] = useState('Tous')
   const shownPhones = phones.filter(p => grpFilter === 'Tous' || p.group_name === grpFilter)
 
-  const lbl: CSSProperties = { fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 7, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 7, display: 'block' }
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
-  const seg = (on: boolean): CSSProperties => ({ flex: 1, height: 32, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: on ? theme.accentBtn : 'rgba(255,255,255,0.03)', color: on ? '#fff' : '#A1A1AA' })
+  const seg = (on: boolean): CSSProperties => ({ flex: 1, height: 32, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: on ? theme.accentBtn : 'rgba(255,255,255,0.03)', color: on ? '#fff' : '#A1A1AA' })
 
   return (
     <Modal theme={theme} width={560}

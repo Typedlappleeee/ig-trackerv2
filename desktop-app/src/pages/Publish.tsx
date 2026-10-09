@@ -52,7 +52,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, background: `rgba(${f.tone},0.12)`, border: `1px solid rgba(${f.tone},0.24)`, color: `rgb(${f.tone})` }}>
                 <Icon d={f.icon} size={16} />
               </span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F6' }}>{f.t}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#F4F4F6' }}>{f.t}</span>
               <span style={{ marginLeft: 'auto' }}><Chip text={adminOnly ? 'Admin' : f.ready ? f.cost : 'Bientôt'} tone={adminOnly ? 'violet' : 'mute'} /></span>
             </span>
             <span style={{ fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>{adminOnly ? 'Réservé au superadmin.' : f.d}</span>

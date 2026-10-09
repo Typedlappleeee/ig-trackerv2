@@ -197,7 +197,7 @@ export default function Activity({ theme, infra, user, org }: {
               <button key={f.k} onClick={() => setFilter(f.k)} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer',
                 background: filter === f.k ? `rgba(${theme.tone},0.16)` : 'transparent',
-                color: filter === f.k ? theme.accentText : '#71717A', fontSize: 11, fontWeight: 700, transition: 'all .14s ease',
+                color: filter === f.k ? theme.accentText : '#71717A', fontSize: 11, fontWeight: 600, transition: 'all .14s ease',
               }}>
                 {f.l}
                 <span style={{ opacity: 0.55, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{f.n}</span>
@@ -232,7 +232,7 @@ export default function Activity({ theme, infra, user, org }: {
                 <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
                   <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
                   {/* Sticker infra : d'où vient le run. (Tous GeeLark aujourd'hui ; ScaleFlow Cloud se taguera quand l'infra sera active.) */}
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, flexShrink: 0, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.24)', fontSize: 9.5, fontWeight: 800, color: '#C4B5FD' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 5, flexShrink: 0, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.24)', fontSize: 9.5, fontWeight: 600, color: '#C4B5FD' }}>
                     <span style={{ width: 5, height: 5, borderRadius: 99, background: '#A78BFA' }} />GeeLark
                   </span>
                 </span>
@@ -242,7 +242,7 @@ export default function Activity({ theme, infra, user, org }: {
                 <span style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
                   <span style={{ display: 'block', height: '100%', width: `${pct}%`, borderRadius: 99, background: ok ? '#10B981' : '#F59E0B' }} />
                 </span>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 700, color: ok ? '#34D399' : '#FBBF24' }}>{r.ok} / {r.total}</span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 600, color: ok ? '#34D399' : '#FBBF24' }}>{r.ok} / {r.total}</span>
               </span>
               <span style={{ fontSize: 11, color: '#52525B', minWidth: 84, textAlign: 'right', flexShrink: 0 }}>{r.when}</span>
               <span style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
@@ -260,7 +260,7 @@ export default function Activity({ theme, infra, user, org }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             {([['Comptes réussis', `${detail.ok} / ${detail.total}`], ['Taux', `${detail.total ? Math.round((detail.ok / detail.total) * 100) : 0} %`], ['Quand', detail.when], ['Type', detail.meta]] as [string, string][]).map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-                <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: '#E4E4E7' }}>{v}</span>
+                <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 600, color: '#E4E4E7' }}>{v}</span>
               </div>
             ))}
             <div style={{ marginTop: 4 }}>
@@ -270,7 +270,7 @@ export default function Activity({ theme, infra, user, org }: {
             {/* Détail par compte : qui a posté, qui a échoué (et pourquoi). */}
             {detail.accounts && detail.accounts.length > 0 && (
               <div style={{ marginTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 8 }}>
                   Détail par compte
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>

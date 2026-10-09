@@ -278,7 +278,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
               <Btn theme={theme} sm tone="quiet" label="Aucun" onClick={() => setSel(new Set())} />
             </>} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
+            <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
             <select value={group} onChange={e => setGroup(e.target.value)} style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#E4E4E7', fontSize: 11.5, outline: 'none', cursor: 'pointer' }}>
               {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
             </select>
@@ -343,7 +343,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
                   <span style={{ fontSize: 11, color: '#71717A' }}>Répartition</span>
                   <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     {(['seq', 'random'] as const).map(mm => (
-                      <button key={mm} onClick={() => setImgMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: imgMode === mm ? theme.accentBtn : 'transparent', color: imgMode === mm ? '#fff' : '#71717A' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                      <button key={mm} onClick={() => setImgMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: imgMode === mm ? theme.accentBtn : 'transparent', color: imgMode === mm ? '#fff' : '#71717A' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
                     ))}
                   </span>
                 </div>
@@ -367,7 +367,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
                 {stickerTexts.filter(s => s.trim()).length > 1 && (
                   <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', marginLeft: 'auto' }}>
                     {(['seq', 'random'] as const).map(mm => (
-                      <button key={mm} onClick={() => setStMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: stMode === mm ? theme.accentBtn : 'transparent', color: stMode === mm ? '#fff' : '#71717A' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                      <button key={mm} onClick={() => setStMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: stMode === mm ? theme.accentBtn : 'transparent', color: stMode === mm ? '#fff' : '#71717A' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
                     ))}
                   </span>
                 )}

@@ -106,7 +106,7 @@ export default function LiveDevice({ apiKey, device, onClose, onSaveSequence }: 
   }
   function insertUpload() { if (recording) { stepsRef.current.push({ delay: 800, upload: true }); setStepCount(stepsRef.current.length) } }
 
-  const btn: React.CSSProperties = { height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: BORDER, color: INK }
+  const btn: React.CSSProperties = { height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.04)', border: BORDER, color: INK }
 
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'rgba(4,3,8,0.78)', backdropFilter: 'blur(6px)' }}>
@@ -126,14 +126,14 @@ export default function LiveDevice({ apiKey, device, onClose, onSaveSequence }: 
         <div style={{ width: 320, maxWidth: '46vw', display: 'flex', flexDirection: 'column', gap: 12, padding: 18, borderRadius: 16, background: PANEL, border: BORDER, overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 9, height: 9, borderRadius: 99, background: status === 'live' ? '#34D399' : status === 'offline' ? '#EF4444' : '#F59E0B' }} />
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{device.name ?? device.public_id}</span>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{device.name ?? device.public_id}</span>
             <button style={{ ...btn, height: 28, padding: '0 10px' }} onClick={onClose}>Fermer</button>
           </div>
           <div style={{ fontSize: 11, color: MUTED }}>{status === 'live' ? 'En direct — clique/glisse sur l’écran pour piloter.' : status === 'offline' ? 'Appareil injoignable.' : 'Connexion…'}</div>
 
           {/* Saisie texte */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: MUTED }}>Saisir du texte</span>
+            <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: MUTED }}>Saisir du texte</span>
             <textarea value={text} onChange={e => setText(e.target.value)} rows={2} placeholder="Tape ta légende / recherche…"
               style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: 9, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: BORDER, color: INK, fontSize: 12.5, outline: 'none', fontFamily: 'inherit' }} />
             <div style={{ display: 'flex', gap: 6 }}>
@@ -145,7 +145,7 @@ export default function LiveDevice({ apiKey, device, onClose, onSaveSequence }: 
           {/* Enregistrement de séquence */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 12, background: recording ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${recording ? 'rgba(239,68,68,0.35)' : 'rgba(216,180,254,0.12)'}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: INK }}>{recording ? `Enregistrement… (${stepCount} étapes)` : stepCount > 0 ? `Séquence prête (${stepCount} étapes)` : 'Enregistrer une séquence'}</span>
+              <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: INK }}>{recording ? `Enregistrement… (${stepCount} étapes)` : stepCount > 0 ? `Séquence prête (${stepCount} étapes)` : 'Enregistrer une séquence'}</span>
               <button style={{ ...btn, background: recording ? '#EF4444' : GOLD, color: recording ? '#fff' : '#1a1206', border: 'none' }} onClick={toggleRec}>{recording ? '■ Stop' : '● Rec'}</button>
             </div>
             <p style={{ margin: 0, fontSize: 10.5, lineHeight: 1.5, color: MUTED }}>

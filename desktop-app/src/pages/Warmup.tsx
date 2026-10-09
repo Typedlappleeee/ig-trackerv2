@@ -218,7 +218,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
           <button key={k} onClick={() => setWtab(k)} style={{
             height: 28, padding: '0 14px', border: 'none', borderRadius: 6, cursor: 'pointer',
             background: wtab === k ? `rgba(${theme.tone},0.16)` : 'transparent',
-            color: wtab === k ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 700, transition: 'all .14s ease',
+            color: wtab === k ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 600, transition: 'all .14s ease',
           }}>{l}</button>
         ))}
       </div>
@@ -242,8 +242,8 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
           <Panel theme={theme}>
             <PanelHead title="Téléphones" right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(shownWarm.map(p => p.id)))} />} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
-              <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`, background: '#101015', color: wgroup !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 700, outline: 'none' }}>
+              <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
+              <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`, background: '#101015', color: wgroup !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 600, outline: 'none' }}>
                 {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
               </select>
             </div>
@@ -275,18 +275,18 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                 <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Nom affiché <span style={{ color: '#52525B', fontWeight: 600 }}>· name</span></span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Nom affiché <span style={{ color: '#52525B', fontWeight: 600 }}>· name</span></span>
                       <input value={edit.nickname} onChange={e => setEdit(v => ({ ...v, nickname: e.target.value }))} placeholder="Léa ✨" style={fieldStyle} />
                       <span style={{ fontSize: 10.5, color: '#52525B' }}>Le nom en gras sur le profil. Ne touche pas au @.</span>
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Nom d'utilisateur <span style={{ color: '#52525B', fontWeight: 600 }}>· @username</span></span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Nom d'utilisateur <span style={{ color: '#52525B', fontWeight: 600 }}>· @username</span></span>
                       <textarea value={usernames} onChange={e => { setUsernames(e.target.value); setEditError(null) }} rows={2} placeholder={'lea.officiel{4}\nlea_backup'} style={{ ...fieldStyle, height: 'auto', padding: 9, resize: 'vertical', fontFamily: 'inherit' }} />
                       <span style={{ fontSize: 10.5, color: '#52525B' }}>Un par ligne, attribués dans l'ordre. {'{4}'} = 4 chiffres aléatoires.</span>
                     </label>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Photo de profil</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Photo de profil</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Btn theme={theme} sm tone="ghost" icon="M3 5h18v14H3z|M3 16l5-5 4 4 3-3 6 6" label={avatarIds.length ? `${avatarIds.length} photo${avatarIds.length > 1 ? 's' : ''} choisie${avatarIds.length > 1 ? 's' : ''}` : 'Choisir dans la banque'} onClick={() => setAvatarPicker(true)} />
                       {avatarIds.length > 0 && <Btn theme={theme} sm tone="quiet" label="Retirer" onClick={() => setAvatarIds([])} />}
@@ -296,13 +296,13 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     {([['linkURL', 'Lien (URL)'], ['linkTitle', 'Titre du lien']] as [keyof typeof edit, string][]).map(([k, l]) => (
                       <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{l}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>{l}</span>
                         <input value={edit[k]} onChange={e => setEdit(v => ({ ...v, [k]: e.target.value }))} placeholder={l} style={fieldStyle} />
                       </label>
                     ))}
                   </div>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Bio</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Bio</span>
                     <textarea value={edit.biography} onChange={e => setEdit(v => ({ ...v, biography: e.target.value }))} rows={3} placeholder="Bio…" style={{ resize: 'vertical', padding: 11, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, fontFamily: 'inherit', outline: 'none' }} />
                   </label>
                   {editError && <div role="alert" style={{ padding: '8px 11px', borderRadius: 8, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', color: '#FCA5A5', fontSize: 12 }}>{editError}</div>}
@@ -324,7 +324,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                       const set = (k: 'email' | 'password' | 'totp', v: string) => setCreds(cr => ({ ...cr, [p.id]: { ...c, [k]: v } }))
                       return (
                         <div key={p.id} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#E4E4E7', marginBottom: 7 }}>{phoneLabel(p)}</div>
+                          <div style={{ fontSize: 11.5, fontWeight: 600, color: '#E4E4E7', marginBottom: 7 }}>{phoneLabel(p)}</div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px', gap: 6 }}>
                             <input value={c.email} onChange={e => set('email', e.target.value)} placeholder="email / identifiant" style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 11.5, outline: 'none' }} />
                             <input value={c.password} onChange={e => set('password', e.target.value)} type="password" placeholder="mot de passe" style={{ height: 28, padding: '0 9px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 11.5, outline: 'none' }} />
@@ -359,8 +359,8 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
           <PanelHead title="Téléphones" right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(shownWarm.map(p => p.id)))} />} />
           {/* Filtre groupe (menu déroulant) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
-            <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`, background: '#101015', color: wgroup !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 700, outline: 'none' }}>
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
+            <select value={wgroup} onChange={e => setWgroup(e.target.value)} style={{ flex: 1, height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${wgroup !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`, background: '#101015', color: wgroup !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 600, outline: 'none' }}>
               {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
             </select>
           </div>
@@ -409,8 +409,8 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                     background: act ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.015)',
                     border: '1px solid ' + (act ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.06)'), transition: 'all .14s ease',
                   }}>
-                    <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 17, fontWeight: 700, color: act ? '#FBBF24' : '#D4D4D8', letterSpacing: '-0.02em' }}>{d.v < 60 ? `${d.v} min` : `${d.v / 60} h`}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#52525B' }}>{d.h}</span>
+                    <span style={{ fontFamily: 'inherit', fontSize: 17, fontWeight: 600, color: act ? '#FBBF24' : '#D4D4D8', letterSpacing: '-0.02em' }}>{d.v < 60 ? `${d.v} min` : `${d.v / 60} h`}</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#52525B' }}>{d.h}</span>
                   </button>
                 )
               })}
@@ -425,7 +425,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                 Parcourt <b style={{ color: '#FBBF24' }}>≈ {Math.min(100, dur * 2)} Reels</b>{keyword.trim() ? <> trouvés avec « <b style={{ color: '#E4E4E7' }}>{keyword.trim()}</b> »</> : <> du fil</>}, avec des likes, commentaires et abonnements aléatoires dosés par le flow, puis éteint le téléphone.
               </div>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Mot-clé de recherche (optionnel)</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Mot-clé de recherche (optionnel)</span>
                 <input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="ex. fashion, fitness… — vide = fil Reels" style={{ height: 32, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
               </label>
             </div>
@@ -438,7 +438,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                 {!bearer && !conns.loading ? (
                   <span style={{ color: '#FBBF24' }}>Connecte d'abord ton compte GeeLark (token) dans les Réglages de l'app web, puis reviens ici.</span>
                 ) : (
-                  <>Session de <span style={{ color: '#FBBF24', fontWeight: 700 }}>{durLabel}</span> sur <span style={{ color: '#E4E4E7', fontWeight: 700 }}>{nSel}</span> téléphone{nSel > 1 ? 's' : ''}. Les appareils s'éteignent à la fin.</>
+                  <>Session de <span style={{ color: '#FBBF24', fontWeight: 600 }}>{durLabel}</span> sur <span style={{ color: '#E4E4E7', fontWeight: 600 }}>{nSel}</span> téléphone{nSel > 1 ? 's' : ''}. Les appareils s'éteignent à la fin.</>
                 )}
               </span>
               <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running}

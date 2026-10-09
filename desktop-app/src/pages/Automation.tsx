@@ -141,7 +141,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
     display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 14px',
     border: 'none', borderRadius: 6, cursor: 'pointer',
     background: tab === k ? `rgba(${theme.tone},0.16)` : 'transparent',
-    color: tab === k ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 700, transition: 'all .14s ease',
+    color: tab === k ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 600, transition: 'all .14s ease',
   })
 
   return (
@@ -181,7 +181,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
               right={
                 <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   {['Tous', 'Instagram', 'TikTok', 'Threads'].map(n => (
-                    <button key={n} onClick={() => setNet(n)} style={{ height: 22, padding: '0 8px', border: 'none', borderRadius: 5, cursor: 'pointer', background: net === n ? `rgba(${theme.tone},0.16)` : 'transparent', color: net === n ? theme.accentText : '#71717A', fontSize: 10.5, fontWeight: 700 }}>{n}</button>
+                    <button key={n} onClick={() => setNet(n)} style={{ height: 22, padding: '0 8px', border: 'none', borderRadius: 5, cursor: 'pointer', background: net === n ? `rgba(${theme.tone},0.16)` : 'transparent', color: net === n ? theme.accentText : '#71717A', fontSize: 10.5, fontWeight: 600 }}>{n}</button>
                   ))}
                 </span>
               } />
@@ -201,7 +201,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
                   borderBottom: i < queue.length - 1 ? '1px solid rgba(255,255,255,0.035)' : 'none',
                 }}>
                   <span style={{
-                    fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700,
+                    fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600,
                     color: done || failed ? '#52525B' : theme.accentText, minWidth: 84, flexShrink: 0,
                   }}>{when}</span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -223,7 +223,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
             <div style={{ padding: 13 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 6 }}>
                 {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
-                  <span key={i} style={{ textAlign: 'center', fontSize: 9.5, fontWeight: 800, color: '#3F3F46' }}>{d}</span>
+                  <span key={i} style={{ textAlign: 'center', fontSize: 9.5, fontWeight: 600, color: '#3F3F46' }}>{d}</span>
                 ))}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
@@ -235,7 +235,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
                   return (
                     <span key={day} style={{
                       aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      borderRadius: 5, fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace",
+                      borderRadius: 5, fontSize: 10, fontWeight: 600, fontFamily: "'JetBrains Mono',monospace",
                       background: sched ? 'rgba(139,92,246,0.16)' : pub ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.02)',
                       border: '1px solid ' + (sched ? 'rgba(139,92,246,0.32)' : pub ? 'rgba(16,185,129,0.24)' : 'rgba(255,255,255,0.04)'),
                       color: sched ? '#C4B5FD' : pub ? '#34D399' : '#3F3F46',
@@ -243,7 +243,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
                   )
                 })}
               </div>
-              <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 10.5, fontWeight: 700, color: '#52525B' }}>
+              <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 10.5, fontWeight: 600, color: '#52525B' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ width: 7, height: 7, borderRadius: 2, background: 'rgba(139,92,246,0.5)' }} />Programmé
                 </span>
@@ -282,7 +282,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
                       <span style={{ width: 15, height: 15, borderRadius: 99, background: '#fff' }} />
                     </span>
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: active ? '#F4F4F6' : '#71717A' }}>{t.name || 'Tâche automatique'}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: active ? '#F4F4F6' : '#71717A' }}>{t.name || 'Tâche automatique'}</span>
                       <span style={{ fontSize: 11, color: '#52525B' }}>{cadence}</span>
                     </span>
                     <Chip text={active ? 'active' : 'en pause'} tone={active ? 'ok' : 'mute'} />
@@ -301,8 +301,8 @@ export default function Automation({ theme, infra, user, org, embedded }: {
                       </span>
                     ))}
                     <span style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontSize: 11 }}>
-                      <span style={{ color: '#52525B' }}>Prochaine : <span style={{ color: '#D4D4D8', fontWeight: 700 }}>{active ? whenLabel(t.next_run_at) : 'En pause'}</span></span>
-                      <span style={{ color: '#52525B' }}>Crédits/jour : <span style={{ color: '#FBBF24', fontWeight: 700 }}>{active ? taskCredits(t) : '—'}</span></span>
+                      <span style={{ color: '#52525B' }}>Prochaine : <span style={{ color: '#D4D4D8', fontWeight: 600 }}>{active ? whenLabel(t.next_run_at) : 'En pause'}</span></span>
+                      <span style={{ color: '#52525B' }}>Crédits/jour : <span style={{ color: '#FBBF24', fontWeight: 600 }}>{active ? taskCredits(t) : '—'}</span></span>
                     </span>
                   </div>
                 </Panel>

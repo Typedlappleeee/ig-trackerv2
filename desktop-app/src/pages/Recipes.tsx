@@ -140,7 +140,7 @@ export default function Recipes({ theme, infra, user, org }: {
                     background: `rgba(${tone},0.12)`, border: `1px solid rgba(${tone},0.26)`, color: `rgb(${tone})`,
                   }}><Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6" size={15} /></span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: '#F4F4F6' }}>{t.name || 'Séquence'}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: '#F4F4F6' }}>{t.name || 'Séquence'}</span>
                     <span style={{ fontSize: 11.5, lineHeight: 1.5, color: '#71717A' }}>{describe(t)}</span>
                   </span>
                 </div>
@@ -191,7 +191,7 @@ function EditSeq({ theme, task, onClose, onSaved }: {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const inp = { width: '100%', boxSizing: 'border-box' as const, height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
-  const lbl = { fontSize: 10.5, fontWeight: 800 as const, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: '#71717A', marginBottom: 7, display: 'block' as const }
+  const lbl = { fontSize: 10.5, fontWeight: 600 as const, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: '#71717A', marginBottom: 7, display: 'block' as const }
 
   async function save() {
     setSaving(true); setErr(null)

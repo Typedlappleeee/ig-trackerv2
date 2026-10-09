@@ -112,7 +112,7 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
       <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderTop: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.22)`, color: theme.accentText }}><Icon d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" size={15} /></span>
         <span style={{ minWidth: 130 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6' }}>{TYPE_LABEL[s.type] ?? s.type}</span>{s.result?.platform && s.result.platform !== 'instagram' && <Chip text={s.result.platform} tone="mute" />}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ fontSize: 13, fontWeight: 600, color: '#F4F4F6' }}>{TYPE_LABEL[s.type] ?? s.type}</span>{s.result?.platform && s.result.platform !== 'instagram' && <Chip text={s.result.platform} tone="mute" />}</div>
           <div style={{ fontSize: 11, color: '#71717A' }}>{n} compte{n > 1 ? 's' : ''}</div>
         </span>
         <span style={{ ...cell, minWidth: 150 }}>{new Date(s.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}</span>

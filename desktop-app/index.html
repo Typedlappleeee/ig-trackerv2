@@ -10,11 +10,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
 <style>
-  html,body{margin:0;padding:0;background:#0B0B0F;height:100%;overflow:hidden;}
-  body{font-family:'Manrope',system-ui,sans-serif;color:#F4F4F6;-webkit-font-smoothing:antialiased;}
+  html,body{margin:0;padding:0;background:#0A0A0B;height:100%;overflow:hidden;}
+  /* Interface : Inter (auto-hébergée, cf. main.tsx), chiffres tabulaires, rendu net. */
+  body{font-family:'Inter Variable','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:13px;color:#EDEDEF;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-feature-settings:'cv11','ss01','ss03';text-rendering:optimizeLegibility;}
+  code,kbd,pre{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;}
   #root{height:100%;}
-  button,input{font-family:inherit;}
-  ::selection{background:rgba(139,92,246,0.35);}
+  button,input,select,textarea{font-family:inherit;font-feature-settings:inherit;}
+  ::selection{background:rgba(139,124,246,0.32);}
+  :focus-visible{outline:2px solid rgba(139,124,246,0.65);outline-offset:1px;border-radius:6px;}
+  input:focus,textarea:focus,select:focus{border-color:rgba(255,255,255,0.22)!important;}
+  input::placeholder,textarea::placeholder{color:#5A5A63;}
   *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.14) transparent;}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.11);border-radius:99px;border:3px solid transparent;background-clip:padding-box}
@@ -25,6 +31,7 @@
   @keyframes aSpin{to{transform:rotate(360deg)}}
   @keyframes aBeat{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
   @keyframes aPop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+  @keyframes aFade{from{opacity:0}to{opacity:1}}
   /* ── Blowsome premium ──────────────────────────────────────────────── */
   @keyframes bRise{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
   @keyframes bShine{to{background-position:200% center}}

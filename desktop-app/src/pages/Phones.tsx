@@ -64,7 +64,7 @@ function Check({ on, mid, onClick }: { on: boolean; mid?: boolean; onClick: () =
 }
 
 const TH: CSSProperties = {
-  fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B',
+  fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B',
 }
 
 function ctaKey(p: { geelark_id: string | null; id: string }): string { return `sf-story-link-${p.geelark_id ?? p.id}` }
@@ -219,8 +219,8 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
           <h1 style={{
-            margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 22,
-            fontWeight: 700, letterSpacing: '-0.025em', color: '#F4F4F6',
+            margin: 0, fontFamily: 'inherit', fontSize: 22,
+            fontWeight: 600, letterSpacing: '-0.025em', color: '#F4F4F6',
           }}>{title}</h1>
           <p style={{ margin: '6px 0 0', fontSize: 12.5, lineHeight: 1.55, color: '#71717A', maxWidth: 620 }}>{sub}</p>
         </div>
@@ -270,7 +270,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
               height: 30, padding: '0 8px', borderRadius: 8, cursor: 'pointer',
               border: `1px solid ${group !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`,
               background: '#101015', color: group !== 'Tous' ? theme.accentText : '#A1A1AA',
-              fontSize: 11.5, fontWeight: 700, outline: 'none',
+              fontSize: 11.5, fontWeight: 600, outline: 'none',
             }}
           >
             {groups.map(g => <option key={g} value={g} style={{ background: '#16161C', color: '#E4E4E7' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
@@ -289,7 +289,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
                   padding: '0 9px', border: 'none', borderRadius: 6, cursor: 'pointer',
                   background: on ? `rgba(${theme.tone},0.16)` : 'transparent',
                   color: on ? theme.accentText : '#71717A',
-                  fontSize: 11, fontWeight: 700, transition: 'all .14s ease',
+                  fontSize: 11, fontWeight: 600, transition: 'all .14s ease',
                 }}>
                   {f.l}
                   <span style={{ opacity: 0.55, fontFamily: "'JetBrains Mono',monospace", fontSize: 10 }}>{f.n}</span>
@@ -368,7 +368,7 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         width: 24, height: 24, borderRadius: 6, flexShrink: 0,
                         background: 'linear-gradient(140deg,#3F3F46,#27272A)',
-                        border: '1px solid rgba(255,255,255,0.07)', fontSize: 10, fontWeight: 800, color: '#D4D4D8',
+                        border: '1px solid rgba(255,255,255,0.07)', fontSize: 10, fontWeight: 600, color: '#D4D4D8',
                       }}>{(p.phone_name || p.ig_username || '?').charAt(0).toUpperCase()}</span>
                     )}
                     <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
@@ -413,8 +413,8 @@ export default function Phones({ theme, infra, user, org, onNavigate }: {
           animation: 'aPop .22s cubic-bezier(0.16,1,0.3,1) both',
         }}>
           <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: theme.accentText }}>{sel.size}</span>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A1A1AA' }}>sélectionné{sel.size > 1 ? 's' : ''}</span>
+            <span style={{ fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: theme.accentText }}>{sel.size}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#A1A1AA' }}>sélectionné{sel.size > 1 ? 's' : ''}</span>
           </span>
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           <Btn label="Publier" theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
@@ -511,7 +511,7 @@ function PhoneSettings({ theme, phone, groups, onClose, onSaved }: {
     setSaving(false); onSaved()
   }
 
-  const lbl: CSSProperties = { fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.09)', color: '#F4F4F6', fontSize: 12.5, outline: 'none' }
 
   return (
@@ -555,7 +555,7 @@ function GroupAssign({ theme, count, groups, onClose, onApply }: {
         <Btn theme={theme} tone="quiet" label="Annuler" onClick={onClose} />
         <Btn theme={theme} tone="primary" label="Appliquer" onClick={() => onApply(name.trim())} />
       </>}>
-      <label style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }}>Nom du groupe</label>
+      <label style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6, display: 'block' }}>Nom du groupe</label>
       <input value={name} onChange={e => setName(e.target.value)} placeholder="ex. Luna-Posting (vide = retirer du groupe)" list="grp-list" style={inp} autoFocus />
       <datalist id="grp-list">{groups.map(g => <option key={g} value={g} />)}</datalist>
     </Modal>

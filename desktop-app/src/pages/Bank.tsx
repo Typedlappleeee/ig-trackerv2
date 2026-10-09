@@ -142,7 +142,7 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
       {fresh && (
         <span style={{
           position: 'absolute', top: 6, left: 6, padding: '2px 6px', borderRadius: 4,
-          background: 'rgba(16,185,129,0.9)', color: '#04140C', fontSize: 8, fontWeight: 800, letterSpacing: '0.05em',
+          background: 'rgba(16,185,129,0.9)', color: '#04140C', fontSize: 8, fontWeight: 600, letterSpacing: '0.05em',
         }}>NEUF</span>
       )}
 
@@ -665,7 +665,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 10px',
         border: 'none', borderRadius: 6, cursor: 'pointer',
         background: on ? `rgba(${theme.tone},0.16)` : 'transparent',
-        color: on ? theme.accentText : '#71717A', fontSize: 11, fontWeight: 700, transition: 'all .14s ease',
+        color: on ? theme.accentText : '#71717A', fontSize: 11, fontWeight: 600, transition: 'all .14s ease',
       }}>{children}</button>
     )
   }
@@ -687,7 +687,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         <div onClick={() => setShowTrash(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px,96vw)', maxHeight: '82vh', overflowY: 'auto', borderRadius: 16, background: theme.panelBg, border: `1px solid ${theme.panelEdge}`, padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <span style={{ fontSize: 16, fontWeight: 800, color: theme.accentText }}>🗑 Corbeille ({trash.length})</span>
+              <span style={{ fontSize: 16, fontWeight: 600, color: theme.accentText }}>🗑 Corbeille ({trash.length})</span>
               <button onClick={() => setShowTrash(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: theme.accentText, fontSize: 20, cursor: 'pointer' }}>×</button>
             </div>
             <p style={{ margin: '0 0 12px', fontSize: 12, opacity: 0.7 }}>Médias supprimés — restaurables 7 jours puis purgés définitivement.</p>
@@ -718,7 +718,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         }}>
           <div style={{ textAlign: 'center', color: '#F4F4F6' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, color: theme.accentText }}><Icon d="M12 3v12|M7 10l5 5 5-5|M4 21h16" size={34} /></div>
-            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 17, fontWeight: 700 }}>Dépose pour importer</div>
+            <div style={{ fontFamily: 'inherit', fontSize: 17, fontWeight: 600 }}>Dépose pour importer</div>
             <div style={{ fontSize: 12.5, color: '#A1A1AA', marginTop: 4 }}>Vidéos et images{folder !== 'Tous' && folder !== 'Jamais publiées' ? ` → dossier « ${folder} »` : ''}</div>
           </div>
         </div>
@@ -727,8 +727,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
           <h1 style={{
-            margin: 0, fontFamily: "'Space Grotesk',sans-serif", fontSize: 22,
-            fontWeight: 700, letterSpacing: '-0.025em', color: '#F4F4F6',
+            margin: 0, fontFamily: 'inherit', fontSize: 22,
+            fontWeight: 600, letterSpacing: '-0.025em', color: '#F4F4F6',
           }}>Banque de contenu</h1>
           <p style={{ margin: '6px 0 0', fontSize: 12.5, lineHeight: 1.55, color: '#71717A', maxWidth: 620 }}>
             {loading
@@ -753,7 +753,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             display: 'flex', alignItems: 'center', gap: 12, padding: '13px 15px',
             borderBottom: '1px solid rgba(255,255,255,0.05)',
           }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6' }}>Dossiers</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#F4F4F6' }}>Dossiers</span>
             <span style={{ marginLeft: 'auto' }}>
               <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Nouveau dossier" onClick={() => { setFolderName(''); setFolderModal(true) }} />
             </span>
@@ -839,7 +839,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               const allSel = shown.every(m => sel.has(m.id))
               return (
                 <button onClick={() => setSel(allSel ? new Set() : new Set(shown.map(m => m.id)))}
-                  style={{ marginLeft: 'auto', height: 28, padding: '0 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${allSel ? theme.selEdge : 'rgba(255,255,255,0.09)'}`, background: allSel ? `rgba(${theme.tone},0.14)` : 'rgba(255,255,255,0.03)', color: allSel ? theme.accentText : '#D4D4D8', fontSize: 11.5, fontWeight: 700 }}>
+                  style={{ marginLeft: 'auto', height: 28, padding: '0 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${allSel ? theme.selEdge : 'rgba(255,255,255,0.09)'}`, background: allSel ? `rgba(${theme.tone},0.14)` : 'rgba(255,255,255,0.03)', color: allSel ? theme.accentText : '#D4D4D8', fontSize: 11.5, fontWeight: 600 }}>
                   {allSel ? 'Tout désélectionner' : `Tout sélectionner (${shown.length})`}
                 </button>
               )
@@ -864,11 +864,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   {captions.map(c => (
                     <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 10, background: theme.panelBg, border: `1px solid ${theme.panelEdge}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'Légende'}</span>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'Légende'}</span>
                         <button onClick={() => deleteCaption(c.id)} title="Supprimer" style={{ marginLeft: 'auto', display: 'flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={13} /></button>
                       </div>
                       <div style={{ fontSize: 11.5, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap', maxHeight: 110, overflow: 'hidden' }}>{c.content}</div>
-                      <button onClick={() => { navigator.clipboard?.writeText(c.content); setNotice('Légende copiée.') }} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#A1A1AA', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Copier</button>
+                      <button onClick={() => { navigator.clipboard?.writeText(c.content); setNotice('Légende copiée.') }} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#A1A1AA', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Copier</button>
                     </div>
                   ))}
                 </div>
@@ -921,8 +921,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           animation: 'aPop .22s cubic-bezier(0.16,1,0.3,1) both',
         }}>
           <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: theme.accentText }}>{sel.size}</span>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A1A1AA' }}>sélectionnée{sel.size > 1 ? 's' : ''}</span>
+            <span style={{ fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: theme.accentText }}>{sel.size}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#A1A1AA' }}>sélectionnée{sel.size > 1 ? 's' : ''}</span>
           </span>
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
           <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
@@ -1068,11 +1068,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Nom</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Nom</span>
               <input value={renameVal} onChange={e => setRenameVal(e.target.value)} style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>Tags (séparés par des virgules)</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>Tags (séparés par des virgules)</span>
               <input value={tagsVal} onChange={e => setTagsVal(e.target.value)} placeholder="motivation, produit…" style={{ height: 34, padding: '0 11px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: '#E4E4E7', fontSize: 12.5, outline: 'none' }} />
             </label>
           </div>

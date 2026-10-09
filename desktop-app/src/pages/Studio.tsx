@@ -213,7 +213,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(52,211,153,0.3)'; e.currentTarget.style.transform = 'none' }}>
             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: 'rgba(52,211,153,0.16)', border: '1px solid rgba(52,211,153,0.3)', color: '#34D399' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={19} /></span>
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F6' }}>Auto-contenu</span><Chip text="Recommandé" tone="ok" /></span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 15, fontWeight: 600, color: '#F4F4F6' }}>Auto-contenu</span><Chip text="Recommandé" tone="ok" /></span>
               <span style={{ fontSize: 12, lineHeight: 1.55, color: '#9C99AA' }}>Une source → X variantes uniques en un clic : légende (pool + style), coupe, micro-vitesse, mode Tendance et spoof (device/GPS).</span>
             </span>
             <span style={{ display: 'flex', color: '#34D399' }}><Icon d="M9 18l6-6-6-6" size={17} /></span>
@@ -231,7 +231,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
                 <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, background: `rgba(${t.tone},0.12)`, border: `1px solid rgba(${t.tone},0.24)`, color: `rgb(${t.tone})` }}>
                   <Icon d={t.i} size={16} />
                 </span>
-                <span style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F6' }}>{t.t}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#F4F4F6' }}>{t.t}</span>
                 <span style={{ marginLeft: 'auto' }}><Chip text={t.tag} tone="mute" /></span>
               </span>
               <span style={{ fontSize: 12, lineHeight: 1.6, color: '#71717A' }}>{t.d}</span>
@@ -342,7 +342,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
                   {!capManual ? (
                     <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                       {(['top', 'center', 'bottom'] as const).map(p => (
-                        <button key={p} onClick={() => setCapPos(p)} style={{ flex: 1, height: 30, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: capPos === p ? theme.accentBtn : 'transparent', color: capPos === p ? '#fff' : '#A1A1AA' }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
+                        <button key={p} onClick={() => setCapPos(p)} style={{ flex: 1, height: 30, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, background: capPos === p ? theme.accentBtn : 'transparent', color: capPos === p ? '#fff' : '#A1A1AA' }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
                       ))}
                     </div>
                   ) : (
@@ -369,7 +369,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
                   {overlayImgs.length > 1 && (
                     <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', marginLeft: 'auto' }}>
                       {(['seq', 'random'] as const).map(mm => (
-                        <button key={mm} onClick={() => setOvMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: ovMode === mm ? theme.accentBtn : 'transparent', color: ovMode === mm ? '#fff' : '#71717A' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                        <button key={mm} onClick={() => setOvMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: ovMode === mm ? theme.accentBtn : 'transparent', color: ovMode === mm ? '#fff' : '#71717A' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
                       ))}
                     </span>
                   )}
@@ -390,7 +390,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
           <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 11 }}>
             {([[isImgTool ? 'Photos sources' : 'Vidéos sources', String(nSrc)], ['Sortie', output], ['Coût', 'Gratuit']] as [string, string][]).map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: k === 'Coût' ? '#34D399' : '#E4E4E7' }}>{v}</span>
+                <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 600, color: k === 'Coût' ? '#34D399' : '#E4E4E7' }}>{v}</span>
               </div>
             ))}
 
@@ -418,11 +418,11 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
 
             {results.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#34D399' }}>{results.length} sortie(s) · enregistrées dans la banque</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#34D399' }}>{results.length} sortie(s) · enregistrées dans la banque</span>
                 {results.map((r, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
-                    <a href={r.url} download={`${r.title}.${r.ext ?? 'mp4'}`} style={{ fontSize: 11, fontWeight: 700, color: theme.accentText, textDecoration: 'none' }}>Télécharger</a>
+                    <a href={r.url} download={`${r.title}.${r.ext ?? 'mp4'}`} style={{ fontSize: 11, fontWeight: 600, color: theme.accentText, textDecoration: 'none' }}>Télécharger</a>
                   </div>
                 ))}
               </div>

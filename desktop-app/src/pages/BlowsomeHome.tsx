@@ -12,7 +12,7 @@ const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
 const GOLD = '#E9C46A'
 const INK = '#ECE9F5'
 const MUTED = '#A79FBD'
-const SERIF = "'Space Grotesk',sans-serif"
+const SERIF = 'inherit'
 
 function Card({ children, style, className }: { children: ReactNode; style?: CSSProperties; className?: string }) {
   return (
@@ -28,8 +28,8 @@ function Stat({ label, value, accent }: { label: string; value: ReactNode; accen
   return (
     <Card className="blow-card" style={{ padding: 18, position: 'relative', overflow: 'hidden' }}>
       <div aria-hidden style={{ position: 'absolute', top: -30, right: -20, width: 120, height: 120, borderRadius: '50%', background: `radial-gradient(circle, ${accent}44, transparent 68%)`, opacity: 0.5 }} />
-      <div style={{ position: 'relative', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: MUTED }}>{label}</div>
-      <div style={{ position: 'relative', marginTop: 8, fontFamily: SERIF, fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', color: INK, lineHeight: 1 }}>{value}</div>
+      <div style={{ position: 'relative', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: MUTED }}>{label}</div>
+      <div style={{ position: 'relative', marginTop: 8, fontFamily: SERIF, fontSize: 30, fontWeight: 600, letterSpacing: '-0.03em', color: INK, lineHeight: 1 }}>{value}</div>
     </Card>
   )
 }
@@ -60,17 +60,17 @@ export default function BlowsomeHome({ user, org, onNavigate }: { user: User; or
         <div aria-hidden className="blow-float" style={{ position: 'absolute', top: -60, right: -30, width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.28), transparent 66%)' }} />
         <span aria-hidden style={{ position: 'absolute', top: 0, left: 28, right: 28, height: 1, background: `linear-gradient(90deg, transparent, ${GOLD}73, transparent)` }} />
         <div style={{ position: 'relative' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.4)', color: '#D8B4FE', fontSize: 11, fontWeight: 800 }}>✦ Espace Blowsome</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.4)', color: '#D8B4FE', fontSize: 11, fontWeight: 600 }}>✦ Espace Blowsome</span>
           <h1 style={{ margin: '16px 0 0', display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '.28em', fontSize: 'clamp(30px,4vw,44px)', lineHeight: 1, letterSpacing: '-0.035em' }}>
-            <span style={{ fontFamily: SERIF, fontWeight: 700, color: INK }}>Bonjour,</span>
+            <span style={{ fontFamily: SERIF, fontWeight: 600, color: INK }}>Bonjour,</span>
             <span className="blow-shine" style={{ fontFamily: 'Georgia, serif', fontWeight: 400, textTransform: 'capitalize', backgroundImage: GRAD, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{firstName}</span>
           </h1>
           <p style={{ margin: '14px 0 0', fontSize: 14.5, lineHeight: 1.6, color: MUTED, maxWidth: 520 }}>
             Ton cockpit VIP — pilote tes flottes premium et retrouve toute ta banque, sans quitter Blowsome.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-            <button className="blow-cta" onClick={() => onNavigate?.('blowContent')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 18px', borderRadius: 11, border: 'none', cursor: 'pointer', background: GRAD, color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 12px 30px -12px rgba(168,85,247,0.8)' }}>Publier maintenant</button>
-            <button onClick={() => onNavigate?.('blowParc')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px', borderRadius: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.2)', color: '#D8B4FE', fontSize: 13, fontWeight: 700 }}>Voir le parc VIP</button>
+            <button className="blow-cta" onClick={() => onNavigate?.('blowContent')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 18px', borderRadius: 11, border: 'none', cursor: 'pointer', background: GRAD, color: '#fff', fontSize: 13, fontWeight: 600, boxShadow: '0 12px 30px -12px rgba(168,85,247,0.8)' }}>Publier maintenant</button>
+            <button onClick={() => onNavigate?.('blowParc')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px', borderRadius: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.2)', color: '#D8B4FE', fontSize: 13, fontWeight: 600 }}>Voir le parc VIP</button>
           </div>
         </div>
       </Card>
@@ -87,7 +87,7 @@ export default function BlowsomeHome({ user, org, onNavigate }: { user: User; or
       </div>
 
       {/* Accès rapide — tout cliquable */}
-      <div style={{ fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 12 }}>Accès rapide</div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: INK, marginBottom: 12 }}>Accès rapide</div>
       <div className="blow-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
         {[
           { t: 'Posting', d: 'Publie sur tes comptes (Reels, Story, cross-post).', go: 'publish', i: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
@@ -101,7 +101,7 @@ export default function BlowsomeHome({ user, org, onNavigate }: { user: User; or
             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.28)', color: '#D8B4FE', marginBottom: 11 }}>
               <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">{x.i.split('|').map((d, k) => <path key={k} d={d} />)}</svg>
             </span>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>{x.t}</div>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: INK, marginBottom: 4 }}>{x.t}</div>
             <div style={{ fontSize: 12, lineHeight: 1.5, color: MUTED }}>{x.d}</div>
           </button>
         ))}

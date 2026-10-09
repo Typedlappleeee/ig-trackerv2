@@ -201,10 +201,10 @@ function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInp
           <span style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, height: 46, borderRadius: 12, flexShrink: 0,
             background: 'linear-gradient(140deg,#3F3F46,#27272A)', border: '1px solid rgba(255,255,255,0.08)',
-            color: '#E4E4E7', fontFamily: "'Space Grotesk',sans-serif", fontSize: 17, fontWeight: 700,
+            color: '#E4E4E7', fontFamily: 'inherit', fontSize: 17, fontWeight: 600,
           }}>{initial}</span>
           <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#F4F4F6' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#F4F4F6' }}>
               {displayName?.trim() || <span style={{ fontStyle: 'italic', color: '#71717A' }}>Aucun nom</span>}
             </span>
             <span style={{ fontSize: 12, color: '#71717A' }}>{user.email ?? '—'}</span>
@@ -289,7 +289,7 @@ function OrgTab({ theme, org, balance, canManage }: {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ display: 'flex', color: theme.accentText }}><Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={16} /></span>
             <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>Espace personnel</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>Espace personnel</span>
               <span style={{ fontSize: 11.5, color: '#71717A' }}>Tu travailles hors organisation. Tes appareils et ton contenu sont privés.</span>
             </span>
           </div>
@@ -297,7 +297,7 @@ function OrgTab({ theme, org, balance, canManage }: {
           {/* Créer son organisation : l'owner devient le « chef » — ses crédits sont
               partagés, et toute dépense d'un membre débite le solde du chef. */}
           <div style={{ padding: '14px', borderRadius: 10, background: `rgba(${theme.tone},0.06)`, border: `1px solid rgba(${theme.tone},0.2)` }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6', marginBottom: 4 }}>Créer une organisation</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#F4F4F6', marginBottom: 4 }}>Créer une organisation</div>
             <div style={{ fontSize: 11.5, color: '#A1A1AA', lineHeight: 1.55, marginBottom: 10 }}>
               Invite des membres et pilote leurs comptes. Les crédits sont ceux du chef d’orga (toi) : chaque publication d’un membre débite <b>ton</b> solde.
             </div>
@@ -329,7 +329,7 @@ function OrgTab({ theme, org, balance, canManage }: {
             {role ? <Chip text={ROLE_LABEL[role]} tone={ROLE_TONE[role]} /> : DASH}
           </Field>
           <Field label="Crédits de l’organisation">
-            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#FBBF24' }}>
+            <span style={{ fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: '#FBBF24' }}>
               {balance === null ? '…' : fmtNumber(balance)}
             </span>
           </Field>
@@ -397,7 +397,7 @@ function InviteBox({ theme, orgId, onReload }: { theme: Theme; orgId: string; on
       <PanelHead title="Inviter dans l’organisation" sub="Ajoute un membre par son email de compte ScaleFlow" />
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '15px 16px', flexWrap: 'wrap' }}>
         <span style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#71717A' }}>Adresse e-mail</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#71717A' }}>Adresse e-mail</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 11px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
             <span style={{ display: 'flex', color: '#52525B' }}><Icon d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z|M22 6l-10 7L2 6" size={13} /></span>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="prenom@agence.fr"
@@ -450,7 +450,7 @@ function MembersTab({ theme, org, members, canManage, currentUserId, onReload }:
                   <span style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
                     <span style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 99, flexShrink: 0,
-                      background: `rgba(${av},0.16)`, border: `1px solid rgba(${av},0.3)`, color: `rgb(${av})`, fontSize: 11, fontWeight: 700,
+                      background: `rgba(${av},0.16)`, border: `1px solid rgba(${av},0.3)`, color: `rgb(${av})`, fontSize: 11, fontWeight: 600,
                     }}>{initialsFrom(m.display_name, m.email)}</span>
                     <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -495,7 +495,7 @@ function MembersTab({ theme, org, members, canManage, currentUserId, onReload }:
                   <span style={{ width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 7, height: 7, borderRadius: 99, background: `rgb(${tone})` }} />
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>{ROLE_LABEL[r.r]}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>{ROLE_LABEL[r.r]}</span>
                     </span>
                     <span style={{ fontSize: 11, lineHeight: 1.45, color: '#52525B' }}>{r.d}</span>
                   </span>
@@ -543,13 +543,13 @@ function BillingTab({ theme, user, org, balance, canManage, onRedeemed }: {
         background: `linear-gradient(120deg, rgba(${theme.tone},0.1), ${theme.panelBg})`, border: `1px solid rgba(${theme.tone},0.3)`,
       }}>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: theme.accentText }}>Plan actuel</span>
-          <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: '#F4F4F6' }}>{planLabel}</span>
+          <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: theme.accentText }}>Plan actuel</span>
+          <span style={{ fontFamily: 'inherit', fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', color: '#F4F4F6' }}>{planLabel}</span>
         </span>
         <span style={{ width: 1, height: 52, background: 'rgba(255,255,255,0.08)' }} />
         <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52525B' }}>Crédits disponibles</span>
-          <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 22, fontWeight: 700, color: '#FBBF24', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52525B' }}>Crédits disponibles</span>
+          <span style={{ fontFamily: 'inherit', fontSize: 22, fontWeight: 600, color: '#FBBF24', fontVariantNumeric: 'tabular-nums' }}>
             {balance === null ? '…' : fmtNumber(balance)}
           </span>
         </span>
@@ -642,7 +642,7 @@ function InfraTab({ theme, user, org, canManage }: { theme: Theme; user: User; o
     color: '#F4F4F6', fontSize: 12.5, fontFamily: "'JetBrains Mono',monospace", outline: 'none',
   }
   const eye = (on: boolean, set: (v: boolean) => void) => (
-    <button onClick={() => set(!on)} style={{ flexShrink: 0, height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#A1A1AA', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{on ? 'Cacher' : 'Voir'}</button>
+    <button onClick={() => set(!on)} style={{ flexShrink: 0, height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#A1A1AA', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{on ? 'Cacher' : 'Voir'}</button>
   )
 
   return (

@@ -66,7 +66,7 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
 
   const seg = (on: boolean): CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 14px', border: 'none', borderRadius: 6, cursor: 'pointer',
-    background: on ? `rgba(${theme.tone},0.16)` : 'transparent', color: on ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 700,
+    background: on ? `rgba(${theme.tone},0.16)` : 'transparent', color: on ? theme.accentText : '#71717A', fontSize: 12, fontWeight: 600,
   })
 
   const Star = ({ k, big }: { k: string; big?: boolean }) => {
@@ -98,15 +98,15 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: big ? 40 : 30, height: big ? 40 : 30, borderRadius: big ? 11 : 8, flexShrink: 0, background: `rgba(${f.tone},0.14)`, border: `1px solid rgba(${f.tone},0.26)`, color: `rgb(${f.tone})` }}><Icon d={f.i} size={big ? 18 : 15} /></span>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: big ? 4 : 7 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: big ? 14.5 : 13, fontWeight: 700, color: '#F4F4F6' }}>{f.t}</span>
+          <span style={{ fontSize: big ? 14.5 : 13, fontWeight: 600, color: '#F4F4F6' }}>{f.t}</span>
           {f.beta && <Chip text="Beta" tone="warn" />}
         </span>
         <span style={{ fontSize: big ? 12 : 11.5, lineHeight: 1.55, color: '#71717A' }}>{f.d}</span>
-        {!big && <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', paddingTop: 9, borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 10.5, fontWeight: 700, color: '#52525B' }}>{f.p}<span style={{ opacity: 0.4 }}>·</span>{f.n} étapes</span>}
+        {!big && <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', paddingTop: 9, borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 10.5, fontWeight: 600, color: '#52525B' }}>{f.p}<span style={{ opacity: 0.4 }}>·</span>{f.n} étapes</span>}
       </span>
       <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
         {big && <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, marginRight: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA' }}>{f.p}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#A1A1AA' }}>{f.p}</span>
           <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#3F3F46' }}>{f.n} étapes</span>
         </span>}
         <Star k={f.k} big={big} />
@@ -122,7 +122,7 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
     <div key={label} style={{ marginBottom: 18 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
         {label === 'Recommandés' && <span style={{ color: '#FBBF24', display: 'flex', alignSelf: 'center' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={13} /></span>}
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: label === 'Recommandés' ? '#FBBF24' : '#52525B' }}>{label}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: label === 'Recommandés' ? '#FBBF24' : '#52525B' }}>{label}</span>
         {hint && <span style={{ fontSize: 11, color: '#3F3F46' }}>{hint}</span>}
         <span style={{ marginLeft: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#3F3F46' }}>{items.length}</span>
       </div>

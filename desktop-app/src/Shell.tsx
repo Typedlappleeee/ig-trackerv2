@@ -140,7 +140,14 @@ export default function Shell({
   orgs: { id: string; name: string }[]; currentOrgId: string | null; onSwitchOrg: (id: string | null) => void
   onSignOut: () => void; children: ReactNode
 }) {
-  const [navOpen, setNavOpen] = useState(true)
+  // Petits écrans : barre latérale repliée et marges réduites.
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 860)
+  const [navOpen, setNavOpen] = useState(() => !(typeof window !== 'undefined' && window.innerWidth < 860))
+  useEffect(() => {
+    const on = () => setNarrow(window.innerWidth < 860)
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
   const [infraOpen, setInfraOpen] = useState(false)
   const [userMenu, setUserMenu] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -166,7 +173,7 @@ export default function Shell({
   ]
 
   const path = TITLES[page] ?? ['Accueil']
-  const navW = navOpen ? 212 : 56
+  const navW = navOpen ? 224 : 56
   const initial = (userName || 'U').charAt(0).toUpperCase()
 
   return (
@@ -181,17 +188,17 @@ export default function Shell({
         <span aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 1, background: T.rim, pointerEvents: 'none' }} />
 
         {/* logo */}
-        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, height: 52, padding: '0 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(145deg,#A78BFA,#7C3AED)', flexShrink: 0 }}>
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, height: 48, padding: '0 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, width: 28, height: 28, borderRadius: 8, background: '#7462E8', flexShrink: 0 }}>
             <span style={{ width: 12, height: 2.5, borderRadius: 99, background: '#fff', transform: 'skewX(-14deg)' }} />
             <span style={{ width: 12, height: 2.5, borderRadius: 99, background: '#fff', transform: 'skewX(14deg)' }} />
           </span>
           {navOpen && (
             <>
-              <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-                <span style={{ color: '#fff' }}>scale</span><span style={{ color: '#A78BFA' }}>flow</span>
+              <span style={{ fontFamily: 'inherit', fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                <span style={{ color: '#EDEDEF' }}>scale</span><span style={{ color: '#8B8B94' }}>flow</span>
               </span>
-              <span style={{ marginLeft: 'auto', padding: '2px 7px', borderRadius: 5, background: 'rgba(139,92,246,0.14)', color: '#C4B5FD', fontSize: 9, fontWeight: 800, letterSpacing: '0.06em' }}>PRO</span>
+              <span style={{ marginLeft: 'auto', padding: '2px 7px', borderRadius: 5, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA', fontSize: 10, fontWeight: 500, letterSpacing: '0.02em' }}>PRO</span>
             </>
           )}
         </div>
@@ -199,21 +206,21 @@ export default function Shell({
         {/* sélecteur d'infrastructure */}
         <div style={{ flexShrink: 0, position: 'relative', padding: '10px 10px 4px' }}>
           <button onClick={() => setInfraOpen(o => !o)} style={{
-            display: 'flex', alignItems: 'center', gap: 9, width: '100%', height: navOpen ? 46 : 38,
-            padding: navOpen ? '0 9px' : '0', border: `1px solid ${infraOpen ? `rgba(${inf.tone},0.5)` : `rgba(${inf.tone},0.24)`}`,
-            borderRadius: 9, background: `rgba(${inf.tone},0.07)`, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box', transition: 'all 0.16s ease',
+            display: 'flex', alignItems: 'center', gap: 9, width: '100%', height: navOpen ? 40 : 36,
+            padding: navOpen ? '0 8px' : '0', justifyContent: navOpen ? 'flex-start' : 'center', border: `1px solid ${infraOpen ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius: 7, background: '#111113', cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box', transition: 'border-color .12s ease',
           }}>
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 7, background: `rgba(${inf.tone},0.14)`, border: `1px solid rgba(${inf.tone},0.28)`, color: inf.color, flexShrink: 0 }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 5, background: `rgba(${inf.tone},0.12)`, color: inf.color, flexShrink: 0 }}>
               <Icon d={inf.icon} size={13} />
             </span>
             {navOpen && (
               <>
                 <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#52525B' }}>Infrastructure</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: inf.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inf.name}</span>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: '#71717A' }}>Infrastructure</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inf.name}</span>
                 </span>
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 700, color: inf.color }}>{inf.short}</span>
+                  <span style={{ display: 'flex', color: '#71717A' }}><Icon d="M7 15l5 5 5-5|M7 9l5-5 5 5" size={13} /></span>
                 </span>
               </>
             )}
@@ -222,7 +229,7 @@ export default function Shell({
           {infraOpen && (
             <div style={{
               position: 'absolute', top: 'calc(100% - 2px)', left: 10, right: 10, zIndex: 40, borderRadius: 10, overflow: 'hidden',
-              background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)',
+              background: '#141416', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)',
               animation: 'aIn 0.2s cubic-bezier(0.16,1,0.3,1) both',
             }}>
               {Object.values(INFRAS).filter(o => (o.k !== 'blowsome' && o.k !== 'cloud' && o.k !== 'iremotech') || canBlowsome || isAdmin).map(o => {
@@ -240,8 +247,8 @@ export default function Shell({
                     </span>
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: on ? o.color : '#E4E4E7' }}>{o.name}</span>
-                        {o.beta && <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(6,182,212,0.16)', color: '#22D3EE', fontSize: 8, fontWeight: 800, letterSpacing: '0.05em' }}>BETA</span>}
+                        <span style={{ fontSize: 12, fontWeight: 600, color: on ? o.color : '#E4E4E7' }}>{o.name}</span>
+                        {o.beta && <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(6,182,212,0.16)', color: '#22D3EE', fontSize: 8, fontWeight: 600, letterSpacing: '0.05em' }}>BETA</span>}
                       </span>
                       <span style={{ fontSize: 10.5, color: '#52525B' }}>{o.desc}</span>
                       <span style={{ display: 'flex', gap: 10, marginTop: 2, fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: '#3F3F46' }}>
@@ -260,9 +267,9 @@ export default function Shell({
         {navOpen && (
           <div style={{ flexShrink: 0, padding: '6px 10px' }}>
             <button onClick={() => { setPaletteOpen(true); setPaletteQ('') }} style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 32, padding: '0 10px',
-              border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, background: 'rgba(255,255,255,0.02)', color: '#71717A',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box', transition: 'all 0.16s ease',
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 30, padding: '0 8px 0 10px',
+              border: '1px solid rgba(255,255,255,0.07)', borderRadius: 7, background: '#111113', color: '#71717A',
+              fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box', transition: 'all 0.16s ease',
             }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.color = '#A1A1AA' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#71717A' }}>
@@ -281,25 +288,24 @@ export default function Shell({
           {NAV.map((sec, si) => (
             <div key={si} style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
               {sec.g && navOpen ? (
-                <div style={{ padding: '11px 10px 5px', fontSize: 9.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#3F3F46' }}>{sec.g}</div>
+                <div style={{ padding: '14px 10px 4px', fontSize: 11.5, fontWeight: 500, color: '#5A5A63' }}>{sec.g}</div>
               ) : sec.g ? <div style={{ height: 11 }} /> : null}
               {sec.items.map(it => {
                 const on = page === it.k
                 return (
                   <button key={it.k} onClick={() => setPage(it.k)} title={it.l} style={{
-                    display: 'flex', alignItems: 'center', gap: 9, width: '100%', flexShrink: 0, height: 32,
-                    padding: navOpen ? '0 10px' : '0', border: 'none', borderRadius: 8, cursor: 'pointer', boxSizing: 'border-box',
+                    display: 'flex', alignItems: 'center', gap: 9, width: '100%', flexShrink: 0, height: 30,
+                    padding: navOpen ? '0 9px' : '0', border: 'none', borderRadius: 6, cursor: 'pointer', boxSizing: 'border-box',
                     justifyContent: navOpen ? 'flex-start' : 'center',
-                    background: on ? `rgba(${T.tone},0.14)` : 'transparent', color: on ? T.accentText : '#A1A1AA',
-                    fontSize: 12.5, fontWeight: on ? 700 : 600, transition: 'all .14s ease', position: 'relative',
+                    background: on ? 'rgba(255,255,255,0.07)' : 'transparent', color: on ? '#EDEDEF' : '#A1A1AA',
+                    fontSize: 13, fontWeight: 500, transition: 'background .12s ease, color .12s ease', position: 'relative',
                   }}
                     onMouseEnter={e => { if (!on) { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#E4E4E7' } }}
                     onMouseLeave={e => { if (!on) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' } }}>
-                    {on && <span style={{ position: 'absolute', left: -10, top: 7, bottom: 7, width: 2, borderRadius: 99, background: T.accent }} />}
-                    <span style={{ display: 'flex', flexShrink: 0 }}><Icon d={it.i} size={15} /></span>
+                    <span style={{ display: 'flex', flexShrink: 0, color: on ? T.accentText : '#71717A' }}><Icon d={it.i} size={15} /></span>
                     {navOpen && <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.l}</span>}
-                    {navOpen && it.soon && <span style={{ padding: '1px 6px', borderRadius: 99, fontSize: 9.5, fontWeight: 800, color: T.accentText, background: `rgba(${T.tone},0.14)`, border: `1px solid rgba(${T.tone},0.28)` }}>{it.soon}</span>}
-                    {navOpen && it.n != null && <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: on ? 'rgba(196,181,253,0.7)' : '#3F3F46' }}>{fmtNumber(it.n)}</span>}
+                    {navOpen && it.soon && <span style={{ padding: '1px 6px', borderRadius: 5, fontSize: 10.5, fontWeight: 500, color: '#A1A1AA', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>{it.soon}</span>}
+                    {navOpen && it.n != null && <span style={{ fontSize: 11.5, fontVariantNumeric: 'tabular-nums', color: '#5A5A63' }}>{fmtNumber(it.n)}</span>}
                   </button>
                 )
               })}
@@ -313,24 +319,24 @@ export default function Shell({
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                  <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, fontWeight: 700, color: '#F4F4F6', fontVariantNumeric: 'tabular-nums' }}>{balance === null ? '…' : fmtNumber(balance)}</span>
-                  <span style={{ fontSize: 9.5, fontWeight: 700, color: '#52525B' }}>crédits</span>
+                  <span style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#F4F4F6', fontVariantNumeric: 'tabular-nums' }}>{balance === null ? '…' : fmtNumber(balance)}</span>
+                  <span style={{ fontSize: 9.5, fontWeight: 600, color: '#52525B' }}>crédits</span>
                 </span>
                 <span style={{ height: 2, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                  <span style={{ display: 'block', height: '100%', width: `${balance === null ? 0 : Math.min(100, Math.round((balance / 5000) * 100))}%`, borderRadius: 99, background: 'linear-gradient(90deg,#8B5CF6,#A78BFA)' }} />
+                  <span style={{ display: 'block', height: '100%', width: `${balance === null ? 0 : Math.min(100, Math.round((balance / 5000) * 100))}%`, borderRadius: 99, background: T.accent }} />
                 </span>
               </span>
-              <button onClick={() => setPage('settings')} title="Acheter des crédits" style={{ height: 22, padding: '0 8px', border: '1px solid rgba(139,92,246,0.28)', borderRadius: 6, background: 'rgba(139,92,246,0.1)', color: '#C4B5FD', fontSize: 10, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>＋</button>
+              <button onClick={() => setPage('settings')} title="Acheter des crédits" style={{ height: 22, padding: '0 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, background: '#161618', color: '#D4D4D8', fontSize: 11, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>＋</button>
             </div>
           )}
 
           {userMenu && navOpen && (
             <div style={{
               position: 'absolute', left: 10, right: 10, bottom: 'calc(100% - 4px)', zIndex: 40, borderRadius: 10, overflow: 'hidden',
-              background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)', animation: 'aIn 0.2s cubic-bezier(0.16,1,0.3,1) both',
+              background: '#141416', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)', animation: 'aIn 0.2s cubic-bezier(0.16,1,0.3,1) both',
             }}>
               {/* Organisations : espace perso + chaque orga. Clic = bascule. */}
-              <div style={{ padding: '9px 12px 5px', fontSize: 9.5, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#52525B' }}>Organisation</div>
+              <div style={{ padding: '9px 12px 5px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#52525B' }}>Organisation</div>
               <button onClick={() => { onSwitchOrg(null); setUserMenu(false) }} style={{ ...menuItemStyle, paddingTop: 8, paddingBottom: 8 }}>
                 <span style={{ color: currentOrgId === null ? T.accentText : '#52525B', display: 'flex' }}><Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={14} /></span>
                 <span style={{ flex: 1 }}>Espace perso</span>
@@ -358,12 +364,12 @@ export default function Shell({
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '5px 4px' }}>
             <button onClick={() => setUserMenu(m => !m)} aria-label="Menu utilisateur" style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 7,
-              background: 'linear-gradient(140deg,#3F3F46,#27272A)', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8',
-              fontSize: 10.5, fontWeight: 800, flexShrink: 0, cursor: 'pointer',
+              background: '#1C1C1F', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8',
+              fontSize: 10.5, fontWeight: 600, flexShrink: 0, cursor: 'pointer',
             }}>{initial}</button>
             {navOpen && (
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#E4E4E7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: '#E4E4E7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 9.5, fontWeight: 600, color: '#52525B', overflow: 'hidden' }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{orgName}</span>
                   {role && <><span style={{ flexShrink: 0, opacity: 0.5 }}>·</span><span style={{ flexShrink: 0, color: T.accentText }}>{role}</span></>}
@@ -385,12 +391,12 @@ export default function Shell({
       {/* ══════════ COLONNE PRINCIPALE ══════════ */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* topbar */}
-        <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, height: 52, padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: T.appBg, transition: 'background 0.4s ease' }}>
+        <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, height: 48, padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: T.appBg }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
             {path.map((l, i) => (
               <Fragment key={i}>
-                <span style={{ fontSize: 12.5, fontWeight: i === path.length - 1 ? 700 : 600, color: i === path.length - 1 ? '#F4F4F6' : '#71717A', whiteSpace: 'nowrap' }}>{l}</span>
-                {i < path.length - 1 && <span style={{ color: '#3F3F46', fontSize: 11 }}>/</span>}
+                <span style={{ fontSize: 13, fontWeight: 500, color: i === path.length - 1 ? '#EDEDEF' : '#71717A', whiteSpace: 'nowrap' }}>{l}</span>
+                {i < path.length - 1 && <span style={{ color: '#3F3F46', fontSize: 13 }}>/</span>}
               </Fragment>
             ))}
           </div>
@@ -400,34 +406,34 @@ export default function Shell({
             <UpdateChip theme={T} />
             {/* pastille de run (visuelle) */}
             <button onClick={() => setPage('activity')} style={{
-              position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 9, height: 28, padding: '0 12px',
-              border: `1px solid rgba(${inf.tone},0.28)`, borderRadius: 99, background: `rgba(${inf.tone},0.14)`, color: '#E4E4E7',
-              cursor: 'pointer', overflow: 'hidden', flexShrink: 0, transition: 'all 0.16s ease',
+              position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8, height: 28, padding: '0 10px',
+              border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, background: page === 'activity' ? 'rgba(255,255,255,0.07)' : 'transparent', color: '#D4D4D8',
+              cursor: 'pointer', overflow: 'hidden', flexShrink: 0, transition: 'background .12s ease',
             }}>
               <span style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 1.5, height: 10, flexShrink: 0, color: inf.color }}>
                 <span style={{ width: 2, height: 6, borderRadius: 99, background: 'currentColor', animation: 'aBeat 1.1s ease-in-out infinite' }} />
                 <span style={{ width: 2, height: 10, borderRadius: 99, background: 'currentColor', animation: 'aBeat 1.1s ease-in-out 0.16s infinite' }} />
                 <span style={{ width: 2, height: 4, borderRadius: 99, background: 'currentColor', animation: 'aBeat 1.1s ease-in-out 0.32s infinite' }} />
               </span>
-              <span style={{ position: 'relative', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap' }}>Activité</span>
+              <span style={{ position: 'relative', fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap' }}>Activité</span>
             </button>
             <span style={{ position: 'relative' }}>
-              <button onClick={() => setBellOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, border: `1px solid ${bellOpen ? `rgba(${T.tone},0.4)` : 'rgba(255,255,255,0.07)'}`, borderRadius: 8, background: bellOpen ? `rgba(${T.tone},0.1)` : 'transparent', color: bellOpen ? T.accentText : '#71717A', cursor: 'pointer', transition: 'all 0.16s ease' }}
+              <button onClick={() => setBellOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, background: bellOpen ? 'rgba(255,255,255,0.07)' : 'transparent', color: bellOpen ? '#EDEDEF' : '#8B8B94', cursor: 'pointer', transition: 'background .12s ease' }}
                 aria-label="Notifications">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
               </button>
               {bellOpen && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 260, zIndex: 50, borderRadius: 10, overflow: 'hidden', background: '#16161C', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 22px 52px -16px rgba(0,0,0,0.9)', animation: 'aIn 0.18s cubic-bezier(0.16,1,0.3,1) both' }}>
-                  <div style={{ padding: '11px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12, fontWeight: 700, color: '#E4E4E7' }}>Notifications</div>
+                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 260, zIndex: 50, borderRadius: 8, overflow: 'hidden', background: '#141416', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)', animation: 'aIn 0.18s cubic-bezier(0.16,1,0.3,1) both' }}>
+                  <div style={{ padding: '11px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12, fontWeight: 600, color: '#E4E4E7' }}>Notifications</div>
                   <div style={{ padding: '22px 13px', textAlign: 'center', color: '#52525B', fontSize: 12 }}>Tu es à jour — rien de nouveau.</div>
-                  <button onClick={() => { setPage('activity'); setBellOpen(false) }} style={{ ...menuItemStyle, borderTop: '1px solid rgba(255,255,255,0.05)', justifyContent: 'center', color: T.accentText, fontWeight: 700 }}>Voir l'activité</button>
+                  <button onClick={() => { setPage('activity'); setBellOpen(false) }} style={{ ...menuItemStyle, borderTop: '1px solid rgba(255,255,255,0.05)', justifyContent: 'center', color: T.accentText, fontWeight: 600 }}>Voir l'activité</button>
                 </div>
               )}
             </span>
             <button onClick={() => setPage('settings')} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30,
-              border: `1px solid ${page === 'settings' ? `rgba(${T.tone},0.4)` : 'rgba(255,255,255,0.07)'}`, borderRadius: 8,
-              background: page === 'settings' ? `rgba(${T.tone},0.1)` : 'transparent', color: page === 'settings' ? T.accentText : '#71717A', cursor: 'pointer', transition: 'all 0.16s ease',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28,
+              border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
+              background: page === 'settings' ? 'rgba(255,255,255,0.07)' : 'transparent', color: page === 'settings' ? '#EDEDEF' : '#8B8B94', cursor: 'pointer', transition: 'background .12s ease',
             }} aria-label="Réglages">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V10a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
             </button>
@@ -438,7 +444,7 @@ export default function Shell({
 
         {/* contenu */}
         <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', position: 'relative', background: T.mainWash }}>
-          <div style={{ maxWidth: 1520, margin: '0 auto', padding: '24px 24px 40px', width: '100%', boxSizing: 'border-box' }}>{children}</div>
+          <div style={{ maxWidth: 1360, margin: '0 auto', padding: narrow ? '20px 16px 40px' : '28px 32px 48px', width: '100%', boxSizing: 'border-box' }}>{children}</div>
         </main>
       </div>
 
@@ -448,8 +454,8 @@ export default function Shell({
         const ql = paletteQ.trim().toLowerCase()
         const list = ql ? all.filter(it => it.l.toLowerCase().includes(ql)) : all
         return (
-          <div onClick={() => setPaletteOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh', background: 'rgba(4,6,8,0.72)', backdropFilter: 'blur(6px)', animation: 'aFade .14s ease both' }}>
-            <div onClick={e => e.stopPropagation()} style={{ width: 520, maxWidth: '92%', borderRadius: 13, overflow: 'hidden', background: '#131318', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 32px 80px -22px rgba(0,0,0,0.85)', animation: 'aPop .2s cubic-bezier(0.16,1,0.3,1) both' }}>
+          <div onClick={() => setPaletteOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh', background: 'rgba(0,0,0,0.6)', animation: 'aFade .14s ease both' }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '92%', borderRadius: 10, overflow: 'hidden', background: '#111113', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.7)', animation: 'aPop .2s cubic-bezier(0.16,1,0.3,1) both' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 15px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#71717A" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.35-4.35" /></svg>
                 <input autoFocus value={paletteQ} onChange={e => setPaletteQ(e.target.value)}
@@ -460,7 +466,7 @@ export default function Shell({
               <div style={{ maxHeight: 340, overflowY: 'auto', padding: 6 }}>
                 {list.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#52525B', fontSize: 12 }}>Aucun résultat.</div>
                   : list.map(it => (
-                    <button key={it.k} onClick={() => { setPage(it.k); setPaletteOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '9px 11px', border: 'none', borderRadius: 8, cursor: 'pointer', background: page === it.k ? `rgba(${T.tone},0.12)` : 'transparent', color: page === it.k ? T.accentText : '#D4D4D8', fontSize: 12.5, fontWeight: 600, textAlign: 'left' }}
+                    <button key={it.k} onClick={() => { setPage(it.k); setPaletteOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '9px 11px', border: 'none', borderRadius: 8, cursor: 'pointer', background: page === it.k ? 'rgba(255,255,255,0.07)' : 'transparent', color: page === it.k ? '#EDEDEF' : '#D4D4D8', fontSize: 13, fontWeight: 500, textAlign: 'left' }}
                       onMouseEnter={e => { if (page !== it.k) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
                       onMouseLeave={e => { if (page !== it.k) e.currentTarget.style.background = 'transparent' }}>
                       <span style={{ display: 'flex', color: page === it.k ? T.accentText : '#71717A' }}><Icon d={it.i} size={15} /></span>
@@ -478,5 +484,5 @@ export default function Shell({
 
 const menuItemStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '10px 12px', border: 'none',
-  background: 'transparent', color: '#D4D4D8', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+  background: 'transparent', color: '#D4D4D8', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'left',
 }

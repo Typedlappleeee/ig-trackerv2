@@ -182,7 +182,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
           {CROSS_PLATFORMS.map(pl => {
             const on = plats.has(pl.key)
             return (
-              <button key={pl.key} onClick={() => togglePlat(pl.key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 34, padding: '0 13px', borderRadius: 9, cursor: 'pointer', background: on ? `rgba(${theme.tone},0.12)` : 'rgba(255,255,255,0.02)', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.08)'), color: on ? '#F4F4F6' : '#A1A1AA', fontSize: 12.5, fontWeight: 700 }}>
+              <button key={pl.key} onClick={() => togglePlat(pl.key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 34, padding: '0 13px', borderRadius: 9, cursor: 'pointer', background: on ? `rgba(${theme.tone},0.12)` : 'rgba(255,255,255,0.02)', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.08)'), color: on ? '#F4F4F6' : '#A1A1AA', fontSize: 12.5, fontWeight: 600 }}>
                 <span>{pl.emoji}</span>{pl.label}
               </button>
             )

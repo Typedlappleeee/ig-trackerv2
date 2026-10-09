@@ -381,7 +381,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
           <button key={s} onClick={() => setStep(n)} style={{
             display: 'flex', alignItems: 'center', gap: 7, flex: 1, height: 32, padding: '0 12px', border: 'none', borderRadius: 7, cursor: 'pointer', justifyContent: 'center',
             background: active ? `rgba(${theme.tone},0.16)` : 'transparent',
-            color: active ? theme.accentText : past ? '#A1A1AA' : '#52525B', fontSize: 12, fontWeight: 700, transition: 'all .16s ease',
+            color: active ? theme.accentText : past ? '#A1A1AA' : '#52525B', fontSize: 12, fontWeight: 600, transition: 'all .16s ease',
           }}>
             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 17, height: 17, borderRadius: 5, flexShrink: 0, background: active ? theme.accentBtn : past ? 'rgba(16,185,129,0.16)' : 'rgba(255,255,255,0.05)', color: active ? '#fff' : past ? '#34D399' : '#52525B', fontSize: 9.5, fontWeight: 900 }}>{past ? '✓' : n}</span>
             {s}
@@ -393,7 +393,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
   const selectStyle: CSSProperties = {
     height: 28, padding: '0 8px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${group !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.07)'}`,
-    background: '#101015', color: group !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 700, outline: 'none',
+    background: '#101015', color: group !== 'Tous' ? theme.accentText : '#A1A1AA', fontSize: 11.5, fontWeight: 600, outline: 'none',
   }
 
   return (
@@ -418,7 +418,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
       {/* ── Barre de presets (réglages + captions mémorisés) ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px', padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Presets</span>
+        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Presets</span>
         <select value={presetSel} onChange={e => { const v = e.target.value; if (v) doLoadPreset(v); else setPresetSel('') }}
           style={{ height: 30, padding: '0 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.09)', background: '#101015', color: '#E4E4E7', fontSize: 12, fontWeight: 600, outline: 'none', minWidth: 170, cursor: 'pointer' }}>
           <option value="" style={{ background: '#16161C' }}>{presets.length ? '— Charger un preset —' : 'Aucun preset enregistré'}</option>
@@ -437,14 +437,14 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             <Btn theme={theme} sm tone="quiet" label="Aucun" onClick={() => setSel(new Set())} />
           </>} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
+            <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>Groupe</span>
             <select value={group} onChange={e => setGroup(e.target.value)} style={selectStyle}>
               {groups.map(g => <option key={g} value={g} style={{ background: '#16161C' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
             </select>
             <button onClick={() => setHealthy(h => !h)} style={{
               display: 'inline-flex', alignItems: 'center', gap: 7, height: 28, padding: '0 11px', borderRadius: 8, cursor: 'pointer',
               background: healthy ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (healthy ? 'rgba(16,185,129,0.32)' : 'rgba(255,255,255,0.07)'),
-              color: healthy ? '#34D399' : '#71717A', fontSize: 11.5, fontWeight: 700,
+              color: healthy ? '#34D399' : '#71717A', fontSize: 11.5, fontWeight: 600,
             }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 13, height: 13, borderRadius: 4, background: healthy ? '#10B981' : 'transparent', border: healthy ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#04140C', fontSize: 8, fontWeight: 900 }}>{healthy ? '✓' : ''}</span>
               Santé ≥ 70 seulement
@@ -533,7 +533,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                 {captions.filter(c => c.trim()).length > 1 && (
                   <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', marginLeft: 'auto' }}>
                     {(['seq', 'random'] as const).map(m => (
-                      <button key={m} onClick={() => setCapMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: capMode === m ? theme.accentBtn : 'transparent', color: capMode === m ? '#fff' : '#71717A' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                      <button key={m} onClick={() => setCapMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: capMode === m ? theme.accentBtn : 'transparent', color: capMode === m ? '#fff' : '#71717A' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
                     ))}
                   </span>
                 )}
@@ -545,7 +545,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ width: 26, height: 26, borderRadius: 99, background: `linear-gradient(140deg,${theme.accentSoft},${theme.accentBtn})`, flexShrink: 0 }} />
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#E4E4E7' }}>@{phones.find(p => sel.has(p.id))?.ig_username ?? 'compte'}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: '#E4E4E7' }}>@{phones.find(p => sel.has(p.id))?.ig_username ?? 'compte'}</span>
               </div>
               <div style={{ aspectRatio: '9 / 14', borderRadius: 8, background: `linear-gradient(160deg, rgba(${theme.tone},0.16), rgba(${theme.tone},0.03))`, border: '1px solid rgba(255,255,255,0.06)' }} />
               <div style={{ fontSize: 11, lineHeight: 1.6, color: '#71717A' }}>{(() => { const c = captions.find(x => x.trim()); return c ? c.split('\n')[0].slice(0, 62) + (c.length > 62 ? '…' : '') : 'Aucune légende' })()}</div>
@@ -579,7 +579,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
               </span>
               <select value={rotationOn ? '1' : String(simulPhones)} disabled={rotationOn}
                 onChange={e => setSimulPhones(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                style={{ height: 30, padding: '0 8px', borderRadius: 8, cursor: rotationOn ? 'default' : 'pointer', border: '1px solid rgba(255,255,255,0.09)', background: '#101015', color: '#E4E4E7', fontSize: 11.5, fontWeight: 700, outline: 'none' }}>
+                style={{ height: 30, padding: '0 8px', borderRadius: 8, cursor: rotationOn ? 'default' : 'pointer', border: '1px solid rgba(255,255,255,0.09)', background: '#101015', color: '#E4E4E7', fontSize: 11.5, fontWeight: 600, outline: 'none' }}>
                 {rotationOn ? <option value="1" style={{ background: '#16161C' }}>1 (série)</option> : <>
                   <option value="all" style={{ background: '#16161C' }}>Tous</option>
                   {[1, 2, 3, 5, 10].map(n => <option key={n} value={n} style={{ background: '#16161C' }}>{n}</option>)}
@@ -594,7 +594,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
               </span>
               <span style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 {(['seq', 'random'] as const).map(m => (
-                  <button key={m} onClick={() => setVidMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, background: vidMode === m ? theme.accentBtn : 'transparent', color: vidMode === m ? '#fff' : '#71717A' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
+                  <button key={m} onClick={() => setVidMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, background: vidMode === m ? theme.accentBtn : 'transparent', color: vidMode === m ? '#fff' : '#71717A' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
                 ))}
               </span>
             </div>
@@ -615,14 +615,14 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 9 }}>
               {([['Comptes', nSel], ['Vidéos', nVid], ['Plateforme', 'Instagram']] as [string, any][]).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                  <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 700, color: '#E4E4E7' }}>{v}</span>
+                  <span style={{ color: '#71717A' }}>{k}</span><span style={{ fontWeight: 600, color: '#E4E4E7' }}>{v}</span>
                 </div>
               ))}
               <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <span style={{ fontSize: 12, color: '#71717A' }}>Coût</span>
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                  <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 17, fontWeight: 700, color: '#FBBF24' }}>{cost} crédits</span>
+                  <span style={{ fontFamily: 'inherit', fontSize: 17, fontWeight: 600, color: '#FBBF24' }}>{cost} crédits</span>
                   {balance !== null && <span style={{ fontSize: 10.5, color: '#52525B' }}>solde après : {Math.max(0, balance - cost).toLocaleString('fr-FR')}</span>}
                 </span>
               </div>
@@ -688,7 +688,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
               }} />
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <label style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A' }}>Date et heure</label>
+            <label style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A' }}>Date et heure</label>
             <input type="datetime-local" value={schedVal} min={schedLocalValue(1)} max={schedLocalValue(29 * 24 * 60)}
               onChange={e => setSchedVal(e.target.value)}
               style={{ height: 40, padding: '0 12px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.12)', color: '#F4F4F6', fontSize: 13, outline: 'none', colorScheme: 'dark' }} />

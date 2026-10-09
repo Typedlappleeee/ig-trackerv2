@@ -37,11 +37,11 @@ function fmtDay(iso: string): string {
 export function LangSwitch({ theme }: { theme: Theme }) {
   const lang = useLang()
   return (
-    <span role="group" aria-label="Langue / Language" data-no-tr style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+    <span role="group" aria-label="Langue / Language" data-no-tr style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
       {(['fr', 'en'] as const).map(l => (
         <button key={l} type="button" onClick={() => { void setLang(l) }} aria-pressed={lang === l} style={{
-          height: 22, padding: '0 7px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.03em',
-          background: lang === l ? `rgba(${theme.tone},0.18)` : 'transparent', color: lang === l ? theme.accentText : '#71717A',
+          height: 22, padding: '0 7px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11, fontWeight: 500,
+          background: lang === l ? 'rgba(255,255,255,0.09)' : 'transparent', color: lang === l ? '#EDEDEF' : '#71717A',
         }}>{l.toUpperCase()}</button>
       ))}
     </span>
@@ -53,8 +53,8 @@ function EntryView({ e, theme, isNew }: { e: ChangelogEntry; theme: Theme; isNew
   return (
     <div style={{ padding: '14px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
-        <span style={{ fontSize: 13.5, fontWeight: 700, color: '#F4F4F6' }}>{pick(e.title)}</span>
-        {isNew && <span style={{ padding: '1px 7px', borderRadius: 99, fontSize: 10, fontWeight: 800, color: theme.accentText, background: `rgba(${theme.tone},0.16)`, border: `1px solid rgba(${theme.tone},0.3)` }}>{pick({ fr: 'Dernière', en: 'Latest' })}</span>}
+        <span style={{ fontSize: 13.5, fontWeight: 600, color: '#EDEDEF' }}>{pick(e.title)}</span>
+        {isNew && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 500, color: theme.accentText, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.25)` }}>{pick({ fr: 'Dernière', en: 'Latest' })}</span>}
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#71717A', whiteSpace: 'nowrap' }}>{fmtDay(e.date)}</span>
       </div>
       <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -92,13 +92,13 @@ export function UpdateChip({ theme }: { theme: Theme }) {
       <button type="button" onClick={() => { setOpen(true); markSeen() }}
         title={pick({ fr: `Version ${APP_BUILD.id} — mise à jour le ${full}. Clique pour voir les nouveautés.`, en: `Version ${APP_BUILD.id} — updated ${full}. Click to see what's new.` })}
         data-no-tr style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 99, flexShrink: 0, cursor: 'pointer',
-          border: `1px solid ${hot ? `rgba(${theme.tone},0.45)` : 'rgba(255,255,255,0.07)'}`, background: hot ? `rgba(${theme.tone},0.1)` : 'transparent',
-          color: hot ? theme.accentText : '#71717A', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'inherit',
+          display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', flexShrink: 0, cursor: 'pointer',
+          border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', borderRadius: 6,
+          color: hot ? '#D4D4D8' : '#8B8B94', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', fontFamily: 'inherit',
         }}>
         <span style={{ width: 6, height: 6, borderRadius: 99, background: hot ? theme.accentText : '#34D399', animation: unseen ? 'aPulse 1.6s ease-in-out infinite' : undefined }} />
         {pick({ fr: 'MAJ', en: 'Updated' })} {pick({ fr: fmtBuild(), en: new Date(APP_BUILD.builtAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) })}
-        {unseen && <span style={{ padding: '0 6px', borderRadius: 99, fontSize: 9.5, fontWeight: 800, color: '#fff', background: theme.accentBtn }}>{pick({ fr: 'Nouveau', en: 'New' })}</span>}
+        {unseen && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 500, color: '#fff', background: theme.accentBtn }}>{pick({ fr: 'Nouveau', en: 'New' })}</span>}
       </button>
       {open && <WhatsNewModal theme={theme} onClose={() => setOpen(false)} />}
     </>
@@ -116,18 +116,18 @@ export function WhatsNewBar({ theme }: { theme: Theme }) {
       {unseen && (
         <div role="status" data-no-tr style={{
           flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap', padding: '11px 20px',
-          background: `linear-gradient(90deg, rgba(${theme.tone},0.2), rgba(${theme.tone},0.07))`, borderBottom: `1px solid rgba(${theme.tone},0.35)`,
+          background: '#111113', borderBottom: '1px solid rgba(255,255,255,0.07)', boxShadow: `inset 2px 0 0 ${theme.accent}`,
           animation: 'aIn .35s cubic-bezier(0.16,1,0.3,1) both',
         }}>
-          <span style={{ fontSize: 18, lineHeight: '20px' }}>✨</span>
+          <span style={{ fontSize: 15, lineHeight: '20px' }}>✨</span>
           <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>
               {pick({ fr: 'ScaleFlow a été mis à jour', en: 'ScaleFlow has been updated' })}
               <span style={{ color: theme.accentText }}> · {pick(LATEST.title)}</span>
               <span style={{ fontWeight: 500, color: '#71717A' }}> — {fmtDay(LATEST.date)}</span>
             </span>
             <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {pick(LATEST.items).slice(0, 3).map((t, i) => <li key={i} style={{ fontSize: 12, lineHeight: 1.45, color: '#C4C4CC' }}>{t}</li>)}
+              {pick(LATEST.items).slice(0, 3).map((t, i) => <li key={i} style={{ fontSize: 12.5, lineHeight: 1.5, color: '#A1A1AA' }}>{t}</li>)}
             </ul>
           </div>
           <span style={{ display: 'flex', gap: 8, alignSelf: 'center' }}>
@@ -162,12 +162,12 @@ export function UpdateBanner({ theme }: { theme: Theme }) {
     <>
       <div role="status" data-no-tr style={{
         flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '9px 20px',
-        background: `rgba(${theme.tone},0.12)`, borderBottom: `1px solid rgba(${theme.tone},0.3)`, color: '#E4E4E7', fontSize: 12.5,
+        background: '#111113', borderBottom: '1px solid rgba(255,255,255,0.07)', boxShadow: `inset 2px 0 0 ${theme.accent}`, color: '#E4E4E7', fontSize: 12.5,
       }}>
-        <span style={{ fontWeight: 700, color: theme.accentText }}>{pick({ fr: 'Nouvelle version de ScaleFlow en ligne', en: 'A new version of ScaleFlow is live' })}{when}.</span>
+        <span style={{ fontWeight: 600, color: '#EDEDEF' }}>{pick({ fr: 'Nouvelle version de ScaleFlow en ligne', en: 'A new version of ScaleFlow is live' })}{when}.</span>
         {fresh.length > 0
           ? <span style={{ color: '#C4C4CC' }}>{pick({ fr: 'Au programme : ', en: "What's in it: " })}<b style={{ color: '#E4E4E7' }}>{pick(fresh[0].title)}</b>
-              {' · '}<button type="button" onClick={() => setNotes(true)} style={{ border: 'none', background: 'none', padding: 0, color: theme.accentText, cursor: 'pointer', fontSize: 12.5, fontWeight: 700, textDecoration: 'underline' }}>{pick({ fr: 'détails', en: 'details' })}</button></span>
+              {' · '}<button type="button" onClick={() => setNotes(true)} style={{ border: 'none', background: 'none', padding: 0, color: theme.accentText, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, textDecoration: 'underline' }}>{pick({ fr: 'détails', en: 'details' })}</button></span>
           : <span style={{ color: '#A1A1AA' }}>{pick({ fr: "Rafraîchis la page pour l'avoir — ton onglet utilise l'ancienne.", en: 'Refresh the page to get it — this tab is still on the old one.' })}</span>}
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <Btn sm theme={theme} tone="quiet" label={pick({ fr: 'Plus tard', en: 'Later' })} onClick={later} />

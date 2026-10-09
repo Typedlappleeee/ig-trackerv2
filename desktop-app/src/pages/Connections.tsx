@@ -72,7 +72,7 @@ export default function Connections({ theme, infra, user, org }: {
               <Icon d="M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" size={15} />
             </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#F4F4F6' }}>App Meta pas encore branchée</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#F4F4F6' }}>App Meta pas encore branchée</div>
               <p style={{ margin: '5px 0 0', fontSize: 12, lineHeight: 1.6, color: '#A1A1AA', maxWidth: 620 }}>
                 Crée une App Meta (developers.facebook.com, produit « Instagram Graph API »), pose <b>META_APP_ID</b>, <b>META_APP_SECRET</b> et <b>META_REDIRECT_URI</b> en variables d'env Vercel, et renseigne <code>meta_app_id</code> + <code>meta_redirect_uri</code> dans ta config. La connexion s'activera alors ici automatiquement.
               </p>
@@ -105,7 +105,7 @@ export default function Connections({ theme, infra, user, org }: {
               <Icon d="M20 6L9 17l-5-5" size={14} sw={2.4} />
             </span>
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>@{c.ig_username ?? c.ig_user_id}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>@{c.ig_username ?? c.ig_user_id}</span>
               <span style={{ fontSize: 11, color: '#52525B' }}>Page {c.page_id ?? '—'} · sync {fmtDate(c.last_synced_at)}</span>
             </span>
             <Chip text="connecté" tone="ok" />

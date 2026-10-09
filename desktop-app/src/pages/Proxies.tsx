@@ -145,7 +145,7 @@ export default function Proxies({ theme, infra, user, org }: {
   const th: CSSProperties = {
     display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
     padding: '9px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)',
-    fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B',
+    fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B',
   }
 
   return (
@@ -190,7 +190,7 @@ export default function Proxies({ theme, infra, user, org }: {
 
           {/* Pools */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 13px', flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B', marginRight: 3 }}>Pools</span>
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B', marginRight: 3 }}>Pools</span>
             {pools.map(o => {
               const on = pool === o.g
               return (
@@ -198,7 +198,7 @@ export default function Proxies({ theme, infra, user, org }: {
                   display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 99, cursor: 'pointer',
                   background: on ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.02)',
                   border: '1px solid ' + (on ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'),
-                  color: on ? '#C4B5FD' : '#A1A1AA', fontSize: 11.5, fontWeight: 700, transition: 'all .14s ease',
+                  color: on ? '#C4B5FD' : '#A1A1AA', fontSize: 11.5, fontWeight: 600, transition: 'all .14s ease',
                 }}>
                   <span>{o.g}</span>
                   <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: on ? 'rgba(255,255,255,0.5)' : '#3F3F46' }}>{o.n}</span>
@@ -226,7 +226,7 @@ export default function Proxies({ theme, infra, user, org }: {
                   <span><Checkbox on={on} onClick={() => toggle(r.id)} label="Sélectionner" /></span>
                   <span>{r.group_name ? <Chip text={r.group_name} tone="mute" /> : <span style={{ fontSize: 11, color: '#3F3F46' }}>—</span>}</span>
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyName(r)}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyName(r)}</span>
                     <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#52525B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyEndpoint(r)}</span>
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -238,7 +238,7 @@ export default function Proxies({ theme, infra, user, org }: {
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 6,
                       background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
-                      color: '#52525B', fontSize: 11, fontWeight: 700,
+                      color: '#52525B', fontSize: 11, fontWeight: 600,
                     }}>libre</span>
                   </span>
                   <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 3 }}>
@@ -271,7 +271,7 @@ export default function Proxies({ theme, infra, user, org }: {
               <span style={{ fontSize: 12, color: '#A1A1AA' }}>Type par défaut</span>
               <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 {(['socks5', 'http'] as const).map(t => (
-                  <button key={t} onClick={() => setAddType(t)} style={{ height: 24, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', background: addType === t ? `rgba(${theme.tone},0.16)` : 'transparent', color: addType === t ? theme.accentText : '#71717A', fontSize: 11.5, fontWeight: 700 }}>{t.toUpperCase()}</button>
+                  <button key={t} onClick={() => setAddType(t)} style={{ height: 24, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', background: addType === t ? `rgba(${theme.tone},0.16)` : 'transparent', color: addType === t ? theme.accentText : '#71717A', fontSize: 11.5, fontWeight: 600 }}>{t.toUpperCase()}</button>
                 ))}
               </span>
               <input value={addGroup} onChange={e => setAddGroup(e.target.value)} placeholder="Groupe (optionnel)"

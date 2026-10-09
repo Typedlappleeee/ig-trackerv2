@@ -39,7 +39,7 @@ function LaunchTile({ a, onClick }: { a: ReturnType<typeof launchTiles>[number];
           background: `rgba(${a.tone},0.12)`, border: `1px solid rgba(${a.tone},0.24)`, color: `rgb(${a.tone})`,
         }}><Icon d={a.icon} size={15} /></span>
       </span>
-      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>{a.label}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>{a.label}</span>
       <span style={{ fontSize: 11, color: '#71717A' }}>{a.hint}</span>
     </button>
   )
@@ -51,13 +51,13 @@ function Kpi({ theme, label, value, color, hint, hintColor }: {
 }) {
   return (
     <Panel theme={theme} style={{ padding: 15 }}>
-      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#52525B' }}>{label}</div>
+      <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#52525B' }}>{label}</div>
       <div style={{
-        marginTop: 9, fontFamily: "'Space Grotesk',sans-serif", fontSize: 25, fontWeight: 700,
+        marginTop: 9, fontFamily: 'inherit', fontSize: 25, fontWeight: 600,
         letterSpacing: '-0.03em', color: color || '#F4F4F6', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
       }}>{value}</div>
       {hint ? (
-        <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: hintColor || '#71717A' }}>{hint}</div>
+        <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: hintColor || '#71717A' }}>{hint}</div>
       ) : null}
     </Panel>
   )
@@ -107,7 +107,7 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
 
       {/* Lancer */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '26px 0 11px' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52525B' }}>Lancer</span>
+        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#52525B' }}>Lancer</span>
       </div>
       <div data-rows="" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 10 }}>
         {TILES.map(a => <LaunchTile key={a.id} a={a} onClick={() => onNavigate(a.page)} />)}
@@ -133,7 +133,7 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
                   display: 'flex', alignItems: 'center', gap: 11, padding: '11px 15px',
                   borderBottom: i < upcoming.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, color: theme.accentSoft, minWidth: 58, flexShrink: 0 }}>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600, color: theme.accentSoft, minWidth: 58, flexShrink: 0 }}>
                     {fmtTime(r.scheduled_at)}
                   </span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -184,7 +184,7 @@ export default function Home({ theme, infra, user, data, loading, reload, onNavi
                       <span style={{ fontSize: 12, fontWeight: 600, color: '#E4E4E7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
                       <span style={{ fontSize: 10.5, color: '#52525B' }}>{date}</span>
                     </span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, color: ok ? '#34D399' : '#FBBF24', flexShrink: 0 }}>{stat}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600, color: ok ? '#34D399' : '#FBBF24', flexShrink: 0 }}>{stat}</span>
                   </div>
                 )
               })}

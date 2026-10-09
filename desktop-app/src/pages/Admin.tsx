@@ -165,7 +165,7 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
               </div>} />
             <div style={{ display: 'flex', gap: 4, padding: '0 13px 12px', flexWrap: 'wrap' }}>
               {(['all', 'active', 'used', 'expired', 'revoked'] as Filter[]).map(f => (
-                <button key={f} onClick={() => setFilter(f)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', border: 'none', borderRadius: 7, cursor: 'pointer', background: filter === f ? `rgba(${theme.tone},0.16)` : 'rgba(255,255,255,0.03)', color: filter === f ? theme.accentText : '#A1A1AA', fontSize: 12, fontWeight: 700 }}>
+                <button key={f} onClick={() => setFilter(f)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', border: 'none', borderRadius: 7, cursor: 'pointer', background: filter === f ? `rgba(${theme.tone},0.16)` : 'rgba(255,255,255,0.03)', color: filter === f ? theme.accentText : '#A1A1AA', fontSize: 12, fontWeight: 600 }}>
                   {STATUS_LABEL[f]}<span style={{ opacity: 0.6, ...mono, fontSize: 10 }}>{counts[f]}</span>
                 </button>
               ))}
@@ -179,7 +179,7 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
                     return (
                       <div key={k.id} style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '12px 15px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span style={{ ...mono, fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>{k.key}</span>
+                          <span style={{ ...mono, fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>{k.key}</span>
                           <button onClick={() => copy(k.key)} title="Copier" style={{ display: 'flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: copied === k.key ? '#34D399' : '#71717A', cursor: 'pointer' }}><Icon d={copied === k.key ? 'M20 6 9 17l-5-5' : 'M9 9h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z|M5 15H4a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1'} size={12} /></button>
                           <Chip text={STATUS_LABEL[st]} tone={STATUS_TONE[st]} />
                           <Chip text={k.plan} tone="mute" />
@@ -199,7 +199,7 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
                           <Btn theme={theme} sm tone="danger" label="Supprimer" onClick={() => setDelTarget(k)} />
                           {extendFor === k.id && (
                             <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
-                              {[7, 30, 90, 365].map(d => <button key={d} onClick={() => extendKey(k, d)} style={{ height: 26, padding: '0 9px', borderRadius: 6, border: `1px solid rgba(${theme.tone},0.3)`, background: 'transparent', color: theme.accentText, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>+{d}j</button>)}
+                              {[7, 30, 90, 365].map(d => <button key={d} onClick={() => extendKey(k, d)} style={{ height: 26, padding: '0 9px', borderRadius: 6, border: `1px solid rgba(${theme.tone},0.3)`, background: 'transparent', color: theme.accentText, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>+{d}j</button>)}
                             </span>
                           )}
                         </div>
@@ -217,7 +217,7 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {codes.map(c => (
                   <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 15px', borderTop: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap' }}>
-                    <span style={{ ...mono, fontSize: 12.5, fontWeight: 700, color: '#F4F4F6' }}>{c.code}</span>
+                    <span style={{ ...mono, fontSize: 12.5, fontWeight: 600, color: '#F4F4F6' }}>{c.code}</span>
                     <button onClick={() => copy(c.code)} title="Copier" style={{ display: 'flex', width: 22, height: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: copied === c.code ? '#34D399' : '#71717A', cursor: 'pointer' }}><Icon d="M9 9h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2z" size={11} /></button>
                     <Chip text={`${c.amount} cr`} tone="ok" />
                     {c.used_by ? <Chip text="Utilisé" tone="info" /> : c.is_active ? <Chip text="Actif" tone="ok" /> : <Chip text="Révoqué" tone="bad" />}
@@ -240,7 +240,7 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
               <div>
                 <label style={lbl}>Clé générée</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={gk} onChange={e => setGk(e.target.value.toUpperCase())} style={{ ...inp, ...mono, flex: 1, fontWeight: 700 }} />
+                  <input value={gk} onChange={e => setGk(e.target.value.toUpperCase())} style={{ ...inp, ...mono, flex: 1, fontWeight: 600 }} />
                   <Btn theme={theme} sm tone="quiet" label="↻" onClick={() => setGk(genKey())} />
                 </div>
               </div>
@@ -274,7 +274,7 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
               <div>
                 <label style={lbl}>Code généré</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={gc} onChange={e => setGc(e.target.value.toUpperCase())} style={{ ...inp, ...mono, flex: 1, fontWeight: 700 }} />
+                  <input value={gc} onChange={e => setGc(e.target.value.toUpperCase())} style={{ ...inp, ...mono, flex: 1, fontWeight: 600 }} />
                   <Btn theme={theme} sm tone="quiet" label="↻" onClick={() => setGc(genCode())} />
                 </div>
               </div>
@@ -302,4 +302,4 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
   )
 }
 
-const lbl: CSSProperties = { display: 'block', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6 }
+const lbl: CSSProperties = { display: 'block', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A', marginBottom: 6 }

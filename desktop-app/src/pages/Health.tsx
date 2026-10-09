@@ -39,7 +39,7 @@ function Bar({ v }: { v: number }) {
       <span style={{ flex: 1, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
         <span style={{ display: 'block', height: '100%', width: `${v}%`, borderRadius: 99, background: c }} />
       </span>
-      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 700, color: c, minWidth: 24, textAlign: 'right' }}>{v}</span>
+      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 600, color: c, minWidth: 24, textAlign: 'right' }}>{v}</span>
     </span>
   )
 }
@@ -104,13 +104,13 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
             {CRITERIA.map(([l, w, d, c], i) => (
               <div key={l} style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '14px 15px', borderRight: i < 4 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                 <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                  <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 20, fontWeight: 700, color: c }}>{w}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#3F3F46' }}>pts</span>
+                  <span style={{ fontFamily: 'inherit', fontSize: 20, fontWeight: 600, color: c }}>{w}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#3F3F46' }}>pts</span>
                 </span>
                 <span style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
                   <span style={{ display: 'block', height: '100%', width: `${(w / 30) * 100}%`, borderRadius: 99, background: c }} />
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#E4E4E7' }}>{l}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#E4E4E7' }}>{l}</span>
                 <span style={{ fontSize: 10.5, lineHeight: 1.5, color: '#52525B' }}>{d}</span>
               </div>
             ))}
@@ -157,7 +157,7 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
                         color: bad ? '#F87171' : '#FBBF24',
                       }}><Icon d="M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" size={13} /></span>
                       <span style={{ width: 160, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.ig_username ?? 'compte'}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#F4F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{p.ig_username ?? 'compte'}</span>
                         <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: bad ? '#F87171' : '#FBBF24' }}>santé {p.health}</span>
                       </span>
                       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -175,7 +175,7 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
           {/* Classement complet */}
           <Panel theme={theme}>
             <PanelHead title="Tous les comptes" sub="Trié du plus fragile au plus solide" />
-            <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '9px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '9px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#52525B' }}>
               {['Compte', 'Santé', 'Groupe', 'Âge', 'Cadence'].map((h, i) => <span key={i}>{h}</span>)}
             </div>
             {rows.map((p, i) => (

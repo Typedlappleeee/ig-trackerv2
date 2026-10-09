@@ -25,7 +25,7 @@ const GRAD = 'linear-gradient(100deg,#EC4899,#A855F7,#6366F1)'
 const GOLD = '#E9C46A'
 const INK = '#ECE9F5'
 const MUTED = '#A79FBD'
-const SERIF = "'Space Grotesk',sans-serif"
+const SERIF = 'inherit'
 const selStyle: CSSProperties = { height: 32, padding: '0 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, outline: 'none', cursor: 'pointer' }
 const optStyle: CSSProperties = { background: '#17111F' }
 
@@ -50,7 +50,7 @@ const numInp: CSSProperties = { width: 62, height: 30, padding: '0 8px', borderR
 function Grp({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ borderRadius: 14, border: '1px solid rgba(216,180,254,0.1)', background: 'rgba(255,255,255,0.015)', padding: 15, marginTop: 12 }}>
-      <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: '#C9A9F0' }}>{title}</p>
+      <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: '#C9A9F0' }}>{title}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>
     </div>
   )
@@ -72,7 +72,7 @@ function Seg<T extends string>({ value, onChange, options }: { value: T; onChang
   return (
     <span style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 9, background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(216,180,254,0.14)' }}>
       {options.map(o => (
-        <button key={o.v} onClick={() => onChange(o.v)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, background: value === o.v ? GRAD : 'transparent', color: value === o.v ? '#fff' : MUTED }}>{o.label}</button>
+        <button key={o.v} onClick={() => onChange(o.v)} style={{ height: 26, padding: '0 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, background: value === o.v ? GRAD : 'transparent', color: value === o.v ? '#fff' : MUTED }}>{o.label}</button>
       ))}
     </span>
   )
@@ -93,8 +93,8 @@ function Head({ title, sub, right }: { title: string; sub?: string; right?: Reac
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
       <div style={{ minWidth: 0 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 7, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.4)', color: '#D8B4FE', fontSize: 10, fontWeight: 800, marginBottom: 10 }}>✦ Blowsome VIP</span>
-        <h1 style={{ margin: 0, fontFamily: SERIF, fontSize: 24, fontWeight: 700, letterSpacing: '-0.03em', color: INK }}>{title}</h1>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 7, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.4)', color: '#D8B4FE', fontSize: 10, fontWeight: 600, marginBottom: 10 }}>✦ Blowsome VIP</span>
+        <h1 style={{ margin: 0, fontFamily: SERIF, fontSize: 24, fontWeight: 600, letterSpacing: '-0.03em', color: INK }}>{title}</h1>
         {sub && <p style={{ margin: '7px 0 0', fontSize: 13, lineHeight: 1.55, color: MUTED, maxWidth: 560 }}>{sub}</p>}
       </div>
       {right && <div style={{ marginLeft: 'auto' }}>{right}</div>}
@@ -104,7 +104,7 @@ function Head({ title, sub, right }: { title: string; sub?: string; right?: Reac
 function BlowBtn({ label, onClick, ghost }: { label: string; onClick?: () => void; ghost?: boolean }) {
   return (
     <button onClick={onClick} className={ghost ? 'blow-tap' : 'blow-cta'} style={{
-      height: 38, padding: '0 18px', borderRadius: 11, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+      height: 38, padding: '0 18px', borderRadius: 11, cursor: 'pointer', fontSize: 13, fontWeight: 600,
       background: ghost ? 'rgba(255,255,255,0.03)' : GRAD, color: ghost ? '#D8B4FE' : '#fff',
       border: ghost ? '1px solid rgba(216,180,254,0.2)' : 'none', boxShadow: ghost ? 'none' : '0 12px 30px -12px rgba(168,85,247,0.8)',
     }}>{label}</button>
@@ -114,7 +114,7 @@ function ConnectIrt({ title }: { title: string }) {
   return (
     <Card style={{ padding: 34, textAlign: 'center' }}>
       <div style={{ fontSize: 34 }}>📱</div>
-      <div style={{ marginTop: 14, fontSize: 15, fontWeight: 700, color: INK }}>{title}</div>
+      <div style={{ marginTop: 14, fontSize: 15, fontWeight: 600, color: INK }}>{title}</div>
       <p style={{ margin: '8px auto 0', maxWidth: 460, fontSize: 12.5, lineHeight: 1.6, color: MUTED }}>
         Le Parc VIP pilote tes vrais iPhones via iRemoTech. Renseigne ta clé API iRemoTech dans <code>iremotech_config</code> (app_config/org_config) et le parc apparaîtra ici — comme la connexion Meta, c'est prêt côté app.
       </p>
@@ -295,7 +295,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
     setTesting(false)
   }
 
-  const btn: CSSProperties = { height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(216,180,254,0.14)', color: INK }
+  const btn: CSSProperties = { height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(216,180,254,0.14)', color: INK }
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
@@ -311,7 +311,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
           <>
             {/* Posting : rejeu de séquence sur le parc */}
             <Card style={{ padding: 18, marginBottom: 16 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 10 }}>Publier sur le parc</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: INK, marginBottom: 10 }}>Publier sur le parc</div>
               {sequences.length === 0 ? (
                 <p style={{ margin: 0, fontSize: 12, color: MUTED, lineHeight: 1.55 }}>Aucune séquence enregistrée. Ouvre un iPhone ci-dessous, clique <b style={{ color: GOLD }}>● Rec</b>, fais une publication à la main une fois, puis enregistre-la — tu pourras la rejouer sur tout le parc.</p>
               ) : (
@@ -343,7 +343,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
 
             {/* Test : sélection de container par VISION (OCR du sélecteur Crane) */}
             <Card style={{ padding: 18, marginBottom: 16 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>🧪 Test — aller à un container (vision)</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: INK, marginBottom: 4 }}>🧪 Test — aller à un container (vision)</div>
               <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Ouvre Instagram, lit le sélecteur Crane à l'écran et tape le bon container (scroll auto). Vérifie la fiabilité sur 1 iPhone avant qu'on construise la boucle de post.</p>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <select value={testDev || devices[0]?.public_id || ''} onChange={e => setTestDev(e.target.value)}
@@ -368,14 +368,14 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
                       <span style={{ position: 'relative', width: 40, height: 40, borderRadius: 12, display: 'grid', placeItems: 'center', color: '#D8B4FE', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.25)' }}>📱
                         <span style={{ position: 'absolute', right: -2, bottom: -2, width: 10, height: 10, borderRadius: 99, background: on ? '#34D399' : '#EF4444', boxShadow: '0 0 0 2px #17111F' }} /></span>
                       <span style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name ?? d.public_id}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name ?? d.public_id}</div>
                         <div style={{ fontSize: 11, color: MUTED }}>{d.model ?? 'iPhone'}</div>
                       </span>
                       {runSeq && <span onClick={() => toggleRun(d.public_id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 5, cursor: 'pointer', flexShrink: 0, background: checked ? GOLD : 'transparent', border: checked ? 'none' : '1px solid rgba(216,180,254,0.3)', color: '#1a1206', fontSize: 11, fontWeight: 900 }}>{checked ? '✓' : ''}</span>}
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                       <button onClick={() => setLive(d)} style={{ ...btn, flex: 1, background: 'rgba(168,85,247,0.14)', border: '1px solid rgba(168,85,247,0.3)', color: '#D8B4FE' }}>Contrôler</button>
-                      <button onClick={() => openPublish(d)} style={{ ...btn, flex: 1, background: GOLD, border: 'none', color: '#1a1206', fontWeight: 800 }}>📦 Publier</button>
+                      <button onClick={() => openPublish(d)} style={{ ...btn, flex: 1, background: GOLD, border: 'none', color: '#1a1206', fontWeight: 600 }}>📦 Publier</button>
                     </div>
                   </Card>
                 )
@@ -393,7 +393,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
         <div onClick={() => !runningMulti && setPublishDev(null)} style={{ position: 'fixed', inset: 0, zIndex: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(4,3,8,0.8)', backdropFilter: 'blur(6px)' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '96vw', maxHeight: '90vh', overflowY: 'auto', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.16)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: INK }}>📦 Publier — {publishDev.name ?? publishDev.public_id}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: INK }}>📦 Publier — {publishDev.name ?? publishDev.public_id}</div>
               <button style={{ ...btn, marginLeft: 'auto', padding: '0 10px' }} onClick={() => !runningMulti && setPublishDev(null)}>Fermer</button>
             </div>
             <p style={{ margin: '0 0 14px', fontSize: 11.5, color: MUTED, lineHeight: 1.55 }}>Définis les containers de cet iPhone (une fois), coche ceux à publier, assigne une vidéo + une légende à chacun. Pour chaque container coché : ouverture (vision) → injection de sa vidéo → publication du Reel (OCR).</p>
@@ -413,7 +413,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
                   <div key={j.container} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: 10, borderRadius: 10, background: j.on ? 'rgba(233,196,106,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${j.on ? 'rgba(233,196,106,0.28)' : 'rgba(216,180,254,0.12)'}` }}>
                     <span onClick={() => setJobs(js => js.map((x, k) => k === i ? { ...x, on: !x.on } : x))}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 6, cursor: 'pointer', flexShrink: 0, background: j.on ? GOLD : 'transparent', border: j.on ? 'none' : '1px solid rgba(216,180,254,0.3)', color: '#1a1206', fontSize: 12, fontWeight: 900 }}>{j.on ? '✓' : ''}</span>
-                    <span style={{ minWidth: 60, fontSize: 12.5, fontWeight: 800, color: GOLD }}>{j.container}</span>
+                    <span style={{ minWidth: 60, fontSize: 12.5, fontWeight: 600, color: GOLD }}>{j.container}</span>
                     <button style={{ ...btn, background: j.vid ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.04)', border: j.vid ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(216,180,254,0.14)' }}
                       onClick={() => { setPickingFor(i); setPicker(true) }}>{j.vid ? `🎞 ${j.vid.title.slice(0, 18)}` : 'Vidéo'}</button>
                     <input value={j.caption} onChange={e => { const v = e.target.value; setJobs(js => js.map((x, k) => k === i ? { ...x, caption: v } : x)) }} placeholder="Légende"
@@ -426,7 +426,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
 
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, color: MUTED }}>{jobs.filter(j => j.on && j.vid).length} container(s) prêt(s)</span>
-              <button style={{ ...btn, marginLeft: 'auto', background: GOLD, color: '#1a1206', border: 'none', fontWeight: 800, opacity: jobs.some(j => j.on && j.vid) && !runningMulti ? 1 : 0.5 }}
+              <button style={{ ...btn, marginLeft: 'auto', background: GOLD, color: '#1a1206', border: 'none', fontWeight: 600, opacity: jobs.some(j => j.on && j.vid) && !runningMulti ? 1 : 0.5 }}
                 disabled={!jobs.some(j => j.on && j.vid) || runningMulti} onClick={runContainerJobs}>
                 {runningMulti ? 'Publication…' : `Publier ${jobs.filter(j => j.on && j.vid).length} container(s)`}
               </button>
@@ -440,7 +440,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
       {pendingSteps && createPortal(
         <div onClick={() => setPendingSteps(null)} style={{ position: 'fixed', inset: 0, zIndex: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4,3,8,0.78)', backdropFilter: 'blur(6px)' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: 380, maxWidth: '92vw', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.14)' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: INK, marginBottom: 4 }}>Enregistrer la séquence</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>Enregistrer la séquence</div>
             <p style={{ margin: '0 0 12px', fontSize: 11.5, color: MUTED }}>{pendingSteps.length} étapes capturées.</p>
             <input value={seqName} onChange={e => setSeqName(e.target.value)} placeholder="Nom (ex. Publier Reel Insta)" autoFocus
               style={{ width: '100%', boxSizing: 'border-box', height: 36, padding: '0 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.14)', color: INK, fontSize: 12.5, outline: 'none', marginBottom: 12 }} />
@@ -739,7 +739,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
 
       {/* Presets : réglages + légendes mémorisés, rechargeables en 1 clic */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12, padding: '9px 13px', borderRadius: 12, background: 'rgba(233,196,106,0.05)', border: '1px solid rgba(233,196,106,0.18)' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: GOLD }}>Presets</span>
+        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: GOLD }}>Presets</span>
         <select value={presetSel} onChange={e => { const v = e.target.value; if (v) doLoadPreset(v); else setPresetSel('') }}
           style={{ height: 30, padding: '0 8px', borderRadius: 8, border: '1px solid rgba(233,196,106,0.28)', background: '#171410', color: INK, fontSize: 12, fontWeight: 600, outline: 'none', minWidth: 180, cursor: 'pointer' }}>
           <option value="" style={{ background: '#171410' }}>{presets.length ? '— Charger un preset —' : 'Aucun preset enregistré'}</option>
@@ -755,7 +755,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         <Grp title="Source">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <BlowBtn ghost label={sources.length ? `${sources.length} vidéo(s)` : 'Choisir dans la banque'} onClick={() => setPicker(true)} />
-            <button onClick={() => fileRef.current?.click()} disabled={!!uploading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 11, cursor: uploading ? 'default' : 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.2)', color: '#D8B4FE', fontSize: 13, fontWeight: 700, opacity: uploading ? 0.6 : 1 }}>⬆ Mon PC</button>
+            <button onClick={() => fileRef.current?.click()} disabled={!!uploading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 11, cursor: uploading ? 'default' : 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.2)', color: '#D8B4FE', fontSize: 13, fontWeight: 600, opacity: uploading ? 0.6 : 1 }}>⬆ Mon PC</button>
             <input ref={fileRef} type="file" accept="video/*" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files) importFromPC(e.target.files); e.target.value = '' }} />
             {uploading && <span style={{ fontSize: 11, color: GOLD }}>Envoi : {uploading}</span>}
             <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
@@ -800,8 +800,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           {burnCap && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginLeft: 49 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'rgba(255,255,255,0.03)', color: INK, fontSize: 12, fontWeight: 700 }}>📁 Choisir dans la banque</button>
-                {capPool.trim() && <button onClick={() => setCapPool('')} style={{ padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: MUTED, fontSize: 12, fontWeight: 700 }}>Vider</button>}
+                <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'rgba(255,255,255,0.03)', color: INK, fontSize: 12, fontWeight: 600 }}>📁 Choisir dans la banque</button>
+                {capPool.trim() && <button onClick={() => setCapPool('')} style={{ padding: '7px 12px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: MUTED, fontSize: 12, fontWeight: 600 }}>Vider</button>}
               </div>
               <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne (distribuées entre les variantes)…\nEx : Sérieux là ?'} style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(216,180,254,0.18)', color: INK, fontSize: 12.5, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
               <Fld label="Format"><Seg value={capStyle} onChange={setCapStyle} options={[{ v: 'snapchat', label: 'Snapchat' }, { v: 'outline', label: 'Contour' }]} /></Fld>
@@ -855,7 +855,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
       <div className="blow-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
         {shortcuts.map(s => (
           <button key={s.t} className="blow-card blow-tap" onClick={() => onNavigate?.(s.go)} style={{ textAlign: 'left', cursor: 'pointer', padding: 20, borderRadius: 16, background: 'linear-gradient(168deg,#17111F,#120C19)', border: '1px solid rgba(216,180,254,0.12)', boxShadow: '0 20px 50px -30px rgba(168,85,247,0.5)' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: INK, marginBottom: 6 }}>{s.t}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 6 }}>{s.t}</div>
             <div style={{ fontSize: 12, lineHeight: 1.55, color: MUTED }}>{s.d}</div>
           </button>
         ))}
@@ -903,7 +903,7 @@ function CaptionBankPicker({ user, org, onSelect, onClose }: {
       style={{ position: 'fixed', inset: 0, zIndex: 9600, background: 'rgba(6,6,8,0.92)', backdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: 'calc(100vh - 80px)', background: '#120C19', border: '1px solid rgba(216,180,254,0.16)', borderRadius: 16, display: 'flex', flexDirection: 'column', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(216,180,254,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: INK }}>Choisir des captions</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: INK }}>Choisir des captions</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 20 }}>×</button>
         </div>
         <div style={{ padding: '12px 20px' }}>
@@ -917,16 +917,16 @@ function CaptionBankPicker({ user, org, onSelect, onClose }: {
               const on = selected.has(it.id)
               return (
                 <button key={it.id} onClick={() => toggle(it.id)} style={{ textAlign: 'left', padding: '9px 11px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${on ? 'rgba(168,85,247,0.6)' : 'rgba(216,180,254,0.12)'}`, background: on ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.02)' }}>
-                  {it.title && <div style={{ fontSize: 11, fontWeight: 700, color: on ? '#E9D5FF' : MUTED, marginBottom: 2 }}>{it.title}</div>}
+                  {it.title && <div style={{ fontSize: 11, fontWeight: 600, color: on ? '#E9D5FF' : MUTED, marginBottom: 2 }}>{it.title}</div>}
                   <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.45 }}>{it.content}</div>
                 </button>
               )
             })}
         </div>
         <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(216,180,254,0.12)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: INK, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>Annuler</button>
+          <button onClick={onClose} style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(216,180,254,0.18)', background: 'transparent', color: INK, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Annuler</button>
           <button onClick={() => onSelect(items.filter(it => selected.has(it.id)).map(it => it.content).filter(Boolean))}
-            style={{ padding: '9px 16px', borderRadius: 10, border: 'none', background: GRAD, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, opacity: selected.size ? 1 : 0.5, pointerEvents: selected.size ? 'auto' : 'none' }}>
+            style={{ padding: '9px 16px', borderRadius: 10, border: 'none', background: GRAD, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: selected.size ? 1 : 0.5, pointerEvents: selected.size ? 'auto' : 'none' }}>
             Ajouter {selected.size || ''}
           </button>
         </div>
@@ -951,8 +951,8 @@ export function BlowTools() {
         {TOOLS.map(t => (
           <Card key={t.t} style={{ padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: INK }}>{t.t}</span>
-              <span style={{ marginLeft: 'auto', padding: '3px 9px', borderRadius: 6, background: 'rgba(233,196,106,0.14)', border: `1px solid rgba(233,196,106,0.4)`, color: GOLD, fontSize: 10.5, fontWeight: 800 }}>{t.tag}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: INK }}>{t.t}</span>
+              <span style={{ marginLeft: 'auto', padding: '3px 9px', borderRadius: 6, background: 'rgba(233,196,106,0.14)', border: `1px solid rgba(233,196,106,0.4)`, color: GOLD, fontSize: 10.5, fontWeight: 600 }}>{t.tag}</span>
             </div>
             <p style={{ margin: '9px 0 0', fontSize: 12.5, lineHeight: 1.6, color: MUTED }}>{t.d}</p>
           </Card>

@@ -30,7 +30,7 @@ export default function ScheduleModal({ theme, count, kind, onClose, onSchedule 
         <Btn theme={theme} tone="primary" label={`Programmer sur ${count} compte${count > 1 ? 's' : ''}`} disabled={!val} onClick={confirm} />
       </>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A' }}>Date et heure</label>
+        <label style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#71717A' }}>Date et heure</label>
         <input type="datetime-local" value={val} min={localVal(1)} max={localVal(29 * 24 * 60)} onChange={e => setVal(e.target.value)}
           style={{ height: 40, padding: '0 12px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.12)', color: '#F4F4F6', fontSize: 13, outline: 'none', colorScheme: 'dark' }} />
         <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.6, color: '#71717A' }}>
