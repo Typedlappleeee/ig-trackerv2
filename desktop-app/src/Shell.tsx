@@ -391,21 +391,21 @@ export default function Shell({
       {/* ══════════ COLONNE PRINCIPALE ══════════ */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* topbar */}
-        <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, height: 48, padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: T.appBg }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-            {path.map((l, i) => (
+        <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, height: 48, padding: narrow ? '0 12px' : '0 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: T.appBg }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: narrow ? 1 : undefined, overflow: 'hidden' }}>
+            {(narrow ? path.slice(-1) : path).map((l, i, arr) => (
               <Fragment key={i}>
-                <span style={{ fontSize: 13, fontWeight: 500, color: i === path.length - 1 ? '#EDEDEF' : '#71717A', whiteSpace: 'nowrap' }}>{l}</span>
-                {i < path.length - 1 && <span style={{ color: '#3F3F46', fontSize: 13 }}>/</span>}
+                <span style={{ fontSize: 13, fontWeight: 500, color: i === arr.length - 1 ? '#EDEDEF' : '#71717A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</span>
+                {i < arr.length - 1 && <span style={{ color: '#3F3F46', fontSize: 13 }}>/</span>}
               </Fragment>
             ))}
           </div>
 
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <LangSwitch theme={T} />
-            <UpdateChip theme={T} />
+            {!narrow && <UpdateChip theme={T} />}
             {/* pastille de run (visuelle) */}
-            <button onClick={() => setPage('activity')} style={{
+            {!narrow && <button onClick={() => setPage('activity')} style={{
               position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8, height: 28, padding: '0 10px',
               border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, background: page === 'activity' ? 'rgba(255,255,255,0.07)' : 'transparent', color: '#D4D4D8',
               cursor: 'pointer', overflow: 'hidden', flexShrink: 0, transition: 'background .12s ease',
@@ -416,7 +416,7 @@ export default function Shell({
                 <span style={{ width: 2, height: 4, borderRadius: 99, background: 'currentColor', animation: 'aBeat 1.1s ease-in-out 0.32s infinite' }} />
               </span>
               <span style={{ position: 'relative', fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap' }}>Activité</span>
-            </button>
+            </button>}
             <span style={{ position: 'relative' }}>
               <button onClick={() => setBellOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, background: bellOpen ? 'rgba(255,255,255,0.07)' : 'transparent', color: bellOpen ? '#EDEDEF' : '#8B8B94', cursor: 'pointer', transition: 'background .12s ease' }}
                 aria-label="Notifications">

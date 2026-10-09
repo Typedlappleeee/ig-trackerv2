@@ -745,7 +745,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       </div>
 
       {/* Corps : colonne Dossiers + grille */}
-      <div style={{ display: 'grid', gridTemplateColumns: '196px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '228px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         {/* Dossiers */}
         <Panel theme={theme}>
           <div style={{

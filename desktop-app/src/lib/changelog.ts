@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-09d',
+    date: '2026-10-09',
+    title: { fr: 'Nouvelle interface', en: 'New interface' },
+    items: {
+      fr: [
+        'Design entièrement revu : plus sobre, plus net et plus lisible sur toutes les pages.',
+        'Nouvelle police (Inter) intégrée à l’app, boutons, champs et tableaux harmonisés.',
+        'Meilleur affichage sur petit écran : barre latérale repliée et barre du haut simplifiée.',
+      ],
+      en: [
+        'Fully redesigned: cleaner, sharper and easier to read on every page.',
+        'New built-in font (Inter), consistent buttons, fields and tables.',
+        'Better on small screens: collapsed sidebar and a simpler top bar.',
+      ],
+    },
+  },
+  {
     id: '2026-10-09c',
     date: '2026-10-09',
     title: { fr: 'Correctif : fin des stories', en: 'Fix: finishing Stories' },
