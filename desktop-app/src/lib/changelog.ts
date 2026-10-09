@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-09f',
+    date: '2026-10-09',
+    title: { fr: 'Banque : sélection rapide', en: 'Library: quick selection' },
+    items: {
+      fr: [
+        'Reste appuyé sur une vidéo pour la sélectionner, puis glisse sur les autres pour en cocher plein d’un coup.',
+        'Dès qu’une vidéo est cochée, un simple clic coche les suivantes ; rectangle de sélection sur un espace vide.',
+        'Raccourcis : Ctrl+A tout sélectionner, Suppr pour supprimer, Échap pour annuler.',
+        'Nouveautés : « Voir toutes les mises à jour » affiche tout l’historique, mois par mois.',
+      ],
+      en: [
+        'Press and hold a video to select it, then drag across the others to select many at once.',
+        'Once one is selected, a simple click selects more; drag a box on empty space to select a group.',
+        'Shortcuts: Ctrl+A select all, Delete to remove, Esc to cancel.',
+        'What’s new: “See all updates” shows the full history, month by month.',
+      ],
+    },
+  },
+  {
     id: '2026-10-09e',
     date: '2026-10-09',
     title: { fr: 'Plus simple à prendre en main', en: 'Easier to get started' },

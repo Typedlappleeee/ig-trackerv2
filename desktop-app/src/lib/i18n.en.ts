@@ -1796,6 +1796,9 @@ export const EN: Dict = {
     "Choisis au moins une vidéo pour continuer.": "Pick at least one video to continue.",
     "Étape": "Step",
     "sur 4 ·": "of 4 ·",
+    "Clic pour cocher / décocher · glisse pour en cocher plusieurs": "Click to select / unselect · drag to select several",
+    "Clic pour lire · reste appuyé pour sélectionner · clic droit pour les actions": "Click to play · press and hold to select · right-click for actions",
+    "Astuce : clique ou glisse sur les vignettes pour en cocher plusieurs · rectangle sur un espace vide · Ctrl+A tout · Suppr supprime · Échap annule": "Tip: click or drag across thumbnails to select several · drag a box on empty space · Ctrl+A all · Delete removes · Esc cancels",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
