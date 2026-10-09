@@ -68,6 +68,7 @@ type SortKey = 'recent' | 'name' | 'used'
 function TileCheck({ on, onToggle, accent = '#8B7CF6' }: { on: boolean; onToggle: (e: React.MouseEvent) => void; accent?: string }) {
   return (
     <span
+      data-tile-check=""
       onClick={e => { e.stopPropagation(); onToggle(e) }}
       title="Sélectionner · Maj+clic pour sélectionner un intervalle"
       style={{
@@ -98,8 +99,9 @@ function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin = '400px
 
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
-function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu }: {
+function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx }: {
   item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: (e: React.MouseEvent) => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
+  selecting?: boolean; idx?: number
 }) {
   const fresh = (item.used_count ?? 0) === 0
   const dur = type === 'video' ? fmtDuration(item.duration) : ''
@@ -112,15 +114,19 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
   return (
     <button
       ref={btnRef}
-      onClick={onOpen}
+      data-tile-idx={idx}
+      // Mode sélection (≥ 1 média coché) : un clic n'importe où sur la vignette la coche.
+      onClick={selecting ? onToggle : onOpen}
       onContextMenu={onContextMenu}
-      draggable
+      draggable={!selecting}
       onDragStart={onDragStart}
-      title="Clic pour lire · clic droit pour les actions · carré pour sélectionner"
+      title={selecting ? 'Clic pour cocher / décocher · glisse pour en cocher plusieurs' : 'Clic pour lire · reste appuyé pour sélectionner · clic droit pour les actions'}
       style={{
         position: 'relative', aspectRatio: type === 'image' ? '4 / 5' : '9 / 16', borderRadius: 6, padding: 0,
-        cursor: 'pointer', overflow: 'hidden', transition: 'border-color .12s ease',
+        cursor: 'pointer', overflow: 'hidden', transition: 'border-color .12s ease, transform .12s ease',
         border: `1px solid ${on ? theme.accent : 'rgba(255,255,255,0.07)'}`,
+        boxShadow: on ? `inset 0 0 0 1px ${theme.accent}` : 'none', transform: on ? 'scale(0.97)' : 'none',
+        WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none',
         background: '#161618',
       }}
     >
@@ -635,6 +641,117 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     lastIdxRef.current = idx
   }
 
+  // ── Sélection rapide : appui long, glisser pour cocher, rectangle, raccourcis ──
+  const selecting = sel.size > 0
+  const gridRef = useRef<HTMLDivElement>(null)
+  const gesture = useRef<{ kind: 'press' | 'paint' | 'band'; id?: number; x: number; y: number; mode?: boolean; base?: Set<string>; timer?: number } | null>(null)
+  const suppressClick = useRef(false)
+  const [band, setBand] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const tileAt = (x: number, y: number): number | null => {
+    const el = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest('[data-tile-idx]') as HTMLElement | null
+    return el && gridRef.current?.contains(el) ? Number(el.dataset.tileIdx) : null
+  }
+  const paint = (idx: number, add: boolean) => {
+    const it = shown[idx]; if (!it) return
+    setSel(prev => { if (prev.has(it.id) === add) return prev; const n = new Set(prev); if (add) n.add(it.id); else n.delete(it.id); return n })
+    lastIdxRef.current = idx
+  }
+  const endGesture = () => {
+    const g = gesture.current
+    if (g?.timer) window.clearTimeout(g.timer)
+    gesture.current = null
+    setBand(null)
+    // Le « click » natif suit immédiatement le relâchement : on lève le blocage juste après.
+    if (suppressClick.current) window.setTimeout(() => { suppressClick.current = false }, 0)
+  }
+  const onGridPointerDown = (e: React.PointerEvent) => {
+    // Case à cocher et Maj+clic (intervalle) gardent leur comportement habituel.
+    if (e.button !== 0 || e.shiftKey && !!(e.target as HTMLElement).closest('[data-tile-idx]') || (e.target as HTMLElement).closest('[data-tile-check]')) return
+    const idx = tileAt(e.clientX, e.clientY)
+    if (idx === null) {
+      // Espace vide de la grille, à la souris : rectangle de sélection.
+      if (e.pointerType !== 'mouse') return
+      gesture.current = { kind: 'band', x: e.clientX, y: e.clientY, base: e.shiftKey || e.ctrlKey || e.metaKey ? new Set(sel) : new Set() }
+      e.preventDefault()
+      return
+    }
+    const id = shown[idx]?.id; if (!id) return
+    if (selecting && e.pointerType === 'mouse') {
+      // Mode sélection, souris : on coche/décoche tout de suite et on « peint » en glissant.
+      const add = !sel.has(id)
+      gesture.current = { kind: 'paint', x: e.clientX, y: e.clientY, mode: add, id: idx }
+      paint(idx, add); suppressClick.current = true
+      e.preventDefault()
+      return
+    }
+    // Appui long (~0,45 s) : sélectionne la vignette puis on peut glisser sur les autres.
+    const timer = window.setTimeout(() => {
+      const g = gesture.current; if (!g || g.kind !== 'press') return
+      const add = !sel.has(id)
+      gesture.current = { ...g, kind: 'paint', mode: add }
+      paint(idx, add); suppressClick.current = true
+      try { navigator.vibrate?.(15) } catch { /* ignore */ }
+    }, 450)
+    gesture.current = { kind: 'press', x: e.clientX, y: e.clientY, id: idx, timer }
+  }
+  useEffect(() => {
+    const mv = (e: PointerEvent) => { if (gesture.current?.kind === 'band') onGridPointerMove(e as unknown as React.PointerEvent) }
+    window.addEventListener('pointermove', mv)
+    return () => window.removeEventListener('pointermove', mv)
+  })
+  const onGridPointerMove = (e: React.PointerEvent) => {
+    const g = gesture.current; if (!g) return
+    if (g.kind === 'press') {
+      if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 8) endGesture()   // c'est un défilement ou un glisser-déposer
+      return
+    }
+    if (g.kind === 'paint') {
+      const idx = tileAt(e.clientX, e.clientY)
+      if (idx !== null && idx !== g.id) { g.id = idx; paint(idx, !!g.mode) }
+      return
+    }
+    // Rectangle de sélection
+    const x = Math.min(g.x, e.clientX), y = Math.min(g.y, e.clientY), w = Math.abs(e.clientX - g.x), h = Math.abs(e.clientY - g.y)
+    if (w < 4 && h < 4) return
+    setBand({ x, y, w, h })
+    const hit = new Set(g.base)
+    gridRef.current?.querySelectorAll<HTMLElement>('[data-tile-idx]').forEach(el => {
+      const r = el.getBoundingClientRect()
+      if (r.right > x && r.left < x + w && r.bottom > y && r.top < y + h) { const it = shown[Number(el.dataset.tileIdx)]; if (it) hit.add(it.id) }
+    })
+    setSel(hit)
+    suppressClick.current = true
+  }
+  useEffect(() => {
+    const up = () => { if (gesture.current) endGesture() }
+    window.addEventListener('pointerup', up)
+    return () => window.removeEventListener('pointerup', up)
+  })
+  // Pendant un « glisser pour cocher » au doigt, on bloque le défilement de la page.
+  useEffect(() => {
+    const el = gridRef.current; if (!el) return
+    const block = (ev: TouchEvent) => { if (gesture.current?.kind === 'paint') ev.preventDefault() }
+    el.addEventListener('touchmove', block, { passive: false })
+    return () => el.removeEventListener('touchmove', block)
+  })
+  // Le clic qui suit un appui long / un glisser ne doit pas re-basculer la vignette.
+  const onGridClickCapture = (e: React.MouseEvent) => {
+    if (suppressClick.current) { e.stopPropagation(); e.preventDefault(); suppressClick.current = false }
+  }
+  // Raccourcis clavier : Ctrl/⌘+A, Suppr, Échap (hors champs de saisie et fenêtres).
+  useEffect(() => {
+    if (tab === 'caption') return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.closest('input,textarea,select,[contenteditable]') || document.querySelector('[role=dialog]'))) return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); setSel(new Set(shown.map(m => m.id))) }
+      else if ((e.key === 'Delete' || e.key === 'Backspace') && sel.size) { e.preventDefault(); setConfirmDel([...sel]) }
+      else if (e.key === 'Escape' && sel.size) setSel(new Set())
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [tab, shown, sel])
+
   const isCloud = infra === 'cloud'
   const TABS: { k: TabKey; l: string; n: number }[] = [
     { k: 'video', l: 'Vidéos', n: counts.video },
@@ -894,13 +1011,17 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               action={<Btn label="Réinitialiser" theme={theme} sm onClick={() => { setQ(''); setFolder('Tous') }} />}
             />
           ) : (
-            <div style={{
+            <div ref={gridRef}
+              onPointerDown={onGridPointerDown} onPointerMove={onGridPointerMove} onPointerUp={endGesture} onPointerCancel={endGesture} onPointerLeave={e => { if (gesture.current?.kind !== 'band') return; if (e.buttons === 0) endGesture() }}
+              onClickCapture={onGridClickCapture}
+              onContextMenuCapture={e => { if (suppressClick.current || gesture.current?.kind === 'paint') { e.preventDefault(); e.stopPropagation() } }}
+              style={{
               display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(112px,132px))',
-              gap: 8, padding: 16,
+              gap: 8, padding: 16, WebkitUserSelect: 'none', userSelect: 'none',
             }}>
               {shown.map((i, idx) => (
                 <Tile
-                  key={i.id} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)}
+                  key={i.id} idx={idx} selecting={selecting} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={(e) => toggleAt(idx, i.id, e.shiftKey)}
                   onDragStart={e => e.dataTransfer.setData('text/plain', i.id)}
                   onOpen={() => openPlayer(i)}
@@ -911,6 +1032,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           )}
         </Panel>
       </div>
+      {band && createPortal(<div aria-hidden style={{ position: 'fixed', left: band.x, top: band.y, width: band.w, height: band.h, zIndex: 80, pointerEvents: 'none', borderRadius: 4, border: `1px solid ${theme.accent}`, background: `rgba(${theme.tone},0.12)` }} />, document.body)}
 
       {/* Barre d'actions groupées (sticky) */}
       {sel.size > 0 && (
@@ -932,9 +1054,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setMoveOpen(true)} />
           <Btn label="Télécharger" theme={theme} sm icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" onClick={() => downloadMedia([...sel])} />
           <Btn label="Supprimer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />
-          <span style={{ marginLeft: 'auto' }}>
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {sel.size < shown.length && <Btn label={`Tout sélectionner (${shown.length})`} theme={theme} sm tone="ghost" onClick={() => setSel(new Set(shown.map(m => m.id)))} />}
             <Btn label="Désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
           </span>
+          <span style={{ flexBasis: '100%', fontSize: 11.5, color: '#71717A' }}>Astuce : clique ou glisse sur les vignettes pour en cocher plusieurs · rectangle sur un espace vide · Ctrl+A tout · Suppr supprime · Échap annule</span>
         </div>
       )}
 

@@ -64,16 +64,48 @@ function EntryView({ e, theme, isNew }: { e: ChangelogEntry; theme: Theme; isNew
   )
 }
 
-export function WhatsNewModal({ theme, onClose, entries = CHANGELOG.slice(0, 3) }: { theme: Theme; onClose: () => void; entries?: ChangelogEntry[] }) {
+// Les 3 dernières par défaut ; « Voir toutes les mises à jour » déplie tout l'historique,
+// regroupé par mois. `entries` force une liste précise (nouvelle version pas encore chargée).
+export function WhatsNewModal({ theme, onClose, entries, startAll = false }: { theme: Theme; onClose: () => void; entries?: ChangelogEntry[]; startAll?: boolean }) {
   useLang()
+  const [all, setAll] = useState(startAll && !entries)
+  const list = entries ?? (all ? CHANGELOG : CHANGELOG.slice(0, 3))
+  const months: { key: string; label: string; items: ChangelogEntry[] }[] = []
+  for (const e of list) {
+    const key = e.date.slice(0, 7)
+    let g = months.find(m => m.key === key)
+    if (!g) {
+      const d = new Date(e.date + 'T12:00:00')
+      const label = d.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })
+      g = { key, label: label.charAt(0).toUpperCase() + label.slice(1), items: [] }
+      months.push(g)
+    }
+    g.items.push(e)
+  }
+  const canExpand = !entries && CHANGELOG.length > 3
   return (
     <Modal theme={theme} icon="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z"
       title={pick({ fr: 'Nouveautés', en: "What's new" })}
-      sub={pick({ fr: 'Les 3 dernières mises à jour de ScaleFlow', en: 'The last 3 ScaleFlow updates' })}
-      onClose={onClose} width={520}
-      footer={<Btn theme={theme} tone="primary" label={pick({ fr: 'OK', en: 'Got it' })} onClick={onClose} />}>
+      sub={all
+        ? pick({ fr: `Toutes les mises à jour de ScaleFlow (${CHANGELOG.length})`, en: `All ScaleFlow updates (${CHANGELOG.length})` })
+        : pick({ fr: 'Les 3 dernières mises à jour de ScaleFlow', en: 'The last 3 ScaleFlow updates' })}
+      onClose={onClose} width={560}
+      footer={<>
+        {canExpand && <span style={{ marginRight: 'auto' }}>
+          <Btn theme={theme} tone="ghost" label={all
+            ? pick({ fr: 'Voir seulement les 3 dernières', en: 'Show only the last 3' })
+            : pick({ fr: `Voir toutes les mises à jour (${CHANGELOG.length})`, en: `See all updates (${CHANGELOG.length})` })}
+            onClick={() => setAll(a => !a)} />
+        </span>}
+        <Btn theme={theme} tone="primary" label={pick({ fr: 'OK', en: 'Got it' })} onClick={onClose} />
+      </>}>
       <div data-no-tr style={{ marginTop: -14 }}>
-        {entries.map((e, i) => <EntryView key={e.id} e={e} theme={theme} isNew={i === 0} />)}
+        {all ? months.map(m => (
+          <div key={m.key}>
+            <div style={{ position: 'sticky', top: -18, zIndex: 1, padding: '14px 0 6px', background: '#111113', fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{m.label}</div>
+            {m.items.map(e => <EntryView key={e.id} e={e} theme={theme} isNew={e.id === CHANGELOG[0].id} />)}
+          </div>
+        )) : list.map((e, i) => <EntryView key={e.id} e={e} theme={theme} isNew={i === 0} />)}
       </div>
     </Modal>
   )
@@ -131,12 +163,12 @@ export function WhatsNewBar({ theme }: { theme: Theme }) {
             </ul>
           </div>
           <span style={{ display: 'flex', gap: 8, alignSelf: 'center' }}>
-            <Btn sm theme={theme} tone="quiet" label={pick({ fr: 'Voir les 3 dernières MAJ', en: 'See the last 3 updates' })} onClick={() => { setOpen(true); markSeen() }} />
+            <Btn sm theme={theme} tone="quiet" label={pick({ fr: 'Toutes les MAJ', en: 'All updates' })} onClick={() => { setOpen(true); markSeen() }} />
             <Btn sm theme={theme} tone="primary" label={pick({ fr: 'OK, compris', en: 'Got it' })} onClick={markSeen} />
           </span>
         </div>
       )}
-      {open && <WhatsNewModal theme={theme} onClose={() => setOpen(false)} />}
+      {open && <WhatsNewModal theme={theme} onClose={() => setOpen(false)} startAll />}
     </>
   )
 }
