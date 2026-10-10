@@ -56,13 +56,13 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
         {PLATS.map(pl => (
           <section key={pl.k}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 7, background: '#161618', border: '1px solid rgba(255,255,255,0.08)', color: pl.color }}><Icon d={pl.icon} size={14} /></span>
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 99, background: pl.color, flexShrink: 0 }} />
+              <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{pl.label}</span>
-                <span style={{ fontSize: 12, color: '#8B8B94' }}>{pl.sub}</span>
+                <span style={{ fontSize: 12, color: '#71717A' }}>{pl.sub}</span>
               </span>
             </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(280px,100%),1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(260px,100%),1fr))', gap: 12 }}>
         {FORMATS.filter(f => f.plat === pl.k).map(f => {
           const adminOnly = (f.id === 'cross' || f.id === 'photo') && !isAdmin
           const locked = !f.ready || adminOnly
@@ -78,11 +78,13 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
                 <Icon d={f.icon} size={15} />
               </span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{f.t}</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 7px', borderRadius: 5, fontSize: 11, fontWeight: 500, color: '#A1A1AA', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', whiteSpace: 'nowrap' }}><span style={{ width: 6, height: 6, borderRadius: 99, background: PLATS.find(x => x.k === f.plat)!.color }} />{PLATS.find(x => x.k === f.plat)!.label}</span>
-              <span style={{ marginLeft: 'auto' }}><Chip text={adminOnly ? 'Admin' : f.ready ? f.cost : 'Bientôt'} tone={adminOnly ? 'violet' : 'mute'} /></span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.t}</span>
             </span>
-            <span style={{ fontSize: 12.5, lineHeight: 1.55, color: '#8B8B94' }}>{adminOnly ? 'Réservé au superadmin.' : f.d}</span>
+            <span style={{ flex: 1, fontSize: 12.5, lineHeight: 1.55, color: '#8B8B94' }}>{adminOnly ? 'Réservé au superadmin.' : f.d}</span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <Chip text={adminOnly ? 'Admin' : f.ready ? f.cost : 'Bientôt'} tone={adminOnly ? 'violet' : 'mute'} />
+              {!locked && <span style={{ display: 'flex', color: '#71717A' }}><Icon d="M5 12h14|M13 6l6 6-6 6" size={14} /></span>}
+            </span>
           </button>
           )
         })}
