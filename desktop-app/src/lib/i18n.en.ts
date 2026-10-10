@@ -1882,6 +1882,7 @@ export const EN: Dict = {
     "Vidéos sur tes comptes TikTok (les téléphones doivent être connectés à TikTok).": "Videos on your TikTok accounts (phones must be logged in to TikTok).",
     "Autres réseaux": "Other networks",
     "Facebook, YouTube Shorts, X, Threads, Reddit, Pinterest.": "Facebook, YouTube Shorts, X, Threads, Reddit, Pinterest.",
+    "Clique une vidéo pour choisir sa miniature": "Click a video to pick its thumbnail",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

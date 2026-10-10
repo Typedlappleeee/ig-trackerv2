@@ -605,11 +605,23 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
             {/* Essai Reels */}
             {!tiktok && <RunToggle label="Essai Reels" hint="Publie en mode essai (visible non-abonnés)" on={reelsTrial} onToggle={() => setReelsTrial(v => !v)} theme={theme} border />}
             {/* Miniatures par vidéo (définies à l'étape Vidéos) — Instagram uniquement */}
-            {!tiktok && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' }}>
-              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {!tiktok && <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 16px' }}>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Miniatures (couverture)</span>
-                <span style={{ fontSize: 12, color: '#8B8B94' }}>{Object.keys(covers).length > 0 ? `${Object.keys(covers).length} vidéo(s) avec miniature — modifiable à l’étape Vidéos` : 'Optionnel — choisis une miniature par vidéo à l’étape Vidéos (icône 🖼)'}</span>
+                <span style={{ fontSize: 12, color: '#8B8B94' }}>Clique une vidéo pour choisir sa miniature</span>
               </span>
+              {/* Sélecteur de miniature directement ici, à la fin : une vignette par vidéo choisie. */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {videos.filter(v => vidSel.has(v.id)).map(v => (
+                  <button key={v.id} type="button" title={v.title}
+                    onClick={async () => { const url = await resolveVideoUrl(v); setCoverPickerFor({ id: v.id, url: url ?? '' }) }}
+                    style={{ position: 'relative', width: 54, height: 96, padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: '#161618',
+                      border: covers[v.id] ? `2px solid ${theme.accent}` : '1px solid rgba(255,255,255,0.12)' }}>
+                    {(covers[v.id] ?? thumbFor(v)) && <img src={covers[v.id] ?? thumbFor(v) ?? undefined} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                    <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '2px 0', fontSize: 11, fontWeight: 500, color: '#fff', background: 'rgba(0,0,0,0.6)', textAlign: 'center' }}>{covers[v.id] ? '✓' : '+'}</span>
+                  </button>
+                ))}
+              </div>
             </div>}
           </Panel>
           <Panel theme={theme}>
