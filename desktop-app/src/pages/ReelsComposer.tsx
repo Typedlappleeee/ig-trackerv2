@@ -489,7 +489,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
       {/* ── Étape 2 : Vidéos ── */}
       {step === 2 && (
         <Panel theme={theme}>
-          <PanelHead title="Quel contenu ?" sub="Plusieurs vidéos ? Elles seront réparties entre les comptes." right={<>
+          <PanelHead title="Quel contenu ?" sub={tiktok ? 'Plusieurs vidéos ? Elles seront réparties entre les comptes.' : 'Plusieurs vidéos ? Elles seront réparties entre les comptes. Bouton « Miniature » sur chaque vidéo pour choisir sa couverture.'} right={<>
             <Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPicker('videos')} />
             <Chip text={`${nVid} sélectionnée${nVid > 1 ? 's' : ''}`} tone="mute" />
           </>} />
@@ -509,12 +509,17 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
                       : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
                     <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     {/* Miniature par vidéo = une FRAME de la vidéo. Clic → sélecteur d'image (n'active pas le toggle). */}
-                    <span role="button" title={covers[v.id] ? 'Miniature choisie — cliquer pour changer' : 'Choisir la miniature (image de la vidéo)'}
+                    {!tiktok && <span role="button" title={covers[v.id] ? 'Miniature choisie — cliquer pour changer' : 'Choisir la miniature (image de la vidéo)'}
                       onClick={async e => { e.stopPropagation(); const url = await resolveVideoUrl(v); setCoverPickerFor({ id: v.id, url: url ?? '' }) }}
-                      style={{ position: 'absolute', bottom: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 5, overflow: 'hidden', backgroundColor: 'rgba(10,10,11,0.72)', backgroundImage: covers[v.id] ? `url(${covers[v.id]})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', border: covers[v.id] ? '1px solid rgba(255,255,255,0.7)' : '1px solid rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer' }}>
-                      {!covers[v.id] && <Icon d="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" size={11} />}
-                    </span>
-                    {fmtDur(v.duration) && <span style={{ position: 'absolute', bottom: 5, left: 6, fontSize: 11, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: 'rgba(255,255,255,0.85)' }}>{fmtDur(v.duration)}</span>}
+                      style={{ position: 'absolute', left: 6, right: 6, bottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, height: 26, borderRadius: 6,
+                        background: covers[v.id] ? theme.accent : 'rgba(10,10,11,0.82)', border: covers[v.id] ? 'none' : '1px solid rgba(255,255,255,0.28)',
+                        color: '#fff', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
+                      {covers[v.id]
+                        ? <span style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0, backgroundImage: `url(${covers[v.id]})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid rgba(255,255,255,0.7)' }} />
+                        : <Icon d="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" size={12} />}
+                      {covers[v.id] ? 'Miniature ✓' : 'Miniature'}
+                    </span>}
+                    {fmtDur(v.duration) && <span style={{ position: 'absolute', top: 6, left: 7, textShadow: '0 1px 3px rgba(0,0,0,0.6)', fontSize: 11, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: 'rgba(255,255,255,0.85)' }}>{fmtDur(v.duration)}</span>}
                   </button>
                 )
               })}
