@@ -12,6 +12,7 @@ import { useConnections } from '@/lib/connections'
 import { geelarkUploadVideo, geelarkUploadImageData, postReelToPhone, scheduleReelOnPhone, startPhones } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
+import ReelPreview from '@/components/ReelPreview'
 import { generateCaption } from '@/lib/ai'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
@@ -27,7 +28,7 @@ function schedLocalValue(plusMin: number): string {
 }
 const defaultSchedVal = () => schedLocalValue(60)   // par défaut : dans 1h
 
-interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null; ig_status: string | null; last_post_at: string | null; account_state: string | null }
+interface Phone { id: string; ig_username: string | null; pp_url?: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null; ig_status: string | null; last_post_at: string | null; account_state: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; duration: number | null; notes: string | null }
 
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
@@ -157,7 +158,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
     setLoading(true)
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, vRes, bal] = await Promise.all([
-      scope(supabase.from('phones').select('id,ig_username,phone_name,status,group_name,geelark_id,ig_status,last_post_at,account_state')).not('geelark_id', 'is', null).order('phone_name'),
+      scope(supabase.from('phones').select('id,ig_username,phone_name,status,group_name,geelark_id,ig_status,last_post_at,account_state,pp_url')).not('geelark_id', 'is', null).order('phone_name'),
       scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }),
       // Solde fiable (RPC SECURITY DEFINER côté perso → contourne la RLS de user_credits).
       currentOrg ? fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : fetchBalance(user.id),
@@ -541,13 +542,13 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
           </Panel>
           <Panel theme={theme}>
             <PanelHead title="Aperçu" />
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 26, height: 26, borderRadius: 99, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', boxSizing: 'border-box', flexShrink: 0 }} />
-                <span style={{ fontSize: 12.5, fontWeight: 500, color: '#EDEDEF' }}>@{phones.find(p => sel.has(p.id))?.ig_username ?? 'compte'}</span>
-              </div>
-              <div style={{ aspectRatio: '9 / 14', borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.07)' }} />
-              <div style={{ fontSize: 12.5, lineHeight: 1.55, color: '#A1A1AA' }}>{(() => { const c = captions.find(x => x.trim()); return c ? c.split('\n')[0].slice(0, 62) + (c.length > 62 ? '…' : '') : 'Aucune légende' })()}</div>
+            <div style={{ padding: 16 }}>
+              <ReelPreview theme={theme}
+                videos={videos.filter(v => vidSel.has(v.id)).map(v => ({ id: v.id, title: v.title }))}
+                accounts={phones.filter(p => sel.has(p.id)).map(p => ({ username: p.ig_username ?? phoneLabel(p), pp: p.pp_url }))}
+                captions={captions}
+                resolveUrl={async id => { const v = videos.find(x => x.id === id); return v ? resolveVideoUrl(v) : null }}
+                posterFor={id => covers[id] ?? (() => { const v = videos.find(x => x.id === id); return v ? thumbFor(v) ?? undefined : undefined })()} />
             </div>
           </Panel>
         </div>
