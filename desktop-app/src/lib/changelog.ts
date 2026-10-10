@@ -14,22 +14,14 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     id: '2026-10-10',
     date: '2026-10-10',
-    title: { fr: 'Automatisations fiables + édition en masse vérifiée', en: 'Reliable automations + verified bulk editing' },
+    title: { fr: 'Mise à jour Flow Builder', en: 'Flow Builder update' },
     items: {
       fr: [
-        'Flow Builder : chaque bloc repart d’un Instagram propre, quel que soit le bloc d’avant (plus de bloc qui échoue parce que le précédent est resté sur une page).',
-        'Chaque bloc a une durée maximale : une tâche bloquée est annulée chez GeeLark et la suite continue proprement. « Arrêter » interrompt vraiment le bloc en cours.',
-        'Plus de double post : une publication dont le résultat est incertain n’est jamais relancée par-dessus.',
-        'Édition en masse : le @ et la photo sont vérifiés à l’écran (plus de faux « OK »), le bon compte est choisi, les fenêtres Instagram sont fermées, Instagram en français reconnu.',
-        'Édition en masse : plusieurs téléphones en même temps, rotation d’IP appliquée, suivi en direct qui reste affiché même si tu changes de page, et historique dans Activité.',
+        'Mise à jour du Flow Builder.',
         'Interface plus nette partout : champs, interrupteurs et onglets harmonisés, chargements plus fluides, meilleur affichage sur mobile.',
       ],
       en: [
-        'Flow Builder: every block starts from a clean Instagram, whatever the previous block did (no more blocks failing because the last one stayed on a screen).',
-        'Each block has a time limit: a stuck task is cancelled on GeeLark and the flow carries on cleanly. “Stop” really interrupts the running block.',
-        'No more double posts: a post with an uncertain result is never re-posted on top.',
-        'Bulk editing: the @ and the picture are checked on screen (no more false “OK”), the right account is picked, Instagram pop-ups are dismissed, French Instagram is recognised.',
-        'Bulk editing: several phones at once, IP rotation applied, live progress that stays visible when you switch pages, and history in Activity.',
+        'Flow Builder update.',
         'Cleaner interface everywhere: consistent fields, switches and tabs, smoother loading, better on mobile.',
       ],
     },
