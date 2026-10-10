@@ -28,24 +28,63 @@ export function geelarkStatusLabel(status: number): string {
   return (status === 0 || status === 2) ? 'online' : 'offline'
 }
 
+// Délai réseau : un appel GeeLark bloqué ne doit jamais figer un bloc d'automatisation.
+const FETCH_TIMEOUT_MS = 45_000
+
 export async function geelarkFetch(path: string, body: unknown, bearer: string): Promise<Record<string, unknown>> {
-  // WEB : relais serverless (bypass CORS). Electron : appel direct.
-  if (IS_WEB) {
-    const res = await fetch('/api/geelark', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ method: 'POST', url: `${BASE}${path}`, headers: { Authorization: `Bearer ${bearer}` }, body: body ?? {} }),
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS)
+  try {
+    // WEB : relais serverless (bypass CORS). Electron : appel direct.
+    if (IS_WEB) {
+      const res = await fetch('/api/geelark', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+        body: JSON.stringify({ method: 'POST', url: `${BASE}${path}`, headers: { Authorization: `Bearer ${bearer}` }, body: body ?? {} }),
+      })
+      const j = await res.json() as { ok: boolean; error?: string; data?: unknown }
+      if (!j.ok) throw new Error(j.error || 'GeeLark (relais) : échec')
+      return (j.data ?? {}) as Record<string, unknown>
+    }
+    const res = await fetch(`${BASE}${path}`, {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+      body: JSON.stringify(body ?? {}),
     })
-    const j = await res.json() as { ok: boolean; error?: string; data?: unknown }
-    if (!j.ok) throw new Error(j.error || 'GeeLark (relais) : échec')
-    return (j.data ?? {}) as Record<string, unknown>
+    if (!res.ok) throw new Error(`GeeLark HTTP ${res.status}`)
+    return (await res.json()) as Record<string, unknown>
+  } catch (e) {
+    if (ctrl.signal.aborted) throw new Error('GeeLark ne répond pas (délai réseau dépassé)')
+    throw e
+  } finally { clearTimeout(timer) }
+}
+
+// ── Interruption d'un téléphone (annulation d'un run, délai max d'un bloc) ─────
+// abortPhone(id) : la primitive en cours sur ce téléphone s'arrête à sa prochaine
+// attente, et sa tâche GeeLark en cours est annulée (pas de tâche orpheline qui
+// continuerait de cliquer pendant le bloc suivant).
+const _aborted = new Set<string>()
+const _currentTask = new Map<string, string>()
+export class PhoneAbortedError extends Error { constructor() { super('Interrompu'); this.name = 'PhoneAbortedError' } }
+export function abortPhone(phoneId: string): void { _aborted.add(phoneId) }
+export function clearPhoneAbort(phoneId: string): void { _aborted.delete(phoneId) }
+export function isPhoneAborted(phoneId: string): boolean { return _aborted.has(phoneId) }
+export function throwIfAborted(phoneId: string): void { if (_aborted.has(phoneId)) throw new PhoneAbortedError() }
+/** Attente interruptible (par pas de 1 s). Lève PhoneAbortedError si le téléphone est interrompu. */
+export async function waitPhone(phoneId: string, ms: number): Promise<void> {
+  const end = Date.now() + ms
+  while (Date.now() < end) {
+    throwIfAborted(phoneId)
+    await sleep(Math.min(1000, end - Date.now()))
   }
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify(body ?? {}),
-  })
-  if (!res.ok) throw new Error(`GeeLark HTTP ${res.status}`)
-  return (await res.json()) as Record<string, unknown>
+  throwIfAborted(phoneId)
+}
+/** Annule la tâche RPA GeeLark en cours sur ce téléphone (s'il y en a une). */
+export async function cancelPhoneTask(bearer: string, phoneId: string, log?: (m: string) => void): Promise<void> {
+  const t = _currentTask.get(phoneId)
+  if (!t) return
+  _currentTask.delete(phoneId)
+  const ok = await cancelGeelarkTask(bearer, t)
+  log?.(ok ? '   ⏹ Tâche GeeLark annulée' : '   ⚠ Annulation de la tâche GeeLark non confirmée')
 }
 
 // Liste paginée des téléphones GeeLark. Lève une erreur claire si le token est refusé.
@@ -243,7 +282,8 @@ export async function ensurePhoneRunning(bearer: string, phoneId: string, log: (
   // de vie n'arrive (onglet fermé, plantage…). Prolongé pendant les tâches.
   void leasePhone(phoneId)
   if (_managedPhones.has(phoneId)) {
-    const st = await phoneStatus(bearer, phoneId, true)
+    let st = await phoneStatus(bearer, phoneId, true)
+    if (st === -1) { await sleep(3000); st = await phoneStatus(bearer, phoneId, true) }   // liste momentanément indisponible
     if (st === 0) return { ok: true }
     log('↻ Le téléphone s\'est éteint entre deux blocs — redémarrage…')
     if (st === 3) await sleep(8000)   // en cours d'arrêt : GeeLark refuse un start immédiat
@@ -260,12 +300,17 @@ export async function ensurePhoneRunning(bearer: string, phoneId: string, log: (
   }
 
   log('⏳ Attente du démarrage (max 120 s)…')
+  let lastSt = -1
   for (let i = 0; i < 24; i++) {
     await sleep(5000)
-    if (await phoneStatus(bearer, phoneId) === 0) { log('  ✅ Téléphone démarré'); return { ok: true } }
+    lastSt = await phoneStatus(bearer, phoneId)
+    if (lastSt === 0) { log('  ✅ Téléphone démarré'); return { ok: true } }
   }
-  log('  ⚠️ Démarrage non confirmé — on poursuit quand même')
-  return { ok: true }
+  // Statut illisible (liste GeeLark indisponible) ≠ téléphone éteint : on poursuit
+  // prudemment. Téléphone vu éteint / en arrêt → échec clair au lieu d'un faux OK.
+  if (lastSt === -1 || lastSt === 2) { log('  ⚠️ Démarrage non confirmé — on poursuit quand même'); return { ok: true } }
+  log('  ❌ Le téléphone ne s’est pas allumé (120 s)')
+  return { ok: false, reason: 'Le téléphone ne s’est pas allumé en 120 s' }
 }
 
 // Tâche RPA créée sur un téléphone → abonnés (historique des runs : chaque compte
@@ -295,13 +340,24 @@ export async function queryTaskResults(bearer: string, ids: string[]): Promise<R
 }
 
 // Sonde une tâche RPA jusqu'à complétion. Statuts GeeLark : 3=Done, 4=Failed, 7/8=annulé/erreur.
-async function pollRpaTask(bearer: string, phoneId: string, taskId: string, log: (m: string) => void, timeoutMs: number): Promise<{ ok: boolean; error?: string }> {
+// Résultat d'une tâche : `definite` = GeeLark a répondu « échec » (statut 4/7/8) ;
+// sinon (délai dépassé, interruption) on ne sait PAS si le post est parti → aucun
+// repli ne doit relancer une autre publication par-dessus (risque de double post).
+export interface TaskResult { ok: boolean; error?: string; definite?: boolean; aborted?: boolean }
+
+async function pollRpaTask(bearer: string, phoneId: string, taskId: string, log: (m: string) => void, timeoutMs: number): Promise<TaskResult> {
   _taskListeners.forEach(f => { try { f(phoneId, taskId) } catch { /* abonné défaillant */ } })
+  _currentTask.set(phoneId, taskId)
+  const done = (r: TaskResult): TaskResult => { if (_currentTask.get(phoneId) === taskId) _currentTask.delete(phoneId); return r }
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     // Signe de vie : la tâche tourne → le watchdog serveur ne coupe pas le téléphone.
     heartbeatPhone(phoneId)
-    await sleep(15000)
+    try { await waitPhone(phoneId, 15000) } catch {
+      log('   ⏹ Interrompu — annulation de la tâche GeeLark…')
+      await cancelPhoneTask(bearer, phoneId, log)
+      return done({ ok: false, error: 'Interrompu', aborted: true })
+    }
     let q: Record<string, unknown>
     try { q = await geelarkFetch('/task/query', { ids: [taskId] }, bearer) } catch { continue }
     const d = (q['data'] ?? q) as Record<string, unknown>
@@ -309,18 +365,19 @@ async function pollRpaTask(bearer: string, phoneId: string, taskId: string, log:
     const it = list.find(x => String(x['id'] ?? x['taskId']) === String(taskId)) ?? list[0]
     if (!it) continue
     const st = Number(it['status'])
-    if (st === 3) { log('   ✅ Tâche terminée'); return { ok: true } }
+    if (st === 3) { log('   ✅ Tâche terminée'); return done({ ok: true }) }
     if ([4, 7, 8].includes(st)) {
       const fd = (it['failDesc'] ?? it['failMsg'] ?? it['msg']) as string | undefined
       log(`   ❌ Tâche échouée : ${fd ?? `statut ${st}`}`)
-      return { ok: false, error: fd ?? `statut ${st}` }
+      return done({ ok: false, error: fd ?? `statut ${st}`, definite: true })
     }
   }
-  // Délai dépassé : on ne sait pas si la tâche a abouti, et le `finally` de
-  // l'appelant éteint le téléphone (donc la coupe). On le signale comme un échec
-  // plutôt qu'un faux succès (crédits remboursés, média non mis à la corbeille).
-  log('   ⏳ Délai dépassé — tâche non confirmée, téléphone éteint.')
-  return { ok: false, error: 'Délai dépassé (tâche non confirmée)' }
+  // Délai dépassé : on ne sait pas si la tâche a abouti. On l'ANNULE chez GeeLark
+  // (sinon elle continue de cliquer pendant le bloc suivant) et on le signale comme
+  // un échec plutôt qu'un faux succès (crédits remboursés, média non mis à la corbeille).
+  log('   ⏳ Délai dépassé — tâche non confirmée, annulation…')
+  await cancelPhoneTask(bearer, phoneId, log)
+  return done({ ok: false, error: 'Délai dépassé (tâche non confirmée)' })
 }
 
 // Warmup via flow RPA GeeLark CUSTOM (fourni) : recherche mot-clé + Reels, avec
@@ -1016,6 +1073,9 @@ export async function postReelToPhone(
           log('   Tâche créée — publication en cours…')
           const rC = await pollRpaTask(bearer, phoneId, tidC, log, 20 * 60_000)
           if (rC.ok) return rC
+          // Délai dépassé / interrompu : le Reel est peut-être parti → JAMAIS de repli
+          // (une 2e publication par-dessus = double post).
+          if (!rC.definite) return rC
           // Compte réellement déconnecté → aucun flow ne peut publier : message clair, pas de repli.
           if (/not logged in|login wall|sign in before|needhuman|déconnect/i.test(rC.error ?? '')) {
             log('   ⛔ Compte DÉCONNECTÉ sur ce téléphone — reconnecte-le (onglet Connexion) avant de reposter.')

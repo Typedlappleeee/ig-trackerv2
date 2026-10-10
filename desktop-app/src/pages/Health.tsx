@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, StatusDot, Panel, PanelHead, PageHead, Kpi, Empty, ConnectBanner } from '@/lib/ui'
+import { Btn, Chip, Icon, StatusDot, Panel, PanelHead, PageHead, Kpi, Empty, ConnectBanner, SkeletonRows } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { scopeInfra } from '@/lib/data'
 import { deriveHealth, healthColor, healthReason } from '@/lib/health'
@@ -46,12 +46,12 @@ function Bar({ v }: { v: number }) {
 
 const COLS = 'minmax(0,1.2fr) 168px 84px 84px 96px'
 
-const CRITERIA: [string, number, string, string][] = [
-  ['Âge du compte', 20, 'Un compte de moins de 14 jours est fragile', '#6366F1'],
-  ['Cadence', 25, 'Posts par jour comparés au seuil sûr de la plateforme', '#06B6D4'],
-  ['Blocages récents', 30, 'Actions refusées sur les 7 derniers jours', '#EF4444'],
-  ['Taux de succès', 15, 'Publications réussies sur les 30 dernières', '#10B981'],
-  ['Warmup', 10, 'Sessions de chauffe effectuées ce mois', '#F59E0B'],
+const CRITERIA: [string, number, string][] = [
+  ['Âge du compte', 20, 'Un compte de moins de 14 jours est fragile'],
+  ['Cadence', 25, 'Posts par jour comparés au seuil sûr de la plateforme'],
+  ['Blocages récents', 30, 'Actions refusées sur les 7 derniers jours'],
+  ['Taux de succès', 15, 'Publications réussies sur les 30 dernières'],
+  ['Warmup', 10, 'Sessions de chauffe effectuées ce mois'],
 ]
 
 export default function Health({ theme, infra, user, org, onNavigate }: {
@@ -101,14 +101,14 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
         <Panel theme={theme}>
           <PanelHead title="Comment le score est calculé" sub="Cinq critères, recalculés à chaque exécution" right={<Chip text="sur 100" tone="mute" />} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 0 }}>
-            {CRITERIA.map(([l, w, d, c], i) => (
+            {CRITERIA.map(([l, w, d], i) => (
               <div key={l} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, borderRight: i < 4 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
                 <span style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                   <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{w}</span>
                   <span style={{ fontSize: 12, fontWeight: 500, color: '#71717A' }}>pts</span>
                 </span>
                 <span style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                  <span style={{ display: 'block', height: '100%', width: `${(w / 30) * 100}%`, borderRadius: 99, background: c }} />
+                  <span style={{ display: 'block', height: '100%', width: `${(w / 30) * 100}%`, borderRadius: 99, background: theme.accent }} />
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{l}</span>
                 <span style={{ fontSize: 12, lineHeight: 1.5, color: '#8B8B94' }}>{d}</span>
@@ -133,7 +133,7 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
       </div>
 
       {loading ? (
-        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div></Panel>
+        <Panel theme={theme}><SkeletonRows rows={5} avatar /></Panel>
       ) : error ? (
         <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} /></Panel>
       ) : rows.length === 0 ? (
@@ -175,7 +175,8 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
           {/* Classement complet */}
           <Panel theme={theme}>
             <PanelHead title="Tous les comptes" sub="Trié du plus fragile au plus solide" />
-            <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '0 16px', height: 36, borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 11, fontWeight: 500, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#71717A' }}>
+            <div style={{ overflowX: 'auto' }}><div style={{ minWidth: 600 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '0 16px', height: 36, borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 11, fontWeight: 500, color: '#71717A' }}>
               {['Compte', 'Santé', 'Groupe', 'Âge', 'Cadence'].map((h, i) => <span key={i}>{h}</span>)}
             </div>
             {rows.map((p, i) => (
@@ -192,6 +193,7 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
                 <span><Chip text={p.health >= 85 ? 'normale' : p.health >= 70 ? 'à réduire' : 'trop élevée'} tone={p.health >= 85 ? 'ok' : p.health >= 70 ? 'warn' : 'bad'} /></span>
               </div>
             ))}
+            </div></div>
           </Panel>
         </>
       )}

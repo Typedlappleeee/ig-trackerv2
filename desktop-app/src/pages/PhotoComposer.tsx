@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { startRunHistory } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, FIELD_SM, TEXTAREA, Toggle, Segmented, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -30,6 +30,7 @@ function dotKind(s: string): string { return s === 'warming' ? 'warmup' : s }
 
 type Phase = 'pending' | 'running' | 'done' | 'failed'
 interface RunItem { id: string; name: string; phase: Phase; detail?: string }
+const PHONE_ICON = 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01'
 
 export default function PhotoComposer({ theme, user, org, onBack }: {
   theme: Theme; user: User; org: OrgState; onBack: () => void
@@ -37,6 +38,7 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
   const { currentOrg } = org
   const conns = useConnections(user, org)
   const bearer = conns.bearer
+  const narrow = useNarrow()
 
   const [phones, setPhones] = useState<Phone[]>([])
   const [images, setImages] = useState<Media[]>([])
@@ -206,8 +208,6 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
     setRunning(false)
   }
 
-  const inputStyle = { height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const, width: '100%' }
-
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead
@@ -228,7 +228,7 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '280px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         {/* Comptes */}
         <Panel theme={theme}>
           <PanelHead title="Comptes" sub={nSel ? `${nSel} compte${nSel > 1 ? 's' : ''} · ${nSel * 2} crédits` : 'aucun'}
@@ -238,23 +238,23 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
             </>} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Groupe</span>
-            <select value={group} onChange={e => setGroup(e.target.value)} style={{ height: 28, padding: '0 8px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12.5, outline: 'none', cursor: 'pointer' }}>
+            <select value={group} onChange={e => setGroup(e.target.value)} style={{ ...FIELD_SM, width: 'auto', padding: '0 8px', cursor: 'pointer' }}>
               {groups.map(g => <option key={g} value={g} style={{ background: '#161618' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
             </select>
             <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{shownPhones.length} affichés · {nSel} cochés</span>
           </div>
           <div style={{ maxHeight: 460, overflowY: 'auto' }}>
-            {loading ? <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Chargement…</div>
-              : shownPhones.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Aucun compte.</div>
+            {loading ? <SkeletonRows rows={5} avatar />
+              : shownPhones.length === 0 ? <Empty icon={PHONE_ICON} title="Aucun compte." text={null} />
               : shownPhones.map(p => {
                 const on = sel.has(p.id)
                 return (
-                  <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 16px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left', background: on ? 'rgba(255,255,255,0.04)' : 'transparent', boxSizing: 'border-box' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+                  <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 16px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', textAlign: 'left', background: on ? 'rgba(255,255,255,0.04)' : 'transparent', boxSizing: 'border-box' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     <StatusDot kind={dotKind(p.status)} />
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                   </button>
                 )
@@ -279,7 +279,7 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
                       border: '1px solid rgba(255,255,255,0.08)', background: '#161618',
                     }}>
                       {prev && <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', background: 'rgba(10,10,11,0.72)', border: '1px solid rgba(255,255,255,0.16)', color: '#EDEDEF', fontSize: 9, fontWeight: 600 }}>✕</span>
+                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', background: 'rgba(10,10,11,0.72)', border: '1px solid rgba(255,255,255,0.16)', color: '#EDEDEF', fontSize: 11, fontWeight: 600 }}>✕</span>
                     </button>
                   )
                 })}
@@ -287,11 +287,7 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
               {chosenImgs.length > 1 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px 16px' }}>
                   <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Répartition (1 photo/compte)</span>
-                  <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    {(['seq', 'random'] as const).map(mm => (
-                      <button key={mm} onClick={() => setImgMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: imgMode === mm ? 'rgba(255,255,255,0.08)' : 'transparent', color: imgMode === mm ? '#EDEDEF' : '#8B8B94' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
-                    ))}
-                  </span>
+                  <Segmented value={imgMode} onChange={setImgMode} options={[{ v: 'seq', l: 'Séquentiel' }, { v: 'random', l: 'Aléatoire' }]} />
                 </div>
               )}
             </>)}
@@ -304,17 +300,15 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {captions.map((s, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8 }}>
-                  <textarea value={s} onChange={e => setCaptionAt(i, e.target.value)} rows={2} placeholder="Écris ta description…" style={{ ...inputStyle, height: 'auto', minHeight: 52, padding: 10, lineHeight: 1.55, resize: 'vertical', fontFamily: 'inherit' }} />
+                  <textarea value={s} onChange={e => setCaptionAt(i, e.target.value)} rows={2} placeholder="Écris ta description…" style={{ ...TEXTAREA, minHeight: 52, padding: 10, lineHeight: 1.55 }} />
                   {captions.length > 1 && <button onClick={() => removeCaption(i)} title="Retirer" style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#8B8B94', cursor: 'pointer' }}>✕</button>}
                 </div>
               ))}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Ajouter" onClick={() => setCaptions(c => [...c, ''])} />
                 {captions.filter(s => s.trim()).length > 1 && (
-                  <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', marginLeft: 'auto' }}>
-                    {(['seq', 'random'] as const).map(mm => (
-                      <button key={mm} onClick={() => setCapMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: capMode === mm ? 'rgba(255,255,255,0.08)' : 'transparent', color: capMode === mm ? '#EDEDEF' : '#8B8B94' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
-                    ))}
+                  <span style={{ display: 'flex', marginLeft: 'auto' }}>
+                    <Segmented value={capMode} onChange={setCapMode} options={[{ v: 'seq', l: 'Séquentiel' }, { v: 'random', l: 'Aléatoire' }]} />
                   </span>
                 )}
               </div>
@@ -329,10 +323,8 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
                 <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Rotation d’IP proxy</span>
                 <span style={{ fontSize: 12, color: '#8B8B94' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque compte → envoi en série' : 'Désactivée → tout lancer en même temps (parallèle)'}</span>
               </span>
-              <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
-                title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 28, height: 14, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
-                <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
+              <span title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'} style={{ display: 'flex', flexShrink: 0 }}>
+                <Toggle on={rotationOn} disabled={!rotationConfigured} onChange={() => rotationConfigured && setRotationOn(v => !v)} />
               </span>
             </div>
           </Panel>
@@ -347,7 +339,7 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
                   return <Chip key={it.id} text={`${m} @${it.name}`} tone={c as any} />
                 })}
               </div>
-              <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 220, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
+              <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 220, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
                 {logs.length === 0 ? '…' : logs.join('\n')}
               </div>
             </Panel>

@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Panel, PanelHead, PageHead, Kpi, Empty, Modal } from '@/lib/ui'
+import { Btn, Chip, Panel, PanelHead, PageHead, Kpi, Empty, Modal, FIELD, TEXTAREA, MONO, Segmented, SkeletonRows, toast } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 
 // Parse une ligne d'import de proxy (porté de electron-app/src/lib/proxyStore.ts).
@@ -79,7 +79,7 @@ export default function Proxies({ theme, infra, user, org }: {
   }
   async function doAdd() {
     const parsed = addText.split('\n').map(l => parseProxyLine(l, addType)).filter(Boolean) as ReturnType<typeof parseProxyLine>[]
-    if (parsed.length === 0) { setNotice('Aucun proxy valide (format host:port ou user:pass@host:port).'); return }
+    if (parsed.length === 0) { toast('Aucun proxy valide (format host:port ou user:pass@host:port).', 'bad'); return }
     setAdding(true)
     const rowsToInsert = parsed.map(p => ({
       id: newProxyId(), user_id: user.id, org_id: currentOrg?.id ?? null,
@@ -88,8 +88,8 @@ export default function Proxies({ theme, infra, user, org }: {
     }))
     const { error: err } = await supabase.from('cloud_proxies').insert(rowsToInsert)
     setAdding(false)
-    if (err) { setNotice(`Échec de l'ajout : ${err.message}`); return }
-    setAddOpen(false); setAddText(''); setAddGroup(''); setNotice(`${rowsToInsert.length} proxy(s) ajouté(s).`)
+    if (err) { toast(`Échec de l'ajout : ${err.message}`, 'bad'); return }
+    setAddOpen(false); setAddText(''); setAddGroup(''); toast(`${rowsToInsert.length} proxy(s) ajouté(s).`, 'ok')
     load()
   }
 
@@ -167,7 +167,7 @@ export default function Proxies({ theme, infra, user, org }: {
       </div>
 
       {loading ? (
-        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div></Panel>
+        <Panel theme={theme}><SkeletonRows rows={4} /></Panel>
       ) : error ? (
         <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} /></Panel>
       ) : rows.length === 0 ? (
@@ -191,20 +191,7 @@ export default function Proxies({ theme, infra, user, org }: {
           {/* Pools */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94', marginRight: 4 }}>Pools</span>
-            {pools.map(o => {
-              const on = pool === o.g
-              return (
-                <button type="button" key={o.g} onClick={() => setPool(o.g)} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, boxSizing: 'border-box', padding: '0 9px', borderRadius: 6, cursor: 'pointer',
-                  background: on ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  border: '1px solid ' + (on ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)'),
-                  color: on ? '#EDEDEF' : '#A1A1AA', fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
-                }}>
-                  <span>{o.g}</span>
-                  <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: on ? '#A1A1AA' : '#71717A' }}>{o.n}</span>
-                </button>
-              )
-            })}
+            <Segmented value={pool} onChange={setPool} options={pools.map(o => ({ v: o.g, l: <span>{o.g}</span>, n: o.n }))} />
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -230,14 +217,14 @@ export default function Proxies({ theme, infra, user, org }: {
                   <span><Checkbox on={on} onClick={() => toggle(r.id)} label="Sélectionner" /></span>
                   <span>{r.group_name ? <Chip text={r.group_name} tone="mute" /> : <span style={{ fontSize: 12, color: '#5A5A63' }}>—</span>}</span>
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyName(r)}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyEndpoint(r)}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyName(r)}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyEndpoint(r)}</span>
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: '#52525B' }} />
+                    <span style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: '#5A5A63' }} />
                     <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Non testé</span>
                   </span>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#5A5A63' }}>—</span>
+                  <span style={{ fontFamily: MONO, fontSize: 12, color: '#5A5A63' }}>—</span>
                   <span>
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', height: 20, boxSizing: 'border-box', padding: '0 7px', borderRadius: 5,
@@ -275,17 +262,14 @@ export default function Proxies({ theme, infra, user, org }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Type par défaut</span>
-              <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-                {(['socks5', 'http'] as const).map(t => (
-                  <button type="button" key={t} onClick={() => setAddType(t)} style={{ height: 24, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer', background: addType === t ? 'rgba(255,255,255,0.08)' : 'transparent', color: addType === t ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500 }}>{t.toUpperCase()}</button>
-                ))}
-              </span>
+              <Segmented<'socks5' | 'http'> sm value={addType} onChange={setAddType}
+                options={(['socks5', 'http'] as const).map(t => ({ v: t, l: t.toUpperCase() }))} />
               <input value={addGroup} onChange={e => setAddGroup(e.target.value)} placeholder="Groupe (optionnel)"
-                style={{ marginLeft: 'auto', height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }} />
+                style={{ ...FIELD, width: 'auto', marginLeft: 'auto' }} />
             </div>
             <textarea value={addText} onChange={e => setAddText(e.target.value)} rows={8}
               placeholder={'host:port\nhost:port:user:pass\nuser:pass@host:port\nsocks5://user:pass@host:port'}
-              style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12, fontFamily: "'JetBrains Mono',monospace", lineHeight: 1.7, outline: 'none' }} />
+              style={{ ...TEXTAREA, fontSize: 12, fontFamily: MONO, lineHeight: 1.7 }} />
           </div>
         </Modal>
       )}

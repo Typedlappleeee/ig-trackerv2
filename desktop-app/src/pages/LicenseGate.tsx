@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { activateKey } from '@/lib/license'
+import { FIELD, MONO } from '@/lib/ui'
 
 // Écran de licence : affiché après connexion quand le compte n'a PAS de licence valide.
 // Sans clé activée → impossible d'accéder à l'app (comme l'ancien web).
@@ -23,9 +24,9 @@ export default function LicenseGate({ user, expired, onActivated, onSignOut }: {
   }
 
   const input: CSSProperties = {
-    width: '100%', boxSizing: 'border-box', height: 40, padding: '0 12px', borderRadius: 6,
-    background: '#161618', border: `1px solid ${err ? 'rgba(248,113,113,0.5)' : 'rgba(255,255,255,0.09)'}`,
-    color: '#EDEDEF', fontSize: 14, fontFamily: "'JetBrains Mono',monospace", letterSpacing: '0.04em', outline: 'none', textAlign: 'center',
+    ...FIELD, height: 40, padding: '0 12px',
+    border: `1px solid ${err ? 'rgba(248,113,113,0.5)' : 'rgba(255,255,255,0.09)'}`,
+    fontSize: 14, fontFamily: MONO, letterSpacing: '0.04em', textAlign: 'center',
   }
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto', background: '#0A0A0B' }}>

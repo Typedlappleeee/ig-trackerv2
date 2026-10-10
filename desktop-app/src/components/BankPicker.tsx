@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs } from '@/lib/data'
-import { Modal, Btn } from '@/lib/ui'
+import { Modal, Btn, FIELD, Skeleton, SkeletonRows } from '@/lib/ui'
 
 // Sélecteur « Banque » commun (fidèle à _openPicker du prototype ZIP) : une modale
 // avec recherche + grille (vidéos/images) ou liste (légendes), sélection multi ou
@@ -169,7 +169,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
       onClose={onClose} footer={footer} width={620}>
       <div style={{ display: 'flex', gap: 8, padding: '0 0 10px', alignItems: 'center' }}>
         <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…"
-          style={{ flex: 1, minWidth: 0, boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }} />
+          style={{ ...FIELD, flex: 1, minWidth: 0 }} />
         {kind !== 'captions' && <>
           <Btn theme={theme} sm tone="ghost" icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" label={uploading ? 'Import…' : 'Mon PC'} disabled={!!uploading} onClick={() => fileRef.current?.click()} />
           <input ref={fileRef} type="file" multiple accept={kind === 'images' ? 'image/*' : 'video/*'} style={{ display: 'none' }}
@@ -206,7 +206,11 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
         {drag && <div style={{ position: 'absolute', inset: 6, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(10,10,11,0.85)', border: '1px dashed rgba(255,255,255,0.2)', color: '#EDEDEF', fontSize: 13, fontWeight: 500, pointerEvents: 'none' }}>Dépose tes fichiers ici</div>}
         {uploading && <div style={{ marginBottom: 10, fontSize: 12, color: '#A1A1AA' }}>Import en cours : {uploading}</div>}
         {loading ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Chargement…</div>
+          kind === 'captions' ? <SkeletonRows rows={3} /> : (
+            <div aria-busy="true" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 8 }}>
+              {Array.from({ length: 10 }, (_, i) => <Skeleton key={i} r={6} style={{ height: 'auto', aspectRatio: '9 / 16' }} />)}
+            </div>
+          )
         ) : kind === 'captions' ? (
           filteredCaps.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Aucune légende.</div> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -215,7 +219,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
                 return (
                   <button key={c.id} onClick={() => toggle(c.id)} style={{
                     display: 'flex', flexDirection: 'column', gap: 4, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                    background: on ? 'rgba(255,255,255,0.05)' : '#141416', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.07)'),
+                    background: on ? 'rgba(255,255,255,0.05)' : '#161618', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.07)'),
                   }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: on ? '#EDEDEF' : '#D4D4D8' }}>{c.title || 'Légende'}</span>
                     <span style={{ fontSize: 12, lineHeight: 1.55, color: '#8B8B94', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.content}</span>

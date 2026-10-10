@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal, SkeletonRows } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal, SkeletonRows, toast } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { cancelGeelarkTask } from '@/lib/geelark'
@@ -36,12 +36,9 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
   const conns = useConnections(user, org)
   const [rows, setRows] = useState<Sched[]>([])
   const [loading, setLoading] = useState(true)
-  const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState<Sched | null>(null)
-
-  useEffect(() => { if (notice) { const t = setTimeout(() => setNotice(null), 3500); return () => clearTimeout(t) } }, [notice])
 
   // background = rafraîchissement silencieux (pas de clignotement « Chargement »).
   const load = useCallback(async (background = false) => {
@@ -77,25 +74,25 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
   async function cancel(s: Sched) {
     setConfirmCancel(null)
     const ids = s.result?.geelark_task_ids ?? []
-    if (s.status === 'geelark' && ids.length && !conns.bearer) { setNotice('Connexion GeeLark en cours de chargement — réessaie dans un instant.'); return }
+    if (s.status === 'geelark' && ids.length && !conns.bearer) { toast('Connexion GeeLark en cours de chargement — réessaie dans un instant.', 'info'); return }
     setBusy(s.id)
     try {
       const claim = s.status === 'geelark'
         ? await supabase.from('scheduled_posts').delete().eq('id', s.id).eq('status', 'geelark').select('id')
         : await supabase.from('scheduled_posts').update({ status: 'cancelled' }).eq('id', s.id).eq('status', 'pending').select('id')
       if (claim.error) throw new Error(claim.error.message)
-      if (!claim.data?.length) { setNotice('Déjà annulé ou déjà parti — rien à rembourser.'); load(true); return }
+      if (!claim.data?.length) { toast('Déjà annulé ou déjà parti — rien à rembourser.', 'info'); load(true); return }
       let okC = ids.length
       if (s.status === 'geelark' && ids.length) okC = (await Promise.all(ids.map(t => cancelGeelarkTask(conns.bearer!, t)))).filter(Boolean).length
       const owner = s.result?.owner_id, total = s.result?.credits_total ?? 0
       const refund = ids.length ? Math.round(total * okC / ids.length) : total
       if (owner && refund > 0) await refundCredits(owner, refund)
       const lost = ids.length - okC
-      setNotice(lost > 0
+      toast(lost > 0
         ? `Annulé — ${refund} crédits remboursés. ${lost} post(s) déjà parti(s) chez GeeLark, non remboursé(s).`
-        : refund > 0 ? `Annulé — ${refund} crédits remboursés.` : 'Annulé.')
+        : refund > 0 ? `Annulé — ${refund} crédits remboursés.` : 'Annulé.', 'ok')
       load(true)
-    } catch (e) { setNotice(`Échec de l'annulation : ${e instanceof Error ? e.message : ''}`) }
+    } catch (e) { toast(`Échec de l'annulation : ${e instanceof Error ? e.message : ''}`, 'bad') }
     setBusy(null)
   }
 
@@ -137,7 +134,6 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
           <div style={{ fontSize: 13, lineHeight: 1.6, color: '#A1A1AA' }}>Les tâches sont annulées chez GeeLark et les crédits remboursés{(confirmCancel.result?.credits_total ?? 0) > 0 ? ` (jusqu'à ${confirmCancel.result?.credits_total} crédits)` : ''}. Un post déjà parti ne peut plus être annulé ni remboursé.</div>
         </Modal>
       )}
-      {notice && <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', color: '#A1A1AA', fontSize: 13 }}>{notice}</div>}
 
       {loading ? <Panel theme={theme}><SkeletonRows rows={4} avatar /></Panel>
         : rows.length === 0 ? (

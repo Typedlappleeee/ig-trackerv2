@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type RecurringTask } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Icon, Panel, PageHead, Empty, Modal } from '@/lib/ui'
+import { Btn, Icon, Panel, PageHead, Empty, Modal, FIELD, Toggle, SkeletonRows, toast } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import CreateTaskModal from '@/components/CreateTaskModal'
 
@@ -53,13 +53,6 @@ function describe(t: RecurringTask): string {
   return parts.join(' · ')
 }
 
-const TONES = ['6,182,212', '139,92,246', '245,158,11', '236,72,153', '16,185,129', '99,102,241']
-function toneFor(id: string): string {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
-  return TONES[h % TONES.length]
-}
-
 export default function Recipes({ theme, infra, user, org }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState
 }) {
@@ -67,27 +60,24 @@ export default function Recipes({ theme, infra, user, org }: {
   const [tasks, setTasks] = useState<RecurringTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [editTask, setEditTask] = useState<RecurringTask | null>(null)
 
   // Rejouer : planifie l'exécution de la séquence MAINTENANT (le serveur la prendra
   // au prochain tick). Écrit next_run_at = now + réactive la tâche.
   async function replay(t: RecurringTask) {
-    setNotice(null)
     const { error: err } = await supabase.from('recurring_tasks')
       .update({ next_run_at: new Date().toISOString(), status: 'active' }).eq('id', t.id)
-    setNotice(err ? `Échec : ${err.message}` : `« ${t.name || 'Séquence'} » planifiée maintenant — le serveur la lance au prochain passage.`)
+    toast(err ? `Échec : ${err.message}` : `« ${t.name || 'Séquence'} » planifiée maintenant — le serveur la lance au prochain passage.`, err ? 'bad' : 'ok')
   }
 
   // Programmer : planifie au prochain cycle (now + recur_hours) et réactive.
   async function scheduleNext(t: RecurringTask) {
-    setNotice(null)
     const h = t.recur_hours || 24
     const at = new Date(Date.now() + h * 3600 * 1000)
     const { error: err } = await supabase.from('recurring_tasks')
       .update({ next_run_at: at.toISOString(), status: 'active' }).eq('id', t.id)
-    setNotice(err ? `Échec : ${err.message}` : `« ${t.name || 'Séquence'} » programmée pour ${at.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`)
+    toast(err ? `Échec : ${err.message}` : `« ${t.name || 'Séquence'} » programmée pour ${at.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`, err ? 'bad' : 'ok')
     load()
   }
 
@@ -112,12 +102,8 @@ export default function Recipes({ theme, infra, user, org }: {
         actions={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Nouvelle séquence" onClick={() => setCreateOpen(true)} />}
       />
 
-      {notice && (
-        <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#EDEDEF' }}>{notice}</div>
-      )}
-
       {loading ? (
-        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div></Panel>
+        <Panel theme={theme}><SkeletonRows rows={3} avatar /></Panel>
       ) : error ? (
         <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} /></Panel>
       ) : tasks.length === 0 ? (
@@ -128,16 +114,15 @@ export default function Recipes({ theme, infra, user, org }: {
             action={<Btn theme={theme} tone="primary" icon="M12 5v14|M5 12h14" label="Nouvelle séquence" onClick={() => setCreateOpen(true)} />} />
         </Panel>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(320px,100%),1fr))', gap: 12 }}>
           {tasks.map(t => {
-            const tone = toneFor(t.id)
             const chips = stepChips(t)
             return (
               <Panel key={t.id} theme={theme}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 16px 0' }}>
                   <span style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, flexShrink: 0,
-                    background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: `rgb(${tone})`,
+                    background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText,
                   }}><Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6" size={14} /></span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>{t.name || 'Séquence'}</span>
@@ -190,7 +175,7 @@ function EditSeq({ theme, task, onClose, onSaved }: {
   const [active, setActive] = useState(task.status === 'active')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const inp = { width: '100%', boxSizing: 'border-box' as const, height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }
+  const inp = FIELD
   const lbl = { fontSize: 12, fontWeight: 500 as const, color: '#8B8B94', marginBottom: 6, display: 'block' as const }
 
   async function save() {
@@ -215,9 +200,7 @@ function EditSeq({ theme, task, onClose, onSaved }: {
           </select>
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
-          <span onClick={() => setActive(a => !a)} style={{ display: 'flex', alignItems: 'center', justifyContent: active ? 'flex-end' : 'flex-start', width: 32, height: 18, padding: 2, borderRadius: 99, background: active ? theme.accent : 'rgba(255,255,255,0.1)', boxSizing: 'border-box', transition: 'background .12s ease' }}>
-            <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
-          </span>
+          <Toggle on={active} onChange={() => setActive(a => !a)} />
           <span style={{ fontSize: 13, color: '#EDEDEF' }}>{active ? 'Active' : 'En pause'}</span>
         </label>
         {err && <p style={{ margin: 0, fontSize: 12, color: '#F87171' }}>{err}</p>}

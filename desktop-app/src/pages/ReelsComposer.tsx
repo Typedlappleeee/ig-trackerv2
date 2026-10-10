@@ -4,7 +4,7 @@ import type { User } from '@supabase/supabase-js'
 import { startRunHistory } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon, Modal, toast, confirmDialog } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon, Modal, toast, confirmDialog, promptDialog, FIELD, FIELD_SM, TEXTAREA, Toggle, Segmented, MONO, useNarrow, Skeleton, SkeletonRows, Empty } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub, fetchBalance, fetchOrgBalance } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -45,6 +45,7 @@ function fmtDur(s: number | null): string {
 type Phase = 'pending' | 'running' | 'done' | 'failed'
 interface RunItem { id: string; name: string; phase: Phase; detail?: string }
 const STEPS = ['Comptes', 'Vidéos', 'Légende', 'Lancement']
+const PHONE_ICON = 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01'
 
 export default function ReelsComposer({ theme, user, org, onBack }: {
   theme: Theme; user: User; org: OrgState; onBack: () => void
@@ -52,6 +53,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   const { currentOrg } = org
   const conns = useConnections(user, org)
   const bearer = conns.bearer
+  const narrow = useNarrow()
 
   const [step, setStep] = useState(1)
   const [phones, setPhones] = useState<Phone[]>([])
@@ -123,8 +125,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   // Charge la LISTE des presets nommés (aucune restauration automatique de réglages).
   useEffect(() => { setPresets(loadPresets<ReelsCfg>(COMPOSER, orgId)) }, [orgId])
 
-  const doSavePreset = () => {
-    const name = window.prompt('Nom du preset (réglages + captions) :', presetSel || '')
+  const doSavePreset = async () => {
+    const name = await promptDialog({ title: 'Nom du preset (réglages + captions) :', value: presetSel || '' })
     if (!name || !name.trim()) return
     setPresets(savePreset<ReelsCfg>(COMPOSER, orgId, name, currentCfg()))
     setPresetSel(name.trim())
@@ -385,7 +387,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
             color: active ? '#EDEDEF' : past ? '#A1A1AA' : '#71717A', fontSize: 12.5, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
           }}>
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box', background: active ? '#EDEDEF' : 'transparent', border: active ? 'none' : `1px solid ${past ? 'rgba(74,222,128,0.35)' : 'rgba(255,255,255,0.14)'}`, color: active ? '#0A0A0B' : past ? '#4ADE80' : '#71717A', fontSize: 10, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{past ? '✓' : n}</span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box', background: active ? '#EDEDEF' : 'transparent', border: active ? 'none' : `1px solid ${past ? 'rgba(74,222,128,0.35)' : 'rgba(255,255,255,0.14)'}`, color: active ? '#0A0A0B' : past ? '#4ADE80' : '#71717A', fontSize: 11, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{past ? '✓' : n}</span>
             {s}
           </button>
         )
@@ -394,8 +396,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   )
 
   const selectStyle: CSSProperties = {
-    height: 28, padding: '0 8px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${group !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.09)'}`,
-    background: '#161618', color: '#EDEDEF', fontSize: 12.5, fontWeight: 400, outline: 'none',
+    ...FIELD_SM, width: 'auto', padding: '0 8px', cursor: 'pointer', border: `1px solid ${group !== 'Tous' ? theme.selEdge : 'rgba(255,255,255,0.09)'}`,
   }
 
   return (
@@ -420,7 +421,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px', padding: '8px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
         <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Presets</span>
         <select value={presetSel} onChange={e => { const v = e.target.value; if (v) doLoadPreset(v); else setPresetSel('') }}
-          style={{ height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#EDEDEF', fontSize: 12.5, outline: 'none', minWidth: 170, cursor: 'pointer' }}>
+          style={{ ...FIELD_SM, width: 'auto', padding: '0 8px', minWidth: 170, cursor: 'pointer' }}>
           <option value="" style={{ background: '#161618' }}>{presets.length ? '— Charger un preset —' : 'Aucun preset enregistré'}</option>
           {presets.map(p => <option key={p.name} value={p.name} style={{ background: '#161618' }}>{p.name}</option>)}
         </select>
@@ -446,13 +447,13 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
               background: healthy ? 'rgba(255,255,255,0.07)' : '#161618', border: '1px solid ' + (healthy ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.09)'),
               color: healthy ? '#EDEDEF' : '#A1A1AA', fontSize: 12.5, fontWeight: 400,
             }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, boxSizing: 'border-box', background: healthy ? theme.accentBtn : 'transparent', border: healthy ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{healthy ? '✓' : ''}</span>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, boxSizing: 'border-box', background: healthy ? theme.accentBtn : 'transparent', border: healthy ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{healthy ? '✓' : ''}</span>
               Santé ≥ 70 seulement
             </button>
             <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{shownPhones.length} affichés · {nSel} cochés</span>
           </div>
-          {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Chargement…</div>
-            : shownPhones.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Aucun compte.</div>
+          {loading ? <SkeletonRows rows={4} avatar />
+            : shownPhones.length === 0 ? <Empty icon={PHONE_ICON} title="Aucun compte." text={null} />
             : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(196px,1fr))', gap: 8, padding: 16 }}>
               {shownPhones.map(p => {
@@ -460,12 +461,12 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                 return (
                   <button key={p.id} onClick={() => toggle(p.id)} style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
-                    background: on ? 'rgba(255,255,255,0.05)' : '#141416', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.07)'), transition: 'background .12s ease, border-color .12s ease',
+                    background: on ? 'rgba(255,255,255,0.05)' : '#161618', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.07)'), transition: 'background .12s ease, border-color .12s ease',
                   }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                     <StatusDot kind={dotKind(p.status)} />
                   </button>
@@ -497,14 +498,14 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                     {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
                       ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
-                    <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+                    <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     {/* Miniature par vidéo = une FRAME de la vidéo. Clic → sélecteur d'image (n'active pas le toggle). */}
                     <span role="button" title={covers[v.id] ? 'Miniature choisie — cliquer pour changer' : 'Choisir la miniature (image de la vidéo)'}
                       onClick={async e => { e.stopPropagation(); const url = await resolveVideoUrl(v); setCoverPickerFor({ id: v.id, url: url ?? '' }) }}
                       style={{ position: 'absolute', bottom: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 5, overflow: 'hidden', backgroundColor: 'rgba(10,10,11,0.72)', backgroundImage: covers[v.id] ? `url(${covers[v.id]})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', border: covers[v.id] ? '1px solid rgba(255,255,255,0.7)' : '1px solid rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer' }}>
                       {!covers[v.id] && <Icon d="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" size={11} />}
                     </span>
-                    {fmtDur(v.duration) && <span style={{ position: 'absolute', bottom: 5, left: 6, fontSize: 10, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: 'rgba(255,255,255,0.85)' }}>{fmtDur(v.duration)}</span>}
+                    {fmtDur(v.duration) && <span style={{ position: 'absolute', bottom: 5, left: 6, fontSize: 11, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: 'rgba(255,255,255,0.85)' }}>{fmtDur(v.duration)}</span>}
                   </button>
                 )
               })}
@@ -515,7 +516,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
       {/* ── Étape 3 : Légende ── */}
       {step === 3 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.4fr) minmax(0,1fr)', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title="Légendes" sub={captions.filter(c => c.trim()).length > 1 ? 'Réparties entre les comptes' : 'Une légende commune (facultatif)'}
               right={<Btn theme={theme} sm tone="ghost" disabled={genning} icon="M9.9 15.5A2 2 0 0 0 8.5 14L2.4 12.5a.5.5 0 0 1 0-1L8.5 10A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0L14.1 8.5A2 2 0 0 0 15.5 9.9l6.1 1.6a.5.5 0 0 1 0 1L15.5 14a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" label={genning ? '…' : 'IA'} onClick={genCaption} />} />
@@ -523,7 +524,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
               {captions.map((c, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                   <textarea value={c} onChange={e => setCaptionAt(i, e.target.value)} placeholder={`Légende ${i + 1} (facultatif)…`} rows={2}
-                    style={{ flex: 1, minHeight: 52, resize: 'vertical', boxSizing: 'border-box', padding: 10, borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, lineHeight: 1.55, fontFamily: 'inherit', outline: 'none' }} />
+                    style={{ ...TEXTAREA, flex: 1, minHeight: 52, padding: 10, lineHeight: 1.55 }} />
                   {captions.length > 1 && <button onClick={() => removeCaption(i)} title="Retirer" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#8B8B94', cursor: 'pointer' }}>✕</button>}
                 </div>
               ))}
@@ -531,10 +532,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                 <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Ajouter" onClick={() => addCaption()} />
                 <Btn theme={theme} sm tone="quiet" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Depuis la banque" onClick={() => setPicker('captions')} />
                 {captions.filter(c => c.trim()).length > 1 && (
-                  <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', marginLeft: 'auto' }}>
-                    {(['seq', 'random'] as const).map(m => (
-                      <button key={m} onClick={() => setCapMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: capMode === m ? 'rgba(255,255,255,0.08)' : 'transparent', color: capMode === m ? '#EDEDEF' : '#8B8B94' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
-                    ))}
+                  <span style={{ display: 'flex', marginLeft: 'auto' }}>
+                    <Segmented value={capMode} onChange={setCapMode} options={[{ v: 'seq', l: 'Séquentiel' }, { v: 'random', l: 'Aléatoire' }]} />
                   </span>
                 )}
               </div>
@@ -556,7 +555,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
       {/* ── Étape 4 : Lancement ── */}
       {step === 4 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.3fr) minmax(0,1fr)', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title="Comportement du run" />
             {/* Proxy rotatif — togglable pour CE run (si configuré dans Paramètres) */}
@@ -565,10 +564,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                 <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Proxy rotatif</span>
                 <span style={{ fontSize: 12, color: '#8B8B94' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque téléphone → envoi en série' : 'Désactivé pour ce run → envoi en parallèle'}</span>
               </span>
-              <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
-                title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 28, height: 14, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
-                <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
+              <span title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'} style={{ display: 'flex', flexShrink: 0 }}>
+                <Toggle on={rotationOn} disabled={!rotationConfigured} onChange={() => rotationConfigured && setRotationOn(v => !v)} />
               </span>
             </div>
             {/* Téléphones simultanés (ignoré si proxy rotatif → série) */}
@@ -579,7 +576,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
               </span>
               <select value={rotationOn ? '1' : String(simulPhones)} disabled={rotationOn}
                 onChange={e => setSimulPhones(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                style={{ height: 28, padding: '0 8px', borderRadius: 6, cursor: rotationOn ? 'default' : 'pointer', border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#EDEDEF', fontSize: 12.5, outline: 'none' }}>
+                style={{ ...FIELD_SM, width: 'auto', padding: '0 8px', cursor: rotationOn ? 'default' : 'pointer' }}>
                 {rotationOn ? <option value="1" style={{ background: '#161618' }}>1 (série)</option> : <>
                   <option value="all" style={{ background: '#161618' }}>Tous</option>
                   {[1, 2, 3, 5, 10].map(n => <option key={n} value={n} style={{ background: '#161618' }}>{n}</option>)}
@@ -592,11 +589,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                 <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Répartition des vidéos</span>
                 <span style={{ fontSize: 12, color: '#8B8B94' }}>Quelle vidéo va sur quel compte</span>
               </span>
-              <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-                {(['seq', 'random'] as const).map(m => (
-                  <button key={m} onClick={() => setVidMode(m)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: vidMode === m ? 'rgba(255,255,255,0.08)' : 'transparent', color: vidMode === m ? '#EDEDEF' : '#8B8B94' }}>{m === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
-                ))}
-              </span>
+              <Segmented value={vidMode} onChange={setVidMode} options={[{ v: 'seq', l: 'Séquentiel' }, { v: 'random', l: 'Aléatoire' }]} />
             </div>
             {/* Usage unique */}
             <RunToggle label="Usage unique des vidéos" hint="Retire de la banque les vidéos utilisées" on={autoRemove} onToggle={() => setAutoRemove(v => !v)} theme={theme} border />
@@ -647,7 +640,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
                     return <Chip key={it.id} text={`${m} @${it.name}`} tone={c as any} />
                   })}
                 </div>
-                <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 240, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
+                <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 240, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
                   {logs.length === 0 ? '…' : logs.join('\n')}
                 </div>
               </Panel>
@@ -691,7 +684,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             <label style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Date et heure</label>
             <input type="datetime-local" value={schedVal} min={schedLocalValue(1)} max={schedLocalValue(29 * 24 * 60)}
               onChange={e => setSchedVal(e.target.value)}
-              style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', colorScheme: 'dark' }} />
+              style={{ ...FIELD, colorScheme: 'dark' }} />
             <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.55, color: '#8B8B94' }}>
               La tâche est créée <b>maintenant</b> sur GeeLark (vidéos hébergées + crédits débités) et s'exécutera <b>toute seule</b> à l'heure prévue. Tu peux la voir/annuler dans les <b>Task Logs</b> de GeeLark. Max ~29 jours (au-delà, l'hébergement vidéo GeeLark expire).
               {reelsTrial ? ' Mode essai activé.' : ''}
@@ -721,15 +714,14 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
 // Interrupteur d'option de run (on/off).
 function RunToggle({ label, hint, on, onToggle, theme, border }: { label: string; hint: string; on: boolean; onToggle: () => void; theme: Theme; border?: boolean }) {
+  void theme
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: border ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: border ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{label}</span>
         <span style={{ fontSize: 12, color: '#8B8B94' }}>{hint}</span>
       </span>
-      <span onClick={onToggle} style={{ display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 28, height: 14, padding: 2, borderRadius: 99, flexShrink: 0, cursor: 'pointer', background: on ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
-        <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
-      </span>
+      <Toggle on={on} onChange={() => onToggle()} />
     </div>
   )
 }
@@ -775,7 +767,7 @@ function CoverFramePicker({ theme, videoUrl, onClose, onPick }: {
         <Btn theme={theme} tone="primary" label="Utiliser cette image" disabled={!ready} onClick={capture} />
       </>}>
       {err ? <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: '#F87171' }}>{err}</div>
-        : !src ? <div style={{ padding: 24, textAlign: 'center', fontSize: 12.5, color: '#8B8B94' }}>Chargement de la vidéo…</div>
+        : !src ? <div aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}><Skeleton h={300} r={8} /><Skeleton h={8} r={4} /></div>
         : (
           <div>
             <video ref={videoRef} src={src} preload="metadata" playsInline muted

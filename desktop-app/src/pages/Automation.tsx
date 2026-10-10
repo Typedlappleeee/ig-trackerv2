@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ScheduledPost, type RecurringTask } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Panel, PanelHead, PageHead, Empty } from '@/lib/ui'
+import { Btn, Chip, Panel, PanelHead, PageHead, Empty, Toggle, Segmented, SkeletonRows, useNarrow } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import CreateTaskModal, { type TaskMode } from '@/components/CreateTaskModal'
 
@@ -76,6 +75,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null) // id de tâche en cours de bascule
   const [createMode, setCreateMode] = useState<TaskMode | null>(null)
+  const narrow = useNarrow()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -137,13 +137,6 @@ export default function Automation({ theme, infra, user, org, embedded }: {
     return { y, m, daysInMonth, firstDow, schedDays, pubDays, planned: schedDays.size + pubDays.size }
   }, [posts])
 
-  const segStyle = (k: Tab): CSSProperties => ({
-    display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px',
-    border: 'none', borderRadius: 5, cursor: 'pointer',
-    background: tab === k ? 'rgba(255,255,255,0.08)' : 'transparent',
-    color: tab === k ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
-  })
-
   return (
     <div style={{ animation: embedded ? 'none' : 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {!embedded && (
@@ -157,33 +150,23 @@ export default function Automation({ theme, infra, user, org, embedded }: {
       )}
 
       {/* segmented Programmé / Récurrent */}
-      <div style={{
-        display: 'flex', gap: 2, padding: 2, borderRadius: 7, marginBottom: 16,
-        background: '#111113', border: '1px solid rgba(255,255,255,0.07)', width: 'fit-content',
-      }}>
-        {([['sched', 'Programmé', schedCount], ['rec', 'Récurrent', tasks.length]] as [Tab, string, number][]).map(([k, l, n]) => (
-          <button key={k} onClick={() => setTab(k)} style={segStyle(k)}>
-            {l}
-            <span style={{ color: '#71717A', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{n}</span>
-          </button>
-        ))}
+      <div style={{ marginBottom: 16 }}>
+        <Segmented<Tab> value={tab} onChange={setTab}
+          options={([['sched', 'Programmé', schedCount], ['rec', 'Récurrent', tasks.length]] as [Tab, string, number][]).map(([k, l, n]) => ({ v: k, l, n }))} />
       </div>
 
       {loading ? (
-        <Panel theme={theme}><div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div></Panel>
+        <Panel theme={theme}><SkeletonRows rows={4} /></Panel>
       ) : error ? (
         <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01|M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" title="Erreur" text={error} /></Panel>
       ) : tab === 'sched' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.3fr) minmax(0,1fr)', gap: 12 }}>
           {/* File d'attente */}
           <Panel theme={theme}>
             <PanelHead title="File d'attente" sub="Exécutés côté serveur — ton PC peut être éteint"
               right={
-                <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', flexWrap: 'wrap' }}>
-                  {['Tous', 'Instagram', 'TikTok', 'Threads'].map(n => (
-                    <button key={n} onClick={() => setNet(n)} style={{ height: 22, padding: '0 8px', border: 'none', borderRadius: 5, cursor: 'pointer', background: net === n ? 'rgba(255,255,255,0.08)' : 'transparent', color: net === n ? '#EDEDEF' : '#8B8B94', fontSize: 11.5, fontWeight: 500 }}>{n}</button>
-                  ))}
-                </span>
+                <Segmented sm value={net} onChange={setNet}
+                  options={['Tous', 'Instagram', 'TikTok', 'Threads'].map(n => ({ v: n, l: n }))} />
               } />
             {queue.length === 0 ? (
               <Empty icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
@@ -271,16 +254,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
               return (
                 <Panel key={t.id} theme={theme}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
-                    <span
-                      onClick={() => { if (busy !== t.id) toggleTask(t) }}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: active ? 'flex-end' : 'flex-start',
-                        width: 32, height: 18, padding: 2, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box',
-                        background: active ? theme.accent : 'rgba(255,255,255,0.1)',
-                        cursor: busy === t.id ? 'wait' : 'pointer', opacity: busy === t.id ? 0.6 : 1, transition: 'background .12s ease',
-                      }}>
-                      <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
-                    </span>
+                    <Toggle on={active} disabled={busy === t.id} onChange={() => { if (busy !== t.id) toggleTask(t) }} label={t.name || 'Tâche automatique'} />
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: active ? '#EDEDEF' : '#A1A1AA' }}>{t.name || 'Tâche automatique'}</span>
                       <span style={{ fontSize: 12, color: '#8B8B94' }}>{cadence}</span>

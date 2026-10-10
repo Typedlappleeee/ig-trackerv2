@@ -14,14 +14,16 @@
 // L'état des runs vit hors React (singleton) → la progression survit à la
 // navigation, et le run apparaît dans la pastille globale (runStore).
 import { startRunHistory, type RunHistory } from './runHistory'
+import { expandUsername, usernameListIssues } from './igRules'
 import { useSyncExternalStore } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
   ensurePhoneRunning, setPhoneManaged, stopPhoneSurely, sleep,
+  abortPhone, clearPhoneAbort, cancelPhoneTask,
   loginInstagramOnPhone, editProfileOnPhone, warmupAccountNative, postReelToPhone, postStoryToPhone,
   geelarkUploadVideo, geelarkUploadImage,
 } from '@/lib/geelark'
-import { changeUsernameOnPhone, changeProfilePicOnPhone } from '@/lib/geelarkAdb'
+import { changeUsernameOnPhone, changeProfilePicOnPhone, resetInstagram } from '@/lib/geelarkAdb'
 import { startCreditRun, isCreditError, CREDIT_COSTS, type CreditRun } from '@/lib/credits'
 import { startRun, type RunHandle } from '@/lib/runStore'
 import { heartbeatPhone } from '@/lib/phoneWatch'
@@ -52,6 +54,7 @@ export interface BlockParams {
   names?: string            // bio : nom affiché, un par ligne (optionnel)
   link?: string             // bio : lien du profil / story : lien du sticker (même pour tous)
   linkTitle?: string        // bio : titre du lien
+  bioSingle?: boolean       // bio : une seule bio (multi-lignes) pour tous les comptes (édition en masse)
   linkMode?: 'same' | 'perAccount'   // story
   links?: string            // story : un lien par compte (une ligne par compte, dans l'ordre)
   linkText?: string         // story : texte du sticker
@@ -161,10 +164,7 @@ export const TEMPLATES: { name: string; desc: string; types: BlockType[] }[] = [
 
 // ── Textes multi-lignes & pseudos ────────────────────────────────────────────
 export const lines = (s?: string) => (s ?? '').split('\n').map(l => l.trim()).filter(Boolean)
-const hasRandom = (s: string) => /\{\d{1,2}\}/.test(s)
-export function expandUsername(tpl: string): string {
-  return tpl.replace(/\{(\d{1,2})\}/g, (_, n) => Array.from({ length: Math.min(12, +n) }, () => Math.floor(Math.random() * 10)).join(''))
-}
+export { expandUsername }
 function pick<T>(arr: T[], i: number, mode: PoolMode | undefined): T | undefined {
   if (arr.length === 0) return undefined
   return mode === 'random' ? arr[Math.floor(Math.random() * arr.length)] : arr[i % arr.length]
@@ -244,7 +244,7 @@ export function validateFlow(f: Flow, nPhones: number, creds?: Record<string, Cr
     if (b.type === 'username') {
       const ls = lines(p.usernames)
       if (ls.length === 0) issues.push(`${n} : ajoute au moins un pseudo.`)
-      else if (nPhones > 0 && ls.length < nPhones && !ls.every(hasRandom)) issues.push(`${n} : ${ls.length} pseudo(s) pour ${nPhones} compte(s) — ajoute-en ou utilise {4} pour des chiffres aléatoires.`)
+      else usernameListIssues(ls, nPhones).forEach(e => issues.push(`${n} : ${e}`))
     }
     if (b.type === 'story') {
       if ((p.linkMode ?? 'same') === 'same' && !p.link?.trim()) issues.push(`${n} : renseigne le lien du sticker.`)
@@ -460,7 +460,7 @@ async function execute(run: FlowRun, handle: RunHandle, flow: Flow, o: RunOption
         if (b.type === 'username') { const t = users[i % Math.max(1, users.length)]; if (t) a.username = expandUsername(t) }
         if (BLOCK[b.type].media) { const id = pick(pool, i, p.mode); if (id) a.media = id }
         if (b.type === 'post') a.caption = pick(caps, i, p.captionMode ?? p.mode) ?? ''
-        if (b.type === 'bio') { a.bio = pick(bios, i, p.mode) ?? ''; a.name = pick(names, i, p.mode) ?? '' }
+        if (b.type === 'bio') { a.bio = p.bioSingle ? (p.bios ?? '').trim() : pick(bios, i, p.mode) ?? ''; a.name = pick(names, i, p.mode) ?? '' }
         if (b.type === 'story') a.link = p.linkMode === 'perAccount' ? (links[i] ?? links[i % Math.max(1, links.length)] ?? '') : (p.link?.trim() ?? '')
         if (b.type === 'warmup' && kws.length) a.keyword = kws[Math.floor(Math.random() * kws.length)]
         assign[i].set(b.id, a)
@@ -592,15 +592,17 @@ async function runPhone(ctx: Ctx, i: number) {
       handle.detail(`${pr.name} · ${name}`)
       log(`── ${k + 1}. ${name} ──`)
       const tries = 1 + retriesOf(b.params)
-      let r: { ok: boolean; error?: string; cancelled?: boolean } = { ok: false }
+      let r: GuardedResult = { ok: false }
       for (let t = 0; t < tries; t++) {
         pr.attempts[k] = t + 1
         if (t > 0) { log(`↻ Nouvel essai ${t + 1}/${tries}`); await sleep(5000) }
-        try { r = await execBlock(ctx, b, i, gid, log) }
-        catch (e) { r = { ok: false, error: e instanceof Error ? e.message : String(e) } }
-        if (r.ok || r.cancelled || handle.isCancelled()) break
+        r = await runGuarded(ctx, b, i, gid, log)
+        if (r.ok || r.cancelled || r.stuck || handle.isCancelled()) break
       }
       if (r.cancelled) { pr.steps[k] = 'skipped'; pr.status = 'cancelled'; skipRest(k + 1); break }
+      // Bloc resté bloqué malgré l'interruption : l'état du téléphone est inconnu →
+      // on n'enchaîne RIEN d'autre dessus (quelle que soit la politique d'erreur).
+      if (r.stuck) { pr.steps[k] = 'failed'; pr.errors[k] = r.error; failed = true; log(`❌ ${r.error}`); skipRest(k + 1); break }
       pr.steps[k] = r.ok ? 'ok' : 'failed'; pr.errors[k] = r.error
       if (r.ok && b.type === 'post' && b.params.removeAfter) {
         const m = ctx.assign[i].get(b.id)?.media
@@ -629,6 +631,70 @@ async function runPhone(ctx: Ctx, i: number) {
   }
 }
 
+// ── Garde-fous d'un bloc ─────────────────────────────────────────────────────
+// Quelle que soit la combinaison de blocs, chaque bloc :
+//   1. part d'un téléphone ALLUMÉ (une pause longue l'a peut-être éteint) et d'un
+//      Instagram FERMÉ (le bloc précédent a pu le laisser sur n'importe quel écran) ;
+//   2. a un délai max : au-delà, la primitive est interrompue et sa tâche GeeLark
+//      annulée (aucune tâche orpheline ne continue pendant le bloc suivant) ;
+//   3. s'arrête vite si le run est annulé.
+const DEADLINE_MIN: Record<BlockType, number> = { login: 15, username: 8, avatar: 8, bio: 12, warmup: 20, post: 25, story: 20, pause: 0 }
+export function blockDeadlineMs(b: FlowBlock): number {
+  if (b.type === 'pause') return 0
+  if (b.type === 'warmup') return ((b.params.maxMin ?? 15) + DEADLINE_MIN.warmup) * 60_000
+  return DEADLINE_MIN[b.type] * 60_000
+}
+// Marge laissée à une primitive interrompue pour rendre la main (elle vérifie
+// l'interruption à chaque attente / commande ADB, et le réseau a un délai de 45 s).
+const ABORT_GRACE_MS = 90_000
+// Échelle des délais (tests uniquement : rend les délais de quelques millisecondes).
+let timeScale = 1
+export function _setFlowTimeScaleForTests(x: number): void { timeScale = x }
+
+type GuardedResult = { ok: boolean; error?: string; cancelled?: boolean; stuck?: boolean }
+
+async function runGuarded(ctx: Ctx, b: FlowBlock, i: number, gid: string, log: (m: string) => void): Promise<GuardedResult> {
+  const { o, handle } = ctx
+  if (b.type === 'pause') {
+    try { return await execBlock(ctx, b, i, gid, log) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) } }
+  }
+  const boot = await ensurePhoneRunning(o.bearer, gid, log)
+  if (!boot.ok) return { ok: false, error: boot.reason ?? 'Téléphone non démarré' }
+  await resetInstagram(o.bearer, gid, log)
+  if (handle.isCancelled()) return { ok: false, cancelled: true }
+
+  const limit = blockDeadlineMs(b)
+  clearPhoneAbort(gid)
+  let timedOut = false, cancelledDuring = false
+  const watch = setInterval(() => { if (handle.isCancelled() && !cancelledDuring) { cancelledDuring = true; abortPhone(gid) } }, Math.max(5, 1000 * timeScale))
+  const timer = setTimeout(() => { timedOut = true; abortPhone(gid) }, limit * timeScale)
+  let hardTimer: ReturnType<typeof setTimeout> | null = null
+  const STUCK = Symbol('stuck')
+  const stuckAfter = new Promise<typeof STUCK>(res => { hardTimer = setTimeout(() => res(STUCK), limit * timeScale + Math.max(ABORT_GRACE_MS * timeScale, 200)) })
+  let r: { ok: boolean; error?: string; cancelled?: boolean } | typeof STUCK
+  const execP = execBlock(ctx, b, i, gid, log).catch(e => ({ ok: false, error: e instanceof Error ? e.message : String(e) }))
+  try {
+    r = await Promise.race([execP, stuckAfter])
+  } finally {
+    clearInterval(watch); clearTimeout(timer); if (hardTimer) clearTimeout(hardTimer)
+  }
+  const mins = Math.round(limit / 60_000)
+  if (r === STUCK) {
+    // La primitive n'a pas rendu la main : on laisse l'interruption active pour
+    // qu'elle s'arrête dès que possible, et on ne lance plus rien sur ce téléphone.
+    await cancelPhoneTask(o.bearer, gid, log).catch(() => {})
+    void execP.finally(() => clearPhoneAbort(gid))
+    return { ok: false, stuck: true, error: `Bloc bloqué (délai max ${mins} min dépassé) — étapes suivantes annulées` }
+  }
+  clearPhoneAbort(gid)
+  // Résultat réel du bloc s'il a fini de lui-même (même si l'annulation arrive juste
+  // après) ; sinon, c'est l'interruption (annulation / délai max) qui l'a arrêté.
+  if (r.ok || (!cancelledDuring && !timedOut)) return r
+  await cancelPhoneTask(o.bearer, gid, log).catch(() => {})
+  if (cancelledDuring) return { ok: false, cancelled: true }
+  return { ok: false, error: `Délai max du bloc dépassé (${mins} min)` }
+}
+
 async function execBlock(ctx: Ctx, b: FlowBlock, i: number, gid: string, log: (m: string) => void): Promise<{ ok: boolean; error?: string; cancelled?: boolean }> {
   const { o } = ctx
   const p = b.params
@@ -642,16 +708,17 @@ async function execBlock(ctx: Ctx, b: FlowBlock, i: number, gid: string, log: (m
     case 'username':
       if (!a.username) return { ok: false, error: 'Aucun pseudo attribué' }
     {
-      const r = await changeUsernameOnPhone(o.bearer, gid, a.username, log, o.targets[i].username)
-      // Garde le @ à jour dans ScaleFlow (sert aussi de repère au prochain changement).
-      if (r.ok) { o.targets[i].username = a.username; void Promise.resolve(supabase.from('phones').update({ ig_username: a.username }).eq('id', o.targets[i].key)).catch(() => {}) }
+      const handle = a.username.trim().replace(/^@/, '')
+      const r = await changeUsernameOnPhone(o.bearer, gid, handle, log, o.targets[i].username)
+      // Pseudo VÉRIFIÉ à l'écran → on garde le @ à jour dans ScaleFlow (repère du prochain changement).
+      if (r.ok) { o.targets[i].username = handle; void Promise.resolve(supabase.from('phones').update({ ig_username: handle }).eq('id', o.targets[i].key)).catch(() => {}) }
       return r
     }
     case 'avatar': {
       if (!a.media) return { ok: false, error: emptyPoolMsg(b) }
       const u = ctx.urls.get(a.media)
       if (!u) return { ok: false, error: 'Image introuvable dans la banque' }
-      return changeProfilePicOnPhone(o.bearer, gid, u, log)
+      return changeProfilePicOnPhone(o.bearer, gid, u, log, o.targets[i].username)
     }
     case 'bio':
       return editProfileOnPhone(o.bearer, gid, {

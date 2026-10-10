@@ -6,8 +6,9 @@
 // le Centre de comptes Meta. Chaque étape cherche l'élément par texte/resource-id
 // dans le dump UI, avec une coordonnée de repli ; le log raconte chaque action pour
 // pouvoir recaler le flow quand Instagram change son interface.
-import { geelarkFetch, ensurePhoneRunning, sleep } from './geelark'
+import { geelarkFetch, ensurePhoneRunning, sleep, throwIfAborted } from './geelark'
 import { heartbeatPhone } from './phoneWatch'
+import { usernameIssue } from './igRules'
 
 type Log = (m: string) => void
 type Pt = [number, number]
@@ -19,6 +20,7 @@ async function shellExec(bearer: string, phoneId: string, cmd: string, maxRetrie
   const NOT_READY = /not running|not started|unavailable|not ready|phone.*start|starting/i
   heartbeatPhone(phoneId)   // automatisation en cours → le serveur ne coupe pas le téléphone
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    throwIfAborted(phoneId)   // run annulé / délai max du bloc → on s'arrête avant la prochaine action
     const d = await geelarkFetch('/shell/execute', { id: phoneId, cmd }, bearer)
     const code = Number(d['code'] ?? -1)
     if (code === 0) return String(((d['data'] as Record<string, unknown>) ?? {})['output'] ?? '')
@@ -30,22 +32,43 @@ async function shellExec(bearer: string, phoneId: string, cmd: string, maxRetrie
   throw new Error('GeeLark shell : téléphone non prêt après plusieurs tentatives')
 }
 
+// ── Remise à zéro entre deux blocs d'automatisation ─────────────────────────
+// Chaque bloc (RPA ou ADB) doit partir d'un Instagram FERMÉ : un bloc précédent a
+// pu laisser l'app dans le Centre de comptes, l'éditeur de story, un dialogue, le
+// clavier ouvert… et le bloc suivant échouait (« Not logged in », bouton introuvable).
+// Best-effort : ne fait jamais échouer le bloc.
+export const IG_PKG = 'com.instagram.android'
+export async function resetInstagram(bearer: string, phoneId: string, log?: Log): Promise<boolean> {
+  try {
+    await shellExec(bearer, phoneId, `input keyevent 111; input keyevent 3; am force-stop ${IG_PKG}`, 3)
+    await sleep(1500)
+    log?.('🧹 Instagram remis à zéro')
+    return true
+  } catch (e) {
+    log?.(`⚠ Remise à zéro d’Instagram impossible : ${e instanceof Error ? e.message : String(e)}`)
+    return false
+  }
+}
+
 const tap = (b: string, id: string, p: Pt) => shellExec(b, id, `input tap ${p[0]} ${p[1]}`)
 
 // ── Lecture de l'écran (uiautomator) ─────────────────────────────────────────
 // Sous charge, `uiautomator dump` renvoie parfois un XML vide/tronqué → on valide
 // la racine et on retente (lire l'UI est sans effet de bord).
+export function isValidDump(xml: string): boolean { return xml.includes('<hierarchy') && xml.includes('</hierarchy>') }
+
+// Écran illisible après 4 essais → on S'ARRÊTE (avant : XML tronqué → aucun élément
+// trouvé → taps à l'aveugle sur des coordonnées de repli).
 async function dumpXml(bearer: string, phoneId: string): Promise<string> {
   const f = '/sdcard/sf_dump.xml'
-  let last = ''
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      last = await shellExec(bearer, phoneId, `rm -f ${f}; uiautomator dump ${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`)
-      if (last.includes('<hierarchy') && last.includes('</hierarchy>')) return last
-    } catch { /* retry */ }
-    if (attempt < 2) await sleep(1200)
+      const xml = await shellExec(bearer, phoneId, `rm -f ${f}; uiautomator dump ${f} >/dev/null 2>&1; cat ${f} 2>/dev/null`)
+      if (isValidDump(xml)) return xml
+    } catch (e) { if (e instanceof Error && e.name === 'PhoneAbortedError') throw e }
+    if (attempt < 3) await sleep(1200 + attempt * 600)
   }
-  return last
+  throw new Error('Écran du téléphone illisible (uiautomator) — rien n’a été touché à l’aveugle')
 }
 
 function centerOf(element: string): Pt | null {
@@ -163,6 +186,46 @@ async function pushImageToGallery(bearer: string, phoneId: string, imageUrl: str
   return { ok: false, error: 'Transfert de la photo : délai dépassé' }
 }
 
+// ── Fenêtres parasites, attentes, clavier ────────────────────────────────────
+// Boutons qui FERMENT une fenêtre sans rien valider (notifications, enregistrer la
+// connexion, autorisation d'accès aux photos…). Jamais « OK / Annuler » génériques.
+const DISMISS = [
+  'Not now', 'Not Now', 'Plus tard', 'Pas maintenant', 'Skip', 'Ignorer', 'Dismiss',
+  'Allow', 'Autoriser', 'Allow all', 'Tout autoriser', 'Allow access to all photos', 'Autoriser l’accès à toutes les photos',
+  'While using the app', 'Lors de l’utilisation de l’application', 'Pendant l’utilisation de l’appli',
+]
+/** Bouton de fermeture d'une fenêtre parasite à l'écran, s'il y en a une. */
+export function findDialogDismiss(xml: string): Pt | null {
+  return findByText(xml, ...DISMISS) ?? findByResourceId(xml, 'permission_allow_button', 'permission_allow_all_button', 'permission_allow_foreground_only_button')
+}
+
+/** Lit l'écran en fermant jusqu'à 3 fenêtres parasites. */
+async function readScreen(bearer: string, phoneId: string): Promise<string> {
+  let xml = await dumpXml(bearer, phoneId)
+  for (let n = 0; n < 3; n++) {
+    const d = findDialogDismiss(xml)
+    if (!d) break
+    await tap(bearer, phoneId, d); await sleep(1500)
+    xml = await dumpXml(bearer, phoneId)
+  }
+  return xml
+}
+
+/** Attend (max `ms`) un écran qui vérifie `ok` ; renvoie le dernier écran lu et si c'est réussi. */
+async function waitForScreen(bearer: string, phoneId: string, ok: (xml: string) => boolean, ms: number): Promise<{ xml: string; ok: boolean }> {
+  const end = Date.now() + ms
+  let xml = await readScreen(bearer, phoneId)
+  while (!ok(xml) && Date.now() < end) {
+    await sleep(1500)
+    xml = await readScreen(bearer, phoneId)
+  }
+  return { xml, ok: ok(xml) }
+}
+
+async function keyboardShown(bearer: string, phoneId: string): Promise<boolean> {
+  try { return /mInputShown=true/.test(await shellExec(bearer, phoneId, 'dumpsys input_method | grep -m1 mInputShown', 2)) } catch { return false }
+}
+
 // ── Navigation : profil → menu → Centre de comptes → écran d'édition ─────────
 interface Screen { sw: number; sh: number; cx: number }
 
@@ -176,25 +239,41 @@ async function prepareScreen(bearer: string, phoneId: string): Promise<Screen> {
   return { sw, sh, cx: Math.floor(sw / 2) }
 }
 
-const ACCOUNT_CENTER = ['Accounts Center', 'Account Center', 'Centre de comptes', 'Meta Accounts Center', 'Meta Account Center']
+export const ACCOUNT_CENTER = ['Accounts Center', 'Account Center', 'Accounts Centre', 'Centre de comptes', 'Espace Comptes', 'Espace comptes', 'Centre des comptes', 'Meta Accounts Center', 'Meta Account Center']
+const SETTINGS = ['Settings and activity', 'Paramètres et activité', 'Settings and privacy', 'Paramètres et confidentialité', 'Settings', 'Paramètres']
+const LOGIN_SCREEN = /^(Log in|Se connecter|Create new account|Créer un compte|Log into another account|Se connecter à un autre compte)$/i
+// Instagram redemande le mot de passe / une vérification avant d'enregistrer.
+export const PASSWORD_PROMPT = /^(Re-enter your password|Saisissez à nouveau votre mot de passe|Enter your password|Entrez votre mot de passe|Confirm it['’]s you|Confirmez qu['’]il s['’]agit bien de vous|Check your email|Vérifiez votre e-mail|Enter confirmation code|Entrez le code de confirmation)$/i
 
-async function openAccountCenterEditor(bearer: string, phoneId: string, s: Screen, log: Log): Promise<string> {
+/** Ligne du BON compte Instagram dans « Profils » : celle du @ actuel si connu, sinon la 1re. */
+export function findAccountRow(xml: string, current?: string): Pt | null {
+  const cur = current?.trim().replace(/^@/, '')
+  return (cur ? findByTextRe(xml, new RegExp(`^@?${esc(cur)}$`, 'i')) ?? findByTextRe(xml, new RegExp(`^@?${esc(cur)}[,\\s]`, 'i')) : null) ??
+    findByText(xml, 'Instagram') ??
+    findByResourceId(xml, 'account_item', 'profile_account_row', 'account_row', 'instagram_account')
+}
+
+async function openProfileTab(bearer: string, phoneId: string, s: Screen, log: Log): Promise<string> {
   log('📲 Ouverture d\'Instagram…')
-  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android'); await sleep(1200)
-  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity'); await sleep(8000)
-
-  let xml = await dumpXml(bearer, phoneId)
-  if (screenHas(xml, /^(Log in|Se connecter|Create new account|Créer un compte)$/i)) {
-    throw new Error('Compte non connecté sur ce téléphone — ajoute un bloc « Connexion » avant')
-  }
+  await shellExec(bearer, phoneId, `am force-stop ${IG_PKG}`); await sleep(1200)
+  await shellExec(bearer, phoneId, `monkey -p ${IG_PKG} -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1`)
+  const home = await waitForScreen(bearer, phoneId, x => !!(findByText(x, 'Profile', 'Profil') ?? findByResourceId(x, 'profile_tab', 'tab_avatar') ?? findByTextRe(x, LOGIN_SCREEN)), 20_000)
+  let xml = home.xml
+  if (findByTextRe(xml, LOGIN_SCREEN)) throw new Error('Compte non connecté sur ce téléphone — ajoute un bloc « Connexion » avant')
+  // Onglet Profil : en bas à droite (position stable depuis des années) si son libellé n'est pas lisible.
   await tap(bearer, phoneId,
     findByText(xml, 'Profile', 'Profil') ??
     findByResourceId(xml, 'profile_tab', 'tab_avatar', 'navigation_profile', 'ig_bottom_bar_profile', 'tab_icon_profile') ??
     [Math.floor(s.sw * 0.92), Math.floor(s.sh * 0.965)])
-  await sleep(4000)
+  await sleep(3500)
+  xml = await readScreen(bearer, phoneId)
+  return xml
+}
+
+async function openAccountCenterEditor(bearer: string, phoneId: string, s: Screen, log: Log, current?: string): Promise<string> {
+  let xml = await openProfileTab(bearer, phoneId, s, log)
 
   log('☰ Menu…')
-  xml = await dumpXml(bearer, phoneId)
   await tap(bearer, phoneId,
     findByResourceId(xml, 'action_bar_overflow_button', 'hamburger_button', 'options_list_button', 'header_options_button') ??
     findByText(xml, 'Options', 'Menu') ??
@@ -202,52 +281,56 @@ async function openAccountCenterEditor(bearer: string, phoneId: string, s: Scree
   await sleep(2500)
 
   log('🏛 Centre de comptes…')
-  xml = await dumpXml(bearer, phoneId)
-  let ac = findByText(xml, ...ACCOUNT_CENTER) ?? findByResourceId(xml, 'account_center_row', 'accounts_center')
+  xml = await readScreen(bearer, phoneId)
+  let ac = findByText(xml, ...ACCOUNT_CENTER) ?? findByTextRe(xml, /^(Accounts? Cent(er|re)|Espace Comptes|Centre de(s)? comptes)\b/i) ?? findByResourceId(xml, 'account_center_row', 'accounts_center')
   if (!ac) {
-    const settings = findByText(xml, 'Settings and privacy', 'Paramètres et confidentialité', 'Settings', 'Paramètres')
+    const settings = findByText(xml, ...SETTINGS)
     if (settings) {
       await tap(bearer, phoneId, settings); await sleep(3000)
-      xml = await dumpXml(bearer, phoneId)
-      ac = findByText(xml, ...ACCOUNT_CENTER)
-      if (!ac) {
-        await shellExec(bearer, phoneId, `input swipe ${s.cx} ${Math.floor(s.sh * 0.7)} ${s.cx} ${Math.floor(s.sh * 0.3)} 600`)
-        await sleep(1000)
-        xml = await dumpXml(bearer, phoneId)
-        ac = findByText(xml, ...ACCOUNT_CENTER)
+      for (let n = 0; n < 2 && !ac; n++) {
+        xml = await readScreen(bearer, phoneId)
+        ac = findByText(xml, ...ACCOUNT_CENTER) ?? findByTextRe(xml, /^(Accounts? Cent(er|re)|Espace Comptes|Centre de(s)? comptes)\b/i)
+        if (!ac) { await shellExec(bearer, phoneId, `input swipe ${s.cx} ${Math.floor(s.sh * 0.7)} ${s.cx} ${Math.floor(s.sh * 0.3)} 600`); await sleep(1000) }
       }
     }
   }
-  if (!ac) throw new Error('Centre de comptes introuvable')
+  if (!ac) throw new Error('Centre de comptes introuvable — rien n’a été modifié')
   await tap(bearer, phoneId, ac); await sleep(4000)
 
   log('👤 Profil…')
-  xml = await dumpXml(bearer, phoneId)
+  xml = await readScreen(bearer, phoneId)
   const details = findByText(xml, 'Profiles', 'Profils', 'Profile and personal details', 'Profil et informations personnelles', 'Profile details')
-  if (details) { await tap(bearer, phoneId, details); await sleep(3000); xml = await dumpXml(bearer, phoneId) }
-  await tap(bearer, phoneId,
-    findByText(xml, 'Instagram') ??
-    findByResourceId(xml, 'account_item', 'profile_account_row', 'account_row', 'instagram_account') ??
-    [s.cx, Math.floor(s.sh * 0.33)])
+  if (details) { await tap(bearer, phoneId, details); await sleep(3000); xml = await readScreen(bearer, phoneId) }
+  const acc = findAccountRow(xml, current)
+  if (!acc) throw new Error('Compte Instagram introuvable dans le Centre de comptes — rien n’a été modifié')
+  await tap(bearer, phoneId, acc)
   await sleep(3500)
-  return dumpXml(bearer, phoneId)
+  return readScreen(bearer, phoneId)
 }
 
-// Enregistre le champ (Terminé/Save en haut à droite) puis revient à la liste.
-async function saveField(bearer: string, phoneId: string, s: Screen, log: Log): Promise<string> {
-  await shellExec(bearer, phoneId, 'input keyevent 4'); await sleep(600)  // ferme le clavier
-  const xml = await dumpXml(bearer, phoneId)
+// Enregistre le champ (Terminé / Enregistrer en haut à droite). Avant : RETOUR systématique
+// « pour fermer le clavier » — sans clavier affiché, ça QUITTAIT l'éditeur (modif perdue)
+// puis un tap à l'aveugle faisait croire au succès.
+const SAVE_TEXTS = ['Done', 'Terminé', 'Save', 'Enregistrer', 'Sauvegarder']
+const SAVE_IDS = ['save_button', 'action_done', 'done_button', 'submit_button', 'action_bar_button_action']
+async function saveField(bearer: string, phoneId: string, log: Log): Promise<string> {
+  let xml = await dumpXml(bearer, phoneId)
+  let btn = findByText(xml, ...SAVE_TEXTS) ?? findByResourceId(xml, ...SAVE_IDS)
+  if (!btn && await keyboardShown(bearer, phoneId)) {
+    await shellExec(bearer, phoneId, 'input keyevent 111'); await sleep(700)   // ÉCHAP : ferme le clavier sans quitter l'écran
+    xml = await dumpXml(bearer, phoneId)
+    btn = findByText(xml, ...SAVE_TEXTS) ?? findByResourceId(xml, ...SAVE_IDS)
+  }
+  if (!btn) throw new Error('Bouton « Terminé / Enregistrer » introuvable — rien n’a été enregistré')
   log('   💾 Enregistrement…')
-  await tap(bearer, phoneId,
-    findByText(xml, 'Done', 'Terminé', 'Save', 'Enregistrer', 'Sauvegarder') ??
-    findByResourceId(xml, 'save_button', 'action_done', 'done_button', 'submit_button') ??
-    [Math.floor(s.sw * 0.9), Math.floor(s.sh * 0.055)])
+  await tap(bearer, phoneId, btn)
   await sleep(3000)
   return dumpXml(bearer, phoneId)
 }
 
 // Messages d'Instagram quand le pseudo est refusé (pris, invalide, trop de changements).
-const USERNAME_REFUSED = /not available|isn't available|is not available|n'est pas disponible|already taken|déjà pris|can't change|ne pouvez pas|try again later|réessayez plus tard|only use letters|uniquement des lettres/i
+// Apostrophes droites ET typographiques (Instagram FR écrit « n’est pas disponible »).
+export const USERNAME_REFUSED = /not available|isn['’]t available|is not available|n['’]est pas disponible|already taken|déjà pris|can['’]t change|ne pouvez pas|try again later|réessayez plus tard|only use letters|uniquement des lettres|isn['’]t allowed|n['’]est pas autorisé/i
 
 // Libellé de la ligne / de l'écran « pseudo ». Ancré au DÉBUT du texte : la ligne
 // peut être « Username » seule ou « Username, lea_123 » (content-desc groupé), mais
@@ -291,45 +374,85 @@ export function isNameEditor(xml: string): boolean {
   return !!findByTextRe(xml, NAME_LABEL) && !isUsernameEditor(xml)
 }
 
+/** Le pseudo `handle` est-il affiché à l'écran (Centre de comptes ou en-tête du profil) ? */
+export function screenShowsHandle(xml: string, handle: string): boolean {
+  const h = esc(handle.replace(/^@/, ''))
+  return !!findByTextRe(xml, new RegExp(`^@?${h}$`, 'i')) || !!findByTextRe(xml, new RegExp(`^(Username|Nom d['’]utilisateur|Pseudo),\\s*@?${h}$`, 'i'))
+}
+
+/** 1re vignette de la grille de la galerie (la photo la plus récente), hors tuile « appareil photo ». */
+export function findFirstGalleryThumb(xml: string, sw: number): Pt | null {
+  const cells: { x: number; y: number; p: Pt }[] = []
+  for (const m of xml.matchAll(/<node\b[^>]*>/g)) {
+    const el = m[0]
+    const b = el.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
+    if (!b) continue
+    const [x1, y1, x2, y2] = b.slice(1).map(Number)
+    const w = x2 - x1, h = y2 - y1
+    if (w < sw * 0.15 || w > sw * 0.45 || Math.abs(w - h) > w * 0.25) continue   // case carrée de la grille
+    const desc = (el.match(/\bcontent-desc="([^"]*)"/)?.[1] ?? '') + ' ' + (el.match(/\bresource-id="([^"]*)"/)?.[1] ?? '')
+    if (/camera|appareil photo|capture/i.test(desc)) continue
+    const rid = el.match(/\bresource-id="([^"]*)"/)?.[1] ?? ''
+    const isCell = /gallery|grid|thumbnail|media_picker|media_item/i.test(rid) || /class="android\.widget\.(ImageView|FrameLayout)"/.test(el) && /clickable="true"/.test(el)
+    if (!isCell) continue
+    cells.push({ x: x1, y: y1, p: [Math.floor((x1 + x2) / 2), Math.floor((y1 + y2) / 2)] })
+  }
+  cells.sort((a, b) => a.y - b.y || a.x - b.x)
+  return cells[0]?.p ?? null
+}
+
 // ── Bloc : changer le @pseudo ────────────────────────────────────────────────
-// `current` : pseudo actuel connu (sert de repère pour trouver la bonne ligne).
+// `current` : pseudo actuel connu (choisit le bon compte et trouve la bonne ligne).
+// Succès = le NOUVEAU pseudo est relu à l'écran après l'enregistrement.
 export async function changeUsernameOnPhone(
   bearer: string, phoneId: string, username: string, log: Log, current?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const handle = username.trim().replace(/^@/, '')
-  if (!/^[a-zA-Z0-9._]{1,30}$/.test(handle)) return { ok: false, error: `Pseudo invalide « ${handle} » (lettres, chiffres, . et _ ; 30 max)` }
+  const invalid = usernameIssue(handle)
+  if (invalid) return { ok: false, error: invalid }
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
     const s = await prepareScreen(bearer, phoneId)
-    let xml = await openAccountCenterEditor(bearer, phoneId, s, log)
+    let xml = await openAccountCenterEditor(bearer, phoneId, s, log, current)
     log(`📝 Pseudo → @${handle}`)
     let row = findUsernameRow(xml, current)
     if (!row) {   // la ligne peut être sous le pli
       await shellExec(bearer, phoneId, `input swipe ${s.cx} ${Math.floor(s.sh * 0.7)} ${s.cx} ${Math.floor(s.sh * 0.4)} 500`)
       await sleep(1200)
-      xml = await dumpXml(bearer, phoneId)
+      xml = await readScreen(bearer, phoneId)
       row = findUsernameRow(xml, current)
     }
     if (!row) return { ok: false, error: 'Ligne « Nom d\'utilisateur » introuvable — rien n\'a été modifié' }
     await tap(bearer, phoneId, row)
     await sleep(2500)
-    xml = await dumpXml(bearer, phoneId)
+    xml = await readScreen(bearer, phoneId)
     // Garde-fou : si c'est l'éditeur du NOM qui s'est ouvert, on ressort sans rien toucher.
     if (!isUsernameEditor(xml) || isNameEditor(xml)) {
       await shellExec(bearer, phoneId, 'input keyevent 4')
       return { ok: false, error: 'L\'écran ouvert n\'est pas celui du nom d\'utilisateur — rien n\'a été modifié' }
     }
-    const field = findByResourceId(xml, 'username_field', 'handle_field', 'username') ?? findEditText(xml)
+    const field = findByResourceId(xml, 'username_field', 'handle_field') ?? findEditText(xml)
     if (!field) return { ok: false, error: 'Champ du nom d\'utilisateur introuvable' }
     await clearAndType(bearer, phoneId, field, handle, log)
     await sleep(2500)  // Instagram vérifie la disponibilité pendant la frappe
     const refusedBefore = screenHas(await dumpXml(bearer, phoneId), USERNAME_REFUSED)
     if (refusedBefore) return { ok: false, error: `Instagram refuse « @${handle} » : ${refusedBefore}` }
-    const after = await saveField(bearer, phoneId, s, log)
+    const after = await saveField(bearer, phoneId, log)
     const refused = screenHas(after, USERNAME_REFUSED)
     if (refused) return { ok: false, error: `Instagram refuse « @${handle} » : ${refused}` }
-    log('   ✅ Nom d\'utilisateur changé')
+    if (findByTextRe(after, PASSWORD_PROMPT)) return { ok: false, error: 'Instagram demande le mot de passe / une vérification pour changer le pseudo — à faire une fois à la main' }
+
+    // Vérification : le nouveau pseudo doit apparaître (Centre de comptes), sinon on
+    // relit l'en-tête du profil Instagram.
+    log('   🔎 Vérification…')
+    let seen = (await waitForScreen(bearer, phoneId, x => screenShowsHandle(x, handle), 8000)).ok
+    if (!seen) {
+      xml = await openProfileTab(bearer, phoneId, s, log)
+      seen = screenShowsHandle(xml, handle) || (await waitForScreen(bearer, phoneId, x => screenShowsHandle(x, handle), 6000)).ok
+    }
+    if (!seen) return { ok: false, error: `Changement non confirmé : @${handle} n’apparaît pas sur le profil après l’enregistrement` }
+    log('   ✅ Nom d\'utilisateur changé (vérifié)')
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -338,40 +461,53 @@ export async function changeUsernameOnPhone(
 
 // ── Bloc : photo de profil ───────────────────────────────────────────────────
 // imageUrl : URL lisible par GeeLark (URL signée Supabase de la banque).
+// Succès = la photo choisie a été recadrée/validée ET on est revenu sur l'écran du profil.
 export async function changeProfilePicOnPhone(
-  bearer: string, phoneId: string, imageUrl: string, log: Log,
+  bearer: string, phoneId: string, imageUrl: string, log: Log, current?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready.ok) return { ok: false, error: ready.reason ?? 'Téléphone non démarré' }
+    // Accès aux photos accordé d'avance (sinon fenêtre d'autorisation Android 13+).
+    await shellExec(bearer, phoneId, ['READ_MEDIA_IMAGES', 'READ_MEDIA_VISUAL_USER_SELECTED', 'READ_EXTERNAL_STORAGE']
+      .map(p => `pm grant ${IG_PKG} android.permission.${p} 2>/dev/null`).join('; ') + '; true', 2).catch(() => '')
     log('🖼 Envoi de la photo…')
     const pushed = await pushImageToGallery(bearer, phoneId, imageUrl, log)
     if (!pushed.ok) return pushed
     const s = await prepareScreen(bearer, phoneId)
-    let xml = await openAccountCenterEditor(bearer, phoneId, s, log)
+    let xml = await openAccountCenterEditor(bearer, phoneId, s, log, current)
     log('🖼 Changement de la photo de profil…')
-    await tap(bearer, phoneId,
-      findByText(xml, 'Profile picture', 'Photo de profil', 'Profile photo', 'Photo de profil ou avatar') ??
-      findByResourceId(xml, 'profile_picture_row', 'profile_photo_row', 'avatar_row') ??
-      [s.cx, Math.floor(s.sh * 0.42)])
+    const row = findByText(xml, 'Profile picture', 'Photo de profil', 'Profile photo', 'Photo de profil ou avatar', 'Edit profile picture', 'Modifier la photo de profil') ??
+      findByTextRe(xml, /^(Profile (picture|photo)|Photo de profil)\b/i) ??
+      findByResourceId(xml, 'profile_picture_row', 'profile_photo_row', 'avatar_row')
+    if (!row) return { ok: false, error: 'Ligne « Photo de profil » introuvable — rien n’a été modifié' }
+    await tap(bearer, phoneId, row)
     await sleep(3000)
-    xml = await dumpXml(bearer, phoneId)
-    const gallery = findByText(xml, 'Choose from library', 'Choisir dans la bibliothèque', 'Choose from Gallery', 'Gallery', 'Galerie', 'Photo library', 'Choose from your photos', 'Choisir dans vos photos') ??
+    xml = await readScreen(bearer, phoneId)
+    const gallery = findByText(xml, 'Choose from library', 'Choisir dans la bibliothèque', 'Choose from Gallery', 'Gallery', 'Galerie', 'Photo library', 'Choose from your photos', 'Choisir dans vos photos', 'New profile picture', 'Nouvelle photo de profil') ??
       findByResourceId(xml, 'gallery_option', 'choose_library', 'library_option', 'choose_from_library')
-    await tap(bearer, phoneId, gallery ?? [s.cx, Math.floor(s.sh * 0.55)])
-    await sleep(4000)
+    if (gallery) { await tap(bearer, phoneId, gallery); await sleep(4000) }
     log('   📷 Sélection de la photo la plus récente…')
-    await tap(bearer, phoneId, [Math.floor(s.sw * 0.17), Math.floor(s.sh * 0.28)])
+    const grid = await waitForScreen(bearer, phoneId, x => !!findFirstGalleryThumb(x, s.sw), 10_000)
+    const thumb = findFirstGalleryThumb(grid.xml, s.sw)
+    if (!thumb) return { ok: false, error: 'Galerie photo introuvable — rien n’a été modifié' }
+    await tap(bearer, phoneId, thumb)
     await sleep(2500)
-    // Recadrage puis confirmation : jusqu'à 2 écrans « Suivant / Terminé ».
-    for (let step = 0; step < 2; step++) {
-      xml = await dumpXml(bearer, phoneId)
-      const next = findByText(xml, 'Next', 'Suivant', 'Done', 'Terminé', 'Save', 'Enregistrer', 'OK') ??
+    // Recadrage puis confirmation : jusqu'à 3 écrans « Suivant / Terminé ».
+    let confirmed = 0
+    for (let step = 0; step < 3; step++) {
+      xml = await readScreen(bearer, phoneId)
+      const next = findByText(xml, 'Next', 'Suivant', 'Done', 'Terminé', 'Save', 'Enregistrer', 'Share', 'Partager') ??
         findByResourceId(xml, 'action_next', 'next_button', 'done_button', 'save_button')
       if (!next) break
-      await tap(bearer, phoneId, next)
+      await tap(bearer, phoneId, next); confirmed++
       await sleep(4000)
     }
+    if (confirmed === 0) return { ok: false, error: 'Écran de validation de la photo introuvable — photo non changée' }
+    // Retour attendu sur l'écran du profil (Centre de comptes ou profil Instagram), plus de recadrage.
+    const back = await waitForScreen(bearer, phoneId, x =>
+      !findByText(x, 'Next', 'Suivant') && !!(findByTextRe(x, /^(Profile (picture|photo)|Photo de profil|Name|Nom|Username|Nom d['’]utilisateur|Edit profile|Modifier le profil)\b/i)), 20_000)
+    if (!back.ok) return { ok: false, error: 'Changement de photo non confirmé (l’écran du profil n’est pas revenu)' }
     log('   ✅ Photo de profil changée')
     return { ok: true }
   } catch (e) {

@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton } from '@/lib/ui'
+import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, PageHead, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -76,7 +76,7 @@ function TileCheck({ on, onToggle, accent = '#8B7CF6' }: { on: boolean; onToggle
         width: 18, height: 18, borderRadius: 4, cursor: 'pointer', zIndex: 3,
         background: on ? accent : 'rgba(10,10,11,0.7)',
         border: on ? 'none' : '1px solid rgba(255,255,255,0.22)',
-        color: '#fff', fontSize: 10, fontWeight: 600,
+        color: '#fff', fontSize: 11, fontWeight: 600,
       }}>{on ? '✓' : ''}</span>
   )
 }
@@ -147,7 +147,7 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
       {fresh && (
         <span style={{
           position: 'absolute', top: 6, left: 6, display: 'inline-flex', alignItems: 'center', height: 16, padding: '0 5px', boxSizing: 'border-box', borderRadius: 4,
-          background: 'rgba(10,10,11,0.75)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ADE80', fontSize: 9.5, fontWeight: 500,
+          background: 'rgba(10,10,11,0.75)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ADE80', fontSize: 11, fontWeight: 500,
         }}>NEUF</span>
       )}
 
@@ -160,13 +160,12 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
           flex: 1, minWidth: 0, fontSize: 11, fontWeight: 500, textAlign: 'left',
           color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>{item.title}</span>
-        {dur && <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{dur}</span>}
+        {dur && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{dur}</span>}
       </span>
     </button>
   )
 }
 
-const el = '…'
 
 export default function Bank({ theme, infra, user, org, onNavigate }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
@@ -589,6 +588,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     setFolderModal(false); setFolderName(''); setFolder(name); load()
   }
   const [notice, setNotice] = useState<string | null>(null)
+  const narrow = useNarrow()
   const moveFolders = useMemo(() => folders.filter(f => f.n !== 'Tous' && !f.special).map(f => f.n), [folders])
 
   async function doMove(target: string) {
@@ -596,8 +596,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     setMoving(true)
     const { error: err } = await supabase.from('content_bank').update({ folder: dest }).in('id', [...sel])
     setMoving(false)
-    if (err) { setNotice(`Échec du déplacement : ${err.message}`); return }
-    setMoveOpen(false); setNewFolder(''); setNotice(`${sel.size} média(s) déplacé(s) vers « ${dest} ».`); setSel(new Set())
+    if (err) { toast(`Échec du déplacement : ${err.message}`, 'bad'); return }
+    setMoveOpen(false); setNewFolder(''); toast(`${sel.size} média(s) déplacé(s) vers « ${dest} ».`, 'ok'); setSel(new Set())
     load()
   }
 
@@ -766,26 +766,6 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const total = items.length
   const neverPublished = items.filter(i => (i.used_count ?? 0) === 0).length
 
-  // Segments réutilisables (portés du prototype _bank → seg()).
-  function Seg({ children }: { children: React.ReactNode }) {
-    return (
-      <span style={{
-        display: 'flex', gap: 2, padding: 2, borderRadius: 7,
-        background: '#111113', border: '1px solid rgba(255,255,255,0.07)',
-      }}>{children}</span>
-    )
-  }
-  function SegBtn({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-    return (
-      <button onClick={onClick} style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px',
-        border: 'none', borderRadius: 5, cursor: 'pointer',
-        background: on ? 'rgba(255,255,255,0.08)' : 'transparent',
-        color: on ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
-      }}>{children}</button>
-    )
-  }
-
   const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
 
   return (
@@ -797,7 +777,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         e.preventDefault(); setDragFiles(false)
         const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video') || f.type.startsWith('image'))
         if (files.length) importFiles(files)
-        else setNotice('Dépose des vidéos ou des images.')
+        else toast('Dépose des vidéos ou des images.', 'info')
       }}>
       {showTrash && (
         <div onClick={() => setShowTrash(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -840,29 +820,22 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         </div>
       )}
       {/* En-tête */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-        <div style={{ minWidth: 0 }}>
-          <h1 style={{
-            margin: 0, fontSize: 22, lineHeight: 1.2,
-            fontWeight: 600, letterSpacing: '-0.025em', color: '#EDEDEF',
-          }}>Banque de contenu</h1>
-          <p style={{ margin: '6px 0 0', fontSize: 13, lineHeight: 1.55, color: '#8B8B94', maxWidth: 620 }}>
-            {loading
-              ? 'Toutes tes vidéos et images, organisées par dossier.'
-              : total === 0
-                ? 'Toutes tes vidéos et images, organisées par dossier.'
-                : `Toutes tes vidéos et images, organisées par dossier. ${neverPublished} média${neverPublished > 1 ? 's' : ''} n’${neverPublished > 1 ? 'ont' : 'a'} jamais été publié${neverPublished > 1 ? 's' : ''}.`}
-          </p>
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <PageHead
+        title="Banque de contenu"
+        sub={loading
+          ? 'Toutes tes vidéos et images, organisées par dossier.'
+          : total === 0
+            ? 'Toutes tes vidéos et images, organisées par dossier.'
+            : `Toutes tes vidéos et images, organisées par dossier. ${neverPublished} média${neverPublished > 1 ? 's' : ''} n’${neverPublished > 1 ? 'ont' : 'a'} jamais été publié${neverPublished > 1 ? 's' : ''}.`}
+        actions={<>
           {trash.length > 0 && <Btn label={`Corbeille (${trash.length})`} theme={theme} icon="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" onClick={() => setShowTrash(true)} />}
           <Btn label="Sync Drive" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
           <Btn label={uploading ? uploading : "Importer"} theme={theme} tone="primary" icon="M12 5v14|M5 12h14" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
-        </div>
-      </div>
+        </>}
+      />
 
       {/* Corps : colonne Dossiers + grille */}
-      <div style={{ display: 'grid', gridTemplateColumns: '228px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '228px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         {/* Dossiers */}
         <Panel theme={theme}>
           <div style={{
@@ -919,22 +892,16 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', minHeight: 48, boxSizing: 'border-box',
             borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap',
           }}>
-            <Seg>
-              {TABS.map(t => (
-                <SegBtn key={t.k} on={tab === t.k} onClick={() => { setTab(t.k); setFolder('Tous') }}>
-                  {t.l}
-                  <span style={{ color: '#71717A', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{loading ? '' : t.n}</span>
-                </SegBtn>
-              ))}
-            </Seg>
+            <Segmented<TabKey> value={tab} onChange={k => { setTab(k); setFolder('Tous') }}
+              options={TABS.map(t => ({ v: t.k, l: t.l, n: loading ? undefined : t.n }))} />
 
             <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.08)' }} />
 
             <span style={{
-              display: 'flex', alignItems: 'center', gap: 8, height: 28, padding: '0 10px', borderRadius: 6, boxSizing: 'border-box',
+              ...FIELD_SM, width: 'auto', display: 'flex', alignItems: 'center', gap: 8,
               flex: '0 1 200px', minWidth: 132,
               border: `1px solid ${q ? theme.selEdge : 'rgba(255,255,255,0.09)'}`,
-              background: '#161618', transition: 'border-color .12s ease',
+              transition: 'border-color .12s ease',
             }}>
               <span style={{ display: 'flex', color: q ? theme.accentText : '#71717A', flexShrink: 0 }}>
                 <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-4.35-4.35" size={12} sw={2} />
@@ -945,24 +912,20 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               />
             </span>
 
-            <Seg>
-              {SORTS.map(s => (
-                <SegBtn key={s.k} on={sort === s.k} onClick={() => setSort(s.k)}>{s.l}</SegBtn>
-              ))}
-            </Seg>
+            <Segmented<SortKey> value={sort} onChange={setSort} options={SORTS.map(s => ({ v: s.k, l: s.l }))} />
 
             {tab !== 'caption' && shown.length > 0 && (() => {
               const allSel = shown.every(m => sel.has(m.id))
               return (
                 <button onClick={() => setSel(allSel ? new Set() : new Set(shown.map(m => m.id)))}
-                  style={{ marginLeft: 'auto', height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${allSel ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.09)'}`, background: allSel ? 'rgba(255,255,255,0.07)' : '#161618', color: allSel ? '#EDEDEF' : '#E4E4E7', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                  style={{ marginLeft: 'auto', height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${allSel ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.09)'}`, background: allSel ? 'rgba(255,255,255,0.07)' : '#161618', color: allSel ? '#EDEDEF' : '#A1A1AA', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' }}>
                   {allSel ? 'Tout désélectionner' : `Tout sélectionner (${shown.length})`}
                 </button>
               )
             })()}
 
             <span style={{ marginLeft: (tab !== 'caption' && shown.length > 0) ? 12 : 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
-              {loading ? el : sel.size ? `${sel.size} sélectionnée${sel.size > 1 ? 's' : ''}` : `${folder} · ${shown.length} affichée${shown.length > 1 ? 's' : ''}`}
+              {loading ? <Skeleton w={72} h={10} style={{ display: 'inline-block', verticalAlign: 'middle' }} /> : sel.size ? `${sel.size} sélectionnée${sel.size > 1 ? 's' : ''}` : `${folder} · ${shown.length} affichée${shown.length > 1 ? 's' : ''}`}
             </span>
           </div>
 
@@ -984,7 +947,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                         <button onClick={() => deleteCaption(c.id)} title="Supprimer" style={{ marginLeft: 'auto', display: 'flex', width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={13} /></button>
                       </div>
                       <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap', maxHeight: 110, overflow: 'hidden' }}>{c.content}</div>
-                      <button onClick={() => { navigator.clipboard?.writeText(c.content); setNotice('Légende copiée.') }} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#1C1C1F', color: '#E4E4E7', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>Copier</button>
+                      <button onClick={() => { navigator.clipboard?.writeText(c.content); toast('Légende copiée.', 'ok') }} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#1C1C1F', color: '#EDEDEF', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>Copier</button>
                     </div>
                   ))}
                 </div>
@@ -1080,7 +1043,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               </button>
             ))}
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="Nouveau dossier…" style={{ flex: 1, minWidth: 0, height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="Nouveau dossier…" style={{ ...FIELD, flex: 1, minWidth: 0 }} />
             </div>
           </div>
         </Modal>
@@ -1093,8 +1056,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="primary" label={savingCap ? 'Enregistrement…' : 'Enregistrer'} disabled={savingCap || !capContent.trim()} onClick={addCaption} />
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input value={capTitle} onChange={e => setCapTitle(e.target.value)} placeholder="Titre (optionnel)" style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-            <textarea value={capContent} onChange={e => setCapContent(e.target.value)} rows={6} placeholder="Ta légende…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
+            <input value={capTitle} onChange={e => setCapTitle(e.target.value)} placeholder="Titre (optionnel)" style={FIELD} />
+            <textarea value={capContent} onChange={e => setCapContent(e.target.value)} rows={6} placeholder="Ta légende…" style={{ ...TEXTAREA, lineHeight: 1.6 }} />
           </div>
         </Modal>
       )}
@@ -1111,7 +1074,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               { l: 'Déplacer', d: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z', fn: () => { setSel(new Set([ctx.item.id])); setMoveOpen(true) } },
               { l: 'Télécharger', d: 'M12 3v12|M7 10l5 5 5-5|M4 21h16', fn: () => downloadMedia([ctx.item.id]) },
             ].map(o => (
-              <button key={o.l} onClick={() => { o.fn(); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#E4E4E7', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+              <button key={o.l} onClick={() => { o.fn(); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <span style={{ color: '#71717A', display: 'flex' }}><Icon d={o.d} size={14} /></span>{o.l}
               </button>
@@ -1130,7 +1093,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         <>
           <div onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
           <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 110), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
-            <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#E4E4E7', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+            <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" size={14} /></span>Renommer
             </button>
@@ -1159,7 +1122,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="primary" label="Renommer" disabled={!renameFolderVal.trim()} onClick={() => { renameFolder(renameFolderOf, renameFolderVal); setRenameFolderOf(null) }} />
           </>}>
           <input autoFocus value={renameFolderVal} onChange={e => setRenameFolderVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && renameFolderVal.trim()) { renameFolder(renameFolderOf, renameFolderVal); setRenameFolderOf(null) } }}
-            style={{ width: '100%', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            style={FIELD} />
         </Modal>
       )}
 
@@ -1194,11 +1157,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom</span>
-              <input value={renameVal} onChange={e => setRenameVal(e.target.value)} style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              <input value={renameVal} onChange={e => setRenameVal(e.target.value)} style={FIELD} />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Tags (séparés par des virgules)</span>
-              <input value={tagsVal} onChange={e => setTagsVal(e.target.value)} placeholder="motivation, produit…" style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              <input value={tagsVal} onChange={e => setTagsVal(e.target.value)} placeholder="motivation, produit…" style={FIELD} />
             </label>
           </div>
         </Modal>
@@ -1211,7 +1174,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="primary" label="Créer" disabled={!folderName.trim()} onClick={createFolder} />
           </>}>
           <input autoFocus value={folderName} onChange={e => setFolderName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && folderName.trim()) createFolder() }} placeholder="Nom du dossier"
-            style={{ width: '100%', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            style={FIELD} />
         </Modal>
       )}
 
@@ -1229,7 +1192,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           </>}>
           <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#8B8B94', lineHeight: 1.55 }}>Cette description pré-remplira la légende quand tu publieras ce média.</p>
           <textarea value={descVal} onChange={e => setDescVal(e.target.value)} rows={6} placeholder="Écris la légende / description…"
-            style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, lineHeight: 1.6, fontFamily: 'inherit', outline: 'none' }} />
+            style={{ ...TEXTAREA, lineHeight: 1.6 }} />
         </Modal>
       )}
     </div>
