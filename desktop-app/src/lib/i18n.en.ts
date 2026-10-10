@@ -1873,6 +1873,15 @@ export const EN: Dict = {
     "Trois étapes,": "Three steps,",
     "cinq minutes.": "five minutes.",
     "Conçu en France": "Made in France",
+    "Abonnements": "Following",
+    "Pour toi": "For You",
+    "Une vidéo sur des dizaines de comptes Instagram, en parallèle.": "One video on dozens of Instagram accounts, in parallel.",
+    "Vidéo TikTok": "TikTok video",
+    "Une vidéo sur des dizaines de comptes TikTok, en parallèle.": "One video on dozens of TikTok accounts, in parallel.",
+    "Reels, Stories et posts photo sur tes comptes Instagram.": "Reels, Stories and photo posts on your Instagram accounts.",
+    "Vidéos sur tes comptes TikTok (les téléphones doivent être connectés à TikTok).": "Videos on your TikTok accounts (phones must be logged in to TikTok).",
+    "Autres réseaux": "Other networks",
+    "Facebook, YouTube Shorts, X, Threads, Reddit, Pinterest.": "Facebook, YouTube Shorts, X, Threads, Reddit, Pinterest.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -2237,5 +2246,6 @@ export const EN: Dict = {
     ["{0} médias en banque", "{0} media in library"],
     ["≈ {0} jour(s) au rythme actuel", "≈ {0} day(s) at the current pace"],
     ["{0} comptes publiés · {1} échecs", "{0} accounts posted · {1} failed"],
+    ["{0} · {1} compte{2} · {3} vidéo{4}", "{0} · {1} account{2} · {3} video{4}"],
   ],
 }

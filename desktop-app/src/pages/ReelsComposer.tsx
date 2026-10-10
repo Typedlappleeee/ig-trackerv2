@@ -9,7 +9,7 @@ import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub, fetchBalance, fetchOrgBalance } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
 import { useConnections } from '@/lib/connections'
-import { geelarkUploadVideo, geelarkUploadImageData, postReelToPhone, scheduleReelOnPhone, startPhones } from '@/lib/geelark'
+import { geelarkUploadVideo, geelarkUploadImageData, postReelToPhone, scheduleReelOnPhone, startPhones, crossPostToPhone, scheduleCrossOnPhone } from '@/lib/geelark'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import BankPicker, { type PickerKind } from '@/components/BankPicker'
 import ReelPreview from '@/components/ReelPreview'
@@ -48,9 +48,12 @@ interface RunItem { id: string; name: string; phase: Phase; detail?: string }
 const STEPS = ['Comptes', 'Vidéos', 'Légende', 'Lancement']
 const PHONE_ICON = 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01'
 
-export default function ReelsComposer({ theme, user, org, onBack }: {
+export default function ReelsComposer({ theme, user, org, onBack, platform = 'instagram' }: {
   theme: Theme; user: User; org: OrgState; onBack: () => void
+  platform?: 'instagram' | 'tiktok'   // même parcours ; TikTok publie via le RPA GeeLark tiktokPublish
 }) {
+  const tiktok = platform === 'tiktok'
+  const platLabel = tiktok ? 'TikTok' : 'Instagram'
   const { currentOrg } = org
   const conns = useConnections(user, org)
   const bearer = conns.bearer
@@ -273,14 +276,16 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       for (const { p, v, cap } of jobs) {
         const ru = resourceByVid.get(v.id)
         if (!ru) { run.markFailed(); errN++; setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); continue }
-        const r = await scheduleReelOnPhone(bearer, p.geelark_id!, ru, cap, scheduledUnix, push, reelsTrial, coverByVid.get(v.id))
+        const r = tiktok
+          ? await scheduleCrossOnPhone(bearer, p.geelark_id!, 'tiktok', { mediaResourceUrl: ru, caption: cap }, scheduledUnix, push)
+          : await scheduleReelOnPhone(bearer, p.geelark_id!, ru, cap, scheduledUnix, push, reelsTrial, coverByVid.get(v.id))
         if (r.ok) { okN++; postedVidIds.add(v.id); if (r.taskId) schedTaskIds.push(r.taskId); schedPhones.push({ geelark_id: p.geelark_id!, name: phoneLabel(p) }) } else { run.markFailed(); errN++ }
         setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: r.ok ? 'done' : 'failed', detail: r.ok ? 'programmé ✓' : r.error } : it))
       }
       R.finish(); setRunId(null)
       const { refunded } = await run.settle()
       if (refunded > 0) push(`↩︎ ${refunded} crédits remboursés (échecs de programmation).`)
-      if (okN > 0) await recordGeelarkSchedule({ userId: user.id, orgId: currentOrg?.id ?? null, ownerId, type: 'mass_posting', scheduledAtUnix: scheduledUnix, phones: schedPhones, taskIds: schedTaskIds, caption: caps[0], trial: reelsTrial, platform: 'instagram', creditsTotal: okN * CREDIT_COSTS.mass_posting })
+      if (okN > 0) await recordGeelarkSchedule({ userId: user.id, orgId: currentOrg?.id ?? null, ownerId, type: tiktok ? 'tiktok' : 'mass_posting', scheduledAtUnix: scheduledUnix, phones: schedPhones, taskIds: schedTaskIds, caption: caps[0], trial: !tiktok && reelsTrial, platform, creditsTotal: okN * CREDIT_COSTS.mass_posting })
       // Usage unique : NE PAS supprimer les vidéos ici — elles seront postées plus tard.
       push(okN > 0 ? `✅ ${okN} post(s) programmé(s). Visibles dans « Programmé ». Ils partiront tout seuls, PC éteint.` : '❌ Aucune programmation créée.')
       setRunning(false); load()
@@ -289,7 +294,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
 
     // Historique écrit DÈS MAINTENANT (avant : seulement à la fin → rien si l'onglet se fermait).
     const hist = await startRunHistory({
-      userId: user.id, orgId: currentOrg?.id ?? null, type: 'mass_posting',
+      userId: user.id, orgId: currentOrg?.id ?? null, type: tiktok ? 'tiktok' : 'mass_posting',
       accounts: jobs.map(j => ({ key: j.p.id, name: phoneLabel(j.p), geelarkId: j.p.geelark_id })),
     })
     const concurrency = rot ? 1 : (simulPhones === 'all' ? jobs.length : Math.max(1, Number(simulPhones)))
@@ -306,7 +311,9 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
       if (!ru) { run.markFailed(); errN++; R.tick(false); results.set(p.id, { name: phoneLabel(p), ok: false, error: 'vidéo non hébergée' }); hist.set(p.id, { ok: false, error: 'vidéo non hébergée' }); setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'failed', detail: 'vidéo non hébergée' } : it)); return }
       push(`— ${phoneLabel(p)} · ${v.title}${cap ? ' · légende' : ''} —`)
-      const r = await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id), skipStart)
+      const r = tiktok
+        ? await crossPostToPhone(bearer, p.geelark_id!, 'tiktok', { mediaResourceUrl: ru, caption: cap, rotationUrls: rot }, push)
+        : await postReelToPhone(bearer, p.geelark_id!, ru, cap, push, rot, reelsTrial, coverByVid.get(v.id), skipStart)
       if (r.ok) { postedVidIds.add(v.id); okN++ } else { run.markFailed(); errN++ }
       results.set(p.id, { name: phoneLabel(p), ok: r.ok, error: r.ok ? undefined : r.error })
       hist.set(p.id, { ok: r.ok, error: r.ok ? undefined : r.error })
@@ -326,7 +333,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
       // → chaque post saute son démarrage individuel (skipStart). Si le groupé plante,
       // on retombe sur le démarrage par téléphone.
       let batchSkip = false
-      if (!rot) {
+      // TikTok : chaque publication démarre son téléphone elle-même (crossPostToPhone).
+      if (!rot && !tiktok) {
         push(`📱 Démarrage groupé de ${batchIds.length} téléphone(s)…`)
         try {
           const n = await startPhones(bearer, batchIds)
@@ -403,8 +411,8 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead
-        title="Publier un Reel"
-        sub={`Instagram · ${nSel} compte${nSel > 1 ? 's' : ''} · ${nVid} vidéo${nVid > 1 ? 's' : ''}`}
+        title={tiktok ? 'Publier sur TikTok' : 'Publier un Reel'}
+        sub={`${platLabel} · ${nSel} compte${nSel > 1 ? 's' : ''} · ${nVid} vidéo${nVid > 1 ? 's' : ''}`}
         actions={<>
           <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
         </>}
@@ -543,7 +551,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
           <Panel theme={theme}>
             <PanelHead title="Aperçu" />
             <div style={{ padding: 16 }}>
-              <ReelPreview theme={theme}
+              <ReelPreview theme={theme} platform={platform}
                 videos={videos.filter(v => vidSel.has(v.id)).map(v => ({ id: v.id, title: v.title }))}
                 accounts={phones.filter(p => sel.has(p.id)).map(p => ({ username: p.ig_username ?? phoneLabel(p), pp: p.pp_url }))}
                 captions={captions}
@@ -595,19 +603,19 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
             {/* Usage unique */}
             <RunToggle label="Usage unique des vidéos" hint="Retire de la banque les vidéos utilisées" on={autoRemove} onToggle={() => setAutoRemove(v => !v)} theme={theme} border />
             {/* Essai Reels */}
-            <RunToggle label="Essai Reels" hint="Publie en mode essai (visible non-abonnés)" on={reelsTrial} onToggle={() => setReelsTrial(v => !v)} theme={theme} border />
-            {/* Miniatures par vidéo (définies à l'étape Vidéos) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' }}>
+            {!tiktok && <RunToggle label="Essai Reels" hint="Publie en mode essai (visible non-abonnés)" on={reelsTrial} onToggle={() => setReelsTrial(v => !v)} theme={theme} border />}
+            {/* Miniatures par vidéo (définies à l'étape Vidéos) — Instagram uniquement */}
+            {!tiktok && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' }}>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Miniatures (couverture)</span>
                 <span style={{ fontSize: 12, color: '#8B8B94' }}>{Object.keys(covers).length > 0 ? `${Object.keys(covers).length} vidéo(s) avec miniature — modifiable à l’étape Vidéos` : 'Optionnel — choisis une miniature par vidéo à l’étape Vidéos (icône 🖼)'}</span>
               </span>
-            </div>
+            </div>}
           </Panel>
           <Panel theme={theme}>
             <PanelHead title="Récapitulatif" />
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {([['Comptes', nSel], ['Vidéos', nVid], ['Plateforme', 'Instagram']] as [string, any][]).map(([k, v]) => (
+              {([['Comptes', nSel], ['Vidéos', nVid], ['Plateforme', platLabel]] as [string, any][]).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                   <span style={{ color: '#8B8B94' }}>{k}</span><span style={{ fontWeight: 500, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{v}</span>
                 </div>
@@ -688,7 +696,7 @@ export default function ReelsComposer({ theme, user, org, onBack }: {
               style={{ ...FIELD, colorScheme: 'dark' }} />
             <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.55, color: '#8B8B94' }}>
               La tâche est créée <b>maintenant</b> sur GeeLark (vidéos hébergées + crédits débités) et s'exécutera <b>toute seule</b> à l'heure prévue. Tu peux la voir/annuler dans les <b>Task Logs</b> de GeeLark. Max ~29 jours (au-delà, l'hébergement vidéo GeeLark expire).
-              {reelsTrial ? ' Mode essai activé.' : ''}
+              {!tiktok && reelsTrial ? ' Mode essai activé.' : ''}
             </p>
           </div>
         </Modal>

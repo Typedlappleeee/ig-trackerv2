@@ -16,8 +16,9 @@ const ICONS = {
   shuffle: 'M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6|M4 4l5 5',
 }
 
-export default function ReelPreview({ theme, videos, accounts, captions, resolveUrl, posterFor }: {
+export default function ReelPreview({ theme, videos, accounts, captions, resolveUrl, posterFor, platform = 'instagram' }: {
   theme: Theme
+  platform?: 'instagram' | 'tiktok'
   videos: PreviewVideo[]
   accounts: PreviewAccount[]
   captions: string[]
@@ -56,7 +57,9 @@ export default function ReelPreview({ theme, videos, accounts, captions, resolve
         )}
 
         {/* Habillage Reels Instagram */}
-        <div style={{ position: 'absolute', top: 12, left: 14, fontSize: 16, fontWeight: 600, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Reels</div>
+        {platform === 'tiktok'
+          ? <div style={{ position: 'absolute', top: 12, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 14, fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.65)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}><span>Abonnements</span><span style={{ color: '#fff', borderBottom: '2px solid #fff', paddingBottom: 3 }}>Pour toi</span></div>
+          : <div style={{ position: 'absolute', top: 12, left: 14, fontSize: 16, fontWeight: 600, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>Reels</div>}
         <div style={{ position: 'absolute', inset: 'auto 0 0 0', height: '55%', background: 'linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0))', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', right: 10, bottom: 70, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, color: '#fff' }}>
           {[ICONS.heart, ICONS.comment, ICONS.send, ICONS.more].map((d, i) => <Icon key={i} d={d} size={22} sw={1.9} />)}
