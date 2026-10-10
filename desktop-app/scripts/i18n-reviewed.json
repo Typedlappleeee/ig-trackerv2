@@ -373,6 +373,7 @@
  "^(Username|Nom d['’]utilisateur|Pseudo),\\s*@?{0}$",
  "actions",
  "adb · connected",
+ "auto 0 0 0",
  "blowContent",
  "blowParc",
  "blowTools",

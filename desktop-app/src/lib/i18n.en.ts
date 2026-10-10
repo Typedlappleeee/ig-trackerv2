@@ -1835,6 +1835,12 @@ export const EN: Dict = {
     "Changement de photo non confirmé (l’écran du profil n’est pas revenu)": "Picture change not confirmed (the profile screen didn’t come back)",
     "Pseudo vide": "Empty username",
     "Le même pseudo est utilisé deux fois — chaque compte doit avoir un @ unique.": "The same username is used twice — each account needs a unique @.",
+    "Aucune vidéo choisie": "No video selected",
+    "Suivre": "Follow",
+    "plus": "more",
+    "· Son original": "· Original audio",
+    "Autre aperçu": "Another preview",
+    "Vidéo, compte et légende tirés au hasard": "Random video, account and caption",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

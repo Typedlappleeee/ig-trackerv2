@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-10b',
+    date: '2026-10-10',
+    title: { fr: 'Aperçu du Reel', en: 'Reel preview' },
+    items: {
+      fr: ['Publier un Reel : l’aperçu montre le Reel comme sur Instagram (vidéo, compte et légende tirés au hasard, bouton « Autre aperçu »).'],
+      en: ['Post a Reel: the preview shows the Reel like on Instagram (random video, account and caption, “Another preview” button).'],
+    },
+  },
+  {
     id: '2026-10-10',
     date: '2026-10-10',
     title: { fr: 'Mise à jour Flow Builder', en: 'Flow Builder update' },
