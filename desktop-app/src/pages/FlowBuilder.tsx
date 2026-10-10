@@ -2,13 +2,14 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSPr
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Modal, PageHead, Panel, PanelHead, StatusDot } from '@/lib/ui'
+import { Btn, Chip, Icon, Modal, PageHead, Panel, PanelHead, StatusDot, FIELD, TEXTAREA, MONO, SkeletonRows } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { scopeInfra, phoneLabel } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import { cancelRun } from '@/lib/runStore'
 import BankPicker from '@/components/BankPicker'
+import FlowRunCard from '@/components/FlowRunCard'
 import {
   BLOCKS, BLOCK, TEMPLATES, newBlock, newFlow, estimateFlow, flowCredits, fmtMinutes, validateFlow, lines,
   loadFlows, saveFlow, deleteFlow, runFlow, useFlowRuns, dismissFlowRun, BOOT_ESTIMATE,
@@ -20,9 +21,9 @@ import {
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null; group_name: string | null }
 type Drag = { kind: 'new'; type: BlockType } | { kind: 'move'; from: number }
 
-const MONO = "'JetBrains Mono',monospace"
-const inputStyle: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
-const areaStyle: CSSProperties = { ...inputStyle, height: 'auto', padding: 10, resize: 'vertical', lineHeight: 1.5 }
+// Champs : styles partagés de l'app (src/lib/ui.tsx).
+const inputStyle: CSSProperties = FIELD
+const areaStyle: CSSProperties = { ...TEXTAREA, padding: 10 }
 
 // Mise en page responsive (les styles inline n'ont pas de media queries).
 const LAYOUT_CSS = `
@@ -309,7 +310,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
               backgroundSize: `${18 * view.z}px ${18 * view.z}px`, backgroundPosition: `${view.x}px ${view.y}px`,
             }}>
             {!flow ? (flowsLoading
-              ? <div style={{ padding: 60, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div>
+              ? <SkeletonRows rows={6} />
               : <EmptyState theme={theme} onTemplate={i => setNewOpen(i)} />
             ) : (
               <div style={{ position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '26px 16px 90px', transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`, transformOrigin: '0 0' }}>
@@ -1125,84 +1126,13 @@ function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId
 
 // ── Exécutions en direct ─────────────────────────────────────────────────────
 
-const STEP_COLOR: Record<StepStatus, string> = { pending: 'rgba(255,255,255,0.1)', running: '#FBBF24', ok: '#4ADE80', failed: '#F87171', skipped: 'rgba(255,255,255,0.04)' }
-const PHONE_TONE = { pending: 'mute', booting: 'warn', running: 'warn', done: 'ok', failed: 'bad', cancelled: 'mute' } as const
-const PHONE_LABEL = { pending: 'En attente', booting: 'Démarrage', running: 'En cours', done: 'Terminé', failed: 'Échec', cancelled: 'Annulé' } as const
 
 function RunsPanel({ theme, runs }: { theme: Theme; runs: FlowRun[] }) {
   if (runs.length === 0) return null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {runs.map(r => <RunCard key={r.id} theme={theme} run={r} />)}
+      {runs.map(r => <FlowRunCard key={r.id} theme={theme} run={r} />)}
     </div>
   )
 }
 
-function RunCard({ theme, run }: { theme: Theme; run: FlowRun }) {
-  const [filter, setFilter] = useState<'all' | 'active' | 'failed'>('all')
-  const [open, setOpen] = useState<string | null>(null)
-  const done = run.phones.filter(p => p.status === 'done').length
-  const failed = run.phones.filter(p => p.status === 'failed').length
-  const active = run.status === 'preparing' || run.status === 'running'
-  const list = run.phones.filter(p => filter === 'all' || (filter === 'failed' ? p.status === 'failed' : p.status === 'booting' || p.status === 'running'))
-  const LIMIT = 150
-  const elapsed = Math.round(((run.endedAt ?? Date.now()) - run.startedAt) / 60_000)
-  return (
-    <Panel theme={theme}>
-      <PanelHead
-        title={<span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{run.flowName}<Chip text={run.status === 'preparing' ? 'Préparation' : run.status === 'running' ? 'En cours' : run.status === 'done' ? 'Terminé' : run.status === 'cancelled' ? 'Annulé' : 'Erreur'} tone={active ? 'warn' : run.status === 'done' ? 'ok' : run.status === 'error' ? 'bad' : 'mute'} /></span>}
-        sub={`${done} OK · ${failed} échec(s) · ${run.phones.length} compte(s) · ${elapsed} min`}
-        right={<span style={{ display: 'flex', gap: 6 }}>
-          {active
-            ? <Btn theme={theme} sm tone="danger" label="Arrêter" onClick={() => cancelRun(run.handleId)} />
-            : <Btn theme={theme} sm tone="quiet" label="Masquer" onClick={() => dismissFlowRun(run.id)} />}
-        </span>}
-      />
-      {/* Progression globale */}
-      <div style={{ height: 3, margin: '12px 16px 0', borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex' }}>
-        <span style={{ width: `${(done / Math.max(1, run.phones.length)) * 100}%`, background: '#4ADE80', transition: 'width .3s ease' }} />
-        <span style={{ width: `${(failed / Math.max(1, run.phones.length)) * 100}%`, background: '#F87171', transition: 'width .3s ease' }} />
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 2, margin: '12px 16px 8px', padding: 2, width: 'fit-content', borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-        {([['all', 'Tous'], ['active', 'En cours'], ['failed', `Échecs${failed ? ` (${failed})` : ''}`]] as const).map(([k, l]) => (
-          <button key={k} onClick={() => setFilter(k)} style={{ height: 24, padding: '0 10px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500, background: filter === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: filter === k ? '#EDEDEF' : '#8B8B94' }}>{l}</button>
-        ))}
-      </div>
-      <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-        {list.slice(0, LIMIT).map(p => {
-          const isOpen = open === p.key
-          const curLabel = p.status === 'booting' ? 'Démarrage du téléphone' : p.current >= 0 && p.status === 'running' ? blockName(run.blocks[p.current]) : ''
-          const err = p.errors.find(Boolean)
-          return (
-            <div key={p.key} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <button onClick={() => setOpen(isOpen ? null : p.key)} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', minHeight: 44, padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ width: 150, flexShrink: 0, fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-                <span style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
-                  {p.steps.map((s, i) => (
-                    <span key={i} title={`${i + 1}. ${blockName(run.blocks[i])} — ${s}${p.errors[i] ? ` : ${p.errors[i]}` : ''}`}
-                      style={{ width: 16, height: 6, borderRadius: 2, background: STEP_COLOR[s], animation: s === 'running' ? 'aPulse 1.4s ease-in-out infinite' : undefined }} />
-                  ))}
-                </span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: err && p.status === 'failed' ? '#F87171' : '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {p.status === 'failed' && err ? err : curLabel}
-                </span>
-                <Chip text={PHONE_LABEL[p.status]} tone={PHONE_TONE[p.status]} />
-              </button>
-              {isOpen && (
-                <div style={{ margin: '0 16px 12px', padding: '8px 12px', borderRadius: 6, background: '#0C0C0E', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 220, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
-                  {p.logs.length ? p.logs.join('\n') : 'En attente…'}
-                </div>
-              )}
-            </div>
-          )
-        })}
-        {list.length > LIMIT && <div style={{ padding: '10px 16px', fontSize: 12, color: '#71717A', borderTop: '1px solid rgba(255,255,255,0.05)' }}>… et {list.length - LIMIT} autre(s) — filtre « En cours » ou « Échecs » pour les voir.</div>}
-      </div>
-      {run.log.length > 0 && (
-        <div style={{ margin: '4px 16px 16px', padding: '8px 12px', borderRadius: 6, background: '#0C0C0E', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 90, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.6, color: '#71717A', whiteSpace: 'pre-wrap' }}>
-          {run.log.join('\n')}
-        </div>
-      )}
-    </Panel>
-  )
-}

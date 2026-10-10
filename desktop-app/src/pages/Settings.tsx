@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import ProxyRotationPanel from '@/components/ProxyRotationPanel'
 import { LangSwitch } from '@/components/AppUpdate'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, FIELD, MONO, Toggle, Skeleton, SkeletonRows, useNarrow, toast } from '@/lib/ui'
 import { supabase, type OrgRole } from '@/lib/supabase'
 import { fetchBalance, fetchOrgBalance, fmtNumber, type OrgState } from '@/lib/data'
 
@@ -61,28 +61,9 @@ function ReadValue({ value, mono }: { value: ReactNode; mono?: boolean }) {
       display: 'inline-block', verticalAlign: 'middle', height: 32, lineHeight: '30px', padding: '0 10px', borderRadius: 6, boxSizing: 'border-box',
       background: '#161618', border: '1px solid rgba(255,255,255,0.09)', maxWidth: '100%', width: 320,
       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      fontFamily: mono ? "'JetBrains Mono',monospace" : undefined, fontSize: mono ? 12 : 13, color: '#EDEDEF',
+      fontFamily: mono ? MONO : undefined, fontSize: mono ? 12 : 13, color: '#EDEDEF',
     }}>{value}</span>
   )
-}
-
-// Toggle purement visuel (les préférences ne sont pas persistées dans cette passe).
-function Toggle({ theme, on }: { theme: Theme; on: boolean }) {
-  return (
-    <span aria-hidden style={{
-      display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start', width: 32, height: 18,
-      padding: 2, borderRadius: 99, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accent : 'rgba(255,255,255,0.12)',
-    }}>
-      <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
-    </span>
-  )
-}
-
-// Champ de saisie standard (input/select) — guide « SaaS épuré ».
-const FIELD: CSSProperties = {
-  height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6,
-  background: '#161618', border: '1px solid rgba(255,255,255,0.09)',
-  color: '#EDEDEF', fontSize: 13, outline: 'none',
 }
 
 const DASH = <span style={{ color: '#5A5A63' }}>—</span>
@@ -98,7 +79,7 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [nameInput, setNameInput] = useState('')
   const [savingName, setSavingName] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
+  const narrow = useNarrow()
   useEffect(() => {
     let alive = true
     supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
@@ -110,8 +91,8 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
     setSavingName(true)
     const { error } = await supabase.from('profiles').update({ display_name: nameInput.trim() || null }).eq('id', user.id)
     setSavingName(false)
-    if (!error) { setDisplayName(nameInput.trim() || null); setNotice('Nom enregistré.') }
-    else setNotice(`Échec : ${error.message}`)
+    if (!error) { setDisplayName(nameInput.trim() || null); toast('Nom enregistré.', 'ok') }
+    else toast(`Échec : ${error.message}`, 'bad')
   }
 
   // ── Solde de crédits réel (org ou perso) ────────────────────────────────────────
@@ -154,13 +135,13 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
   useEffect(() => { loadMembers() }, [loadMembers])
 
   const menu = (
-    <div style={{ position: 'sticky', top: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <div style={{ position: narrow ? 'static' : 'sticky', top: 0, display: 'flex', flexDirection: narrow ? 'row' : 'column', flexWrap: narrow ? 'wrap' : 'nowrap', gap: 2 }}>
       {SECTIONS.map(x => {
         const on = tab === x.k
         return (
           <button key={x.k} onClick={() => setTab(x.k)} style={{
             display: 'flex', alignItems: 'center', gap: 10, height: 32, padding: '0 10px', border: 'none',
-            borderRadius: 6, cursor: 'pointer', textAlign: 'left', width: '100%',
+            borderRadius: 6, cursor: 'pointer', textAlign: 'left', width: narrow ? 'auto' : '100%',
             background: on ? 'rgba(255,255,255,0.07)' : 'transparent', color: on ? '#EDEDEF' : '#A1A1AA',
             fontSize: 13, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
           }}
@@ -177,11 +158,11 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Réglages" sub="Ton profil, ton organisation, tes membres et ton abonnement." />
-      <div style={{ display: 'grid', gridTemplateColumns: '200px minmax(0,1fr)', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '200px minmax(0,1fr)', gap: narrow ? 16 : 24, alignItems: 'start' }}>
         {menu}
         <div style={{ minWidth: 0 }}>
           {tab === 'account' && <AccountTab theme={theme} user={user} displayName={displayName} onSignOut={onSignOut}
-            nameInput={nameInput} setNameInput={setNameInput} savingName={savingName} saveName={saveName} notice={notice} />}
+            nameInput={nameInput} setNameInput={setNameInput} savingName={savingName} saveName={saveName} />}
           {tab === 'org' && <OrgTab theme={theme} org={org} balance={balance} canManage={canManage} />}
           {tab === 'members' && <MembersTab theme={theme} org={org} members={members} canManage={canManage} currentUserId={user.id} onReload={loadMembers} />}
           {tab === 'billing' && <BillingTab theme={theme} user={user} org={org} balance={balance} canManage={canManage} onRedeemed={reloadBalance} />}
@@ -196,9 +177,9 @@ export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
 }
 
 // ══════════ PROFIL — c'est ici la déconnexion officielle ══════════
-function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInput, savingName, saveName, notice }: {
+function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInput, savingName, saveName }: {
   theme: Theme; user: User; displayName: string | null; onSignOut: () => void
-  nameInput: string; setNameInput: (v: string) => void; savingName: boolean; saveName: () => void; notice: string | null
+  nameInput: string; setNameInput: (v: string) => void; savingName: boolean; saveName: () => void
 }) {
   const initial = initialsFrom(displayName, user.email ?? null)
   return (
@@ -233,10 +214,6 @@ function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInp
           </Field>
         </div>
       </Panel>
-
-      {notice && (
-        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#EDEDEF' }}>{notice}</div>
-      )}
 
       <div style={{ marginTop: 12 }}>
         <Panel theme={theme}>
@@ -338,7 +315,7 @@ function OrgTab({ theme, org, balance, canManage }: {
           </Field>
           <div style={{ marginBottom: -1 }}><Field label="Crédits de l’organisation">
             <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>
-              {balance === null ? '…' : fmtNumber(balance)}
+              {balance === null ? <Skeleton w={56} h={14} /> : fmtNumber(balance)}
             </span>
           </Field></div>
         </div>
@@ -406,7 +383,7 @@ function InviteBox({ theme, orgId, onReload }: { theme: Theme; orgId: string; on
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: 16, flexWrap: 'wrap' }}>
         <span style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Adresse e-mail</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)' }}>
+          <span style={{ ...FIELD, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ display: 'flex', color: '#71717A' }}><Icon d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z|M22 6l-10 7L2 6" size={13} /></span>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="prenom@agence.fr"
               onKeyDown={e => { if (e.key === 'Enter') invite() }}
@@ -442,7 +419,7 @@ function MembersTab({ theme, org, members, canManage, currentUserId, onReload }:
       <Panel theme={theme}>
         <PanelHead title="Membres" right={<Chip text={loading ? '…' : String(list.length)} tone="mute" />} />
         {loading ? (
-          <div style={{ padding: '24px 16px', fontSize: 12, color: '#71717A' }}>…</div>
+          <SkeletonRows rows={3} avatar />
         ) : list.length === 0 ? (
           <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: '#8B8B94' }}>Aucun membre.</div>
         ) : (
@@ -557,7 +534,7 @@ function BillingTab({ theme, user, org, balance, canManage, onRedeemed }: {
         <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Crédits disponibles</span>
           <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>
-            {balance === null ? '…' : fmtNumber(balance)}
+            {balance === null ? <Skeleton w={80} h={22} r={5} /> : fmtNumber(balance)}
           </span>
         </span>
         {canManage && (
@@ -591,7 +568,7 @@ function BillingTab({ theme, user, org, balance, canManage, onRedeemed }: {
             <input value={code} onChange={e => { setCode(e.target.value.toUpperCase()); setRedeemMsg(null) }}
               onKeyDown={e => { if (e.key === 'Enter') redeem() }}
               placeholder="CR-XXXX-XXXX" spellCheck={false} autoComplete="off"
-              style={{ ...FIELD, flex: 1, minWidth: 180, fontFamily: "'JetBrains Mono',monospace", letterSpacing: '0.04em' }} />
+              style={{ ...FIELD, flex: 1, minWidth: 180, fontFamily: MONO, letterSpacing: '0.04em' }} />
             <Btn theme={theme} tone="primary" label={redeeming ? 'Validation…' : 'Valider le code'} disabled={redeeming || !code.trim()} onClick={redeem} />
           </div>
           {redeemMsg && (
@@ -643,9 +620,7 @@ function InfraTab({ theme, user, org, canManage }: { theme: Theme; user: User; o
     setSaving(false)
   }
 
-  const inp: CSSProperties = {
-    ...FIELD, width: '100%', fontSize: 12, fontFamily: "'JetBrains Mono',monospace",
-  }
+  const inp = { ...FIELD, fontSize: 12, fontFamily: MONO }
   const eye = (on: boolean, set: (v: boolean) => void) => (
     <button type="button" onClick={() => set(!on)} style={{ flexShrink: 0, height: 32, minWidth: 64, padding: '0 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#A1A1AA', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{on ? 'Cacher' : 'Voir'}</button>
   )
@@ -656,7 +631,12 @@ function InfraTab({ theme, user, org, canManage }: { theme: Theme; user: User; o
         sub={currentOrg ? `Partagées par l’organisation « ${currentOrg.name} »` : 'Ton espace perso'}
         right={<Chip text={currentOrg ? 'Org' : 'Perso'} tone="violet" />} />
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {loading ? <span style={{ fontSize: 13, color: '#8B8B94' }}>Chargement…</span> : (
+        {loading ? (
+          <div aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Skeleton w={160} h={12} /><Skeleton h={32} r={6} />
+            <Skeleton w={120} h={12} style={{ marginTop: 10 }} /><Skeleton h={32} r={6} />
+          </div>
+        ) : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Token GeeLark (Bearer)</span>
@@ -703,7 +683,7 @@ function NotifTab({ theme, email }: { theme: Theme; email: string | null }) {
     <>
       <Panel theme={theme}>
         <PanelHead title="Quand te prévenir" sub="Préférences à venir" />
-        {rows.map(r => <Field key={r.l} label={r.l} hint={r.hint}><Toggle theme={theme} on={r.on} /></Field>)}
+        {rows.map(r => <Field key={r.l} label={r.l} hint={r.hint}><Toggle on={r.on} onChange={() => {}} label={r.l} /></Field>)}
       </Panel>
       <div style={{ marginTop: 12 }}>
         <Panel theme={theme}>
@@ -732,7 +712,7 @@ function SecurityTab({ theme }: { theme: Theme }) {
           <span style={{ fontSize: 13, color: '#5A5A63' }}>—</span>
         </Field>
         <Field label="Clés API">
-          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#5A5A63' }}>—</span>
+          <span style={{ fontFamily: MONO, fontSize: 12, color: '#5A5A63' }}>—</span>
         </Field>
       </Panel>
       <div style={{ marginTop: 12 }}>

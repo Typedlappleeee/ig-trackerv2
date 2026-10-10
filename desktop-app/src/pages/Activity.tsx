@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ScheduledPost, type PostRun } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PageHead, Kpi, Empty, Modal, SkeletonRows } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PageHead, Kpi, Empty, Modal, SkeletonRows, Segmented, toast } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { queryTaskResults } from '@/lib/geelark'
@@ -74,7 +74,6 @@ export default function Activity({ theme, infra, user, org }: {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [detail, setDetail] = useState<RunItem | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const { bearer } = useConnections(user, org)
   // Lignes post_runs brutes : sert à retrouver le résultat des comptes « en attente ».
   const rawRef = useRef<{ id: string; created_at: string; details: HistoryEntry[] }[]>([])
@@ -86,10 +85,10 @@ export default function Activity({ theme, infra, user, org }: {
     if (r.id.startsWith('sched-')) {
       const id = r.id.slice('sched-'.length)
       const { error } = await supabase.from('scheduled_posts').update({ status: 'pending' }).eq('id', id)
-      setNotice(error ? `Échec : ${error.message}` : 'Post remis en file — le serveur relancera les comptes échoués.')
+      toast(error ? `Échec : ${error.message}` : 'Post remis en file — le serveur relancera les comptes échoués.', error ? 'bad' : 'ok')
       if (!error) load()
     } else {
-      setNotice('Ce run a été lancé depuis ton PC — relance-le depuis Publication (les runs serveur, eux, sont relançables ici).')
+      toast('Ce run a été lancé depuis ton PC — relance-le depuis Publication (les runs serveur, eux, sont relançables ici).', 'info', 7000)
     }
   }
 
@@ -210,10 +209,10 @@ export default function Activity({ theme, infra, user, org }: {
     setRecovering(true)
     try {
       const r = await recoverLast24h({ bearer, userId: user.id, orgId: currentOrg?.id ?? null })
-      if (r.ok && r.runs > 0) { setNotice(`${r.runs} run(s) des dernières 24 h récupéré(s) depuis GeeLark (${r.tasks} tâche(s)).`); load(true) }
-      else if (!auto) setNotice(r.ok ? 'Rien à récupérer : tout ce que GeeLark a fait ces dernières 24 h est déjà dans l’historique.' : `Récupération impossible : ${r.error}`)
+      if (r.ok && r.runs > 0) { toast(`${r.runs} run(s) des dernières 24 h récupéré(s) depuis GeeLark (${r.tasks} tâche(s)).`, 'ok', 6000); load(true) }
+      else if (!auto) toast(r.ok ? 'Rien à récupérer : tout ce que GeeLark a fait ces dernières 24 h est déjà dans l’historique.' : `Récupération impossible : ${r.error}`, r.ok ? 'info' : 'bad', 6000)
     } catch (e) {
-      if (!auto) setNotice(`Récupération impossible : ${e instanceof Error ? e.message : String(e)}`)
+      if (!auto) toast(`Récupération impossible : ${e instanceof Error ? e.message : String(e)}`, 'bad', 6000)
     } finally { setRecovering(false) }
   }, [bearer, recovering, user.id, currentOrg?.id, load])
   useEffect(() => {
@@ -256,10 +255,6 @@ export default function Activity({ theme, infra, user, org }: {
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Activité" sub="L'historique de tous tes runs. Relance les comptes échoués sans reconstruire la diffusion." />
 
-      {notice && (
-        <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', fontSize: 13, color: '#A1A1AA' }}>{notice}</div>
-      )}
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>
         <Kpi theme={theme} label="Runs · 7 jours" value={kpi.count7} />
         <Kpi theme={theme} label="Taux de succès" value={kpi.count7 ? `${kpi.rate} %` : '—'} color={kpi.count7 ? '#4ADE80' : undefined} />
@@ -269,18 +264,7 @@ export default function Activity({ theme, infra, user, org }: {
 
       <Panel theme={theme}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
-          <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-            {filters.map(f => (
-              <button key={f.k} onClick={() => setFilter(f.k)} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
-                background: filter === f.k ? 'rgba(255,255,255,0.08)' : 'transparent',
-                color: filter === f.k ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
-              }}>
-                {f.l}
-                <span style={{ color: filter === f.k ? '#A1A1AA' : '#5A5A63', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{f.n}</span>
-              </button>
-            ))}
-          </span>
+          <Segmented<Filter> value={filter} onChange={setFilter} options={filters.map(f => ({ v: f.k, l: f.l, n: f.n }))} />
           <span style={{ flex: 1 }} />
           <Btn theme={theme} sm tone="ghost" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={recovering ? 'Récupération…' : 'Récupérer les dernières 24 h'}
             disabled={!bearer || recovering} onClick={() => recover(false)} />
@@ -297,7 +281,7 @@ export default function Activity({ theme, infra, user, org }: {
           const pct = r.total ? Math.round((r.ok / r.total) * 100) : 0
           return (
             <div key={r.id} style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', minHeight: 52, boxSizing: 'border-box',
+              display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', minHeight: 52, boxSizing: 'border-box', flexWrap: 'wrap',
               borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', transition: 'background .12s ease',
             }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
@@ -308,12 +292,12 @@ export default function Activity({ theme, infra, user, org }: {
                 border: '1px solid rgba(255,255,255,0.08)',
                 color: ok ? '#4ADE80' : '#FBBF24',
               }}><Icon d={ok ? 'M20 6L9 17l-5-5' : 'M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'} size={13} /></span>
-              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ flex: '1 1 200px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
                   <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
                   {/* Sticker infra : d'où vient le run. (Tous GeeLark aujourd'hui ; ScaleFlow Cloud se taguera quand l'infra sera active.) */}
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 18, padding: '0 6px', boxSizing: 'border-box', borderRadius: 4, flexShrink: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 500, color: '#A1A1AA' }}>
-                    <span style={{ width: 5, height: 5, borderRadius: 99, background: '#A78BFA' }} />GeeLark
+                    <span style={{ width: 5, height: 5, borderRadius: 99, background: theme.accent }} />GeeLark
                   </span>
                   {r.state === 'running' && <Chip text="En cours" tone="info" />}
                   {r.state === 'interrupted' && <Chip text="Interrompu" tone="warn" />}

@@ -1,23 +1,30 @@
 import { lazy, Suspense, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Chip, Icon, PageHead } from '@/lib/ui'
+import { Chip, Icon, PageHead, Skeleton, SkeletonRows } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 // Chaque composer n'est chargé qu'à l'ouverture de son format.
 const ReelsComposer = lazy(() => import('./ReelsComposer'))
 const StoryComposer = lazy(() => import('./StoryComposer'))
 const CrossComposer = lazy(() => import('./CrossComposer'))
 const PhotoComposer = lazy(() => import('./PhotoComposer'))
-const Wait = () => <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><div style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.08)', borderTopColor: '#A1A1AA', animation: 'aSpin 0.7s linear infinite' }} /></div>
+// Chargement d'un composer : squelette (titre + panneau) au lieu d'un spinner.
+const Wait = () => (
+  <div aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <Skeleton w={200} h={20} r={5} />
+    <Skeleton w={320} h={12} style={{ marginBottom: 12 }} />
+    <div style={{ borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}><SkeletonRows rows={4} /></div>
+  </div>
+)
 
 // Hub de publication : choix du format. Le contenu et les comptes se règlent à
 // l'étape suivante (wizards Reels/Story — branchés à la phase actions).
-interface Format { id: string; t: string; d: string; cost: string; tone: string; ready: boolean; icon: string }
+interface Format { id: string; t: string; d: string; cost: string; ready: boolean; icon: string }
 const FORMATS: Format[] = [
-  { id: 'reels', t: 'Reels', d: 'Une vidéo sur des dizaines de comptes Instagram ou TikTok, en parallèle.', cost: '2 crédits / compte', tone: '139,92,246', ready: true, icon: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
-  { id: 'story', t: 'Story', d: 'Une image et un sticker lien propre à chaque compte.', cost: '1 crédit / compte', tone: '6,182,212', ready: true, icon: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1' },
-  { id: 'photo', t: 'Photo', d: 'Une photo (ou carrousel) + description dans le feed, sur tes comptes.', cost: '2 crédits / compte', tone: '236,72,153', ready: true, icon: 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' },
-  { id: 'cross', t: 'Cross-posting', d: 'Facebook, Shorts, X, Threads, Reddit et Pinterest en une fois.', cost: '2 crédits / compte', tone: '99,102,241', ready: true, icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
+  { id: 'reels', t: 'Reels', d: 'Une vidéo sur des dizaines de comptes Instagram ou TikTok, en parallèle.', cost: '2 crédits / compte', ready: true, icon: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z' },
+  { id: 'story', t: 'Story', d: 'Une image et un sticker lien propre à chaque compte.', cost: '1 crédit / compte', ready: true, icon: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1' },
+  { id: 'photo', t: 'Photo', d: 'Une photo (ou carrousel) + description dans le feed, sur tes comptes.', cost: '2 crédits / compte', ready: true, icon: 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' },
+  { id: 'cross', t: 'Cross-posting', d: 'Facebook, Shorts, X, Threads, Reddit et Pinterest en une fois.', cost: '2 crédits / compte', ready: true, icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
 ]
 
 export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
@@ -46,10 +53,10 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
             border: '1px solid rgba(255,255,255,0.07)', cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.5 : 1,
             textAlign: 'left', transition: 'background .12s ease, border-color .12s ease', boxSizing: 'border-box', fontFamily: 'inherit',
           }}
-            onMouseEnter={e => { if (locked) return; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#141416' }}
+            onMouseEnter={e => { if (locked) return; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#161618' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: `rgb(${f.tone})` }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
                 <Icon d={f.icon} size={15} />
               </span>
               <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{f.t}</span>

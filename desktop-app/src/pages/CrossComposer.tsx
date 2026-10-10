@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { startRunHistory } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, TEXTAREA, Toggle, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { phoneLabel, phoneSub, useBankThumbs } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -27,6 +27,7 @@ function isVid(v: Video): boolean {
 function dotKind(s: string): string { return s === 'warming' ? 'warmup' : s }
 type Phase = 'pending' | 'running' | 'done' | 'failed'
 interface RunItem { id: string; name: string; phase: Phase; detail?: string }
+const PHONE_ICON = 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01'
 
 export default function CrossComposer({ theme, user, org, onBack }: {
   theme: Theme; user: User; org: OrgState; onBack: () => void
@@ -34,6 +35,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
   const { currentOrg } = org
   const conns = useConnections(user, org)
   const bearer = conns.bearer
+  const narrow = useNarrow()
   const [phones, setPhones] = useState<Phone[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
@@ -190,20 +192,21 @@ export default function CrossComposer({ theme, user, org, onBack }: {
         </div>
       </Panel>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '280px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         <Panel theme={theme}>
           <PanelHead title="Comptes" sub={nSel ? `${nSel} × ${plats.size} réseaux` : 'aucun'} right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(phones.map(p => p.id)))} />} />
           <div style={{ maxHeight: 360, overflowY: 'auto' }}>
-            {loading ? <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Chargement…</div>
+            {loading ? <SkeletonRows rows={5} avatar />
+              : phones.length === 0 ? <Empty icon={PHONE_ICON} title="Aucun compte." text={null} />
               : phones.map(p => {
                 const on = sel.has(p.id)
                 return (
-                  <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 16px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left', background: on ? 'rgba(255,255,255,0.04)' : 'transparent', boxSizing: 'border-box' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+                  <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 16px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', textAlign: 'left', background: on ? 'rgba(255,255,255,0.04)' : 'transparent', boxSizing: 'border-box' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     <StatusDot kind={dotKind(p.status)} />
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                   </button>
                 )
@@ -225,7 +228,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
                       {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
                         ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
-                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     </button>
                   )
                 })}
@@ -235,7 +238,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
           <Panel theme={theme}>
             <PanelHead title="Légende" />
             <div style={{ padding: 16 }}>
-              <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={3} placeholder="Légende (facultatif)…" style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: 10, borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, lineHeight: 1.55, fontFamily: 'inherit', outline: 'none' }} />
+              <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={3} placeholder="Légende (facultatif)…" style={{ ...TEXTAREA, padding: 10, lineHeight: 1.55 }} />
             </div>
           </Panel>
           {/* Comportement : tout lancer en parallèle OU rotation IP (série) */}
@@ -246,10 +249,8 @@ export default function CrossComposer({ theme, user, org, onBack }: {
                 <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Rotation d’IP proxy</span>
                 <span style={{ fontSize: 12, color: '#8B8B94' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque compte → envoi en série' : 'Désactivée → tout lancer en même temps (parallèle)'}</span>
               </span>
-              <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
-                title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 28, height: 14, padding: 2, borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accentBtn : 'rgba(255,255,255,0.12)', transition: 'background .15s ease' }}>
-                <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
+              <span title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'} style={{ display: 'flex', flexShrink: 0 }}>
+                <Toggle on={rotationOn} disabled={!rotationConfigured} onChange={() => rotationConfigured && setRotationOn(v => !v)} />
               </span>
             </div>
           </Panel>
@@ -259,7 +260,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '12px 16px' }}>
                 {runItems.map(it => <Chip key={it.id} text={`${it.phase === 'done' ? '✓' : it.phase === 'failed' ? '✕' : it.phase === 'running' ? '…' : '·'} ${it.name}`} tone={(it.phase === 'done' ? 'ok' : it.phase === 'failed' ? 'bad' : it.phase === 'running' ? 'warn' : 'mute') as any} />)}
               </div>
-              <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.length === 0 ? '…' : logs.join('\n')}</div>
+              <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 200, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.length === 0 ? '…' : logs.join('\n')}</div>
             </Panel>
           )}
         </div>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead } from '@/lib/ui'
+import { Btn, Chip, Empty, FIELD, FIELD_SM, Icon, MONO, Panel, PanelHead, PageHead, Segmented, TEXTAREA, Toggle, useNarrow } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs } from '@/lib/data'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -16,15 +16,15 @@ import { startRun } from '@/lib/runStore'
 
 // Studio vidéo : hub des outils (gratuits) + wizard par outil (fidèle à _studio()).
 // La génération n'est pas encore branchée (outils serveur) — le wizard prépare tout.
-interface Tool { k: string; t: string; d: string; tone: string; tag: string; i: string }
+interface Tool { k: string; t: string; d: string; tag: string; i: string }
 const TOOLS: Tool[] = [
-  { k: 'overlay', t: 'Incrustation photo/vidéo', d: 'Mets une vidéo, choisis une photo et place-la où tu veux, le temps que tu veux.', tone: '99,102,241', tag: 'photo', i: 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' },
-  { k: 'montage', t: 'Montage', d: 'Assemble et découpe tes vidéos : coupe, ordre, transitions simples.', tone: '245,158,11', tag: 'découpe', i: 'M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z|M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6z|M20 4L8.12 15.88|M14.47 14.48L20 20|M8.12 8.12L12 12' },
-  { k: 'mixer', t: 'Mixer', d: 'Ajoute une légende / un montage par-dessus ta vidéo, rendu côté serveur.', tone: '236,72,153', tag: 'overlay', i: 'M4 21v-7|M4 10V3|M12 21v-9|M12 8V3|M20 21v-5|M20 12V3|M1 14h6|M9 8h6|M17 16h6' },
-  { k: 'remix', t: 'Remix', d: 'Une vidéo devient des dizaines de variantes uniques : luminosité, zoom, vitesse, recadrage.', tone: '139,92,246', tag: '×24 variantes', i: 'M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6' },
-  { k: 'spoof', t: 'Spoof', d: "Anti-empreinte : réécrit device, GPS, EXIF et micro-varie l'image. Rend chaque vidéo unique pour l'algo.", tone: '167,139,250', tag: 'anti-détection', i: 'M12 22s8-4.5 8-11a8 8 0 1 0-16 0c0 6.5 8 11 8 11z|M9 12l2 2 4-4' },
-  { k: 'imgspoof', t: 'Spoof image', d: 'Photos → variantes uniques en .jpg : micro-zoom, EXIF effacé puis device/GPS réécrits. Anti-doublon pour l’algo.', tone: '52,211,153', tag: 'photo · .jpg', i: 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' },
-  { k: 'subs', t: 'Sous-titres', d: 'Sous-titres automatiques (Groq Whisper), incrustés mot par mot.', tone: '6,182,212', tag: 'Whisper', i: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z|M7 9h10|M7 13h6' },
+  { k: 'overlay', t: 'Incrustation photo/vidéo', d: 'Mets une vidéo, choisis une photo et place-la où tu veux, le temps que tu veux.', tag: 'photo', i: 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' },
+  { k: 'montage', t: 'Montage', d: 'Assemble et découpe tes vidéos : coupe, ordre, transitions simples.', tag: 'découpe', i: 'M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z|M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6z|M20 4L8.12 15.88|M14.47 14.48L20 20|M8.12 8.12L12 12' },
+  { k: 'mixer', t: 'Mixer', d: 'Ajoute une légende / un montage par-dessus ta vidéo, rendu côté serveur.', tag: 'overlay', i: 'M4 21v-7|M4 10V3|M12 21v-9|M12 8V3|M20 21v-5|M20 12V3|M1 14h6|M9 8h6|M17 16h6' },
+  { k: 'remix', t: 'Remix', d: 'Une vidéo devient des dizaines de variantes uniques : luminosité, zoom, vitesse, recadrage.', tag: '×24 variantes', i: 'M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6' },
+  { k: 'spoof', t: 'Spoof', d: "Anti-empreinte : réécrit device, GPS, EXIF et micro-varie l'image. Rend chaque vidéo unique pour l'algo.", tag: 'anti-détection', i: 'M12 22s8-4.5 8-11a8 8 0 1 0-16 0c0 6.5 8 11 8 11z|M9 12l2 2 4-4' },
+  { k: 'imgspoof', t: 'Spoof image', d: 'Photos → variantes uniques en .jpg : micro-zoom, EXIF effacé puis device/GPS réécrits. Anti-doublon pour l’algo.', tag: 'photo · .jpg', i: 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' },
+  { k: 'subs', t: 'Sous-titres', d: 'Sous-titres automatiques (Groq Whisper), incrustés mot par mot.', tag: 'Whisper', i: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z|M7 9h10|M7 13h6' },
 ]
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null; folder: string | null }
 
@@ -47,6 +47,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
   const [pickerOpen, setPickerOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const { thumbFor } = useBankThumbs(videos)
+  const narrow = useNarrow()
 
   // ── Paramètres par outil ──
   const [copies, setCopies] = useState(3)          // spoof / remix : nb de variantes/source
@@ -209,7 +210,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
             display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: 16, marginBottom: 12, borderRadius: 8, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
             background: '#111113', border: '1px solid rgba(255,255,255,0.07)', transition: 'background .12s ease, border-color .12s ease',
           }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#141416' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#161618' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: '#4ADE80' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={15} /></span>
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -225,10 +226,10 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
               display: 'flex', flexDirection: 'column', gap: 12, padding: 16, borderRadius: 8, background: '#111113', textAlign: 'left',
               border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', transition: 'background .12s ease, border-color .12s ease', boxSizing: 'border-box',
             }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#141416' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#161618' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: `rgb(${t.tone})` }}>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
                   <Icon d={t.i} size={15} />
                 </span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{t.t}</span>
@@ -251,7 +252,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
   const folders = [...new Set(videos.map(v => v.folder).filter((f): f is string => !!f))].sort()
   const per = hasSpoofOpts ? copies : 1
   const output = `${nSrc * per} fichier${nSrc * per > 1 ? 's' : ''}`
-  const numInp: React.CSSProperties = { width: 80, height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', textAlign: 'right', boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }
+  const numInp: React.CSSProperties = { ...FIELD, width: 80, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
@@ -259,7 +260,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
         <Chip text="Gratuit · 0 crédit" tone="ok" />
         <Btn theme={theme} tone="quiet" label="Retour" onClick={() => setTool(null)} />
       </>} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.4fr) minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title={isImgTool ? 'Photos sources' : 'Vidéos sources'} sub={uploading ? `Import : ${uploading}` : `${nSrc} sélectionnée${nSrc > 1 ? 's' : ''}`} right={<>
@@ -268,7 +269,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
               <input ref={fileRef} type="file" accept="video/*,image/*" multiple style={{ display: 'none' }}
                 onChange={e => { if (e.target.files) importFromPC(e.target.files); e.target.value = '' }} />
             </>} />
-            {nSrc === 0 ? <div style={{ padding: 28, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>{isImgTool ? 'Aucune photo choisie.' : 'Aucune vidéo choisie.'}<br />Clique « Banque » ou « Mon PC ».</div> : (
+            {nSrc === 0 ? <Empty icon={isImgTool ? 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' : 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z'} title={isImgTool ? 'Aucune photo choisie.' : 'Aucune vidéo choisie.'} text="Clique « Banque » ou « Mon PC »." /> : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 16, maxHeight: 300, overflowY: 'auto' }}>
                 {videos.filter(v => src.has(v.id)).map((v) => {
                   const on = src.has(v.id); const prev = thumbFor(v); const vid = isVid(v)
@@ -281,7 +282,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
                       {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
                         ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
-                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accent : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+                      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accent : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     </button>
                   )
                 })}
@@ -299,7 +300,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ flex: 1, fontSize: 13, color: '#A1A1AA' }}>Intensité anti-détection</span>
-                    <select value={intensity} onChange={e => setIntensity(e.target.value as any)} style={{ ...numInp, width: 130, textAlign: 'left', cursor: 'pointer' }}>
+                    <select value={intensity} onChange={e => setIntensity(e.target.value as any)} style={{ ...FIELD, width: 130, cursor: 'pointer' }}>
                       <option value="subtle" style={{ background: '#161618' }}>Subtile</option>
                       <option value="normal" style={{ background: '#161618' }}>Normale</option>
                       <option value="strong" style={{ background: '#161618' }}>Forte</option>
@@ -307,13 +308,13 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ flex: 1, fontSize: 13, color: '#A1A1AA' }}>Localisation GPS</span>
-                    <select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={{ ...numInp, width: 150, textAlign: 'left', cursor: 'pointer' }}>
+                    <select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={{ ...FIELD, width: 150, cursor: 'pointer' }}>
                       {GPS_CITIES.map(c => <option key={c.k} value={c.k} style={{ background: '#161618' }}>{c.label}</option>)}
                     </select>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ flex: 1, fontSize: 13, color: '#A1A1AA' }}>Appareil (spoof)</span>
-                    <select value={device} onChange={e => setDevice(e.target.value)} style={{ ...numInp, width: 150, textAlign: 'left', cursor: 'pointer' }}>
+                    <select value={device} onChange={e => setDevice(e.target.value)} style={{ ...FIELD, width: 150, cursor: 'pointer' }}>
                       {SPOOF_DEVICES.map(d => <option key={d.k} value={d.k} style={{ background: '#161618' }}>{d.label}</option>)}
                     </select>
                   </label>
@@ -334,16 +335,14 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
               {tool === 'mixer' && (
                 <>
                   <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={2} placeholder="Ta légende à incruster…"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }} />
+                    style={{ ...TEXTAREA, minHeight: 60 }} />
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#A1A1AA', cursor: 'pointer' }}>
-                    <span onClick={() => setCapManual(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: capManual ? 'flex-end' : 'flex-start', width: 30, height: 18, padding: 2, boxSizing: 'border-box', borderRadius: 99, background: capManual ? theme.accent : 'rgba(255,255,255,0.12)', transition: 'background .12s ease' }}><span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} /></span>
+                    <Toggle on={capManual} onChange={() => setCapManual(v => !v)} />
                     Placement manuel
                   </label>
                   {!capManual ? (
-                    <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-                      {(['top', 'center', 'bottom'] as const).map(p => (
-                        <button key={p} onClick={() => setCapPos(p)} style={{ flex: 1, height: 28, border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: capPos === p ? 'rgba(255,255,255,0.08)' : 'transparent', color: capPos === p ? '#EDEDEF' : '#8B8B94' }}>{p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}</button>
-                      ))}
+                    <div>
+                      <Segmented value={capPos} onChange={setCapPos} options={(['top', 'center', 'bottom'] as const).map(p => ({ v: p, l: p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas' }))} />
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -367,10 +366,8 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
                   <Btn theme={theme} sm tone="primary" icon="M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" label={overlayImgs.length ? `${overlayImgs.length} photo(s)` : 'Choisir des photos'} onClick={() => setImgPicker(true)} />
                   {overlayImgs.map(im => <Chip key={im.id} text={im.title} tone="violet" />)}
                   {overlayImgs.length > 1 && (
-                    <span style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', marginLeft: 'auto' }}>
-                      {(['seq', 'random'] as const).map(mm => (
-                        <button key={mm} onClick={() => setOvMode(mm)} style={{ height: 24, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: ovMode === mm ? 'rgba(255,255,255,0.08)' : 'transparent', color: ovMode === mm ? '#EDEDEF' : '#8B8B94' }}>{mm === 'seq' ? 'Séquentiel' : 'Aléatoire'}</button>
-                      ))}
+                    <span style={{ marginLeft: 'auto' }}>
+                      <Segmented sm value={ovMode} onChange={setOvMode} options={(['seq', 'random'] as const).map(mm => ({ v: mm, l: mm === 'seq' ? 'Séquentiel' : 'Aléatoire' }))} />
                     </span>
                   )}
                   <span style={{ width: '100%', fontSize: 11.5, color: '#71717A' }}>Photo incrustée au centre. Plusieurs photos → réparties entre les vidéos (séquentiel/aléatoire).</span>
@@ -396,7 +393,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
               <span style={{ color: '#8B8B94' }}>Dossier de destination</span>
-              <select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={{ marginLeft: 'auto', height: 28, padding: '0 8px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12.5, outline: 'none', cursor: 'pointer', maxWidth: 150 }}>
+              <select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={{ ...FIELD_SM, width: 'auto', marginLeft: 'auto', cursor: 'pointer', maxWidth: 150 }}>
                 <option value="" style={{ background: '#161618' }}>Racine (aucun)</option>
                 {folders.map(f => <option key={f} value={f} style={{ background: '#161618' }}>{f}</option>)}
               </select>
@@ -413,7 +410,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
             <div style={{ fontSize: 11.5, color: '#71717A', textAlign: 'center', lineHeight: 1.5 }}>{isImgTool ? 'Traitement local instantané (aucun moteur à charger).' : 'Traitement local (ffmpeg) — le premier lancement charge le moteur (~30 Mo).'}</div>
 
             {logs.length > 0 && (
-              <div style={{ padding: 10, borderRadius: 6, background: '#0E0E10', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 140, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>
+              <div style={{ padding: 10, borderRadius: 6, background: '#0E0E10', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 140, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.join('\n')}</div>
             )}
 
             {results.length > 0 && (
@@ -421,7 +418,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
                 <span style={{ fontSize: 12, fontWeight: 500, color: '#4ADE80' }}>{results.length} sortie(s) · enregistrées dans la banque</span>
                 {results.map((r, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', height: 32, borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
                     <a href={r.url} download={`${r.title}.${r.ext ?? 'mp4'}`} style={{ fontSize: 12, fontWeight: 500, color: theme.accentText, textDecoration: 'none' }}>Télécharger</a>
                   </div>
                 ))}

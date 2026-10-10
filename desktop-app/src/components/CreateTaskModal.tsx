@@ -6,7 +6,7 @@ import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { phoneLabel, phoneSub, scopeInfra } from '@/lib/data'
 import type { InfraKey } from '@/lib/theme'
-import { Modal, Btn, Chip } from '@/lib/ui'
+import { Modal, Btn, Chip, FIELD, FIELD_SM, TEXTAREA, MONO, Segmented } from '@/lib/ui'
 import BankPicker, { type PickerKind, type PickerResult } from './BankPicker'
 
 // Création d'une automatisation, branchée sur la vraie DB.
@@ -128,8 +128,7 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
   const shownPhones = phones.filter(p => grpFilter === 'Tous' || p.group_name === grpFilter)
 
   const lbl: CSSProperties = { fontSize: 12, fontWeight: 500, color: '#8B8B94', marginBottom: 6, display: 'block' }
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', colorScheme: 'dark' }
-  const seg = (on: boolean): CSSProperties => ({ flex: 1, height: 28, border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: on ? 'rgba(255,255,255,0.08)' : 'transparent', color: on ? '#EDEDEF' : '#8B8B94', transition: 'background .12s ease, color .12s ease' })
+  const inp: CSSProperties = { ...FIELD, colorScheme: 'dark' }
 
   return (
     <Modal theme={theme} width={560}
@@ -148,16 +147,16 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
 
         <div>
           <label style={lbl}>Type</label>
-          <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <button style={seg(type === 'publication')} onClick={() => { setType('publication'); setMedia([]) }}>Publication (Reels)</button>
-            <button style={seg(type === 'story')} onClick={() => { setType('story'); setMedia([]) }}>Story + lien</button>
+          <div>
+            <Segmented<PostType> value={type} onChange={v => { setType(v); setMedia([]) }}
+              options={[{ v: 'publication', l: 'Publication (Reels)' }, { v: 'story', l: 'Story + lien' }]} />
           </div>
         </div>
 
         <div>
           <label style={lbl}>Comptes ({nSel})</label>
           {groups.length > 0 && (
-            <select value={grpFilter} onChange={e => setGrpFilter(e.target.value)} style={{ ...inp, height: 28, marginBottom: 8, cursor: 'pointer' }}>
+            <select value={grpFilter} onChange={e => setGrpFilter(e.target.value)} style={{ ...FIELD_SM, colorScheme: 'dark', marginBottom: 8, cursor: 'pointer' }}>
               <option value="Tous" style={{ background: '#161618' }}>Tous les groupes</option>
               {groups.map(g => <option key={g} value={g} style={{ background: '#161618' }}>{g}</option>)}
             </select>
@@ -168,12 +167,12 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
               return (
                 <button key={p.id} onClick={() => toggle(p.id)} style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 6, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
-                  background: on ? 'rgba(255,255,255,0.05)' : '#141416', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.07)'),
+                  background: on ? 'rgba(255,255,255,0.05)' : '#161618', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.07)'),
                 }}>
                   <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                     <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                   </span>
                 </button>
               )
@@ -195,7 +194,7 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
           <div>
             <label style={lbl}>Légende (facultatif)</label>
             <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={2} placeholder="Légende commune…"
-              style={{ ...inp, height: 'auto', minHeight: 56, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.55 }} />
+              style={{ ...TEXTAREA, minHeight: 56, lineHeight: 1.55 }} />
             <div style={{ marginTop: 6 }}>
               <Btn theme={theme} sm tone="quiet" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Depuis la banque" onClick={() => setPicker('captions')} />
             </div>

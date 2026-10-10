@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal, FIELD, MONO, Toggle, Segmented, SkeletonRows, useNarrow, toast } from '@/lib/ui'
 
 // ── Panel Admin (superadmin) : création + historique des clés de licence et des
 //    codes de crédits. Porté de electron-app/src/pages/Licences.tsx. ──────────────
@@ -53,7 +53,8 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
   const [keys, setKeys] = useState<LicenseKey[]>([])
   const [codes, setCodes] = useState<CreditCode[]>([])
   const [loading, setLoading] = useState(true)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [loadErr, setLoadErr] = useState<string | null>(null)
+  const narrow = useNarrow()
 
   // Formulaire clé
   const [gk, setGk] = useState(genKey)
@@ -74,11 +75,10 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
   const [delTarget, setDelTarget] = useState<LicenseKey | null>(null)
   const [extendFor, setExtendFor] = useState<string | null>(null)
 
-  useEffect(() => { if (notice) { const t = setTimeout(() => setNotice(null), 3500); return () => clearTimeout(t) } }, [notice])
-
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('license_keys').select('*').order('created_at', { ascending: false })
+    const { data, error: keysErr } = await supabase.from('license_keys').select('*').order('created_at', { ascending: false })
+    setLoadErr(keysErr ? keysErr.message : null)
     if (data) {
       const uids = [...new Set(data.filter((k: LicenseKey) => k.user_id).map((k: LicenseKey) => k.user_id!))]
       const emails: Record<string, string> = {}
@@ -107,34 +107,34 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
       break
     }
     setCreating(false)
-    if (error) { setNotice(`Échec création clé : ${error.message}`); return }
-    setNotice(`Clé créée : ${gk}`); setGk(genKey()); setNotes(''); load()
+    if (error) { toast(`Échec création clé : ${error.message}`, 'bad'); return }
+    toast(`Clé créée : ${gk}`, 'ok'); setGk(genKey()); setNotes(''); load()
   }
-  async function revokeKey(id: string) { const { error } = await supabase.from('license_keys').update({ is_active: false }).eq('id', id); if (error) setNotice(error.message); else load() }
-  async function deleteKey() { if (!delTarget) return; const { error } = await supabase.from('license_keys').delete().eq('id', delTarget.id); setDelTarget(null); if (error) setNotice(error.message); else load() }
+  async function revokeKey(id: string) { const { error } = await supabase.from('license_keys').update({ is_active: false }).eq('id', id); if (error) toast(error.message, 'bad'); else load() }
+  async function deleteKey() { if (!delTarget) return; const { error } = await supabase.from('license_keys').delete().eq('id', delTarget.id); setDelTarget(null); if (error) toast(error.message, 'bad'); else load() }
   async function extendKey(k: LicenseKey, days: number) {
-    if (!k.expires_at) { setNotice('Clé à vie — rien à ajouter.'); return }
+    if (!k.expires_at) { toast('Clé à vie — rien à ajouter.', 'info'); return }
     const base = Math.max(Date.now(), new Date(k.expires_at).getTime())
     const next = new Date(Math.max(Date.now(), base + days * 86_400_000)).toISOString()
     const { error } = await supabase.from('license_keys').update({ expires_at: next, is_active: true }).eq('id', k.id)
-    setExtendFor(null); if (error) setNotice(error.message); else { setNotice(`${days > 0 ? '+' : ''}${days}j — ${daysLeft(next)}`); load() }
+    setExtendFor(null); if (error) toast(error.message, 'bad'); else { toast(`${days > 0 ? '+' : ''}${days}j — ${daysLeft(next)}`, 'ok'); load() }
   }
   async function toggleBlowsome(k: LicenseKey) {
     const next = !k.blowsome
     const { error } = await supabase.from('license_keys').update({ blowsome: next }).eq('id', k.id)
-    if (error) setNotice(/blowsome/.test(error.message) ? 'Migration 20260722_license_blowsome.sql requise.' : error.message)
-    else { setKeys(prev => prev.map(x => x.id === k.id ? { ...x, blowsome: next } : x)); setNotice(next ? 'Blowsome activé ✦' : 'Blowsome retiré') }
+    if (error) toast(/blowsome/.test(error.message) ? 'Migration 20260722_license_blowsome.sql requise.' : error.message, 'bad')
+    else { setKeys(prev => prev.map(x => x.id === k.id ? { ...x, blowsome: next } : x)); toast(next ? 'Blowsome activé ✦' : 'Blowsome retiré', 'ok') }
   }
   async function createCode() {
     setCcCreating(true)
     const { error } = await supabase.from('credit_codes').insert({ code: gc, amount: ccAmount, notes: ccNotes || null, created_by: user.id })
     setCcCreating(false)
-    if (error) { setNotice(`Échec code : ${error.message}`); return }
-    setNotice(`Code créé : ${gc} (${ccAmount} cr)`); setGc(genCode()); setCcNotes(''); load()
+    if (error) { toast(`Échec code : ${error.message}`, 'bad'); return }
+    toast(`Code créé : ${gc} (${ccAmount} cr)`, 'ok'); setGc(genCode()); setCcNotes(''); load()
   }
-  async function revokeCode(id: string) { const { error } = await supabase.from('credit_codes').update({ is_active: false }).eq('id', id); if (error) setNotice(error.message); else load() }
+  async function revokeCode(id: string) { const { error } = await supabase.from('credit_codes').update({ is_active: false }).eq('id', id); if (error) toast(error.message, 'bad'); else load() }
 
-  function copy(txt: string) { navigator.clipboard?.writeText(txt); setCopied(txt); setNotice('Copié.'); setTimeout(() => setCopied(c => c === txt ? null : c), 1500) }
+  function copy(txt: string) { navigator.clipboard?.writeText(txt); setCopied(txt); toast('Copié.', 'ok'); setTimeout(() => setCopied(c => c === txt ? null : c), 1500) }
 
   const ql = search.trim().toLowerCase()
   const shownKeys = keys.filter(k =>
@@ -143,36 +143,31 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
   const counts: Record<Filter, number> = { all: keys.length, active: 0, used: 0, expired: 0, revoked: 0 }
   keys.forEach(k => { counts[keyStatus(k)]++ })
 
-  const inp: CSSProperties = { height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }
-  const sel: CSSProperties = { ...inp, cursor: 'pointer' }
+  const inp: CSSProperties = FIELD
+  const sel: CSSProperties = { ...FIELD, cursor: 'pointer' }
   const opt: CSSProperties = { background: '#161618' }
-  const mono: CSSProperties = { fontFamily: "'JetBrains Mono',monospace" }
+  const mono: CSSProperties = { fontFamily: MONO }
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Admin · Licences" sub="Création et historique des clés de licence et des codes de crédits. Réservé au superadmin." actions={<Chip text="Superadmin" tone="violet" />} />
 
-      {notice && <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', color: '#EDEDEF', fontSize: 13 }}>{notice}</div>}
+      {loadErr && <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)', color: '#F87171', fontSize: 13 }}>{`Échec : ${loadErr}`}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.5fr) minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
         {/* ── Colonne gauche : liste des clés ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title="Clés de licence" sub={`${keys.length} au total`} right={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#71717A' }}>
+              <div style={{ ...FIELD, width: 'auto', display: 'flex', alignItems: 'center', gap: 8, color: '#71717A' }}>
                 <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-3.5-3.5" size={13} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (clé, email, note)…" style={{ width: 200, maxWidth: '40vw', border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, outline: 'none' }} />
               </div>} />
             <div style={{ padding: '12px 16px' }}>
-              <div style={{ display: 'inline-flex', gap: 2, padding: 2, maxWidth: '100%', flexWrap: 'wrap', boxSizing: 'border-box', borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-                {(['all', 'active', 'used', 'expired', 'revoked'] as Filter[]).map(f => (
-                  <button type="button" key={f} onClick={() => setFilter(f)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', background: filter === f ? 'rgba(255,255,255,0.08)' : 'transparent', color: filter === f ? '#EDEDEF' : '#8B8B94', fontSize: 12, fontWeight: 500 }}>
-                    {STATUS_LABEL[f]}<span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', color: filter === f ? '#A1A1AA' : '#71717A' }}>{counts[f]}</span>
-                  </button>
-                ))}
-              </div>
+              <Segmented<Filter> value={filter} onChange={setFilter}
+                options={(['all', 'active', 'used', 'expired', 'revoked'] as Filter[]).map(f => ({ v: f, l: STATUS_LABEL[f], n: counts[f] }))} />
             </div>
-            {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 13 }}>…</div>
+            {loading ? <SkeletonRows rows={4} />
               : shownKeys.length === 0 ? <Empty icon="M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z" title="Aucune clé" text="Crée ta première clé de licence à droite." />
               : (
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -259,7 +254,7 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
                 </select>
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#EDEDEF', cursor: 'pointer' }}>
-                <span onClick={() => setBlowsome(v => !v)} style={{ display: 'flex', alignItems: 'center', justifyContent: blowsome ? 'flex-end' : 'flex-start', width: 32, height: 18, padding: 2, boxSizing: 'border-box', flexShrink: 0, borderRadius: 99, background: blowsome ? theme.accent : 'rgba(255,255,255,0.12)', transition: 'background .12s ease' }}><span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} /></span>
+                <Toggle on={blowsome} onChange={() => setBlowsome(v => !v)} />
                 Add-on Blowsome ✦ (accès infra VIP)
               </label>
               <div>

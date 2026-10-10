@@ -21,36 +21,67 @@ const H = vi.hoisted(() => {
     execCount: 0,
     bankRows: [] as Record<string, unknown>[],
     trashed: [] as string[],
+    // Téléphone simulé : allumé ? Instagram ouvert (sur un écran quelconque) ? tâche GeeLark en cours ?
+    phone: new Map<string, { on: boolean; igOpen: boolean; task: string | null }>(),
+    aborted: new Set<string>(),
+    hangFn: (_gid: string, _type: string, _call: number): '' | 'hang' | 'stuck' => '',
   }
   const reset = () => {
     S.events = []; S.managed = new Set(); S.bootFail = new Set(); S.failFn = () => false
     S.calls = new Map(); S.credits = []; S.insufficient = false; S.cancelled = false
     S.cancelAfterExec = -1; S.execCount = 0; S.trashed = []
+    S.phone = new Map(); S.aborted = new Set(); S.hangFn = () => ''
   }
-  // Primitive simulée : journalise, compte les appels, échoue selon failFn.
+  const ph = (gid: string) => { if (!S.phone.has(gid)) S.phone.set(gid, { on: false, igOpen: false, task: null }); return S.phone.get(gid)! }
+  // Primitive simulée : exige un état PROPRE (téléphone allumé, Instagram fermé, aucune
+  // tâche GeeLark en cours), puis laisse Instagram ouvert sur un écran quelconque —
+  // comme les vraies primitives. Peut aussi rester bloquée jusqu'à interruption
+  // (« hang », tâche GeeLark laissée en cours) ou ne jamais rendre la main (« stuck »).
   const prim = (type: string) => async (_bearer: string, gid: string) => {
     const key = `${gid}:${type}`
     const call = (S.calls.get(key) ?? 0) + 1
     S.calls.set(key, call)
     S.events.push({ gid, ev: `block:${type}` })
+    const st = ph(gid)
+    if (!st.on || st.igOpen || st.task) S.events.push({ gid, ev: `dirty:${type}:${!st.on ? 'off' : st.igOpen ? 'ig-open' : 'task'}` })
+    st.igOpen = true
     S.execCount++
     if (S.cancelAfterExec >= 0 && S.execCount >= S.cancelAfterExec) S.cancelled = true
+    const hang = S.hangFn(gid, type, call)
+    if (hang) {
+      st.task = `${gid}-${type}-${call}`
+      if (hang === 'stuck') return new Promise<never>(() => {})
+      while (!S.aborted.has(gid)) await new Promise(r => setTimeout(r, 2))
+      return { ok: false, error: 'Interrompu' }   // la tâche reste « en cours » : au moteur de l'annuler
+    }
     return S.failFn(gid, type, call) ? { ok: false, error: `${type} KO` } : { ok: true }
   }
-  return { S, reset, prim }
+  return { S, reset, prim, ph }
 })
 
 vi.mock('@/lib/geelark', () => ({
   sleep: () => Promise.resolve(),
+  // 1er appel (téléphone pas encore piloté) = démarrage ; ensuite = vérification avant chaque bloc.
   ensurePhoneRunning: async (_b: string, gid: string) => {
-    H.S.events.push({ gid, ev: 'boot' })
-    return H.S.bootFail.has(gid) ? { ok: false, reason: 'boot KO' } : { ok: true }
+    const managed = H.S.managed.has(gid)
+    const st = H.ph(gid)
+    H.S.events.push({ gid, ev: managed ? (st.on ? 'check' : 'reboot') : 'boot' })
+    if (H.S.bootFail.has(gid)) return { ok: false, reason: 'boot KO' }
+    if (!st.on) { st.on = true; st.igOpen = false }   // démarrage à froid : Instagram fermé
+    return { ok: true }
   },
+  abortPhone: (gid: string) => { H.S.aborted.add(gid) },
+  clearPhoneAbort: (gid: string) => { H.S.aborted.delete(gid) },
+  cancelPhoneTask: async (_b: string, gid: string) => { const st = H.ph(gid); if (st.task) { H.S.events.push({ gid, ev: 'cancel' }); st.task = null } },
   setPhoneManaged: (gid: string, on: boolean) => {
     H.S.events.push({ gid, ev: on ? 'managed:on' : 'managed:off' })
     if (on) H.S.managed.add(gid); else H.S.managed.delete(gid)
   },
-  stopPhoneSurely: async (_b: string, gid: string) => { H.S.events.push({ gid, ev: H.S.managed.has(gid) ? 'stop:while-managed' : 'stop' }); return true },
+  stopPhoneSurely: async (_b: string, gid: string) => {
+    H.S.events.push({ gid, ev: H.S.managed.has(gid) ? 'stop:while-managed' : 'stop' })
+    const st = H.ph(gid); st.on = false; st.igOpen = false; st.task = null
+    return true
+  },
   loginInstagramOnPhone: H.prim('login'),
   editProfileOnPhone: H.prim('bio'),
   warmupAccountNative: H.prim('warmup'),
@@ -62,6 +93,8 @@ vi.mock('@/lib/geelark', () => ({
 vi.mock('@/lib/geelarkAdb', () => ({
   changeUsernameOnPhone: H.prim('username'),
   changeProfilePicOnPhone: H.prim('avatar'),
+  // Remise à zéro : HOME + force-stop Instagram (n'annule PAS une tâche GeeLark en cours).
+  resetInstagram: async (_b: string, gid: string) => { H.S.events.push({ gid, ev: 'reset' }); const st = H.ph(gid); if (st.on) st.igOpen = false; return true },
 }))
 vi.mock('@/lib/credits', () => ({
   CREDIT_COSTS: { posting: 2, mass_posting: 2, story: 1 },
@@ -113,7 +146,9 @@ vi.mock('@/lib/supabase', () => {
   }
 })
 
-import { runFlow, waitFlowRun, getFlowRun, newBlock, BLOCK, isActive, retriesOf, type Flow, type FlowBlock, type BlockType } from './flowEngine'
+import { runFlow, waitFlowRun, getFlowRun, newBlock, BLOCK, isActive, retriesOf, _setFlowTimeScaleForTests, type Flow, type FlowBlock, type BlockType } from './flowEngine'
+// Délais max des blocs ramenés à quelques millisecondes (25 min → 15 ms).
+_setFlowTimeScaleForTests(0.00001)
 
 // ── Banque de test ───────────────────────────────────────────────────────────
 const BANK = [
@@ -189,6 +224,9 @@ function checkInvariants(flow: Flow, run: NonNullable<ReturnType<typeof getFlowR
     if (pr.status === 'done') expect(pr.steps.some(s => s === 'failed'), P('done ⇒ aucun échec')).toBe(false)
     if (ev.length === 0) { expect(pr.status, P('jamais lancé ⇒ annulé')).toBe('cancelled'); return }
 
+    // ÉTAT PROPRE : aucun bloc n'a démarré sur un téléphone éteint, un Instagram resté
+    // ouvert par le bloc précédent, ou une tâche GeeLark encore en cours.
+    expect(ev.filter(e => e.startsWith('dirty:')), P('chaque bloc part d’un état propre')).toEqual([])
     // Un seul démarrage, avant tout bloc ; téléphone toujours rendu puis éteint à la fin.
     expect(ev.filter(e => e === 'boot').length, P('1 seul démarrage')).toBe(1)
     expect(ev[0], P('démarrage en premier')).toBe('boot')
@@ -206,7 +244,15 @@ function checkInvariants(flow: Flow, run: NonNullable<ReturnType<typeof getFlowR
         for (let a = 0; a < primCalls; a++) expected.push(`block:${b.type}`)
       }
     })
-    expect(ev.filter(e => e.startsWith('block:')), P('ordre des blocs')).toEqual(expected)
+    // Annulation PENDANT un bloc : ce bloc a pu être lancé puis interrompu (→ « sauté »),
+    // ou annulé juste avant son lancement.
+    const actual = ev.filter(e => e.startsWith('block:'))
+    const alt = [...expected]
+    if (pr.status === 'cancelled') {
+      const k = pr.steps.findIndex((s, j) => s === 'skipped' && pr.attempts[j] > 0 && flow.blocks[j].type !== 'pause' && isActive(flow.blocks[j]))
+      if (k >= 0 && !mediaOrTextMissing(flow.blocks[k])) for (let a = 0; a < pr.attempts[k]; a++) alt.push(`block:${flow.blocks[k].type}`)
+    }
+    expect(JSON.stringify(actual) === JSON.stringify(alt) ? alt : actual, P('ordre des blocs')).toEqual(alt.length !== expected.length && JSON.stringify(actual) === JSON.stringify(alt) ? alt : expected)
 
     // Politique d'échec : « arrêter » ⇒ plus aucun bloc après l'échec.
     const firstFail = pr.steps.findIndex(s => s === 'failed')
@@ -260,6 +306,15 @@ describe('combinaisons aléatoires de blocs', () => {
         return failTable.get(k)!
       }
       if (seed % 7 === 0) H.S.bootFail.add('g0')
+      // Blocs qui restent bloqués (délai max dépassé) ou ne rendent jamais la main.
+      if (seed % 4 === 0) {
+        const hangTable = new Map<string, '' | 'hang' | 'stuck'>()
+        H.S.hangFn = (gid, type, call) => {
+          const k = `${gid}:${type}:${call}`
+          if (!hangTable.has(k)) { const x = r(); hangTable.set(k, x < 0.12 ? 'hang' : x < 0.15 ? 'stuck' : '') }
+          return hangTable.get(k)!
+        }
+      }
       if (seed % 11 === 0) H.S.cancelAfterExec = 1 + Math.floor(r() * 4)
       const credsFor = seed % 5 === 0 ? 0 : nPhones
       const { run } = await launch(flow, nPhones, { concurrency: 1 + Math.floor(r() * 4), rotation: seed % 9 === 0, credsFor })
@@ -348,6 +403,60 @@ describe('cas ciblés', () => {
     const { run } = await launch(flowOf(a, w), 1)
     expect(run.phones[0].steps).toEqual(['failed', 'ok'])
     expect(run.phones[0].status).toBe('failed')
+  })
+
+  it('état propre garanti : @ puis chauffe puis post puis story, Instagram remis à zéro avant chaque bloc', async () => {
+    const u = newBlock('username'); u.params.usernames = 'lea{3}'
+    const s = newBlock('story'); s.params.imageIds = ['i1']; s.params.link = 'https://x.co'
+    const post = newBlock('post'); post.params.videoIds = ['v1']
+    const { run } = await launch(flowOf(u, newBlock('warmup'), post, s, newBlock('avatar')), 2)
+    const ev = H.S.events.filter(e => e.gid === 'g0').map(e => e.ev)
+    expect(ev.filter(e => e.startsWith('dirty:'))).toEqual([])
+    // chaque bloc est précédé de « check » (téléphone allumé) puis « reset » (Instagram fermé)
+    ev.forEach((e, k) => { if (e.startsWith('block:')) expect(ev.slice(k - 2, k)).toEqual(['check', 'reset']) })
+    expect(run.phones[0].steps.slice(0, 4)).toEqual(['ok', 'ok', 'ok', 'ok'])
+  })
+
+  it('après une longue pause (téléphone éteint) le bloc suivant redémarre le téléphone', async () => {
+    const geelark = await import('@/lib/geelark')
+    const p = newBlock('pause'); p.params.minMin = 4; p.params.maxMin = 4
+    const { run } = await launch(flowOf(newBlock('warmup'), p, newBlock('warmup')), 1)
+    const ev = H.S.events.filter(e => e.gid === 'g0').map(e => e.ev)
+    expect(ev).toContain('reboot')
+    expect(run.phones[0].steps).toEqual(['ok', 'ok', 'ok'])
+    void geelark
+  })
+
+  it('bloc bloqué : délai max → tâche GeeLark annulée, échec, le bloc suivant part propre', async () => {
+    const a = newBlock('warmup'); a.params.onError = 'continue'
+    H.S.hangFn = (_g, t, call) => (t === 'warmup' && call === 1 ? 'hang' : '')
+    const { run } = await launch(flowOf(a, newBlock('warmup')), 1)
+    const ev = H.S.events.filter(e => e.gid === 'g0').map(e => e.ev)
+    expect(run.phones[0].steps).toEqual(['failed', 'ok'])
+    expect(run.phones[0].errors[0]).toContain('Délai max')
+    expect(ev).toContain('cancel')
+    expect(ev.filter(e => e.startsWith('dirty:'))).toEqual([])
+  })
+
+  it('bloc qui ne rend jamais la main : étapes suivantes annulées, téléphone éteint quand même', async () => {
+    const a = newBlock('bio'); a.params.bios = 'x'; a.params.onError = 'continue'
+    H.S.hangFn = (_g, t) => (t === 'bio' ? 'stuck' : '')
+    const { run } = await launch(flowOf(a, newBlock('warmup')), 1)
+    expect(run.phones[0].steps).toEqual(['failed', 'skipped'])
+    expect(run.phones[0].errors[0]).toContain('bloqué')
+    expect(H.S.events.filter(e => e.gid === 'g0').at(-1)?.ev).toBe('stop')
+  })
+
+  it('annulation pendant un bloc en cours : interrompu vite, tâche annulée, reste sauté', async () => {
+    const post = newBlock('post'); post.params.videoIds = ['v1']
+    H.S.hangFn = (_g, t) => (t === 'warmup' ? 'hang' : '')
+    setTimeout(() => { H.S.cancelled = true }, 5)
+    const t0 = Date.now()
+    const { run } = await launch(flowOf(newBlock('warmup'), post), 1)
+    expect(Date.now() - t0).toBeLessThan(2000)
+    expect(run.phones[0].status).toBe('cancelled')
+    expect(run.phones[0].steps).toEqual(['skipped', 'skipped'])
+    expect(H.S.events.some(e => e.ev === 'cancel')).toBe(true)
   })
 
   it('annulation pendant une pause : blocs restants sautés, téléphone éteint', async () => {

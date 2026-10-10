@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, MONO, SkeletonRows } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import {
   useMetaConfig, buildMetaAuthUrl, fetchMetaConnections, syncMetaInsights,
@@ -22,12 +22,13 @@ export default function Connections({ theme, infra, user, org }: {
   const cfg = useMetaConfig(user, org)
   const [conns, setConns] = useState<MetaConnection[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setConns(await fetchMetaConnections(user, org)) } catch { setConns([]) }
+    try { setConns(await fetchMetaConnections(user, org)); setLoadErr(null) } catch (e) { setConns([]); setLoadErr(e instanceof Error ? e.message : String(e)) }
     setLoading(false)
   }, [org.currentOrg?.id, user.id])
 
@@ -92,7 +93,9 @@ export default function Connections({ theme, infra, user, org }: {
           ) : undefined}
         />
         {loading ? (
-          <div style={{ padding: 36, textAlign: 'center', color: '#71717A', fontSize: 13 }}>Chargement…</div>
+          <SkeletonRows rows={2} avatar />
+        ) : loadErr ? (
+          <div style={{ padding: '14px 16px', fontSize: 13, color: '#F87171', lineHeight: 1.5 }}>{`Échec : ${loadErr}`}</div>
         ) : conns.length === 0 ? (
           <Empty icon="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"
             title="Aucun compte connecté"
@@ -113,7 +116,7 @@ export default function Connections({ theme, infra, user, org }: {
         ))}
 
         {logs.length > 0 && (
-          <div style={{ margin: '8px 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
+          <div style={{ margin: '8px 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 200, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>
             {logs.join('\n')}
           </div>
         )}

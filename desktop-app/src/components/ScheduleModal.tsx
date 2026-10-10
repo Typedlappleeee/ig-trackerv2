@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Theme } from '@/lib/theme'
-import { Btn, Modal, toast } from '@/lib/ui'
+import { Btn, Modal, toast, FIELD } from '@/lib/ui'
 
 // Modale de programmation « PC éteint » : la tâche est créée maintenant sur GeeLark
 // avec un scheduleAt futur → GeeLark l'exécute dans son cloud à l'heure prévue.
@@ -32,7 +32,7 @@ export default function ScheduleModal({ theme, count, kind, onClose, onSchedule 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <label style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Date et heure</label>
         <input type="datetime-local" value={val} min={localVal(1)} max={localVal(29 * 24 * 60)} onChange={e => setVal(e.target.value)}
-          style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', colorScheme: 'dark' }} />
+          style={{ ...FIELD, colorScheme: 'dark' }} />
         <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.55, color: '#8B8B94' }}>
           La tâche est créée <b>maintenant</b> sur GeeLark (média hébergé + crédits débités) et part <b>toute seule</b> à l'heure prévue. Visible/annulable dans les <b>Task Logs</b> de GeeLark. Max ~29 jours.
         </p>

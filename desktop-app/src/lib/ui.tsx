@@ -92,6 +92,61 @@ export function Btn({ label, theme, tone = 'ghost', sm, icon, onClick, disabled 
   )
 }
 
+// ── Champs, interrupteur, onglets segmentés (partagés par toutes les pages) ───
+export const MONO = "'JetBrains Mono',monospace"
+/** Style de champ standard (input / select / textarea) — hauteur 32 (28 en sm). */
+export const FIELD: CSSProperties = {
+  height: 32, padding: '0 10px', borderRadius: 6, boxSizing: 'border-box', width: '100%',
+  background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF',
+  fontSize: 13, outline: 'none', fontFamily: 'inherit',
+}
+export const FIELD_SM: CSSProperties = { ...FIELD, height: 28, fontSize: 12.5 }
+export const TEXTAREA: CSSProperties = { ...FIELD, height: 'auto', minHeight: 72, padding: '8px 10px', lineHeight: 1.5, resize: 'vertical' }
+
+export function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled}
+      onClick={e => { e.stopPropagation(); if (!disabled) onChange(!on) }}
+      style={{
+        position: 'relative', width: 30, height: 18, borderRadius: 99, padding: 0, flexShrink: 0,
+        border: `1px solid ${on ? '#8B7CF6' : 'rgba(255,255,255,0.12)'}`, background: on ? '#8B7CF6' : '#1C1C1F',
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1, transition: 'background .15s ease, border-color .15s ease',
+      }}>
+      <span style={{ position: 'absolute', top: 2, left: on ? 14 : 2, width: 12, height: 12, borderRadius: 99, background: on ? '#FFFFFF' : '#A1A1AA', transition: 'left .15s ease, background .15s ease' }} />
+    </button>
+  )
+}
+
+export function Segmented<T extends string>({ value, options, onChange, sm }: {
+  value: T; options: { v: T; l: ReactNode; n?: number }[]; onChange: (v: T) => void; sm?: boolean
+}) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', flexWrap: 'wrap' }}>
+      {options.map(o => {
+        const on = o.v === value
+        return (
+          <button key={o.v} type="button" onClick={() => onChange(o.v)} aria-pressed={on} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, height: sm ? 22 : 26, padding: sm ? '0 8px' : '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
+            background: on ? 'rgba(255,255,255,0.08)' : 'transparent', color: on ? '#EDEDEF' : '#8B8B94',
+            fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease', whiteSpace: 'nowrap',
+          }}>
+            {o.l}
+            {o.n !== undefined && <span style={{ color: on ? '#A1A1AA' : '#5A5A63', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{o.n}</span>}
+          </button>
+        )
+      })}
+    </span>
+  )
+}
+
+/** Vrai sous `px` de large (mise en page empilée sur mobile / petite fenêtre). */
+export function useNarrow(px = 860): boolean {
+  const q = () => typeof window !== 'undefined' && window.innerWidth < px
+  const [n, setN] = useState(q)
+  useEffect(() => { const f = () => setN(q()); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f) }, [px]) // eslint-disable-line react-hooks/exhaustive-deps
+  return n
+}
+
 // ── _panel ──────────────────────────────────────────────────────────────────────
 export function Panel({ theme, style, children }: { theme: Theme; style?: CSSProperties; children: ReactNode }) {
   return (
@@ -275,13 +330,22 @@ export function Toaster() {
 }
 
 // ── Confirmation (remplace window.confirm) : const ok = await confirmDialog({…}) ─
-interface ConfirmReq { title: string; text?: string; confirmLabel?: string; danger?: boolean; resolve: (v: boolean) => void }
+interface ConfirmReq { title: string; text?: string; confirmLabel?: string; danger?: boolean; input?: { value: string; placeholder?: string }; resolve: (v: boolean) => void }
 let _confirm: ConfirmReq | null = null
 const _confirmL = new Set<() => void>()
 export function confirmDialog(o: { title: string; text?: string; confirmLabel?: string; danger?: boolean }): Promise<boolean> {
   return new Promise(resolve => {
     _confirm?.resolve(false)
     _confirm = { ...o, resolve }
+    _confirmL.forEach(f => f())
+  })
+}
+// Saisie (remplace window.prompt) : const nom = await promptDialog({ title, placeholder }) → null si annulé.
+export function promptDialog(o: { title: string; text?: string; placeholder?: string; value?: string; confirmLabel?: string }): Promise<string | null> {
+  return new Promise(resolve => {
+    _confirm?.resolve(false)
+    const input = { value: o.value ?? '', placeholder: o.placeholder }
+    _confirm = { title: o.title, text: o.text, confirmLabel: o.confirmLabel, input, resolve: ok => resolve(ok && input.value.trim() ? input.value.trim() : null) }
     _confirmL.forEach(f => f())
   })
 }
@@ -295,6 +359,12 @@ export function DialogHost({ theme }: { theme: Theme }) {
     <Modal theme={theme} title={c.title} onClose={() => close(false)} width={440}
       footer={<><Btn theme={theme} tone="ghost" label="Annuler" onClick={() => close(false)} /><Btn theme={theme} tone={c.danger ? 'danger' : 'primary'} label={c.confirmLabel ?? 'Confirmer'} onClick={() => close(true)} /></>}>
       {c.text ? <div style={{ fontSize: 13, lineHeight: 1.55, color: '#A1A1AA' }}>{c.text}</div> : null}
+      {c.input ? (
+        <input autoFocus defaultValue={c.input.value} placeholder={c.input.placeholder}
+          onChange={e => { c.input!.value = e.target.value }}
+          onKeyDown={e => { if (e.key === 'Enter') close(true) }}
+          style={{ ...FIELD, marginTop: c.text ? 12 : 0 }} />
+      ) : null}
     </Modal>
   )
 }

@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Kpi, Panel, PageHead, StatusDot, Modal, SkeletonRows, toast, confirmDialog } from '@/lib/ui'
+import { Btn, Empty, FIELD, Icon, Kpi, Panel, PageHead, Segmented, Skeleton, StatusDot, Modal, SkeletonRows, toast, confirmDialog } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -83,14 +83,14 @@ function Check({ on, mid, accent, onClick }: { on: boolean; mid?: boolean; accen
         width: 15, height: 15, borderRadius: 4, cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box',
         background: on || mid ? (accent || '#8B7CF6') : 'transparent',
         border: on || mid ? 'none' : '1px solid rgba(255,255,255,0.18)',
-        color: '#fff', fontSize: 9, fontWeight: 600, transition: 'background .12s ease, border-color .12s ease',
+        color: '#fff', fontSize: 11, fontWeight: 600, transition: 'background .12s ease, border-color .12s ease',
       }}
     >{mid ? '–' : on ? '✓' : ''}</span>
   )
 }
 
 const TH: CSSProperties = {
-  fontSize: 11, fontWeight: 500, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#71717A',
+  fontSize: 11, fontWeight: 500, color: '#71717A',
 }
 
 function ctaKey(p: { geelark_id: string | null; id: string }): string { return `sf-story-link-${p.geelark_id ?? p.id}` }
@@ -335,48 +335,29 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
           <select
             value={group} onChange={e => setGroup(e.target.value)}
             style={{
-              height: 32, padding: '0 10px', borderRadius: 6, cursor: 'pointer',
+              ...FIELD, width: 'auto', maxWidth: '100%', cursor: 'pointer',
               border: `1px solid ${group !== 'Tous' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.09)'}`,
-              background: '#161618', color: group !== 'Tous' ? '#EDEDEF' : '#A1A1AA',
-              fontSize: 13, fontWeight: 400, outline: 'none',
+              color: group !== 'Tous' ? '#EDEDEF' : '#A1A1AA',
             }}
           >
             {groups.map(g => <option key={g} value={g} style={{ background: '#161618', color: '#EDEDEF' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
           </select>
 
           {/* Pills */}
-          <span style={{
-            display: 'flex', gap: 2, padding: 2, borderRadius: 7,
-            background: '#111113', border: '1px solid rgba(255,255,255,0.07)',
-          }}>
-            {FILTERS.map(f => {
-              const on = filter === f.k
-              return (
-                <button key={f.k} onClick={() => setFilter(f.k)} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6, height: 26,
-                  padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
-                  background: on ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  color: on ? '#EDEDEF' : '#8B8B94',
-                  fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
-                }}>
-                  {f.l}
-                  <span style={{ color: on ? '#A1A1AA' : '#5A5A63', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{f.n}</span>
-                </button>
-              )
-            })}
-          </span>
+          <Segmented value={filter} onChange={setFilter} options={FILTERS.map(f => ({ v: f.k, l: f.l, n: f.n }))} />
 
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
             {!isCloud && poweredIds.length > 0 && (
               <Btn theme={theme} sm tone="danger" icon={POWER_ICON} label={`Tout éteindre (${poweredIds.length})`} onClick={stopAll} />
             )}
             <span style={{ fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
-              {loading ? el : `${shown.length} / ${total}`}
+              {loading ? <Skeleton w={40} h={10} style={{ display: 'inline-block' }} /> : `${shown.length} / ${total}`}
             </span>
           </span>
         </div>
 
-        {/* En-tête de table */}
+        {/* En-tête de table + corps : défilement horizontal sur mobile (colonnes fixes). */}
+        <div style={{ overflowX: 'auto' }}><div style={{ minWidth: !loading && !error && shown.length > 0 ? 680 : undefined }}>
         <div style={{
           display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
           padding: '0 16px', height: 36, borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -478,6 +459,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
             })}
           </div>
         )}
+        </div></div>
       </Panel>
 
       {/* Barre d'actions groupées */}
@@ -593,7 +575,7 @@ function PhoneSettings({ theme, phone, groups, onClose, onSaved }: {
   }
 
   const lbl: CSSProperties = { fontSize: 12, fontWeight: 500, color: '#8B8B94', marginBottom: 6, display: 'block' }
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }
+  const inp: CSSProperties = FIELD
 
   return (
     <Modal theme={theme} title={phone.phone_name || 'Appareil'} sub="Compte, groupe et lien CTA de la story"
@@ -628,7 +610,7 @@ function GroupAssign({ theme, count, groups, onClose, onApply }: {
   theme: Theme; count: number; groups: string[]; onClose: () => void; onApply: (name: string) => void
 }) {
   const [name, setName] = useState('')
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none' }
+  const inp: CSSProperties = FIELD
   return (
     <Modal theme={theme} title="Assigner un groupe" sub={`${count} appareil${count > 1 ? 's' : ''} sélectionné${count > 1 ? 's' : ''}`}
       icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClose={onClose} width={440}

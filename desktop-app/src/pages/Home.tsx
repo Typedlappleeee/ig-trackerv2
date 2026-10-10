@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { useState } from 'react'
-import { Btn, Icon, Panel, PanelHead, PageHead, Skeleton, SkeletonRows } from '@/lib/ui'
+import { Btn, Icon, MONO, Panel, PanelHead, PageHead, Skeleton, SkeletonRows } from '@/lib/ui'
 import { useConnections } from '@/lib/connections'
 import type { OrgState } from '@/lib/data'
 import {
@@ -10,21 +10,21 @@ import {
 import type { PageKey } from '@/Shell'
 
 // Tuiles « Lancer » — portées de _hub() (LAUNCH), par infrastructure.
-function launchTiles(infra: InfraKey): { id: string; label: string; hint: string; icon: string; tone: string; page: PageKey }[] {
+function launchTiles(infra: InfraKey): { id: string; label: string; hint: string; icon: string; page: PageKey }[] {
   return infra === 'cloud' ? [
-    { id: 'dev', label: 'Mes appareils', hint: 'appareils cloud', icon: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', tone: '6,182,212', page: 'cloud' },
-    { id: 'flows', label: 'Automatisation', hint: 'flux prêts', icon: 'M12 8V4H8|M4 4h16v16H4z|M9 16h6', tone: '139,92,246', page: 'flows' },
-    { id: 'studio', label: 'Remixer une vidéo', hint: 'gratuit', icon: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z', tone: '236,72,153', page: 'studio' },
-    { id: 'reci', label: 'Rejouer une séquence', hint: 'séquences prêtes', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6', tone: '16,185,129', page: 'recipes' },
+    { id: 'dev', label: 'Mes appareils', hint: 'appareils cloud', icon: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', page: 'cloud' },
+    { id: 'flows', label: 'Automatisation', hint: 'flux prêts', icon: 'M12 8V4H8|M4 4h16v16H4z|M9 16h6', page: 'flows' },
+    { id: 'studio', label: 'Remixer une vidéo', hint: 'gratuit', icon: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z', page: 'studio' },
+    { id: 'reci', label: 'Rejouer une séquence', hint: 'séquences prêtes', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6', page: 'recipes' },
   ] : [
-    { id: 'reels', label: 'Publier un Reel', hint: 'comptes prêts', icon: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z', tone: '139,92,246', page: 'publish' },
-    { id: 'story', label: 'Publier une Story', hint: 'lien par compte', icon: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1', tone: '6,182,212', page: 'publish' },
-    { id: 'studio', label: 'Remixer une vidéo', hint: 'gratuit', icon: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z', tone: '236,72,153', page: 'studio' },
-    { id: 'warm', label: 'Chauffer des comptes', hint: 'warmup', icon: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z', tone: '245,158,11', page: 'warmup' },
+    { id: 'reels', label: 'Publier un Reel', hint: 'comptes prêts', icon: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z', page: 'publish' },
+    { id: 'story', label: 'Publier une Story', hint: 'lien par compte', icon: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1', page: 'publish' },
+    { id: 'studio', label: 'Remixer une vidéo', hint: 'gratuit', icon: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z', page: 'studio' },
+    { id: 'warm', label: 'Chauffer des comptes', hint: 'warmup', icon: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z', page: 'warmup' },
   ]
 }
 
-function LaunchTile({ a, onClick }: { a: ReturnType<typeof launchTiles>[number]; onClick: () => void }) {
+function LaunchTile({ a, accent, onClick }: { a: ReturnType<typeof launchTiles>[number]; accent: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -33,13 +33,13 @@ function LaunchTile({ a, onClick }: { a: ReturnType<typeof launchTiles>[number];
         background: '#111113', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer',
         textAlign: 'left', transition: 'background .12s ease, border-color .12s ease', boxSizing: 'border-box',
       }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#141416' }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#161618' }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}
     >
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6,
-          background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: `rgb(${a.tone})`,
+          background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: accent,
         }}><Icon d={a.icon} size={15} /></span>
       </span>
       <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{a.label}</span>
@@ -167,7 +167,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
         <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>Lancer</span>
       </div>
       <div data-rows="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
-        {TILES.map(a => <LaunchTile key={a.id} a={a} onClick={() => onNavigate(a.page)} />)}
+        {TILES.map(a => <LaunchTile key={a.id} a={a} accent={theme.accentText} onClick={() => onNavigate(a.page)} />)}
       </div>
 
       {/* Deux colonnes */}
@@ -190,7 +190,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
                   display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', minHeight: 48, boxSizing: 'border-box',
                   borderBottom: i < upcoming.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 500, color: theme.accentText, minWidth: 58, flexShrink: 0 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 500, color: theme.accentText, minWidth: 58, flexShrink: 0 }}>
                     {fmtTime(r.scheduled_at)}
                   </span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -241,7 +241,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
                       <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
                       <span style={{ fontSize: 11.5, color: '#71717A' }}>{date}</span>
                     </span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 500, color: ok ? '#4ADE80' : '#FBBF24', flexShrink: 0 }}>{stat}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 500, color: ok ? '#4ADE80' : '#FBBF24', flexShrink: 0 }}>{stat}</span>
                   </div>
                 )
               })}

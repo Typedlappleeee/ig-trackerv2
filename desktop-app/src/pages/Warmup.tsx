@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Empty, StatusDot, Panel, PanelHead, PageHead } from '@/lib/ui'
+import { Btn, Chip, Empty, StatusDot, Panel, PanelHead, PageHead, FIELD, FIELD_SM, TEXTAREA, MONO, Toggle, Segmented, SkeletonRows, useNarrow } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { scopeInfra, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
-import { warmupAccountNative, editProfileOnPhone, loginInstagramOnPhone, ensurePhoneRunning, setPhoneManaged, stopPhoneSurely } from '@/lib/geelark'
-import { changeUsernameOnPhone, changeProfilePicOnPhone } from '@/lib/geelarkAdb'
-import { bankUrls, expandUsername, lines } from '@/lib/flowEngine'
+import { warmupAccountNative, loginInstagramOnPhone } from '@/lib/geelark'
+import { lines, newBlock, runFlow, useFlowRuns, type Flow } from '@/lib/flowEngine'
+import { usernameListIssues } from '@/lib/igRules'
+import FlowRunCard from '@/components/FlowRunCard'
 import BankPicker from '@/components/BankPicker'
 import ComingSoon from '@/components/ComingSoon'
 import { isReleased, releaseLabel } from '@/lib/releases'
@@ -32,6 +33,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
 }) {
   // Édition en masse en maintenance jusqu'à sa date de retour (le super-admin garde l'accès).
   const editLocked = !isReleased('massEdit') && !isSuperAdmin
+  const narrow = useNarrow()
   const { currentOrg } = org
   const conns = useConnections(user, org)
   const bearer = conns.bearer
@@ -104,72 +106,55 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
     setRunning(false)
   }
 
-  // Édition de profil en masse (RÉELLE), par téléphone : nom d'utilisateur et photo
-  // (ADB, Centre de comptes) puis nom affiché / bio / lien (RPA instagramEdit).
-  // Le téléphone démarre UNE fois pour tout, puis est éteint à la fin (même en échec).
+  // Édition de profil en masse (RÉELLE) : exécutée par le MOTEUR DE FLOWS (mêmes blocs
+  // que le Flow Builder : @, photo, nom/bio/lien). On hérite ainsi de la remise à zéro
+  // d'Instagram entre les étapes, des délais max, de la rotation d'IP, du parallélisme,
+  // de l'historique Activité et d'un suivi qui survit au changement de page.
+  const EDIT_FLOW_NAME = 'Édition en masse'
+  const flowRuns = useFlowRuns()
+  const editRuns = flowRuns.filter(r => r.flowName === EDIT_FLOW_NAME)
+  const busyKeys = new Set(flowRuns.filter(r => r.status === 'preparing' || r.status === 'running').flatMap(r => r.phones.map(p => p.key)))
+  const [editSimul, setEditSimul] = useState<'all' | number>(3)
   const userLines = lines(usernames)
   const hasRpaEdit = !!(edit.nickname.trim() || edit.biography.trim() || edit.linkURL.trim())
   const hasEdit = hasRpaEdit || userLines.length > 0 || avatarIds.length > 0
   function editIssue(n: number): string | null {
-    const bad = userLines.find(u => !/^@?[a-zA-Z0-9._{}]{1,30}$/.test(u.replace(/\{\d{1,2}\}/g, '0')))
-    if (bad) return `Nom d'utilisateur invalide « ${bad} » (lettres, chiffres, . et _ uniquement).`
-    if (userLines.length > 0 && userLines.length < n && !userLines.some(u => /\{\d{1,2}\}/.test(u)))
-      return `Il faut un nom d'utilisateur différent par compte (${userLines.length}/${n}) — ou ajoute {4} pour des chiffres aléatoires.`
-    return null
+    const issues = userLines.length ? usernameListIssues(userLines, n) : []
+    return issues[0] ?? null
   }
 
   async function launchEdit() {
     const targets = phones.filter(p => sel.has(p.id) && p.geelark_id)
-    if (editLocked || targets.length === 0 || !bearer || running || !hasEdit) return
+    if (editLocked || targets.length === 0 || !bearer || !hasEdit) return
     const issue = editIssue(targets.length)
     setEditError(issue)
     if (issue) return
-    setRunning(true); setLogs([])
-    setRunItems(targets.map(p => ({ id: p.id, name: phoneLabel(p), phase: 'pending' as RunPhase })))
-    const push = (m: string) => setLogs(l => [...l.slice(-200), m])
+    const busy = targets.filter(p => busyKeys.has(p.id))
+    if (busy.length) { setEditError(`${busy.length} compte(s) déjà dans une automatisation en cours — attends la fin ou retire-les.`); return }
     await loadProxyRotation(currentOrg?.id ?? null, user.id)
     const rotU = resolveRotationUrls(); const rot = (rotationOn && rotU.length) ? rotU : undefined
-    const urls = avatarIds.length ? await bankUrls(avatarIds) : new Map<string, string>()
-    if (avatarIds.length && urls.size === 0) push('⚠ Photos de profil introuvables dans la banque — ignorées.')
-    const avatars = avatarIds.map(id => urls.get(id)).filter((u): u is string => !!u)
 
-    for (const [i, p] of targets.entries()) {
-      const gid = p.geelark_id!
-      setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: 'running' } : it))
-      push(`— ${phoneLabel(p)} —`)
-      const errors: string[] = []
-      setPhoneManaged(gid, true)
-      try {
-        const ready = await ensurePhoneRunning(bearer, gid, push, rot)
-        if (!ready.ok) { errors.push(ready.reason ?? 'Téléphone non démarré'); continue }
-        if (userLines.length) {
-          const handle = expandUsername(userLines[i % userLines.length]).replace(/^@/, '')
-          const r = await changeUsernameOnPhone(bearer, gid, handle, push, p.ig_username ?? undefined)
-          if (r.ok) {
-            await supabase.from('phones').update({ ig_username: handle }).eq('id', p.id)
-            setPhones(ps => ps.map(x => x.id === p.id ? { ...x, ig_username: handle } : x))
-          } else errors.push(`nom d'utilisateur : ${r.error}`)
-        }
-        if (avatars.length) {
-          const r = await changeProfilePicOnPhone(bearer, gid, avatars[i % avatars.length], push)
-          if (!r.ok) errors.push(`photo : ${r.error}`)
-        }
-        if (hasRpaEdit) {
-          const r = await editProfileOnPhone(bearer, gid, edit, push, rot)
-          if (!r.ok) errors.push(`profil : ${r.error}`)
-        }
-      } catch (e) {
-        errors.push(e instanceof Error ? e.message : String(e))
-      } finally {
-        setPhoneManaged(gid, false)
-        await stopPhoneSurely(bearer, gid, push)
-        if (errors.length) push(`❌ ${errors.join(' · ')}`)
-        setRunItems(items => items.map(it => it.id === p.id ? { ...it, phase: errors.length ? 'failed' : 'done', detail: errors.join(' · ') || undefined } : it))
-      }
+    const blocks = []
+    if (userLines.length) { const b = newBlock('username'); b.params.usernames = usernames; b.params.onError = 'continue'; blocks.push(b) }
+    if (avatarIds.length) { const b = newBlock('avatar'); Object.assign(b.params, { source: 'pick', imageIds: avatarIds, mode: 'seq', onError: 'continue' }); blocks.push(b) }
+    if (hasRpaEdit) {
+      const b = newBlock('bio')
+      Object.assign(b.params, { names: edit.nickname, bios: edit.biography, bioSingle: true, link: edit.linkURL, linkTitle: edit.linkTitle, mode: 'seq', onError: 'continue' })
+      blocks.push(b)
     }
-    push('✔ Édition terminée.')
-    setRunning(false)
+    const flow: Flow = { id: 'mass-edit', name: EDIT_FLOW_NAME, blocks, onError: 'continue' }
+    await runFlow({
+      bearer, flow,
+      targets: targets.map(p => ({ key: p.id, geelarkId: p.geelark_id!, name: phoneLabel(p), username: p.ig_username ?? undefined })),
+      creds: {}, concurrency: editSimul === 'all' ? targets.length : editSimul,
+      rotationUrls: rot, creditOwnerId: user.id, scope: { orgId: currentOrg?.id ?? null, userId: user.id },
+    })
   }
+
+  // Les @ changés (et vérifiés) sont écrits en base par le moteur → on recharge la liste à la fin.
+  const editActive = editRuns.some(r => r.status === 'preparing' || r.status === 'running')
+  const wasActive = useRef(false)
+  useEffect(() => { if (wasActive.current && !editActive) void load(); wasActive.current = editActive }, [editActive, load])
 
   // Auto-login (RÉEL) : flow RPA login par téléphone, avec les identifiants saisis.
   async function launchLogin() {
@@ -213,14 +198,8 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
       />
 
       {/* Onglets Connexion / Édition en masse / Warmup */}
-      <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 7, marginBottom: 16, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', width: 'fit-content', maxWidth: '100%', flexWrap: 'wrap' }}>
-        {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => setWtab(k)} style={{
-            height: 28, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer',
-            background: wtab === k ? 'rgba(255,255,255,0.08)' : 'transparent',
-            color: wtab === k ? '#EDEDEF' : '#8B8B94', fontSize: 12.5, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
-          }}>{l}</button>
-        ))}
+      <div style={{ marginBottom: 16 }}>
+        <Segmented value={wtab} onChange={setWtab} options={TABS.map(([v, l]) => ({ v, l }))} />
       </div>
 
       {/* Rotation d'IP proxy — même toggle que les composers (Reels/Story/Photo…). */}
@@ -229,15 +208,13 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
           <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Rotation d’IP proxy</span>
           <span style={{ fontSize: 12, color: '#8B8B94' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque téléphone (envoi en série)' : 'Désactivée pour ce run'}</span>
         </span>
-        <span onClick={() => rotationConfigured && setRotationOn(v => !v)}
-          title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: rotationOn ? 'flex-end' : 'flex-start', width: 30, height: 18, padding: 2, boxSizing: 'border-box', borderRadius: 99, flexShrink: 0, cursor: rotationConfigured ? 'pointer' : 'not-allowed', opacity: rotationConfigured ? 1 : 0.4, background: rotationOn ? theme.accent : 'rgba(255,255,255,0.12)', transition: 'background .12s ease' }}>
-          <span style={{ width: 14, height: 14, borderRadius: 99, background: '#fff' }} />
+        <span title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}>
+          <Toggle on={rotationOn} onChange={setRotationOn} disabled={!rotationConfigured} label="Rotation d’IP proxy" />
         </span>
       </div>
 
       {wtab !== 'warm' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '250px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
           {/* Sélecteur de téléphones (partagé) */}
           <Panel theme={theme}>
             <PanelHead title="Téléphones" right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(shownWarm.map(p => p.id)))} />} />
@@ -252,7 +229,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                 const on = sel.has(p.id)
                 return (
                   <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 40, padding: '8px 12px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left', background: on ? 'rgba(255,255,255,0.04)' : 'transparent', boxSizing: 'border-box' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accent : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 8.5, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0, background: on ? theme.accent : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     <StatusDot kind={dotKind(p.status)} />
                     <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
                   </button>
@@ -276,12 +253,12 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom affiché <span style={{ color: '#71717A', fontWeight: 400 }}>· name</span></span>
-                      <input value={edit.nickname} onChange={e => setEdit(v => ({ ...v, nickname: e.target.value }))} placeholder="Léa ✨" style={fieldStyle} />
+                      <input value={edit.nickname} onChange={e => setEdit(v => ({ ...v, nickname: e.target.value }))} placeholder="Léa ✨" style={FIELD} />
                       <span style={{ fontSize: 11.5, color: '#71717A' }}>Le nom en gras sur le profil. Ne touche pas au @.</span>
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom d'utilisateur <span style={{ color: '#71717A', fontWeight: 400 }}>· @username</span></span>
-                      <textarea value={usernames} onChange={e => { setUsernames(e.target.value); setEditError(null) }} rows={2} placeholder={'lea.officiel{4}\nlea_backup'} style={{ ...fieldStyle, height: 'auto', padding: '8px 10px', resize: 'vertical', fontFamily: 'inherit' }} />
+                      <textarea value={usernames} onChange={e => { setUsernames(e.target.value); setEditError(null) }} rows={2} placeholder={'lea.officiel{4}\nlea_backup'} style={TEXTAREA} />
                       <span style={{ fontSize: 11.5, color: '#71717A' }}>Un par ligne, attribués dans l'ordre. {'{4}'} = 4 chiffres aléatoires.</span>
                     </label>
                   </div>
@@ -297,19 +274,26 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                     {([['linkURL', 'Lien (URL)'], ['linkTitle', 'Titre du lien']] as [keyof typeof edit, string][]).map(([k, l]) => (
                       <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                         <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{l}</span>
-                        <input value={edit[k]} onChange={e => setEdit(v => ({ ...v, [k]: e.target.value }))} placeholder={l} style={fieldStyle} />
+                        <input value={edit[k]} onChange={e => setEdit(v => ({ ...v, [k]: e.target.value }))} placeholder={l} style={FIELD} />
                       </label>
                     ))}
                   </div>
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Bio</span>
-                    <textarea value={edit.biography} onChange={e => setEdit(v => ({ ...v, biography: e.target.value }))} rows={3} placeholder="Bio…" style={{ resize: 'vertical', padding: '8px 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+                    <textarea value={edit.biography} onChange={e => setEdit(v => ({ ...v, biography: e.target.value }))} rows={3} placeholder="Bio…" style={TEXTAREA} />
                   </label>
                   {editError && <div role="alert" style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171', fontSize: 12.5 }}>{editError}</div>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
                   <span style={{ flex: 1, minWidth: 200, fontSize: 12.5, color: '#8B8B94' }}>Édite <b style={{ color: '#EDEDEF', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{nSel}</b> compte{nSel > 1 ? 's' : ''}. Le téléphone s'éteint à la fin.</span>
-                  <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || running || !hasEdit} icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" label={running ? 'Édition…' : 'Lancer l\'édition'} onClick={launchEdit} />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#8B8B94' }}>
+                    Téléphones simultanés
+                    <select value={String(editSimul)} onChange={e => setEditSimul(e.target.value === 'all' ? 'all' : Number(e.target.value))} style={{ ...FIELD_SM, width: 'auto' }}>
+                      {[1, 2, 3, 5, 10].map(n => <option key={n} value={n}>{n}</option>)}
+                      <option value="all">Tous</option>
+                    </select>
+                  </label>
+                  <Btn theme={theme} tone="primary" disabled={nSel === 0 || !bearer || !hasEdit} icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" label="Lancer l'édition" onClick={launchEdit} />
                 </div>
               </Panel>
             ) : (
@@ -326,9 +310,9 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                         <div key={p.id} style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                           <div style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', marginBottom: 8 }}>{phoneLabel(p)}</div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(110px,1fr))', gap: 8 }}>
-                            <input value={c.email} onChange={e => set('email', e.target.value)} placeholder="email / identifiant" style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12.5, outline: 'none', boxSizing: 'border-box', minWidth: 0 }} />
-                            <input value={c.password} onChange={e => set('password', e.target.value)} type="password" placeholder="mot de passe" style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12.5, outline: 'none', boxSizing: 'border-box', minWidth: 0 }} />
-                            <input value={c.totp} onChange={e => set('totp', e.target.value)} placeholder="clé 2FA" style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 12.5, outline: 'none', boxSizing: 'border-box', minWidth: 0, fontFamily: "'JetBrains Mono',monospace" }} />
+                            <input value={c.email} onChange={e => set('email', e.target.value)} placeholder="email / identifiant" style={{ ...FIELD_SM, minWidth: 0 }} />
+                            <input value={c.password} onChange={e => set('password', e.target.value)} type="password" placeholder="mot de passe" style={{ ...FIELD_SM, minWidth: 0 }} />
+                            <input value={c.totp} onChange={e => set('totp', e.target.value)} placeholder="clé 2FA" style={{ ...FIELD_SM, minWidth: 0, fontFamily: MONO }} />
                           </div>
                         </div>
                       )
@@ -341,19 +325,20 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                 </div>
               </Panel>
             )}
-            {runItems.length > 0 && (
+            {wtab === 'edit' && editRuns.map(r => <FlowRunCard key={r.id} theme={theme} run={r} />)}
+            {wtab !== 'edit' && runItems.length > 0 && (
               <Panel theme={theme}>
                 <PanelHead title="En direct" sub={`${runItems.filter(r => r.phase === 'done').length}/${runItems.length} terminés`} />
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '12px 16px' }}>
                   {runItems.map(it => <Chip key={it.id} text={`${it.phase === 'done' ? '✓' : it.phase === 'failed' ? '✕' : it.phase === 'running' ? '…' : '·'} ${it.name}`} tone={(it.phase === 'done' ? 'ok' : it.phase === 'failed' ? 'bad' : it.phase === 'running' ? 'warn' : 'mute') as any} />)}
                 </div>
-                <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0E0E10', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 200, overflowY: 'auto', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.length === 0 ? '…' : logs.join('\n')}</div>
+                <div style={{ margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0E0E10', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 200, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap' }}>{logs.length === 0 ? '…' : logs.join('\n')}</div>
               </Panel>
             )}
           </div>
         </div>
       ) : (
-      <div style={{ display: 'grid', gridTemplateColumns: '250px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '250px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         {/* Téléphones */}
         <Panel theme={theme}>
           <PanelHead title="Téléphones" right={<Btn theme={theme} sm tone="quiet" label="Tout" onClick={() => setSel(new Set(shownWarm.map(p => p.id)))} />} />
@@ -365,7 +350,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
             </select>
           </div>
           {loading ? (
-            <div style={{ padding: 30, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Chargement…</div>
+            <SkeletonRows rows={5} />
           ) : error ? (
             <div style={{ padding: 20, textAlign: 'center', color: '#F87171', fontSize: 12.5 }}>{error}</div>
           ) : shownWarm.length === 0 ? (
@@ -381,12 +366,12 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                   }}>
                     <span style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, flexShrink: 0,
-                      background: on ? theme.accent : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 8.5, fontWeight: 600,
+                      background: on ? theme.accent : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 11, fontWeight: 600,
                     }}>{on ? '✓' : ''}</span>
                     <StatusDot kind={dotKind(p.status)} />
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <span style={{ fontSize: 13, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                   </button>
                 )
@@ -425,7 +410,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
               </div>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Mot-clé de recherche (optionnel)</span>
-                <input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="ex. fashion, fitness… — vide = fil Reels" style={{ height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                <input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="ex. fashion, fitness… — vide = fil Reels" style={FIELD} />
               </label>
             </div>
           </Panel>
@@ -459,7 +444,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                 <div style={{
                   margin: '0 16px 16px', padding: '10px 12px', borderRadius: 6, background: '#0E0E10',
                   border: '1px solid rgba(255,255,255,0.06)', maxHeight: 220, overflowY: 'auto',
-                  fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap',
+                  fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: '#A1A1AA', whiteSpace: 'pre-wrap',
                 }}>
                   {logs.length === 0 ? '…' : logs.join('\n')}
                 </div>
@@ -478,4 +463,3 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
   )
 }
 
-const fieldStyle = { height: 32, padding: '0 10px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF', fontSize: 13, outline: 'none', boxSizing: 'border-box' } as const
