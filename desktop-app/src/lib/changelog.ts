@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-10c',
+    date: '2026-10-10',
+    title: { fr: 'Publication TikTok', en: 'TikTok posting' },
+    items: {
+      fr: ['Publication : nouveau format « Vidéo TikTok » (même parcours que les Reels), et formats rangés par réseau — Instagram, TikTok, autres réseaux — pour ne plus se tromper.'],
+      en: ['Posting: new “TikTok video” format (same flow as Reels), and formats grouped by network — Instagram, TikTok, other networks — so you never mix them up.'],
+    },
+  },
+  {
     id: '2026-10-10b',
     date: '2026-10-10',
     title: { fr: 'Aperçu du Reel', en: 'Reel preview' },
