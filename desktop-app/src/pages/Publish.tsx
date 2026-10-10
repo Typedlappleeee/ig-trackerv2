@@ -56,7 +56,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
         {PLATS.map(pl => (
           <section key={pl.k}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 99, background: pl.color, flexShrink: 0 }} />
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, flexShrink: 0, background: '#161618', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}><Icon d={pl.icon} size={13} /></span>
               <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{pl.label}</span>
                 <span style={{ fontSize: 12, color: '#71717A' }}>{pl.sub}</span>
