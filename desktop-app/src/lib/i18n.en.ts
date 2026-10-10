@@ -1883,6 +1883,9 @@ export const EN: Dict = {
     "Autres réseaux": "Other networks",
     "Facebook, YouTube Shorts, X, Threads, Reddit, Pinterest.": "Facebook, YouTube Shorts, X, Threads, Reddit, Pinterest.",
     "Clique une vidéo pour choisir sa miniature": "Click a video to pick its thumbnail",
+    "Plusieurs vidéos ? Elles seront réparties entre les comptes. Bouton « Miniature » sur chaque vidéo pour choisir sa couverture.": "Several videos? They will be spread across accounts. Use the “Thumbnail” button on each video to pick its cover.",
+    "Miniature": "Thumbnail",
+    "Miniature ✓": "Thumbnail ✓",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
