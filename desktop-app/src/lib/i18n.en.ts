@@ -2111,6 +2111,8 @@ export const EN: Dict = {
     "Ajoute des comptes de référence (modèles, concurrents) pour voir leurs Reels qui cartonnent.": "Add reference accounts (models, competitors) to see their top-performing Reels.",
     "la normale": "normal",
     "· moy.": "· avg.",
+    "Bientôt disponible.": "Coming soon.",
+    "Les Reels viraux des comptes de référence apparaîtront ici dès le prochain relevé.": "Viral Reels from the reference accounts will show up here after the next fetch.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

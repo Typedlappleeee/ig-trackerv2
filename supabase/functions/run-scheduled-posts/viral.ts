@@ -30,7 +30,7 @@ export async function refreshWatch(db: any, w: { id: string; username: string })
 /** Relève les comptes pas relevés depuis 20 h (ou ceux d'un utilisateur, sur demande), dans le budget. */
 // deno-lint-ignore no-explicit-any
 export async function runViralWatch(db: any, deadline: number, userId: string | null = null, force = false): Promise<{ accounts: number; reels: number }> {
-  let q = db.from('viral_watch').select('id, username').order('fetched_at', { ascending: true, nullsFirst: true }).limit(userId ? 300 : 40)
+  let q = db.from('viral_watch').select('id, username').order('fetched_at', { ascending: true, nullsFirst: true }).limit(userId || force ? 300 : 40)
   if (userId) q = q.eq('user_id', userId)
   if (!force) q = q.or(`fetched_at.is.null,fetched_at.lt.${new Date(Date.now() - 20 * 3600_000).toISOString()}`)
   const { data } = await q
