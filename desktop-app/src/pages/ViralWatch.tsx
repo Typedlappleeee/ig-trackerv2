@@ -383,7 +383,7 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
 
       {isAdmin && userView && (
         <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(139,124,246,0.1)', border: '1px solid rgba(139,124,246,0.3)', fontSize: 12.5, color: '#C4BBFA' }}>
-          Aperçu : c’est ce que voient les utilisateurs (la page reste réservée à l’admin pour l’instant).
+          Aperçu : c’est ce que voient les utilisateurs.
         </div>
       )}
       {isAdmin && noRegion && !noScope && !userView && (
