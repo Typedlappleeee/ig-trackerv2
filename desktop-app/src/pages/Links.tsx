@@ -326,6 +326,17 @@ function LinksTab({ theme, links, groups, phones, stats, BASE, copy, owner, relo
     const { error } = await supabase.from('tracked_links').delete().eq('id', l.id)
     if (error) toast(`Échec : ${error.message}`, 'bad'); else reload()
   }
+  // Suppression en masse (par lots de 200) : tous les liens d'un groupe, ou tous les liens.
+  async function deleteMany(list: TLink[], title: string) {
+    if (!list.length) return
+    if (!await confirmDialog({ title, text: `${list.length} lien(s) ne fonctionneront plus et leurs statistiques seront supprimées.`, confirmLabel: 'Tout supprimer', danger: true })) return
+    const ids = list.map(l => l.id)
+    for (let i = 0; i < ids.length; i += 200) {
+      const { error } = await supabase.from('tracked_links').delete().in('id', ids.slice(i, i + 200))
+      if (error) { toast(`Échec : ${error.message}`, 'bad'); reload(); return }
+    }
+    toast(`${ids.length} lien(s) supprimé(s)`, 'ok'); reload()
+  }
   async function deleteGroup(id: string) {
     if (!await confirmDialog({ title: 'Supprimer ce groupe ?', text: 'Les liens ne sont pas supprimés : ils passent dans « Sans groupe ».', confirmLabel: 'Supprimer', danger: true })) return
     const { error } = await supabase.from('link_groups').delete().eq('id', id)
@@ -352,6 +363,7 @@ function LinksTab({ theme, links, groups, phones, stats, BASE, copy, owner, relo
           <Btn theme={theme} sm tone="ghost" icon="M12 5v14|M5 12h14" label="Créer un groupe" onClick={newGroup} />
           <Btn theme={theme} sm tone="quiet" label="Tout déplier" onClick={() => setClosed(new Set())} />
           <Btn theme={theme} sm tone="quiet" label="Tout replier" onClick={() => setClosed(new Set(sections.map(s => s.id ?? 'none')))} />
+          {links.length > 0 && <Btn theme={theme} sm tone="danger" icon={ICON_TRASH} label="Supprimer tous les liens" onClick={() => deleteMany(links, `Supprimer les ${links.length} liens ?`)} />}
         </span>
       </div>
       {links.length === 0 && <Panel theme={theme}><Empty icon={ICON_LINK} title="Aucun lien" text="Lance la « Création automatique » : une page par compte et ses liens directs (OF, MYM), en une fois." /></Panel>}
@@ -374,7 +386,10 @@ function LinksTab({ theme, links, groups, phones, stats, BASE, copy, owner, relo
               <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
                 <span style={{ fontSize: 12, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }}>{fmtNumber(week)} · 7 j</span>
                 <Spark values={trend} w={90} h={24} />
-                {sec.id && <span onClick={e => e.stopPropagation()}><Btn theme={theme} sm tone="quiet" icon={ICON_TRASH} onClick={() => deleteGroup(sec.id!)} /></span>}
+                <span onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 4 }}>
+                  {list.length > 0 && <Btn theme={theme} sm tone="ghost" label="Vider le groupe" onClick={() => deleteMany(list, `Supprimer les ${list.length} liens de « ${sec.name} » ?`)} />}
+                  {sec.id && <Btn theme={theme} sm tone="quiet" icon={ICON_TRASH} onClick={() => deleteGroup(sec.id!)} />}
+                </span>
               </span>
             </div>
             {open && list.length > 0 && (

@@ -2082,6 +2082,9 @@ export const EN: Dict = {
     "vers": "record pointing to",
     ", puis contacte le support ScaleFlow pour l’activer.": ", then contact ScaleFlow support to activate it.",
     "Nom de domaine invalide (ex. liens.monagence.com).": "Invalid domain name (e.g. links.myagency.com).",
+    "Tout supprimer": "Delete all",
+    "Supprimer tous les liens": "Delete all links",
+    "Vider le groupe": "Empty group",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -2463,5 +2466,9 @@ export const EN: Dict = {
     ["Assombrir : {0} %", "Darken: {0} %"],
     ["Arrondi des boutons : {0}px", "Button roundness: {0}px"],
     ["{0} bouton(s) sans lien : ils s’afficheront dès qu’ils auront une URL.", "{0} button(s) without a link: they’ll show once they have a URL."],
+    ["{0} lien(s) ne fonctionneront plus et leurs statistiques seront supprimées.", "{0} link(s) will stop working and their stats will be deleted."],
+    ["{0} lien(s) supprimé(s)", "{0} link(s) deleted"],
+    ["Supprimer les {0} liens ?", "Delete the {0} links?"],
+    ["Supprimer les {0} liens de « {1} » ?", "Delete the {0} links in “{1}”?"],
   ],
 }
