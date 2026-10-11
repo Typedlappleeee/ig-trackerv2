@@ -17,19 +17,27 @@ function db() {
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : null
 
-function page(res, status, body, extraHead = '') {
+// Thèmes des pages publiques : [fond, texte, texte secondaire, bouton, bouton (texte), bouton principal, bouton principal (texte), bordure]
+const THEMES = {
+  dark: ['#0A0A0B', '#EDEDEF', '#A1A1AA', '#161618', '#EDEDEF', '#EDEDEF', '#0A0A0B', 'rgba(255,255,255,.1)'],
+  light: ['#FAFAFA', '#0A0A0B', '#52525B', '#FFFFFF', '#0A0A0B', '#0A0A0B', '#FFFFFF', 'rgba(0,0,0,.1)'],
+  violet: ['#140F24', '#F4F1FF', '#B9B0DA', '#211936', '#F4F1FF', '#8B7CF6', '#FFFFFF', 'rgba(255,255,255,.12)'],
+  rose: ['#1F0F17', '#FFF1F6', '#E3AFC4', '#2E1622', '#FFF1F6', '#F472B6', '#1F0F17', 'rgba(255,255,255,.12)'],
+}
+function page(res, status, body, extraHead = '', theme = 'dark') {
+  const [bg, fg, mut, btn, btnFg, pri, priFg, bd] = THEMES[theme] || THEMES.dark
   res.statusCode = status
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store')
   res.setHeader('X-Robots-Tag', 'noindex')
   res.end(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${extraHead}
-<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0A0A0B;color:#EDEDEF;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;display:flex;justify-content:center}
+<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;background:${bg};color:${fg};font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;display:flex;justify-content:center}
 .w{width:100%;max-width:440px;padding:48px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
-.av{width:96px;height:96px;border-radius:99px;object-fit:cover;border:1px solid rgba(255,255,255,.12);background:#161618}
-h1{margin:6px 0 0;font-size:22px;font-weight:600;letter-spacing:-.02em}p{margin:0;color:#A1A1AA;font-size:14.5px;line-height:1.55;white-space:pre-line}
-a.b{display:block;width:100%;padding:15px 18px;border-radius:12px;background:#161618;border:1px solid rgba(255,255,255,.1);color:#EDEDEF;text-decoration:none;font-weight:600;font-size:15px;transition:transform .12s,background .12s}
-a.b:active{transform:scale(.98)}a.b:hover{background:#1C1C1F}a.p{background:#EDEDEF;color:#0A0A0B;border-color:#EDEDEF}
-.hint{font-size:12.5px;color:#71717A;margin-top:6px}</style></head><body><div class="w">${body}</div></body></html>`)
+.av{width:96px;height:96px;border-radius:99px;object-fit:cover;border:1px solid ${bd};background:${btn}}
+h1{margin:6px 0 0;font-size:22px;font-weight:600;letter-spacing:-.02em}p{margin:0;color:${mut};font-size:14.5px;line-height:1.55;white-space:pre-line}
+a.b{display:block;width:100%;padding:15px 18px;border-radius:12px;background:${btn};border:1px solid ${bd};color:${btnFg};text-decoration:none;font-weight:600;font-size:15px;transition:transform .12s,background .12s}
+a.b:active{transform:scale(.98)}a.b:hover{filter:brightness(1.08)}a.p{background:${pri};color:${priFg};border-color:${pri}}
+.hint{font-size:12.5px;color:${mut};margin-top:6px}</style></head><body><div class="w">${body}</div></body></html>`)
 }
 
 export default async function handler(req, res) {
@@ -82,7 +90,7 @@ export default async function handler(req, res) {
 <div style="width:100%;display:flex;flex-direction:column;gap:10px;margin-top:10px">
 ${buttons.map((x, i) => safeUrl(x?.url) ? `<a class="b${i === 0 ? ' p' : ''}" href="/l/${esc(code)}?b=${i}${q}" rel="nofollow">${esc(x.label || 'Lien')}</a>` : '').join('')}
 </div>`
-    return page(res, 200, body, `<title>${esc(pg.title || 'Liens')}</title>`)
+    return page(res, 200, body, `<title>${esc(pg.title || 'Liens')}</title>`, pg.theme)
   } catch (e) {
     return page(res, 500, '<h1>Indisponible</h1><p>Réessaie dans un instant.</p>')
   }

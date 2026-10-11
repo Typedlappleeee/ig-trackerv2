@@ -12,6 +12,7 @@ create table if not exists public.link_pages (
   bio text not null default '',
   avatar_url text,
   buttons jsonb not null default '[]'::jsonb,      -- [{ "label": "...", "url": "https://..." }]
+  theme text not null default 'dark' check (theme in ('dark','light','violet','rose')),
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -49,13 +50,13 @@ alter table public.link_clicks enable row level security;
 -- Propriétaire, ou membre de l'organisation.
 drop policy if exists link_pages_rw on public.link_pages;
 create policy link_pages_rw on public.link_pages for all
-  using (user_id = auth.uid() or (org_id is not null and exists (select 1 from org_members m where m.org_id = link_pages.org_id and m.user_id = auth.uid())))
-  with check (user_id = auth.uid() or (org_id is not null and exists (select 1 from org_members m where m.org_id = link_pages.org_id and m.user_id = auth.uid())));
+  using (user_id = auth.uid() or (org_id is not null and exists (select 1 from organization_members m where m.org_id = link_pages.org_id and m.user_id = auth.uid())))
+  with check (user_id = auth.uid() or (org_id is not null and exists (select 1 from organization_members m where m.org_id = link_pages.org_id and m.user_id = auth.uid())));
 
 drop policy if exists tracked_links_rw on public.tracked_links;
 create policy tracked_links_rw on public.tracked_links for all
-  using (user_id = auth.uid() or (org_id is not null and exists (select 1 from org_members m where m.org_id = tracked_links.org_id and m.user_id = auth.uid())))
-  with check (user_id = auth.uid() or (org_id is not null and exists (select 1 from org_members m where m.org_id = tracked_links.org_id and m.user_id = auth.uid())));
+  using (user_id = auth.uid() or (org_id is not null and exists (select 1 from organization_members m where m.org_id = tracked_links.org_id and m.user_id = auth.uid())))
+  with check (user_id = auth.uid() or (org_id is not null and exists (select 1 from organization_members m where m.org_id = tracked_links.org_id and m.user_id = auth.uid())));
 
 -- Clics : lecture seulement (l'écriture se fait côté serveur avec la clé service_role).
 drop policy if exists link_clicks_read on public.link_clicks;
@@ -63,3 +64,6 @@ create policy link_clicks_read on public.link_clicks for select using (
   exists (select 1 from public.tracked_links l where l.id = link_clicks.link_id)
   or exists (select 1 from public.link_pages p where p.id = link_clicks.page_id)
 );
+
+-- (Ré-exécutable) colonne thème si la table existait déjà.
+alter table public.link_pages add column if not exists theme text not null default 'dark';
