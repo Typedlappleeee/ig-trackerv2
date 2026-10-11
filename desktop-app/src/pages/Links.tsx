@@ -28,10 +28,14 @@ interface Click { link_id: string | null; page_id: string | null; button: number
 type Owner = { user_id: string; org_id: string | null }
 
 const SF_BASE = IS_WEB && typeof window !== 'undefined' && /^https?:/.test(window.location.origin) ? `${window.location.origin}/l/` : 'https://scaleflow.company/l/'
-export type LinkDomain = 'scaleflow' | 'tapmylink'
-const DOMAIN_KEY = 'sf-link-domain'
-export const baseFor = (d: LinkDomain) => d === 'tapmylink' ? 'https://tapmylink.fr/' : SF_BASE
-const loadDomain = (): LinkDomain => { try { return localStorage.getItem(DOMAIN_KEY) === 'tapmylink' ? 'tapmylink' : 'scaleflow' } catch { return 'scaleflow' } }
+// Domaine des liens : tapmylink.fr par défaut, ou le domaine perso de l'agence.
+export type LinkDomain = 'tapmylink' | 'custom'
+const DOMAIN_KEY = 'sf-link-domain', CUSTOM_KEY = 'sf-link-custom-domain'
+export const cleanDomain = (d: string) => d.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+const loadCustom = () => { try { return localStorage.getItem(CUSTOM_KEY) ?? '' } catch { return '' } }
+export const baseFor = (d: LinkDomain) => d === 'custom' && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(cleanDomain(loadCustom())) ? `https://${cleanDomain(loadCustom())}/` : 'https://tapmylink.fr/'
+const loadDomain = (): LinkDomain => { try { return localStorage.getItem(DOMAIN_KEY) === 'custom' ? 'custom' : 'tapmylink' } catch { return 'tapmylink' } }
+void SF_BASE
 export const slugify = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
 /** Code unique : base, puis base2, base3… si déjà pris. */
 export function makeCode(base: string, taken: Set<string>): string {
@@ -718,16 +722,34 @@ function PageEditor({ theme, value: edit, setEdit, BASE, scopeFolder, onSave }: 
 
 // ── Réglages ─────────────────────────────────────────────────────────────────
 function SettingsTab({ theme, domain, setDomain }: { theme: Theme; domain: LinkDomain; setDomain: (d: LinkDomain) => void }) {
+  const [custom, setCustom] = useState(loadCustom)
+  const valid = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(cleanDomain(custom))
+  const saveCustom = () => {
+    if (!valid) { toast('Nom de domaine invalide (ex. liens.monagence.com).', 'bad'); return }
+    try { localStorage.setItem(CUSTOM_KEY, cleanDomain(custom)) } catch { /* ignore */ }
+    setDomain('custom'); toast('Domaine enregistré', 'ok')
+  }
+  const card = (on: boolean, children: ReactNode, click: () => void) => (
+    <button type="button" onClick={click} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 14, borderRadius: 8, textAlign: 'left', cursor: 'pointer', background: on ? 'rgba(255,255,255,0.05)' : '#111113', border: `1px solid ${on ? theme.accent : 'rgba(255,255,255,0.08)'}`, color: 'inherit' }}>{children}</button>
+  )
   return (
     <Panel theme={theme}>
       <PanelHead title="Domaine des liens" sub="L’adresse utilisée pour les pages et les liens de compte." />
-      <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(260px,100%),1fr))', gap: 12 }}>
-        {([['scaleflow', 'scaleflow.company/l/…', 'Fonctionne tout de suite.'], ['tapmylink', 'tapmylink.fr/…', 'À activer une fois le domaine validé dans Vercel (Settings → Domains).']] as [LinkDomain, string, string][]).map(([k, l, d]) => (
-          <button key={k} type="button" onClick={() => setDomain(k)} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 14, borderRadius: 8, textAlign: 'left', cursor: 'pointer', background: domain === k ? 'rgba(255,255,255,0.05)' : '#111113', border: `1px solid ${domain === k ? theme.accent : 'rgba(255,255,255,0.08)'}`, color: 'inherit' }}>
-            <span data-no-tr style={{ fontFamily: MONO, fontSize: 13, color: '#EDEDEF' }}>{l}</span>
-            <span style={{ fontSize: 12, color: '#8B8B94' }}>{d}</span>
-          </button>
-        ))}
+      <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(280px,100%),1fr))', gap: 12 }}>
+        {card(domain === 'tapmylink', <>
+          <span data-no-tr style={{ fontFamily: MONO, fontSize: 13, color: '#EDEDEF' }}>tapmylink.fr/…</span>
+          <span style={{ fontSize: 12, color: '#8B8B94' }}>Domaine par défaut, prêt à l’emploi.</span>
+        </>, () => setDomain('tapmylink'))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 14, borderRadius: 8, background: domain === 'custom' ? 'rgba(255,255,255,0.05)' : '#111113', border: `1px solid ${domain === 'custom' ? theme.accent : 'rgba(255,255,255,0.08)'}` }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Ton propre nom de domaine</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={custom} onChange={e => setCustom(e.target.value)} placeholder="liens.monagence.com" style={{ ...FIELD, fontFamily: MONO, fontSize: 12.5 }} />
+            <Btn theme={theme} sm tone="primary" label="Utiliser" onClick={saveCustom} />
+          </div>
+          <span style={{ fontSize: 12, color: '#8B8B94', lineHeight: 1.55 }}>
+            Chez ton fournisseur de domaine, ajoute un enregistrement <b style={{ color: '#EDEDEF', fontWeight: 600 }}>CNAME</b> vers <span data-no-tr style={{ fontFamily: MONO, color: '#EDEDEF' }}>cname.vercel-dns.com</span>, puis contacte le support ScaleFlow pour l’activer.
+          </span>
+        </div>
       </div>
     </Panel>
   )
