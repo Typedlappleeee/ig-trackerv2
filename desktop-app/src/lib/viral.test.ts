@@ -40,3 +40,16 @@ describe('veille des Reels — fiche', () => {
     expect(engagement({ views: 0, likes: 3, comments: 0 })).toBe(0)
   })
 })
+
+describe('veille des Reels — filtre pays', () => {
+  it('FR / US / tous', () => {
+    const now = Date.parse('2026-10-12T12:00:00Z')
+    const r = (watch_id: string, code: string) => ({ watch_id, code, username: watch_id, views: 1, likes: 0, comments: 0, taken_at: '2026-10-12T08:00:00Z', thumb: null, url: null, baseline: 1, score: 1 })
+    const watch = [{ id: 'a', username: 'a', niche: '', fetched_at: null, last_error: null, region: 'fr' as const }, { id: 'b', username: 'b', niche: '', fetched_at: null, last_error: null, region: 'us' as const }, { id: 'c', username: 'c', niche: '', fetched_at: null, last_error: null }]
+    const reels = [r('a', '1'), r('b', '2'), r('c', '3')]
+    const codes = (region: '' | 'fr' | 'us') => filterReels(reels, watch, { range: '7', niche: '', account: '', sort: 'views', region }, now).map(x => x.code).sort()
+    expect(codes('fr')).toEqual(['1', '3'])   // sans pays = FR
+    expect(codes('us')).toEqual(['2'])
+    expect(codes('')).toEqual(['1', '2', '3'])
+  })
+})
