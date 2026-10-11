@@ -105,29 +105,29 @@ body{font-family:${fontCss};color:${D.text};background:${bgCss};min-height:100vh
 .str{position:absolute;border-radius:50%;background:#fff;animation:tw 3.5s ease-in-out infinite}
 @keyframes tw{0%,100%{opacity:.15}50%{opacity:1}}
 .prt{position:absolute;bottom:-20px;border-radius:50%;background:rgba(255,255,255,.55);animation:up linear infinite}
-main{position:relative;z-index:1;width:100%;max-width:500px;margin:0 auto;padding:28px 18px 48px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
-.av{position:relative;width:118px;height:118px;border-radius:50%;padding:4px;background:${D.ring};box-shadow:0 10px 30px -10px rgba(0,0,0,.35)}
+main{position:relative;z-index:1;width:100%;max-width:540px;margin:0 auto;padding:28px 18px 48px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.av{position:relative;width:144px;height:144px;border-radius:50%;padding:4px;background:${D.ring};box-shadow:0 10px 30px -10px rgba(0,0,0,.35)}
 .av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;background:#ddd}
-.av .on{position:absolute;right:6px;bottom:8px;width:20px;height:20px;border-radius:50%;background:#22C55E;border:3px solid #fff}
+.av .on{position:absolute;right:9px;bottom:11px;width:24px;height:24px;border-radius:50%;background:#22C55E;border:3px solid #fff}
 .glw{position:absolute;inset:-18px;border-radius:50%;background:${D.ring};filter:blur(24px);opacity:.6;z-index:-1;animation:tw 3s ease-in-out infinite}
-h1{display:flex;align-items:center;gap:8px;font-size:26px;font-weight:700;letter-spacing:-.01em;margin-top:6px;${ts}}
+h1{display:flex;align-items:center;gap:8px;font-size:28px;font-weight:700;letter-spacing:-.01em;margin-top:6px;${ts}}
 .vf{width:22px;height:22px;flex-shrink:0}
 .bio{font-size:15px;font-weight:500;opacity:.95;white-space:pre-line;${ts}}
 .list{width:100%;display:flex;flex-direction:column;gap:12px;margin-top:14px}
 a{-webkit-tap-highlight-color:transparent;text-decoration:none}
-.card{position:relative;display:block;width:100%;aspect-ratio:3/1;overflow:hidden;box-shadow:${D.btn.shadow ? '0 18px 40px -16px rgba(0,0,0,.45)' : 'none'};transition:transform .15s}
+.card{position:relative;display:block;width:100%;aspect-ratio:2.4/1;overflow:hidden;box-shadow:${D.btn.shadow ? '0 18px 40px -16px rgba(0,0,0,.45)' : 'none'};transition:transform .15s}
 .card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .card .cg{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0) 55%)}
-.card .ct{position:absolute;left:0;right:0;bottom:16px;font-size:18px;font-weight:800;color:#fff;letter-spacing:.01em;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+.card .ct{position:absolute;left:0;right:0;bottom:18px;font-size:21px;font-weight:800;color:#fff;letter-spacing:.01em;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.5)}
 .card .cl{position:absolute;top:12px;right:14px;display:flex}
-.pill{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:10px 14px;font-size:16px;font-weight:700;letter-spacing:.01em;text-transform:uppercase;box-shadow:${D.btn.shadow ? '0 14px 30px -14px rgba(0,0,0,.45)' : 'none'};transition:transform .15s}
-.pill .pt{flex:1;text-align:center}.ic-sp{width:44px;flex-shrink:0}
-.ic{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;flex-shrink:0;background:#0f1a24}
+.pill{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:76px;padding:12px 16px;font-size:18px;font-weight:700;letter-spacing:.01em;text-transform:uppercase;box-shadow:${D.btn.shadow ? '0 14px 30px -14px rgba(0,0,0,.45)' : 'none'};transition:transform .15s}
+.pill .pt{flex:1;text-align:center}.ic-sp{width:50px;flex-shrink:0}
+.ic{display:flex;align-items:center;justify-content:center;width:50px;height:50px;border-radius:50%;flex-shrink:0;background:#0f1a24}
 .ic-t{font-size:10px;font-weight:800;color:#fff;letter-spacing:.02em}
 .card:active,.pill:active{transform:scale(.98)}@media (hover:hover){.card:hover,.pill:hover{transform:translateY(-2px)}}
 /* Animations des boutons */
 .an-pulse{animation:apul 1.8s ease-in-out infinite}@keyframes apul{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
-.an-shake{animation:ashk 3s ease-in-out infinite}@keyframes ashk{0%,88%,100%{transform:rotate(0)}90%{transform:rotate(-2deg)}93%{transform:rotate(2deg)}96%{transform:rotate(-1.5deg)}}
+.an-shake{animation:ashk 1.4s ease-in-out infinite}@keyframes ashk{0%,70%,100%{transform:rotate(0)}74%{transform:rotate(-3deg)}80%{transform:rotate(3deg)}86%{transform:rotate(-2.5deg)}92%{transform:rotate(2deg)}}
 .an-bounce{animation:abnc 2.2s ease-in-out infinite}@keyframes abnc{0%,70%,100%{transform:translateY(0)}80%{transform:translateY(-6px)}90%{transform:translateY(0)}}
 .an-glow{animation:aglw 2s ease-in-out infinite}@keyframes aglw{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}50%{box-shadow:0 0 22px 4px rgba(255,120,200,.55)}}
 .an-shine{overflow:hidden}.an-shine::after{content:'';position:absolute;top:0;bottom:0;width:40%;left:-60%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);animation:ashn 2.6s ease-in-out infinite}@keyframes ashn{0%{left:-60%}60%,100%{left:130%}}
