@@ -1,7 +1,8 @@
 // Veille des Reels viraux : relève les derniers Reels des comptes surveillés
 // (HikerAPI, repli RapidAPI via ig-provider) et calcule le score « au-dessus de
 // la normale » = vues / médiane des vues du compte.
-// Déployée automatiquement par .github/workflows/deploy-functions.yml (push sur main).
+// Déployée automatiquement par .github/workflows/deploy-functions.yml (push sur main,
+// secret GitHub SUPABASE_ACCESS_TOKEN requis).
 import { igReels } from './ig-provider.ts'
 import { parseReels } from './ig-rapidapi.ts'
 
