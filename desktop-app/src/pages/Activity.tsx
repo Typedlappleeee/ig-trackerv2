@@ -6,7 +6,7 @@ import { Btn, Chip, Icon, Panel, PageHead, Kpi, Empty, Modal, SkeletonRows, Segm
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { queryTaskResults } from '@/lib/geelark'
-import { counts, runState, type HistoryEntry } from '@/lib/runHistory'
+import { counts, runState, relaunchFromDetails, setRelaunch, type HistoryEntry } from '@/lib/runHistory'
 import { recoverLast24h } from '@/lib/recoverHistory'
 
 // ── Un « run » unifié (post_runs directs + scheduled_posts exécutés) ────────────
@@ -64,8 +64,8 @@ function runCost(type: string, total: number): number {
 
 type Filter = 'all' | 'ok' | 'ko'
 
-export default function Activity({ theme, infra, user, org }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState
+export default function Activity({ theme, infra, user, org, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
 }) {
   const { currentOrg } = org
   const [runs, setRuns] = useState<RunItem[]>([])
@@ -88,6 +88,10 @@ export default function Activity({ theme, infra, user, org }: {
       toast(error ? `Échec : ${error.message}` : 'Post remis en file — le serveur relancera les comptes échoués.', error ? 'bad' : 'ok')
       if (!error) load()
     } else {
+      // Run lancé depuis l'app : on rouvre le bon composer avec SEULEMENT les comptes échoués.
+      const raw = rawRef.current.find(x => 'run-' + x.id === r.id)
+      const rl = raw ? relaunchFromDetails(raw.details) : null
+      if (rl && onNavigate) { setRelaunch(rl); onNavigate('publish'); return }
       toast('Ce run a été lancé depuis ton PC — relance-le depuis Publication (les runs serveur, eux, sont relançables ici).', 'info', 7000)
     }
   }

@@ -16,6 +16,32 @@ export interface HistoryEntry {
   geelark_id?: string
   taskId?: string
   recovered?: boolean      // reconstitué depuis GeeLark (récupération 24 h)
+  phone_id?: string        // ligne `phones` (relance des échecs)
+  media_id?: string        // vidéo / image de la banque utilisée
+  kind?: RelaunchKind      // composer qui a lancé le run (relance des échecs)
+}
+
+// ── Relance des échecs : Activité → composer pré-rempli ──────────────────────
+export type RelaunchKind = 'reels' | 'tiktok' | 'story'
+export interface Relaunch { kind: RelaunchKind; phoneIds: string[]; mediaIds: string[] }
+const RELAUNCH_KEY = 'sf-relaunch'
+export function setRelaunch(r: Relaunch): void { try { sessionStorage.setItem(RELAUNCH_KEY, JSON.stringify(r)) } catch { /* ignore */ } }
+export function peekRelaunch(): Relaunch | null {
+  try { const v = sessionStorage.getItem(RELAUNCH_KEY); return v ? JSON.parse(v) as Relaunch : null } catch { return null }
+}
+/** Lit ET efface la demande de relance (une seule utilisation). */
+export function takeRelaunch(kind?: RelaunchKind): Relaunch | null {
+  const r = peekRelaunch()
+  if (!r || (kind && r.kind !== kind)) return null
+  try { sessionStorage.removeItem(RELAUNCH_KEY) } catch { /* ignore */ }
+  return r
+}
+/** Demande de relance à partir des comptes ÉCHOUÉS d'un run (null si rien de relançable). */
+export function relaunchFromDetails(details: HistoryEntry[]): Relaunch | null {
+  const failed = details.filter(d => !d.ok && !d.pending && d.phone_id)
+  const kind = details.find(d => d.kind)?.kind
+  if (!kind || failed.length === 0) return null
+  return { kind, phoneIds: [...new Set(failed.map(d => d.phone_id!))], mediaIds: [...new Set(failed.map(d => d.media_id).filter((x): x is string => !!x))] }
 }
 
 export interface RunHistory {
@@ -37,14 +63,18 @@ export async function startRunHistory(opts: {
   userId: string
   orgId: string | null
   type: string
-  accounts: { key: string; name: string; geelarkId?: string | null }[]
+  accounts: { key: string; name: string; geelarkId?: string | null; phoneId?: string; mediaId?: string }[]
+  kind?: RelaunchKind
 }): Promise<RunHistory> {
   const entries = new Map<string, HistoryEntry>()
   // Un téléphone peut porter plusieurs entrées (cross-posting : une par plateforme,
   // jouées l'une après l'autre) → la tâche va à la 1re entrée encore sans taskId.
   const byPhone = new Map<string, string[]>()
   for (const a of opts.accounts) {
-    entries.set(a.key, { name: a.name, ok: false, pending: true, ...(a.geelarkId ? { geelark_id: a.geelarkId } : {}) })
+    entries.set(a.key, {
+      name: a.name, ok: false, pending: true, ...(a.geelarkId ? { geelark_id: a.geelarkId } : {}),
+      ...(a.phoneId ? { phone_id: a.phoneId } : {}), ...(a.mediaId ? { media_id: a.mediaId } : {}), ...(opts.kind ? { kind: opts.kind } : {}),
+    })
     if (a.geelarkId) byPhone.set(a.geelarkId, [...(byPhone.get(a.geelarkId) ?? []), a.key])
   }
   const total = opts.accounts.length

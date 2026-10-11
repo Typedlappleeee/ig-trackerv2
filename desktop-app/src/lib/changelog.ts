@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-11',
+    date: '2026-10-11',
+    title: { fr: 'Relancer les échecs + calendrier', en: 'Retry failures + calendar' },
+    items: {
+      fr: [
+        'Activité : « Relancer » rouvre la publication avec seulement les comptes échoués et les mêmes vidéos, déjà sélectionnés.',
+        'Programmé : nouvelle vue Calendrier (semaine / mois). Glisse un post en attente sur un autre jour pour le décaler.',
+        'Publier un Reel : bouton « Miniature » bien visible sur chaque vidéo, et choix des miniatures possible à l’étape Lancement.',
+      ],
+      en: [
+        'Activity: “Retry” reopens posting with only the failed accounts and the same videos, already selected.',
+        'Scheduled: new Calendar view (week / month). Drag a pending post onto another day to move it.',
+        'Post a Reel: clear “Thumbnail” button on each video, and thumbnails can be picked at the Launch step.',
+      ],
+    },
+  },
+  {
     id: '2026-10-10c',
     date: '2026-10-10',
     title: { fr: 'Publication TikTok', en: 'TikTok posting' },

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { startRunHistory } from '@/lib/runHistory'
+import { startRunHistory, peekRelaunch, takeRelaunch } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, FIELD, FIELD_SM, Toggle, Segmented, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
+import { Icon, Btn, Chip, StatusDot, Panel, PanelHead, PageHead, FIELD, FIELD_SM, Toggle, Segmented, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -44,11 +44,14 @@ export default function StoryComposer({ theme, user, org, onBack }: {
   const [phones, setPhones] = useState<Phone[]>([])
   const [images, setImages] = useState<Media[]>([])
   const [loading, setLoading] = useState(true)
-  const [sel, setSel] = useState<Set<string>>(new Set())
+  // Relance des échecs : comptes échoués et mêmes images pré-sélectionnés.
+  const [relaunch] = useState(() => { const r = peekRelaunch(); return r?.kind === 'story' ? r : null })
+  useEffect(() => { if (relaunch) takeRelaunch('story') }, [relaunch])
+  const [sel, setSel] = useState<Set<string>>(() => new Set(relaunch?.phoneIds ?? []))
   const [group, setGroup] = useState('Tous')
   const [rotationConfigured, setRotationConfigured] = useState(false)
   const [rotationOn, setRotationOn] = useState(false)   // OFF par défaut → tout lancer en parallèle
-  const [imageIds, setImageIds] = useState<string[]>([])       // pool d'images
+  const [imageIds, setImageIds] = useState<string[]>(() => relaunch?.mediaIds ?? [])       // pool d'images
   const [imgMode, setImgMode] = useState<'seq' | 'random'>('seq')
   const [stickerTexts, setStickerTexts] = useState<string[]>(['Voir plus'])  // pool de textes sticker
   const [stMode, setStMode] = useState<'seq' | 'random'>('seq')
@@ -199,7 +202,8 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     // Historique écrit DÈS MAINTENANT (avant : seulement à la fin → rien si l'onglet se fermait).
     const hist = await startRunHistory({
       userId: user.id, orgId: currentOrg?.id ?? null, type: 'story',
-      accounts: jobs.map(j => ({ key: j.p.id, name: phoneLabel(j.p), geelarkId: j.p.geelark_id })),
+      accounts: jobs.map(j => ({ key: j.p.id, name: phoneLabel(j.p), geelarkId: j.p.geelark_id, phoneId: j.p.id, mediaId: j.img.id })),
+      kind: 'story',
     })
     const concurrency = rot ? 1 : jobs.length
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : `⚡ ${jobs.length} compte(s) en parallèle.`)
@@ -259,6 +263,12 @@ export default function StoryComposer({ theme, user, org, onBack }: {
         sub="Une image et un sticker lien propre à chaque compte. 1 crédit par compte."
         actions={<>
           <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
+      {relaunch && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.08)', boxShadow: `inset 2px 0 0 ${theme.accent}`, fontSize: 13, color: '#A1A1AA' }}>
+          <Icon d="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" size={14} />
+          <span>Relance de <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{relaunch.phoneIds.length}</b> compte(s) échoué(s) — comptes et images déjà sélectionnés.</span>
+        </div>
+      )}
           <Btn theme={theme} tone="ghost" disabled={!ready} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
             label="Programmer" onClick={() => setSchedOpen(true)} />
           <Btn theme={theme} tone="primary" disabled={!ready} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z"

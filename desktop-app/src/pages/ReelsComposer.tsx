@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { startRunHistory } from '@/lib/runHistory'
+import { startRunHistory, peekRelaunch, takeRelaunch } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon, Modal, toast, confirmDialog, promptDialog, FIELD, FIELD_SM, TEXTAREA, Toggle, Segmented, MONO, useNarrow, Skeleton, SkeletonRows, Empty } from '@/lib/ui'
@@ -63,10 +63,13 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
   const [phones, setPhones] = useState<Phone[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
-  const [sel, setSel] = useState<Set<string>>(new Set())
+  // Relance des échecs : comptes échoués et mêmes vidéos pré-sélectionnés.
+  const [relaunch] = useState(() => { const r = peekRelaunch(); return r?.kind === (tiktok ? 'tiktok' : 'reels') ? r : null })
+  useEffect(() => { if (relaunch) takeRelaunch(relaunch.kind) }, [relaunch])
+  const [sel, setSel] = useState<Set<string>>(() => new Set(relaunch?.phoneIds ?? []))
   const [group, setGroup] = useState('Tous')
   const [healthy, setHealthy] = useState(false)
-  const [vidSel, setVidSel] = useState<Set<string>>(new Set())
+  const [vidSel, setVidSel] = useState<Set<string>>(() => new Set(relaunch?.mediaIds ?? []))
   const [captions, setCaptions] = useState<string[]>([''])   // pool de légendes
   const [capMode, setCapMode] = useState<'seq' | 'random'>('seq')
   const [balance, setBalance] = useState<number | null>(null)
@@ -295,7 +298,8 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
     // Historique écrit DÈS MAINTENANT (avant : seulement à la fin → rien si l'onglet se fermait).
     const hist = await startRunHistory({
       userId: user.id, orgId: currentOrg?.id ?? null, type: tiktok ? 'tiktok' : 'mass_posting',
-      accounts: jobs.map(j => ({ key: j.p.id, name: phoneLabel(j.p), geelarkId: j.p.geelark_id })),
+      accounts: jobs.map(j => ({ key: j.p.id, name: phoneLabel(j.p), geelarkId: j.p.geelark_id, phoneId: j.p.id, mediaId: j.v.id })),
+      kind: tiktok ? 'tiktok' : 'reels',
     })
     const concurrency = rot ? 1 : (simulPhones === 'all' ? jobs.length : Math.max(1, Number(simulPhones)))
     push(rot ? '🔁 Envoi en série (proxy rotatif).' : concurrency >= jobs.length ? `⚡ ${jobs.length} téléphone(s) en parallèle.` : `⚡ Par lots de ${concurrency} téléphone(s).`)
@@ -415,6 +419,12 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
         sub={`${platLabel} · ${nSel} compte${nSel > 1 ? 's' : ''} · ${nVid} vidéo${nVid > 1 ? 's' : ''}`}
         actions={<>
           <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
+      {relaunch && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.08)', boxShadow: `inset 2px 0 0 ${theme.accent}`, fontSize: 13, color: '#A1A1AA' }}>
+          <Icon d="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" size={14} />
+          <span>Relance de <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{relaunch.phoneIds.length}</b> compte(s) échoué(s) — comptes et vidéos déjà sélectionnés.</span>
+        </div>
+      )}
         </>}
       />
 
