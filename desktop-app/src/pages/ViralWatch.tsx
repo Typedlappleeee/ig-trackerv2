@@ -15,7 +15,9 @@ import type { OrgState } from '@/lib/data'
 import { fmtNumber } from '@/lib/data'
 
 type Scope = 'public' | 'private'
-interface Watch { id: string; username: string; niche: string; fetched_at: string | null; last_error: string | null; scope?: Scope }
+type Region = 'fr' | 'us'
+const REGIONS: { v: Region; l: string }[] = [{ v: 'fr', l: '🇫🇷 FR' }, { v: 'us', l: '🇺🇸 US' }]
+interface Watch { id: string; username: string; niche: string; fetched_at: string | null; last_error: string | null; scope?: Scope; region?: Region }
 interface Reel { watch_id: string; code: string; username: string; views: number; likes: number; comments: number; taken_at: string | null; thumb: string | null; url: string | null; baseline: number; score: number }
 interface Media { videoUrl: string | null; caption: string; duration: number; views: number; likes: number; comments: number; thumb: string | null }
 type Range = '1' | '7' | '30'
@@ -38,12 +40,14 @@ const I = {
   pulse: 'M22 12h-4l-3 9L9 3l-3 9H2',
 }
 
-/** Pur : filtre période / niche / compte puis tri. */
-export function filterReels(reels: Reel[], watch: Watch[], o: { range: Range; niche: string; account: string; sort: Sort }, now = Date.now()): Reel[] {
+/** Pur : filtre période / pays / niche / compte puis tri. */
+export function filterReels(reels: Reel[], watch: Watch[], o: { range: Range; niche: string; account: string; sort: Sort; region?: Region | '' }, now = Date.now()): Reel[] {
   const nicheOf = new Map(watch.map(w => [w.id, w.niche]))
+  const regionOf = new Map(watch.map(w => [w.id, w.region ?? 'fr']))
   const t = (r: Reel) => r.taken_at ? Date.parse(r.taken_at) : 0
   return reels
     .filter(r => r.taken_at && now - Date.parse(r.taken_at) <= Number(o.range) * 86400000)
+    .filter(r => !o.region || regionOf.get(r.watch_id) === o.region)
     .filter(r => !o.niche || nicheOf.get(r.watch_id) === o.niche)
     .filter(r => !o.account || r.username === o.account)
     .sort((a, b) => o.sort === 'score' ? b.score - a.score || b.views - a.views
@@ -246,14 +250,15 @@ function ReelDetail({ theme, list, index, setIndex, onClose }: { theme: Theme; l
 // ── Gestion des comptes suivis (sélection publique ou comptes perso) ──────────
 function WatchPanel({ theme, title, sub, list, onAdd, onRemove, limit }: {
   theme: Theme; title: string; sub: string; list: Watch[]; limit?: number
-  onAdd: (names: string[], niche: string) => Promise<boolean>; onRemove: (w: Watch) => void
+  onAdd: (names: string[], niche: string, region: Region) => Promise<boolean>; onRemove: (w: Watch) => void
 }) {
   const [adding, setAdding] = useState('')
   const [niche, setNiche] = useState('Modèles FR')
+  const [region, setRegion] = useState<Region>('fr')
   const errors = list.filter(w => w.last_error)
   async function add() {
     const names = [...new Set(adding.split(/[\s,;]+/).map(s => s.trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '').toLowerCase()).filter(s => /^[a-z0-9._]{1,30}$/.test(s)))]
-    if (await onAdd(names, niche.trim())) setAdding('')
+    if (await onAdd(names, niche.trim(), region)) setAdding('')
   }
   return (
     <Panel theme={theme} style={{ marginBottom: 12 }}>
@@ -262,6 +267,7 @@ function WatchPanel({ theme, title, sub, list, onAdd, onRemove, limit }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <textarea value={adding} onChange={e => setAdding(e.target.value)} rows={3} placeholder={'Colle des @ ou liens Instagram (un par ligne)\n@modele1\nhttps://instagram.com/modele2'} style={TEXTAREA} />
           <div style={{ display: 'flex', gap: 8 }}>
+            <Segmented value={region} onChange={setRegion} options={REGIONS} />
             <input value={niche} onChange={e => setNiche(e.target.value)} placeholder="Niche (ex. Modèles FR)" style={FIELD} />
             <Btn theme={theme} label="Ajouter" icon="M12 5v14|M5 12h14" onClick={() => void add()} />
           </div>
@@ -271,6 +277,7 @@ function WatchPanel({ theme, title, sub, list, onAdd, onRemove, limit }: {
           {list.map(w => (
             <span key={w.id} title={w.last_error ?? (w.fetched_at ? `Relevé le ${new Date(w.fetched_at).toLocaleString('fr-FR')}` : 'Pas encore relevé')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 4px 0 10px', borderRadius: 99, background: '#161618', border: `1px solid ${w.last_error ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.09)'}`, fontSize: 12, color: '#EDEDEF' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#8B8B94' }}>{(w.region ?? 'fr').toUpperCase()}</span>
               <span data-no-tr>@{w.username}</span>
               <button type="button" onClick={() => onRemove(w)} aria-label="Retirer" style={{ display: 'flex', border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer', padding: 2 }}><Icon d="M18 6L6 18|M6 6l12 12" size={11} /></button>
             </span>
@@ -288,6 +295,8 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
   const [noScope, setNoScope] = useState(false)   // SQL 20261012c pas encore passé
+  const [noRegion, setNoRegion] = useState(false) // SQL 20261012d pas encore passé
+  const [fRegion, setFRegion] = useState<Region | ''>('')
   const [busy, setBusy] = useState(false)
   const [tab, setTab] = useState<'public' | 'mine'>('public')
   const [userView, setUserView] = useState(false)
@@ -300,10 +309,14 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
 
   const load = useCallback(async () => {
     setLoading(true)
-    let w: { data: unknown[] | null; error: { message: string } | null } = await supabase.from('viral_watch').select('id,username,niche,fetched_at,last_error,scope').order('username')
+    // Colonnes ajoutées par des SQL successifs : on retombe proprement si l'une manque.
+    const base = 'id,username,niche,fetched_at,last_error'
+    let w: { data: unknown[] | null; error: { message: string } | null } = await supabase.from('viral_watch').select(`${base},scope,region`).order('username')
+    const regionMissing = !!w.error && /region/i.test(w.error.message)
+    if (regionMissing) w = await supabase.from('viral_watch').select(`${base},scope`).order('username')
     const scopeMissing = !!w.error && /scope/i.test(w.error.message)
-    if (scopeMissing) w = await supabase.from('viral_watch').select('id,username,niche,fetched_at,last_error').order('username')
-    setNoScope(scopeMissing)
+    if (scopeMissing) w = await supabase.from('viral_watch').select(base).order('username')
+    setNoScope(scopeMissing); setNoRegion(regionMissing || scopeMissing)
     setMissing(!!w.error && /relation|does not exist|schema cache/i.test(w.error.message))
     const list = ((w.data ?? []) as Watch[]).map(x => ({ ...x, scope: x.scope ?? 'public' }))
     setWatch(list)
@@ -319,15 +332,15 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
   const tabWatch = useMemo(() => watch.filter(w => w.scope === scope), [watch, scope])
   const tabReels = useMemo(() => { const ids = new Set(tabWatch.map(w => w.id)); return reels.filter(r => ids.has(r.watch_id)) }, [reels, tabWatch])
   const niches = [...new Set(tabWatch.map(w => w.niche).filter(Boolean))]
-  const shown = useMemo(() => filterReels(tabReels, tabWatch, { range, niche: fNiche, account: fAccount, sort }).slice(0, 120), [tabReels, tabWatch, range, fNiche, fAccount, sort])
+  const shown = useMemo(() => filterReels(tabReels, tabWatch, { range, region: fRegion, niche: fNiche, account: fAccount, sort }).slice(0, 120), [tabReels, tabWatch, range, fRegion, fNiche, fAccount, sort])
   const canManage = tab === 'public' ? admin : !noScope
   useEffect(() => { setFNiche(''); setFAccount(''); setOpen(null) }, [tab])
 
-  async function addAccounts(names: string[], niche: string): Promise<boolean> {
+  async function addAccounts(names: string[], niche: string, region: Region): Promise<boolean> {
     const fresh = names.filter(n => !tabWatch.some(w => w.username === n))
     if (!fresh.length) { toast('Aucun nouveau compte valide.', 'info'); return false }
     if (scope === 'private' && tabWatch.length + fresh.length > MAX_PRIVATE) { toast(`Maximum ${MAX_PRIVATE} comptes suivis.`, 'bad'); return false }
-    const rows = fresh.map(username => ({ username, niche, user_id: user.id, org_id: scope === 'private' ? currentOrg?.id ?? null : null, ...(noScope ? {} : { scope }) }))
+    const rows = fresh.map(username => ({ username, niche, user_id: user.id, org_id: scope === 'private' ? currentOrg?.id ?? null : null, ...(noScope ? {} : { scope }), ...(noRegion ? {} : { region }) }))
     const { error } = await supabase.from('viral_watch').insert(rows)
     if (error) { toast(`Échec : ${error.message}`, 'bad'); return false }
     toast(`${fresh.length} compte(s) ajouté(s) — clique « Actualiser » pour relever leurs Reels.`, 'ok'); void load(); return true
@@ -348,7 +361,7 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
     } catch { toast('Relevé impossible (réseau).', 'bad') } finally { setBusy(false); void load() }
   }
 
-  const periodReels = useMemo(() => filterReels(tabReels, tabWatch, { range, niche: fNiche, account: fAccount, sort: 'views' }), [tabReels, tabWatch, range, fNiche, fAccount])
+  const periodReels = useMemo(() => filterReels(tabReels, tabWatch, { range, region: fRegion, niche: fNiche, account: fAccount, sort: 'views' }), [tabReels, tabWatch, range, fRegion, fNiche, fAccount])
   const totalViews = periodReels.reduce((a, r) => a + r.views, 0)
   const best = periodReels.reduce((a, r) => Math.max(a, r.score), 0)
   const avgEng = periodReels.length ? Math.round(periodReels.reduce((a, r) => a + engagement(r), 0) / periodReels.length * 10) / 10 : 0
@@ -371,6 +384,11 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
       {isAdmin && userView && (
         <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(139,124,246,0.1)', border: '1px solid rgba(139,124,246,0.3)', fontSize: 12.5, color: '#C4BBFA' }}>
           Aperçu : c’est ce que voient les utilisateurs (la page reste réservée à l’admin pour l’instant).
+        </div>
+      )}
+      {isAdmin && noRegion && !noScope && !userView && (
+        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 12.5, color: '#FCD34D' }}>
+          Pour activer le filtre FR / US, colle supabase/migrations/20261012d_viral_region.sql dans Supabase → SQL Editor → Run.
         </div>
       )}
       {isAdmin && noScope && !userView && (
@@ -400,6 +418,7 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        {!noRegion && <Segmented value={fRegion || 'all'} onChange={v => setFRegion(v === 'all' ? '' : v)} options={[{ v: 'all' as const, l: 'Tous' }, ...REGIONS]} />}
         <Segmented value={range} onChange={setRange} options={[{ v: '1', l: '24 h' }, { v: '7', l: '7 jours' }, { v: '30', l: '30 jours' }]} />
         <Segmented value={sort} onChange={setSort} options={[{ v: 'views', l: 'Plus de vues' }, { v: 'score', l: 'Au-dessus de la normale' }, { v: 'likes', l: 'Plus de likes' }, { v: 'recent', l: 'Plus récents' }]} />
         {niches.length > 1 && <select value={fNiche} onChange={e => setFNiche(e.target.value)} style={{ ...FIELD, width: 'auto', height: 30 }}><option value="">Toutes les niches</option>{niches.map(n => <option key={n} value={n}>{n}</option>)}</select>}

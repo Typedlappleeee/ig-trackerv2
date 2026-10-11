@@ -2148,6 +2148,7 @@ export const EN: Dict = {
     "Plus récents": "Most recent",
     "Ajoute tes comptes (ou ceux de tes modèles) pour voir quelles vidéos marchent le mieux.": "Add your accounts (or your models') to see which videos perform best.",
     "Les Reels qui explosent en ce moment, sélectionnés par ScaleFlow — classés par vues.": "Reels blowing up right now, curated by ScaleFlow — ranked by views.",
+    "Pour activer le filtre FR / US, colle supabase/migrations/20261012d_viral_region.sql dans Supabase → SQL Editor → Run.": "To enable the FR / US filter, paste supabase/migrations/20261012d_viral_region.sql into Supabase → SQL Editor → Run.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
