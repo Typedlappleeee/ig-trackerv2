@@ -5,8 +5,9 @@
 // secret GitHub SUPABASE_ACCESS_TOKEN requis).
 import { igReels } from './ig-provider.ts'
 import { parseReels } from './ig-rapidapi.ts'
+import { hikerGet } from './ig-hikerapi.ts'
 
-export { scoreReels, type ScoredReel } from './viral-score.ts'
+export { scoreReels, isIgCdn, type ScoredReel } from './viral-score.ts'
 import { scoreReels } from './viral-score.ts'
 
 // deno-lint-ignore no-explicit-any
@@ -29,12 +30,14 @@ export async function refreshWatch(db: any, w: { id: string; username: string })
   }
 }
 
-/** Relève les comptes pas relevés depuis 20 h (ou ceux d'un utilisateur, sur demande), dans le budget. */
+/** Relève les comptes pas relevés depuis `minAgeMs` (20 h par défaut), dans le budget.
+ *  `userId` : seulement les comptes privés de cet utilisateur (bouton « Actualiser » côté client). */
 // deno-lint-ignore no-explicit-any
-export async function runViralWatch(db: any, deadline: number, userId: string | null = null, force = false): Promise<{ accounts: number; reels: number }> {
-  let q = db.from('viral_watch').select('id, username').order('fetched_at', { ascending: true, nullsFirst: true }).limit(userId || force ? 300 : 40)
-  if (userId) q = q.eq('user_id', userId)
-  if (!force) q = q.or(`fetched_at.is.null,fetched_at.lt.${new Date(Date.now() - 20 * 3600_000).toISOString()}`)
+export async function runViralWatch(db: any, deadline: number, o: { userId?: string | null; minAgeMs?: number; max?: number } = {}): Promise<{ accounts: number; reels: number }> {
+  const minAge = o.minAgeMs ?? 20 * 3600_000
+  let q = db.from('viral_watch').select('id, username').order('fetched_at', { ascending: true, nullsFirst: true }).limit(o.max ?? 40)
+  if (o.userId) q = q.eq('user_id', o.userId).eq('scope', 'private')
+  if (minAge > 0) q = q.or(`fetched_at.is.null,fetched_at.lt.${new Date(Date.now() - minAge).toISOString()}`)
   const { data } = await q
   let accounts = 0, reels = 0
   for (const w of (data ?? []) as { id: string; username: string }[]) {
@@ -43,4 +46,25 @@ export async function runViralWatch(db: any, deadline: number, userId: string | 
     accounts++; reels += r.n
   }
   return { accounts, reels }
+}
+
+// Détail d'un Reel à la demande (fiche) : URL vidéo fraîche (les liens CDN expirent),
+// légende et stats à jour. HikerAPI /v1/media/by/code, repli /v1/media/by/url.
+export interface ReelMedia { videoUrl: string | null; caption: string; duration: number; views: number; likes: number; comments: number; thumb: string | null }
+export async function reelMedia(code: string): Promise<ReelMedia | null> {
+  if (!/^[A-Za-z0-9_-]{5,40}$/.test(code)) return null
+  // deno-lint-ignore no-explicit-any
+  let m: any = await hikerGet('/v1/media/by/code', { code })
+  if (!m || typeof m !== 'object') m = await hikerGet('/v1/media/by/url', { url: `https://www.instagram.com/reel/${code}/` })
+  if (!m || typeof m !== 'object') return null
+  const n = (...v: unknown[]) => { for (const x of v) { const k = Number(x); if (Number.isFinite(k) && k > 0) return k } return 0 }
+  return {
+    videoUrl: m.video_url ?? m?.video_versions?.[0]?.url ?? null,
+    caption: String(m.caption_text ?? m?.caption?.text ?? ''),
+    duration: n(m.video_duration),
+    views: n(m.play_count, m.view_count, m.ig_play_count),
+    likes: n(m.like_count),
+    comments: n(m.comment_count),
+    thumb: m.thumbnail_url ?? m?.image_versions2?.candidates?.[0]?.url ?? null,
+  }
 }

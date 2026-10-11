@@ -9,3 +9,8 @@ export function scoreReels<T extends ReelLike>(reels: T[]): (T & { code: string;
   const median = v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : Math.round((v[v.length / 2 - 1] + v[v.length / 2]) / 2)) : 0
   return withCode.map(r => ({ ...r, baseline: median, score: median > 0 ? Math.round((r.views / median) * 100) / 100 : 0 }))
 }
+
+/** Seules les vidéos du CDN Instagram / Facebook passent par le proxy. */
+export function isIgCdn(u: string): boolean {
+  try { const h = new URL(u).hostname; return /^https:$/.test(new URL(u).protocol) && /(^|\.)(cdninstagram\.com|fbcdn\.net)$/.test(h) } catch { return false }
+}

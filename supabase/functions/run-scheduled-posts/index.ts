@@ -376,16 +376,32 @@ Deno.serve(async (req) => {
       })
     }
 
-    // ── Veille des Reels viraux : relevé immédiat de tous les comptes (super-admin seulement,
-    // les comptes de référence sont partagés et visibles par tous les utilisateurs) ──
+    // ── Veille des Reels viraux : relevé immédiat. Super-admin → tous les comptes
+    // (sélection ScaleFlow comprise) ; utilisateur → ses comptes privés, au plus 1×/15 min
+    // par compte et 30 comptes (coût HikerAPI maîtrisé). ──
     if (body?.viral === 'refresh' && filterUserId) {
       const { data: prof } = await db.from('profiles').select('email, is_super_admin').eq('id', filterUserId).maybeSingle()
-      if (!prof?.is_super_admin && prof?.email !== 'tintin.aunea@gmail.com') {
-        return new Response(JSON.stringify({ ok: false, error: 'admin only' }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
-      }
+      const admin = !!prof?.is_super_admin || prof?.email === 'tintin.aunea@gmail.com'
       const { runViralWatch } = await import('./viral.ts')
-      const r = await runViralWatch(db, Date.now() + 50_000, null, true)
+      const r = admin
+        ? await runViralWatch(db, Date.now() + 50_000, { minAgeMs: 0, max: 300 })
+        : await runViralWatch(db, Date.now() + 50_000, { userId: filterUserId, minAgeMs: 15 * 60_000, max: 30 })
       return new Response(JSON.stringify({ ok: true, ...r }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
+
+    // ── Veille Reels : fiche d'un Reel (vidéo fraîche + légende) et proxy vidéo
+    // (lecture / téléchargement : le CDN Instagram bloque le navigateur en CORS) ──
+    if (body?.viral === 'media' && filterUserId && typeof body.code === 'string') {
+      const { reelMedia } = await import('./viral.ts')
+      const m = await reelMedia(body.code)
+      return new Response(JSON.stringify(m ? { ok: true, ...m } : { ok: false, error: 'reel introuvable' }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
+    if (body?.viral === 'video' && filterUserId && typeof body.url === 'string') {
+      const { isIgCdn } = await import('./viral.ts')
+      if (!isIgCdn(body.url)) return new Response('forbidden', { status: 403, headers: CORS })
+      const r = await fetch(body.url, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.instagram.com/' } }).catch(() => null)
+      if (!r || !r.ok || !r.body) return new Response('', { status: r?.status ?? 502, headers: CORS })
+      return new Response(r.body, { headers: { ...CORS, 'Content-Type': r.headers.get('content-type') ?? 'video/mp4', ...(r.headers.get('content-length') ? { 'Content-Length': r.headers.get('content-length')! } : {}) } })
     }
 
     // ── Courbe des vues : vues des reels regroupées par DATE DE PUBLICATION ──
