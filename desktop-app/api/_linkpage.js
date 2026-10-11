@@ -28,6 +28,15 @@ const ICONS = {
   heart: '<span class="ic" style="background:#FF3B6B"><svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M12 21s-7.5-4.6-9.5-9.2C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.2 5.3 3.1 1.7-1.9 3.2-3.1 5.3-3.1 3.7 0 5.8 3.8 4.2 7.3C19.5 16.4 12 21 12 21z"/></svg></span>',
 }
 export const EFFECTS = ['none', 'aurora', 'hearts', 'stars', 'particles', 'glow']
+export const BTN_ANIMS = ['none', 'pulse', 'shine', 'shake', 'bounce', 'glow']
+/** URL de bouton propre : espaces retirés, https:// ajouté si oublié ; '' si invalide. */
+export function normalizeUrl(u) {
+  let s = String(u ?? '').trim().replace(/\s+/g, '')
+  if (!s) return ''
+  if (/^(javascript|data|vbscript):/i.test(s)) return ''
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s.replace(/^\/+/, '')
+  return /^https?:\/\/[^\s/]+\.[^\s]+/i.test(s) ? s : ''
+}
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const safeColor = c => /^#[0-9a-f]{3,8}$/i.test(String(c || '')) ? c : null
@@ -74,10 +83,12 @@ export function renderLinkPage({ title, bio, avatar, buttons, design, preview = 
     const bg = safeColor(b.bg) || D.btn.bg, fg = safeColor(b.fg) || D.btn.fg
     const href = preview ? '#' : esc(b.href)
     if (b.style === 'card' && safeImg(b.image)) {
-      return `<a class="card" href="${href}" rel="nofollow" style="border-radius:${D.btn.radius}px"><img src="${esc(b.image)}" alt=""><span class="cg"></span><span class="ct">${esc(b.label)}</span><span class="cl"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span></a>`
+      const an = BTN_ANIMS.includes(b.anim) && b.anim !== 'none' ? ` an-${b.anim}` : ''
+    return `<a class="card${an}" href="${href}" rel="nofollow" style="border-radius:${D.btn.radius}px"><img src="${esc(b.image)}" alt=""><span class="cg"></span><span class="ct">${esc(b.label)}</span><span class="cl"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span></a>`
     }
     const ic = ICONS[b.icon] || ''
-    return `<a class="pill${i === 0 ? ' first' : ''}" href="${href}" rel="nofollow" style="background:${bg};color:${fg};border-radius:${D.btn.radius}px">${ic}<span class="pt">${esc(b.label)}</span>${ic ? '<span class="ic-sp"></span>' : ''}</a>`
+    const an = BTN_ANIMS.includes(b.anim) && b.anim !== 'none' ? ` an-${b.anim}` : ''
+    return `<a class="pill${i === 0 ? ' first' : ''}${an}" href="${href}" rel="nofollow" style="background:${bg};color:${fg};border-radius:${D.btn.radius}px">${ic}<span class="pt">${esc(b.label)}</span>${ic ? '<span class="ic-sp"></span>' : ''}</a>`
   }).join('')
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title || 'Liens')}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=${fontQ}&display=swap" rel="stylesheet">
@@ -114,7 +125,13 @@ a{-webkit-tap-highlight-color:transparent;text-decoration:none}
 .ic{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;flex-shrink:0;background:#0f1a24}
 .ic-t{font-size:10px;font-weight:800;color:#fff;letter-spacing:.02em}
 .card:active,.pill:active{transform:scale(.98)}@media (hover:hover){.card:hover,.pill:hover{transform:translateY(-2px)}}
-@media (prefers-reduced-motion:reduce){.fx *{animation:none!important}}
+/* Animations des boutons */
+.an-pulse{animation:apul 1.8s ease-in-out infinite}@keyframes apul{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+.an-shake{animation:ashk 3s ease-in-out infinite}@keyframes ashk{0%,88%,100%{transform:rotate(0)}90%{transform:rotate(-2deg)}93%{transform:rotate(2deg)}96%{transform:rotate(-1.5deg)}}
+.an-bounce{animation:abnc 2.2s ease-in-out infinite}@keyframes abnc{0%,70%,100%{transform:translateY(0)}80%{transform:translateY(-6px)}90%{transform:translateY(0)}}
+.an-glow{animation:aglw 2s ease-in-out infinite}@keyframes aglw{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}50%{box-shadow:0 0 22px 4px rgba(255,120,200,.55)}}
+.an-shine{overflow:hidden}.an-shine::after{content:'';position:absolute;top:0;bottom:0;width:40%;left:-60%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);animation:ashn 2.6s ease-in-out infinite}@keyframes ashn{0%{left:-60%}60%,100%{left:130%}}
+@media (prefers-reduced-motion:reduce){.fx *,[class*=an-]{animation:none!important}}
 </style></head><body>
 ${bgImg ? `<div class="bgi"></div>` : ''}${D.bg.dim > 0 ? '<div class="dim"></div>' : ''}${fx}
 <main>

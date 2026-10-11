@@ -5,7 +5,7 @@
 // Env Vercel : SUPABASE_URL (ou VITE_SUPABASE_URL) + SUPABASE_SERVICE_ROLE_KEY.
 import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
-import { renderLinkPage, normalizeDesign } from './_linkpage.js'
+import { renderLinkPage, normalizeDesign, normalizeUrl } from './_linkpage.js'
 
 const BOT = /facebookexternalhit|facebot|instagram.*(preview|link)|twitterbot|slackbot|whatsapp|telegrambot|discordbot|linkedinbot|bot\b|crawler|spider|preview/i
 const IN_APP = /Instagram|FBAN|FBAV|BytedanceWebview|musical_ly|TikTok/i
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
 
     // Boutons de la page, avec les URL propres à CE compte (ex. son lien OF de suivi).
     const ov = (link && link.overrides && typeof link.overrides === 'object') ? link.overrides : {}
-    const buttons = (Array.isArray(pg?.buttons) ? pg.buttons : []).map((x, i) => safeUrl(ov[i]) ? { ...x, url: ov[i] } : x)
+    const buttons = (Array.isArray(pg?.buttons) ? pg.buttons : []).map((x, i) => ({ ...x, url: normalizeUrl(safeUrl(ov[i]) ? ov[i] : x?.url) }))
     const b = btn !== null && /^\d+$/.test(btn) ? Number(btn) : null
     const target = link?.destination ? safeUrl(link.destination) : b !== null ? safeUrl(buttons[b]?.url) : null
 

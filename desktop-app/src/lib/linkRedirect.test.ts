@@ -70,3 +70,19 @@ describe('liens suivis /l/<code>', () => {
     expect((await call('/api/l?p=../etc')).statusCode).toBe(404)
   })
 })
+
+import { normalizeUrl } from '../../api/_linkpage.js'
+describe('liens des boutons', () => {
+  it('URL sans https:// réparée, espaces retirés, schémas dangereux refusés', () => {
+    expect(normalizeUrl(' onlyfans.com/luna ')).toBe('https://onlyfans.com/luna')
+    expect(normalizeUrl('https://mym.fans/x')).toBe('https://mym.fans/x')
+    expect(normalizeUrl('javascript:alert(1)')).toBe('')
+    expect(normalizeUrl('')).toBe('')
+  })
+  it('page enregistrée avec un lien sans https:// : bouton affiché et redirection OK', async () => {
+    H.pages[0].buttons = [{ label: 'Mon OF', url: 'onlyfans.com/lea' }]
+    expect((await call('/api/l?p=lea')).body).toContain('Mon OF')
+    const r = await call('/api/l?p=lea&b=0')
+    expect(r.headers.Location).toBe('https://onlyfans.com/lea')
+  })
+})

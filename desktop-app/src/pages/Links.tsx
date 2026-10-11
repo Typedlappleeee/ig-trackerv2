@@ -8,7 +8,7 @@
 // Servi publiquement par api/l.js (/l/<code>, ou tapmylink.fr/<code>).
 // Tables : supabase/migrations/20261011_links.sql + 20261011b_links_v2.sql.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { renderLinkPage, normalizeDesign, GRADIENTS, EFFECTS, type LinkDesign } from '../../api/_linkpage.js'
+import { renderLinkPage, normalizeDesign, normalizeUrl, GRADIENTS, EFFECTS, type LinkDesign } from '../../api/_linkpage.js'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
@@ -19,7 +19,7 @@ import { IS_WEB } from '@/lib/platform'
 import { computeLinkStats, type Period } from '@/lib/linkStats'
 
 type PageTheme = 'dark' | 'light' | 'violet' | 'rose'
-interface PageButton { label: string; url: string; style?: 'pill' | 'card'; image?: string; icon?: string; bg?: string; fg?: string }
+interface PageButton { label: string; url: string; style?: 'pill' | 'card'; image?: string; icon?: string; bg?: string; fg?: string; anim?: string }
 interface LinkPage { id: string; slug: string; title: string; bio: string; avatar_url: string | null; buttons: PageButton[]; active: boolean; theme: PageTheme; design?: Partial<LinkDesign> | null }
 interface TLink { id: string; page_id: string | null; phone_id: string | null; code: string; destination: string | null; label: string; kind: 'landing' | 'direct'; group_id: string | null; notes: string; overrides: Record<string, string> }
 interface Group { id: string; name: string }
@@ -565,6 +565,7 @@ type EditPage = Omit<LinkPage, 'id'> & { id?: string }
 const GRAD_LABELS: Record<string, string> = { lavender: 'Lavande', peach: 'Pêche', sunset: 'Coucher de soleil', ocean: 'Océan', mint: 'Menthe', midnight: 'Nuit', noir: 'Noir', rose: 'Bordeaux' }
 const EFFECT_LABELS: Record<string, string> = { none: 'Aucun', aurora: 'Aurore', hearts: 'Cœurs', stars: 'Étoiles', particles: 'Bulles', glow: 'Halo' }
 const FONT_LABELS: Record<string, string> = { poppins: 'Poppins', inter: 'Inter', serif: 'Élégante', rounded: 'Arrondie' }
+const ANIM_LABELS: [string, string][] = [['none', 'Aucune'], ['pulse', 'Pulsation'], ['shine', 'Reflet'], ['shake', 'Secousse'], ['bounce', 'Rebond'], ['glow', 'Halo']]
 const ICON_LABELS: [string, string][] = [['', 'Aucun logo'], ['mym', 'MYM'], ['of', 'OnlyFans'], ['telegram', 'Telegram'], ['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['heart', 'Cœur']]
 
 // Petits éléments de formulaire (au niveau du module : pas de perte de focus à la frappe).
@@ -608,7 +609,9 @@ function PageEditor({ theme, value: edit, setEdit, BASE, scopeFolder, onSave }: 
     const slug = slugify(edit.slug || edit.title)
     if (slug.length < 2) { toast('Choisis une adresse (au moins 2 caractères).', 'bad'); return }
     await onSave({ slug, title: edit.title.trim(), bio: edit.bio.trim(), avatar_url: edit.avatar_url?.trim() || null, active: edit.active, theme: edit.theme ?? 'dark', design: D,
-      buttons: edit.buttons.filter(b => b.label.trim() && /^https?:\/\//i.test(b.url.trim())).map(b => ({ ...b, label: b.label.trim(), url: b.url.trim() })) })
+      buttons: edit.buttons.filter(b => b.label.trim()).map(b => ({ ...b, label: b.label.trim(), url: normalizeUrl(b.url) })) })
+    const missingUrl = edit.buttons.filter(b => b.label.trim() && !normalizeUrl(b.url)).length
+    if (missingUrl) toast(`${missingUrl} bouton(s) sans lien : ils s’afficheront dès qu’ils auront une URL.`, 'info', 6000)
   }
   const srcDoc = useMemo(() => renderLinkPage({
     title: edit.title || 'Nom affiché', bio: edit.bio, avatar: edit.avatar_url || null, design: D, preview: true,
@@ -675,7 +678,10 @@ function PageEditor({ theme, value: edit, setEdit, BASE, scopeFolder, onSave }: 
                   </span>
                 </Row>
                 <input value={b.label} placeholder="Texte (ex. Viens discuter ici 💕)" onChange={e => setBtn(i, { label: e.target.value })} style={FIELD} />
-                <input value={b.url} placeholder="https://… (OF, MYM, Telegram…)" onChange={e => setBtn(i, { url: e.target.value })} style={{ ...FIELD, fontFamily: MONO, fontSize: 12 }} />
+                <input value={b.url} placeholder="Colle le lien (OF, MYM, Telegram…)" onChange={e => setBtn(i, { url: e.target.value })} onBlur={e => { const n = normalizeUrl(e.target.value); if (n) setBtn(i, { url: n }) }} style={{ ...FIELD, fontFamily: MONO, fontSize: 12, borderColor: b.url.trim() && !normalizeUrl(b.url) ? 'rgba(251,191,36,0.5)' : undefined }} />
+                <span style={{ fontSize: 11.5, color: normalizeUrl(b.url) ? '#4ADE80' : '#FBBF24' }}>{normalizeUrl(b.url) ? '✓ Lien valide' : b.url.trim() ? 'Lien invalide' : 'Ajoute un lien pour que le bouton s’affiche'}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Animation</span>
+                <Row>{ANIM_LABELS.map(([v, l]) => chip((b.anim ?? 'none') === v, l, () => setBtn(i, { anim: v })))}</Row>
                 {(b.style ?? 'pill') === 'card'
                   ? <Row>{b.image && <img src={b.image} alt="" style={{ width: 72, height: 24, objectFit: 'cover', borderRadius: 4 }} />}{uploadBtn(`btn${i}`, 'Image de la carte', u => setBtn(i, { image: u }))}</Row>
                   : <Row>
