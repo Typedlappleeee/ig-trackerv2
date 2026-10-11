@@ -2147,6 +2147,7 @@ export const EN: Dict = {
     "Plus de likes": "Most likes",
     "Plus récents": "Most recent",
     "Ajoute tes comptes (ou ceux de tes modèles) pour voir quelles vidéos marchent le mieux.": "Add your accounts (or your models') to see which videos perform best.",
+    "Les Reels qui explosent en ce moment, sélectionnés par ScaleFlow — classés par vues.": "Reels blowing up right now, curated by ScaleFlow — ranked by views.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
