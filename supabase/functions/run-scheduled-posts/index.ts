@@ -376,6 +376,13 @@ Deno.serve(async (req) => {
       })
     }
 
+    // ── Veille des Reels viraux : relevé immédiat des comptes de l'utilisateur ──
+    if (body?.viral === 'refresh' && filterUserId) {
+      const { runViralWatch } = await import('./viral.ts')
+      const r = await runViralWatch(db, Date.now() + 50_000, filterUserId, true)
+      return new Response(JSON.stringify({ ok: true, ...r }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
+
     // ── Courbe des vues : vues des reels regroupées par DATE DE PUBLICATION ──
     // (sur les derniers reels de chaque compte du périmètre).
     if (body?.trend === 'posting-views') {
@@ -570,6 +577,15 @@ Deno.serve(async (req) => {
     const n = await runAccountSync(db, nowIso, Date.now() + 60_000)
     if (n > 0) summary['account_sync'] = `${n} compte(s) synchronisé(s)`
   } catch { /* ignore */ }
+
+  // ── Étape 0-viral : veille des Reels viraux (comptes pas relevés depuis 20 h, ≤ 20 s) ──
+  if (!filterUserId) {
+    try {
+      const { runViralWatch } = await import('./viral.ts')
+      const r = await runViralWatch(db, Date.now() + 20_000)
+      if (r.accounts > 0) summary['viral_watch'] = `${r.accounts} compte(s) · ${r.reels} reel(s)`
+    } catch { /* tables absentes / fournisseur indisponible : ignoré */ }
+  }
 
   // ── Étape 0-stats : sync serveur des stats (followers/posts) par lots ──
   // Plafonné à ~40s. No-op si ni HIKERAPI_KEY ni RAPIDAPI_KEY (le poller client prend le relais).

@@ -46,6 +46,7 @@ const SiteLanding = lazy(() => import('@/pages/SiteLanding').then(m => ({ defaul
 const Admin = lazy(() => import('@/pages/Admin'))
 const Scheduled = lazy(() => import('@/pages/Scheduled'))
 const Links = lazy(() => import('@/pages/Links'))
+const ViralWatch = lazy(() => import('@/pages/ViralWatch'))
 // Annonce de lancement des Liens (bandeau en haut de chaque page) — passer à false pour la retirer.
 const SHOW_LINKS_LAUNCH = true
 
@@ -201,6 +202,8 @@ function AppInner({ user }: { user: User }) {
         ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'scheduled'
         ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
+        : page === 'viral' && license.isSuperAdmin
+        ? <ViralWatch theme={theme} user={user} org={org} />
         : page === 'links'
         ? <Links theme={theme} user={user} org={org} />
         : page === 'insights'
