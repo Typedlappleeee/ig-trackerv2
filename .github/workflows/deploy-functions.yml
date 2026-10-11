@@ -1,0 +1,22 @@
+name: Deploy Supabase functions
+
+# Redéploie l'edge function run-scheduled-posts à chaque changement sur main
+# (ou à la main : Actions → Deploy Supabase functions → Run workflow).
+# Secret GitHub requis : SUPABASE_ACCESS_TOKEN (supabase.com/dashboard/account/tokens).
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/functions/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase functions deploy run-scheduled-posts --project-ref fvmkmkspfksscgqyvysl --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
