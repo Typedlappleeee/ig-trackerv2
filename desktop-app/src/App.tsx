@@ -45,6 +45,7 @@ const Settings = lazy(() => import('@/pages/Settings'))
 const SiteLanding = lazy(() => import('@/pages/SiteLanding').then(m => ({ default: m.SiteLanding })))
 const Admin = lazy(() => import('@/pages/Admin'))
 const Scheduled = lazy(() => import('@/pages/Scheduled'))
+const Links = lazy(() => import('@/pages/Links'))
 
 // Repli pendant le chargement d'une page (bref, discret, sans saut de mise en page).
 function PageLoader() {
@@ -198,6 +199,8 @@ function AppInner({ user }: { user: User }) {
         ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'scheduled'
         ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
+        : page === 'links' && license.isSuperAdmin
+        ? <Links theme={theme} user={user} org={org} />
         : page === 'insights'
         ? <Placeholder theme={theme} spec={SPECS.insights!} />
         : page === 'connections'
