@@ -24,3 +24,19 @@ describe('veille des Reels viraux', () => {
     expect(filterReels(reels, watch, { range: '1', niche: 'FR', account: '', sort: 'score' }, now).map(r => r.code)).toEqual(['1'])
   })
 })
+
+describe('veille des Reels — fiche', () => {
+  it('proxy vidéo limité au CDN Instagram', async () => {
+    const { isIgCdn } = await import('../../../supabase/functions/run-scheduled-posts/viral-score')
+    expect(isIgCdn('https://scontent-cdg4-1.cdninstagram.com/o1/v/t16/x.mp4?a=1')).toBe(true)
+    expect(isIgCdn('https://video.fbcdn.net/v.mp4')).toBe(true)
+    expect(isIgCdn('http://scontent.cdninstagram.com/x.mp4')).toBe(false)
+    expect(isIgCdn('https://evil.com/cdninstagram.com.mp4')).toBe(false)
+    expect(isIgCdn('https://cdninstagram.com.evil.com/x')).toBe(false)
+  })
+  it('engagement = (likes + commentaires) / vues', async () => {
+    const { engagement } = await import('@/pages/ViralWatch')
+    expect(engagement({ views: 1000, likes: 45, comments: 5 })).toBe(5)
+    expect(engagement({ views: 0, likes: 3, comments: 0 })).toBe(0)
+  })
+})
