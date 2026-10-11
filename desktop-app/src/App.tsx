@@ -203,7 +203,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'scheduled'
         ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
         : page === 'viral' && license.isSuperAdmin
-        ? <ViralWatch theme={theme} user={user} org={org} />
+        ? <ViralWatch theme={theme} user={user} org={org} canEdit={license.isSuperAdmin} />
         : page === 'links'
         ? <Links theme={theme} user={user} org={org} />
         : page === 'insights'

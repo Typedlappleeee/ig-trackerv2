@@ -1,4 +1,5 @@
-// Veille des Reels viraux (admin) : les derniers Reels des comptes surveillés, classés
+// Veille des Reels viraux : le super-admin choisit les comptes de référence, tous les
+// utilisateurs voient le fil (lecture seule, RLS 20261012b_viral_shared.sql). Les derniers Reels des comptes surveillés, classés
 // par score « au-dessus de la normale » (vues / médiane du compte). Relevé quotidien
 // côté serveur (edge function run-scheduled-posts, étape 0-viral) ou à la demande.
 // Tables : supabase/migrations/20261012_viral.sql. Données : HikerAPI (secret HIKERAPI_KEY).
@@ -29,8 +30,7 @@ export function filterReels(reels: Reel[], watch: Watch[], o: { range: Range; ni
     .sort((a, b) => o.sort === 'score' ? b.score - a.score || b.views - a.views : b.views - a.views)
 }
 
-export default function ViralWatch({ theme, user, org }: { theme: Theme; user: User; org: OrgState }) {
-  const { currentOrg } = org
+export default function ViralWatch({ theme, user, canEdit }: { theme: Theme; user: User; org: OrgState; canEdit: boolean }) {
   const [watch, setWatch] = useState<Watch[]>([])
   const [reels, setReels] = useState<Reel[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,11 +42,10 @@ export default function ViralWatch({ theme, user, org }: { theme: Theme; user: U
   const [sort, setSort] = useState<Sort>('score')
   const [fNiche, setFNiche] = useState('')
   const [fAccount, setFAccount] = useState('')
-  const scope = useCallback((q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null), [currentOrg?.id, user.id])
 
   const load = useCallback(async () => {
     setLoading(true)
-    const w = await scope(supabase.from('viral_watch').select('id,username,niche,fetched_at,last_error')).order('username')
+    const w = await supabase.from('viral_watch').select('id,username,niche,fetched_at,last_error').order('username')
     setMissing(!!w.error && /relation|does not exist|schema cache/i.test(w.error.message))
     const list = (w.data ?? []) as Watch[]
     setWatch(list)
@@ -55,14 +54,14 @@ export default function ViralWatch({ theme, user, org }: { theme: Theme; user: U
       setReels((r.data ?? []) as Reel[])
     } else setReels([])
     setLoading(false)
-  }, [scope])
+  }, [])
   useEffect(() => { void load() }, [load])
 
   async function addAccounts() {
     const names = [...new Set(adding.split(/[\s,;]+/).map(s => s.trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '').toLowerCase()).filter(s => /^[a-z0-9._]{1,30}$/.test(s)))]
     const fresh = names.filter(n => !watch.some(w => w.username === n))
     if (!fresh.length) { toast('Aucun nouveau compte valide.', 'info'); return }
-    const { error } = await supabase.from('viral_watch').insert(fresh.map(username => ({ username, niche: niche.trim(), user_id: user.id, org_id: currentOrg?.id ?? null })))
+    const { error } = await supabase.from('viral_watch').insert(fresh.map(username => ({ username, niche: niche.trim(), user_id: user.id, org_id: null })))
     if (error) { toast(`Échec : ${error.message}`, 'bad'); return }
     toast(`${fresh.length} compte(s) ajouté(s) — clique « Actualiser » pour relever leurs Reels.`, 'ok'); setAdding(''); void load()
   }
@@ -87,15 +86,15 @@ export default function ViralWatch({ theme, user, org }: { theme: Theme; user: U
 
   if (missing) return (
     <div><PageHead title="Veille Reels" sub="Les Reels qui explosent chez tes comptes de référence." />
-      <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01" title="Activation requise" text="Colle supabase/migrations/20261012_viral.sql dans Supabase → SQL Editor → Run, puis recharge." /></Panel></div>
+      <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01" title="Activation requise" text={canEdit ? 'Colle supabase/migrations/20261012_viral.sql dans Supabase → SQL Editor → Run, puis recharge.' : 'Bientôt disponible.'} /></Panel></div>
   )
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Veille Reels" sub="Les Reels qui explosent chez tes comptes de référence — classés « au-dessus de la normale » de chaque compte. Relevé automatique chaque jour."
-        actions={<Btn theme={theme} tone="primary" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={busy ? 'Relevé en cours…' : 'Actualiser maintenant'} disabled={busy || !watch.length} onClick={refresh} />} />
+        actions={canEdit && <Btn theme={theme} tone="primary" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={busy ? 'Relevé en cours…' : 'Actualiser maintenant'} disabled={busy || !watch.length} onClick={refresh} />} />
 
-      <Panel theme={theme} style={{ marginBottom: 12 }}>
+      {canEdit && <Panel theme={theme} style={{ marginBottom: 12 }}>
         <PanelHead title="Comptes suivis" sub={`${watch.length} compte(s)${errors.length ? ` · ${errors.length} en erreur` : ''}`} />
         <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(300px,100%),1fr))', gap: 12 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -115,7 +114,7 @@ export default function ViralWatch({ theme, user, org }: { theme: Theme; user: U
             ))}
           </div>
         </div>
-      </Panel>
+      </Panel>}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <Segmented value={range} onChange={setRange} options={[{ v: '1', l: '24 h' }, { v: '7', l: '7 jours' }, { v: '30', l: '30 jours' }]} />
@@ -126,7 +125,7 @@ export default function ViralWatch({ theme, user, org }: { theme: Theme; user: U
       </div>
 
       {loading ? <Panel theme={theme}><SkeletonRows rows={4} /></Panel> : shown.length === 0 ? (
-        <Panel theme={theme}><Empty icon="M22 12h-4l-3 9L9 3l-3 9H2" title="Aucun Reel pour l’instant" text={watch.length ? 'Clique « Actualiser maintenant » pour relever les derniers Reels de tes comptes suivis.' : 'Ajoute des comptes de référence (modèles, concurrents) pour voir leurs Reels qui cartonnent.'} /></Panel>
+        <Panel theme={theme}><Empty icon="M22 12h-4l-3 9L9 3l-3 9H2" title="Aucun Reel pour l’instant" text={!canEdit ? 'Les Reels viraux des comptes de référence apparaîtront ici dès le prochain relevé.' : watch.length ? 'Clique « Actualiser maintenant » pour relever les derniers Reels de tes comptes suivis.' : 'Ajoute des comptes de référence (modèles, concurrents) pour voir leurs Reels qui cartonnent.'} /></Panel>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12 }}>
           {shown.map(r => {

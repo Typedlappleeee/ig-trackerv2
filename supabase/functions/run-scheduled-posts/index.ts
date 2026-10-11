@@ -376,10 +376,15 @@ Deno.serve(async (req) => {
       })
     }
 
-    // ── Veille des Reels viraux : relevé immédiat des comptes de l'utilisateur ──
+    // ── Veille des Reels viraux : relevé immédiat de tous les comptes (super-admin seulement,
+    // les comptes de référence sont partagés et visibles par tous les utilisateurs) ──
     if (body?.viral === 'refresh' && filterUserId) {
+      const { data: prof } = await db.from('profiles').select('email, is_super_admin').eq('id', filterUserId).maybeSingle()
+      if (!prof?.is_super_admin && prof?.email !== 'tintin.aunea@gmail.com') {
+        return new Response(JSON.stringify({ ok: false, error: 'admin only' }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+      }
       const { runViralWatch } = await import('./viral.ts')
-      const r = await runViralWatch(db, Date.now() + 50_000, filterUserId, true)
+      const r = await runViralWatch(db, Date.now() + 50_000, null, true)
       return new Response(JSON.stringify({ ok: true, ...r }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
 
