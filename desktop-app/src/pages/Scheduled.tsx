@@ -3,7 +3,8 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal, SkeletonRows, toast } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal, SkeletonRows, toast, Segmented } from '@/lib/ui'
+import ScheduleCalendar from '@/components/ScheduleCalendar'
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { cancelGeelarkTask } from '@/lib/geelark'
@@ -39,6 +40,15 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
   const [busy, setBusy] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState<Sched | null>(null)
+  const [view, setView] = useState<'list' | 'calendar'>(() => { try { return localStorage.getItem('sf-sched-view') === 'calendar' ? 'calendar' : 'list' } catch { return 'list' } })
+  const changeView = (v: 'list' | 'calendar') => { setView(v); try { localStorage.setItem('sf-sched-view', v) } catch { /* ignore */ } }
+  // Calendrier : décale un post serveur en attente (même heure, autre jour).
+  async function movePost(p: { id: string }, to: Date) {
+    const { data, error } = await supabase.from('scheduled_posts').update({ scheduled_at: to.toISOString() }).eq('id', p.id).eq('status', 'pending').select('id')
+    if (error || !data?.length) { toast(error ? `Échec : ${error.message}` : 'Ce post ne peut plus être déplacé (déjà lancé ?).', 'bad'); return }
+    toast(`Post décalé au ${to.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}.`, 'ok')
+    load(true)
+  }
 
   // background = rafraîchissement silencieux (pas de clignotement « Chargement »).
   const load = useCallback(async (background = false) => {
@@ -125,7 +135,10 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Programmé" sub="Toutes tes publications programmées (PC éteint, via GeeLark). Annule ici pour récupérer les crédits."
-        actions={<Btn theme={theme} sm tone="quiet" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Rafraîchir" onClick={() => load()} />} />
+        actions={<>
+          <Segmented value={view} onChange={changeView} options={[{ v: 'list', l: 'Liste' }, { v: 'calendar', l: 'Calendrier' }]} />
+          <Btn theme={theme} sm tone="quiet" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Rafraîchir" onClick={() => load()} />
+        </>} />
       {loadError && <div style={{ padding: '10px 12px', marginBottom: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(248,113,113,0.25)', color: '#F87171', fontSize: 13 }}>Impossible de charger les programmations : {loadError}</div>}
       {confirmCancel && (
         <Modal theme={theme} title="Annuler cette programmation ?" sub={`${confirmCancel.phones?.length ?? 0} compte(s) · ${new Date(confirmCancel.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}`} icon="M18 6L6 18|M6 6l12 12" width={460}
@@ -136,7 +149,9 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
       )}
 
       {loading ? <Panel theme={theme}><SkeletonRows rows={4} avatar /></Panel>
-        : rows.length === 0 ? (
+        : view === 'calendar' ? (
+          <ScheduleCalendar theme={theme} posts={rows} onMove={movePost} onOpen={s => { const r = rows.find(x => x.id === s.id); if (r && ((r.status === 'geelark' && new Date(r.scheduled_at).getTime() > Date.now()) || r.status === 'pending')) setConfirmCancel(r) }} />
+        ) : rows.length === 0 ? (
           <Panel theme={theme}><Empty icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
             title="Aucune publication programmée" text="Depuis Posting / Story / Cross-post, clique « Programmer (PC éteint) » — elles apparaîtront ici." /></Panel>
         ) : (
