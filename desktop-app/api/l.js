@@ -5,6 +5,7 @@
 // Env Vercel : SUPABASE_URL (ou VITE_SUPABASE_URL) + SUPABASE_SERVICE_ROLE_KEY.
 import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
+import { renderLinkPage, normalizeDesign } from './_linkpage.js'
 
 const BOT = /facebookexternalhit|facebot|instagram.*(preview|link)|twitterbot|slackbot|whatsapp|telegrambot|discordbot|linkedinbot|bot\b|crawler|spider|preview/i
 const IN_APP = /Instagram|FBAN|FBAV|BytedanceWebview|musical_ly|TikTok/i
@@ -93,12 +94,15 @@ export default async function handler(req, res) {
     if (target) { res.statusCode = 302; res.setHeader('Location', target); res.setHeader('Cache-Control', 'no-store'); return res.end() }
     if (!pg) return page(res, 404, '<h1>Lien introuvable</h1>')
     const q = url.searchParams.get('x') === '1' ? '&x=1' : ''
-    const body = `${pg.avatar_url ? `<img class="av" src="${esc(pg.avatar_url)}" alt="">` : ''}
-<h1>${esc(pg.title)}</h1>${pg.bio ? `<p>${esc(pg.bio)}</p>` : ''}
-<div style="width:100%;display:flex;flex-direction:column;gap:10px;margin-top:10px">
-${buttons.map((x, i) => safeUrl(x?.url) ? `<a class="b${i === 0 ? ' p' : ''}" href="/l/${esc(code)}?b=${i}${q}&v=${visitId}" rel="nofollow">${esc(x.label || 'Lien')}</a>` : '').join('')}
-</div>`
-    return page(res, 200, body, `<title>${esc(pg.title || 'Liens')}</title>`, pg.theme)
+    const html = renderLinkPage({
+      title: pg.title || '', bio: pg.bio || '', avatar: pg.avatar_url, design: normalizeDesign(pg),
+      buttons: buttons.map((x, i) => ({ x, i })).filter(({ x }) => safeUrl(x?.url)).map(({ x, i }) => ({ ...x, href: `/l/${code}?b=${i}${q}&v=${visitId}` })),
+    })
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('X-Robots-Tag', 'noindex')
+    return res.end(html)
   } catch (e) {
     return page(res, 500, '<h1>Indisponible</h1><p>Réessaie dans un instant.</p>')
   }

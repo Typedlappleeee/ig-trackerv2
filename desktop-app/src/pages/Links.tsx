@@ -7,7 +7,8 @@
 //   • Pages : les pages de liens (photo envoyée depuis le PC, boutons, thème).
 // Servi publiquement par api/l.js (/l/<code>, ou tapmylink.fr/<code>).
 // Tables : supabase/migrations/20261011_links.sql + 20261011b_links_v2.sql.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { renderLinkPage, normalizeDesign, GRADIENTS, EFFECTS, type LinkDesign } from '../../api/_linkpage.js'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
@@ -18,7 +19,8 @@ import { IS_WEB } from '@/lib/platform'
 import { computeLinkStats, type Period } from '@/lib/linkStats'
 
 type PageTheme = 'dark' | 'light' | 'violet' | 'rose'
-interface LinkPage { id: string; slug: string; title: string; bio: string; avatar_url: string | null; buttons: { label: string; url: string }[]; active: boolean; theme: PageTheme }
+interface PageButton { label: string; url: string; style?: 'pill' | 'card'; image?: string; icon?: string; bg?: string; fg?: string }
+interface LinkPage { id: string; slug: string; title: string; bio: string; avatar_url: string | null; buttons: PageButton[]; active: boolean; theme: PageTheme; design?: Partial<LinkDesign> | null }
 interface TLink { id: string; page_id: string | null; phone_id: string | null; code: string; destination: string | null; label: string; kind: 'landing' | 'direct'; group_id: string | null; notes: string; overrides: Record<string, string> }
 interface Group { id: string; name: string }
 interface Phone { id: string; phone_name: string; ig_username: string | null; geelark_id: string | null }
@@ -52,7 +54,7 @@ const THEMES: { k: PageTheme; l: string; c: [string, string, string, string, str
   { k: 'rose', l: 'Rose', c: ['#1F0F17', '#FFF1F6', '#2E1622', '#F472B6', '#1F0F17'] },
 ]
 const DAY = 86400000
-const EMPTY_PAGE: Omit<LinkPage, 'id'> = { slug: '', title: '', bio: '', avatar_url: '', buttons: [{ label: 'Mon OnlyFans', url: '' }, { label: 'Mon MYM', url: '' }], active: true, theme: 'dark' }
+const EMPTY_PAGE: Omit<LinkPage, 'id'> = { slug: '', title: '', bio: '', avatar_url: '', buttons: [{ label: 'Viens discuter ici 💕', url: '', style: 'card' }, { label: 'MYM gratuit', url: '', style: 'pill', icon: 'mym' }], active: true, theme: 'light', design: null }
 const ICON_LINK = 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1'
 const ICON_PAGE = 'M4 4h16v16H4z|M4 9h16|M9 20V9'
 const ICON_COPY = 'M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2|M16 4h4v4|M10 14L20 4'
@@ -560,19 +562,33 @@ function PagesTab({ theme, pages, clicks, BASE, copy, onEdit, onNew, reload }: {
 }
 
 type EditPage = Omit<LinkPage, 'id'> & { id?: string }
+const GRAD_LABELS: Record<string, string> = { lavender: 'Lavande', peach: 'Pêche', sunset: 'Coucher de soleil', ocean: 'Océan', mint: 'Menthe', midnight: 'Nuit', noir: 'Noir', rose: 'Bordeaux' }
+const EFFECT_LABELS: Record<string, string> = { none: 'Aucun', aurora: 'Aurore', hearts: 'Cœurs', stars: 'Étoiles', particles: 'Bulles', glow: 'Halo' }
+const FONT_LABELS: Record<string, string> = { poppins: 'Poppins', inter: 'Inter', serif: 'Élégante', rounded: 'Arrondie' }
+const ICON_LABELS: [string, string][] = [['', 'Aucun logo'], ['mym', 'MYM'], ['of', 'OnlyFans'], ['telegram', 'Telegram'], ['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['heart', 'Cœur']]
+
+// Petits éléments de formulaire (au niveau du module : pas de perte de focus à la frappe).
+const L = ({ t, children }: { t: string; children: ReactNode }) => <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}><span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{t}</span>{children}</label>
+const Row = ({ children }: { children: ReactNode }) => <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>{children}</div>
+const Color = ({ v, on }: { v: string; on: (c: string) => void }) => <input type="color" value={v} onChange={e => on(e.target.value)} style={{ width: 36, height: 30, padding: 2, borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: '#161618', cursor: 'pointer' }} />
+
 function PageEditor({ theme, value: edit, setEdit, BASE, scopeFolder, onSave }: {
   theme: Theme; value: EditPage; setEdit: (v: EditPage | null) => void
   BASE: string; scopeFolder: string; onSave: (row: Record<string, unknown>) => Promise<void>
 }) {
-  const [uploading, setUploading] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const tc = (THEMES.find(t => t.k === (edit.theme ?? 'dark')) ?? THEMES[0]).c
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [sec, setSec] = useState<'profil' | 'fond' | 'boutons' | 'style'>('profil')
+  const D = normalizeDesign(edit)
   const set = (patch: Partial<LinkPage>) => setEdit({ ...edit, ...patch })
-  // Photo envoyée depuis le PC → stockage ScaleFlow, URL signée longue durée (10 ans).
-  async function upload(f: File) {
+  const setD = (patch: Partial<LinkDesign>) => set({ design: { ...D, ...patch } })
+  const setBtn = (i: number, patch: Partial<PageButton>) => set({ buttons: edit.buttons.map((x, j) => j === i ? { ...x, ...patch } : x) })
+  const moveBtn = (i: number, d: number) => { const b = [...edit.buttons]; const j = i + d; if (j < 0 || j >= b.length) return; [b[i], b[j]] = [b[j], b[i]]; set({ buttons: b }) }
+
+  // Image envoyée depuis le PC → stockage ScaleFlow, URL signée longue durée (10 ans).
+  async function upload(key: string, f: File, done: (url: string) => void) {
     if (!f.type.startsWith('image/')) { toast('Choisis une image.', 'bad'); return }
     if (f.size > 8 * 1024 * 1024) { toast('Image trop lourde (8 Mo max).', 'bad'); return }
-    setUploading(true)
+    setUploading(key)
     try {
       const ext = (f.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
       const path = `videos/${scopeFolder}/linkpic-${Date.now()}.${ext}`
@@ -580,75 +596,115 @@ function PageEditor({ theme, value: edit, setEdit, BASE, scopeFolder, onSave }: 
       if (up.error) throw up.error
       const { data, error } = await supabase.storage.from('content').createSignedUrl(path, 10 * 365 * 24 * 3600)
       if (error || !data?.signedUrl) throw error ?? new Error('URL')
-      set({ avatar_url: data.signedUrl }); toast('Photo ajoutée', 'ok')
-    } catch (e) { toast(`Envoi impossible : ${(e as { message?: string })?.message ?? String(e)}`, 'bad') } finally { setUploading(false) }
+      done(data.signedUrl); toast('Photo ajoutée', 'ok')
+    } catch (e) { toast(`Envoi impossible : ${(e as { message?: string })?.message ?? String(e)}`, 'bad') } finally { setUploading(null) }
+  }
+  const pick = (key: string, done: (url: string) => void) => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'
+    inp.onchange = () => { const f = inp.files?.[0]; if (f) void upload(key, f, done) }
+    inp.click()
   }
   async function save() {
     const slug = slugify(edit.slug || edit.title)
     if (slug.length < 2) { toast('Choisis une adresse (au moins 2 caractères).', 'bad'); return }
-    await onSave({ slug, title: edit.title.trim(), bio: edit.bio.trim(), avatar_url: edit.avatar_url?.trim() || null, active: edit.active, theme: edit.theme ?? 'dark',
-      buttons: edit.buttons.filter(b => b.label.trim() && /^https?:\/\//i.test(b.url.trim())).map(b => ({ label: b.label.trim(), url: b.url.trim() })) })
+    await onSave({ slug, title: edit.title.trim(), bio: edit.bio.trim(), avatar_url: edit.avatar_url?.trim() || null, active: edit.active, theme: edit.theme ?? 'dark', design: D,
+      buttons: edit.buttons.filter(b => b.label.trim() && /^https?:\/\//i.test(b.url.trim())).map(b => ({ ...b, label: b.label.trim(), url: b.url.trim() })) })
   }
+  const srcDoc = useMemo(() => renderLinkPage({
+    title: edit.title || 'Nom affiché', bio: edit.bio, avatar: edit.avatar_url || null, design: D, preview: true,
+    buttons: edit.buttons.filter(b => b.label.trim()).map(b => ({ ...b, href: '#' })),
+  }), [edit]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const chip = (on: boolean, label: string, click: () => void, sw?: string) => (
+    <button key={label} type="button" onClick={click} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30, padding: '0 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, color: '#EDEDEF', background: '#161618', border: `1px solid ${on ? theme.accent : 'rgba(255,255,255,0.09)'}` }}>
+      {sw && <span style={{ width: 16, height: 16, borderRadius: 4, background: sw, border: '1px solid rgba(255,255,255,0.2)' }} />}{label}
+    </button>
+  )
+  const uploadBtn = (k: string, label: string, done: (u: string) => void) => <Btn theme={theme} sm tone="ghost" icon="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4|M17 8l-5-5-5 5|M12 3v12" label={uploading === k ? 'Envoi…' : label} disabled={!!uploading} onClick={() => pick(k, done)} />
+
   return (
-    <Modal theme={theme} title={edit.id ? 'Modifier la page' : 'Nouvelle page de liens'} width={780} onClose={() => setEdit(null)}
+    <Modal theme={theme} title={edit.id ? 'Modifier la page' : 'Nouvelle page de liens'} width={980} onClose={() => setEdit(null)}
       footer={<><Btn theme={theme} tone="ghost" label="Annuler" onClick={() => setEdit(null)} /><Btn theme={theme} tone="primary" label="Enregistrer" onClick={save} /></>}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(300px,100%),1fr))', gap: 20 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Photo</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ width: 56, height: 56, borderRadius: 99, overflow: 'hidden', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>{edit.avatar_url && <img src={edit.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</span>
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = '' }} />
-            <Btn theme={theme} sm tone="ghost" icon="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4|M17 8l-5-5-5 5|M12 3v12" label={uploading ? 'Envoi…' : 'Choisir depuis le PC'} disabled={uploading} onClick={() => fileRef.current?.click()} />
-            {edit.avatar_url && <Btn theme={theme} sm tone="quiet" label="Retirer" onClick={() => set({ avatar_url: '' })} />}
-          </div>
-          {([['Nom affiché', 'title', 'Luna'], ['Adresse', 'slug', 'luna']] as [string, 'title' | 'slug', string][]).map(([l, k, ph]) => (
-            <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{l}</span>
-              <input value={edit[k] ?? ''} placeholder={ph} onChange={e => set({ [k]: k === 'slug' ? slugify(e.target.value) : e.target.value } as Partial<LinkPage>)} style={FIELD} />
-              {k === 'slug' && <span data-no-tr style={{ fontFamily: MONO, fontSize: 11, color: '#71717A' }}>{BASE}{slugify(edit.slug || edit.title) || '…'}</span>}
-            </label>
-          ))}
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Bio</span>
-            <textarea value={edit.bio} rows={3} onChange={e => set({ bio: e.target.value })} style={TEXTAREA} />
-          </label>
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Boutons</span>
-          {edit.buttons.map((b, i) => (
-            <div key={i} style={{ display: 'flex', gap: 6 }}>
-              <input value={b.label} placeholder="Texte (ex. Mon OnlyFans)" onChange={e => set({ buttons: edit.buttons.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} style={{ ...FIELD, flex: 1 }} />
-              <input value={b.url} placeholder="https://…" onChange={e => set({ buttons: edit.buttons.map((x, j) => j === i ? { ...x, url: e.target.value } : x) })} style={{ ...FIELD, flex: 1.4 }} />
-              <Btn theme={theme} sm tone="quiet" icon="M18 6L6 18|M6 6l12 12" onClick={() => set({ buttons: edit.buttons.filter((_, j) => j !== i) })} />
-            </div>
-          ))}
-          <span><Btn theme={theme} sm tone="ghost" icon="M12 5v14|M5 12h14" label="Ajouter un bouton" onClick={() => set({ buttons: [...edit.buttons, { label: '', url: '' }] })} /></span>
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Thème</span>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {THEMES.map(t => (
-              <button key={t.k} type="button" onClick={() => set({ theme: t.k })} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30, padding: '0 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, color: '#EDEDEF', background: '#161618', border: `1px solid ${(edit.theme ?? 'dark') === t.k ? theme.accent : 'rgba(255,255,255,0.09)'}` }}>
-                <span style={{ width: 14, height: 14, borderRadius: 4, background: t.c[0], border: `3px solid ${t.c[3]}`, boxSizing: 'border-box' }} />{t.l}
-              </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(340px,100%),1fr))', gap: 20, alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+          <Segmented value={sec} onChange={setSec} options={[{ v: 'profil', l: 'Profil' }, { v: 'fond', l: 'Fond & effets' }, { v: 'boutons', l: 'Boutons' }, { v: 'style', l: 'Style' }]} />
+
+          {sec === 'profil' && <>
+            <Row>
+              <span style={{ width: 56, height: 56, borderRadius: 99, overflow: 'hidden', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>{edit.avatar_url && <img src={edit.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</span>
+              {uploadBtn('avatar', 'Choisir depuis le PC', u => set({ avatar_url: u }))}
+              {edit.avatar_url && <Btn theme={theme} sm tone="quiet" label="Retirer" onClick={() => set({ avatar_url: '' })} />}
+            </Row>
+            <L t="Nom affiché"><input value={edit.title} placeholder="Zoé" onChange={e => set({ title: e.target.value })} style={FIELD} /></L>
+            <L t="Adresse">
+              <input value={edit.slug} placeholder="zoe" onChange={e => set({ slug: slugify(e.target.value) })} style={FIELD} />
+              <span data-no-tr style={{ fontFamily: MONO, fontSize: 11, color: '#71717A' }}>{BASE}{slugify(edit.slug || edit.title) || '…'}</span>
+            </L>
+            <L t="Bio"><textarea value={edit.bio} rows={2} placeholder="Viens discuter ici ⇩" onChange={e => set({ bio: e.target.value })} style={TEXTAREA} /></L>
+            <Row><Toggle on={D.verified} onChange={v => setD({ verified: v })} /><span style={{ fontSize: 13, color: '#EDEDEF' }}>Badge vérifié</span></Row>
+            <Row><Toggle on={D.online} onChange={v => setD({ online: v })} /><span style={{ fontSize: 13, color: '#EDEDEF' }}>Pastille « en ligne »</span></Row>
+            <Row><span style={{ fontSize: 12.5, color: '#8B8B94' }}>Contour de la photo</span><Color v={D.ring} on={c => setD({ ring: c })} /></Row>
+            <Row><Toggle on={edit.active} onChange={on => set({ active: on })} /><span style={{ fontSize: 13, color: '#EDEDEF' }}>Page en ligne</span></Row>
+          </>}
+
+          {sec === 'fond' && <>
+            <Segmented value={D.bg.type} onChange={t => setD({ bg: { ...D.bg, type: t } })} options={[{ v: 'gradient', l: 'Dégradé' }, { v: 'color', l: 'Couleur' }, { v: 'image', l: 'Image' }]} />
+            {D.bg.type === 'gradient' && <Row>{Object.keys(GRADIENTS).map(g => chip(D.bg.preset === g, GRAD_LABELS[g] ?? g, () => setD({ bg: { ...D.bg, preset: g } }), GRADIENTS[g]))}</Row>}
+            {D.bg.type === 'color' && <Row><span style={{ fontSize: 12.5, color: '#8B8B94' }}>Couleur du fond</span><Color v={D.bg.color} on={c => setD({ bg: { ...D.bg, color: c } })} /></Row>}
+            {D.bg.type === 'image' && <>
+              <Row>
+                {D.bg.image && <img src={D.bg.image} alt="" style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 6 }} />}
+                {uploadBtn('bg', 'Image de fond depuis le PC', u => setD({ bg: { ...D.bg, image: u } }))}
+              </Row>
+              <L t={`Flou : ${D.bg.blur}px`}><input type="range" min={0} max={30} value={D.bg.blur} onChange={e => setD({ bg: { ...D.bg, blur: Number(e.target.value) } })} /></L>
+            </>}
+            <L t={`Assombrir : ${D.bg.dim} %`}><input type="range" min={0} max={70} value={D.bg.dim} onChange={e => setD({ bg: { ...D.bg, dim: Number(e.target.value) } })} /></L>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Effet animé</span>
+            <Row>{EFFECTS.map(fx => chip(D.effect === fx, EFFECT_LABELS[fx] ?? fx, () => setD({ effect: fx })))}</Row>
+          </>}
+
+          {sec === 'boutons' && <>
+            {edit.buttons.map((b, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <Row>
+                  <Segmented sm value={b.style ?? 'pill'} onChange={st => setBtn(i, { style: st })} options={[{ v: 'pill', l: 'Bouton' }, { v: 'card', l: 'Carte image' }]} />
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
+                    <Btn theme={theme} sm tone="quiet" icon="M18 15l-6-6-6 6" onClick={() => moveBtn(i, -1)} />
+                    <Btn theme={theme} sm tone="quiet" icon="M6 9l6 6 6-6" onClick={() => moveBtn(i, 1)} />
+                    <Btn theme={theme} sm tone="quiet" icon="M18 6L6 18|M6 6l12 12" onClick={() => set({ buttons: edit.buttons.filter((_, j) => j !== i) })} />
+                  </span>
+                </Row>
+                <input value={b.label} placeholder="Texte (ex. Viens discuter ici 💕)" onChange={e => setBtn(i, { label: e.target.value })} style={FIELD} />
+                <input value={b.url} placeholder="https://… (OF, MYM, Telegram…)" onChange={e => setBtn(i, { url: e.target.value })} style={{ ...FIELD, fontFamily: MONO, fontSize: 12 }} />
+                {(b.style ?? 'pill') === 'card'
+                  ? <Row>{b.image && <img src={b.image} alt="" style={{ width: 72, height: 24, objectFit: 'cover', borderRadius: 4 }} />}{uploadBtn(`btn${i}`, 'Image de la carte', u => setBtn(i, { image: u }))}</Row>
+                  : <Row>
+                    <select value={b.icon ?? ''} onChange={e => setBtn(i, { icon: e.target.value || undefined })} style={{ ...FIELD, width: 'auto', height: 30 }}>{ICON_LABELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                    <span style={{ fontSize: 12, color: '#8B8B94' }}>Couleurs</span>
+                    <Color v={b.bg ?? D.btn.bg} on={c => setBtn(i, { bg: c })} /><Color v={b.fg ?? D.btn.fg} on={c => setBtn(i, { fg: c })} />
+                  </Row>}
+              </div>
             ))}
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#EDEDEF' }}>
-            <Toggle on={edit.active} onChange={on => set({ active: on })} /> Page en ligne
-          </label>
+            <span><Btn theme={theme} sm tone="ghost" icon="M12 5v14|M5 12h14" label="Ajouter un bouton" onClick={() => set({ buttons: [...edit.buttons, { label: '', url: '', style: 'pill' }] })} /></span>
+          </>}
+
+          {sec === 'style' && <>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Police</span>
+            <Row>{Object.keys(FONT_LABELS).map(f => chip(D.font === f, FONT_LABELS[f], () => setD({ font: f })))}</Row>
+            <Row><span style={{ fontSize: 12.5, color: '#8B8B94' }}>Couleur du texte</span><Color v={D.text} on={c => setD({ text: c })} /><Toggle on={D.shadowText} onChange={v => setD({ shadowText: v })} /><span style={{ fontSize: 12.5, color: '#8B8B94' }}>Ombre du texte</span></Row>
+            <Row><span style={{ fontSize: 12.5, color: '#8B8B94' }}>Boutons (par défaut)</span><Color v={D.btn.bg} on={c => setD({ btn: { ...D.btn, bg: c } })} /><Color v={D.btn.fg} on={c => setD({ btn: { ...D.btn, fg: c } })} /></Row>
+            <L t={`Arrondi des boutons : ${D.btn.radius}px`}><input type="range" min={0} max={40} value={D.btn.radius} onChange={e => setD({ btn: { ...D.btn, radius: Number(e.target.value) } })} /></L>
+            <Row><Toggle on={D.btn.shadow} onChange={v => setD({ btn: { ...D.btn, shadow: v } })} /><span style={{ fontSize: 13, color: '#EDEDEF' }}>Ombre des boutons</span></Row>
+          </>}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <div style={{ width: 260, minHeight: 460, borderRadius: 28, border: '1px solid rgba(255,255,255,0.12)', background: tc[0], padding: '36px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
-            <span style={{ width: 72, height: 72, borderRadius: 99, overflow: 'hidden', background: tc[2], border: '1px solid rgba(127,127,127,0.25)' }}>{edit.avatar_url && <img src={edit.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</span>
-            <span data-no-tr style={{ fontSize: 16, fontWeight: 600, color: tc[1] }}>{edit.title || 'Nom affiché'}</span>
-            {edit.bio && <span data-no-tr style={{ fontSize: 12, color: tc[1], opacity: 0.7, whiteSpace: 'pre-line' }}>{edit.bio}</span>}
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-              {edit.buttons.filter(b => b.label.trim()).map((b, i) => (
-                <span key={i} data-no-tr style={{ padding: '11px 12px', borderRadius: 10, fontSize: 13, fontWeight: 600, background: i === 0 ? tc[3] : tc[2], color: i === 0 ? tc[4] : tc[1], border: '1px solid rgba(127,127,127,0.25)' }}>{b.label}</span>
-              ))}
-            </div>
+
+        {/* Aperçu = le vrai rendu public (même code que la page servie aux visiteurs). */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, position: 'sticky', top: 0 }}>
+          <div style={{ width: 300, height: 600, borderRadius: 32, overflow: 'hidden', border: '6px solid #1C1C1F', boxShadow: '0 24px 60px -24px rgba(0,0,0,0.8)', background: '#000' }}>
+            <iframe title="Aperçu" srcDoc={srcDoc} sandbox="" style={{ width: 375, height: 750, border: 'none', transform: 'scale(0.8)', transformOrigin: '0 0', display: 'block' }} />
           </div>
+          <span style={{ fontSize: 11.5, color: '#71717A' }}>Aperçu réel de la page publique</span>
         </div>
-      </div>
-      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#71717A' }}>
-        <Icon d="M12 16v-4|M12 8h.01|M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" size={13} />
-        Les URL des boutons OF / MYM servent par défaut : la création automatique les remplace par les liens propres à chaque compte.
       </div>
     </Modal>
   )

@@ -32,8 +32,8 @@ describe('liens suivis /l/<code>', () => {
   it('lien d’un compte → page de liens, visite comptée pour ce compte', async () => {
     const r = await call('/api/l?p=lea-ig07')
     expect(r.statusCode).toBe(200)
-    expect(r.body).toContain('Mon OF')
-    expect(r.body).toMatch(/\/l\/lea-ig07\?b=0&v=[0-9a-f-]{36}/)
+    expect(r.body).toContain('Mon OF'); expect(r.body).toContain('class="pill first"')
+    expect(r.body).toMatch(/\/l\/lea-ig07\?b=0&amp;v=[0-9a-f-]{36}/)
     expect(H.inserts[0]).toMatchObject({ link_id: 'l1', page_id: 'pg1', button: null, country: 'FR', device: 'ios', bot: false })
   })
   it('clic sur un bouton → redirection 302 vers sa vraie destination, clic compté', async () => {
