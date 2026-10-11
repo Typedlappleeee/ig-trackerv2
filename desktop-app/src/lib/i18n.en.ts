@@ -2085,6 +2085,9 @@ export const EN: Dict = {
     "Tout supprimer": "Delete all",
     "Supprimer tous les liens": "Delete all links",
     "Vider le groupe": "Empty group",
+    "Nouveau : les Liens ScaleFlow sont arrivés 🎉": "New: ScaleFlow Links are here 🎉",
+    "Ta page de liens façon Linktree, un lien suivi par compte et les clics en direct : sache enfin quel compte t’envoie des abonnés.": "Your Linktree-style link page, one tracked link per account and live clicks: finally know which account brings you subscribers.",
+    "Découvrir les Liens": "Discover Links",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

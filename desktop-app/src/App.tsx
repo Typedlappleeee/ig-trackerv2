@@ -46,6 +46,8 @@ const SiteLanding = lazy(() => import('@/pages/SiteLanding').then(m => ({ defaul
 const Admin = lazy(() => import('@/pages/Admin'))
 const Scheduled = lazy(() => import('@/pages/Scheduled'))
 const Links = lazy(() => import('@/pages/Links'))
+// Annonce de lancement des Liens (bandeau en haut de chaque page) — passer à false pour la retirer.
+const SHOW_LINKS_LAUNCH = true
 
 // Repli pendant le chargement d'une page (bref, discret, sans saut de mise en page).
 function PageLoader() {
@@ -199,7 +201,7 @@ function AppInner({ user }: { user: User }) {
         ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'scheduled'
         ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
-        : page === 'links' && license.isSuperAdmin
+        : page === 'links'
         ? <Links theme={theme} user={user} org={org} />
         : page === 'insights'
         ? <Placeholder theme={theme} spec={SPECS.insights!} />
@@ -230,6 +232,17 @@ function AppInner({ user }: { user: User }) {
       onSwitchOrg={org.switchOrg}
       onSignOut={signOut}
     >
+      {/* Annonce « Liens ScaleFlow » : reste affichée tant que SHOW_LINKS_LAUNCH est vrai. */}
+      {SHOW_LINKS_LAUNCH && page !== 'links' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(139,124,246,0.16), rgba(244,114,182,0.10))', border: '1px solid rgba(139,124,246,0.35)', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 9, background: '#8B7CF6', color: '#fff', flexShrink: 0, fontSize: 18 }}>🔗</span>
+          <span style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF' }}>Nouveau : les Liens ScaleFlow sont arrivés 🎉</span>
+            <span style={{ fontSize: 12.5, color: '#A1A1AA' }}>Ta page de liens façon Linktree, un lien suivi par compte et les clics en direct : sache enfin quel compte t’envoie des abonnés.</span>
+          </span>
+          <Btn theme={theme} tone="primary" label="Découvrir les Liens" onClick={() => setPage('links')} />
+        </div>
+      )}
       <Suspense fallback={<PageLoader />}>{content}</Suspense>
       <RunWidget theme={theme} />
       <Toaster />
