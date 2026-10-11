@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-11c',
+    date: '2026-10-11',
+    title: { fr: '🔥 Nouveau : la Veille Reels', en: '🔥 New: Reels Watch' },
+    items: {
+      fr: [
+        'Les Reels qui explosent en ce moment, classés par vues, avec le badge « ×N la normale » quand un Reel fait bien plus que d’habitude.',
+        'Filtres FR / US, période, niche et compte. Sur chaque Reel : vues, likes, commentaires, légende, téléchargement de la vidéo et lien.',
+        '« Mes comptes » : suis tes propres comptes pour voir quelles vidéos marchent le mieux. Menu Analyse → Veille Reels.',
+      ],
+      en: [
+        'Reels blowing up right now, ranked by views, with a “×N normal” badge when a Reel does far better than usual.',
+        'FR / US, period, niche and account filters. On each Reel: views, likes, comments, caption, video download and link.',
+        '“My accounts”: track your own accounts to see which videos perform best. Menu Analytics → Reels Watch.',
+      ],
+    },
+  },
+  {
     id: '2026-10-11b',
     date: '2026-10-11',
     title: { fr: '🔗 Les Liens ScaleFlow sont arrivés', en: '🔗 ScaleFlow Links are here' },

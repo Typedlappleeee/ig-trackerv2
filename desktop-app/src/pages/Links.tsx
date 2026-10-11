@@ -274,7 +274,9 @@ function AreaChart({ points, hourly }: { points: { ts: number; v: number; c: num
   const path = P.map((p, i) => {
     if (i === 0) return `M${p[0]},${p[1]}`
     const p0 = P[i - 2] ?? P[i - 1], p1 = P[i - 1], p3 = P[i + 1] ?? p
-    return `C${p1[0] + (p[0] - p0[0]) / 6},${p1[1] + (p[1] - p0[1]) / 6} ${p[0] - (p3[0] - p1[0]) / 6},${p[1] - (p3[1] - p1[1]) / 6} ${p[0]},${p[1]}`
+    // Points de contrôle bornés à la zone du graphique : la courbe ne plonge plus sous 0.
+    const yb = y(0), cy = (v: number) => Math.min(yb, Math.max(padT, v))
+    return `C${p1[0] + (p[0] - p0[0]) / 6},${cy(p1[1] + (p[1] - p0[1]) / 6)} ${p[0] - (p3[0] - p1[0]) / 6},${cy(p[1] - (p3[1] - p1[1]) / 6)} ${p[0]},${p[1]}`
   }).join(' ')
   const lab = (ts: number) => hourly ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   const every = Math.ceil(points.length / 6)
@@ -285,7 +287,7 @@ function AreaChart({ points, hourly }: { points: { ts: number; v: number; c: num
         {[0, nice / 2, nice].map(t => <g key={t}><line x1={padL} x2={w} y1={y(t)} y2={y(t)} stroke="rgba(255,255,255,0.06)" /><text x={padL - 8} y={y(t) + 3.5} textAnchor="end" fontSize={10.5} fill="#71717A">{fmtNumber(t)}</text></g>)}
         {P.length > 1 && <path d={`${path} L${P[P.length - 1][0]},${y(0)} L${P[0][0]},${y(0)} Z`} fill="#8B7CF6" fillOpacity={0.1} />}
         <path d={path} fill="none" stroke="#8B7CF6" strokeWidth={2} strokeLinejoin="round" />
-        {points.map((p, i) => i % every === 0 || i === points.length - 1 ? <text key={i} x={x(i)} y={H - 6} textAnchor="middle" fontSize={10.5} fill="#71717A">{lab(p.ts)}</text> : null)}
+        {points.map((p, i) => i % every === 0 || i === points.length - 1 ? <text key={i} x={x(i)} y={H - 6} textAnchor={i === points.length - 1 ? 'end' : i === 0 ? 'start' : 'middle'} fontSize={10.5} fill="#71717A">{lab(p.ts)}</text> : null)}
         {hover !== null && <g><line x1={x(hover)} x2={x(hover)} y1={padT} y2={y(0)} stroke="rgba(255,255,255,0.18)" /><circle cx={x(hover)} cy={y(points[hover].v)} r={4.5} fill="#8B7CF6" stroke="#111113" strokeWidth={2} /></g>}
       </svg>
       {hover !== null && (

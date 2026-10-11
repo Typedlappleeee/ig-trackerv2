@@ -87,6 +87,8 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       g: 'Analyse', items: [
         { k: 'insights' as PageKey, l: 'Performances', i: 'M3 3v18h18|M7 15l4-6 4 3 5-8' },
         { k: 'links' as PageKey, l: 'Liens', i: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1', soon: 'Nouveau' },
+        // Veille Reels : sélection ScaleFlow (gérée par le super-admin) + comptes suivis par chacun.
+        { k: 'viral' as PageKey, l: 'Veille Reels', i: 'M2 12h4l3-9 6 18 3-9h4', soon: 'Nouveau' },
         // « Santé des comptes » retirée : score heuristique (pas de vraie donnée santé)
         // → il signalait des comptes « bannis » sur des appareils sans compte réel.
         // Les vraies stats passent par Performances (données Meta officielles).
@@ -126,7 +128,7 @@ const TITLES: Record<PageKey, string[]> = {
   irtComptes: ['iRemoTech', 'Comptes'],
   scheduled: ['Diffusion', 'Programmé'],
   links: ['Analyse', 'Liens'],
-  viral: ['Admin', 'Veille Reels'],
+  viral: ['Analyse', 'Veille Reels'],
   admin: ['Admin', 'Licences'],
   settings: ['Réglages'],
 }
@@ -174,8 +176,6 @@ export default function Shell({
     ...navFor(infra, phoneCount, videoCount),
     ...(isAdmin ? [{ g: 'Admin', items: [
       { k: 'admin' as PageKey, l: 'Admin · Licences', i: 'M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z' },
-      // Veille des Reels viraux : réservée au super-admin pendant la phase de test.
-      { k: 'viral' as PageKey, l: 'Veille Reels', i: 'M22 12h-4l-3 9L9 3l-3 9H2' },
     ] }] : []),
   ]
 

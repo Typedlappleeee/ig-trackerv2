@@ -10,6 +10,7 @@ import { setLeaseOwner, runClientWatchguard } from '@/lib/phoneWatch'
 import { fetchAllPhones, stopPhones } from '@/lib/geelark'
 import { useConnections } from '@/lib/connections'
 import RunWidget from '@/components/RunWidget'
+import LaunchSpotlight, { spotlightSeen } from '@/components/LaunchSpotlight'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 import LicenseGate from '@/pages/LicenseGate'
 import ComingSoon from '@/components/ComingSoon'
@@ -110,6 +111,8 @@ function AppInner({ user }: { user: User }) {
   // ScaleFlow Cloud (auto-hébergé) reste vide tant que tu n'as pas branché tes serveurs.
   const [infra, setInfra] = useState<InfraKey>('geelark')
   const [page, setPage] = useState<PageKey>('hub')
+  // Écran « Nouveautés » : s'ouvre une fois à l'arrivée sur l'accueil, puis via la bannière.
+  const [spot, setSpot] = useState(() => !spotlightSeen())
   const org = useOrg(user)
   const license = useLicense(user, org)
   const { data, loading, reload } = useHubData(user, org, infra)
@@ -202,7 +205,7 @@ function AppInner({ user }: { user: User }) {
         ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'scheduled'
         ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
-        : page === 'viral' && license.isSuperAdmin
+        : page === 'viral'
         ? <ViralWatch theme={theme} user={user} org={org} isAdmin={license.isSuperAdmin} />
         : page === 'links'
         ? <Links theme={theme} user={user} org={org} />
@@ -235,18 +238,20 @@ function AppInner({ user }: { user: User }) {
       onSwitchOrg={org.switchOrg}
       onSignOut={signOut}
     >
-      {/* Annonce « Liens ScaleFlow » : reste affichée tant que SHOW_LINKS_LAUNCH est vrai. */}
-      {SHOW_LINKS_LAUNCH && page !== 'links' && (
+      {/* Annonce des nouveautés (Liens + Veille Reels) : reste affichée tant que SHOW_LINKS_LAUNCH est vrai. */}
+      {SHOW_LINKS_LAUNCH && page !== 'links' && page !== 'viral' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(139,124,246,0.16), rgba(244,114,182,0.10))', border: '1px solid rgba(139,124,246,0.35)', flexWrap: 'wrap' }}>
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 9, background: '#8B7CF6', color: '#fff', flexShrink: 0, fontSize: 18 }}>🔗</span>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 9, background: 'linear-gradient(135deg,#8B7CF6,#F472B6)', color: '#fff', flexShrink: 0, fontSize: 18 }}>🎉</span>
           <span style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF' }}>Nouveau : les Liens ScaleFlow sont arrivés 🎉</span>
-            <span style={{ fontSize: 12.5, color: '#A1A1AA' }}>Ta page de liens façon Linktree, un lien suivi par compte et les clics en direct : sache enfin quel compte t’envoie des abonnés.</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF' }}>Nouveau : les Liens ScaleFlow et la Veille Reels sont arrivés 🎉</span>
+            <span style={{ fontSize: 12.5, color: '#A1A1AA' }}>Sache quel compte t’envoie des abonnés, et repère les Reels qui explosent en ce moment. Plus TikTok et une interface toute neuve.</span>
           </span>
-          <Btn theme={theme} tone="primary" label="Découvrir les Liens" onClick={() => setPage('links')} />
+          <Btn theme={theme} label="Voir les nouveautés" onClick={() => setSpot(true)} />
+          <Btn theme={theme} tone="primary" label="Veille Reels" onClick={() => setPage('viral')} />
         </div>
       )}
       <Suspense fallback={<PageLoader />}>{content}</Suspense>
+      {spot && page === 'hub' && <LaunchSpotlight onClose={() => setSpot(false)} onNavigate={p => setPage(p)} />}
       <RunWidget theme={theme} />
       <Toaster />
       <DialogHost theme={theme} />

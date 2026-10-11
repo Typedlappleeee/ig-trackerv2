@@ -292,6 +292,7 @@
  "Reddit",
  "Reel",
  "Reels",
+ "Reels Instagram",
  "Reels Scaleflow",
  "Reels Trial Scaleflow",
  "Remix",
@@ -440,6 +441,7 @@
  "qui donne envie de regarder jusqu'au bout",
  "reason.eq.{0},stop_at.lt.{1}",
  "reels-{0}.csv",
+ "rotate({0}deg)",
  "sb_publishable_hip63djbBYnu3EsSx2gA4w_0tgjweEo",
  "scale",
  "scale(0.8)",
@@ -458,6 +460,7 @@
  "sfl-btn sfl-btn-block",
  "sfl-card sfl-rv sfl-plan",
  "sfl-cost-v sfl-num",
+ "sfsBar {0}ms linear both",
  "span 1",
  "span 2",
  "stealth",
@@ -509,5 +512,8 @@
  "🇬🇧 United Kingdom",
  "🇺🇸 US",
  "🇺🇸 United States",
- "🎬 Posting — Reels"
+ "🎬 Posting — Reels",
+ "💌 Telegram",
+ "📸 Instagram",
+ "🔥 Contenu exclusif"
 ]

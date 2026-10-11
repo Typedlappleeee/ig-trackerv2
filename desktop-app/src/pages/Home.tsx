@@ -157,9 +157,11 @@ function ActivityChart({ days }: { days: DayPoint[] }) {
     const ro = new ResizeObserver(([e]) => setW(Math.max(260, Math.floor(e.contentRect.width))))
     ro.observe(el); return () => ro.disconnect()
   }, [])
-  const H = 200, padL = 30, padB = 22, padT = 8
+  const H = 200, padB = 22, padT = 8
   const max = Math.max(4, ...days.map(d => d.ok + d.failed))
   const nice = (() => { const step = Math.pow(10, Math.floor(Math.log10(max))); const m = Math.ceil(max / step); return (m <= 2 ? 2 : m <= 5 ? 5 : 10) * step })()
+  // Marge gauche selon la plus longue graduation (« 1 000 » était coupé en « 000 »).
+  const padL = Math.max(30, 14 + fmtNumber(nice).length * 6.5)
   const plotW = w - padL, plotH = H - padB - padT
   const band = plotW / days.length
   const bw = Math.min(24, Math.max(6, band * 0.56))
