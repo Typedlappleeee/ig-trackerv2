@@ -4,6 +4,7 @@
 //   • depuis le navigateur intégré d'Instagram / TikTok : tente d'ouvrir le vrai navigateur
 // Env Vercel : SUPABASE_URL (ou VITE_SUPABASE_URL) + SUPABASE_SERVICE_ROLE_KEY.
 import { createClient } from '@supabase/supabase-js'
+import { randomUUID } from 'node:crypto'
 
 const BOT = /facebookexternalhit|facebot|instagram.*(preview|link)|twitterbot|slackbot|whatsapp|telegrambot|discordbot|linkedinbot|bot\b|crawler|spider|preview/i
 const IN_APP = /Instagram|FBAN|FBAV|BytedanceWebview|musical_ly|TikTok/i
@@ -53,7 +54,7 @@ export default async function handler(req, res) {
     const s = db()
 
     // Lien d'un compte, sinon page de liens.
-    const { data: link } = await s.from('tracked_links').select('id,page_id,destination').eq('code', code).maybeSingle()
+    const { data: link } = await s.from('tracked_links').select('*').eq('code', code).maybeSingle()
     let pg = null
     const pageId = link?.page_id ?? null
     if (link && !link.destination && pageId) ({ data: pg } = await s.from('link_pages').select('*').eq('id', pageId).maybeSingle())
@@ -61,7 +62,9 @@ export default async function handler(req, res) {
     if (!link && !pg) return page(res, 404, '<h1>Lien introuvable</h1>')
     if (pg && !pg.active) return page(res, 404, '<h1>Page indisponible</h1>')
 
-    const buttons = Array.isArray(pg?.buttons) ? pg.buttons : []
+    // Boutons de la page, avec les URL propres à CE compte (ex. son lien OF de suivi).
+    const ov = (link && link.overrides && typeof link.overrides === 'object') ? link.overrides : {}
+    const buttons = (Array.isArray(pg?.buttons) ? pg.buttons : []).map((x, i) => safeUrl(ov[i]) ? { ...x, url: ov[i] } : x)
     const b = btn !== null && /^\d+$/.test(btn) ? Number(btn) : null
     const target = link?.destination ? safeUrl(link.destination) : b !== null ? safeUrl(buttons[b]?.url) : null
 
@@ -79,8 +82,13 @@ export default async function handler(req, res) {
       }
     }
 
-    // Clic enregistré (sans bloquer la redirection en cas d'erreur).
-    await s.from('link_clicks').insert({ link_id: link?.id ?? null, page_id: pg?.id ?? pageId, button: b, country, device, bot }).then(() => {}, () => {})
+    // Visite (affichage de la page) ou clic (bouton / lien direct). Une visite reçoit un
+    // visit_id repris par ses clics → « visites avec clic » et taux de clic.
+    const vq = url.searchParams.get('v')
+    const visitId = b === null && !target ? randomUUID() : (/^[0-9a-f-]{36}$/i.test(vq || '') ? vq : null)
+    const row = { link_id: link?.id ?? null, page_id: pg?.id ?? pageId, button: b, country, device, bot, visit_id: visitId }
+    const ins = await s.from('link_clicks').insert(row).then(r => r, e => ({ error: e }))
+    if (ins && ins.error) { delete row.visit_id; await s.from('link_clicks').insert(row).then(() => {}, () => {}) }   // schéma v1
 
     if (target) { res.statusCode = 302; res.setHeader('Location', target); res.setHeader('Cache-Control', 'no-store'); return res.end() }
     if (!pg) return page(res, 404, '<h1>Lien introuvable</h1>')
@@ -88,7 +96,7 @@ export default async function handler(req, res) {
     const body = `${pg.avatar_url ? `<img class="av" src="${esc(pg.avatar_url)}" alt="">` : ''}
 <h1>${esc(pg.title)}</h1>${pg.bio ? `<p>${esc(pg.bio)}</p>` : ''}
 <div style="width:100%;display:flex;flex-direction:column;gap:10px;margin-top:10px">
-${buttons.map((x, i) => safeUrl(x?.url) ? `<a class="b${i === 0 ? ' p' : ''}" href="/l/${esc(code)}?b=${i}${q}" rel="nofollow">${esc(x.label || 'Lien')}</a>` : '').join('')}
+${buttons.map((x, i) => safeUrl(x?.url) ? `<a class="b${i === 0 ? ' p' : ''}" href="/l/${esc(code)}?b=${i}${q}&v=${visitId}" rel="nofollow">${esc(x.label || 'Lien')}</a>` : '').join('')}
 </div>`
     return page(res, 200, body, `<title>${esc(pg.title || 'Liens')}</title>`, pg.theme)
   } catch (e) {
