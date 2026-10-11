@@ -2113,6 +2113,7 @@ export const EN: Dict = {
     "· moy.": "· avg.",
     "Bientôt disponible.": "Coming soon.",
     "Les Reels viraux des comptes de référence apparaîtront ici dès le prochain relevé.": "Viral Reels from the reference accounts will show up here after the next fetch.",
+    "fonction pas à jour": "function out of date",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -2503,5 +2504,6 @@ export const EN: Dict = {
     ["{0} compte(s){1}", "{0} account(s){1}"],
     ["· {0} en erreur", "· {0} with errors"],
     ["Relevé le {0}", "Fetched on {0}"],
+    ["Relevé impossible : redéploie la fonction run-scheduled-posts et vérifie le secret HIKERAPI_KEY. ({0})", "Fetch failed: redeploy the run-scheduled-posts function and check the HIKERAPI_KEY secret. ({0})"],
   ],
 }

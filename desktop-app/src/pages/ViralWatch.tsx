@@ -74,8 +74,9 @@ export default function ViralWatch({ theme, user, canEdit }: { theme: Theme; use
     try {
       const { data: s } = await supabase.auth.getSession()
       const res = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token ?? ''}` }, body: JSON.stringify({ viral: 'refresh' }) })
-      const j = await res.json().catch(() => ({})) as { ok?: boolean; accounts?: number; reels?: number }
-      if (!res.ok || !j.ok) toast('Relevé impossible : redéploie la fonction run-scheduled-posts et vérifie le secret HIKERAPI_KEY.', 'bad', 8000)
+      const j = await res.json().catch(() => ({})) as { ok?: boolean; accounts?: number; reels?: number; error?: string }
+      // Ancienne version de la fonction (pas encore redéployée) : pas de champ « accounts ».
+      if (!res.ok || !j.ok || j.accounts === undefined) toast(`Relevé impossible : redéploie la fonction run-scheduled-posts et vérifie le secret HIKERAPI_KEY. (${j.error ?? (j.accounts === undefined && res.ok ? 'fonction pas à jour' : `HTTP ${res.status}`)})`, 'bad', 10000)
       else toast(`${j.accounts ?? 0} compte(s) relevé(s) · ${j.reels ?? 0} Reel(s)`, 'ok')
     } catch { toast('Relevé impossible (réseau).', 'bad') } finally { setBusy(false); void load() }
   }
