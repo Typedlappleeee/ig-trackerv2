@@ -36,7 +36,7 @@
   },
   "rewrites": [
     {
-      "source": "/:code((?!api$|assets$|l$)[a-z0-9][a-z0-9-]{1,60})",
+      "source": "/:code([a-z0-9][a-z0-9-]+)",
       "has": [
         {
           "type": "host",
@@ -46,7 +46,7 @@
       "destination": "/api/l?p=:code"
     },
     {
-      "source": "/:code((?!api$|assets$|l$)[a-z0-9][a-z0-9-]{1,60})",
+      "source": "/:code([a-z0-9][a-z0-9-]+)",
       "has": [
         {
           "type": "host",
