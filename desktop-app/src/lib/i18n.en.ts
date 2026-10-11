@@ -2065,6 +2065,15 @@ export const EN: Dict = {
     "Boutons (par défaut)": "Buttons (default)",
     "Ombre des boutons": "Button shadow",
     "Aperçu réel de la page publique": "Real preview of the public page",
+    "Pulsation": "Pulse",
+    "Reflet": "Shine",
+    "Secousse": "Shake",
+    "Rebond": "Bounce",
+    "Colle le lien (OF, MYM, Telegram…)": "Paste the link (OF, MYM, Telegram…)",
+    "✓ Lien valide": "✓ Valid link",
+    "Lien invalide": "Invalid link",
+    "Ajoute un lien pour que le bouton s’affiche": "Add a link so the button shows",
+    "Animation": "Animation",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -2445,5 +2454,6 @@ export const EN: Dict = {
     ["Flou : {0}px", "Blur: {0}px"],
     ["Assombrir : {0} %", "Darken: {0} %"],
     ["Arrondi des boutons : {0}px", "Button roundness: {0}px"],
+    ["{0} bouton(s) sans lien : ils s’afficheront dès qu’ils auront une URL.", "{0} button(s) without a link: they’ll show once they have a URL."],
   ],
 }
