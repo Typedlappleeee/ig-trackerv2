@@ -6,7 +6,7 @@ name: Deploy Supabase functions
 on:
   push:
     branches: [main]
-    paths: ['supabase/functions/**']
+    paths: ['supabase/functions/**', '.github/workflows/deploy-functions.yml']
   workflow_dispatch:
 
 jobs:
@@ -19,4 +19,4 @@ jobs:
           version: latest
       - run: supabase functions deploy run-scheduled-posts --project-ref fvmkmkspfksscgqyvysl --no-verify-jwt
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN || secrets.SUPABASE_ACCESS_TOKE }}
