@@ -33,7 +33,7 @@ describe('liens suivis /l/<code>', () => {
     const r = await call('/api/l?p=lea-ig07')
     expect(r.statusCode).toBe(200)
     expect(r.body).toContain('Mon OF')
-    expect(r.body).toContain('/l/lea-ig07?b=0')
+    expect(r.body).toMatch(/\/l\/lea-ig07\?b=0&v=[0-9a-f-]{36}/)
     expect(H.inserts[0]).toMatchObject({ link_id: 'l1', page_id: 'pg1', button: null, country: 'FR', device: 'ios', bot: false })
   })
   it('clic sur un bouton → redirection 302 vers sa vraie destination, clic compté', async () => {
@@ -41,6 +41,12 @@ describe('liens suivis /l/<code>', () => {
     expect(r.statusCode).toBe(302)
     expect(r.headers.Location).toBe('https://onlyfans.com/lea')
     expect(H.inserts[0]).toMatchObject({ link_id: 'l1', button: 0 })
+  })
+  it('lien d’un compte : ses propres URL de boutons (ex. son lien OF de suivi)', async () => {
+    H.links[0].overrides = { 0: 'https://onlyfans.com/lea/c133' }
+    const r = await call('/api/l?p=lea-ig07&b=0&v=11111111-2222-3333-4444-555555555555')
+    expect(r.headers.Location).toBe('https://onlyfans.com/lea/c133')
+    expect(H.inserts[0].visit_id).toBe('11111111-2222-3333-4444-555555555555')
   })
   it('lien direct → 302', async () => {
     const r = await call('/api/l?p=direct')
