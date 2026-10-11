@@ -3,17 +3,45 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/geelark-upload.js": { "maxDuration": 60 },
-    "api/groq.mjs": { "maxDuration": 60 },
-    "api/fivesim.mjs": { "maxDuration": 30 },
-    "api/herosms.mjs": { "maxDuration": 30 },
-    "api/iremotech.js": { "maxDuration": 60 },
-    "api/iremotech-stream.js": { "maxDuration": 60 },
-    "api/meta-callback.js": { "maxDuration": 15 },
-    "api/rotate.js": { "maxDuration": 15 },
-    "api/geelark.js": { "maxDuration": 30 }
+    "api/geelark-upload.js": {
+      "maxDuration": 60
+    },
+    "api/groq.mjs": {
+      "maxDuration": 60
+    },
+    "api/fivesim.mjs": {
+      "maxDuration": 30
+    },
+    "api/herosms.mjs": {
+      "maxDuration": 30
+    },
+    "api/iremotech.js": {
+      "maxDuration": 60
+    },
+    "api/iremotech-stream.js": {
+      "maxDuration": 60
+    },
+    "api/meta-callback.js": {
+      "maxDuration": 15
+    },
+    "api/rotate.js": {
+      "maxDuration": 15
+    },
+    "api/geelark.js": {
+      "maxDuration": 30
+    },
+    "api/l.js": {
+      "maxDuration": 10
+    }
   },
   "rewrites": [
-    { "source": "/((?!api/|assets/|ffmpeg/|.*\\.).*)", "destination": "/index.html" }
+    {
+      "source": "/l/:path*",
+      "destination": "/api/l?p=:path*"
+    },
+    {
+      "source": "/((?!api/|assets/|ffmpeg/|.*\\.).*)",
+      "destination": "/index.html"
+    }
   ]
 }

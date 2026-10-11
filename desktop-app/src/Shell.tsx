@@ -14,7 +14,7 @@ export type PageKey =
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
   | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
-  | 'scheduled'
+  | 'scheduled' | 'links'
   | 'admin'
   | 'settings'
 
@@ -124,6 +124,7 @@ const TITLES: Record<PageKey, string[]> = {
   irtAccount: ['iRemoTech', 'Création de compte'],
   irtComptes: ['iRemoTech', 'Comptes'],
   scheduled: ['Diffusion', 'Programmé'],
+  links: ['Admin', 'Liens'],
   admin: ['Admin', 'Licences'],
   settings: ['Réglages'],
 }
@@ -169,7 +170,11 @@ export default function Shell({
   // Compteurs de nav = vrais counts (téléphones, banque) ; null tant que non chargés.
   const NAV = [
     ...navFor(infra, phoneCount, videoCount),
-    ...(isAdmin ? [{ g: 'Admin', items: [{ k: 'admin' as PageKey, l: 'Admin · Licences', i: 'M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z' }] }] : []),
+    ...(isAdmin ? [{ g: 'Admin', items: [
+      { k: 'admin' as PageKey, l: 'Admin · Licences', i: 'M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z' },
+      // Liens suivis (façon GetMySocial) : réservé au super-admin pendant la phase de test.
+      { k: 'links' as PageKey, l: 'Liens', i: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1' },
+    ] }] : []),
   ]
 
   const path = TITLES[page] ?? ['Accueil']
