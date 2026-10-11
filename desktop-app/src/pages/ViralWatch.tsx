@@ -292,7 +292,7 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
   const [tab, setTab] = useState<'public' | 'mine'>('public')
   const [userView, setUserView] = useState(false)
   const [range, setRange] = useState<Range>('7')
-  const [sort, setSort] = useState<Sort>('score')
+  const [sort, setSort] = useState<Sort>('views')
   const [fNiche, setFNiche] = useState('')
   const [fAccount, setFAccount] = useState('')
   const [open, setOpen] = useState<number | null>(null)
@@ -362,7 +362,7 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Veille Reels"
-        sub={tab === 'public' ? 'Les Reels qui explosent en ce moment, sélectionnés par ScaleFlow — classés « au-dessus de la normale » de chaque compte.' : 'Suis tes comptes (ou ceux de tes modèles) et vois quelles vidéos marchent le mieux.'}
+        sub={tab === 'public' ? 'Les Reels qui explosent en ce moment, sélectionnés par ScaleFlow — classés par vues.' : 'Suis tes comptes (ou ceux de tes modèles) et vois quelles vidéos marchent le mieux.'}
         actions={<span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {isAdmin && <Segmented value={userView ? 'user' : 'admin'} onChange={v => setUserView(v === 'user')} options={[{ v: 'admin', l: 'Admin' }, { v: 'user', l: 'Vue utilisateur' }]} />}
           {showRefresh && <Btn theme={theme} tone="primary" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={busy ? 'Relevé en cours…' : 'Actualiser maintenant'} disabled={busy} onClick={refresh} />}
@@ -401,7 +401,7 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <Segmented value={range} onChange={setRange} options={[{ v: '1', l: '24 h' }, { v: '7', l: '7 jours' }, { v: '30', l: '30 jours' }]} />
-        <Segmented value={sort} onChange={setSort} options={[{ v: 'score', l: 'Au-dessus de la normale' }, { v: 'views', l: 'Plus de vues' }, { v: 'likes', l: 'Plus de likes' }, { v: 'recent', l: 'Plus récents' }]} />
+        <Segmented value={sort} onChange={setSort} options={[{ v: 'views', l: 'Plus de vues' }, { v: 'score', l: 'Au-dessus de la normale' }, { v: 'likes', l: 'Plus de likes' }, { v: 'recent', l: 'Plus récents' }]} />
         {niches.length > 1 && <select value={fNiche} onChange={e => setFNiche(e.target.value)} style={{ ...FIELD, width: 'auto', height: 30 }}><option value="">Toutes les niches</option>{niches.map(n => <option key={n} value={n}>{n}</option>)}</select>}
         {tabWatch.length > 1 && <select value={fAccount} onChange={e => setFAccount(e.target.value)} style={{ ...FIELD, width: 'auto', height: 30 }}><option value="">Tous les comptes</option>{tabWatch.map(w => <option key={w.id} value={w.username}>@{w.username}</option>)}</select>}
         <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A' }}>{fmtNumber(shown.length)} Reel(s)</span>
