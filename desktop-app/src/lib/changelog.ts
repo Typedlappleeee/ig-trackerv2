@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-11b',
+    date: '2026-10-11',
+    title: { fr: '🔗 Les Liens ScaleFlow sont arrivés', en: '🔗 ScaleFlow Links are here' },
+    items: {
+      fr: [
+        'Ta page de liens façon Linktree : photo, badge vérifié, fonds et effets animés, boutons et cartes image, animations.',
+        'Un lien suivi par compte, créé automatiquement pour tous tes comptes (avec leurs liens OF / MYM).',
+        'Tableau de bord : visites, clics, taux de clic, en direct, pays, meilleurs comptes. Menu Analyse → Liens.',
+      ],
+      en: [
+        'Your Linktree-style link page: photo, verified badge, animated backgrounds and effects, buttons and image cards, animations.',
+        'One tracked link per account, created automatically for all your accounts (with their OF / MYM links).',
+        'Dashboard: visits, clicks, click-through rate, live, countries, top accounts. Menu Analytics → Links.',
+      ],
+    },
+  },
+  {
     id: '2026-10-11',
     date: '2026-10-11',
     title: { fr: 'Relancer les échecs + calendrier', en: 'Retry failures + calendar' },
