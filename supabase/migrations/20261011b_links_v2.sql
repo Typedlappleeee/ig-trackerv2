@@ -23,3 +23,6 @@ alter table public.tracked_links add column if not exists overrides jsonb not nu
 -- Visite → clic : chaque affichage de page reçoit un visit_id, repris par le clic sur un bouton.
 alter table public.link_clicks add column if not exists visit_id uuid;
 create index if not exists link_clicks_ts on public.link_clicks (created_at desc);
+
+-- Design complet de la page (fond dégradé / couleur / image, effets, police, badge, boutons…).
+alter table public.link_pages add column if not exists design jsonb not null default '{}'::jsonb;
