@@ -36,6 +36,26 @@
   },
   "rewrites": [
     {
+      "source": "/:code((?!api$|assets$|l$)[a-z0-9][a-z0-9-]{1,60})",
+      "has": [
+        {
+          "type": "host",
+          "value": "tapmylink.fr"
+        }
+      ],
+      "destination": "/api/l?p=:code"
+    },
+    {
+      "source": "/:code((?!api$|assets$|l$)[a-z0-9][a-z0-9-]{1,60})",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.tapmylink.fr"
+        }
+      ],
+      "destination": "/api/l?p=:code"
+    },
+    {
       "source": "/l/:path*",
       "destination": "/api/l?p=:path*"
     },
