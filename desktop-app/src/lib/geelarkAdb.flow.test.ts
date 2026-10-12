@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 type Btn = { text: string; to?: string; field?: boolean }
 const H = vi.hoisted(() => ({
   screen: 'home', typed: '', saved: '', cmds: [] as string[], keyboard: false,
-  refuse: false, saveIgnored: false,
+  refuse: false, saveIgnored: false, confirm: false,
 }))
 const node = (t: string, y: number, extra = '') => `<node text="${t}" content-desc="" ${extra} bounds="[0,${y}][1080,${y + 80}]" />`
 function screens(): Record<string, Btn[]> {
@@ -21,6 +21,7 @@ function screens(): Record<string, Btn[]> {
     profiles: [{ text: 'other_acc', to: 'wrong' }, { text: 'Instagram', to: 'wrong' }, { text: handle, to: 'detail' }, { text: 'Instagram', to: 'detail' }],
     wrong: [{ text: 'Nom' }, { text: 'Nom d’utilisateur', to: 'wrong-editor' }],
     detail: [{ text: 'Nom' }, { text: 'Léa' }, { text: 'Nom d’utilisateur', to: 'editor' }, { text: handle }],
+    confirm: [{ text: 'Changer le nom d’utilisateur', to: 'saved' }, { text: 'Annuler', to: 'detail' }],
     editor: [{ text: 'Nom d’utilisateur' }, { text: H.typed, field: true }, ...(H.refuse ? [{ text: 'Ce nom d’utilisateur n’est pas disponible.' }] : []), { text: 'Terminé', to: 'saved' }],
   }
 }
@@ -48,7 +49,8 @@ vi.mock('./geelark', () => ({
       const y = Number(cmd.split(' ')[3])
       const list = screens()[H.screen] ?? []
       const btn = list[Math.round((y - 240) / 100)]
-      if (btn?.to === 'saved') { if (!H.refuse && !H.saveIgnored) H.saved = H.typed; H.screen = 'detail' }
+      if (btn?.to === 'saved' && H.confirm && H.screen === 'editor') H.screen = 'confirm'   // Instagram demande confirmation
+      else if (btn?.to === 'saved') { if (!H.refuse && !H.saveIgnored) H.saved = H.typed; H.screen = 'detail' }
       else if (btn?.to) H.screen = btn.to
     }
     return { code: 0, data: { output: out } }
@@ -57,7 +59,7 @@ vi.mock('./geelark', () => ({
 vi.mock('./phoneWatch', () => ({ heartbeatPhone: () => {} }))
 import { changeUsernameOnPhone } from './geelarkAdb'
 
-beforeEach(() => { Object.assign(H, { screen: 'home', typed: '', saved: '', cmds: [], keyboard: false, refuse: false, saveIgnored: false }) })
+beforeEach(() => { Object.assign(H, { screen: 'home', typed: '', saved: '', cmds: [], keyboard: false, refuse: false, saveIgnored: false, confirm: false }) })
 const log = () => {}
 
 describe('changer le @ sur un Instagram simulé (FR, « Espace Comptes »)', () => {
@@ -81,6 +83,12 @@ describe('changer le @ sur un Instagram simulé (FR, « Espace Comptes »)', () 
     spy.mockRestore()
     expect(r.ok).toBe(false)
     expect(r.error).toMatch(/non confirmé/)
+  })
+  it('Instagram demande de confirmer le changement → le robot confirme, puis vérifie', async () => {
+    H.confirm = true
+    const r = await changeUsernameOnPhone('b', 'g', 'nova.lea', log, 'old_handle')
+    expect(r).toEqual({ ok: true })
+    expect(H.saved).toBe('nova.lea')
   })
   it('pseudo invalide → refusé avant de toucher au téléphone', async () => {
     const r = await changeUsernameOnPhone('b', 'g', 'nova..lea', log)

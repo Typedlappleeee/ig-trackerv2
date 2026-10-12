@@ -106,3 +106,15 @@ describe('Centre de comptes — ligne du compte (écrans récents)', () => {
     expect(screenSummary('<hierarchy></hierarchy>')).toBe('(écran vide)')
   })
 })
+
+describe('vérification du nouveau @ (écrans groupés)', () => {
+  const row = (attrs: string) => `<node ${attrs} bounds="[0,100][1080,200]" />`
+  it('pseudo dans un texte court groupé', () => {
+    expect(screenShowsHandle(`<hierarchy>${row('text="Nom d’utilisateur luuciiieprzz"')}</hierarchy>`, 'luuciiieprzz')).toBe(true)
+    expect(screenShowsHandle(`<hierarchy>${row('content-desc="luuciiieprzz, Changer de compte"')}</hierarchy>`, '@luuciiieprzz')).toBe(true)
+  })
+  it('jamais un pseudo voisin, jamais le champ de saisie', () => {
+    expect(screenShowsHandle(`<hierarchy>${row('text="luuciiieprzz2"')}</hierarchy>`, 'luuciiieprzz')).toBe(false)
+    expect(screenShowsHandle(`<hierarchy>${row('class="android.widget.EditText" text="luuciiieprzz"')}</hierarchy>`, 'luuciiieprzz')).toBe(false)
+  })
+})
