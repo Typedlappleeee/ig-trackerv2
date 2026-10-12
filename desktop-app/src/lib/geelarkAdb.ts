@@ -245,12 +245,40 @@ const LOGIN_SCREEN = /^(Log in|Se connecter|Create new account|Créer un compte|
 // Instagram redemande le mot de passe / une vérification avant d'enregistrer.
 export const PASSWORD_PROMPT = /^(Re-enter your password|Saisissez à nouveau votre mot de passe|Enter your password|Entrez votre mot de passe|Confirm it['’]s you|Confirmez qu['’]il s['’]agit bien de vous|Check your email|Vérifiez votre e-mail|Enter confirmation code|Entrez le code de confirmation)$/i
 
-/** Ligne du BON compte Instagram dans « Profils » : celle du @ actuel si connu, sinon la 1re. */
+/** Centre du 1er nœud dont le text/content-desc COURT (≤ `max` caractères) vérifie `re`. */
+function findShortByRe(xml: string, re: RegExp, max: number): Pt | null {
+  for (const m of xml.matchAll(/<node\b[^>]*>/g)) {
+    const el = m[0]
+    for (const v of [el.match(/\btext="([^"]*)"/)?.[1] ?? '', el.match(/\bcontent-desc="([^"]*)"/)?.[1] ?? '']) {
+      if (v && v.length <= max && re.test(v)) { const p = centerOf(el); if (p) return p }
+    }
+  }
+  return null
+}
+
+/**
+ * Ligne du BON compte Instagram dans « Profils ». Le Centre de comptes récent groupe souvent
+ * la ligne en UN nœud (« Lucie, Instagram », « lucie.fr · Instagram ») et peut afficher le
+ * NOM plutôt que le @ : on accepte ces formes, mais jamais une phrase d'explication
+ * (« Gérez les profils de vos comptes Instagram et Facebook »).
+ */
 export function findAccountRow(xml: string, current?: string): Pt | null {
   const cur = current?.trim().replace(/^@/, '')
-  return (cur ? findByTextRe(xml, new RegExp(`^@?${esc(cur)}$`, 'i')) ?? findByTextRe(xml, new RegExp(`^@?${esc(cur)}[,\\s]`, 'i')) : null) ??
+  return (cur ? findShortByRe(xml, new RegExp(`(^|[\\s,·•@(])@?${esc(cur)}($|[\\s,·•)])`, 'i'), 80) : null) ??
     findByText(xml, 'Instagram') ??
+    findShortByRe(xml, /^.{1,60}?[,·•\s]\s*Instagram$/i, 70) ??
     findByResourceId(xml, 'account_item', 'profile_account_row', 'account_row', 'instagram_account')
+}
+
+/** Textes courts visibles à l'écran (diagnostic dans le journal quand un élément manque). */
+export function screenSummary(xml: string, n = 15): string {
+  const seen = new Set<string>()
+  for (const m of xml.matchAll(/(?:text|content-desc)="([^"]+)"/g)) {
+    const v = m[1].trim()
+    if (v && v.length <= 60 && !seen.has(v)) seen.add(v)
+    if (seen.size >= n) break
+  }
+  return [...seen].map(v => `« ${v} »`).join(', ') || '(écran vide)'
 }
 
 async function openProfileTab(bearer: string, phoneId: string, s: Screen, log: Log): Promise<string> {
@@ -294,15 +322,27 @@ async function openAccountCenterEditor(bearer: string, phoneId: string, s: Scree
       }
     }
   }
-  if (!ac) throw new Error('Centre de comptes introuvable — rien n’a été modifié')
-  await tap(bearer, phoneId, ac); await sleep(4000)
+  if (!ac) { log(`🔎 Écran : ${screenSummary(xml)}`); throw new Error('Centre de comptes introuvable — rien n’a été modifié') }
+  await tap(bearer, phoneId, ac)
 
+  // Le Centre de comptes (écrans web / Bloks) peut mettre plus de 4 s à s'afficher : on ATTEND
+  // l'entrée « Profils » (ou directement la ligne du compte) au lieu de dormir un temps fixe.
   log('👤 Profil…')
-  xml = await readScreen(bearer, phoneId)
-  const details = findByText(xml, 'Profiles', 'Profils', 'Profile and personal details', 'Profil et informations personnelles', 'Profile details')
-  if (details) { await tap(bearer, phoneId, details); await sleep(3000); xml = await readScreen(bearer, phoneId) }
-  const acc = findAccountRow(xml, current)
-  if (!acc) throw new Error('Compte Instagram introuvable dans le Centre de comptes — rien n’a été modifié')
+  const findProfiles = (x: string) => findByText(x, 'Profiles', 'Profils', 'Profile and personal details', 'Profil et informations personnelles', 'Profile details') ??
+    findShortByRe(x, /^(Profiles?|Profils?)\b/i, 40)
+  xml = (await waitForScreen(bearer, phoneId, x => !!(findProfiles(x) ?? findAccountRow(x, current)), 15_000)).xml
+  const details = findProfiles(xml)
+  if (details) {   // comme avant : on passe TOUJOURS par « Profils » quand l'entrée existe
+    await tap(bearer, phoneId, details)
+    xml = (await waitForScreen(bearer, phoneId, x => !!findAccountRow(x, current), 12_000)).xml
+  }
+  let acc = findAccountRow(xml, current)
+  if (!acc) {   // ligne hors écran : on défile une fois
+    await shellExec(bearer, phoneId, `input swipe ${s.cx} ${Math.floor(s.sh * 0.7)} ${s.cx} ${Math.floor(s.sh * 0.35)} 500`); await sleep(1500)
+    xml = await readScreen(bearer, phoneId)
+    acc = findAccountRow(xml, current)
+  }
+  if (!acc) { log(`🔎 Écran : ${screenSummary(xml)}`); throw new Error('Compte Instagram introuvable dans le Centre de comptes — rien n’a été modifié') }
   await tap(bearer, phoneId, acc)
   await sleep(3500)
   return readScreen(bearer, phoneId)
