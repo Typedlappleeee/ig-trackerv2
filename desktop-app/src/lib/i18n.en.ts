@@ -2184,6 +2184,7 @@ export const EN: Dict = {
     "✨ Nouveau ·": "✨ New ·",
     "Terminer": "Done",
     "Aperçu : c’est ce que voient les utilisateurs.": "Preview: this is what users see.",
+    "(écran vide)": "(empty screen)",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -2578,5 +2579,6 @@ export const EN: Dict = {
     ["Publié le {0} · {1} / {2}", "Posted {0} · {1} / {2}"],
     ["{0} · {1}{2} compte(s){3}", "{0} · {1}{2} account(s){3}"],
     ["Maximum {0} comptes suivis.", "Maximum {0} followed accounts."],
+    ["🔎 Écran : {0}", "🔎 Screen: {0}"],
   ],
 }

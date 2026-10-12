@@ -26,7 +26,7 @@ describe('ligne « nom d\'utilisateur » — jamais le nom affiché', () => {
 })
 
 // ── Nouvelles protections (édition en masse) ─────────────────────────────────
-import { USERNAME_REFUSED, PASSWORD_PROMPT, findAccountRow, findDialogDismiss, findFirstGalleryThumb, screenShowsHandle, isValidDump } from './geelarkAdb'
+import { USERNAME_REFUSED, PASSWORD_PROMPT, findAccountRow, findDialogDismiss, findFirstGalleryThumb, screenShowsHandle, isValidDump, screenSummary } from './geelarkAdb'
 import { usernameIssue, usernameTemplateIssue, usernameListIssues } from './igRules'
 
 describe('édition en masse — lecture d’écran', () => {
@@ -78,5 +78,31 @@ describe('règles Instagram des pseudos', () => {
   it('pseudos fixes en double refusés', () => {
     expect(usernameListIssues(['a.b', 'A.B'], 2).join(' ')).toMatch(/unique/)
     expect(usernameListIssues(['a{4}'], 5)).toEqual([])
+  })
+})
+
+describe('Centre de comptes — ligne du compte (écrans récents)', () => {
+  const row = (attrs: string, b: string) => `<node ${attrs} bounds="${b}" />`
+  it('ligne groupée « Nom, Instagram » sans @', () => {
+    const xml = `<hierarchy>${row('text="" content-desc="Profils"', '[0,100][1080,200]')}${row('text="" content-desc="Lucie, Instagram"', '[0,300][1080,400]')}</hierarchy>`
+    expect(findAccountRow(xml)).toEqual([540, 350])
+  })
+  it('@ connu au milieu d’un texte court', () => {
+    const xml = `<hierarchy>${row('text="Autre, Instagram" content-desc=""', '[0,300][1080,400]')}${row('text="Lucie · @lucie.fr" content-desc=""', '[0,500][1080,600]')}</hierarchy>`
+    expect(findAccountRow(xml, 'lucie.fr')).toEqual([540, 550])
+    expect(findAccountRow(xml, '@lucie.fr')).toEqual([540, 550])
+  })
+  it('« lucie.fr, Instagram » avec le @ connu, sans confondre lucie.fr2', () => {
+    const xml = `<hierarchy>${row('text="lucie.fr2, Instagram"', '[0,300][1080,400]')}${row('text="lucie.fr, Instagram"', '[0,500][1080,600]')}</hierarchy>`
+    expect(findAccountRow(xml, 'lucie.fr')).toEqual([540, 550])
+  })
+  it('jamais une phrase d’explication', () => {
+    const xml = `<hierarchy>${row('text="Gérez les informations de profil de vos comptes sur Facebook et Instagram"', '[0,300][1080,400]')}</hierarchy>`
+    expect(findAccountRow(xml)).toBeNull()
+  })
+  it('résumé d’écran : textes courts, uniques, limités', () => {
+    const xml = `<hierarchy>${row('text="Profils" content-desc="Profils"', '[0,0][1,1]')}${row('text="Lucie"', '[0,0][1,1]')}${row(`text="${'x'.repeat(80)}"`, '[0,0][1,1]')}</hierarchy>`
+    expect(screenSummary(xml)).toBe('« Profils », « Lucie »')
+    expect(screenSummary('<hierarchy></hierarchy>')).toBe('(écran vide)')
   })
 })
