@@ -2185,6 +2185,7 @@ export const EN: Dict = {
     "Terminer": "Done",
     "Aperçu : c’est ce que voient les utilisateurs.": "Preview: this is what users see.",
     "(écran vide)": "(empty screen)",
+    "✔ Confirmation du changement": "✔ Confirming the change",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -2580,5 +2581,7 @@ export const EN: Dict = {
     ["{0} · {1}{2} compte(s){3}", "{0} · {1}{2} account(s){3}"],
     ["Maximum {0} comptes suivis.", "Maximum {0} followed accounts."],
     ["🔎 Écran : {0}", "🔎 Screen: {0}"],
+    ["↻ Repli : image hébergée chez GeeLark ({0})", "↻ Fallback: image hosted on GeeLark ({0})"],
+    ["Envoi de l'image vers GeeLark impossible{0}", "Could not send the image to GeeLark{0}"],
   ],
 }

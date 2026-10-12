@@ -6,7 +6,7 @@
 // le Centre de comptes Meta. Chaque étape cherche l'élément par texte/resource-id
 // dans le dump UI, avec une coordonnée de repli ; le log raconte chaque action pour
 // pouvoir recaler le flow quand Instagram change son interface.
-import { geelarkFetch, ensurePhoneRunning, sleep, throwIfAborted } from './geelark'
+import { geelarkFetch, ensurePhoneRunning, sleep, throwIfAborted, geelarkUploadImage } from './geelark'
 import { heartbeatPhone } from './phoneWatch'
 import { usernameIssue } from './igRules'
 
@@ -139,30 +139,46 @@ async function clearAndType(bearer: string, phoneId: string, point: Pt, text: st
 // Android 13+ ignore le broadcast MEDIA_SCANNER : un fichier poussé à la main
 // n'apparaît pas dans la galerie d'Instagram. Le transfert de fichiers GeeLark
 // (material center → /phone/file/upload) l'indexe correctement.
-const _materialCache = new Map<string, Promise<string | null>>()
-function materialId(bearer: string, fileUrl: string, fileName: string): Promise<string | null> {
+type Material = { id: string | null; error?: string }
+const _materialCache = new Map<string, Promise<Material>>()
+async function tempUpload(bearer: string, fileUrl: string, fileName: string): Promise<Material> {
+  let error = ''
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const up = await geelarkFetch('/material/temp/upload', { fileUrl, fileType: 1, fileName }, bearer)
+      const fid = ((up['data'] as Record<string, unknown>)?.['fileId']) as string | undefined
+      if (Number(up['code']) === 0 && fid) return { id: fid }
+      error = String(up['msg'] ?? `code ${up['code']}`)
+    } catch (e) { error = e instanceof Error ? e.message : String(e) }
+    await sleep(1500 + attempt * 1500)
+  }
+  return { id: null, error }
+}
+// L'URL signée de la banque peut être refusée par GeeLark (longueur, format…) : repli en
+// hébergeant d'abord l'image chez GeeLark (/upload/getUrl, comme pour les posts).
+function materialId(bearer: string, fileUrl: string, fileName: string, log: Log): Promise<Material> {
   const hit = _materialCache.get(fileUrl)
   if (hit) return hit
-  const p = (async () => {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const up = await geelarkFetch('/material/temp/upload', { fileUrl, fileType: 1, fileName }, bearer)
-        const fid = ((up['data'] as Record<string, unknown>)?.['fileId']) as string | undefined
-        if (Number(up['code']) === 0 && fid) return fid
-      } catch { /* retry */ }
-      await sleep(1500 + attempt * 1500)
-    }
-    return null
+  const p = (async (): Promise<Material> => {
+    const first = await tempUpload(bearer, fileUrl, fileName)
+    if (first.id) return first
+    log(`   ↻ Repli : image hébergée chez GeeLark (${first.error || 'refus'})`)
+    const hosted = await geelarkUploadImage(bearer, fileUrl, log)
+    if (!hosted) return { id: null, error: first.error }
+    const ext = (hosted.split('?')[0].match(/\.([a-z0-9]+)$/i)?.[1] || 'jpg').toLowerCase()
+    const second = await tempUpload(bearer, hosted, fileName.replace(/\.[a-z0-9]+$/i, `.${ext}`))
+    return second.id ? second : { id: null, error: second.error || first.error }
   })()
   _materialCache.set(fileUrl, p)
-  p.then(v => { if (!v) _materialCache.delete(fileUrl) }).catch(() => _materialCache.delete(fileUrl))
+  p.then(v => { if (!v.id) _materialCache.delete(fileUrl) }).catch(() => _materialCache.delete(fileUrl))
   return p
 }
 
 async function pushImageToGallery(bearer: string, phoneId: string, imageUrl: string, log: Log): Promise<{ ok: boolean; error?: string }> {
   const fileName = `sf_pfp_${Date.now()}.jpg`
-  const fileId = await materialId(bearer, imageUrl, fileName)
-  if (!fileId) return { ok: false, error: 'Envoi de l\'image vers GeeLark impossible' }
+  const mat = await materialId(bearer, imageUrl, fileName, log)
+  const fileId = mat.id
+  if (!fileId) return { ok: false, error: `Envoi de l'image vers GeeLark impossible${mat.error ? ` (${mat.error})` : ''}` }
   let taskId: string | undefined
   for (let attempt = 0; attempt < 3 && !taskId; attempt++) {
     const push = await geelarkFetch('/phone/file/upload', { id: phoneId, fileId, path: '/sdcard/DCIM/Camera' }, bearer)
@@ -370,6 +386,7 @@ async function saveField(bearer: string, phoneId: string, log: Log): Promise<str
 
 // Messages d'Instagram quand le pseudo est refusé (pris, invalide, trop de changements).
 // Apostrophes droites ET typographiques (Instagram FR écrit « n’est pas disponible »).
+export const USERNAME_CONFIRM = /^(Change username|Changer (le|de) nom d['’]utilisateur|Confirm|Confirmer)$/i
 export const USERNAME_REFUSED = /not available|isn['’]t available|is not available|n['’]est pas disponible|already taken|déjà pris|can['’]t change|ne pouvez pas|try again later|réessayez plus tard|only use letters|uniquement des lettres|isn['’]t allowed|n['’]est pas autorisé/i
 
 // Libellé de la ligne / de l'écran « pseudo ». Ancré au DÉBUT du texte : la ligne
@@ -417,7 +434,12 @@ export function isNameEditor(xml: string): boolean {
 /** Le pseudo `handle` est-il affiché à l'écran (Centre de comptes ou en-tête du profil) ? */
 export function screenShowsHandle(xml: string, handle: string): boolean {
   const h = esc(handle.replace(/^@/, ''))
-  return !!findByTextRe(xml, new RegExp(`^@?${h}$`, 'i')) || !!findByTextRe(xml, new RegExp(`^(Username|Nom d['’]utilisateur|Pseudo),\\s*@?${h}$`, 'i'))
+  // Le champ de saisie contient le pseudo TAPÉ, pas forcément enregistré : on l'ignore.
+  xml = xml.replace(/<node\b[^>]*class="android\.widget\.EditText"[^>]*>/g, '')
+  // Le pseudo seul, ou dans un texte court groupé (« Nom d'utilisateur luuciiieprzz »,
+  // « luuciiieprzz, Changer de compte ») — en mot entier : « lea » ≠ « lea2 ».
+  return !!findByTextRe(xml, new RegExp(`^@?${h}$`, 'i')) ||
+    !!findShortByRe(xml, new RegExp(`(^|[\\s,·•:@(])@?${h}($|[\\s,·•)])`, 'i'), 80)
 }
 
 /** 1re vignette de la grille de la galerie (la photo la plus récente), hors tuile « appareil photo ». */
@@ -478,7 +500,11 @@ export async function changeUsernameOnPhone(
     await sleep(2500)  // Instagram vérifie la disponibilité pendant la frappe
     const refusedBefore = screenHas(await dumpXml(bearer, phoneId), USERNAME_REFUSED)
     if (refusedBefore) return { ok: false, error: `Instagram refuse « @${handle} » : ${refusedBefore}` }
-    const after = await saveField(bearer, phoneId, log)
+    let after = await saveField(bearer, phoneId, log)
+    // Instagram peut demander de CONFIRMER le changement (« Changer le nom d'utilisateur ? »).
+    // Sans ce tap, la modification est abandonnée. Bouton explicite uniquement, jamais « OK ».
+    const confirm = findByTextRe(after, USERNAME_CONFIRM)
+    if (confirm) { log('   ✔ Confirmation du changement'); await tap(bearer, phoneId, confirm); await sleep(3000); after = await dumpXml(bearer, phoneId) }
     const refused = screenHas(after, USERNAME_REFUSED)
     if (refused) return { ok: false, error: `Instagram refuse « @${handle} » : ${refused}` }
     if (findByTextRe(after, PASSWORD_PROMPT)) return { ok: false, error: 'Instagram demande le mot de passe / une vérification pour changer le pseudo — à faire une fois à la main' }
@@ -491,7 +517,10 @@ export async function changeUsernameOnPhone(
       xml = await openProfileTab(bearer, phoneId, s, log)
       seen = screenShowsHandle(xml, handle) || (await waitForScreen(bearer, phoneId, x => screenShowsHandle(x, handle), 6000)).ok
     }
-    if (!seen) return { ok: false, error: `Changement non confirmé : @${handle} n’apparaît pas sur le profil après l’enregistrement` }
+    if (!seen) {
+      log(`🔎 Écran : ${screenSummary(await dumpXml(bearer, phoneId).catch(() => ''))}`)
+      return { ok: false, error: `Changement non confirmé : @${handle} n’apparaît pas sur le profil après l’enregistrement` }
+    }
     log('   ✅ Nom d\'utilisateur changé (vérifié)')
     return { ok: true }
   } catch (e) {
