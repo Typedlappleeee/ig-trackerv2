@@ -325,8 +325,6 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
     : []
   const photos = usePhotos(user, org)
   const topReels = useTopReels(8)
-  // Meilleures miniatures d'abord (Reels les plus vus) : la n°1 va au bandeau « Publier un Reel ».
-  const best = [...(topReels ?? []).map(r => r.thumb), ...photos.viral, ...photos.bank].filter((x, i, a) => a.indexOf(x) === i)
   const TILES = launchTiles(infra).map(t => t.id === 'reels' && data && !loading ? { ...t, hint: `${fmtNumber(data.phoneCount)} comptes prêts` } : t)
   const STEPS = [
     { done: !!conns.bearer, title: 'Connecter GeeLark', text: 'Colle ton token GeeLark (OpenAPI) pour piloter tes téléphones.', cta: 'Ouvrir les réglages', page: 'settings' as PageKey },
@@ -343,7 +341,6 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* Bandeau « cinéma » : vraies miniatures de part et d'autre, titre XXL, action principale. */}
       <HomeHero
-        photos={best}
         kicker={`${hello}, ${firstName}`}
         line1={infra === 'cloud' ? 'Ton parc' : 'Tes comptes'}
         line2="en pilote auto"

@@ -2754,6 +2754,10 @@ export const EN: Dict = {
     "« Copy API key »": "“Copy API key”",
     "et colle-la ici telle quelle. Elle reste sur le serveur : personne ne peut la relire depuis l’app.": "and paste it here as is. It stays on the server: nobody can read it back from the app.",
     "en pilote auto": "on autopilot",
+    "Reel publié": "Reel posted",
+    "Story publiée": "Story posted",
+    "Warmup terminé": "Warmup done",
+    "✓ Reel publié": "✓ Reel posted",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
