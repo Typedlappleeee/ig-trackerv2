@@ -16,6 +16,7 @@ import { visibleTools, type Tool } from '@/lib/tools'
 import { openTool } from '@/lib/openTool'
 import { ToolCard, usePhotos, pickerFor } from '@/pages/Explore'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
+import { HomeHero, ViralShowcase, useTopReels } from '@/components/CineHero'
 
 // Tuiles « Lancer » — portées de _hub() (LAUNCH), par infrastructure.
 function launchTiles(infra: InfraKey): { id: string; label: string; hint: string; icon: string; page: PageKey }[] {
@@ -320,6 +321,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
     ? (() => { const v = visibleTools(infra, isAdmin); return [...v.filter(t => t.badge === 'Populaire'), ...v.filter(t => t.badge === 'Nouveau')].slice(0, 6) })()
     : []
   const photos = usePhotos(user, org)
+  const topReels = useTopReels(8)
   const TILES = launchTiles(infra).map(t => t.id === 'reels' && data && !loading ? { ...t, hint: `${fmtNumber(data.phoneCount)} comptes prêts` } : t)
   const STEPS = [
     { done: !!conns.bearer, title: 'Connecter GeeLark', text: 'Colle ton token GeeLark (OpenAPI) pour piloter tes téléphones.', cta: 'Ouvrir les réglages', page: 'settings' as PageKey },
@@ -334,20 +336,22 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      {/* En-tête : salutation + état du compte en un coup d'œil */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, color: '#71717A', marginBottom: 6 }}>{cap}</div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.15, color: '#EDEDEF' }}>
-            {hello}, <span data-no-tr>{firstName}</span>
-          </h1>
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {/* Bandeau « cinéma » : vraies miniatures de part et d'autre, titre XXL, action principale. */}
+      <HomeHero
+        photos={(topReels ?? []).map(r => r.thumb).concat(photos.viral).slice(0, 2)}
+        kicker={`${hello}, ${firstName}`}
+        line1={infra === 'cloud' ? 'Ton parc' : 'Tes comptes'}
+        line2="en pilote automatique"
+        sub={<>{data ? `${fmtNumber(data.phoneCount)} comptes prêts` : '…'} · {balance === null ? '…' : `${fmtNumber(balance)} crédits`} · {cap}</>}
+        cta={infra === 'cloud' ? 'Ouvrir mes appareils' : 'Publier un Reel'}
+        onCta={() => infra === 'cloud' ? onNavigate('cloud') : openTool(onNavigate, 'publish', { mode: 'reels' })}
+        secondary="Explorer les outils" onSecondary={() => onNavigate('explore')}
+        footer={<>
           {infra !== 'cloud' && <StatusPill ok={conns.loading ? null : !!conns.bearer} label={conns.loading ? 'GeeLark…' : conns.bearer ? 'GeeLark connecté' : 'GeeLark non connecté'} onClick={() => conns.bearer ? onNavigate('phones') : openTool(onNavigate, 'settings', { tab: 'integrations' })} />}
           {onNow !== null && <StatusPill ok={true} label={`${fmtNumber(onNow)} allumé(s) maintenant`} onClick={() => onNavigate('phones')} />}
           <Btn label="Actualiser" theme={theme} sm onClick={refresh} icon="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.7-3|M21 3v6h-6|M3 21v-6h6" />
-        </div>
-      </div>
+        </>}
+      />
 
       {showOnboard && <Onboarding theme={theme} steps={STEPS} onNavigate={p => p === 'settings' ? openTool(onNavigate, 'settings', { tab: 'integrations' }) : onNavigate(p)} onHide={() => { setHideOnboard(true); try { localStorage.setItem(ONBOARD_KEY, '1') } catch { /* ignore */ } }} />}
 
@@ -380,6 +384,9 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
         </Panel>
         <LiveRuns theme={theme} onNavigate={onNavigate} />
       </div>
+
+      {/* Vitrine Veille Reels (grandes cartes plein cadre) */}
+      {topReels && topReels.length >= 2 && <div style={{ marginTop: 16 }}><ViralShowcase reels={topReels} onOpen={() => onNavigate('viral')} /></div>}
 
       {/* Lancer */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '24px 0 12px' }}>
