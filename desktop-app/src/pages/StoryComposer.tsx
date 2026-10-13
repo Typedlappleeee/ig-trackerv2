@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { fetchAllRows } from '@/lib/bankStorage'
 import type { User } from '@supabase/supabase-js'
 import { startRunHistory, peekRelaunch, takeRelaunch } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
@@ -67,7 +68,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, mRes] = await Promise.all([
       scope(supabase.from('phones').select('id,ig_username,phone_name,status,group_name,geelark_id')).not('geelark_id', 'is', null).order('phone_name'),
-      scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }),
+      fetchAllRows<any>(() => scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }).order('id')),
     ])
     const ph = (phRes.data ?? []) as Phone[]
     setPhones(ph)
@@ -89,7 +90,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
   // photo fraîchement importée a bien son id dans `imageIds` mais pas dans `images` → pool vide.
   const reloadImages = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false })
+    const { data } = await fetchAllRows<any>(() => scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }).order('id'))
     const all = ((data ?? []) as Media[]).filter(m => !(SENTINELS.includes(m.notes ?? '') && !m.storage_path && !m.file_url))
     const imgs = all.filter(isImage)
     setImages(imgs.length > 0 ? imgs : all)

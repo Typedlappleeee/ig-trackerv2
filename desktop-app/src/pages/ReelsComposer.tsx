@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fetchAllRows } from '@/lib/bankStorage'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { startRunHistory, peekRelaunch, takeRelaunch } from '@/lib/runHistory'
@@ -76,7 +77,9 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
 
   // Options de run (fonctionnelles).
   const [vidMode, setVidMode] = useState<'seq' | 'random'>('random')  // répartition vidéo → compte (aléatoire par défaut)
-  const [autoRemove, setAutoRemove] = useState(true)               // usage unique
+  // Usage unique DÉSACTIVÉ par défaut : activé, chaque vidéo publiée partait à la corbeille puis
+  // était effacée 7 jours après — la principale cause des médias qui « disparaissaient ».
+  const [autoRemove, setAutoRemove] = useState(false)              // usage unique
   const [reelsTrial, setReelsTrial] = useState(false)              // essai Reels
   const [schedOpen, setSchedOpen] = useState(false)                // modale de programmation
   const [schedVal, setSchedVal] = useState('')                     // valeur datetime-local
@@ -100,7 +103,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
   // pour ne plus refaire les réglages ni recoller les captions à chaque fois.
   type ReelsCfg = {
     captions: string[]; capMode: 'seq' | 'random'; vidMode: 'seq' | 'random'
-    autoRemove: boolean; reelsTrial: boolean; simulPhones: 'all' | number
+    autoRemove: boolean; autoRemove2?: boolean; reelsTrial: boolean; simulPhones: 'all' | number
     rotationOn: boolean; group: string; healthy: boolean
   }
   const COMPOSER = 'reels'
@@ -108,12 +111,14 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
   const [presets, setPresets] = useState<ComposerPreset<ReelsCfg>[]>([])
   const [presetSel, setPresetSel] = useState('')
 
-  const currentCfg = (): ReelsCfg => ({ captions, capMode, vidMode, autoRemove, reelsTrial, simulPhones, rotationOn, group, healthy })
+  const currentCfg = (): ReelsCfg => ({ captions, capMode, vidMode, autoRemove, autoRemove2: autoRemove, reelsTrial, simulPhones, rotationOn, group, healthy })
   const applyCfg = (c: Partial<ReelsCfg>, rotOk: boolean) => {
     if (c.captions && c.captions.length) setCaptions(c.captions); else if (c.captions) setCaptions([''])
     if (c.capMode) setCapMode(c.capMode)
     if (c.vidMode) setVidMode(c.vidMode)
-    if (typeof c.autoRemove === 'boolean') setAutoRemove(c.autoRemove)
+    // `autoRemove2` : choix fait APRÈS le passage du défaut à « désactivé » (l'ancien
+    // réglage mémorisé valait « activé » sans que personne l'ait choisi).
+    if (typeof c.autoRemove2 === 'boolean') setAutoRemove(c.autoRemove2)
     if (typeof c.reelsTrial === 'boolean') setReelsTrial(c.reelsTrial)
     if (c.simulPhones !== undefined) setSimulPhones(c.simulPhones)
     if (typeof c.group === 'string') setGroup(c.group)
@@ -165,7 +170,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, vRes, bal] = await Promise.all([
       scope(supabase.from('phones').select('id,ig_username,phone_name,status,group_name,geelark_id,ig_status,last_post_at,account_state,pp_url')).not('geelark_id', 'is', null).order('phone_name'),
-      scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }),
+      fetchAllRows<any>(() => scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }).order('id')),
       // Solde fiable (RPC SECURITY DEFINER côté perso → contourne la RLS de user_credits).
       currentOrg ? fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : fetchBalance(user.id),
     ])
@@ -616,7 +621,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
               <Segmented value={vidMode} onChange={setVidMode} options={[{ v: 'seq', l: 'Séquentiel' }, { v: 'random', l: 'Aléatoire' }]} />
             </div>
             {/* Usage unique */}
-            <RunToggle label="Usage unique des vidéos" hint="Retire de la banque les vidéos utilisées" on={autoRemove} onToggle={() => setAutoRemove(v => !v)} theme={theme} border />
+            <RunToggle label="Usage unique des vidéos" hint="Envoie les vidéos publiées à la corbeille (effacées après 7 jours)" on={autoRemove} onToggle={() => setAutoRemove(v => !v)} theme={theme} border />
             {/* Essai Reels */}
             {!tiktok && <RunToggle label="Essai Reels" hint="Publie en mode essai (visible non-abonnés)" on={reelsTrial} onToggle={() => setReelsTrial(v => !v)} theme={theme} border />}
             {/* Miniatures par vidéo (définies à l'étape Vidéos) — Instagram uniquement */}

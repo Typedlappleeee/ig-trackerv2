@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fetchAllRows } from '@/lib/bankStorage'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
@@ -76,7 +77,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
       const { data } = await scope(supabase.from('caption_bank').select('id,title,content')).order('created_at', { ascending: false })
       setCaps((data ?? []) as Cap[])
     } else {
-      const { data } = await scope(supabase.from('content_bank').select('*')).is('deleted_at', null).order('created_at', { ascending: false })
+      const { data } = await fetchAllRows<any>(() => scope(supabase.from('content_bank').select('*')).is('deleted_at', null).order('created_at', { ascending: false }).order('id'))
       const all = ((data ?? []) as Media[]).filter(m => !(SENTINELS.includes(m.notes ?? '') && !m.storage_path && !m.file_url))
       const typed = kind === 'images' ? all.filter(isImg) : all.filter(m => !isImg(m))
       setMedia(typed.length > 0 ? typed : all)

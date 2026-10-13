@@ -24,6 +24,7 @@ import {
   geelarkUploadVideo, geelarkUploadImage,
 } from '@/lib/geelark'
 import { changeUsernameOnPhone, changeProfilePicOnPhone, resetInstagram } from '@/lib/geelarkAdb'
+import { fetchAllRows } from '@/lib/bankStorage'
 import { startCreditRun, isCreditError, CREDIT_COSTS, type CreditRun } from '@/lib/credits'
 import { startRun, type RunHandle } from '@/lib/runStore'
 import { heartbeatPhone } from '@/lib/phoneWatch'
@@ -184,9 +185,11 @@ const kindOf = (r: BankRow): 'image' | 'video' => {
 const isMedia = (r: BankRow) => !SENTINELS.includes(r.notes ?? '') && !r.deleted_at && !!(r.storage_path || r.file_url)
 
 async function bankRows(scope: Scope): Promise<BankRow[]> {
-  let q = supabase.from('content_bank').select('id,folder,title,storage_path,file_url,notes,deleted_at')
-  q = scope.orgId ? q.eq('org_id', scope.orgId) : q.eq('user_id', scope.userId).is('org_id', null)
-  const { data, error } = await q
+  const make = () => {
+    const q = supabase.from('content_bank').select('id,folder,title,storage_path,file_url,notes,deleted_at').order('created_at', { ascending: false }).order('id')
+    return scope.orgId ? q.eq('org_id', scope.orgId) : q.eq('user_id', scope.userId).is('org_id', null)
+  }
+  const { data, error } = await fetchAllRows<BankRow>(make)
   if (error) throw new Error(`Banque : ${error.message}`)
   return (data ?? []) as BankRow[]
 }

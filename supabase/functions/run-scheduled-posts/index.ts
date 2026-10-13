@@ -584,11 +584,20 @@ Deno.serve(async (req) => {
       .select('id, storage_path, thumbnail_path').lt('deleted_at', cutoff).limit(500)
     if (expired && expired.length) {
       const ids = (expired as { id: string }[]).map(r => r.id)
-      await db.from('content_bank').delete().in('id', ids)
-      const paths = (expired as { storage_path?: string; thumbnail_path?: string }[])
-        .flatMap(r => [r.storage_path, r.thumbnail_path]).filter(Boolean) as string[]
+      // On n'efface du stockage QUE les fichiers des lignes réellement supprimées, et
+      // jamais un fichier encore utilisé par une autre ligne (copie, autre dossier…).
+      const { data: gone, error: delErr } = await db.from('content_bank').delete().in('id', ids).select('id, storage_path, thumbnail_path')
+      if (delErr) throw delErr
+      const cand = [...new Set(((gone ?? []) as { storage_path?: string; thumbnail_path?: string }[])
+        .flatMap(r => [r.storage_path, r.thumbnail_path]).filter(Boolean) as string[])]
+      let paths = cand
+      if (cand.length) {
+        const { data: still } = await db.from('content_bank').select('storage_path, thumbnail_path').or(`storage_path.in.(${cand.map(p => `"${p}"`).join(',')}),thumbnail_path.in.(${cand.map(p => `"${p}"`).join(',')})`)
+        const used = new Set(((still ?? []) as { storage_path?: string; thumbnail_path?: string }[]).flatMap(r => [r.storage_path, r.thumbnail_path]))
+        paths = cand.filter(p => !used.has(p))
+      }
       if (paths.length) await db.storage.from('content').remove(paths)
-      summary['trash_purge'] = `${ids.length} média(s) purgé(s) (corbeille > 7 j)`
+      summary['trash_purge'] = `${(gone ?? []).length} média(s) purgé(s) (corbeille > 7 j)`
     }
   } catch { /* best-effort */ }
 

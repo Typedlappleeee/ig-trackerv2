@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, PageHead, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABEL } from '@/lib/bankStorage'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -40,7 +41,7 @@ function isSentinel(i: ContentItem): boolean {
 // ── Type de média inféré de l'extension (même logique que electron Bank.tsx) ────
 type MediaType = 'video' | 'image'
 function inferType(i: ContentItem): MediaType {
-  const src = (i.storage_path ?? i.file_url ?? '').toLowerCase()
+  const src = (i.storage_path ?? i.file_url ?? '').toLowerCase().split('?')[0]
   const ext = src.split('.').pop() ?? ''
   if (['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif'].includes(ext)) return 'image'
   return 'video'
@@ -100,10 +101,12 @@ function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin = '400px
 
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
-function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx }: {
+function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx, broken = false }: {
   item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: (e: React.MouseEvent) => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
-  selecting?: boolean; idx?: number
+  selecting?: boolean; idx?: number; broken?: boolean
 }) {
+  const [failed, setFailed] = useState(false)
+  const ext = ((item.storage_path ?? item.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)
   const fresh = (item.used_count ?? 0) === 0
   const dur = type === 'video' ? fmtDuration(item.duration) : ''
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -112,6 +115,14 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
     position: 'absolute', inset: 0,
     background: '#161618',
   }
+  // Vignette de repli lisible (jamais un carré vide) : format non lisible par le navigateur
+  // (ex. .MOV HEVC d'iPhone), ou fichier introuvable dans le stockage.
+  const fallback = (
+    <span style={{ ...placeholder, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, background: broken ? 'repeating-linear-gradient(135deg,#1A1215,#1A1215 8px,#16101299 8px,#16101299 16px)' : `linear-gradient(160deg, rgba(${hueFor(item.id)},0.28), #161618)`, color: broken ? '#F87171' : 'rgba(255,255,255,0.7)' }}>
+      <Icon d={broken ? 'M12 9v4|M12 17h.01|M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z' : type === 'video' ? 'M6 4l14 8-14 8V4z' : 'M3 3h18v18H3z|M21 15l-5-5L5 21'} size={18} />
+      <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.04em' }}>{broken ? 'Fichier introuvable' : ext || (type === 'video' ? 'VIDÉO' : 'IMAGE')}</span>
+    </span>
+  )
   return (
     <button
       ref={btnRef}
@@ -131,16 +142,16 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
         background: '#161618',
       }}
     >
-      {thumb
-        ? <img src={thumb} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      {broken || failed ? fallback : thumb
+        ? <img src={thumb} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : type === 'video'
           // Vidéo : aperçu (1re image) monté SEULEMENT si la tuile est visible → limite
           // le nombre de <video> décodés en même temps. Hors écran → placeholder.
           ? (media && inView
-              ? <video src={`${media}#t=0.1`} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              ? <video src={`${media}#t=0.1`} muted playsInline preload="metadata" onError={() => setFailed(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
               : <span style={placeholder} />)
           : media && inView
-            ? <img src={media} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            ? <img src={media} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={placeholder} />}
 
       <TileCheck on={on} onToggle={onToggle} accent={theme.accent} />
@@ -192,22 +203,28 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [sel, setSel] = useState<Set<string>>(new Set())
 
   // ── Chargement (requête IDENTIQUE à electron Bank.tsx : select * scoping org/user) ──
+  // Paginé (au-delà de 1000 lignes Supabase coupait en silence → des médias « disparaissaient »),
+  // et seule la DERNIÈRE requête compte (changement d'espace perso / organisation en cours).
+  const loadSeq = useRef(0)
   const load = useCallback(async () => {
+    if (org.loading) return
+    const seq = ++loadSeq.current
     setLoading(true)
     setError(null)
-    let query = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
-    query = currentOrg
-      ? query.eq('org_id', currentOrg.id)
-      : query.eq('user_id', user.id).is('org_id', null)
-    const { data, error: err } = await query
-    if (err) { setError('Erreur lors du chargement de la banque.'); setItems([]); setFolderNames([]); setLoading(false); return }
-    const rows = (data ?? []) as ContentItem[]
+    const make = () => {
+      const q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).order('id')
+      return currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    }
+    const { data, error: err } = await fetchAllRows<ContentItem>(make)
+    if (seq !== loadSeq.current) return
+    if (err) { setError('Erreur lors du chargement de la banque.'); setLoading(false); return }
+    const rows = data
     setFolderNames(rows.filter(isSentinel).map(r => r.folder ?? r.title).filter((f): f is string => Boolean(f)))
     // Médias en corbeille (deleted_at) exclus de la banque, listés à part (restaurable 7 j).
     setItems(rows.filter(r => !isSentinel(r) && !r.deleted_at))
     setTrash(rows.filter(r => !isSentinel(r) && !!r.deleted_at).sort((a, b) => (b.deleted_at ?? '').localeCompare(a.deleted_at ?? '')))
     setLoading(false)
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, org.loading])
 
   useEffect(() => { load() }, [load])
   useEffect(() => { setSel(new Set()) }, [tab, folder])
@@ -241,27 +258,40 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   //    (média source) — mais PAR LOTS de 100 (createSignedUrls échoue si on lui passe
   //    des centaines de chemins d'un coup → c'était la régression des vignettes). On
   //    fusionne les résultats au fur et à mesure. ─────────────────────────────────────
+  // URLs valables 6 h et RE-signées toutes les 5 h (avant : 1 h jamais renouvelée → vignettes
+  // et lecture vides si l'app restait ouverte). Lot en échec → nouvel essai. Les chemins que
+  // le stockage ne connaît pas sont notés « introuvables » (fichier réellement disparu).
+  const [missing, setMissing] = useState<Set<string>>(new Set())
+  const [signTick, setSignTick] = useState(0)
+  useEffect(() => { const id = setInterval(() => setSignTick(t => t + 1), 5 * 3600_000); return () => clearInterval(id) }, [])
   useEffect(() => {
-    const thumbPaths = items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
-    const mediaPaths = items.filter(i => i.storage_path).map(i => i.storage_path as string)
+    const thumbPaths = [...items, ...trash].filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
+    const mediaPaths = [...items, ...trash].filter(i => i.storage_path).map(i => i.storage_path as string)
     const paths = [...new Set([...thumbPaths, ...mediaPaths])]
     if (paths.length === 0) return
     let cancelled = false
     ;(async () => {
       const CHUNK = 100
+      const lost: string[] = []
       for (let i = 0; i < paths.length; i += CHUNK) {
         const batch = paths.slice(i, i + CHUNK)
-        const { data } = await supabase.storage.from('content').createSignedUrls(batch, 3600)
+        let res = await supabase.storage.from('content').createSignedUrls(batch, 6 * 3600)
+        if (res.error || !res.data) { await new Promise(r => setTimeout(r, 1500)); res = await supabase.storage.from('content').createSignedUrls(batch, 6 * 3600) }
         if (cancelled) return
-        if (data) setThumbs(prev => {
-          const map = { ...prev }
-          data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl })
-          return map
-        })
+        const data = res.data
+        if (data) {
+          data.forEach(d => { if (!d.signedUrl && d.path && /not.?found|does not exist/i.test(String(d.error ?? ''))) lost.push(d.path) })
+          setThumbs(prev => {
+            const map = { ...prev }
+            data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl })
+            return map
+          })
+        }
       }
+      if (!cancelled) setMissing(new Set(lost))
     })()
     return () => { cancelled = true }
-  }, [items])
+  }, [items, trash, signTick])
 
   function thumbFor(i: ContentItem): string | null {
     if (i.thumbnail_url) return i.thumbnail_url
@@ -271,7 +301,24 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // URL signée du média source (pour afficher la vidéo/image quand pas de miniature).
   function mediaFor(i: ContentItem): string | null {
     if (i.storage_path && thumbs[i.storage_path]) return thumbs[i.storage_path]
-    return i.file_url ?? null
+    return i.file_url && /^https?:/i.test(i.file_url) ? i.file_url : null
+  }
+  // Média VIDE : fichier absent du stockage, ou ancien chemin local (C:\…) jamais migré.
+  const isBroken = (i: ContentItem) => (!!i.storage_path && missing.has(i.storage_path)) || (!i.storage_path && !(i.file_url && /^https?:/i.test(i.file_url)))
+  const broken = useMemo(() => items.filter(isBroken), [items, missing])
+  async function cleanBroken() {
+    if (!broken.length) return
+    if (!await confirmDialog({ title: `Retirer ${broken.length} fichier(s) vide(s) ?`, text: 'Leur fichier n’existe plus (envoi interrompu ou supprimé). On retire juste ces lignes vides de ta banque.', confirmLabel: 'Nettoyer' })) return
+    const ids = broken.map(b => b.id)
+    let removed = 0
+    for (let k = 0; k < ids.length; k += 200) {
+      const part = ids.slice(k, k + 200)
+      const r = await scopeQ(supabase.from('content_bank').delete().in('id', part).select('id'))
+      if (!r.error) removed += (r.data?.length ?? 0)
+      else { const rpc = await supabase.rpc('delete_bank_items', { p_ids: part }); if (!rpc.error) removed += part.length }
+    }
+    toast(removed ? `${removed} fichier(s) vide(s) retiré(s).` : 'Impossible de retirer ces fichiers (droits insuffisants).', removed ? 'ok' : 'bad')
+    load()
   }
 
   // Compteurs par type (réels).
@@ -302,12 +349,18 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState<string | null>(null)
   const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
+  const { usage, reload: reloadUsage } = useBankUsage(currentOrg?.id ?? null)
   const IMG = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 
   async function importFiles(files: FileList | File[]) {
     const list = Array.from(files)
     if (list.length === 0) return
-    let done = 0
+    // Limite d'espace de l'abonnement (le stockage la vérifie aussi côté serveur).
+    const u = await reloadUsage()
+    const over = quotaIssue(u, list.reduce((s, f) => s + f.size, 0))
+    if (over) { toast(over, 'bad', 9000); return }
+    let done = 0, ok = 0
+    const fails: string[] = []
     for (const file of list) {
       setUploading(`${file.name} (${++done}/${list.length})`)
       try {
@@ -316,17 +369,35 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         const id = crypto.randomUUID()
         const storagePath = `videos/${scopeFolder}/${id}.${ext}`
         const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
-        if (up.error) { setNotice(`Échec upload ${file.name} : ${up.error.message}`); continue }
+        if (up.error) { fails.push(`${file.name} : ${/row-level security|policy/i.test(up.error.message) ? 'espace plein ou accès refusé' : up.error.message}`); continue }
+        // Miniature + durée générées tout de suite (avant : aucune miniature → vignettes vides).
+        let thumbPath: string | null = null, duration: number | null = null
+        if (!file.type.startsWith('image') && !IMG.includes(ext)) {
+          const th = await videoThumb(file)
+          if (th) {
+            duration = th.duration || null
+            const tp = `videos/${scopeFolder}/${id}_thumb.jpg`
+            const tu = await supabase.storage.from('content').upload(tp, th.blob, { contentType: 'image/jpeg', upsert: false })
+            if (!tu.error) thumbPath = tp
+          }
+        }
         const dest = (folder !== 'Tous' && folder !== 'Jamais publiées') ? folder : null
-        await supabase.from('content_bank').insert({
+        const ins = await supabase.from('content_bank').insert({
           user_id: user.id, org_id: currentOrg?.id ?? null,
-          title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: null,
-          file_url: null, folder: dest, duration: null, tags: [], notes: null, used_count: 0,
+          title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: thumbPath,
+          file_url: null, folder: dest, duration, tags: [], notes: null, used_count: 0,
         })
-      } catch (e) { setNotice(`Échec ${file.name} : ${e instanceof Error ? e.message : ''}`) }
+        if (ins.error) {   // ligne refusée → on ne laisse pas un fichier orphelin dans le stockage
+          await supabase.storage.from('content').remove([storagePath, ...(thumbPath ? [thumbPath] : [])]).catch(() => {})
+          fails.push(`${file.name} : ${ins.error.message}`); continue
+        }
+        ok++
+      } catch (e) { fails.push(`${file.name} : ${e instanceof Error ? e.message : 'erreur'}`) }
     }
     setUploading(null)
-    setNotice(`${list.length} fichier(s) importé(s).`)
+    if (fails.length) toast(`${ok}/${list.length} importé(s). Échec : ${fails.slice(0, 3).join(' · ')}${fails.length > 3 ? '…' : ''}`, ok ? 'info' : 'bad', 9000)
+    else toast(`${ok} fichier(s) importé(s).`, 'ok')
+    void reloadUsage()
     load()
   }
 
@@ -481,13 +552,16 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   async function purgeMedia(items: ContentItem[]) {
     const ids = items.map(i => i.id)
     if (!ids.length) return
-    const paths = items.flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
-    let q = supabase.from('content_bank').delete().in('id', ids)
+    let q = supabase.from('content_bank').delete().in('id', ids).select('id')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    await q
+    const { data: gone, error } = await q
+    if (error) { toast(`Échec : ${error.message}`, 'bad'); return }
+    const goneIds = new Set(((gone ?? []) as { id: string }[]).map(r => r.id))
+    const paths = items.filter(i => goneIds.has(i.id)).flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
     for (const part of ((a: string[], n: number) => { const o: string[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o })(paths, 100)) {
       try { if (part.length) await supabase.storage.from('content').remove(part) } catch { /* best-effort */ }
     }
+    void reloadUsage()
     load()
   }
 
@@ -521,7 +595,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }
   async function deleteFolder(name: string) {
     // Dégroupe les médias (folder → null). Nécessite le droit d'update sur ces lignes.
-    const { error: upErr } = await scopeQ(supabase.from('content_bank').update({ folder: null }).eq('folder', name).not('notes', 'in', '("__sf_folder__","__sf_drive_folder__")'))
+    const { error: upErr } = await scopeQ(supabase.from('content_bank').update({ folder: null }).eq('folder', name).or('notes.is.null,notes.not.in.("__sf_folder__","__sf_drive_folder__")'))
     // Supprime la/les ligne(s) sentinelle(s) du dossier via la RPC fiable (RLS-proof),
     // fallback DELETE direct si la RPC n'est pas déployée.
     const { data: sentinels } = await scopeQ(supabase.from('content_bank').select('id').eq('folder', name).in('notes', ['__sf_folder__', '__sf_drive_folder__']))
@@ -830,10 +904,38 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             : `Toutes tes vidéos et images, organisées par dossier. ${neverPublished} média${neverPublished > 1 ? 's' : ''} n’${neverPublished > 1 ? 'ont' : 'a'} jamais été publié${neverPublished > 1 ? 's' : ''}.`}
         actions={<>
           {trash.length > 0 && <Btn label={`Corbeille (${trash.length})`} theme={theme} icon="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" onClick={() => setShowTrash(true)} />}
-          <Btn label="Sync Drive" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
+          <Btn label="Actualiser" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
           <Btn label={uploading ? uploading : "Importer"} theme={theme} tone="primary" icon="M12 5v14|M5 12h14" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
         </>}
       />
+
+      {/* Espace utilisé (limite de l'abonnement) + fichiers vides à nettoyer */}
+      {(usage || broken.length > 0) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          {usage && (() => {
+            const pct = usage.quota ? Math.min(100, Math.round((usage.used / usage.quota) * 100)) : 0
+            const col = pct >= 100 ? '#F87171' : pct >= 80 ? '#FBBF24' : theme.accent
+            return (
+              <div title={usage.quota ? `Abonnement ${PLAN_LABEL[usage.plan] ?? usage.plan} · corbeille comprise` : 'Espace illimité'} style={{ flex: '1 1 280px', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: '#111113', border: `1px solid ${pct >= 80 ? col + '66' : 'rgba(255,255,255,0.07)'}` }}>
+                <span style={{ display: 'flex', color: col }}><Icon d="M21 5c0 1.7-4 3-9 3S3 6.7 3 5s4-3 9-3 9 1.3 9 3z|M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5|M3 12c0 1.7 4 3 9 3s9-1.3 9-3" size={15} /></span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5 }}>
+                    <span style={{ color: '#EDEDEF', fontWeight: 600 }}>{usage.quota ? `${fmtBytes(usage.used)} / ${fmtBytes(usage.quota)}` : `${fmtBytes(usage.used)} · illimité`}</span>
+                    <span style={{ color: pct >= 80 ? col : '#71717A' }}>{usage.quota ? (pct >= 100 ? 'Espace plein — envois bloqués' : pct >= 80 ? `${pct} % · bientôt plein` : `${pct} %`) : ''}</span>
+                  </span>
+                  {usage.quota !== null && <span style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${Math.max(2, pct)}%`, background: col, borderRadius: 99, transition: 'width .4s ease' }} /></span>}
+                </span>
+              </div>
+            )
+          })()}
+          {broken.length > 0 && (
+            <div style={{ flex: '1 1 280px', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.3)' }}>
+              <span style={{ flex: 1, fontSize: 12.5, color: '#FCA5A5' }}>{broken.length} fichier(s) vide(s) : leur fichier n’existe plus.</span>
+              <Btn theme={theme} sm tone="danger" label="Nettoyer" onClick={() => void cleanBroken()} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Corps : colonne Dossiers + grille */}
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '228px minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
@@ -985,7 +1087,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             }}>
               {shown.map((i, idx) => (
                 <Tile
-                  key={i.id} idx={idx} selecting={selecting} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)}
+                  key={i.id} idx={idx} selecting={selecting} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)} broken={isBroken(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={(e) => toggleAt(idx, i.id, e.shiftKey)}
                   onDragStart={e => e.dataTransfer.setData('text/plain', i.id)}
                   onOpen={() => openPlayer(i)}
@@ -1138,7 +1240,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
       {/* Confirmation de suppression */}
       {confirmDel && (
-        <Modal theme={theme} title={`Supprimer ${confirmDel.length} média(s) ?`} sub="Action irréversible — les fichiers sont retirés du stockage." icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6"
+        <Modal theme={theme} title={`Supprimer ${confirmDel.length} média(s) ?`} sub="Ils vont dans la corbeille : restaurables pendant 7 jours, puis effacés." icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6"
           onClose={() => setConfirmDel(null)}
           footer={<>
             <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDel(null)} />

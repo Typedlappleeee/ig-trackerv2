@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { fetchAllRows } from '@/lib/bankStorage'
 import type { User } from '@supabase/supabase-js'
 import { startRunHistory } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
@@ -62,7 +63,7 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const [phRes, mRes] = await Promise.all([
       scope(supabase.from('phones').select('id,ig_username,phone_name,status,group_name,geelark_id')).not('geelark_id', 'is', null).order('phone_name'),
-      scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }),
+      fetchAllRows<any>(() => scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }).order('id')),
     ])
     setPhones((phRes.data ?? []) as Phone[])
     const all = ((mRes.data ?? []) as Media[]).filter(m => !(SENTINELS.includes(m.notes ?? '') && !m.storage_path && !m.file_url))

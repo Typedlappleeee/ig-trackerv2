@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { fetchAllRows } from '@/lib/bankStorage'
 import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -78,7 +79,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
 
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false })
+    const { data } = await fetchAllRows<any>(() => scope(supabase.from('content_bank').select('*')).order('created_at', { ascending: false }).order('id'))
     setVideos(((data ?? []) as Video[]).filter(v => !(SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url)))
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
