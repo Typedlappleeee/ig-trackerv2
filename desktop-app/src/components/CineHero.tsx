@@ -3,7 +3,7 @@
 // (grandes cartes plein cadre). Photos = miniatures Veille Reels (via le proxy d'images).
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
-import { fmtNumber } from '@/lib/data'
+import { compact } from '@/lib/data'
 import { useNarrow } from '@/lib/ui'
 
 const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
@@ -38,14 +38,37 @@ export const CINE_KEYFRAMES = `
   @media (prefers-reduced-motion: reduce){.sf-cine *{animation:none!important}}
 `
 
-function Side({ src, side }: { src: string | null; side: 'left' | 'right' }) {
-  const mask = `linear-gradient(to ${side === 'left' ? 'right' : 'left'}, #000 35%, transparent 100%)`
+// Mur de téléphones (même esprit que le site) : colonnes de cartes 9:16 qui défilent en sens
+// alternés, en perspective, avec les vraies miniatures. CSS pur, aucun re-rendu.
+const WALL_CSS = `
+  .sf-wall{position:absolute;inset:-12% -8%;perspective:1300px;overflow:hidden;pointer-events:none}
+  .sf-wall-in{position:absolute;left:50%;top:50%;display:flex;gap:16px;transform:translate(-50%,-50%) rotateX(20deg) rotateZ(-11deg) scale(1.05)}
+  .sf-wall-col{display:flex;flex-direction:column;gap:16px;width:150px;animation:sfWallUp 52s linear infinite;will-change:transform}
+  .sf-wall-col.dn{animation-name:sfWallDn}
+  .sf-wall-ph{position:relative;aspect-ratio:9/17;border-radius:20px;overflow:hidden;background:#141416;border:1px solid rgba(255,255,255,.1);box-shadow:0 0 0 3px #0E0E10}
+  .sf-wall-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .sf-wall-ph i{position:absolute;top:6px;left:50%;width:34%;height:9px;margin-left:-17%;border-radius:99px;background:#000}
+  .sf-wall-ph b{position:absolute;left:8px;top:22px;padding:3px 7px;border-radius:99px;font-size:9.5px;font-weight:800;color:#0A0A0B;background:#fff}
+  .sf-wall-ph b.run{color:#fff;background:rgba(139,92,246,.9)}
+  @keyframes sfWallUp{from{transform:translateY(0)}to{transform:translateY(calc(-50% - 8px))}}
+  @keyframes sfWallDn{from{transform:translateY(calc(-50% - 8px))}to{transform:translateY(0)}}
+  @media (prefers-reduced-motion: reduce){.sf-wall-col{animation:none!important}}
+`
+function PhoneWall({ photos, cols }: { photos: string[]; cols: number }) {
+  const at = (n: number) => photos.length ? photos[n % photos.length] : null
   return (
-    <span style={{ position: 'absolute', top: 0, bottom: 0, [side]: 0, width: '38%', overflow: 'hidden', WebkitMaskImage: mask, maskImage: mask }}>
-      {src
-        ? <img src={src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%', filter: 'grayscale(.15) contrast(1.05) brightness(.8)', animation: `cineKen 14s ease-in-out ${side === 'left' ? 0 : -7}s infinite alternate` }} />
-        : null}
-    </span>
+    <div className="sf-wall" aria-hidden="true">
+      <div className="sf-wall-in">
+        {Array.from({ length: cols }, (_, c) => (
+          <div key={c} className={'sf-wall-col' + (c % 2 ? ' dn' : '')} style={{ animationDuration: `${48 + (c % 3) * 8}s` }}>
+            {[0, 1].map(d => Array.from({ length: 4 }, (_, i) => {
+              const n = c * 3 + i * 2, src = at(n)
+              return <span key={`${d}-${i}`} className="sf-wall-ph">{src && <img src={src} alt="" loading="lazy" />}<i />{(c + i) % 3 === 0 && <b className={(c + i) % 2 ? 'run' : ''}>{(c + i) % 2 ? 'Publication…' : '✓ Publié'}</b>}</span>
+            }))}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -55,26 +78,48 @@ export function HomeHero({ photos, kicker, line1, line2, sub, cta, onCta, second
 }) {
   const narrow = useNarrow(760)
   return (
-    <section className="sf-cine" style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, border: '1px solid rgba(255,255,255,0.07)', background: '#0C0C0D', minHeight: narrow ? 300 : 330, marginBottom: 16 }}>
-      <style>{CINE_KEYFRAMES}</style>
-      {!narrow && <><Side src={photos[0] ?? null} side="left" /><Side src={photos[1] ?? null} side="right" /></>}
-      {narrow && photos[0] && <span style={{ position: 'absolute', inset: 0, opacity: 0.35 }}><img src={photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', animation: 'cineKen 14s ease-in-out infinite alternate' }} /></span>}
-      <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(40% 60% at 50% 45%, rgba(12,12,13,.0), rgba(12,12,13,.35))' }} />
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12, padding: narrow ? '34px 18px 22px' : '40px 24px 26px', maxWidth: 640, margin: '0 auto', animation: 'cineUp .6s cubic-bezier(.2,.8,.2,1) both' }}>
-        <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#EDEDEF' }}>{kicker}</span>
-        <h1 style={{ ...H1, fontSize: narrow ? 34 : 'clamp(40px, 4.6vw, 62px)' }}>
+    <section className="sf-cine" style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 24, border: '1px solid rgba(255,255,255,0.07)', background: '#0A0A0B', minHeight: narrow ? 380 : 440, display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+      <style>{CINE_KEYFRAMES + WALL_CSS}</style>
+      <PhoneWall photos={photos} cols={narrow ? 4 : 8} />
+      <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 62% 70% at 50% 50%, rgba(10,10,11,.95) 0%, rgba(10,10,11,.82) 45%, rgba(10,10,11,.4) 100%)' }} />
+      <div style={{ position: 'relative', zIndex: 2, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12, padding: narrow ? '36px 18px 24px' : '48px 24px 30px', maxWidth: 760, margin: '0 auto', animation: 'cineUp .6s cubic-bezier(.2,.8,.2,1) both' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 28, padding: '0 12px', borderRadius: 99, border: '1px solid rgba(167,139,250,.35)', background: 'rgba(167,139,250,.1)', fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#C4B5FD', backdropFilter: 'blur(8px)' }}>{kicker}</span>
+        <h1 style={{ ...H1, letterSpacing: '-0.055em', lineHeight: 0.9, fontSize: narrow ? 'clamp(28px, 8.4vw, 40px)' : 'clamp(48px, 5.6vw, 84px)' }}>
           <span style={{ display: 'block', color: '#F4F4F5' }}>{line1}</span>
-          <span style={{ display: 'block', color: '#A1A1AA' }}>{line2}</span>
+          <span style={{ display: 'block', background: 'linear-gradient(90deg,#C4B5FD,#F472B6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{line2}</span>
         </h1>
-        <span style={{ fontSize: 14.5, fontWeight: 500, color: '#A1A1AA' }}>{sub}</span>
+        <span style={{ fontSize: 14.5, fontWeight: 500, color: '#C4C4CC' }}>{sub}</span>
         <span style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button type="button" onClick={onCta} style={{ height: 42, padding: '0 20px', border: 'none', borderRadius: 11, background: LIME, color: '#fff', fontSize: 14, fontWeight: 750, cursor: 'pointer', boxShadow: '0 4px 0 #6D28D9, 0 14px 30px -10px rgba(167,139,250,.55)', transition: 'transform .12s ease' }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(2px)' }} onMouseUp={e => { e.currentTarget.style.transform = 'none' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none' }}>{cta}</button>
-          {secondary && onSecondary && <button type="button" onClick={onSecondary} style={{ height: 42, padding: '0 18px', borderRadius: 11, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.06)', color: '#EDEDEF', fontSize: 14, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(6px)' }}>{secondary}</button>}
+          <button type="button" onClick={onCta} style={{ height: 46, padding: '0 22px', border: 'none', borderRadius: 12, background: 'linear-gradient(135deg,#8B5CF6,#EC4899)', color: '#fff', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 0 #6D28D9, 0 16px 34px -12px rgba(236,72,153,.6)', transition: 'transform .12s ease' }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(2px)' }} onMouseUp={e => { e.currentTarget.style.transform = 'none' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none' }}>{cta} →</button>
+          {secondary && onSecondary && <button type="button" onClick={onSecondary} style={{ height: 46, padding: '0 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.06)', color: '#EDEDEF', fontSize: 14.5, fontWeight: 650, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>{secondary}</button>}
         </span>
-        {footer && <span style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>{footer}</span>}
+        {footer && <span style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>{footer}</span>}
       </div>
     </section>
+  )
+}
+
+/** Barre de chiffres unique (séparateurs fins) : Accueil, Veille Reels. */
+export interface StatItem { l: string; v: ReactNode; c?: string; sub?: ReactNode; extra?: ReactNode; onClick?: () => void }
+export function StatBar({ items }: { items: StatItem[] }) {
+  const narrow = useNarrow(760)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, minmax(0,1fr))' : `repeat(${items.length}, minmax(0,1fr))`, borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', background: '#0F0F11', marginBottom: 16 }}>
+      {items.map((x, i) => (
+        <button key={x.l} type="button" onClick={x.onClick} disabled={!x.onClick}
+          style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, textAlign: 'left', color: 'inherit', background: 'transparent', border: 'none', cursor: x.onClick ? 'pointer' : 'default', padding: narrow ? '15px 16px' : '20px 22px',
+            borderLeft: (narrow ? i % 2 : i) ? '1px solid rgba(255,255,255,0.06)' : 'none', borderTop: narrow && i >= 2 ? '1px solid rgba(255,255,255,0.06)' : 'none', transition: 'background .15s ease' }}
+          onMouseEnter={e => { if (x.onClick) e.currentTarget.style.background = 'rgba(255,255,255,0.025)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#71717A' }}>{x.l}</span>
+          <span style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontSize: narrow ? 26 : 34, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, color: x.c ?? '#F4F4F5', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{x.v}</span>
+            {!narrow && x.extra}
+          </span>
+          {x.sub !== undefined && <span style={{ minHeight: 15, fontSize: 12 }}>{x.sub}</span>}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -100,24 +145,30 @@ export function ViralShowcase({ reels, onOpen }: { reels: TopReel[]; onOpen: () 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: LIME }}>Meilleur ratio · ×{best >= 10 ? Math.round(best) : best.toFixed(1)} la normale</span>
           <span style={{ display: 'flex', gap: 14, padding: '9px 16px', borderRadius: 11, border: `1px solid ${LIME}55`, background: 'rgba(167,139,250,0.06)', fontFamily: "'JetBrains Mono', monospace", fontSize: 15, fontWeight: 700, color: LIME }}>
-            <span>{fmtNumber(reels.length)} REELS</span><span style={{ opacity: 0.5 }}>:</span><span>{total >= 1e6 ? `${(total / 1e6).toFixed(1)}M` : `${Math.round(total / 1e3)}K`} VUES</span>
+            <span>{reels.length} REELS</span><span style={{ opacity: 0.5 }}>·</span><span>{compact(total)} VUES</span>
           </span>
         </div>
       </div>
-      <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 14, padding: narrow ? 14 : 22 }}>
-        {reels.slice(0, 4).map((r, i) => (
-          <button key={r.thumb} type="button" onClick={onOpen} style={{ position: 'relative', aspectRatio: '4 / 5', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', padding: 0, cursor: 'pointer', background: '#161618', animation: `cineUp .5s ${0.1 + i * 0.08}s both` }}
-            onMouseEnter={e => { const im = e.currentTarget.querySelector('img'); if (im) im.style.transform = 'scale(1.06)' }}
-            onMouseLeave={e => { const im = e.currentTarget.querySelector('img'); if (im) im.style.transform = 'none' }}>
-            <img src={r.thumb} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .6s cubic-bezier(.2,.8,.2,1)' }} />
-            <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.75), transparent 50%)' }} />
-            {r.score > 0 && <span style={{ position: 'absolute', top: 0, right: 14, padding: '9px 7px 11px', background: i === 0 ? LIME : 'rgba(10,10,11,.75)', color: i === 0 ? '#0A0A0B' : '#fff', fontSize: 12, fontWeight: 900, clipPath: 'polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)' }}>×{r.score >= 10 ? Math.round(r.score) : r.score.toFixed(1)}</span>}
-            <span style={{ position: 'absolute', left: 12, right: 12, bottom: 12, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, textAlign: 'left' }}>
-              <span data-no-tr style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{r.username}</span>
-              <span style={{ fontSize: 14, fontWeight: 900, color: '#fff', whiteSpace: 'nowrap' }}>▶ {r.views >= 1e6 ? `${(r.views / 1e6).toFixed(1)}M` : `${Math.round(r.views / 1e3)}k`}</span>
-            </span>
-          </button>
-        ))}
+      <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))', gap: 14, padding: narrow ? 14 : 22 }}>
+        {reels.slice(0, narrow ? 4 : 5).map((r, i) => {
+          const hot = r.score >= 3
+          return (
+            <button key={r.thumb} type="button" onClick={onOpen} style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', padding: 0, cursor: 'pointer', background: '#161618', animation: `cineUp .5s ${0.1 + i * 0.07}s both`, transition: 'transform .3s cubic-bezier(.2,.8,.2,1), border-color .3s ease' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = 'rgba(167,139,250,.6)'; const im = e.currentTarget.querySelector('img'); if (im) im.style.transform = 'scale(1.06)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; const im = e.currentTarget.querySelector('img'); if (im) im.style.transform = 'none' }}>
+              <img src={r.thumb} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .7s cubic-bezier(.2,.8,.2,1)' }} />
+              <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.5) 0%, transparent 24%, transparent 50%, rgba(0,0,0,.92) 100%)' }} />
+              <span style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                <span style={{ height: 22, padding: '0 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 99, background: i < 3 ? '#F4F4F5' : 'rgba(10,10,11,.55)', color: i < 3 ? '#0A0A0B' : '#fff', fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, fontWeight: 800 }}>{String(i + 1).padStart(2, '0')}</span>
+                {r.score > 0 && <span style={{ height: 22, padding: '0 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 99, background: hot ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'rgba(10,10,11,.55)', border: hot ? 'none' : '1px solid rgba(255,255,255,.16)', color: '#fff', fontSize: 12, fontWeight: 800 }}>{hot ? '🔥 ' : ''}×{r.score >= 10 ? Math.round(r.score) : r.score.toFixed(1).replace('.', ',')}</span>}
+              </span>
+              <span style={{ position: 'absolute', left: 12, right: 12, bottom: 12, display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left' }}>
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, color: '#fff' }}><b style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 1 }}>{compact(r.views)}</b><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#A1A1AA' }}>vues</span></span>
+                <span data-no-tr style={{ fontSize: 12.5, fontWeight: 700, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{r.username}</span>
+              </span>
+            </button>
+          )
+        })}
       </div>
     </section>
   )

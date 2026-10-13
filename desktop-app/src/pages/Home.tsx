@@ -9,14 +9,14 @@ import { useActivitySeries, type DayPoint } from '@/lib/activitySeries'
 import { useConnections } from '@/lib/connections'
 import type { OrgState } from '@/lib/data'
 import {
-  type HubData, firstNameFrom, fmtNumber, fmtTime, fmtDay, phoneCountOf,
+  type HubData, firstNameFrom, fmtNumber, compact, fmtTime, fmtDay, phoneCountOf,
 } from '@/lib/data'
 import type { PageKey } from '@/Shell'
 import { visibleTools, type Tool } from '@/lib/tools'
 import { openTool } from '@/lib/openTool'
 import { ToolCard, usePhotos, pickerFor } from '@/pages/Explore'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
-import { HomeHero, ViralShowcase, useTopReels, CineSection, CineStat, FeatureBanner } from '@/components/CineHero'
+import { HomeHero, ViralShowcase, useTopReels, CineSection, StatBar } from '@/components/CineHero'
 
 // Tuiles « Lancer » — portées de _hub() (LAUNCH), par infrastructure.
 function launchTiles(infra: InfraKey): { id: string; label: string; hint: string; icon: string; page: PageKey }[] {
@@ -343,7 +343,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* Bandeau « cinéma » : vraies miniatures de part et d'autre, titre XXL, action principale. */}
       <HomeHero
-        photos={best.slice(2, 4)}
+        photos={best}
         kicker={`${hello}, ${firstName}`}
         line1={infra === 'cloud' ? 'Ton parc' : 'Tes comptes'}
         line2="en pilote automatique"
@@ -360,19 +360,31 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
 
       {showOnboard && <Onboarding theme={theme} steps={STEPS} onNavigate={p => p === 'settings' ? openTool(onNavigate, 'settings', { tab: 'integrations' }) : onNavigate(p)} onHide={() => { setHideOnboard(true); try { localStorage.setItem(ONBOARD_KEY, '1') } catch { /* ignore */ } }} />}
 
-      {/* Chiffres de la semaine */}
-      <CineSection kicker="Cette semaine" line1="Tes chiffres" line2="en un coup d’œil">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(200px,100%),1fr))', gap: 12 }}>
-          <CineStat label="Comptes publiés" value={sLoading ? '…' : fmtNumber(series?.ok7 ?? 0)} extra={!sLoading && <Spark values={okSpark.slice(-7)} color={C_OK} />}
-            sub={series && <Delta now={series.ok7} prev={series.okPrev7} />} onClick={() => onNavigate('activity')} />
-          <CineStat label="Taux de réussite" accent={series?.rate7 !== null && series && series.rate7 < 80 ? '#FBBF24' : '#4ADE80'} value={sLoading ? '…' : series?.rate7 === null || !series ? '—' : `${series.rate7} %`}
-            extra={!sLoading && series?.rate7 !== null && <Spark values={rateSpark.slice(-7).map(v => v * 100)} color="#4ADE80" />}
-            sub={series && <Delta now={series.rate7} prev={series.ratePrev7} unit="pts" />} onClick={() => onNavigate('activity')} />
-          <CineStat label="Appareils" value={loading || !data ? '…' : fmtNumber(data.phoneCount)}
-            sub={<span style={{ color: '#71717A' }}>{onNow !== null ? `${fmtNumber(onNow)} allumé(s) maintenant` : `${fmtNumber(data?.videoCount ?? 0)} médias en banque`}</span>} onClick={() => onNavigate('phones')} />
-          <CineStat label="Crédits" accent="#A78BFA" value={loading || balance === null ? '…' : fmtNumber(balance)}
-            sub={<span style={{ color: '#71717A' }}>{runway !== null ? `≈ ${fmtNumber(runway)} jour(s) au rythme actuel` : `≈ ${fmtNumber(Math.floor((balance ?? 0) / 2))} posts restants`}</span>} onClick={() => openTool(onNavigate, 'settings', { tab: 'billing' })} />
-        </div>
+      {/* Chiffres de la semaine : une barre unique */}
+      <StatBar items={[
+        { l: 'Comptes publiés · 7 j', v: sLoading ? '…' : compact(series?.ok7 ?? 0), extra: !sLoading && <Spark values={okSpark.slice(-7)} color={C_OK} />,
+          sub: series ? <Delta now={series.ok7} prev={series.okPrev7} /> : null, onClick: () => onNavigate('activity') },
+        { l: 'Taux de réussite', c: series?.rate7 !== null && series && series.rate7 < 80 ? '#FBBF24' : '#4ADE80', v: sLoading ? '…' : series?.rate7 === null || !series ? '—' : `${series.rate7} %`,
+          extra: !sLoading && series?.rate7 !== null && <Spark values={rateSpark.slice(-7).map(v => v * 100)} color="#4ADE80" />,
+          sub: series ? <Delta now={series.rate7} prev={series.ratePrev7} unit="pts" /> : null, onClick: () => onNavigate('activity') },
+        { l: 'Appareils', v: loading || !data ? '…' : compact(data.phoneCount),
+          sub: <span style={{ color: '#71717A' }}>{onNow !== null ? `${fmtNumber(onNow)} allumé(s) maintenant` : `${fmtNumber(data?.videoCount ?? 0)} médias en banque`}</span>, onClick: () => onNavigate('phones') },
+        { l: 'Crédits', c: '#A78BFA', v: loading || balance === null ? '…' : fmtNumber(balance),
+          sub: <span style={{ color: '#71717A' }}>{runway !== null ? `≈ ${fmtNumber(runway)} jour(s) au rythme actuel` : `≈ ${fmtNumber(Math.floor((balance ?? 0) / 2))} posts restants`}</span>, onClick: () => openTool(onNavigate, 'settings', { tab: 'billing' }) },
+      ]} />
+
+      {/* Lancer : les outils phares, juste sous les chiffres */}
+      <CineSection kicker="Outils" line1="Lance" line2="en un clic" right={<button type="button" onClick={() => onNavigate('explore')} style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.06)', color: '#EDEDEF', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Tous les outils →</button>}>
+        {picks.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(220px,100%),1fr))', gap: 12 }}>
+            <style>{SPOT_KEYFRAMES}</style>
+            {picks.map((t, i) => <ToolCard key={t.id} t={t} i={i} pick={pickerFor(t, i, photos)} fav={false} onOpen={() => onOpenTool!(t)} />)}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 12 }}>
+            {TILES.map(a => <LaunchTile key={a.id} a={a} accent={theme.accentText} onClick={() => onNavigate(a.page)} />)}
+          </div>
+        )}
       </CineSection>
 
       {/* Activité 14 jours + en direct */}
@@ -389,28 +401,6 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
 
       {/* Vitrine Veille Reels (grandes cartes plein cadre) */}
       {topReels && topReels.length >= 2 && <ViralShowcase reels={topReels} onOpen={() => onNavigate('viral')} />}
-
-      {/* Lancer : deux grands bandeaux + les outils phares */}
-      {infra !== 'cloud' && (
-        <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'repeat(2, minmax(0,1fr))', gap: 16, marginBottom: 16 }}>
-          <FeatureBanner compact height={200} kicker="Publier" line1="Un Reel," line2="sur tous tes comptes" text={data ? `${fmtNumber(data.phoneCount)} comptes prêts · 2 crédits par compte` : undefined}
-            cta="Publier un Reel" onCta={() => openTool(onNavigate, 'publish', { mode: 'reels' })} photos={best.slice(0, 2)} />
-          <FeatureBanner compact height={200} kicker="TikTok" line1="La même vidéo," line2="sur TikTok" text="Publie en parallèle sur tous tes comptes TikTok."
-            cta="Publier sur TikTok" onCta={() => openTool(onNavigate, 'publish', { mode: 'tiktok' })} photos={best.slice(4, 6)} />
-        </div>
-      )}
-      <CineSection kicker="Outils" line1="Lance" line2="en un clic" right={<button type="button" onClick={() => onNavigate('explore')} style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.06)', color: '#EDEDEF', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Tous les outils →</button>}>
-        {picks.length > 0 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(220px,100%),1fr))', gap: 12 }}>
-            <style>{SPOT_KEYFRAMES}</style>
-            {picks.map((t, i) => <ToolCard key={t.id} t={t} i={i} pick={pickerFor(t, i, photos)} fav={false} onOpen={() => onOpenTool!(t)} />)}
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 12 }}>
-            {TILES.map(a => <LaunchTile key={a.id} a={a} accent={theme.accentText} onClick={() => onNavigate(a.page)} />)}
-          </div>
-        )}
-      </CineSection>
 
       {/* Aujourd'hui : programmé + activité récente */}
       <CineSection kicker="Aujourd’hui" line1="Ce qui part" line2="et ce qui est parti">

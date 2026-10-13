@@ -2678,6 +2678,12 @@ export const EN: Dict = {
     "Le poste de pilotage Instagram &amp; TikTok des créateurs, agences et growth teams.": "The Instagram &amp; TikTok control room for creators, agencies and growth teams.",
     "explose.": "blowing up.",
     "Carrousel · 3 photos": "Carousel · 3 photos",
+    "✓ Publié": "✓ Posted",
+    "Explorer ·": "Explore ·",
+    "Tous tes outils": "All your tools",
+    "au même endroit": "in one place",
+    "Publier, créer, gérer tes comptes, analyser : choisis un outil et lance-toi.": "Post, create, manage your accounts, analyze: pick a tool and go.",
+    "Comptes publiés · 7 j": "Accounts posted · 7 d",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
