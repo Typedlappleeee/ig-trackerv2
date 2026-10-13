@@ -73,8 +73,7 @@ function KeyPanel({ theme, onSaved, nudge }: { theme: Theme; onSaved: () => void
   const [st, setSt] = useState<{ set: boolean; hint: string | null; at: string | null } | null>(null)
   const [noSql, setNoSql] = useState(false)
   const [open, setOpen] = useState(false)
-  const [id, setId] = useState('')
-  const [secret, setSecret] = useState('')
+  const [key, setKey] = useState('')
   const [saving, setSaving] = useState(false)
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc('sf_secret_status', { p_name: 'higgsfield' })
@@ -86,13 +85,14 @@ function KeyPanel({ theme, onSaved, nudge }: { theme: Theme; onSaved: () => void
   // Une génération a buté sur l'absence de clé : on ouvre le formulaire.
   useEffect(() => { if (nudge) setOpen(true) }, [nudge])
   async function save(clear = false) {
-    const v = clear ? '' : `${id.trim()}:${secret.trim()}`
-    if (!clear && (!id.trim() || !secret.trim() || /[:\s]/.test(id.trim() + secret.trim()))) { toast('Colle le Key ID et le Key Secret (sans espaces).', 'bad'); return }
+    // Higgsfield donne UNE clé « ID:SECRET » (bouton « Copy API key »).
+    const v = clear ? '' : key.trim()
+    if (!clear && !/^[^:\s]+:[^:\s]+$/.test(v)) { toast('Colle la clé complète copiée sur Higgsfield (format ID:SECRET, sans espaces).', 'bad'); return }
     setSaving(true)
     const { error } = await supabase.rpc('sf_set_secret', { p_name: 'higgsfield', p_value: v })
     setSaving(false)
     if (error) { toast(/function|schema cache|does not exist/i.test(error.message) ? 'Colle d’abord supabase/migrations/20261014_sf_secrets.sql dans Supabase → SQL Editor → Run.' : `Enregistrement impossible : ${error.message}`, 'bad', 9000); return }
-    setId(''); setSecret(''); setOpen(false); toast(clear ? 'Clé Higgsfield retirée.' : 'Clé Higgsfield enregistrée.', 'ok'); void load(); onSaved()
+    setKey(''); setOpen(false); toast(clear ? 'Clé Higgsfield retirée.' : 'Clé Higgsfield enregistrée.', 'ok'); void load(); onSaved()
   }
   const ok = !!st?.set
   return (
@@ -107,11 +107,10 @@ function KeyPanel({ theme, onSaved, nudge }: { theme: Theme; onSaved: () => void
       </div>
       {open && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-          <span style={{ fontSize: 12.5, color: '#8B8B94', lineHeight: 1.5 }}>Sur console.higgsfield.ai → API keys : copie le <b>Key ID</b> et le <b>Key Secret</b>. Ils restent sur le serveur, personne ne peut les relire depuis l’app.</span>
+          <span style={{ fontSize: 12.5, color: '#8B8B94', lineHeight: 1.5 }}>Sur Higgsfield, clique <b>« Copy API key »</b> et colle-la ici telle quelle. Elle reste sur le serveur : personne ne peut la relire depuis l’app.</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input value={id} onChange={e => setId(e.target.value)} placeholder="Key ID" autoComplete="off" spellCheck={false} style={{ ...FIELD, flex: '1 1 200px' }} />
-            <input value={secret} onChange={e => setSecret(e.target.value)} placeholder="Key Secret" type="password" autoComplete="new-password" spellCheck={false} style={{ ...FIELD, flex: '1 1 200px' }} />
-            <Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={() => void save()} />
+            <input value={key} onChange={e => setKey(e.target.value)} placeholder="Clé API Higgsfield" type="password" autoComplete="new-password" spellCheck={false} style={{ ...FIELD, flex: '1 1 320px' }} />
+            <Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving || !key.trim()} onClick={() => void save()} />
           </div>
           {ok && <span><Btn theme={theme} sm tone="quiet" label="Retirer la clé" onClick={() => void save(true)} /></span>}
         </div>
