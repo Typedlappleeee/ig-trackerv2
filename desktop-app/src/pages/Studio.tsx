@@ -217,7 +217,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
             <FeatureBanner height={240} kicker="Recommandé · Auto-contenu" line1="Une vidéo," line2="des dizaines de variantes"
               text="Légende (pool + style), coupe, micro-vitesse, mode Tendance et spoof device/GPS — en un clic, chaque compte reçoit une vidéo unique."
               cta="Lancer l’Auto-contenu →" onCta={() => onNavigate('blowContent')} meta="GRATUIT"
-              photos={[0, 1, 2, 3].map(k => { const pool = [...photos.bank, ...photos.viral]; return pool.length ? pool[(k + 1) % pool.length] : null })} />
+              photos={[0, 1, 2, 3].map(k => { const pool = [...photos.viral, ...photos.bank]; return pool.length ? pool[k % pool.length] : null })} />
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 12 }}>

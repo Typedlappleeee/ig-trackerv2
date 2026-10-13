@@ -11,7 +11,8 @@ import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Empty, Icon, Kpi, Modal, PageHead, Panel, PanelHead, SkeletonRows, Segmented, FIELD, TEXTAREA, toast, useNarrow } from '@/lib/ui'
+import { FeatureBanner, CineStat } from '@/components/CineHero'
+import { Btn, Empty, Icon, Modal, PageHead, Panel, PanelHead, SkeletonRows, Segmented, FIELD, TEXTAREA, toast, useNarrow } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber } from '@/lib/data'
 
@@ -109,9 +110,9 @@ async function copyText(text: string, okMsg: string) {
 function IconBtn({ d, title, onClick }: { d: string; title: string; onClick: () => void }) {
   return (
     <button type="button" title={title} aria-label={title} onClick={e => { e.stopPropagation(); onClick() }}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, flexShrink: 0, borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#161618', color: '#A1A1AA', cursor: 'pointer' }}
-      onMouseEnter={e => { e.currentTarget.style.color = '#EDEDEF'; e.currentTarget.style.background = '#1E1E21' }}
-      onMouseLeave={e => { e.currentTarget.style.color = '#A1A1AA'; e.currentTarget.style.background = '#161618' }}>
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, flexShrink: 0, borderRadius: 99, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(10,10,11,0.55)', backdropFilter: 'blur(8px)', color: '#fff', cursor: 'pointer' }}
+      onMouseEnter={e => { e.currentTarget.style.background = '#8B5CF6' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(10,10,11,0.55)' }}>
       <Icon d={d} size={13} />
     </button>
   )
@@ -119,39 +120,58 @@ function IconBtn({ d, title, onClick }: { d: string; title: string; onClick: () 
 function Badge({ score }: { score: number }) {
   if (!(score > 0)) return null
   const hot = score >= 3
-  return <span style={{ padding: '3px 8px', borderRadius: 99, fontSize: 12, fontWeight: 700, background: hot ? '#F472B6' : 'rgba(10,10,11,0.75)', color: '#fff', backdropFilter: 'blur(4px)', whiteSpace: 'nowrap' }}>×{ratio(score)} la normale</span>
+  return <span style={{ padding: '3px 8px', borderRadius: 99, fontSize: 12, fontWeight: 700, background: hot ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'rgba(10,10,11,0.6)', boxShadow: hot ? '0 4px 14px -4px rgba(236,72,153,.7)' : 'none', color: '#fff', backdropFilter: 'blur(4px)', whiteSpace: 'nowrap' }}>×{ratio(score)} la normale</span>
 }
 function Stat({ d, v }: { d: string; v: number }) {
   return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon d={d} size={12} />{fmtNumber(v)}</span>
 }
 
-function ReelCard({ r, onOpen }: { r: Reel; onOpen: () => void }) {
+function ReelCard({ r, rank, onOpen }: { r: Reel; rank: number; onOpen: () => void }) {
   const [hover, setHover] = useState(false)
+  const touch = useNarrow(760)
   const hot = r.score >= 3
+  const podium = rank <= 3
+  const showActs = hover || touch
   return (
-    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden', background: '#111113', border: `1px solid ${hot ? 'rgba(244,114,182,0.45)' : 'rgba(255,255,255,0.07)'}`, transition: 'transform .15s ease', transform: hover ? 'translateY(-2px)' : 'none' }}>
-      <button type="button" onClick={onOpen} title="Voir le Reel" style={{ position: 'relative', aspectRatio: '9 / 14', background: '#161618', border: 'none', padding: 0, cursor: 'pointer', display: 'block', width: '100%' }}>
-        {r.thumb && <img src={img(r.thumb)} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-        <span style={{ position: 'absolute', top: 8, left: 8 }}><Badge score={r.score} /></span>
-        <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0, transition: 'opacity .15s ease', background: 'rgba(0,0,0,0.25)' }}>
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, height: 46, borderRadius: 99, background: 'rgba(255,255,255,0.92)', color: '#0A0A0B' }}><Icon d={I.play} size={18} /></span>
-        </span>
-        <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '22px 10px 8px', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', display: 'flex', alignItems: 'center', gap: 9, fontSize: 11.5, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 14, fontWeight: 700 }}><Icon d={I.play} size={12} />{fmtNumber(r.views)}</span>
-          <Stat d={I.heart} v={r.likes} />
-          <Stat d={I.comment} v={r.comments} />
-        </span>
-      </button>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 8px 8px 10px' }}>
-        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span data-no-tr style={{ fontSize: 12.5, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{r.username}</span>
-          <span style={{ fontSize: 11.5, color: '#71717A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtDate(r.taken_at)} · {engagement(r)} %</span>
-        </span>
+    <div role="button" tabIndex={0} title="Voir le Reel" onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter') onOpen() }}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: '#121214',
+        border: `1px solid ${hover ? 'rgba(167,139,250,0.55)' : hot ? 'rgba(236,72,153,0.35)' : 'rgba(255,255,255,0.07)'}`,
+        transform: hover ? 'translateY(-4px)' : 'none', boxShadow: hover ? '0 22px 50px -24px rgba(139,92,246,0.7)' : 'none',
+        transition: 'transform .25s cubic-bezier(0.16,1,0.3,1), box-shadow .25s ease, border-color .25s ease', animation: `aIn .45s cubic-bezier(0.16,1,0.3,1) ${Math.min(rank, 16) * 25}ms both` }}>
+      {r.thumb && <img src={img(r.thumb)} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: hover ? 'scale(1.06)' : 'scale(1)', transition: 'transform .6s cubic-bezier(0.16,1,0.3,1)' }} />}
+      <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.55) 0%, transparent 22%, transparent 48%, rgba(0,0,0,.92) 100%)' }} />
+
+      <span style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+        <span style={{ fontSize: podium ? 26 : 15, fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 1, color: '#fff', fontVariantNumeric: 'tabular-nums',
+          ...(podium ? { background: 'linear-gradient(135deg,#C4B5FD,#F472B6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,.6))' } : { textShadow: '0 1px 6px rgba(0,0,0,.7)' }) }}>#{rank}</span>
+        <Badge score={r.score} />
+      </span>
+
+      <span style={{ position: 'absolute', top: 44, right: 10, display: 'flex', flexDirection: 'column', gap: 6, opacity: showActs ? 1 : 0, transform: showActs ? 'none' : 'translateX(6px)', transition: 'opacity .2s ease, transform .2s ease', pointerEvents: showActs ? 'auto' : 'none' }}>
         <IconBtn d={I.download} title="Télécharger la vidéo" onClick={() => void downloadReel(r)} />
         <IconBtn d={I.link} title="Copier le lien" onClick={() => void copyText(reelUrl(r), 'Lien copié.')} />
         <IconBtn d={I.external} title="Ouvrir sur Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
-      </div>
+      </span>
+
+      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0, transition: 'opacity .2s ease', pointerEvents: 'none' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: 99, background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.35)', backdropFilter: 'blur(8px)', color: '#fff' }}><Icon d={I.play} size={20} /></span>
+      </span>
+
+      <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 5, color: '#fff' }}>
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{fmtNumber(r.views)}</span>
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#C4C4CC' }}>vues</span>
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5, fontWeight: 600, color: '#D4D4D8' }}>
+          <Stat d={I.heart} v={r.likes} /><Stat d={I.comment} v={r.comments} />
+          <span style={{ marginLeft: 'auto', color: '#A1A1AA' }}>{engagement(r)} %</span>
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#A1A1AA', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+          <span data-no-tr style={{ fontWeight: 650, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{r.username}</span>
+          <span style={{ marginLeft: 'auto', flexShrink: 0 }}>{fmtDate(r.taken_at)}</span>
+        </span>
+      </span>
     </div>
   )
 }
@@ -366,6 +386,7 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
   const totalViews = periodReels.reduce((a, r) => a + r.views, 0)
   const best = periodReels.reduce((a, r) => Math.max(a, r.score), 0)
   const avgEng = periodReels.length ? Math.round(periodReels.reduce((a, r) => a + engagement(r), 0) / periodReels.length * 10) / 10 : 0
+  const heroPhotos = useMemo(() => [...periodReels].sort((a, b) => b.views - a.views).filter(r => r.thumb).slice(0, 4).map(r => img(r.thumb as string)), [periodReels])
   const showRefresh = tab === 'mine' ? tabWatch.length > 0 && !noScope : admin
 
   if (missing) return (
@@ -375,12 +396,22 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead title="Veille Reels"
-        sub={tab === 'public' ? 'Les Reels qui explosent en ce moment, sélectionnés par ScaleFlow — classés par vues.' : 'Suis tes comptes (ou ceux de tes modèles) et vois quelles vidéos marchent le mieux.'}
-        actions={<span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <FeatureBanner kicker={tab === 'public' ? 'Veille Reels · Sélection ScaleFlow' : 'Veille Reels · Mes comptes'}
+        line1="Ce qui explose" line2="en ce moment"
+        text={tab === 'public' ? 'Les Reels qui cartonnent chez les comptes de référence choisis par ScaleFlow. Regarde, télécharge, inspire-toi.' : 'Suis tes comptes (ou ceux de tes modèles) et vois quelles vidéos marchent le mieux.'}
+        photos={heroPhotos} height={240}
+        meta={periodReels.length ? `${fmtNumber(periodReels.length)} REELS · ${fmtNumber(totalViews)} VUES` : undefined} />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '14px 0 12px' }}>
+        <Segmented value={tab} onChange={setTab} options={[
+          { v: 'public', l: 'Sélection ScaleFlow', n: watch.filter(w => w.scope === 'public').length },
+          { v: 'mine', l: 'Mes comptes', n: watch.filter(w => w.scope === 'private').length },
+        ]} />
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {isAdmin && <Segmented value={userView ? 'user' : 'admin'} onChange={v => setUserView(v === 'user')} options={[{ v: 'admin', l: 'Admin' }, { v: 'user', l: 'Vue utilisateur' }]} />}
           {showRefresh && <Btn theme={theme} tone="primary" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={busy ? 'Relevé en cours…' : 'Actualiser maintenant'} disabled={busy} onClick={refresh} />}
-        </span>} />
+        </span>
+      </div>
 
       {isAdmin && userView && (
         <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(139,124,246,0.1)', border: '1px solid rgba(139,124,246,0.3)', fontSize: 12.5, color: '#C4BBFA' }}>
@@ -398,23 +429,16 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
         </div>
       )}
 
-      <div style={{ marginBottom: 12 }}>
-        <Segmented value={tab} onChange={setTab} options={[
-          { v: 'public', l: 'Sélection ScaleFlow', n: watch.filter(w => w.scope === 'public').length },
-          { v: 'mine', l: 'Mes comptes', n: watch.filter(w => w.scope === 'private').length },
-        ]} />
-      </div>
-
       {canManage && (tab === 'public'
         ? <WatchPanel theme={theme} title="Sélection ScaleFlow" sub="Visible par tous les utilisateurs" list={tabWatch} onAdd={addAccounts} onRemove={removeWatch} />
         : <WatchPanel theme={theme} title="Mes comptes suivis" sub="Visibles par toi et ton équipe" list={tabWatch} limit={MAX_PRIVATE} onAdd={addAccounts} onRemove={removeWatch} />)}
 
       {tabReels.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginBottom: 12 }}>
-          <Kpi theme={theme} label="Reels sur la période" value={fmtNumber(periodReels.length)} />
-          <Kpi theme={theme} label="Vues cumulées" value={fmtNumber(totalViews)} />
-          <Kpi theme={theme} label="Meilleur ratio" value={best > 0 ? `×${ratio(best)}` : '—'} color={best >= 3 ? '#F472B6' : undefined} />
-          <Kpi theme={theme} label="Engagement moyen" value={`${avgEng} %`} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(170px,46%),1fr))', gap: 10, marginBottom: 14 }}>
+          <CineStat label="Reels sur la période" value={fmtNumber(periodReels.length)} sub={<span style={{ color: '#71717A' }}>{fmtNumber(tabWatch.length)} compte(s) suivi(s)</span>} />
+          <CineStat label="Vues cumulées" value={fmtNumber(totalViews)} />
+          <CineStat label="Meilleur ratio" value={best > 0 ? `×${ratio(best)}` : '—'} accent={best >= 3 ? '#F472B6' : undefined} sub={<span style={{ color: '#71717A' }}>vs vues habituelles</span>} />
+          <CineStat label="Engagement moyen" value={`${avgEng} %`} />
         </div>
       )}
 
@@ -434,8 +458,8 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
             : admin ? (tabWatch.length ? 'Clique « Actualiser maintenant » pour relever les derniers Reels de tes comptes suivis.' : 'Ajoute des comptes de référence (modèles, concurrents) pour voir leurs Reels qui cartonnent.')
             : 'Les Reels viraux des comptes de référence apparaîtront ici dès le prochain relevé.'} /></Panel>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(200px,100%),1fr))', gap: 12 }}>
-          {shown.map((r, i) => <ReelCard key={`${r.watch_id}-${r.code}`} r={r} onOpen={() => setOpen(i)} />)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(190px,46%),1fr))', gap: 14 }}>
+          {shown.map((r, i) => <ReelCard key={`${r.watch_id}-${r.code}`} r={r} rank={i + 1} onOpen={() => setOpen(i)} />)}
         </div>
       )}
 

@@ -5,8 +5,10 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, PageHead, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
+import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
+import { FeatureBanner } from '@/components/CineHero'
+import { usePhotos } from '@/pages/Explore'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABEL } from '@/lib/bankStorage'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -183,6 +185,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
 }) {
   const { currentOrg } = org
+  const bankPhotos = usePhotos(user, org)
   const [items, setItems] = useState<ContentItem[]>([])
   const [trash, setTrash] = useState<ContentItem[]>([])
   const [showTrash, setShowTrash] = useState(false)
@@ -894,19 +897,20 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         </div>
       )}
       {/* En-tête */}
-      <PageHead
-        title="Banque de contenu"
-        sub={loading
-          ? 'Toutes tes vidéos et images, organisées par dossier.'
-          : total === 0
-            ? 'Toutes tes vidéos et images, organisées par dossier.'
-            : `Toutes tes vidéos et images, organisées par dossier. ${neverPublished} média${neverPublished > 1 ? 's' : ''} n’${neverPublished > 1 ? 'ont' : 'a'} jamais été publié${neverPublished > 1 ? 's' : ''}.`}
-        actions={<>
+      <div style={{ marginBottom: 14 }}>
+        <FeatureBanner compact height={190} kicker="Banque" line1="Ton contenu," line2="prêt à publier"
+          text={`${counts.video} vidéo(s) · ${counts.image} image(s) · ${captions.length} légende(s)`}
+          cta="Importer des fichiers" onCta={() => fileRef.current?.click()}
+          photos={[...items.map(i => thumbFor(i) ?? (inferType(i) === 'image' ? mediaFor(i) : null)).filter((x): x is string => !!x).slice(0, 4), ...bankPhotos.viral].slice(0, 4)} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        {!loading && neverPublished > 0 && <span style={{ fontSize: 12.5, color: '#8B8B94' }}>{`${neverPublished} média(s) jamais publié(s)`}</span>}
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {trash.length > 0 && <Btn label={`Corbeille (${trash.length})`} theme={theme} icon="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" onClick={() => setShowTrash(true)} />}
           <Btn label="Actualiser" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
           <Btn label={uploading ? uploading : "Importer"} theme={theme} tone="primary" icon="M12 5v14|M5 12h14" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
-        </>}
-      />
+        </span>
+      </div>
 
       {/* Espace utilisé (limite de l'abonnement) + fichiers vides à nettoyer */}
       {(usage || broken.length > 0) && (
