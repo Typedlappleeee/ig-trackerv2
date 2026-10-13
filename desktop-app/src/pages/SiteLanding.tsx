@@ -7,535 +7,40 @@ import type { ReactNode, CSSProperties, MouseEvent as ReactMouseEvent } from 're
  * index.html fige html/body/#root à 100 % de hauteur avec overflow:hidden (shell de l'app) :
  * la landing est donc SON PROPRE conteneur de défilement (.sfl-root, 100dvh, overflow-y:auto),
  * et les ancres (#features, #pricing…) défilent en douceur à l'intérieur de ce conteneur.
- * Styles : un bloc <style> préfixé « sfl- » (responsive + survols) + quelques styles inline.
+ * Même DA que l'app : noir, violet ScaleFlow, titres XXL en capitales.
+ * Photos : public/site/c1…c13.webp (Unsplash, licence libre). Styles : bloc <style> préfixé « sfl- ».
  */
 
-const APP_URL = './index.html?auth=login'
 const WIN_URL = 'https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-Setup.exe'
 const TG_URL = 'https://t.me/justquentin'
-
-// ── Icônes (trait 1.8, style Lucide) ─────────────────────────────────────────
-type IconName =
-  | 'zap' | 'calendar' | 'sparkles' | 'film' | 'flame' | 'phone' | 'users' | 'coins' | 'home' | 'folder'
-  | 'clapper' | 'cloud' | 'download' | 'arrow' | 'check' | 'menu' | 'close' | 'plus' | 'clock' | 'shield'
-  | 'infinity' | 'lock' | 'play' | 'pause' | 'link' | 'repeat' | 'bot' | 'send' | 'calc' | 'message'
-  | 'sliders' | 'upload' | 'star' | 'grid' | 'layers'
-
-const PATHS: Record<IconName, ReactNode> = {
-  zap: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />,
-  calendar: <><rect x="3" y="4.5" width="18" height="16.5" rx="2.5" /><path d="M16 2.5v4M8 2.5v4M3 10h18" /></>,
-  sparkles: <><path d="M11 3.5l1.9 5.1 5.1 1.9-5.1 1.9L11 17.5l-1.9-5.1L4 10.5l5.1-1.9z" /><path d="M19 3v4M17 5h4M18.5 16v3M17 17.5h3" /></>,
-  film: <><rect x="3" y="3" width="18" height="18" rx="2.5" /><path d="M7.5 3v18M16.5 3v18M3 8h4.5M3 16h4.5M16.5 8H21M16.5 16H21M3 12h18" /></>,
-  flame: <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z" />,
-  phone: <><rect x="6" y="2" width="12" height="20" rx="2.5" /><path d="M11 18h2" /></>,
-  users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></>,
-  coins: <><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18M7 6h1v4M16.71 13.88l.7.71-2.82 2.82" /></>,
-  home: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
-  folder: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
-  clapper: <><path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8z" /><path d="m4 11-.88-2.87a2 2 0 0 1 1.33-2.5l11.48-3.5a2 2 0 0 1 2.5 1.32l.87 2.87L4 11z" /><path d="m6.6 5 3.38 4.2M11.86 3.38l3.38 4.2" /></>,
-  cloud: <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z" />,
-  download: <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />,
-  arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
-  check: <path d="M20 6 9 17l-5-5" />,
-  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
-  close: <path d="M18 6 6 18M6 6l12 12" />,
-  plus: <path d="M12 5v14M5 12h14" />,
-  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
-  shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
-  infinity: <path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4z" />,
-  lock: <><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
-  play: <path d="M7 4.5v15l12.5-7.5z" fill="currentColor" />,
-  pause: <path d="M8 5v14M16 5v14" />,
-  link: <><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></>,
-  repeat: <><path d="M17 2l4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></>,
-  bot: <><rect x="4" y="8" width="16" height="12" rx="2.5" /><path d="M12 8V4.5M9 13v2M15 13v2" /></>,
-  send: <path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" />,
-  calc: <><rect x="5" y="2" width="14" height="20" rx="2.5" /><path d="M9 6.5h6M9 11h.01M12 11h.01M15 11h.01M9 14.5h.01M12 14.5h.01M15 14.5h.01M9 18h6" /></>,
-  message: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
-  sliders: <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />,
-  upload: <path d="M12 21V9M7 14l5-5 5 5M5 3h14" />,
-  star: <path d="m12 2.5 2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" fill="currentColor" stroke="none" />,
-  grid: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
-  layers: <><path d="m12 2 10 5-10 5L2 7z" /><path d="m2 17 10 5 10-5M2 12l10 5 10-5" /></>,
-}
-
-function Ico({ n, s = 16, className, style }: { n: IconName; s?: number; className?: string; style?: CSSProperties }) {
-  return (
-    <svg className={className} style={style} width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-      {PATHS[n]}
-    </svg>
-  )
-}
-
-/** Délai de révélation (stagger) passé en variable CSS. */
+const APP_URL = './index.html?auth=login'
+const N_PHOTOS = 13
+const photo = (n: number) => `/site/c${(((n % N_PHOTOS) + N_PHOTOS) % N_PHOTOS) + 1}.webp`
+const HANDLES = ['lea.daily', 'manon.off', 'ines.paris', 'jade.xo', 'chloe.fit', 'emma.vibes', 'lou.officiel', 'sarah.ugc', 'nina.club', 'zoe.mood', 'ashley.rose', 'mila.studio', 'luna.reels']
+const handle = (n: number) => HANDLES[(((n % HANDLES.length) + HANDLES.length) % HANDLES.length)]
 const dl = (ms: number) => ({ '--d': ms + 'ms' } as CSSProperties)
 
-// ── Contenu ──────────────────────────────────────────────────────────────────
-const TOTAL = 52
-const order: number[] = []
-for (let i = 0; i < TOTAL; i++) order.push((i * 17 + 6) % TOTAL)
-const rankOf: number[] = []
-order.forEach((seat, rank) => { rankOf[seat] = rank })
-const RINGS = [{ n: 10, r: 62 }, { n: 16, r: 96 }, { n: 26, r: 130 }]
-const seats: { x: number; y: number }[] = []
-RINGS.forEach((ring, ri) => {
-  for (let k = 0; k < ring.n; k++) {
-    const a = (-90 + (k / ring.n) * 360 + ri * 9) * Math.PI / 180
-    seats.push({ x: +(160 + Math.cos(a) * ring.r).toFixed(1), y: +(160 + Math.sin(a) * ring.r).toFixed(1) })
-  }
-})
-const NAMES = ['brand.paris', 'studio.creatif', 'ugc.factory', 'growth.lab', 'viral.fr', 'daily.motiv', 'clip.master', 'fit.life']
-
-const NAV: [string, string][] = [['#showcase', "L'app"], ['#features', 'Fonctionnalités'], ['#pricing', 'Tarifs'], ['#faq', 'FAQ']]
-
-const MARQUEE: { ic: IconName; label: string }[] = [
-  { ic: 'zap', label: 'Mass Posting' }, { ic: 'layers', label: 'Instagram + TikTok' }, { ic: 'calendar', label: 'Programmation' },
-  { ic: 'flame', label: 'Auto-Warmup' }, { ic: 'film', label: 'Remix vidéo' }, { ic: 'sparkles', label: 'Captions IA' },
-  { ic: 'cloud', label: 'Cloud Phones' }, { ic: 'link', label: 'Stories automatiques' }, { ic: 'grid', label: 'Multi-comptes' },
-  { ic: 'users', label: "Collaboration d'équipe" },
-]
-
-type Feat = { ic: IconName; title: string; text: string; size: 'f1' | 'f2' | 'f2x' | 'f3'; viz?: 'mass' | 'remix' | 'credits' }
-const FEATURES: Feat[] = [
-  { ic: 'zap', title: 'Mass Posting', size: 'f2', viz: 'mass', text: 'Publie simultanément sur des dizaines de comptes Instagram ET TikTok. Chaque phone se libère dès que sa publication est terminée.' },
-  { ic: 'calendar', title: 'Programmation', size: 'f1', text: "Calendrier visuel, files d'attente par compte, fuseaux horaires et créneaux récurrents." },
-  { ic: 'sparkles', title: 'Captions IA', size: 'f1', text: 'Génère captions, hashtags et idées de contenu. Propulsé par Claude & Groq.' },
-  { ic: 'film', title: 'Remix & Repurpose vidéo', size: 'f2x', viz: 'remix', text: 'Mixe, recoupe et réinvente tes vidéos. Sous-titres, watermarks et préréglages pour produire en masse.' },
-  { ic: 'flame', title: 'Auto-Warmup', size: 'f1', text: 'Chauffe tes nouveaux comptes automatiquement : likes, follows à rythme humain. Routines configurables.' },
-  { ic: 'phone', title: 'Cloud Phones', size: 'f1', text: 'Pilote tes cloud phones depuis un seul dashboard. Statut en temps réel, IP et sessions isolées.' },
-  { ic: 'users', title: "Collaboration d'équipe", size: 'f1', text: 'Invite ton organisation, attribue des rôles (admin, membre, viewer) et restreins les accès.' },
-  { ic: 'coins', title: 'Crédits à la demande', size: 'f3', viz: 'credits', text: "Un solde unique pour l'IA et les automatisations. Recharge à la demande, partagé par organisation." },
-]
-
-const STEPS: { n: string; ic: IconName; title: string; text: string }[] = [
-  { n: '01', ic: 'link', title: 'Connecte ton GeeLark', text: 'Colle ton bearer token, ScaleFlow détecte tous tes cloud phones et leurs comptes en quelques secondes.' },
-  { n: '02', ic: 'upload', title: 'Charge tes vidéos', text: "Importe ta banque de contenu, remixe-la si besoin, et laisse l'IA générer captions et hashtags." },
-  { n: '03', ic: 'zap', title: 'Lance la diffusion', text: 'Un clic, et tes posts partent en parallèle sur tous tes comptes. Suis tout en temps réel.' },
-]
-
-const REVIEWS = [
-  { name: 'Francis', date: '19 juin', src: '/avis/avis-francis.png', alt: 'Avis de Francis sur Telegram : très bon CRM, staff réduit de 90 %, très bon service, je recommande.' },
-  { name: 'France Killian', date: '19 juin', src: '/avis/avis-france-killian.png', alt: 'Avis de France Killian sur Telegram : comptes augmentés de 300 % en réduisant le staff, je recommande à fond.' },
-  { name: 'Leon', date: '20 juin', src: '/avis/avis-leon.png', alt: 'Avis de Leon sur Telegram : logiciel performant et intuitif, accompagnement irréprochable.' },
-  { name: 'Alx', date: '4 juillet', src: '/avis/avis-alx.png', alt: "Avis d'Alx sur Telegram : tout est regroupé en une seule app, le meilleur outil GeeLark." },
-  { name: 'Njmoss', date: '6 juillet', src: '/avis/avis-njmoss.png', alt: 'Avis de Njmoss sur Telegram : logiciel propre, beaucoup de choses automatisées, gain de temps.' },
-]
-
-const PLANS = [
-  { name: 'Standard', price: '49,99$', desc: 'Pour démarrer sérieusement ta première ferme de comptes.', cta: 'Choisir Standard', pro: false, items: ['2 500 crédits / mois', '50 phones max', 'Toutes les fonctionnalités', 'Mass Posting 10 comptes max', 'Support 24/7'] },
-  { name: 'Pro', price: '99,99$', desc: 'Le sweet spot des agences et growth hackers qui scalent.', cta: 'Choisir Pro', pro: true, items: ['5 500 crédits / mois', '200 phones max', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7'] },
-  { name: 'Organisation', price: '149,99$', desc: 'Pour les structures qui pilotent des centaines de comptes.', cta: 'Choisir Organisation', pro: false, items: ['11 000 crédits / mois', 'Phones illimités', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7 prioritaire', "Proposition d'ajouts avec les devs"] },
-]
-
-const CREDITS: { ic: IconName; label: string; unit: string; cost: string; free?: boolean }[] = [
-  { ic: 'film', label: 'Publication', unit: 'par téléphone', cost: '2 cr' },
-  { ic: 'zap', label: 'Mass Posting', unit: 'par téléphone', cost: '2 cr' },
-  { ic: 'link', label: 'Story', unit: 'par téléphone', cost: '1 cr' },
-  { ic: 'sliders', label: 'Remix & Spoof', unit: 'par vidéo', cost: 'Gratuit', free: true },
-  { ic: 'bot', label: 'Tâche automatique', unit: 'par jour, tâche active', cost: '50 cr' },
-  { ic: 'repeat', label: 'Exécution de tâche', unit: 'par téléphone', cost: '2 cr' },
-]
-
-const PACKS = [
-  { credits: '500', price: '19,99$' }, { credits: '1 200', price: '39,99$' }, { credits: '2 500', price: '74,99$' },
-  { credits: '6 000', price: '164,99$' }, { credits: '15 000', price: '374,99$' },
-]
-
-const QA = [
-  { q: "C'est quoi ScaleFlow exactement ?", a: 'Une app pour gérer en masse tes comptes Instagram : poster automatiquement sur des dizaines de téléphones en parallèle, organiser ta banque de vidéos, voir les stats en temps réel, et automatiser les tâches répétitives.' },
-  { q: 'Ça marche aussi pour TikTok ?', a: 'Oui. Le mass posting, la programmation des posts et le warmup gèrent Instagram ET TikTok depuis le même dashboard.' },
-  { q: "J'ai besoin de quoi pour l'utiliser ?", a: "Un abonnement GeeLark (cloud phones) avec ton bearer token. Niveau machine, n'importe quel Mac/PC moderne suffit." },
-  { q: 'Différence entre Standard et Pro ?', a: 'Le Standard donne 2 500 crédits/mois et tous les outils de base. Le Pro donne 5 500 crédits/mois + organisations multi-membres + auto-warmup + support 24/7.' },
-  { q: "C'est risqué pour mes comptes Instagram ?", a: "ScaleFlow utilise des devices avec leurs propres IPs/sessions. Tant que tu respectes les rythmes humains (notre auto-warmup le fait pour toi), le risque est très faible. Aucune méthode n'est 100% sans risque." },
-  { q: 'Je peux annuler quand je veux ?', a: "Oui, depuis tes paramètres ou directement via Stripe. Tu gardes l'accès jusqu'à la fin de la période payée." },
-  { q: 'Version web ou téléchargement ?', a: "Les deux. Le téléchargement est plus rapide et permet l'accès aux fichiers locaux. La version web est utile pour dépanner depuis un autre poste." },
-  { q: 'Comment je contacte le support ?', a: 'Via Telegram en priorité (@justquentin), ou via le système de tickets directement dans l\'app.' },
-]
-
-const SHOTS: { id: 'mass' | 'hub' | 'bank' | 'studio'; ic: IconName; label: string }[] = [
-  { id: 'mass', ic: 'zap', label: 'Mass Posting' },
-  { id: 'hub', ic: 'home', label: 'Tableau de bord' },
-  { id: 'bank', ic: 'folder', label: 'Banque de contenu' },
-  { id: 'studio', ic: 'clapper', label: 'Studio vidéo' },
-]
-type ShotId = typeof SHOTS[number]['id']
-
-const APP_NAV: { id: string; ic: IconName; label: string }[] = [
-  { id: 'hub', ic: 'home', label: 'Accueil' },
-  { id: 'phones', ic: 'phone', label: 'Téléphones' },
-  { id: 'bank', ic: 'folder', label: 'Banque' },
-  { id: 'mass', ic: 'zap', label: 'Publication' },
-  { id: 'sched', ic: 'calendar', label: 'Automatisation' },
-  { id: 'studio', ic: 'clapper', label: 'Studio vidéo' },
-]
-
-const FOOT_COLS: { h: string; links: [string, string][] }[] = [
-  { h: 'Produit', links: [['#showcase', "L'app"], ['#features', 'Fonctionnalités'], ['#pricing', 'Tarifs']] },
-  { h: 'Ressources', links: [['#faq', 'Questions fréquentes'], ['#how', 'Comment ça marche'], [APP_URL, "Ouvrir l'app"]] },
-  { h: 'Légal', links: [[APP_URL, "Conditions d'utilisation"], [APP_URL, 'Confidentialité'], [TG_URL, 'Contact']] },
-]
-
-// ── Styles ───────────────────────────────────────────────────────────────────
-const CSS = `
-.sfl-root{--bg:#0A0A0B;--s1:#111113;--s2:#161618;--b:rgba(255,255,255,0.07);--b2:rgba(255,255,255,0.1);--b3:rgba(255,255,255,0.14);--t1:#EDEDEF;--t2:#A1A1AA;--t3:#8B8B94;--t4:#71717A;--ac:#8B7CF6;--ac2:#B3A8FA;--ok:#4ADE80;--amb:#FBBF24;--e:cubic-bezier(0.16,1,0.3,1);
-  position:relative;height:100vh;height:100dvh;overflow-x:hidden;overflow-y:auto;scroll-behavior:smooth;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch;
-  background:var(--bg);color:var(--t1);font-size:15px;line-height:1.5;letter-spacing:-0.006em}
-.sfl-root *,.sfl-root *::before,.sfl-root *::after{box-sizing:border-box}
-.sfl-root a{color:inherit;text-decoration:none}
-.sfl-root img{max-width:100%;display:block}
-.sfl-root button{font-family:inherit}
-.sfl-wrap{width:100%;max-width:1160px;margin:0 auto;padding:0 24px}
-.sfl-sec{position:relative;padding:120px 0;scroll-margin-top:60px}
-.sfl-bt{border-top:1px solid var(--b)}
-.sfl-mono{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;font-feature-settings:normal;letter-spacing:0}
-.sfl-num{font-variant-numeric:tabular-nums}
-
-/* Header */
-.sfl-hdr{position:sticky;top:0;z-index:50;height:60px;background:rgba(10,10,11,0.55);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);border-bottom:1px solid transparent;transition:border-color .3s ease,background-color .3s ease}
-.sfl-hdr.sfl-scrolled{border-bottom-color:var(--b);background:rgba(10,10,11,0.78)}
-.sfl-hdr-in{height:100%;display:flex;align-items:center;gap:20px}
-.sfl-brand{display:inline-flex;align-items:center;gap:10px;font-size:15.5px;font-weight:600;letter-spacing:-0.025em;color:var(--t1);flex-shrink:0}
-.sfl-nav{display:flex;align-items:center;gap:2px;margin-left:16px}
-.sfl-nav a{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:7px;font-size:13.5px;color:var(--t2);transition:color .15s ease,background-color .15s ease}
-.sfl-nav a:hover{color:var(--t1);background:rgba(255,255,255,0.045)}
-.sfl-soon{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;background:rgba(139,124,246,0.12);border:1px solid rgba(139,124,246,0.22);color:var(--ac2);font-size:10.5px;font-weight:500;letter-spacing:0}
-.sfl-hdr-cta{margin-left:auto;display:flex;align-items:center;gap:8px}
-.sfl-burger{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px solid var(--b2);background:rgba(255,255,255,0.03);color:var(--t1);cursor:pointer}
-.sfl-menu{display:none}
-@media (max-width:899px){
-  .sfl-nav,.sfl-hdr-dl{display:none}
-  .sfl-burger{display:inline-flex}
-  .sfl-menu{display:block;position:absolute;top:60px;left:0;right:0;padding:8px 16px 18px;background:rgba(10,10,11,0.97);border-bottom:1px solid var(--b);opacity:0;visibility:hidden;translate:0 -6px;pointer-events:none;transition:opacity .2s ease,translate .3s var(--e),visibility .2s}
-  .sfl-menu.sfl-open{opacity:1;visibility:visible;translate:none;pointer-events:auto}
-  .sfl-menu a.sfl-mlink{display:flex;align-items:center;justify-content:space-between;height:48px;border-bottom:1px solid var(--b);font-size:15px;color:var(--t1)}
-  .sfl-menu-cta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
-}
-
-/* Boutons */
-.sfl-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;border:1px solid transparent;font-size:14px;font-weight:500;letter-spacing:-0.01em;white-space:nowrap;cursor:pointer;transition:transform .2s var(--e),background-color .2s ease,border-color .2s ease,color .2s ease}
-.sfl-root .sfl-btn-p{background:#EDEDEF;color:#0A0A0B}
-.sfl-root .sfl-btn-p:hover{background:#FFFFFF}
-.sfl-btn-s{background:rgba(255,255,255,0.03);border-color:var(--b2);color:var(--t1)}
-.sfl-btn-s:hover{background:rgba(255,255,255,0.07);border-color:var(--b3)}
-.sfl-btn-sm{height:32px;padding:0 12px;font-size:13px;border-radius:7px}
-.sfl-btn-lg{height:44px;padding:0 20px;font-size:15px}
-.sfl-btn-block{width:100%}
-.sfl-btn .sfl-arr{transition:transform .2s var(--e)}
-@media (hover:hover){.sfl-btn:hover{transform:translateY(-1px)}.sfl-btn:hover .sfl-arr{transform:translateX(2px)}}
-.sfl-btn:active{transform:none}
-
-/* Typo */
-.sfl-pill{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px 0 10px;border-radius:99px;border:1px solid var(--b2);background:rgba(255,255,255,0.03);font-size:12.5px;color:var(--t2);max-width:100%}
-.sfl-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--ac2)}
-.sfl-eyebrow::before{content:'';width:14px;height:1px;background:currentColor;opacity:.6}
-.sfl-h1{margin:0;font-size:clamp(40px,5.6vw,68px);line-height:1.02;font-weight:600;letter-spacing:-0.045em;padding-bottom:.06em;background:linear-gradient(180deg,#FFFFFF 25%,#A1A1AA 120%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
-.sfl-h2{margin:14px 0 0;font-size:clamp(30px,4.2vw,46px);line-height:1.08;font-weight:600;letter-spacing:-0.035em;color:var(--t1)}
-.sfl-h2 .sfl-dim{color:var(--t4)}
-.sfl-lead{margin:18px 0 0;max-width:560px;font-size:clamp(15px,1.5vw,17px);line-height:1.65;color:var(--t2)}
-.sfl-head{max-width:640px}
-.sfl-head.sfl-c{margin:0 auto;text-align:center}
-.sfl-head.sfl-c .sfl-lead{margin-left:auto;margin-right:auto}
-
-/* Cartes */
-.sfl-card{position:relative;background:var(--s1);border:1px solid var(--b);border-radius:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.025);transition:transform .3s var(--e),border-color .3s ease,background-color .3s ease}
-@media (hover:hover){.sfl-hov:hover{transform:translateY(-2px);border-color:var(--b3)}}
-.sfl-ico{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:9px;flex-shrink:0;background:rgba(139,124,246,0.09);border:1px solid rgba(139,124,246,0.2);color:var(--ac2)}
-.sfl-ico-n{background:rgba(255,255,255,0.04);border-color:var(--b2);color:var(--t2)}
-
-/* Révélation au défilement */
-.sfl-rv{opacity:0;translate:0 12px;transition:opacity .5s var(--e) var(--d,0ms),translate .5s var(--e) var(--d,0ms)}
-.sfl-rv.sfl-card{transition:opacity .5s var(--e) var(--d,0ms),translate .5s var(--e) var(--d,0ms),transform .3s var(--e),border-color .3s ease,background-color .3s ease}
-.sfl-rv.sfl-in{opacity:1;translate:none}
-
-/* Hero */
-.sfl-hero{position:relative;padding:72px 0 104px;overflow:hidden}
-.sfl-hero-bg{position:absolute;inset:0;pointer-events:none}
-.sfl-glow{position:absolute;left:50%;top:-260px;width:1200px;height:760px;margin-left:-600px;background:radial-gradient(closest-side,rgba(139,124,246,0.15),rgba(139,124,246,0.045) 55%,transparent 100%)}
-.sfl-gridbg{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.032) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.032) 1px,transparent 1px);background-size:56px 56px;background-position:center top;-webkit-mask-image:radial-gradient(ellipse 70% 65% at 50% 0%,#000 25%,transparent 75%);mask-image:radial-gradient(ellipse 70% 65% at 50% 0%,#000 25%,transparent 75%)}
-.sfl-hero-grid{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:center}
-.sfl-hero-sub{margin:24px 0 0;max-width:470px;font-size:clamp(15.5px,1.5vw,17.5px);line-height:1.65;color:var(--t2)}
-.sfl-hero-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:32px}
-.sfl-trust{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-top:40px;padding-top:22px;border-top:1px solid var(--b);font-size:13px;color:var(--t4)}
-.sfl-trust b{font-weight:500;color:var(--t2)}
-.sfl-trust i{font-style:normal;opacity:.5}
-.sfl-pulse{width:6px;height:6px;border-radius:99px;background:var(--ok);flex-shrink:0;animation:sflPulse 2s ease-in-out infinite}
-@keyframes sflPulse{0%,100%{opacity:1}50%{opacity:.3}}
-.sfl-hero-vis{position:relative}
-.sfl-chip{display:inline-flex;align-items:center;gap:10px;padding:10px 14px 10px 10px;border-radius:12px;background:rgba(22,22,24,0.92);border:1px solid var(--b2);box-shadow:0 20px 40px -16px rgba(0,0,0,0.75);white-space:nowrap}
-.sfl-chip-t{display:flex;flex-direction:column;line-height:1.25}
-.sfl-chip-t b{font-size:14px;font-weight:600;color:var(--t1)}
-.sfl-chip-t span{font-size:11.5px;color:var(--t3)}
-.sfl-hero-chip{position:absolute;left:-28px;bottom:-22px;animation:sflFloat 9s ease-in-out infinite}
-@keyframes sflFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-@media (max-width:1023px){.sfl-hero-grid{grid-template-columns:minmax(0,1fr);gap:56px}.sfl-hero-chip{display:none}}
-
-/* Fenêtre d'app */
-.sfl-win{position:relative;background:var(--s1);border:1px solid var(--b2);border-radius:14px;overflow:hidden;box-shadow:0 1px 0 rgba(255,255,255,0.04) inset,0 50px 100px -40px rgba(0,0,0,0.8),0 0 0 1px rgba(0,0,0,0.5)}
-.sfl-chrome{display:flex;align-items:center;gap:12px;height:42px;padding:0 14px;border-bottom:1px solid var(--b);background:rgba(255,255,255,0.015)}
-.sfl-dots{display:flex;gap:6px;flex-shrink:0}
-.sfl-dots i{display:block;width:10px;height:10px;border-radius:99px;background:rgba(255,255,255,0.1)}
-.sfl-wtitle{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--t3)}
-.sfl-live{margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);color:var(--ok);font-size:10.5px;font-weight:500;letter-spacing:.04em;flex-shrink:0}
-.sfl-bar{height:4px;border-radius:99px;background:rgba(255,255,255,0.07);overflow:hidden}
-.sfl-bar>i{display:block;height:100%;width:100%;border-radius:99px;background:var(--ok);transform-origin:left center;transition:transform .6s var(--e)}
-.sfl-run-top{padding:18px 18px 4px}
-.sfl-run-count{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
-.sfl-run-count b{font-size:34px;font-weight:600;letter-spacing:-0.035em;color:var(--t1)}
-.sfl-run-count b span{color:var(--t4)}
-.sfl-run-count>span{font-size:12px;color:var(--t3)}
-.sfl-radial{display:block;width:100%;max-height:272px;margin:4px auto 0;overflow:visible}
-.sfl-radial circle.sfl-seat{transition:r .35s var(--e),fill .3s ease}
-.sfl-legend{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:8px 18px 16px;font-size:11.5px;color:var(--t3)}
-.sfl-legend>span{display:inline-flex;align-items:center;gap:6px}
-.sfl-legend i{display:block;width:7px;height:7px;border-radius:99px}
-.sfl-legend .sfl-eta{margin-left:auto;color:var(--t2)}
-.sfl-log{display:flex;flex-direction:column;gap:6px;min-height:92px;padding:14px 18px 16px;border-top:1px solid var(--b);background:rgba(0,0,0,0.22);font-size:11.5px;line-height:1.5}
-.sfl-log>div{display:flex;align-items:center;gap:10px;animation:sflIn .45s var(--e)}
-.sfl-log .sfl-ph{min-width:72px;color:var(--t4)}
-.sfl-log .sfl-acc{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2)}
-@keyframes sflIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-
-/* Marquee */
-.sfl-marq{position:relative;overflow:hidden;padding:18px 0;border-top:1px solid var(--b);border-bottom:1px solid var(--b);-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
-.sfl-marq-track{display:flex;width:max-content;animation:sflMarq 60s linear infinite}
-.sfl-marq:hover .sfl-marq-track{animation-play-state:paused}
-.sfl-marq-i{display:inline-flex;align-items:center;gap:9px;padding:0 26px;font-size:14px;color:var(--t4);white-space:nowrap;transition:color .2s ease}
-.sfl-marq-i:hover{color:var(--t1)}
-@keyframes sflMarq{to{transform:translateX(-50%)}}
-
-/* Showcase */
-.sfl-tabs{display:inline-flex;gap:4px;margin-top:36px;padding:4px;border-radius:11px;border:1px solid var(--b);background:var(--s1);max-width:100%}
-.sfl-tab{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:34px;padding:0 14px;border-radius:8px;border:0;background:transparent;color:var(--t3);font-size:13.5px;font-weight:500;white-space:nowrap;cursor:pointer;transition:color .2s ease,background-color .2s ease,box-shadow .2s ease}
-.sfl-tab:hover{color:var(--t1)}
-.sfl-tab[aria-selected="true"]{background:rgba(255,255,255,0.07);color:var(--t1);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.06)}
-.sfl-showwin{margin-top:16px}
-.sfl-app{display:grid;grid-template-columns:208px minmax(0,1fr);min-height:470px}
-.sfl-side{display:flex;flex-direction:column;gap:2px;padding:12px 8px;border-right:1px solid var(--b);background:rgba(0,0,0,0.12)}
-.sfl-side-i{display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:7px;font-size:13px;color:var(--t3)}
-.sfl-side-i.sfl-on{background:rgba(255,255,255,0.06);color:var(--t1)}
-.sfl-side-cr{margin-top:auto;padding:12px;border-radius:10px;border:1px solid var(--b);background:rgba(255,255,255,0.02)}
-.sfl-appbody{display:flex;flex-direction:column;gap:14px;min-width:0;padding:24px;animation:sflIn .45s var(--e)}
-.sfl-ab-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.sfl-ab-t{font-size:18px;font-weight:600;letter-spacing:-0.02em}
-.sfl-badge{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:6px;font-size:11.5px;font-weight:500;border:1px solid var(--b2);color:var(--t2);background:rgba(255,255,255,0.03);white-space:nowrap}
-.sfl-badge.sfl-ok{color:var(--ok);border-color:rgba(74,222,128,0.22);background:rgba(74,222,128,0.07)}
-.sfl-mc{padding:14px;border-radius:10px;border:1px solid var(--b);background:rgba(255,255,255,0.02);min-width:0}
-.sfl-lbl{font-size:11.5px;color:var(--t4)}
-.sfl-kv{margin-top:8px;font-size:22px;font-weight:600;letter-spacing:-0.03em}
-.sfl-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.sfl-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;flex:1}
-.sfl-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:12.5px}
-.sfl-row span:first-child{color:var(--t1);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sfl-row span:last-child{color:var(--t3);flex-shrink:0}
-.sfl-steps-ui{display:flex;gap:6px;flex-wrap:wrap}
-.sfl-step-ui{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px 0 6px;border-radius:7px;border:1px solid var(--b);font-size:12px;color:var(--t3)}
-.sfl-step-ui i{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,0.06);font-style:normal;font-size:10.5px}
-.sfl-step-ui.sfl-on{color:var(--t1);border-color:rgba(139,124,246,0.35);background:rgba(139,124,246,0.07)}
-.sfl-step-ui.sfl-on i{background:var(--ac);color:#fff}
-.sfl-acc-row{display:flex;align-items:center;gap:12px;height:44px;padding:0 14px;border-radius:9px;border:1px solid var(--b);background:rgba(255,255,255,0.015);font-size:12.5px;animation:sflIn .45s var(--e)}
-.sfl-acc-row.sfl-run{border-color:rgba(251,191,36,0.25);background:rgba(251,191,36,0.04)}
-.sfl-st{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;white-space:nowrap}
-.sfl-st i{width:6px;height:6px;border-radius:99px;background:currentColor;display:block}
-.sfl-fake-btn{display:flex;align-items:center;justify-content:center;gap:8px;height:40px;border-radius:8px;background:#EDEDEF;color:#0A0A0B;font-size:13px;font-weight:500}
-.sfl-thumbs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
-.sfl-thumb{position:relative;aspect-ratio:9/16;border-radius:8px;border:1px solid var(--b);overflow:hidden}
-.sfl-thumb.sfl-sel{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
-.sfl-thumb svg{position:absolute;left:50%;top:50%;margin:-7px 0 0 -7px;color:rgba(255,255,255,0.4)}
-.sfl-thumb b{position:absolute;left:6px;right:6px;bottom:6px;height:3px;border-radius:9px;background:rgba(255,255,255,0.12)}
-.sfl-chipf{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--b);color:var(--t3);font-size:12px}
-.sfl-chipf.sfl-on{color:var(--t1);border-color:var(--b3);background:rgba(255,255,255,0.05)}
-@media (max-width:767px){.sfl-app{grid-template-columns:minmax(0,1fr);min-height:0}.sfl-side{display:none}.sfl-appbody{padding:16px}}
-@media (max-width:639px){.sfl-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.sfl-thumbs{grid-template-columns:repeat(4,minmax(0,1fr))}.sfl-thumb:nth-child(n+9){display:none}
-  .sfl-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}}
-@media (max-width:479px){.sfl-two{grid-template-columns:minmax(0,1fr)}}
-
-/* Bento */
-.sfl-bento{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:56px}
-.sfl-f{display:flex;flex-direction:column;gap:10px;padding:26px;min-height:220px;overflow:hidden}
-.sfl-f2,.sfl-f2x{grid-column:span 2}
-.sfl-f3{grid-column:span 3}
-.sfl-f h3{margin:8px 0 0;font-size:16.5px;font-weight:600;letter-spacing:-0.015em}
-.sfl-f p{margin:0;max-width:480px;font-size:14px;line-height:1.62;color:var(--t2)}
-.sfl-f-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:center;height:100%}
-.sfl-f-txt{display:flex;flex-direction:column;gap:10px}
-.sfl-viz-dots{display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:6px}
-.sfl-viz-dots i{display:block;aspect-ratio:1;border-radius:4px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.05)}
-.sfl-viz-dots i.d{background:rgba(74,222,128,0.2);border-color:rgba(74,222,128,0.4)}
-.sfl-viz-dots i.r{background:rgba(251,191,36,0.25);border-color:rgba(251,191,36,0.55);animation:sflPulse 1.6s ease-in-out infinite}
-.sfl-viz-frames{display:flex;gap:8px;justify-content:center;align-items:flex-end}
-.sfl-viz-frames i{display:block;width:16%;aspect-ratio:9/16;border-radius:7px;border:1px solid var(--b2);background:linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.01))}
-.sfl-viz-frames i:nth-child(3){border-color:rgba(139,124,246,0.6);background:linear-gradient(180deg,rgba(139,124,246,0.18),rgba(139,124,246,0.03));transform:translateY(-8px)}
-.sfl-viz-cr{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:10px;border:1px solid var(--b);background:rgba(0,0,0,0.2)}
-.sfl-viz-cr .sfl-bar>i{background:var(--amb)}
-@media (max-width:1023px){.sfl-bento{grid-template-columns:repeat(2,minmax(0,1fr))}.sfl-f2x{grid-column:span 1}.sfl-f3{grid-column:span 2}.sfl-f2x .sfl-f-split{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:639px){.sfl-bento{grid-template-columns:minmax(0,1fr)}.sfl-f2,.sfl-f2x,.sfl-f3{grid-column:auto}.sfl-f-split{grid-template-columns:minmax(0,1fr);gap:20px}.sfl-f{padding:22px;min-height:0}}
-
-/* Étapes */
-.sfl-steps{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:56px}
-.sfl-step{padding:26px}
-.sfl-step-n{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
-.sfl-step-n span{font-size:12.5px;color:var(--t4)}
-.sfl-step h3{margin:0;font-size:16.5px;font-weight:600;letter-spacing:-0.015em}
-.sfl-step p{margin:10px 0 0;font-size:14px;line-height:1.62;color:var(--t2)}
-@media (max-width:899px){.sfl-steps{grid-template-columns:minmax(0,1fr)}}
-
-/* Cloud */
-.sfl-cloud{background:linear-gradient(180deg,rgba(255,255,255,0.012),transparent 40%)}
-.sfl-cloud-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,0.95fr);gap:64px;align-items:center}
-.sfl-cbadge{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 6px 0 10px;border-radius:99px;border:1px solid rgba(251,191,36,0.25);background:rgba(251,191,36,0.06);color:var(--amb);font-size:11.5px;font-weight:500;letter-spacing:.05em}
-.sfl-cbadge b{height:20px;display:inline-flex;align-items:center;padding:0 8px;border-radius:99px;background:rgba(251,191,36,0.14);font-weight:500;letter-spacing:0}
-.sfl-cbadge .sfl-pulse{background:var(--amb)}
-.sfl-points{display:flex;flex-direction:column;gap:18px;margin-top:32px}
-.sfl-point{display:flex;gap:14px}
-.sfl-point h3{margin:0;font-size:15px;font-weight:600;letter-spacing:-0.01em}
-.sfl-point p{margin:4px 0 0;font-size:14px;line-height:1.6;color:var(--t2)}
-.sfl-wait{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-top:36px}
-.sfl-wait small{font-size:12.5px;color:var(--t3)}
-.sfl-wait small+small{color:var(--t4)}
-.sfl-joined{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:10px 16px;border-radius:8px;border:1px solid rgba(74,222,128,0.28);background:rgba(74,222,128,0.07);color:var(--ok);font-size:14px;font-weight:500;animation:sflIn .45s var(--e)}
-.sfl-phone-wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:20px;padding:8px 0}
-.sfl-phone{position:relative;width:256px;max-width:100%;padding:8px;border-radius:40px;background:#161618;border:1px solid var(--b3);box-shadow:0 60px 100px -40px rgba(0,0,0,0.9),inset 0 1px 0 rgba(255,255,255,0.08)}
-.sfl-screen{position:relative;display:flex;flex-direction:column;aspect-ratio:9/19;border-radius:32px;overflow:hidden;background:#0C0C0E;border:1px solid var(--b)}
-.sfl-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
-@media (min-width:1024px){
-  .sfl-chips{display:contents}
-  .sfl-chips .sfl-chip{position:absolute;z-index:2;animation:sflFloat 10s ease-in-out infinite}
-  .sfl-chip-a{top:64px;left:0}
-  .sfl-chip-b{top:200px;right:0;animation-delay:-3s!important}
-  .sfl-chip-c{bottom:84px;left:12px;animation-delay:-6s!important}
-}
-.sfl-farm{margin-top:64px;padding:24px}
-.sfl-farm-h{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
-.sfl-tiles{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:6px;margin-top:20px}
-.sfl-tile{aspect-ratio:9/15;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);transition:background-color .35s ease,border-color .35s ease,transform .35s var(--e)}
-.sfl-tile.on{background:rgba(74,222,128,0.16);border-color:rgba(74,222,128,0.42)}
-.sfl-tile.boot{background:rgba(251,191,36,0.22);border-color:rgba(251,191,36,0.6);transform:scale(1.1)}
-@media (max-width:1023px){.sfl-cloud-grid{grid-template-columns:minmax(0,1fr);gap:56px}.sfl-tiles{grid-template-columns:repeat(16,minmax(0,1fr))}}
-@media (max-width:639px){.sfl-tiles{grid-template-columns:repeat(12,minmax(0,1fr))}.sfl-farm{padding:18px}.sfl-legend .sfl-eta{margin-left:0;width:100%}}
-
-/* Avis */
-.sfl-revs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:56px}
-.sfl-rev{display:flex;flex-direction:column;gap:12px;margin:0;padding:12px}
-.sfl-rev img{width:100%;height:auto;border-radius:9px}
-.sfl-rev figcaption{display:flex;align-items:center;gap:10px;padding:0 4px 2px;font-size:12.5px;white-space:nowrap}
-.sfl-stars{display:inline-flex;gap:1px;color:var(--amb)}
-.sfl-rev figcaption b{font-weight:500;color:var(--t1)}
-.sfl-rev figcaption span:last-child{margin-left:auto;color:var(--t4);font-size:12px}
-.sfl-voice{display:flex;align-items:center;gap:14px;padding:16px}
-.sfl-play{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;flex-shrink:0;border-radius:99px;border:0;background:#EDEDEF;color:#0A0A0B;cursor:pointer;transition:transform .2s var(--e)}
-@media (hover:hover){.sfl-play:hover{transform:scale(1.05)}}
-.sfl-wave{display:flex;align-items:center;gap:2px;height:28px}
-.sfl-wave i{flex:1;border-radius:9px;background:rgba(255,255,255,0.14);transition:background-color .15s linear}
-.sfl-wave i.p{background:var(--ok)}
-@media (max-width:1023px){.sfl-revs{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:639px){.sfl-revs{grid-template-columns:minmax(0,1fr)}}
-
-/* Tarifs */
-.sfl-plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:56px;align-items:stretch}
-.sfl-plan{display:flex;flex-direction:column;padding:28px}
-.sfl-plan.sfl-pro{border-color:rgba(139,124,246,0.55);background:linear-gradient(180deg,rgba(139,124,246,0.075),var(--s1) 45%)}
-.sfl-plan-name{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;font-weight:500;color:var(--t2)}
-.sfl-pop{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:rgba(139,124,246,0.14);border:1px solid rgba(139,124,246,0.3);color:var(--ac2);font-size:11.5px;font-weight:500}
-.sfl-price{display:flex;align-items:baseline;gap:6px;margin-top:18px}
-.sfl-price b{font-size:40px;font-weight:600;letter-spacing:-0.04em;color:var(--t1)}
-.sfl-price span{font-size:14px;color:var(--t4)}
-.sfl-plan p{margin:10px 0 0;font-size:14px;line-height:1.6;color:var(--t2)}
-.sfl-plan ul{margin:24px 0 0;padding:24px 0 0;border-top:1px solid var(--b);list-style:none;display:flex;flex-direction:column;gap:12px;font-size:14px;color:var(--t1)}
-.sfl-plan li{display:flex;align-items:flex-start;gap:10px}
-.sfl-plan li svg{margin-top:2px;flex-shrink:0;color:var(--t3)}
-.sfl-pro li svg{color:var(--ac2)}
-.sfl-plan-cta{margin-top:auto;padding-top:28px}
-.sfl-box{margin-top:12px;padding:28px}
-.sfl-box-h{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
-.sfl-box-h h3{margin:0;font-size:17px;font-weight:600;letter-spacing:-0.02em}
-.sfl-box-h p{margin:6px 0 0;font-size:14px;color:var(--t2)}
-.sfl-packs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:22px}
-.sfl-pack{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:16px;border-radius:10px;border:1px solid var(--b);background:rgba(255,255,255,0.015);transition:transform .3s var(--e),border-color .3s ease,background-color .3s ease}
-@media (hover:hover){.sfl-pack:hover{transform:translateY(-2px);border-color:var(--b3);background:rgba(255,255,255,0.035)}}
-.sfl-pack b{display:flex;align-items:center;gap:7px;font-size:19px;font-weight:600;letter-spacing:-0.03em;color:var(--t1)}
-.sfl-pack b small{font-size:12px;font-weight:400;color:var(--t4);letter-spacing:0}
-.sfl-pack>span{font-size:13.5px;color:var(--t2)}
-.sfl-costs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:22px}
-.sfl-cost{display:flex;align-items:center;gap:12px;padding:14px;border-radius:10px;border:1px solid var(--b);background:rgba(255,255,255,0.015)}
-.sfl-cost-t{display:flex;flex-direction:column;min-width:0;line-height:1.35}
-.sfl-cost-t b{font-size:13.5px;font-weight:500;color:var(--t1)}
-.sfl-cost-t span{font-size:12px;color:var(--t4)}
-.sfl-cost-v{margin-left:auto;font-size:15px;font-weight:600;letter-spacing:-0.02em;white-space:nowrap;color:var(--amb)}
-.sfl-cost-v.sfl-free{color:var(--ok)}
-.sfl-example{display:flex;align-items:flex-start;gap:12px;margin-top:16px;padding:14px 16px;border-radius:10px;border:1px solid rgba(139,124,246,0.22);background:rgba(139,124,246,0.05);font-size:13.5px;line-height:1.6;color:var(--t2)}
-.sfl-example svg{flex-shrink:0;margin-top:2px;color:var(--ac2)}
-.sfl-example strong{font-weight:600;color:var(--t1)}
-.sfl-pay{margin:28px 0 0;text-align:center;font-size:13px;color:var(--t4)}
-@media (max-width:959px){.sfl-plans{grid-template-columns:minmax(0,1fr);max-width:500px;margin-left:auto;margin-right:auto}}
-@media (max-width:899px){.sfl-packs{grid-template-columns:repeat(3,minmax(0,1fr))}.sfl-costs{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:559px){.sfl-packs{grid-template-columns:repeat(2,minmax(0,1fr))}.sfl-costs{grid-template-columns:minmax(0,1fr)}.sfl-box{padding:20px}.sfl-plan{padding:22px}}
-
-/* FAQ */
-.sfl-faq{display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1.2fr);gap:72px;align-items:start}
-.sfl-faq-head{position:sticky;top:96px}
-.sfl-faq-head a{display:inline-flex;align-items:center;gap:8px;margin-top:24px;font-size:14px;color:var(--t2);transition:color .2s ease}
-.sfl-faq-head a:hover{color:var(--t1)}
-.sfl-qa{border-bottom:1px solid var(--b)}
-.sfl-qa:first-child{border-top:1px solid var(--b)}
-.sfl-q{display:flex;align-items:center;justify-content:space-between;gap:20px;width:100%;padding:20px 0;border:0;background:none;color:var(--t1);font-size:15.5px;font-weight:500;letter-spacing:-0.01em;line-height:1.45;text-align:left;cursor:pointer;transition:color .2s ease}
-.sfl-q:hover{color:#fff}
-.sfl-q svg{flex-shrink:0;color:var(--t3);transition:transform .35s var(--e),color .2s ease}
-.sfl-qa.sfl-open .sfl-q svg{transform:rotate(45deg);color:var(--t1)}
-.sfl-a{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s var(--e)}
-.sfl-qa.sfl-open .sfl-a{grid-template-rows:1fr}
-.sfl-a>div{overflow:hidden}
-.sfl-a p{margin:0;padding:0 40px 22px 0;font-size:14.5px;line-height:1.7;color:var(--t2);opacity:0;transition:opacity .3s ease}
-.sfl-qa.sfl-open .sfl-a p{opacity:1}
-@media (max-width:899px){.sfl-faq{grid-template-columns:minmax(0,1fr);gap:36px}.sfl-faq-head{position:static}.sfl-a p{padding-right:0}}
-
-/* CTA final + footer */
-.sfl-final{position:relative;overflow:hidden;padding:88px 32px;border-radius:20px;border:1px solid var(--b2);background:var(--s1);text-align:center}
-.sfl-final .sfl-gridbg{-webkit-mask-image:radial-gradient(ellipse 60% 80% at 50% 0%,#000 10%,transparent 70%);mask-image:radial-gradient(ellipse 60% 80% at 50% 0%,#000 10%,transparent 70%)}
-.sfl-final p{margin:20px auto 0;max-width:540px;font-size:clamp(15px,1.5vw,17px);line-height:1.65;color:var(--t2)}
-.sfl-final p strong{font-weight:500;color:var(--t1)}
-.sfl-final small{display:block;margin-top:24px;font-size:12.5px;color:var(--t4)}
-.sfl-foot{padding:72px 0 36px}
-.sfl-foot-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
-.sfl-foot-grid p{margin:16px 0 0;max-width:320px;font-size:13.5px;line-height:1.65;color:var(--t3)}
-.sfl-foot-col{display:flex;flex-direction:column;gap:11px}
-.sfl-foot-col h3{margin:0 0 4px;font-size:13px;font-weight:500;color:var(--t1)}
-.sfl-foot-col a{font-size:13.5px;color:var(--t3);transition:color .15s ease;width:fit-content}
-.sfl-foot-col a:hover{color:var(--t1)}
-.sfl-foot-bot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:56px;padding-top:24px;border-top:1px solid var(--b);font-size:12.5px;color:var(--t4)}
-.sfl-fr{display:inline-flex;align-items:center;gap:8px}
-.sfl-flag{display:inline-flex;width:15px;height:10px;border-radius:2px;overflow:hidden}
-.sfl-flag i{flex:1}
-@media (max-width:899px){.sfl-foot-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.sfl-foot-brand{grid-column:1/-1}}
-@media (max-width:479px){.sfl-foot-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:32px 20px}}
-
-/* Mobile */
-@media (max-width:639px){
-  .sfl-wrap{padding:0 16px}
-  .sfl-sec{padding:80px 0}
-  .sfl-hero{padding:44px 0 72px}
-  .sfl-hero-cta .sfl-btn{flex:1 1 auto}
-  .sfl-final{padding:56px 20px;border-radius:16px}
-  .sfl-hdr-in{gap:12px}
-  .sfl-step,.sfl-plan{padding:22px}
-}
-@media (max-width:379px){.sfl-hdr-go{display:none}}
-
-/* Accessibilité : mouvement réduit */
-@media (prefers-reduced-motion:reduce){
-  .sfl-root{scroll-behavior:auto}
-  .sfl-rv{opacity:1;translate:none;transition:none}
-  .sfl-root *,.sfl-root *::before,.sfl-root *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
-}
-`
-
-// ── Petites briques ──────────────────────────────────────────────────────────
-function useTick(period = 650, mod = 58) {
-  const [t, setT] = useState(0)
-  useEffect(() => {
-    const id = window.setInterval(() => setT(v => (v + 1) % mod), period)
-    return () => window.clearInterval(id)
-  }, [period, mod])
-  return t
+// ── Icônes (trait 1.8, style Lucide) ─────────────────────────────────────────
+const P = {
+  arrow: 'M5 12h14|M13 6l6 6-6 6',
+  download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4|M7 10l5 5 5-5|M12 15V3',
+  check: 'M20 6L9 17l-5-5',
+  play: 'M6 4l14 8-14 8V4z',
+  pause: 'M7 4h3v16H7z|M14 4h3v16h-3z',
+  link: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1',
+  menu: 'M4 7h16|M4 12h16|M4 17h16',
+  close: 'M18 6L6 18|M6 6l12 12',
+  plus: 'M12 5v14|M5 12h14',
+  star: 'M12 2l2.9 6.9L22 10l-5.5 4.8L18 22l-6-3.6L6 22l1.5-7.2L2 10l7.1-1.1z',
+  heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z',
+  send: 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z',
+} as const
+function Ico({ d, s = 16, sw = 1.9, style }: { d: string; s?: number; sw?: number; style?: CSSProperties }) {
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, ...style }}>
+      {d.split('|').map((p, i) => <path key={i} d={p} />)}
+    </svg>
+  )
 }
 
 function LogoTile({ s }: { s: number }) {
@@ -546,261 +51,289 @@ function LogoTile({ s }: { s: number }) {
     </span>
   )
 }
+const Brand = () => <span className="sfl-brand"><LogoTile s={26} /><span>ScaleFlow</span></span>
 
-function Brand() {
-  return <span className="sfl-brand"><LogoTile s={26} /><span>ScaleFlow</span></span>
-}
+// ── Données (alignées sur l'app : tarifs, coûts, fonctionnalités réelles) ──────
+const NAV: [string, string][] = [['#live', 'Le produit'], ['#features', 'Fonctionnalités'], ['#pricing', 'Tarifs'], ['#faq', 'FAQ']]
+const MARQUEE = ['Mass Posting', 'Stories avec lien', 'Veille Reels', 'Studio vidéo', 'Programmation', 'Warmup', 'Flow Builder', 'Liens trackés', 'Instagram', 'TikTok']
+const STEPS: [string, string, string][] = [
+  ['01', 'Connecte GeeLark', 'Colle ton token : ScaleFlow importe tous tes cloud phones et leurs comptes en quelques secondes.'],
+  ['02', 'Charge ton contenu', 'Importe tes vidéos dans la banque, ou génère des dizaines de variantes uniques avec le Studio.'],
+  ['03', 'Lance la diffusion', 'Un clic : chaque compte publie en parallèle. Tu suis tout en direct, et tu relances les échecs en 1 clic.'],
+]
+const REVIEWS = [
+  { name: 'Francis', date: '19 juin', src: '/avis/avis-francis.png', alt: 'Avis de Francis sur Telegram : très bon CRM, staff réduit de 90 %, très bon service, je recommande.' },
+  { name: 'France Killian', date: '19 juin', src: '/avis/avis-france-killian.png', alt: 'Avis de France Killian sur Telegram : comptes augmentés de 300 % en réduisant le staff, je recommande à fond.' },
+  { name: 'Leon', date: '20 juin', src: '/avis/avis-leon.png', alt: 'Avis de Leon sur Telegram : logiciel performant et intuitif, accompagnement irréprochable.' },
+  { name: 'Alx', date: '4 juillet', src: '/avis/avis-alx.png', alt: "Avis d'Alx sur Telegram : tout est regroupé en une seule app, le meilleur outil GeeLark." },
+  { name: 'Njmoss', date: '6 juillet', src: '/avis/avis-njmoss.png', alt: 'Avis de Njmoss sur Telegram : logiciel propre, beaucoup de choses automatisées, gain de temps.' },
+]
+const PLANS = [
+  { name: 'Standard', price: '49,99', tag: 'Pour lancer ta première ferme de comptes.', credits: '2 500', items: ['50 téléphones', 'Mass Posting · 10 comptes', '5 Go de banque', 'Toutes les fonctionnalités', 'Support 24/7'] },
+  { name: 'Pro', price: '99,99', tag: 'Le choix des agences qui scalent.', credits: '5 500', best: true, items: ['200 téléphones', 'Mass Posting illimité', '15 Go de banque', 'Organisation multi-membres', 'Auto-warmup', 'Support 24/7'] },
+  { name: 'Organisation', price: '149,99', tag: 'Pour piloter des centaines de comptes.', credits: '11 000', items: ['Téléphones illimités', 'Mass Posting illimité', '50 Go de banque', 'Organisation multi-membres', 'Support prioritaire', 'Accès direct aux devs'] },
+]
+const COSTS: [string, string, string][] = [
+  ['Reel / post', '2', 'crédits par téléphone'], ['Story', '1', 'crédit par téléphone'],
+  ['Tâche automatique', '50', 'crédits / jour + 2 par téléphone'], ['Studio vidéo', '0', 'remix, spoof, montage'],
+]
+const PACKS: [string, string][] = [['500', '19,99'], ['1 200', '39,99'], ['2 500', '74,99'], ['6 000', '164,99'], ['15 000', '374,99']]
+const QA: [string, string][] = [
+  ["C'est quoi ScaleFlow exactement ?", 'Le poste de pilotage de tes comptes Instagram et TikTok : publier sur des dizaines de cloud phones en parallèle, programmer, chauffer les comptes, gérer ta banque de vidéos et repérer les Reels qui explosent.'],
+  ["J'ai besoin de quoi pour l'utiliser ?", "Un compte GeeLark (cloud phones) et ton token API. ScaleFlow tourne sur Windows ou directement dans le navigateur."],
+  ['Ça marche aussi pour TikTok ?', 'Oui. La publication en masse et la programmation gèrent Instagram et TikTok depuis le même tableau de bord.'],
+  ['Mes posts partent même PC éteint ?', 'Oui : les publications programmées et les tâches automatiques tournent sur nos serveurs, ordinateur éteint.'],
+  ['Combien coûte une publication ?', 'Un Reel ou un post coûte 2 crédits par téléphone (même tarif en direct, en masse ou programmé). Une story coûte 1 crédit. Les outils du Studio vidéo sont gratuits.'],
+  ["C'est risqué pour mes comptes ?", "Chaque cloud phone a sa propre IP et sa session isolée, et le warmup suit un rythme humain. Aucune méthode n'est sans risque, mais tu gardes la main sur le rythme."],
+  ['Comment je m’abonne ?', 'Contacte-nous sur Telegram : on te donne une clé d’activation à coller dans Réglages → Licence & crédits. Ton offre est active tout de suite.'],
+]
+const FOOT_COLS: { h: string; links: [string, string][] }[] = [
+  { h: 'Produit', links: [['#live', 'Le produit'], ['#features', 'Fonctionnalités'], ['#pricing', 'Tarifs']] },
+  { h: 'Ressources', links: [['#faq', 'Questions fréquentes'], ['#how', 'Comment ça marche'], [APP_URL, "Ouvrir l'app"]] },
+  { h: 'Contact', links: [[TG_URL, 'Telegram'], [WIN_URL, 'Télécharger pour Windows']] },
+]
 
-function WinChrome({ children }: { children: ReactNode }) {
-  return <div className="sfl-chrome"><span className="sfl-dots" aria-hidden="true"><i /><i /><i /></span>{children}</div>
-}
-
-function Head({ eyebrow, children, sub, center }: { eyebrow: string; children: ReactNode; sub?: ReactNode; center?: boolean }) {
+// ── Éléments visuels ─────────────────────────────────────────────────────────
+// Statut animé en CSS pur (pas de re-rendu) : en attente → publication → publié, en boucle.
+function StatusCycle({ delay }: { delay: number }) {
+  const st = { animationDelay: `${-delay}s` }
   return (
-    <div className={'sfl-head' + (center ? ' sfl-c' : '')}>
-      <div className="sfl-rv"><span className="sfl-eyebrow">{eyebrow}</span></div>
-      <h2 className="sfl-h2 sfl-rv" style={dl(60)}>{children}</h2>
-      {sub && <p className="sfl-lead sfl-rv" style={dl(120)}>{sub}</p>}
+    <span className="sfl-st">
+      <span className="sfl-st-i sfl-st-a" style={st}>En attente</span>
+      <span className="sfl-st-i sfl-st-b" style={st}><i className="sfl-spin" />Publication…</span>
+      <span className="sfl-st-i sfl-st-c" style={st}><Ico d={P.check} s={11} sw={3} />Publié</span>
+    </span>
+  )
+}
+function Phone({ n, delay = 0, status = true, className, style }: { n: number; delay?: number; status?: boolean; className?: string; style?: CSSProperties }) {
+  return (
+    <div className={'sfl-ph' + (className ? ' ' + className : '')} style={style}>
+      <img src={photo(n)} alt="" loading="lazy" decoding="async" />
+      <span className="sfl-ph-shade" />
+      <span className="sfl-ph-top"><span className="sfl-ph-notch" /></span>
+      {status && <span className="sfl-ph-chip"><StatusCycle delay={delay} /></span>}
+      <span className="sfl-ph-side"><Ico d={P.heart} s={15} /><Ico d={P.send} s={15} /></span>
+      <span className="sfl-ph-bot">
+        <span className="sfl-ph-user"><i style={{ backgroundImage: `url(${photo(n + 5)})` }} />@{handle(n)}</span>
+        <span className="sfl-ph-cap" /><span className="sfl-ph-cap sfl-ph-cap2" />
+      </span>
     </div>
   )
 }
 
-const ACC_OK = '#4ADE80', ACC_RUN = '#FBBF24'
-
-/** Radial de diffusion : la vidéo au centre, les comptes en orbite. */
-function Radial({ t }: { t: number }) {
-  const done = Math.max(0, Math.min(TOTAL, Math.floor(t)))
-  const active = t < TOTAL ? Math.floor(t) : -1
-  const wave = 20 + (Math.floor(t) % 4) * 34
+// Mur de téléphones du hero : colonnes qui défilent en sens alternés, en perspective.
+function PhoneWall({ cols = 7, per = 5, seed = 0 }: { cols?: number; per?: number; seed?: number }) {
   return (
-    <svg className="sfl-radial" viewBox="0 0 320 320" aria-hidden="true">
-      {RINGS.map((ring, i) => <circle key={'o' + i} cx={160} cy={160} r={ring.r} fill="none" stroke="#fff" strokeOpacity={0.06} strokeDasharray="2 6" />)}
-      <circle cx={160} cy={160} r={44} fill="#8B7CF6" fillOpacity={0.06} />
-      {seats.map((s, i) => {
-        const rank = rankOf[i]
-        const isDone = rank < done, isActive = rank === active
-        return <line key={'l' + i} x1={160} y1={160} x2={s.x} y2={s.y} stroke={isActive ? ACC_RUN : isDone ? ACC_OK : '#fff'} strokeOpacity={isActive ? 0.7 : isDone ? 0.16 : 0.04} strokeWidth={isActive ? 1.4 : 1} />
-      })}
-      {seats.map((s, i) => {
-        const rank = rankOf[i]
-        const isDone = rank < done, isActive = rank === active
-        return <circle key={'d' + i} className="sfl-seat" cx={s.x} cy={s.y} r={isActive ? 6 : isDone ? 4.4 : 3.2} fill={isActive ? ACC_RUN : isDone ? ACC_OK : 'rgba(255,255,255,0.16)'} />
-      })}
-      <circle cx={160} cy={160} r={wave} fill="none" stroke="#8B7CF6" strokeWidth={1.2} strokeOpacity={Math.max(0, 0.4 - (Math.floor(t) % 4) * 0.1)} />
-      <rect x={144} y={136} width={32} height={48} rx={8} fill="#161618" stroke="rgba(255,255,255,0.28)" strokeWidth={1.2} />
-      <path d="M156 152 L167 160 L156 168 Z" fill="#EDEDEF" />
-    </svg>
+    <div className="sfl-wall" aria-hidden="true">
+      <div className="sfl-wall-in">
+        {Array.from({ length: cols }, (_, c) => (
+          <div key={c} className={'sfl-col ' + (c % 2 ? 'sfl-col-dn' : 'sfl-col-up')} style={{ animationDuration: `${46 + (c % 3) * 9}s` }}>
+            {[0, 1].map(dup => Array.from({ length: per }, (_, i) => {
+              const n = seed + c * 3 + i * 2
+              return <Phone key={`${dup}-${i}`} n={n} delay={((c * 1.7 + i * 2.3) % 6)} />
+            }))}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
-function appLog(t: number) {
-  const done = Math.max(0, Math.min(TOTAL, Math.floor(t)))
-  const active = t < TOTAL ? Math.floor(t) : -1
-  const lines: { id: string; phone: string; name: string; ok: boolean }[] = []
-  for (let k = 2; k >= 0; k--) {
-    const r = done - 1 - k
-    if (r < 0) continue
-    lines.push({ id: 'd' + r, phone: 'iPhone-' + String(order[r] + 1).padStart(2, '0'), name: NAMES[order[r] % NAMES.length], ok: true })
-  }
-  if (active >= 0 && done < TOTAL) lines.push({ id: 'a' + active, phone: 'iPhone-' + String(order[active] + 1).padStart(2, '0'), name: NAMES[order[active] % NAMES.length], ok: false })
-  return lines.slice(-4)
-}
-
-function LiveCount() {
-  const [live, setLive] = useState(18342)
+function useInView<T extends HTMLElement>(margin = '0px'): [React.RefObject<T>, boolean] {
+  const ref = useRef<T>(null)
+  const [v, setV] = useState(false)
   useEffect(() => {
-    const id = window.setInterval(() => setLive(v => v + Math.floor(2 + Math.random() * 5)), 1300)
+    const el = ref.current; if (!el || typeof IntersectionObserver === 'undefined') { setV(true); return }
+    const io = new IntersectionObserver(([e]) => setV(!!e?.isIntersecting), { rootMargin: margin })
+    io.observe(el); return () => io.disconnect()
+  }, [margin])
+  return [ref, v]
+}
+
+// ── Section « run en direct » : 24 comptes publient, en vrai dans l'app ───────
+const RUN_N = 24, RUN_PAR = 6
+function LiveRun() {
+  const [ref, inView] = useInView<HTMLDivElement>('100px')
+  const [t, setT] = useState(0)
+  useEffect(() => {
+    if (!inView) return
+    const id = window.setInterval(() => setT(v => (v + 1) % (RUN_N + 10)), 420)
     return () => window.clearInterval(id)
-  }, [])
-  return <span className="sfl-num">{live.toLocaleString('fr-FR')}</span>
-}
-
-function HeroRun() {
-  const t = useTick()
-  const done = Math.max(0, Math.min(TOTAL, Math.floor(t)))
-  const remain = Math.max(0, TOTAL - done)
+  }, [inView])
+  const done = Math.min(RUN_N, t)
+  const log = Array.from({ length: Math.min(done, 4) }, (_, i) => done - 1 - i)
   return (
-    <div className="sfl-win">
-      <WinChrome>
-        <span className="sfl-wtitle">Mass Posting · reel_042.mp4</span>
-        <span className="sfl-live"><span className="sfl-pulse" />EN DIRECT</span>
-      </WinChrome>
-      <div className="sfl-run-top">
-        <div className="sfl-run-count">
-          <b className="sfl-num">{done}<span> / {TOTAL}</span></b>
-          <span>comptes publiés</span>
-        </div>
-        <div className="sfl-bar"><i style={{ transform: `scaleX(${done / TOTAL})` }} /></div>
+    <div ref={ref} className="sfl-run">
+      <div className="sfl-run-head">
+        <span className="sfl-run-live"><i />Run en cours</span>
+        <span className="sfl-mono sfl-num sfl-run-count"><b>{done}</b> / {RUN_N} publiés</span>
       </div>
-      <Radial t={t} />
-      <div className="sfl-legend">
-        <span><i style={{ background: ACC_OK }} />publié</span>
-        <span><i style={{ background: ACC_RUN }} />en cours</span>
-        <span><i style={{ background: 'rgba(255,255,255,0.18)' }} />en file</span>
-        <span className="sfl-eta sfl-mono">{remain > 0 ? '~' + Math.ceil(remain * 0.9) + ' s restantes' : 'diffusion terminée'}</span>
-      </div>
-      <div className="sfl-log sfl-mono">
-        {appLog(t).map(l => (
-          <div key={l.id} style={{ opacity: l.ok ? 0.7 : 1 }}>
-            <span className="sfl-ph">{l.phone}</span>
-            <span className="sfl-acc">@{l.name}</span>
-            <span className="sfl-st" style={{ color: l.ok ? ACC_OK : ACC_RUN }}><Ico n={l.ok ? 'check' : 'upload'} s={12} />{l.ok ? 'publié' : 'upload…'}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ── Showcase ─────────────────────────────────────────────────────────────────
-function Kpi({ t, v, c }: { t: string; v: string; c?: string }) {
-  return <div className="sfl-mc"><div className="sfl-lbl">{t}</div><div className="sfl-kv sfl-num" style={c ? { color: c } : undefined}>{v}</div></div>
-}
-
-const THUMB_BG = ['rgba(139,124,246,0.13)', 'rgba(255,255,255,0.05)', 'rgba(74,222,128,0.08)', 'rgba(255,255,255,0.035)', 'rgba(251,191,36,0.08)', 'rgba(255,255,255,0.06)']
-
-function AppBody({ shot }: { shot: ShotId }) {
-  const t = useTick()
-  const done = Math.max(0, Math.min(TOTAL, Math.floor(t)))
-  if (shot === 'hub') {
-    return (
-      <div className="sfl-appbody" key="hub">
-        <div className="sfl-ab-t">Bonjour, Quentin</div>
-        <div className="sfl-kpis">
-          <Kpi t="Téléphones" v="52" /><Kpi t="Vidéos" v="347" /><Kpi t="Posts · 7j" v="1 284" c={ACC_OK} /><Kpi t="Crédits" v="2 480" c={ACC_RUN} />
-        </div>
-        <div className="sfl-two">
-          <div className="sfl-mc"><div className="sfl-lbl">Posts à venir</div>{[['24 comptes · Morning routine', '18:00'], ['18 comptes · Story + lien', '21:00'], ['Warmup · groupe Nouveaux', 'demain']].map((r, i) => <div key={i} className="sfl-row"><span>{r[0]}</span><span>{r[1]}</span></div>)}</div>
-          <div className="sfl-mc"><div className="sfl-lbl">Activité récente</div>{[['52/52 · Mass posting', ACC_OK], ['22/24 · Story', ACC_RUN], ['36/36 · TikTok', ACC_OK]].map((r, i) => <div key={i} className="sfl-row"><span>{r[0]}</span><span style={{ color: r[1] }}><Ico n="check" s={14} /></span></div>)}</div>
-        </div>
-      </div>
-    )
-  }
-  if (shot === 'bank') {
-    return (
-      <div className="sfl-appbody" key="bank">
-        <div className="sfl-ab-h"><span className="sfl-ab-t">Banque de contenu</span><span className="sfl-badge">347 vidéos</span></div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{['Motivation', 'Lifestyle', 'Produits'].map((f, i) => <span key={f} className={'sfl-chipf' + (i === 0 ? ' sfl-on' : '')}><Ico n="folder" s={13} />{f}</span>)}</div>
-        <div className="sfl-thumbs">{Array.from({ length: 12 }, (_, i) => <div key={i} className={'sfl-thumb' + (i < 2 ? ' sfl-sel' : '')} style={{ background: `linear-gradient(170deg, ${THUMB_BG[i % THUMB_BG.length]}, rgba(255,255,255,0.01))` }}><Ico n="play" s={14} /><b /></div>)}</div>
-      </div>
-    )
-  }
-  if (shot === 'studio') {
-    const TOOLS: { ic: IconName; name: string; desc: string }[] = [
-      { ic: 'film', name: 'Remix', desc: '×24 variantes uniques' },
-      { ic: 'shield', name: 'Spoof', desc: 'device · GPS · EXIF' },
-      { ic: 'message', name: 'Sous-titres', desc: 'IA Whisper mot à mot' },
-      { ic: 'sliders', name: 'Mixer', desc: 'hook incrusté' },
-    ]
-    return (
-      <div className="sfl-appbody" key="studio">
-        <div className="sfl-ab-t">Studio vidéo</div>
-        <div className="sfl-two">{TOOLS.map(x => <div key={x.name} className="sfl-mc" style={{ padding: 18 }}><span className="sfl-ico"><Ico n={x.ic} s={17} /></span><div style={{ marginTop: 14, fontSize: 14.5, fontWeight: 600 }}>{x.name}</div><div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--t3)' }}>{x.desc}</div></div>)}</div>
-      </div>
-    )
-  }
-  const lines = appLog(t)
-  return (
-    <div className="sfl-appbody" key="mass">
-      <div className="sfl-ab-h"><span className="sfl-ab-t">Nouveau mass posting</span><span className="sfl-badge sfl-ok"><span className="sfl-pulse" />52 phones en ligne</span></div>
-      <div className="sfl-steps-ui">{['Comptes', 'Vidéos', 'Légende', 'Lancement'].map((s, i) => <span key={s} className={'sfl-step-ui' + (i === 3 ? ' sfl-on' : '')}><i className="sfl-mono">{i + 1}</i>{s}</span>)}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minHeight: 194 }}>
-        {lines.map(l => (
-          <div key={l.id} className={'sfl-acc-row' + (l.ok ? '' : ' sfl-run')}>
-            <span className="sfl-mono" style={{ color: 'var(--t1)', fontSize: 12 }}>{l.phone}</span>
-            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--t3)' }}>@{l.name}</span>
-            <span className="sfl-st" style={{ color: l.ok ? ACC_OK : ACC_RUN }}><i />{l.ok ? 'publié' : 'en cours'}</span>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div className="sfl-bar" style={{ flex: 1 }}><i style={{ transform: `scaleX(${done / TOTAL})` }} /></div>
-        <span className="sfl-mono sfl-num" style={{ fontSize: 11.5, color: 'var(--t2)' }}>{done}/{TOTAL}</span>
-      </div>
-      <div className="sfl-fake-btn"><Ico n="zap" s={14} />Lancer la diffusion</div>
-    </div>
-  )
-}
-
-function Showcase() {
-  const [shot, setShot] = useState<ShotId>('mass')
-  const activeNav = shot === 'hub' ? 'hub' : shot === 'bank' ? 'bank' : shot === 'studio' ? 'studio' : 'mass'
-  const shotLabel = (SHOTS.find(s => s.id === shot) || SHOTS[0]).label
-  return (
-    <section id="showcase" className="sfl-sec">
-      <div className="sfl-wrap">
-        <Head eyebrow="L'app" sub="Tout ce qu'il te faut pour gérer une ferme de comptes, dans une seule fenêtre. Windows, Mac et web.">Le poste de pilotage.</Head>
-        <div className="sfl-rv" style={dl(160)}>
-          <div className="sfl-tabs" role="tablist" aria-label="Aperçus de l'app">
-            {SHOTS.map(s => <button key={s.id} type="button" role="tab" aria-selected={shot === s.id} className="sfl-tab" onClick={() => setShot(s.id)}><Ico n={s.ic} s={15} />{s.label}</button>)}
-          </div>
-        </div>
-        <div className="sfl-rv sfl-showwin" style={dl(220)}>
-          <div className="sfl-win">
-            <WinChrome><span className="sfl-wtitle">ScaleFlow — {shotLabel}</span></WinChrome>
-            <div className="sfl-app">
-              <div className="sfl-side" aria-hidden="true">
-                {APP_NAV.map(n => <div key={n.id} className={'sfl-side-i' + (n.id === activeNav ? ' sfl-on' : '')}><Ico n={n.ic} s={15} />{n.label}</div>)}
-                <div className="sfl-side-cr">
-                  <div className="sfl-lbl">Crédits restants</div>
-                  <div className="sfl-num" style={{ marginTop: 4, fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em' }}>107 150</div>
-                  <div className="sfl-bar" style={{ marginTop: 10 }}><i style={{ transform: 'scaleX(0.72)', background: 'var(--amb)' }} /></div>
-                </div>
-              </div>
-              <AppBody shot={shot} />
+      <div className="sfl-run-bar"><i style={{ width: `${(done / RUN_N) * 100}%` }} /></div>
+      <div className="sfl-run-grid">
+        {Array.from({ length: RUN_N }, (_, i) => {
+          const st = i < done ? 'ok' : i < done + RUN_PAR ? 'run' : 'idle'
+          return (
+            <div key={i} className={'sfl-tile sfl-tile-' + st}>
+              <img src={photo(i * 5 + 1)} alt="" loading="lazy" decoding="async" />
+              <span className="sfl-tile-badge">{st === 'ok' ? <Ico d={P.check} s={12} sw={3} /> : st === 'run' ? <i className="sfl-spin" /> : null}</span>
             </div>
-          </div>
-        </div>
+          )
+        })}
       </div>
-    </section>
-  )
-}
-
-// ── Fonctionnalités ──────────────────────────────────────────────────────────
-function FeatViz({ kind }: { kind: 'mass' | 'remix' | 'credits' }) {
-  if (kind === 'mass') {
-    return <div className="sfl-viz-dots" aria-hidden="true">{Array.from({ length: 39 }, (_, i) => { const r = (i * 7 + 3) % 39; return <i key={i} className={r < 24 ? 'd' : r < 26 ? 'r' : ''} /> })}</div>
-  }
-  if (kind === 'remix') {
-    return <div className="sfl-viz-frames" aria-hidden="true"><i /><i /><i /><i /><i /></div>
-  }
-  return (
-    <div className="sfl-viz-cr" aria-hidden="true">
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-        <span className="sfl-lbl">Crédits</span>
-        <span className="sfl-num" style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.03em' }}>2 480</span>
+      <div className="sfl-run-log sfl-mono">
+        {log.length === 0 ? <span className="sfl-dimtxt">Démarrage des téléphones…</span> : log.map(i => (
+          <span key={i} style={{ opacity: 1 - (done - 1 - i) * 0.22 }}><b>✓</b> @{handle(i * 5 + 1)} · Reel publié</span>
+        ))}
       </div>
-      <div className="sfl-bar"><i style={{ transform: 'scaleX(0.62)' }} /></div>
     </div>
   )
 }
+
+// ── Visuels des fonctionnalités ──────────────────────────────────────────────
+function VizMass() {
+  return (
+    <div className="sfl-viz-mass">
+      {[0, 1, 2, 3, 4].map(i => <Phone key={i} n={i * 2 + 3} delay={i * 1.3} className="sfl-fan" style={{ '--i': i - 2 } as CSSProperties} />)}
+    </div>
+  )
+}
+function VizStory() {
+  return (
+    <div className="sfl-viz-center">
+      <div className="sfl-ph sfl-ph-lg">
+        <img src={photo(7)} alt="" loading="lazy" decoding="async" />
+        <span className="sfl-ph-shade" />
+        <span className="sfl-story-bars"><i /><i /><i /></span>
+        <span className="sfl-sticker"><Ico d={P.link} s={14} sw={2.4} />MON LIEN</span>
+      </div>
+    </div>
+  )
+}
+function VizViral() {
+  return (
+    <div className="sfl-viz-viral">
+      {[['1,6 M', '×24', 2], ['1,2 M', '×12', 9], ['880 k', '×8,9', 11]].map(([v, x, n], i) => (
+        <div key={i} className="sfl-reel" style={{ '--i': i } as CSSProperties}>
+          <img src={photo(n as number)} alt="" loading="lazy" decoding="async" />
+          <span className="sfl-ph-shade" />
+          <span className="sfl-reel-rank sfl-mono">{String(i + 1).padStart(2, '0')}</span>
+          <span className="sfl-reel-x">🔥 {x}</span>
+          <span className="sfl-reel-v"><b>{v}</b>vues</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+function VizStudio() {
+  return (
+    <div className="sfl-viz-studio">
+      <div className="sfl-src"><img src={photo(0)} alt="" loading="lazy" decoding="async" /><span>Source</span></div>
+      <span className="sfl-flow"><Ico d={P.arrow} s={18} /></span>
+      <div className="sfl-vars">
+        {[0, 1, 2, 3, 4, 5].map(i => (
+          <div key={i} className="sfl-var" style={{ '--i': i } as CSSProperties}>
+            <img src={photo(0)} alt="" loading="lazy" decoding="async" style={{ filter: `brightness(${0.86 + (i % 3) * 0.08}) saturate(${0.9 + (i % 2) * 0.25}) hue-rotate(${(i - 2) * 4}deg)`, transform: `scale(${1.05 + (i % 3) * 0.06}) translate(${(i % 2 ? 1 : -1) * 3}%, ${(i % 3 - 1) * 2}%)${i % 4 === 1 ? ' scaleX(-1)' : ''}` }} />
+            <span className="sfl-var-cap">{['POV : ton crush t’écrit', 'Personne ne sait que…', 'Ma routine du matin', 'Tu ne devineras jamais', 'Le secret c’est ça', 'Regarde jusqu’à la fin'][i]}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+function VizSched() {
+  const days = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+  return (
+    <div className="sfl-viz-cal">
+      {days.map((d, i) => <span key={i} className="sfl-cal-h">{d}</span>)}
+      {Array.from({ length: 14 }, (_, i) => (
+        <span key={i} className={'sfl-cal-d' + (i === 9 ? ' sfl-cal-now' : '')}>
+          <small>{i + 6}</small>
+          {i % 3 !== 2 && <i className="sfl-cal-p">{['09:00', '12:30', '18:00', '21:15'][i % 4]}</i>}
+          {i % 4 === 0 && <i className="sfl-cal-p sfl-cal-p2">Story</i>}
+        </span>
+      ))}
+    </div>
+  )
+}
+function VizFlow() {
+  return (
+    <div className="sfl-viz-flow">
+      {['Warmup 20 min', 'Reel', 'Pause 2 h', 'Story + lien'].map((b, i) => (
+        <span key={b} style={{ display: 'contents' }}>
+          {i > 0 && <span className="sfl-flow-l" />}
+          <span className="sfl-flow-b" style={{ '--i': i } as CSSProperties}><span className="sfl-mono">{String(i + 1).padStart(2, '0')}</span>{b}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+function VizWarm() {
+  return (
+    <div className="sfl-viz-warm">
+      {[3, 8, 12].map((n, i) => (
+        <div key={n} className="sfl-warm-row" style={{ '--i': i } as CSSProperties}>
+          <i style={{ backgroundImage: `url(${photo(n)})` }} />
+          <span className="sfl-warm-t">@{handle(n)}</span>
+          <span className="sfl-warm-c"><Ico d={P.check} s={10} sw={3} />Bio</span>
+          <span className="sfl-warm-c"><Ico d={P.check} s={10} sw={3} />Photo</span>
+          <span className="sfl-warm-c sfl-warm-run"><i className="sfl-spin" />Chauffe</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+function VizLinks() {
+  const h = [38, 56, 44, 72, 60, 88, 70, 96, 82, 64, 90, 100]
+  return (
+    <div className="sfl-viz-links">
+      <span className="sfl-link-pill"><Ico d={P.link} s={13} sw={2.2} />tapmylink.fr/lea</span>
+      <div className="sfl-bars">{h.map((v, i) => <i key={i} style={{ height: `${v}%`, '--i': i } as CSSProperties} />)}</div>
+    </div>
+  )
+}
+
+type Feat = { k: string; title: ReactNode; text: string; viz: ReactNode; size: 'xl' | 'l' | 'm' }
+const FEATURES: Feat[] = [
+  { k: 'Mass Posting', size: 'xl', viz: <VizMass />, title: <>Un Reel. <span>Cent comptes.</span></>, text: 'Publie sur des dizaines de comptes Instagram ou TikTok en parallèle. Chaque téléphone se libère dès que son post est parti.' },
+  { k: 'Stories', size: 'm', viz: <VizStory />, title: <>Stories <span>avec lien.</span></>, text: 'Image, sticker lien propre à chaque compte et texte : posté en automatique.' },
+  { k: 'Veille Reels', size: 'm', viz: <VizViral />, title: <>Ce qui <span>explose.</span></>, text: 'Les Reels viraux des comptes de référence, classés par vues. FR et US.' },
+  { k: 'Studio vidéo', size: 'l', viz: <VizStudio />, title: <>Une vidéo, <span>des dizaines de variantes.</span></>, text: 'Auto-contenu : légende, coupe, vitesse, spoof. Chaque compte reçoit une vidéo unique. Gratuit.' },
+  { k: 'Programmation', size: 'm', viz: <VizSched />, title: <>PC éteint, <span>ça poste.</span></>, text: 'Calendrier visuel. Tes posts et stories partent à l’heure depuis nos serveurs.' },
+  { k: 'Flow Builder', size: 'm', viz: <VizFlow />, title: <>Tes routines <span>en blocs.</span></>, text: 'Enchaîne warmup, Reels, stories et pauses. Lance la séquence sur tous tes comptes.' },
+  { k: 'Warmup', size: 'm', viz: <VizWarm />, title: <>Chauffe <span>et édite.</span></>, text: 'Warmup à rythme humain, bio, photo et pseudo modifiés en masse, vérifiés à l’écran.' },
+  { k: 'Liens', size: 'm', viz: <VizLinks />, title: <>Chaque clic <span>compté.</span></>, text: 'Pages de liens et liens trackés par compte : tu sais quel compte rapporte.' },
+]
 
 function Features() {
   return (
-    <section id="features" className="sfl-sec sfl-bt">
+    <section id="features" className="sfl-sec">
       <div className="sfl-wrap">
-        <Head center eyebrow="Tout pour scaler" sub="Fini de jongler entre dix outils. Publication, automatisation et production de contenu au même endroit.">
-          Une seule app, <span className="sfl-dim">tout dedans.</span>
-        </Head>
+        <Head kicker="Fonctionnalités" l1="Tout pour scaler." l2="Rien de superflu." sub="Chaque outil dont une ferme de comptes a besoin, dans une seule app." />
         <div className="sfl-bento">
-          {FEATURES.map((f, i) => {
-            const txt = <><span className="sfl-ico"><Ico n={f.ic} s={18} /></span><h3>{f.title}</h3><p>{f.text}</p></>
-            return (
-              <div key={f.title} className={`sfl-card sfl-hov sfl-rv sfl-f sfl-${f.size}`} style={dl((i % 3) * 70)}>
-                {f.viz ? <div className="sfl-f-split"><div className="sfl-f-txt">{txt}</div><FeatViz kind={f.viz} /></div> : txt}
+          {FEATURES.map((f, i) => (
+            <article key={f.k} className={'sfl-feat sfl-rv sfl-feat-' + f.size} style={dl((i % 3) * 80)}>
+              <div className="sfl-feat-viz">{f.viz}</div>
+              <div className="sfl-feat-txt">
+                <span className="sfl-kick">● {f.k}</span>
+                <h3>{f.title}</h3>
+                <p>{f.text}</p>
               </div>
-            )
-          })}
+            </article>
+          ))}
         </div>
       </div>
     </section>
   )
 }
 
-
-// ── Avis ─────────────────────────────────────────────────────────────────────
-function Stars() {
-  return <span className="sfl-stars" aria-hidden="true">{[0, 1, 2, 3, 4].map(i => <Ico key={i} n="star" s={12} />)}</span>
+function Head({ kicker, l1, l2, sub, center }: { kicker: string; l1: ReactNode; l2?: ReactNode; sub?: ReactNode; center?: boolean }) {
+  return (
+    <div className={'sfl-head sfl-rv' + (center ? ' sfl-c' : '')}>
+      <span className="sfl-kick">● {kicker}</span>
+      <h2 className="sfl-h2"><span>{l1}</span>{l2 && <> <span className="sfl-grey">{l2}</span></>}</h2>
+      {sub && <p>{sub}</p>}
+    </div>
+  )
 }
 
 function VoiceNote() {
@@ -811,12 +344,12 @@ function VoiceNote() {
   const fmt = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`
   const toggle = () => { const a = audio.current; if (!a) return; if (a.paused) a.play().then(() => setPlaying(true)).catch(() => {}); else { a.pause(); setPlaying(false) } }
   return (
-    <figure className="sfl-card sfl-hov sfl-rv sfl-rev sfl-voice" style={{ ...dl(140), margin: 0 }}>
-      <button type="button" className="sfl-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Écouter le message vocal'}><Ico n={playing ? 'pause' : 'play'} s={16} /></button>
+    <figure className="sfl-rev sfl-voice sfl-rv">
+      <button type="button" className="sfl-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Écouter le message vocal'}><Ico d={playing ? P.pause : P.play} s={16} /></button>
       <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
         <span className="sfl-wave" aria-hidden="true">{Array.from({ length: 40 }, (_, i) => { const seed = Math.abs(Math.sin(i * 2.7) * Math.cos(i * 0.9)); return <i key={i} className={i / 40 <= pct && pct > 0 ? 'p' : ''} style={{ height: (22 + seed * 70) + '%' }} /> })}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--t4)', whiteSpace: 'nowrap', minWidth: 0 }}>
-          <span style={{ color: 'var(--t1)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>Message vocal d’un client</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: '#71717A', whiteSpace: 'nowrap', minWidth: 0 }}>
+          <span style={{ color: '#EDEDEF', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>Message vocal d’un client</span>
           <span className="sfl-mono sfl-num" style={{ fontSize: 11.5 }}>{time}</span>
           <span style={{ marginLeft: 'auto' }}>Telegram</span>
         </span>
@@ -828,104 +361,19 @@ function VoiceNote() {
   )
 }
 
-function Reviews() {
-  return (
-    <section id="reviews" className="sfl-sec sfl-bt">
-      <div className="sfl-wrap">
-        <Head center eyebrow="Social proof" sub="Les messages reçus, tels quels. Rien de réécrit.">Ils font tourner <span className="sfl-dim">ScaleFlow.</span></Head>
-        <div className="sfl-revs">
-          {REVIEWS.map((r, i) => (
-            <figure key={r.name} className="sfl-card sfl-hov sfl-rv sfl-rev" style={dl((i % 3) * 70)}>
-              <img src={r.src} alt={r.alt} loading="lazy" decoding="async" />
-              <figcaption><Stars /><b>{r.name}</b><span>Telegram · {r.date}</span></figcaption>
-            </figure>
-          ))}
-          <VoiceNote />
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// ── Tarifs ───────────────────────────────────────────────────────────────────
-function Pricing() {
-  return (
-    <section id="pricing" className="sfl-sec sfl-bt">
-      <div className="sfl-wrap">
-        <Head center eyebrow="Tarifs" sub="Trois plans qui grandissent avec ton volume. Crédits inclus chaque mois, recharge à la demande.">Un prix, <span className="sfl-dim">zéro friction.</span></Head>
-        <div className="sfl-plans">
-          {PLANS.map((p, i) => (
-            <article key={p.name} className={'sfl-card sfl-rv sfl-plan' + (p.pro ? ' sfl-pro' : '')} style={dl(i * 80)}>
-              <div className="sfl-plan-name"><span>{p.name}</span>{p.pro && <span className="sfl-pop">Populaire</span>}</div>
-              <div className="sfl-price"><b className="sfl-num">{p.price}</b><span>/mois</span></div>
-              <p>{p.desc}</p>
-              <ul>{p.items.map(x => <li key={x}><Ico n="check" s={15} />{x}</li>)}</ul>
-              <div className="sfl-plan-cta">
-                <a href={TG_URL} target="_blank" rel="noreferrer" className={'sfl-btn sfl-btn-block ' + (p.pro ? 'sfl-btn-p' : 'sfl-btn-s')}>{p.cta}</a>
-              </div>
-            </article>
-          ))}
-        </div>
-
-        <div className="sfl-card sfl-box sfl-rv">
-          <div className="sfl-box-h">
-            <div><h3>Packs de crédits</h3><p>Recharge ton solde à la demande, sans changer de plan.</p></div>
-          </div>
-          <div className="sfl-packs">
-            {PACKS.map(pk => (
-              <a key={pk.credits} href={TG_URL} target="_blank" rel="noreferrer" className="sfl-pack">
-                <b className="sfl-num"><Ico n="coins" s={15} style={{ color: 'var(--amb)' }} />{pk.credits}<small> cr</small></b>
-                <span className="sfl-num">{pk.price}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <div className="sfl-card sfl-box sfl-rv">
-          <div className="sfl-box-h">
-            <div><h3>Les crédits, c'est basé sur quoi ?</h3><p>Tu paies à la publication, pas à l'outil. Le studio vidéo est entièrement gratuit.</p></div>
-            <span className="sfl-badge sfl-ok">Même tarif en direct, en masse ou programmé</span>
-          </div>
-          <div className="sfl-costs">
-            {CREDITS.map(c => (
-              <div key={c.label} className="sfl-cost">
-                <span className="sfl-ico sfl-ico-n" style={{ width: 34, height: 34 }}><Ico n={c.ic} s={16} /></span>
-                <span className="sfl-cost-t"><b>{c.label}</b><span>{c.unit}</span></span>
-                <span className={'sfl-cost-v sfl-num' + (c.free ? ' sfl-free' : '')}>{c.cost}</span>
-              </div>
-            ))}
-          </div>
-          <div className="sfl-example">
-            <Ico n="calc" s={16} />
-            <span>Concrètement : un mass posting sur <strong>52 comptes</strong> coûte <strong>104 crédits</strong>. Avec le plan Pro et ses 5 500 crédits mensuels, ça fait <strong>52 diffusions complètes par mois</strong>.</span>
-          </div>
-        </div>
-        <p className="sfl-pay">Paiement via Telegram · Crypto ou virement · Activation immédiate</p>
-      </div>
-    </section>
-  )
-}
-
-// ── FAQ ──────────────────────────────────────────────────────────────────────
 function Faq() {
   const [open, setOpen] = useState<number | null>(0)
   return (
-    <section id="faq" className="sfl-sec sfl-bt">
-      <div className="sfl-wrap sfl-faq">
-        <div className="sfl-faq-head">
-          <div className="sfl-rv"><span className="sfl-eyebrow">FAQ</span></div>
-          <h2 className="sfl-h2 sfl-rv" style={dl(60)}>On répond à <span className="sfl-dim">tout.</span></h2>
-          <div className="sfl-rv" style={dl(120)}><a href={TG_URL} target="_blank" rel="noreferrer"><Ico n="send" s={15} />Une autre question ? Écris-nous sur Telegram</a></div>
-        </div>
-        <div className="sfl-rv" style={dl(100)}>
-          {QA.map((item, i) => {
-            const isOpen = open === i
+    <section id="faq" className="sfl-sec">
+      <div className="sfl-wrap sfl-faq-grid">
+        <Head kicker="FAQ" l1="Questions" l2="fréquentes." sub={<>Une autre question ? <a href={TG_URL} target="_blank" rel="noreferrer" className="sfl-ul">Écris-nous sur Telegram</a>.</>} />
+        <div className="sfl-faq">
+          {QA.map(([q, a], i) => {
+            const on = open === i
             return (
-              <div key={i} className={'sfl-qa' + (isOpen ? ' sfl-open' : '')}>
-                <button type="button" className="sfl-q" aria-expanded={isOpen} aria-controls={'sfl-a-' + i} id={'sfl-q-' + i} onClick={() => setOpen(isOpen ? null : i)}>
-                  {item.q}<Ico n="plus" s={18} />
-                </button>
-                <div className="sfl-a" id={'sfl-a-' + i} role="region" aria-labelledby={'sfl-q-' + i}><div><p>{item.a}</p></div></div>
+              <div key={q} className={'sfl-qa sfl-rv' + (on ? ' sfl-on' : '')} style={dl(i * 40)}>
+                <button type="button" onClick={() => setOpen(on ? null : i)} aria-expanded={on}>{q}<span className="sfl-qa-ic"><Ico d={P.plus} s={16} /></span></button>
+                <div className="sfl-qa-a"><div><p>{a}</p></div></div>
               </div>
             )
           })}
@@ -983,6 +431,13 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
     else el.scrollIntoView({ behavior, block: 'start' })
   }
 
+  const cta = (big?: boolean) => (
+    <div className="sfl-ctas">
+      <button type="button" className={'sfl-btn sfl-btn-p' + (big ? ' sfl-btn-lg' : '')} onClick={onStudio}>Créer mon compte<Ico d={P.arrow} s={17} /></button>
+      <a href={WIN_URL} className={'sfl-btn sfl-btn-s' + (big ? ' sfl-btn-lg' : '')}><Ico d={P.download} s={16} />Télécharger pour Windows</a>
+    </div>
+  )
+
   return (
     <div ref={rootRef} className="sfl-root" onScroll={onScroll} onClick={onRootClick}>
       <style>{CSS}</style>
@@ -995,105 +450,147 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
             {NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}
           </nav>
           <div className="sfl-hdr-cta">
-            <a href={WIN_URL} className="sfl-btn sfl-btn-s sfl-btn-sm sfl-hdr-dl">Télécharger</a>
-            <button type="button" className="sfl-btn sfl-btn-p sfl-btn-sm sfl-hdr-go" onClick={onStudio}>Commencer</button>
-            <button type="button" className="sfl-burger" aria-label={menu ? 'Fermer le menu' : 'Ouvrir le menu'} aria-expanded={menu} aria-controls="sfl-menu" onClick={() => setMenu(m => !m)}><Ico n={menu ? 'close' : 'menu'} s={18} /></button>
+            <button type="button" className="sfl-btn sfl-btn-g sfl-btn-sm sfl-hdr-login" onClick={onStudio}>Connexion</button>
+            <button type="button" className="sfl-btn sfl-btn-p sfl-btn-sm" onClick={onStudio}>Commencer</button>
+            <button type="button" className="sfl-burger" aria-label={menu ? 'Fermer le menu' : 'Ouvrir le menu'} aria-expanded={menu} aria-controls="sfl-menu" onClick={() => setMenu(m => !m)}><Ico d={menu ? P.close : P.menu} s={18} /></button>
           </div>
         </div>
         <div id="sfl-menu" className={'sfl-menu' + (menu ? ' sfl-open' : '')}>
-          {NAV.map(([href, label]) => <a key={href} href={href} className="sfl-mlink" tabIndex={menu ? 0 : -1}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{label}</span><Ico n="arrow" s={15} style={{ color: 'var(--t4)' }} /></a>)}
+          {NAV.map(([href, label]) => <a key={href} href={href} className="sfl-mlink" tabIndex={menu ? 0 : -1}>{label}<Ico d={P.arrow} s={15} style={{ color: '#71717A' }} /></a>)}
           <div className="sfl-menu-cta">
-            <a href={WIN_URL} className="sfl-btn sfl-btn-s" tabIndex={menu ? 0 : -1}><Ico n="download" s={15} />Télécharger</a>
+            <a href={WIN_URL} className="sfl-btn sfl-btn-s" tabIndex={menu ? 0 : -1}><Ico d={P.download} s={15} />Télécharger</a>
             <button type="button" className="sfl-btn sfl-btn-p" tabIndex={menu ? 0 : -1} onClick={() => { setMenu(false); onStudio() }}>Commencer</button>
           </div>
         </div>
       </header>
 
       <main>
-        {/* HERO */}
+        {/* HERO : mur de téléphones qui publient */}
         <section id="top" className="sfl-hero">
-          <div className="sfl-hero-bg" aria-hidden="true"><div className="sfl-glow" /><div className="sfl-gridbg" /></div>
-          <div className="sfl-wrap sfl-hero-grid">
-            <div>
-              <div className="sfl-rv"><span className="sfl-pill"><span className="sfl-pulse" /><LiveCount /> posts publiés aujourd'hui</span></div>
-              <h1 className="sfl-h1 sfl-rv" style={{ ...dl(70), marginTop: 24 }}><span>Un clic.</span><br /><span>Cent</span> <span>comptes.</span></h1>
-              <p className="sfl-hero-sub sfl-rv" style={dl(140)}>Mass posting, programmation, warmup et remix vidéo dans un seul poste de pilotage. Ce qui te prenait la semaine se fait en 5 minutes.</p>
-              <div className="sfl-hero-cta sfl-rv" style={dl(210)}>
-                <button type="button" className="sfl-btn sfl-btn-p sfl-btn-lg" onClick={onStudio}>Commencer gratuitement<Ico n="arrow" s={16} className="sfl-arr" /></button>
-                <a href={WIN_URL} className="sfl-btn sfl-btn-s sfl-btn-lg"><Ico n="download" s={16} />Télécharger</a>
-              </div>
-              <div className="sfl-trust sfl-rv" style={dl(280)}>
-                <span>Propulsé par</span>
-                <b>GeeLark</b><i>·</i><b>Instagram</b><i>·</i><b>TikTok</b><i>·</i><b>IA Claude &amp; Groq</b>
-              </div>
-            </div>
-            <div className="sfl-hero-vis sfl-rv" style={dl(200)}>
-              <HeroRun />
-              <div className="sfl-chip sfl-hero-chip">
-                <span className="sfl-ico" style={{ width: 32, height: 32 }}><Ico n="clock" s={16} /></span>
-                <span className="sfl-chip-t"><b>15 h</b><span>gagnées / semaine</span></span>
-              </div>
+          <PhoneWall />
+          <div className="sfl-hero-veil" aria-hidden="true" />
+          <div className="sfl-wrap sfl-hero-in">
+            <span className="sfl-pill sfl-rv"><i className="sfl-dot" />Instagram · TikTok · cloud phones GeeLark</span>
+            <h1 className="sfl-h1 sfl-rv" style={dl(80)}><span>Un clic.</span><span className="sfl-grad">Cent comptes.</span></h1>
+            <p className="sfl-hero-sub sfl-rv" style={dl(160)}>Publication en masse, stories, programmation, warmup et studio vidéo dans un seul poste de pilotage. Ce qui te prenait la semaine part en quelques minutes.</p>
+            <div className="sfl-rv" style={dl(240)}>{cta(true)}</div>
+            <div className="sfl-hero-facts sfl-rv" style={dl(320)}>
+              {[['×100', 'comptes en parallèle'], ['2 cr', 'par Reel publié'], ['0 €', 'les outils vidéo'], ['24/7', 'PC éteint, ça poste']].map(([v, l]) => (
+                <span key={l}><b>{v}</b>{l}</span>
+              ))}
             </div>
           </div>
+          <a href="#live" className="sfl-scroll" aria-label="Défiler"><i /></a>
         </section>
 
         {/* BANDEAU */}
         <div className="sfl-marq" aria-hidden="true">
           <div className="sfl-marq-track">
-            {[...MARQUEE, ...MARQUEE].map((x, i) => <span key={i} className="sfl-marq-i"><Ico n={x.ic} s={15} />{x.label}</span>)}
+            {[0, 1].map(k => MARQUEE.map((m, i) => <span key={`${k}-${i}`} className={'sfl-marq-i' + (i % 2 ? ' sfl-outline' : '')}>{m}<em>✦</em></span>))}
           </div>
         </div>
 
-        <Showcase />
+        {/* LE PRODUIT EN DIRECT */}
+        <section id="live" className="sfl-sec">
+          <div className="sfl-wrap sfl-live">
+            <div>
+              <Head kicker="Le produit" l1="Lance." l2="Regarde. C’est posté." sub="Tu choisis tes comptes et ta vidéo, ScaleFlow démarre les téléphones, publie et te montre chaque compte en direct." />
+              <ul className="sfl-ticks sfl-rv" style={dl(120)}>
+                {['Chaque téléphone se libère dès que son post est parti', 'Un rafraîchissement ? Le run reprend où il en était', 'Historique complet et relance des échecs en 1 clic', 'Crédits remboursés sur les comptes en échec'].map(x => (
+                  <li key={x}><span><Ico d={P.check} s={12} sw={3} /></span>{x}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="sfl-rv" style={dl(100)}><LiveRun /></div>
+          </div>
+        </section>
+
         <Features />
 
         {/* COMMENT ÇA MARCHE */}
-        <section id="how" className="sfl-sec sfl-bt">
+        <section id="how" className="sfl-sec">
           <div className="sfl-wrap">
-            <Head eyebrow="Comment ça marche" sub="Connecte ton GeeLark, charge tes vidéos et lance ton premier mass post aujourd'hui.">Trois étapes, <span className="sfl-dim">cinq minutes.</span></Head>
+            <Head kicker="Comment ça marche" l1="Trois étapes." l2="Cinq minutes." />
             <div className="sfl-steps">
-              {STEPS.map((s, i) => (
-                <div key={s.n} className="sfl-card sfl-rv sfl-step" style={dl(i * 90)}>
-                  <div className="sfl-step-n"><span className="sfl-ico"><Ico n={s.ic} s={17} /></span><span className="sfl-mono">{s.n}</span></div>
-                  <h3>{s.title}</h3>
-                  <p>{s.text}</p>
+              {STEPS.map(([n, t, x], i) => (
+                <div key={n} className="sfl-step sfl-rv" style={dl(i * 100)}>
+                  <span className="sfl-step-n">{n}</span>
+                  <h3>{t}</h3>
+                  <p>{x}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <Reviews />
-        <Pricing />
+        {/* AVIS */}
+        <section id="reviews" className="sfl-sec">
+          <div className="sfl-wrap">
+            <Head center kicker="Ils l’utilisent" l1="Ils font tourner" l2="ScaleFlow." sub="Les messages reçus, tels quels. Rien de réécrit." />
+            <div className="sfl-revs">
+              {REVIEWS.map((r, i) => (
+                <figure key={r.name} className="sfl-rev sfl-rv" style={dl((i % 3) * 70)}>
+                  <img src={r.src} alt={r.alt} loading="lazy" decoding="async" />
+                  <figcaption><span className="sfl-stars">{[0, 1, 2, 3, 4].map(k => <Ico key={k} d={P.star} s={12} />)}</span><b>{r.name}</b><span>Telegram · {r.date}</span></figcaption>
+                </figure>
+              ))}
+              <VoiceNote />
+            </div>
+          </div>
+        </section>
+
+        {/* TARIFS */}
+        <section id="pricing" className="sfl-sec">
+          <div className="sfl-wrap">
+            <Head center kicker="Tarifs" l1="Choisis" l2="ta puissance." sub="Toutes les fonctionnalités dans chaque offre. Plus de crédits, de téléphones et d’espace quand tu grandis." />
+            <div className="sfl-plans">
+              {PLANS.map((p, i) => (
+                <div key={p.name} className={'sfl-plan sfl-rv' + (p.best ? ' sfl-best' : '')} style={dl(i * 90)}>
+                  <div className="sfl-plan-in">
+                    <div className="sfl-plan-top"><span className="sfl-plan-name">{p.name}</span>{p.best && <span className="sfl-tag">Le plus choisi</span>}</div>
+                    <div className="sfl-price"><b>{p.price}$</b><span>/ mois</span></div>
+                    <p className="sfl-plan-tag">{p.tag}</p>
+                    <div className="sfl-plan-cr"><b className="sfl-num">{p.credits}</b><span>crédits / mois</span></div>
+                    <button type="button" className={'sfl-btn ' + (p.best ? 'sfl-btn-p' : 'sfl-btn-w')} onClick={onStudio}>Choisir {p.name}<Ico d={P.arrow} s={16} /></button>
+                    <ul>{p.items.map(x => <li key={x}><span><Ico d={P.check} s={11} sw={3} /></span>{x}</li>)}</ul>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="sfl-costs sfl-rv">
+              {COSTS.map(([l, v, s]) => (
+                <div key={l}><span className="sfl-kick-g">{l}</span><b className={v === '0' ? 'sfl-violet' : ''}>{v === '0' ? 'Gratuit' : v}</b><span>{s}</span></div>
+              ))}
+            </div>
+            <div className="sfl-packs sfl-rv">
+              <span className="sfl-packs-h">Besoin de plus ? <b>Recharges de crédits</b></span>
+              {PACKS.map(([c, p]) => <span key={c} className="sfl-pack"><b className="sfl-num">{c} cr</b><span>{p}$</span></span>)}
+            </div>
+          </div>
+        </section>
+
         <Faq />
 
         {/* CTA FINAL */}
-        <section className="sfl-sec" style={{ paddingTop: 24 }}>
-          <div className="sfl-wrap">
-            <div className="sfl-final sfl-rv">
-              <div className="sfl-gridbg" aria-hidden="true" />
-              <div style={{ position: 'relative' }}>
-                <span className="sfl-eyebrow">C'est le moment</span>
-                <h2 className="sfl-h2" style={{ fontSize: 'clamp(32px, 5vw, 54px)' }}>Prêt à <span className="sfl-dim">passer à l'échelle ?</span></h2>
-                <p>Connecte ton GeeLark, charge tes vidéos et lance ton premier mass post aujourd'hui — sur <strong>Instagram</strong> comme sur <strong>TikTok</strong>.</p>
-                <div className="sfl-hero-cta" style={{ justifyContent: 'center' }}>
-                  <button type="button" className="sfl-btn sfl-btn-p sfl-btn-lg" onClick={onStudio}>Commencer gratuitement<Ico n="arrow" s={16} className="sfl-arr" /></button>
-                  <a href={WIN_URL} className="sfl-btn sfl-btn-s sfl-btn-lg"><Ico n="download" s={16} />Télécharger</a>
-                </div>
-                <small>Sans carte bancaire · Windows, Mac &amp; Web · Setup en &lt; 5 min</small>
-              </div>
-            </div>
+        <section className="sfl-final">
+          <PhoneWall cols={9} per={4} seed={4} />
+          <div className="sfl-final-veil" aria-hidden="true" />
+          <div className="sfl-wrap sfl-final-in sfl-rv">
+            <span className="sfl-kick">● C’est le moment</span>
+            <h2 className="sfl-h1 sfl-h1-final"><span>Prêt à</span><span className="sfl-grad">scaler ?</span></h2>
+            <p className="sfl-hero-sub">Connecte ton GeeLark, charge tes vidéos et lance ton premier run aujourd’hui.</p>
+            {cta(true)}
           </div>
         </section>
       </main>
 
       {/* PIED DE PAGE */}
-      <footer className="sfl-foot sfl-bt">
+      <footer className="sfl-foot">
         <div className="sfl-wrap">
           <div className="sfl-foot-grid">
             <div className="sfl-foot-brand">
               <Brand />
-              <p>La plateforme de mass posting Instagram &amp; TikTok pour créateurs, agences et growth hackers.</p>
+              <p>Le poste de pilotage Instagram &amp; TikTok des créateurs, agences et growth teams.</p>
             </div>
             {FOOT_COLS.map(col => (
               <nav key={col.h} className="sfl-foot-col" aria-label={col.h}>
@@ -1102,6 +599,7 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
               </nav>
             ))}
           </div>
+          <div className="sfl-foot-word" aria-hidden="true">SCALEFLOW</div>
           <div className="sfl-foot-bot">
             <span>© 2026 ScaleFlow. Tous droits réservés.</span>
             <span className="sfl-fr">Conçu en France<span className="sfl-flag" aria-hidden="true"><i style={{ background: '#2B4BA8' }} /><i style={{ background: '#EDEDEF' }} /><i style={{ background: '#D9414B' }} /></span></span>
@@ -1111,5 +609,360 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
     </div>
   )
 }
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+const CSS = `
+.sfl-root{--bg:#0A0A0B;--s1:#111113;--s2:#161618;--b:rgba(255,255,255,0.07);--b2:rgba(255,255,255,0.12);--t1:#F4F4F5;--t2:#A1A1AA;--t3:#8B8B94;--t4:#71717A;--v:#A78BFA;--v2:#C4B5FD;--pk:#F472B6;--grad:linear-gradient(135deg,#8B5CF6,#EC4899);--e:cubic-bezier(0.16,1,0.3,1);
+  position:relative;height:100vh;height:100dvh;overflow-x:hidden;overflow-y:auto;scroll-behavior:smooth;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch;
+  background:var(--bg);color:var(--t1);font-size:15px;line-height:1.5;letter-spacing:-0.006em}
+.sfl-root *,.sfl-root *::before,.sfl-root *::after{box-sizing:border-box}
+.sfl-root a{color:inherit;text-decoration:none}
+.sfl-root img{max-width:100%;display:block}
+.sfl-root button{font-family:inherit}
+.sfl-wrap{width:100%;max-width:1200px;margin:0 auto;padding:0 24px}
+.sfl-sec{position:relative;padding:96px 0;scroll-margin-top:60px}
+.sfl-mono{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0}
+.sfl-num{font-variant-numeric:tabular-nums}
+.sfl-grey{color:#52525B}
+.sfl-violet{color:var(--v)!important}
+.sfl-dimtxt{color:var(--t4)}
+.sfl-grad{background:linear-gradient(90deg,#C4B5FD,#F472B6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+.sfl-ul{color:var(--v2);border-bottom:1px solid rgba(196,181,253,.4)}
+.sfl-kick{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--v)}
+.sfl-kick-g{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)}
+
+/* Révélation */
+.sfl-rv{opacity:0;transform:translateY(22px);transition:opacity .8s var(--e),transform .8s var(--e);transition-delay:var(--d,0ms)}
+.sfl-rv.sfl-in{opacity:1;transform:none}
+
+/* Boutons */
+.sfl-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;height:44px;padding:0 18px;border-radius:12px;border:none;font-size:14.5px;font-weight:750;cursor:pointer;white-space:nowrap;transition:transform .2s var(--e),box-shadow .2s ease,background-color .2s ease}
+.sfl-btn:hover{transform:translateY(-2px)}
+.sfl-btn-p{background:var(--grad);color:#fff;box-shadow:0 4px 0 #6D28D9,0 18px 40px -16px rgba(236,72,153,.7)}
+.sfl-btn-s{background:rgba(255,255,255,0.06);color:var(--t1);border:1px solid var(--b2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.sfl-btn-s:hover{background:rgba(255,255,255,0.1)}
+.sfl-btn-w{background:#F4F4F5;color:#0A0A0B;box-shadow:0 4px 0 #A1A1AA}
+.sfl-btn-g{background:transparent;color:var(--t2);border:1px solid transparent}
+.sfl-btn-g:hover{color:var(--t1);background:rgba(255,255,255,0.05)}
+.sfl-btn-sm{height:34px;padding:0 13px;font-size:13.5px;border-radius:9px}
+.sfl-btn-sm.sfl-btn-p{box-shadow:0 3px 0 #6D28D9}
+.sfl-btn-lg{height:54px;padding:0 24px;font-size:16px;border-radius:14px}
+.sfl-ctas{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+
+/* En-tête */
+.sfl-hdr{position:sticky;top:0;z-index:50;height:64px;background:transparent;border-bottom:1px solid transparent;transition:border-color .3s ease,background-color .3s ease}
+.sfl-hdr.sfl-scrolled{border-bottom-color:var(--b);background:rgba(10,10,11,0.78);-webkit-backdrop-filter:saturate(1.5) blur(16px);backdrop-filter:saturate(1.5) blur(16px)}
+.sfl-hdr-in{height:100%;display:flex;align-items:center;gap:20px}
+.sfl-brand{display:inline-flex;align-items:center;gap:10px;font-size:16px;font-weight:800;letter-spacing:-0.03em;color:var(--t1);flex-shrink:0}
+.sfl-nav{display:flex;align-items:center;gap:2px;margin-left:18px}
+.sfl-nav a{display:inline-flex;align-items:center;height:34px;padding:0 12px;border-radius:8px;font-size:14px;font-weight:550;color:var(--t2);transition:color .15s ease,background-color .15s ease}
+.sfl-nav a:hover{color:var(--t1);background:rgba(255,255,255,0.05)}
+.sfl-hdr-cta{margin-left:auto;display:flex;align-items:center;gap:8px}
+.sfl-burger{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--b2);background:rgba(255,255,255,0.04);color:var(--t1);cursor:pointer}
+.sfl-menu{display:none}
+
+/* Téléphone */
+.sfl-ph{position:relative;aspect-ratio:9/19;border-radius:24px;overflow:hidden;background:#141416;border:1px solid rgba(255,255,255,0.12);box-shadow:0 0 0 4px #0E0E10,0 0 0 5px rgba(255,255,255,0.08),0 30px 60px -30px rgba(0,0,0,.9)}
+.sfl-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sfl-ph-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.45) 0%,transparent 22%,transparent 58%,rgba(0,0,0,.85) 100%)}
+.sfl-ph-top{position:absolute;top:7px;left:0;right:0;display:flex;justify-content:center}
+.sfl-ph-notch{width:34%;height:12px;border-radius:99px;background:#000}
+.sfl-ph-chip{position:absolute;top:28px;left:9px}
+.sfl-ph-side{position:absolute;right:9px;bottom:30%;display:flex;flex-direction:column;gap:12px;color:#fff;opacity:.9}
+.sfl-ph-bot{position:absolute;left:10px;right:34px;bottom:12px;display:flex;flex-direction:column;gap:6px}
+.sfl-ph-user{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sfl-ph-user i{width:18px;height:18px;border-radius:99px;background-size:cover;background-position:center;border:1.5px solid #fff;flex-shrink:0}
+.sfl-ph-cap{height:5px;border-radius:9px;background:rgba(255,255,255,.55);width:85%}
+.sfl-ph-cap2{width:55%;background:rgba(255,255,255,.35)}
+
+/* Statut animé */
+.sfl-st{position:relative;display:inline-grid}
+.sfl-st-i{grid-area:1/1;display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:99px;font-size:10.5px;font-weight:800;white-space:nowrap;animation:6s linear infinite;opacity:0}
+.sfl-st-a{background:rgba(10,10,11,.6);color:#D4D4D8;border:1px solid rgba(255,255,255,.18);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation-name:sflStA}
+.sfl-st-b{background:rgba(139,92,246,.9);color:#fff;animation-name:sflStB}
+.sfl-st-c{background:#fff;color:#0A0A0B;animation-name:sflStC}
+@keyframes sflStA{0%,30%{opacity:1}33%,97%{opacity:0}100%{opacity:1}}
+@keyframes sflStB{0%,30%{opacity:0}33%,63%{opacity:1}66%,100%{opacity:0}}
+@keyframes sflStC{0%,63%{opacity:0}66%,97%{opacity:1}100%{opacity:0}}
+.sfl-spin{display:inline-block;width:10px;height:10px;border-radius:99px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:sflSpin .8s linear infinite}
+@keyframes sflSpin{to{transform:rotate(360deg)}}
+
+/* Hero */
+.sfl-hero{position:relative;min-height:calc(100vh - 0px);min-height:100dvh;margin-top:-64px;display:flex;align-items:center;overflow:hidden;isolation:isolate}
+.sfl-wall{position:absolute;inset:-10% -10%;z-index:-2;perspective:1400px;overflow:hidden}
+.sfl-wall-in{position:absolute;left:50%;top:50%;display:flex;gap:22px;transform:translate(-50%,-50%) rotateX(22deg) rotateZ(-12deg) scale(1.08);transform-style:preserve-3d}
+.sfl-col{display:flex;flex-direction:column;gap:22px;width:190px;animation:46s linear infinite;will-change:transform}
+.sfl-col-up{animation-name:sflUp}
+.sfl-col-dn{animation-name:sflDn}
+@keyframes sflUp{from{transform:translateY(0)}to{transform:translateY(calc(-50% - 11px))}}
+@keyframes sflDn{from{transform:translateY(calc(-50% - 11px))}to{transform:translateY(0)}}
+.sfl-hero-veil{position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse 70% 62% at 50% 50%,rgba(10,10,11,.94) 0%,rgba(10,10,11,.8) 45%,rgba(10,10,11,.35) 100%),linear-gradient(180deg,rgba(10,10,11,.85) 0%,transparent 18%,transparent 78%,#0A0A0B 100%)}
+.sfl-hero-in{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:120px;padding-bottom:110px}
+.sfl-pill{display:inline-flex;align-items:center;gap:9px;height:32px;padding:0 14px;border-radius:99px;border:1px solid rgba(167,139,250,.35);background:rgba(167,139,250,.1);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-size:12.5px;font-weight:700;color:var(--v2)}
+.sfl-dot{width:7px;height:7px;border-radius:99px;background:var(--v);box-shadow:0 0 0 4px rgba(167,139,250,.2);animation:sflPulse 1.8s ease-in-out infinite}
+@keyframes sflPulse{50%{box-shadow:0 0 0 8px rgba(167,139,250,0)}}
+.sfl-h1{margin:26px 0 0;display:flex;flex-direction:column;font-weight:900;letter-spacing:-0.06em;line-height:.86;text-transform:uppercase;font-size:clamp(54px,10.5vw,148px);color:var(--t1)}
+.sfl-hero-sub{margin:28px auto 0;max-width:620px;font-size:clamp(15px,1.5vw,18px);line-height:1.6;color:#C4C4CC}
+.sfl-hero-in .sfl-ctas{margin-top:34px}
+.sfl-hero-facts{margin-top:48px;display:flex;flex-wrap:wrap;justify-content:center;border:1px solid var(--b2);border-radius:18px;background:rgba(14,14,16,.7);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);overflow:hidden}
+.sfl-hero-facts span{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:14px 22px;font-size:12px;color:var(--t3);text-align:left}
+.sfl-hero-facts span+span{border-left:1px solid var(--b)}
+.sfl-hero-facts b{font-size:24px;font-weight:900;letter-spacing:-0.04em;color:var(--t1);line-height:1}
+.sfl-scroll{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:24px;height:38px;border-radius:99px;border:1.5px solid rgba(255,255,255,.3)}
+.sfl-scroll i{position:absolute;left:50%;top:8px;width:3px;height:8px;margin-left:-1.5px;border-radius:9px;background:#fff;animation:sflWheel 1.8s ease-in-out infinite}
+@keyframes sflWheel{0%{opacity:0;transform:translateY(-4px)}40%{opacity:1}100%{opacity:0;transform:translateY(12px)}}
+
+/* Bandeau */
+.sfl-marq{overflow:hidden;border-top:1px solid var(--b);border-bottom:1px solid var(--b);padding:22px 0;background:#0C0C0D}
+.sfl-marq-track{display:flex;width:max-content;animation:sflMarq 38s linear infinite}
+.sfl-marq-i{display:inline-flex;align-items:center;gap:28px;padding-right:28px;font-size:clamp(28px,4vw,52px);font-weight:900;letter-spacing:-0.045em;text-transform:uppercase;white-space:nowrap;color:var(--t1)}
+.sfl-marq-i em{font-style:normal;font-size:.55em;color:var(--v);-webkit-text-stroke:0}
+.sfl-outline{color:transparent;-webkit-text-stroke:1.5px rgba(255,255,255,.45)}
+@keyframes sflMarq{to{transform:translateX(-50%)}}
+
+/* Titres de section */
+.sfl-head{max-width:720px;margin-bottom:48px}
+.sfl-head.sfl-c{margin-left:auto;margin-right:auto;text-align:center}
+.sfl-h2{margin:14px 0 0;font-weight:900;letter-spacing:-0.055em;line-height:.92;text-transform:uppercase;font-size:clamp(36px,5.6vw,76px);color:var(--t1)}
+.sfl-head p{margin:20px 0 0;font-size:16px;line-height:1.6;color:var(--t2);max-width:560px}
+.sfl-head.sfl-c p{margin-left:auto;margin-right:auto}
+
+/* Run en direct */
+.sfl-live{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:56px;align-items:center}
+.sfl-live .sfl-head{margin-bottom:28px}
+.sfl-ticks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px}
+.sfl-ticks li{display:flex;align-items:center;gap:12px;font-size:15px;color:#D4D4D8}
+.sfl-ticks li>span,.sfl-plan li>span{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;flex-shrink:0;background:rgba(167,139,250,.14);color:var(--v)}
+.sfl-run{position:relative;padding:20px;border-radius:24px;background:#0F0F11;border:1px solid var(--b2);box-shadow:0 40px 100px -40px rgba(139,92,246,.55)}
+.sfl-run-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.sfl-run-live{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--v2)}
+.sfl-run-live i{width:8px;height:8px;border-radius:99px;background:var(--pk);animation:sflPulse 1.4s ease-in-out infinite;box-shadow:0 0 0 4px rgba(244,114,182,.2)}
+.sfl-run-count{font-size:13px;color:var(--t3)}
+.sfl-run-count b{font-size:18px;color:var(--t1)}
+.sfl-run-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden;margin-bottom:16px}
+.sfl-run-bar i{display:block;height:100%;background:var(--grad);border-radius:99px;transition:width .4s var(--e)}
+.sfl-run-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
+.sfl-tile{position:relative;aspect-ratio:9/16;border-radius:10px;overflow:hidden;background:#18181B;transition:transform .35s var(--e),box-shadow .35s ease}
+.sfl-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:filter .5s ease,opacity .5s ease}
+.sfl-tile-idle img{filter:grayscale(1) brightness(.45)}
+.sfl-tile-run{box-shadow:0 0 0 2px var(--v);transform:scale(.96)}
+.sfl-tile-run img{filter:brightness(.6)}
+.sfl-tile-ok{box-shadow:0 0 0 1px rgba(255,255,255,.2)}
+.sfl-tile-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center}
+.sfl-tile-ok .sfl-tile-badge{top:auto;bottom:6px;width:20px;height:20px;border-radius:99px;background:#fff;color:#0A0A0B;animation:sflPop .4s var(--e) both}
+.sfl-tile-run .sfl-spin{width:16px;height:16px}
+@keyframes sflPop{from{transform:translate(-50%,0) scale(.3);opacity:0}to{transform:translate(-50%,0) scale(1);opacity:1}}
+.sfl-run-log{margin-top:16px;min-height:88px;display:flex;flex-direction:column;gap:5px;padding:12px 14px;border-radius:12px;background:#0A0A0B;border:1px solid var(--b);font-size:12px;color:var(--t2)}
+.sfl-run-log b{color:var(--v)}
+
+/* Fonctionnalités (bento) */
+.sfl-bento{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.sfl-feat{position:relative;display:flex;flex-direction:column;border-radius:24px;overflow:hidden;background:#0F0F11;border:1px solid var(--b);transition:border-color .3s ease,transform .4s var(--e)}
+.sfl-feat:hover{border-color:rgba(167,139,250,.45);transform:translateY(-4px)}
+.sfl-feat-xl{grid-column:span 2;grid-row:span 2}
+.sfl-feat-l{grid-column:span 2}
+.sfl-feat-viz{position:relative;flex:1;min-height:220px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 120%,rgba(139,92,246,.16),transparent 65%)}
+.sfl-feat-xl .sfl-feat-viz{min-height:380px}
+.sfl-feat-txt{padding:22px 24px 24px;border-top:1px solid var(--b)}
+.sfl-feat h3{margin:10px 0 0;font-size:24px;font-weight:900;letter-spacing:-0.045em;line-height:1;text-transform:uppercase;color:var(--t1)}
+.sfl-feat-xl h3{font-size:clamp(28px,3.2vw,42px)}
+.sfl-feat h3 span{color:#52525B}
+.sfl-feat p{margin:10px 0 0;font-size:14px;line-height:1.55;color:var(--t2)}
+.sfl-viz-mass{position:relative;width:100%;height:100%;min-height:380px;display:flex;align-items:center;justify-content:center}
+.sfl-fan{position:absolute;width:150px;transform:translateX(calc(var(--i) * 108px)) rotate(calc(var(--i) * 7deg)) translateY(calc(var(--i) * var(--i) * 10px));z-index:calc(10 - var(--i) * var(--i));transition:transform .6s var(--e)}
+.sfl-feat:hover .sfl-fan{transform:translateX(calc(var(--i) * 128px)) rotate(calc(var(--i) * 9deg)) translateY(calc(var(--i) * var(--i) * 12px - 8px))}
+.sfl-viz-center{display:flex;align-items:center;justify-content:center;padding:22px 0}
+.sfl-ph-lg{width:132px;transform:rotate(-4deg);transition:transform .5s var(--e)}
+.sfl-feat:hover .sfl-ph-lg{transform:rotate(0) scale(1.04)}
+.sfl-story-bars{position:absolute;top:12px;left:10px;right:10px;display:flex;gap:3px}
+.sfl-story-bars i{flex:1;height:2.5px;border-radius:9px;background:rgba(255,255,255,.4)}
+.sfl-story-bars i:first-child{background:#fff}
+.sfl-sticker{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%) rotate(-3deg);display:inline-flex;align-items:center;gap:5px;padding:7px 11px;border-radius:9px;background:#fff;color:#2563EB;font-size:11.5px;font-weight:900;white-space:nowrap;box-shadow:0 8px 24px -6px rgba(0,0,0,.6);animation:sflBob 3s ease-in-out infinite}
+@keyframes sflBob{50%{transform:translate(-50%,-58%) rotate(2deg)}}
+.sfl-viz-viral{position:relative;width:100%;height:240px}
+.sfl-reel{position:absolute;top:50%;left:50%;width:112px;aspect-ratio:9/16;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.14);box-shadow:0 20px 40px -18px rgba(0,0,0,.9);transform:translate(calc(-50% + (var(--i) - 1) * 96px),calc(-50% + (var(--i) - 1) * (var(--i) - 1) * 12px)) rotate(calc((var(--i) - 1) * 8deg));z-index:calc(5 - var(--i));transition:transform .5s var(--e)}
+.sfl-feat:hover .sfl-reel{transform:translate(calc(-50% + (var(--i) - 1) * 108px),calc(-50% + (var(--i) - 1) * (var(--i) - 1) * 6px)) rotate(calc((var(--i) - 1) * 5deg))}
+.sfl-reel img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sfl-reel-rank{position:absolute;top:7px;left:7px;padding:2px 6px;border-radius:99px;background:#fff;color:#0A0A0B;font-size:9.5px;font-weight:800}
+.sfl-reel-x{position:absolute;top:7px;right:7px;padding:2px 6px;border-radius:99px;background:var(--grad);color:#fff;font-size:9.5px;font-weight:800}
+.sfl-reel-v{position:absolute;left:8px;bottom:8px;display:flex;align-items:baseline;gap:4px;font-size:8.5px;font-weight:800;text-transform:uppercase;color:#C4C4CC}
+.sfl-reel-v b{font-size:17px;letter-spacing:-0.04em;color:#fff}
+.sfl-viz-studio{width:100%;display:flex;align-items:center;gap:18px;padding:26px}
+.sfl-src{position:relative;width:118px;flex-shrink:0;aspect-ratio:9/16;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.18)}
+.sfl-src img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sfl-src span{position:absolute;left:8px;bottom:8px;padding:2px 7px;border-radius:99px;background:rgba(10,10,11,.7);font-size:10px;font-weight:800;color:#fff}
+.sfl-flow{display:flex;color:var(--v);animation:sflNudge 1.6s ease-in-out infinite}
+@keyframes sflNudge{50%{transform:translateX(5px)}}
+.sfl-vars{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;flex:1}
+.sfl-var{position:relative;aspect-ratio:9/16;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.12);animation:sflIn .6s var(--e) both;animation-delay:calc(var(--i) * 90ms)}
+.sfl-var img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sfl-var-cap{position:absolute;left:4px;right:4px;top:32%;padding:3px 4px;border-radius:5px;background:#fff;color:#0A0A0B;font-size:7.5px;font-weight:800;text-align:center;line-height:1.15}
+@keyframes sflIn{from{opacity:0;transform:translateY(10px) scale(.94)}to{opacity:1;transform:none}}
+.sfl-viz-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;width:100%;padding:20px}
+.sfl-cal-h{font-size:10px;font-weight:800;color:var(--t4);text-align:center}
+.sfl-cal-d{display:flex;flex-direction:column;gap:3px;min-height:58px;padding:5px;border-radius:8px;background:#141416;border:1px solid var(--b)}
+.sfl-cal-d small{font-size:9.5px;color:var(--t4)}
+.sfl-cal-now{border-color:rgba(167,139,250,.6);background:rgba(167,139,250,.08)}
+.sfl-cal-p{font-style:normal;font-size:8.5px;font-weight:800;padding:2px 3px;border-radius:4px;background:rgba(167,139,250,.2);color:var(--v2);white-space:nowrap;overflow:hidden}
+.sfl-cal-p2{background:rgba(244,114,182,.18);color:#F9A8D4}
+.sfl-viz-flow{display:flex;flex-direction:column;align-items:center;gap:0;padding:20px}
+.sfl-flow-b{display:inline-flex;align-items:center;gap:9px;padding:9px 14px;border-radius:11px;background:#151517;border:1px solid var(--b2);font-size:13px;font-weight:700;color:var(--t1);animation:sflIn .6s var(--e) both;animation-delay:calc(var(--i) * 120ms)}
+.sfl-flow-b span{font-size:10px;color:var(--v)}
+.sfl-flow-l{width:2px;height:14px;background:linear-gradient(var(--v),rgba(167,139,250,.2))}
+.sfl-viz-warm{display:flex;flex-direction:column;gap:8px;width:100%;padding:20px}
+.sfl-warm-row{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:12px;background:#141416;border:1px solid var(--b);animation:sflIn .6s var(--e) both;animation-delay:calc(var(--i) * 110ms)}
+.sfl-warm-row>i{width:26px;height:26px;border-radius:99px;background-size:cover;background-position:center;flex-shrink:0}
+.sfl-warm-t{flex:1;min-width:0;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sfl-warm-c{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:99px;background:rgba(255,255,255,.07);font-size:9.5px;font-weight:800;color:#D4D4D8}
+.sfl-warm-run{background:rgba(139,92,246,.25);color:var(--v2)}
+.sfl-warm-run .sfl-spin{width:8px;height:8px;border-width:1.5px}
+.sfl-viz-links{display:flex;flex-direction:column;gap:16px;width:100%;padding:22px}
+.sfl-link-pill{align-self:flex-start;display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:99px;background:#fff;color:#0A0A0B;font-size:12px;font-weight:800}
+.sfl-bars{display:flex;align-items:flex-end;gap:5px;height:110px}
+.sfl-bars i{flex:1;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,var(--v),rgba(139,92,246,.25));transform-origin:bottom;animation:sflGrow .8s var(--e) both;animation-delay:calc(var(--i) * 50ms)}
+@keyframes sflGrow{from{transform:scaleY(0)}}
+
+/* Étapes */
+.sfl-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.sfl-step{position:relative;padding:28px;border-radius:24px;background:#0F0F11;border:1px solid var(--b);overflow:hidden}
+.sfl-step-n{display:block;font-size:96px;font-weight:900;letter-spacing:-0.07em;line-height:.8;background:linear-gradient(180deg,rgba(196,181,253,.9),rgba(196,181,253,.05));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+.sfl-step h3{margin:22px 0 0;font-size:22px;font-weight:900;letter-spacing:-0.04em;text-transform:uppercase}
+.sfl-step p{margin:10px 0 0;font-size:14.5px;line-height:1.6;color:var(--t2)}
+
+/* Avis */
+.sfl-revs{columns:3 300px;column-gap:14px}
+.sfl-rev{break-inside:avoid;margin:0 0 14px;border-radius:20px;overflow:hidden;background:#0F0F11;border:1px solid var(--b);transition:border-color .3s ease}
+.sfl-rev:hover{border-color:rgba(167,139,250,.35)}
+.sfl-rev img{width:100%}
+.sfl-rev figcaption{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:12.5px;color:var(--t4);border-top:1px solid var(--b)}
+.sfl-rev figcaption b{color:var(--t1)}
+.sfl-stars{display:inline-flex;gap:1px;color:#FBBF24}
+.sfl-stars svg{fill:currentColor}
+.sfl-voice{display:flex;align-items:center;gap:14px;padding:16px}
+.sfl-play{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:99px;border:none;background:var(--grad);color:#fff;cursor:pointer;flex-shrink:0}
+.sfl-wave{display:flex;align-items:center;gap:2px;height:28px}
+.sfl-wave i{flex:1;border-radius:9px;background:rgba(255,255,255,.18)}
+.sfl-wave i.p{background:var(--v)}
+
+/* Tarifs */
+.sfl-plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}
+.sfl-plan{border-radius:24px;padding:0;transition:transform .4s var(--e)}
+.sfl-plan:hover{transform:translateY(-6px)}
+.sfl-best{padding:1px;background:linear-gradient(160deg,#A78BFA,rgba(236,72,153,.7) 40%,rgba(255,255,255,.08) 80%);box-shadow:0 40px 90px -40px rgba(139,92,246,.9)}
+.sfl-plan-in{height:100%;display:flex;flex-direction:column;gap:16px;padding:26px;border-radius:23px;background:#0F0F11;border:1px solid var(--b)}
+.sfl-best .sfl-plan-in{border:none;background:linear-gradient(180deg,#17131F,#0F0F11 50%)}
+.sfl-plan-top{display:flex;align-items:center;gap:8px;min-height:24px}
+.sfl-plan-name{font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--t2)}
+.sfl-best .sfl-plan-name{color:var(--v2)}
+.sfl-tag{padding:4px 8px;border-radius:99px;background:var(--grad);color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.sfl-price{display:flex;align-items:baseline;gap:6px}
+.sfl-price b{font-size:58px;font-weight:900;letter-spacing:-0.06em;line-height:.9}
+.sfl-price span{font-size:14px;color:var(--t4)}
+.sfl-plan-tag{margin:-4px 0 0;font-size:14px;color:var(--t2)}
+.sfl-plan-cr{display:flex;align-items:baseline;justify-content:space-between;padding:13px 15px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--b)}
+.sfl-plan-cr b{font-size:22px;font-weight:900;letter-spacing:-0.04em}
+.sfl-plan-cr span{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t4)}
+.sfl-plan .sfl-btn{width:100%;height:48px}
+.sfl-plan ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px}
+.sfl-plan li{display:flex;align-items:center;gap:11px;font-size:14px;color:#D4D4D8}
+.sfl-costs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:16px;border-radius:20px;overflow:hidden;border:1px solid var(--b);background:#0F0F11}
+.sfl-costs>div{display:flex;flex-direction:column;gap:6px;padding:20px 22px}
+.sfl-costs>div+div{border-left:1px solid var(--b)}
+.sfl-costs b{font-size:38px;font-weight:900;letter-spacing:-0.05em;line-height:.95}
+.sfl-costs span:last-child{font-size:12.5px;color:var(--t4)}
+.sfl-packs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px}
+.sfl-packs-h{font-size:13.5px;color:var(--t3);margin-right:6px}
+.sfl-packs-h b{color:var(--t1)}
+.sfl-pack{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 13px;border-radius:99px;border:1px solid var(--b2);background:#0F0F11;font-size:13px}
+.sfl-pack span{color:var(--t3)}
+
+/* FAQ */
+.sfl-faq-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:48px;align-items:start}
+.sfl-faq-grid .sfl-h2{font-size:clamp(36px,4.6vw,62px)}
+.sfl-faq{display:flex;flex-direction:column;gap:8px}
+.sfl-qa{border-radius:16px;background:#0F0F11;border:1px solid var(--b);transition:border-color .25s ease}
+.sfl-qa.sfl-on{border-color:rgba(167,139,250,.4)}
+.sfl-qa button{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;border:none;background:transparent;color:var(--t1);font-size:15.5px;font-weight:750;text-align:left;cursor:pointer}
+.sfl-qa-ic{display:flex;color:var(--t4);transition:transform .3s var(--e),color .3s ease}
+.sfl-on .sfl-qa-ic{transform:rotate(45deg);color:var(--v)}
+.sfl-qa-a{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s var(--e)}
+.sfl-on .sfl-qa-a{grid-template-rows:1fr}
+.sfl-qa-a>div{overflow:hidden}
+.sfl-qa-a p{margin:0;padding:0 20px 18px;font-size:14.5px;line-height:1.65;color:var(--t2)}
+
+/* CTA final */
+.sfl-final{position:relative;overflow:hidden;isolation:isolate;padding:150px 0;border-top:1px solid var(--b)}
+.sfl-final .sfl-wall{z-index:-2}
+.sfl-final-veil{position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse 60% 70% at 50% 50%,rgba(10,10,11,.95),rgba(10,10,11,.7) 55%,rgba(10,10,11,.45)),linear-gradient(180deg,#0A0A0B 0%,transparent 25%,transparent 75%,#0A0A0B 100%)}
+.sfl-final-in{display:flex;flex-direction:column;align-items:center;text-align:center}
+.sfl-h1-final{font-size:clamp(52px,9vw,128px)}
+.sfl-final-in .sfl-ctas{margin-top:32px}
+
+/* Pied de page */
+.sfl-foot{border-top:1px solid var(--b);padding:64px 0 28px;overflow:hidden}
+.sfl-foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:32px}
+.sfl-foot-brand p{margin:14px 0 0;max-width:300px;font-size:13.5px;line-height:1.6;color:var(--t3)}
+.sfl-foot-col{display:flex;flex-direction:column;gap:10px}
+.sfl-foot-col h3{margin:0 0 4px;font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--t4)}
+.sfl-foot-col a{font-size:14px;color:var(--t2);transition:color .15s ease}
+.sfl-foot-col a:hover{color:var(--t1)}
+.sfl-foot-word{margin:56px 0 0;font-size:clamp(64px,17vw,250px);font-weight:900;letter-spacing:-0.07em;line-height:.8;text-align:center;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,0));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;user-select:none}
+.sfl-foot-bot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:22px;padding-top:20px;border-top:1px solid var(--b);font-size:12.5px;color:var(--t4)}
+.sfl-fr{display:inline-flex;align-items:center;gap:8px}
+.sfl-flag{display:inline-flex;width:18px;height:12px;border-radius:2px;overflow:hidden}
+.sfl-flag i{flex:1}
+
+/* Responsive */
+@media (max-width:980px){
+  .sfl-nav,.sfl-hdr-login{display:none}
+  .sfl-burger{display:inline-flex}
+  .sfl-menu{display:flex;flex-direction:column;gap:2px;position:absolute;top:64px;left:0;right:0;padding:0 16px;max-height:0;overflow:hidden;background:rgba(10,10,11,.96);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);transition:max-height .35s var(--e),padding .35s var(--e);border-bottom:1px solid transparent}
+  .sfl-menu.sfl-open{max-height:420px;padding:10px 16px 18px;border-bottom-color:var(--b)}
+  .sfl-mlink{display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 6px;font-size:16px;font-weight:700;border-bottom:1px solid var(--b)}
+  .sfl-menu-cta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  .sfl-live,.sfl-faq-grid{grid-template-columns:1fr;gap:36px}
+  .sfl-bento{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sfl-feat-xl{grid-row:auto}
+  .sfl-plans{grid-template-columns:1fr;max-width:480px;margin:0 auto}
+  .sfl-costs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sfl-costs>div:nth-child(3){border-left:none}
+  .sfl-costs>div:nth-child(n+3){border-top:1px solid var(--b)}
+  .sfl-foot-grid{grid-template-columns:1fr 1fr}
+  .sfl-foot-brand{grid-column:1/-1}
+}
+@media (max-width:640px){
+  .sfl-wrap{padding:0 16px}
+  .sfl-sec{padding:84px 0}
+  .sfl-hdr-cta .sfl-btn-p{display:none}
+  .sfl-col{width:120px;gap:14px}
+  .sfl-wall-in{gap:14px}
+  .sfl-hero-in{padding-top:110px;padding-bottom:90px}
+  .sfl-hero-facts{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .sfl-hero-facts span{padding:12px 14px}
+  .sfl-hero-facts span+span{border-left:none}
+  .sfl-hero-facts span:nth-child(even){border-left:1px solid var(--b)}
+  .sfl-hero-facts span:nth-child(n+3){border-top:1px solid var(--b)}
+  .sfl-ctas{width:100%}
+  .sfl-ctas .sfl-btn{width:100%}
+  .sfl-bento{grid-template-columns:1fr}
+  .sfl-feat-xl,.sfl-feat-l{grid-column:auto}
+  .sfl-feat-xl .sfl-feat-viz,.sfl-viz-mass{min-height:300px}
+  .sfl-fan{width:112px;transform:translateX(calc(var(--i) * 62px)) rotate(calc(var(--i) * 7deg)) translateY(calc(var(--i) * var(--i) * 8px))}
+  .sfl-feat:hover .sfl-fan{transform:translateX(calc(var(--i) * 66px)) rotate(calc(var(--i) * 8deg)) translateY(calc(var(--i) * var(--i) * 8px))}
+  .sfl-viz-studio{flex-direction:column}
+  .sfl-flow{transform:rotate(90deg);animation:none}
+  .sfl-vars{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .sfl-run{padding:14px}
+  .sfl-run-grid{grid-template-columns:repeat(6,1fr);gap:6px}
+  .sfl-steps{grid-template-columns:1fr}
+  .sfl-step-n{font-size:72px}
+  .sfl-final{padding:110px 0}
+}
+@media (prefers-reduced-motion:reduce){
+  .sfl-root *{animation:none!important;transition:none!important}
+  .sfl-rv{opacity:1;transform:none}
+  .sfl-st-a{opacity:1}
+}
+`
 
 export default SiteLanding
