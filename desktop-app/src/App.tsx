@@ -52,6 +52,7 @@ const Scheduled = lazy(() => import('@/pages/Scheduled'))
 const Links = lazy(() => import('@/pages/Links'))
 const ViralWatch = lazy(() => import('@/pages/ViralWatch'))
 const Explore = lazy(() => import('@/pages/Explore'))
+const Pricing = lazy(() => import('@/pages/Pricing'))
 // Annonce de lancement des Liens (bandeau en haut de chaque page) — passer à false pour la retirer.
 const SHOW_LINKS_LAUNCH = true
 
@@ -231,6 +232,8 @@ function AppInner({ user }: { user: User }) {
         ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'scheduled'
         ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
+        : page === 'pricing'
+        ? <Pricing theme={theme} org={org} />
         : page === 'explore'
         ? <Explore theme={theme} infra={infra} isAdmin={license.isSuperAdmin} onOpen={openT} user={user} org={org} />
         : page === 'viral'
@@ -267,15 +270,12 @@ function AppInner({ user }: { user: User }) {
       onSignOut={signOut}
     >
       {/* Annonce des nouveautés (Liens + Veille Reels) : reste affichée tant que SHOW_LINKS_LAUNCH est vrai. */}
-      {SHOW_LINKS_LAUNCH && page !== 'links' && page !== 'viral' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(139,124,246,0.16), rgba(244,114,182,0.10))', border: '1px solid rgba(139,124,246,0.35)', flexWrap: 'wrap' }}>
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 9, background: 'linear-gradient(135deg,#8B7CF6,#F472B6)', color: '#fff', flexShrink: 0, fontSize: 18 }}>🎉</span>
-          <span style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF' }}>Nouveau : les Liens ScaleFlow et la Veille Reels sont arrivés 🎉</span>
-            <span style={{ fontSize: 12.5, color: '#A1A1AA' }}>Sache quel compte t’envoie des abonnés, et repère les Reels qui explosent en ce moment. Plus TikTok et une interface toute neuve.</span>
-          </span>
+      {/* Nouveautés : seulement sur l'accueil, en bandeau compact. */}
+      {SHOW_LINKS_LAUNCH && page === 'hub' && (
+        <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, padding: '14px 18px', borderRadius: 18, background: '#0C0C0D', border: '1px solid rgba(167,139,250,0.35)', flexWrap: 'wrap', boxShadow: '0 0 0 1px rgba(167,139,250,0.08), 0 20px 50px -30px rgba(139,92,246,.6)' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#A78BFA', padding: '5px 9px', borderRadius: 7, border: '1px solid rgba(167,139,250,0.4)', background: 'rgba(167,139,250,0.08)' }}>✦ Nouveautés</span>
+          <span style={{ flex: 1, minWidth: 220, fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', textTransform: 'uppercase', color: '#F4F4F5' }}>Liens ScaleFlow · Veille Reels · TikTok <span style={{ color: '#71717A' }}>· nouvelle interface</span></span>
           <Btn theme={theme} label="Voir les nouveautés" onClick={() => setSpot(true)} />
-          <Btn theme={theme} tone="primary" label="Veille Reels" onClick={() => setPage('viral')} />
         </div>
       )}
       <Suspense fallback={<PageLoader />}>{content}</Suspense>

@@ -16,7 +16,7 @@ export type PageKey =
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
   | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
-  | 'scheduled' | 'links' | 'viral' | 'explore'
+  | 'scheduled' | 'links' | 'viral' | 'explore' | 'pricing'
   | 'admin'
   | 'settings'
 
@@ -138,6 +138,7 @@ const TITLES: Record<PageKey, string[]> = {
   links: ['Analyse', 'Liens'],
   viral: ['Analyse', 'Veille Reels'],
   explore: ['Explorer'],
+  pricing: ['Abonnements'],
   admin: ['Admin', 'Licences'],
   settings: ['Réglages'],
 }
@@ -446,6 +447,7 @@ export default function Shell({
                 </div>
               )}
             </span>
+            <button onClick={() => setPage('pricing')} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(167,139,250,0.45)', background: page === 'pricing' ? 'rgba(167,139,250,0.18)' : 'rgba(167,139,250,0.08)', color: '#C4B5FD', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }} aria-label="Abonnements">✦ Abonnements</button>
             <button onClick={() => setPage('settings')} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28,
               border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
