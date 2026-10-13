@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, FIELD, Icon, Kpi, Panel, PageHead, Segmented, Skeleton, StatusDot, Modal, SkeletonRows, toast, confirmDialog } from '@/lib/ui'
 import { openTool } from '@/lib/openTool'
+import { fetchAllRows } from '@/lib/bankStorage'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -158,16 +159,20 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
     const restrictedGroups = (role && role !== 'owner' && role !== 'admin' && perms?.phone_groups?.mode === 'allow')
       ? (perms.phone_groups.list ?? [])
       : null
-    let query = supabase
-      .from('phones')
-      .select('id,phone_name,ig_username,ig_status,group_name,status,total_views,pp_url,last_post_at,account_state,geelark_id,link')
-      .order('phone_name')
-    query = currentOrg
-      ? query.eq('org_id', currentOrg.id)
-      : query.eq('user_id', user.id).is('org_id', null)
-    query = scopeInfra(query, infra)
-    if (restrictedGroups) query = query.in('group_name', restrictedGroups)
-    const { data, error: err } = await query
+    // Paginé : Supabase plafonne à 1 000 lignes par requête (offres à téléphones illimités).
+    const make = () => {
+      let query = supabase
+        .from('phones')
+        .select('id,phone_name,ig_username,ig_status,group_name,status,total_views,pp_url,last_post_at,account_state,geelark_id,link')
+        .order('phone_name').order('id')
+      query = currentOrg
+        ? query.eq('org_id', currentOrg.id)
+        : query.eq('user_id', user.id).is('org_id', null)
+      query = scopeInfra(query, infra)
+      if (restrictedGroups) query = query.in('group_name', restrictedGroups)
+      return query
+    }
+    const { data, error: err } = await fetchAllRows<Phone>(make)
     if (err) { setError('Erreur de chargement des appareils.'); setPhones([]) }
     else setPhones((data ?? []) as Phone[])
     setLoading(false)
@@ -196,11 +201,10 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
       }))
       const currentIds = new Set(rows.map(r => r.geelark_id))
       // Prune : supprime les téléphones GeeLark locaux absents de GeeLark.
-      let existQ = supabase.from('phones').select('id,geelark_id').not('geelark_id', 'is', null)
-      existQ = currentOrg ? existQ.eq('org_id', currentOrg.id) : existQ.eq('user_id', user.id).is('org_id', null)
-      const { data: existing } = await existQ
-      const toDelete = (existing ?? []).filter((p: { id: string; geelark_id: string | null }) => p.geelark_id && !currentIds.has(p.geelark_id))
-      if (toDelete.length > 0) await supabase.from('phones').delete().in('id', toDelete.map((p: { id: string }) => p.id))
+      const existQ = () => { const q = supabase.from('phones').select('id,geelark_id').not('geelark_id', 'is', null).order('id'); return currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null) }
+      const { data: existing } = await fetchAllRows<{ id: string; geelark_id: string | null }>(existQ)
+      const toDelete = existing.filter(p => p.geelark_id && !currentIds.has(p.geelark_id)).map(p => p.id)
+      for (let i = 0; i < toDelete.length; i += 200) await supabase.from('phones').delete().in('id', toDelete.slice(i, i + 200))
       // Upsert via RPC (préserve les champs utilisateur : ig_username, liens…).
       if (rows.length > 0) {
         const { error: rpcErr } = await supabase.rpc('sync_geelark_phones', { p_rows: rows, p_org_id: currentOrg?.id ?? null })
@@ -218,7 +222,8 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
   async function deletePhones(ids: string[]) {
     if (ids.length === 0) return
     setDeleting(true)
-    const { error: err } = await supabase.from('phones').delete().in('id', ids)
+    let err: { message: string } | null = null
+    for (let i = 0; i < ids.length && !err; i += 200) err = (await supabase.from('phones').delete().in('id', ids.slice(i, i + 200))).error
     setDeleting(false); setConfirmDel(null)
     if (err) { setError(`Suppression échouée : ${err.message}`); return }
     setSel(new Set()); load()

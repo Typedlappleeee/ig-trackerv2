@@ -24,6 +24,8 @@ export const SPOT_KEYFRAMES = `
         @keyframes sfsBeat{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
         @keyframes sfsHead{from{left:2%}to{left:96%}}
         @keyframes sfsRise{0%{opacity:0;transform:translateY(8px) scale(.6)}15%{opacity:1;transform:translateY(0) scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-62px) scale(1.15)}}
+        @keyframes sfsDot{0%,30%{opacity:1}34%,96%{opacity:.35}100%{opacity:1}}
+        @keyframes sfsCarousel{0%,26%{transform:translateX(0)}33%,59%{transform:translateX(-33.333%)}66%,92%{transform:translateX(-66.666%)}100%{transform:translateX(0)}}
         @keyframes sfsCycle{0%,28%{opacity:1;filter:none}36%,92%{opacity:.45;filter:saturate(.6)}100%{opacity:1;filter:none}}
         @keyframes sfsGrowY{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
         @keyframes sfsBlink{0%,100%{opacity:1}50%{opacity:.25}}

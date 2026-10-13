@@ -45,9 +45,18 @@ function Art({ t, pick }: { t: Tool; pick: Pick }) {
       <At style={{ top: 40, left: 0, right: 0, textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px #000' }}><span style={{ opacity: 0.7 }}>Abonnements</span>   <b style={{ borderBottom: '2px solid #fff', paddingBottom: 2 }}>Pour toi</b></At>
       <At style={{ right: 10, bottom: 14, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', fontSize: 13 }}>{['❤', '💬', '↗'].map((x, i) => <span key={x} style={{ color: i ? '#fff' : '#FE2C55', textShadow: '0 1px 6px #000', animation: an(i ? 'sfsBob' : 'sfsBeat', i ? 3 : 1.2, i * 0.6) }}>{x}</span>)}</At>
       <At style={{ left: 12, bottom: 14, fontSize: 11, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px #000' }}>@lea · ♫ son original</At></>
-    case 'photo': return <><Back m={M(2)} />
-      <At style={{ left: 12, bottom: 12, display: 'flex', gap: 10, fontSize: 14, color: '#fff', textShadow: '0 1px 6px #000' }}><span style={{ color: '#F43F5E', animation: an('sfsBeat', 1.3) }}>♥</span><span>💬</span><span>↗</span></At>
-      <At style={{ right: 12, bottom: 12, display: 'flex', gap: 4 }}>{[0, 1, 2].map(i => <span key={i} style={{ width: 6, height: 6, borderRadius: 9, background: i ? 'rgba(255,255,255,.45)' : '#fff' }} />)}</At></>
+    // Post photo : carrousel Instagram (3 photos qui défilent) + en-tête et points du carrousel.
+    case 'photo': return <>
+      <span style={{ ...FILL, overflow: 'hidden', background: '#0A0A0B' }}>
+        <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '300%', display: 'flex', animation: an('sfsCarousel', 9, 0, 'cubic-bezier(.7,0,.3,1) infinite') }}>
+          {[4, 7, 10].map(k => <span key={k} style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>{M(k, undefined, undefined, true)}</span>)}
+        </span>
+      </span>
+      <span style={{ ...FILL, background: 'linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,0) 32%, rgba(0,0,0,0) 62%, rgba(0,0,0,.6))' }} />
+      <At style={{ left: 10, top: 10, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 20, height: 20, borderRadius: 99, overflow: 'hidden', border: '1.5px solid #fff', position: 'relative' }}>{M(1, { position: 'relative', width: 20, height: 20 }, undefined, true)}</span><span style={{ fontSize: 11, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px #000' }}>lea.officiel</span></At>
+      <At style={{ right: 10, top: 10 }}>{label('Carrousel · 3 photos')}</At>
+      <At style={{ left: 12, bottom: 11, display: 'flex', gap: 10, fontSize: 14, color: '#fff', textShadow: '0 1px 6px #000' }}><span style={{ color: '#F43F5E', animation: an('sfsBeat', 1.3) }}>♥</span><span>💬</span><span>↗</span></At>
+      <At style={{ left: '50%', bottom: 15, translate: '-50% 0', display: 'flex', gap: 4 }}>{[0, 1, 2].map(i => <span key={i} style={{ width: 6, height: 6, borderRadius: 9, background: '#fff', animation: an('sfsDot', 9, (3 - i) * 3, 'linear infinite') }} />)}</At></>
     case 'cross': return <><Back m={M(0)} shade={0.6} />
       <At style={{ left: 0, right: 0, bottom: 14, display: 'flex', justifyContent: 'center', gap: 8 }}>{([['f', '#1877F2'], ['▶', '#FF0000'], ['𝕏', '#111'], ['@', '#000'], ['P', '#E60023'], ['r', '#FF4500']] as [string, string][]).map(([l, c], i) => <span key={l} style={{ width: 26, height: 26, borderRadius: 99, background: c, color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid rgba(255,255,255,.8)', animation: an('sfsBob', 3, i * 0.45) }}>{l}</span>)}</At></>
     case 'scheduled': return <><Back m={M(3)} shade={0.7} />
