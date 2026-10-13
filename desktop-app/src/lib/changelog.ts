@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-13',
+    date: '2026-10-13',
+    title: { fr: '✨ Explorer, Outils IA et Réglages repensés', en: '✨ Explore, AI tools and redesigned Settings' },
+    items: {
+      fr: [
+        'Explorer : tous les outils de ScaleFlow en galerie, avec recherche, favoris et récemment utilisés. Aussi dans ⌘K.',
+        'Outils IA : légendes (rangées dans ta banque), bios et pseudos générés en quelques secondes, envoyables dans l’édition en masse.',
+        'Réglages repensés (profil & sécurité, équipe, licence & crédits, intégrations avec bouton « Tester ») et nouvelle page de connexion avec Google et mot de passe oublié.',
+      ],
+      en: [
+        'Explore: every ScaleFlow tool in one gallery, with search, favorites and recently used. Also in ⌘K.',
+        'AI tools: captions (saved to your library), bios and usernames generated in seconds, ready for mass edit.',
+        'Redesigned Settings (profile & security, team, license & credits, integrations with a “Test” button) and a new sign-in page with Google and password reset.',
+      ],
+    },
+  },
+  {
     id: '2026-10-11c',
     date: '2026-10-11',
     title: { fr: '🔥 Nouveau : la Veille Reels', en: '🔥 New: Reels Watch' },

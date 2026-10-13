@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom'
 import type { PageKey } from '@/Shell'
 import { Icon, useNarrow } from '@/lib/ui'
 
-export const SPOTLIGHT_KEY = 'sf-spotlight-2026-10'
+export const SPOTLIGHT_KEY = 'sf-spotlight-2026-10b'
 const SLIDE_MS = 7000
 
 export function spotlightSeen(): boolean {
@@ -17,9 +17,46 @@ function markSeen() { try { localStorage.setItem(SPOTLIGHT_KEY, '1') } catch { /
 interface Slide { kicker: string; title: string; text: string; points: string[]; cta: string; page: PageKey | null; a: string; b: string; visual: () => ReactNode }
 
 // ── Visuels ──────────────────────────────────────────────────────────────────
+/** Animations partagées par les visuels (Nouveautés, Explorer, connexion). */
+export const SPOT_KEYFRAMES = `
+        @keyframes sfsBar{from{width:0}to{width:100%}}
+        @keyframes sfsGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+        @keyframes sfsPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
+        @keyframes sfsFill{from{width:0}to{width:100%}}
+        @keyframes sfsFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+        @keyframes sfsPing{0%{opacity:0;transform:translateY(8px)}20%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+        @keyframes sfsGlow{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,-14px) scale(1.12)}}
+      `
+
 const card = { background: 'rgba(10,10,11,0.72)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, backdropFilter: 'blur(8px)' } as const
 
-function VisualHome() {
+export function VisualExplore() {
+  const tiles: [string, string, string][] = [['#F58529', '#8134AF', 'Reels'], ['#25F4EE', '#FE2C55', 'TikTok'], ['#A78BFA', '#DB2777', 'Légendes IA'], ['#F97316', '#7F1D1D', 'Veille'], ['#4ADE80', '#14532D', 'Spoof'], ['#F472B6', '#831843', 'Liens']]
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 96px)', gap: 10 }}>
+      {tiles.map(([a, b, l], i) => (
+        <div key={l} style={{ ...card, overflow: 'hidden', animation: `sfsPop .45s ${0.08 + i * 0.07}s both` }}>
+          <div style={{ height: 58, background: `linear-gradient(135deg, ${a}, ${b})` }} />
+          <div style={{ padding: '7px 9px', fontSize: 11, fontWeight: 600, color: '#fff' }}>{l}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+export function VisualAi() {
+  const lines = ['POV : il pensait que j’étais sage 😇', 'Tu restes jusqu’à la fin ? 👀', 'Dernière chance de me découvrir 🔥', 'Ce que personne ne voit sur mon feed…']
+  return (
+    <div style={{ ...card, width: '80%', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span style={{ fontSize: 11, color: '#C4B5FD', fontWeight: 700 }}>✨ 20 légendes générées</span>
+      {lines.map((l, i) => (
+        <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', fontSize: 12, color: '#fff', animation: `sfsPop .4s ${0.15 + i * 0.18}s both` }}>
+          <span style={{ width: 14, height: 14, borderRadius: 4, background: i < 3 ? '#8B7CF6' : 'transparent', border: '1px solid rgba(255,255,255,0.3)', flexShrink: 0 }} />{l}
+        </span>
+      ))}
+    </div>
+  )
+}
+export function VisualHome() {
   const bars = [38, 52, 44, 70, 58, 86, 74, 100]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '82%' }}>
@@ -37,7 +74,7 @@ function VisualHome() {
     </div>
   )
 }
-function VisualTikTok() {
+export function VisualTikTok() {
   const fmt = (t: string, sub: string, bg: string, d: number) => (
     <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', animation: `sfsPop .5s ${d}s both` }}>
       <span style={{ width: 38, height: 38, borderRadius: 10, background: bg, flexShrink: 0 }} />
@@ -57,7 +94,7 @@ function VisualTikTok() {
     </div>
   )
 }
-function VisualLinks() {
+export function VisualLinks() {
   return (
     <div style={{ position: 'relative', width: 180, height: 300, borderRadius: 26, padding: 10, background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.18)', boxShadow: '0 30px 60px -20px rgba(0,0,0,.6)', animation: 'sfsFloat 5s ease-in-out infinite' }}>
       <div style={{ position: 'absolute', inset: 10, borderRadius: 18, background: 'linear-gradient(160deg,#FF7EB3,#FF758C 45%,#FFB38A)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, padding: '22px 12px' }}>
@@ -75,7 +112,7 @@ function VisualLinks() {
     </div>
   )
 }
-function VisualViral() {
+export function VisualViral() {
   const reels: [string, string, string, number][] = [['×3.2', '384k', 'linear-gradient(160deg,#C084FC,#4C1D95)', -8], ['×24', '1,5M', 'linear-gradient(160deg,#22D3EE,#1E3A8A)', 0], ['×6.8', '442k', 'linear-gradient(160deg,#FB923C,#BE123C)', 8]]
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -93,6 +130,8 @@ function VisualViral() {
 }
 
 const SLIDES: Slide[] = [
+  { kicker: 'Explorer', title: 'Tous tes outils, en un coup d’œil', text: 'Une galerie de 30 outils pour publier, créer, gérer et analyser — cherche, épingle tes favoris, ouvre en 1 clic.', points: ['Nouveau menu « Explorer »', 'Recherche et favoris', 'Aussi dans ⌘K : tape le nom d’un outil'], cta: 'Ouvrir Explorer', page: 'explore', a: '#6366F1', b: '#1E1B4B', visual: VisualExplore },
+  { kicker: 'Outils IA', title: 'Légendes, bios et pseudos en 10 secondes', text: 'Génère des dizaines de légendes dans le ton de ta niche et envoie-les dans ta banque, ou tes bios et pseudos dans l’édition en masse.', points: ['Légendes IA → banque de légendes', 'Bios IA et pseudos → édition en masse', 'Gratuit avec ta clé Groq'], cta: 'Essayer les Outils IA', page: 'ai', a: '#A855F7', b: '#3B0764', visual: VisualAi },
   { kicker: 'Nouvelle interface', title: 'ScaleFlow fait peau neuve', text: 'Un tableau de bord clair pour piloter toute ton agence en un coup d’œil.', points: ['Accueil avec tes chiffres clés et la courbe sur 14 jours', 'Calendrier des posts programmés, glisser-déposer', 'Relancer les échecs en 1 clic, aperçu du Reel avant de poster'], cta: 'C’est parti', page: null, a: '#7C3AED', b: '#2E1065', visual: VisualHome },
   { kicker: 'Publication', title: 'TikTok est arrivé', text: 'Publie une vidéo sur des dizaines de comptes TikTok en parallèle, comme tes Reels.', points: ['Nouveau format « Vidéo TikTok »', 'Formats rangés par réseau : Instagram, TikTok, autres', 'Même parcours que les Reels, même tarif'], cta: 'Publier sur TikTok', page: 'publish', a: '#0EA5B7', b: '#3B0A1E', visual: VisualTikTok },
   { kicker: 'Liens ScaleFlow', title: 'Sache quel compte te rapporte', text: 'Ta page de liens façon Linktree et un lien suivi par compte, créé automatiquement.', points: ['Page 100 % personnalisable : fonds animés, effets, boutons', 'Visites, clics, taux de clic et pays, en direct', 'tapmylink.fr ou ton propre domaine'], cta: 'Découvrir les Liens', page: 'links', a: '#EC4899', b: '#4A044E', visual: VisualLinks },
@@ -120,15 +159,7 @@ export default function LaunchSpotlight({ onClose, onNavigate }: { onClose: () =
 
   return createPortal(
     <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: narrow ? 12 : 24, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)', animation: 'aFade .2s ease both' }}>
-      <style>{`
-        @keyframes sfsBar{from{width:0}to{width:100%}}
-        @keyframes sfsGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-        @keyframes sfsPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
-        @keyframes sfsFill{from{width:0}to{width:100%}}
-        @keyframes sfsFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-        @keyframes sfsPing{0%{opacity:0;transform:translateY(8px)}20%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
-        @keyframes sfsGlow{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,-14px) scale(1.12)}}
-      `}</style>
+      <style>{SPOT_KEYFRAMES}</style>
       <div role="dialog" aria-modal="true" aria-label="Nouveautés ScaleFlow" onClick={e => e.stopPropagation()} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
         style={{ position: 'relative', width: 880, maxWidth: '100%', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', borderRadius: 18, background: '#0E0E10', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px -20px rgba(0,0,0,.8)', animation: 'aPop .25s cubic-bezier(0.16,1,0.3,1) both' }}>
         {/* Barres de progression façon stories */}

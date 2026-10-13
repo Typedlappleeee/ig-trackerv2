@@ -7,6 +7,7 @@
 // bloque le navigateur), légende, stats, liens.
 // Tables : supabase/migrations/20261012*_viral*.sql. Données : HikerAPI (secret HIKERAPI_KEY).
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
@@ -298,7 +299,7 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
   const [noRegion, setNoRegion] = useState(false) // SQL 20261012d pas encore passé
   const [fRegion, setFRegion] = useState<Region | ''>('')
   const [busy, setBusy] = useState(false)
-  const [tab, setTab] = useState<'public' | 'mine'>('public')
+  const [tab, setTab] = useState<'public' | 'mine'>(() => (takeOpenArg<{ tab?: 'public' | 'mine' }>('viral')?.tab) ?? 'public')
   const [userView, setUserView] = useState(false)
   const [range, setRange] = useState<Range>('7')
   const [sort, setSort] = useState<Sort>('views')

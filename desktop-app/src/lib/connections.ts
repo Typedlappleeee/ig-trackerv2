@@ -19,6 +19,13 @@ const EMPTY: ActiveConnections = { bearer: '', groq: '', proxy: '', source: 'use
 export function useConnections(user: User, org: OrgState): ActiveConnections {
   const { currentOrg } = org
   const [conns, setConns] = useState<ActiveConnections>(EMPTY)
+  // Réglages → Intégrations prévient ici quand une clé change (plus besoin de recharger).
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const on = () => setTick(t => t + 1)
+    window.addEventListener('sf-conns-changed', on)
+    return () => window.removeEventListener('sf-conns-changed', on)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -45,7 +52,7 @@ export function useConnections(user: User, org: OrgState): ActiveConnections {
     }
     run()
     return () => { cancelled = true }
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, tick])
 
   return conns
 }

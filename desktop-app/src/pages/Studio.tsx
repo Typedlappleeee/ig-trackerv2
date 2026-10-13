@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
@@ -40,7 +41,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
 }) {
   const { currentOrg } = org
   const conns = useConnections(user, org)
-  const [tool, setTool] = useState<string | null>(null)
+  const [tool, setTool] = useState<string | null>(() => (takeOpenArg<{ tool?: string }>('studio')?.tool) ?? null)
   const [videos, setVideos] = useState<Video[]>([])
   const [src, setSrc] = useState<Set<string>>(new Set())
   const [uploading, setUploading] = useState<string | null>(null)
