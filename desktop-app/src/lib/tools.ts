@@ -67,9 +67,6 @@ export const TOOLS: Tool[] = [
   { id: 'scheduled', label: 'Posts programmés', desc: 'Tout ce qui part plus tard, annulable et remboursé.', cat: 'publish', page: 'scheduled', arg: { view: 'list' }, icon: I.clock, a: '#60A5FA', b: '#312E81', infra: GL },
   { id: 'calendar', label: 'Calendrier', desc: 'Semaine / mois, glisse un post pour le décaler.', cat: 'publish', page: 'scheduled', arg: { view: 'calendar' }, icon: I.cal, a: '#34D399', b: '#065F46', infra: GL },
   // ── Créer
-  { id: 'ai-captions', label: 'Légendes IA', desc: 'Des dizaines de légendes dans le ton de ta niche, rangées dans ta banque.', cat: 'create', page: 'ai', arg: { tab: 'captions' }, icon: I.sparkle, a: '#A78BFA', b: '#DB2777', badge: 'Nouveau', cost: 'gratuit' },
-  { id: 'ai-bios', label: 'Bios IA', desc: 'Des bios Instagram prêtes pour l’édition en masse.', cat: 'create', page: 'ai', arg: { tab: 'bios' }, icon: I.pen, a: '#F472B6', b: '#7C3AED', badge: 'Nouveau', cost: 'gratuit' },
-  { id: 'ai-usernames', label: 'Générateur de pseudos', desc: 'Des @ valides et variés à partir d’un prénom.', cat: 'create', page: 'ai', arg: { tab: 'usernames' }, icon: I.at, a: '#22D3EE', b: '#7C3AED', badge: 'Nouveau', cost: 'gratuit' },
   { id: 'remix', label: 'Remix', desc: 'Une vidéo → jusqu’à 24 variantes uniques.', cat: 'create', page: 'studio', arg: { tool: 'remix' }, icon: I.shuffle, a: '#FB923C', b: '#9F1239', badge: 'Populaire', cost: 'gratuit' },
   { id: 'spoof', label: 'Spoof vidéo', desc: 'Anti-empreinte : device, GPS et EXIF réécrits.', cat: 'create', page: 'studio', arg: { tool: 'spoof' }, icon: I.shield, a: '#4ADE80', b: '#14532D', cost: 'gratuit' },
   { id: 'imgspoof', label: 'Spoof image', desc: 'Des photos rendues uniques en .jpg.', cat: 'create', page: 'studio', arg: { tool: 'imgspoof' }, icon: I.image, a: '#86EFAC', b: '#166534', cost: 'gratuit' },

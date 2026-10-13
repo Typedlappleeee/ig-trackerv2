@@ -19,6 +19,17 @@ interface Slide { kicker: string; title: string; text: string; points: string[];
 // ── Visuels ──────────────────────────────────────────────────────────────────
 /** Animations partagées par les visuels (Nouveautés, Explorer, connexion). */
 export const SPOT_KEYFRAMES = `
+        @keyframes sfsKen{from{transform:scale(1.02)}to{transform:scale(1.16) translate(-3%,-2%)}}
+        @keyframes sfsBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+        @keyframes sfsBeat{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+        @keyframes sfsHead{from{left:2%}to{left:96%}}
+        @keyframes sfsRise{0%{opacity:0;transform:translateY(8px) scale(.6)}15%{opacity:1;transform:translateY(0) scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-62px) scale(1.15)}}
+        @keyframes sfsCycle{0%,28%{opacity:1;filter:none}36%,92%{opacity:.45;filter:saturate(.6)}100%{opacity:1;filter:none}}
+        @keyframes sfsGrowY{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+        @keyframes sfsBlink{0%,100%{opacity:1}50%{opacity:.25}}
+        @keyframes sfsWord{0%{color:#FDE047}20%,100%{color:#fff}}
+        @keyframes sfsSheen{from{transform:translateX(-140%) skewX(-18deg)}to{transform:translateX(260%) skewX(-18deg)}}
+        @media (prefers-reduced-motion: reduce){.sf-art *,.sf-anim *{animation:none!important}}
         @keyframes sfsBar{from{width:0}to{width:100%}}
         @keyframes sfsGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
         @keyframes sfsPop{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
@@ -39,19 +50,6 @@ export function VisualExplore() {
           <div style={{ height: 58, background: `linear-gradient(135deg, ${a}, ${b})` }} />
           <div style={{ padding: '7px 9px', fontSize: 11, fontWeight: 600, color: '#fff' }}>{l}</div>
         </div>
-      ))}
-    </div>
-  )
-}
-export function VisualAi() {
-  const lines = ['POV : il pensait que j’étais sage 😇', 'Tu restes jusqu’à la fin ? 👀', 'Dernière chance de me découvrir 🔥', 'Ce que personne ne voit sur mon feed…']
-  return (
-    <div style={{ ...card, width: '80%', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <span style={{ fontSize: 11, color: '#C4B5FD', fontWeight: 700 }}>✨ 20 légendes générées</span>
-      {lines.map((l, i) => (
-        <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', fontSize: 12, color: '#fff', animation: `sfsPop .4s ${0.15 + i * 0.18}s both` }}>
-          <span style={{ width: 14, height: 14, borderRadius: 4, background: i < 3 ? '#8B7CF6' : 'transparent', border: '1px solid rgba(255,255,255,0.3)', flexShrink: 0 }} />{l}
-        </span>
       ))}
     </div>
   )
@@ -130,8 +128,7 @@ export function VisualViral() {
 }
 
 const SLIDES: Slide[] = [
-  { kicker: 'Explorer', title: 'Tous tes outils, en un coup d’œil', text: 'Une galerie de 30 outils pour publier, créer, gérer et analyser — cherche, épingle tes favoris, ouvre en 1 clic.', points: ['Nouveau menu « Explorer »', 'Recherche et favoris', 'Aussi dans ⌘K : tape le nom d’un outil'], cta: 'Ouvrir Explorer', page: 'explore', a: '#6366F1', b: '#1E1B4B', visual: VisualExplore },
-  { kicker: 'Outils IA', title: 'Légendes, bios et pseudos en 10 secondes', text: 'Génère des dizaines de légendes dans le ton de ta niche et envoie-les dans ta banque, ou tes bios et pseudos dans l’édition en masse.', points: ['Légendes IA → banque de légendes', 'Bios IA et pseudos → édition en masse', 'Gratuit avec ta clé Groq'], cta: 'Essayer les Outils IA', page: 'ai', a: '#A855F7', b: '#3B0764', visual: VisualAi },
+  { kicker: 'Explorer', title: 'Tous tes outils, en un coup d’œil', text: 'Une galerie de tous les outils pour publier, créer, gérer et analyser — cherche, épingle tes favoris, ouvre en 1 clic.', points: ['Nouveau menu « Explorer »', 'Recherche et favoris', 'Aussi dans ⌘K : tape le nom d’un outil'], cta: 'Ouvrir Explorer', page: 'explore', a: '#6366F1', b: '#1E1B4B', visual: VisualExplore },
   { kicker: 'Nouvelle interface', title: 'ScaleFlow fait peau neuve', text: 'Un tableau de bord clair pour piloter toute ton agence en un coup d’œil.', points: ['Accueil avec tes chiffres clés et la courbe sur 14 jours', 'Calendrier des posts programmés, glisser-déposer', 'Relancer les échecs en 1 clic, aperçu du Reel avant de poster'], cta: 'C’est parti', page: null, a: '#7C3AED', b: '#2E1065', visual: VisualHome },
   { kicker: 'Publication', title: 'TikTok est arrivé', text: 'Publie une vidéo sur des dizaines de comptes TikTok en parallèle, comme tes Reels.', points: ['Nouveau format « Vidéo TikTok »', 'Formats rangés par réseau : Instagram, TikTok, autres', 'Même parcours que les Reels, même tarif'], cta: 'Publier sur TikTok', page: 'publish', a: '#0EA5B7', b: '#3B0A1E', visual: VisualTikTok },
   { kicker: 'Liens ScaleFlow', title: 'Sache quel compte te rapporte', text: 'Ta page de liens façon Linktree et un lien suivi par compte, créé automatiquement.', points: ['Page 100 % personnalisable : fonds animés, effets, boutons', 'Visites, clics, taux de clic et pays, en direct', 'tapmylink.fr ou ton propre domaine'], cta: 'Découvrir les Liens', page: 'links', a: '#EC4899', b: '#4A044E', visual: VisualLinks },

@@ -49,15 +49,14 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
   const [running, setRunning] = useState(false)
   const [runItems, setRunItems] = useState<RunItem[]>([])
   const [logs, setLogs] = useState<string[]>([])
-  // Ouverture directe (Explorer, Outils IA) : onglet + pseudos / bio pré-remplis.
-  const [openArg] = useState(() => takeOpenArg<{ tab?: WTab; usernames?: string; bio?: string }>('warmup'))
-  const [wtab, setWtab] = useState<WTab>(openArg?.tab ?? (openArg?.usernames || openArg?.bio ? 'edit' : 'warm'))
+  // Ouverture directe depuis Explorer : bon onglet.
+  const [wtab, setWtab] = useState<WTab>(() => takeOpenArg<{ tab?: WTab }>('warmup')?.tab ?? 'warm')
   const [wgroup, setWgroup] = useState('Tous')
   const [rotationConfigured, setRotationConfigured] = useState(false)
   const [rotationOn, setRotationOn] = useState(false)
-  const [edit, setEdit] = useState({ nickname: '', biography: openArg?.bio ?? '', linkURL: '', linkTitle: '' })
+  const [edit, setEdit] = useState({ nickname: '', biography: '', linkURL: '', linkTitle: '' })
   // Nom d'utilisateur (@) : un par ligne, attribués dans l'ordre ; {4} = 4 chiffres aléatoires.
-  const [usernames, setUsernames] = useState(openArg?.usernames ?? '')
+  const [usernames, setUsernames] = useState('')
   // Photo(s) de profil depuis la banque : distribuées dans l'ordre aux comptes.
   const [avatarIds, setAvatarIds] = useState<string[]>([])
   const [avatarPicker, setAvatarPicker] = useState(false)

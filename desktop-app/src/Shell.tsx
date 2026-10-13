@@ -16,7 +16,7 @@ export type PageKey =
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
   | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
-  | 'scheduled' | 'links' | 'viral' | 'explore' | 'ai'
+  | 'scheduled' | 'links' | 'viral' | 'explore'
   | 'admin'
   | 'settings'
 
@@ -88,7 +88,6 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
     },
     { g: 'Production', items: [
       { k: 'studio', l: 'Studio vidéo', i: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z' },
-      { k: 'ai', l: 'Outils IA', i: 'M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z', soon: 'Nouveau' },
     ] },
     {
       // Analyse : disponible sur les DEUX infras. Chaque infra montre SES propres
@@ -139,7 +138,6 @@ const TITLES: Record<PageKey, string[]> = {
   links: ['Analyse', 'Liens'],
   viral: ['Analyse', 'Veille Reels'],
   explore: ['Explorer'],
-  ai: ['Production', 'Outils IA'],
   admin: ['Admin', 'Licences'],
   settings: ['Réglages'],
 }
