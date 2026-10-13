@@ -86,7 +86,7 @@ RINGS.forEach((ring, ri) => {
 })
 const NAMES = ['brand.paris', 'studio.creatif', 'ugc.factory', 'growth.lab', 'viral.fr', 'daily.motiv', 'clip.master', 'fit.life']
 
-const NAV: [string, string][] = [['#showcase', "L'app"], ['#features', 'Fonctionnalités'], ['#cloud', 'Cloud Phones'], ['#pricing', 'Tarifs'], ['#faq', 'FAQ']]
+const NAV: [string, string][] = [['#showcase', "L'app"], ['#features', 'Fonctionnalités'], ['#pricing', 'Tarifs'], ['#faq', 'FAQ']]
 
 const MARQUEE: { ic: IconName; label: string }[] = [
   { ic: 'zap', label: 'Mass Posting' }, { ic: 'layers', label: 'Instagram + TikTok' }, { ic: 'calendar', label: 'Programmation' },
@@ -144,7 +144,6 @@ const PACKS = [
 const QA = [
   { q: "C'est quoi ScaleFlow exactement ?", a: 'Une app pour gérer en masse tes comptes Instagram : poster automatiquement sur des dizaines de téléphones en parallèle, organiser ta banque de vidéos, voir les stats en temps réel, et automatiser les tâches répétitives.' },
   { q: 'Ça marche aussi pour TikTok ?', a: 'Oui. Le mass posting, la programmation des posts et le warmup gèrent Instagram ET TikTok depuis le même dashboard.' },
-  { q: 'Et les Cloud Phones ScaleFlow ?', a: "Ils arrivent au Q4 2026. Tu pourras héberger tes propres appareils Android sur ton serveur, sans passer par GeeLark ni subir de quota. Inscris-toi sur la liste d'attente pour un accès prioritaire." },
   { q: "J'ai besoin de quoi pour l'utiliser ?", a: "Un abonnement GeeLark (cloud phones) avec ton bearer token. Niveau machine, n'importe quel Mac/PC moderne suffit." },
   { q: 'Différence entre Standard et Pro ?', a: 'Le Standard donne 2 500 crédits/mois et tous les outils de base. Le Pro donne 5 500 crédits/mois + organisations multi-membres + auto-warmup + support 24/7.' },
   { q: "C'est risqué pour mes comptes Instagram ?", a: "ScaleFlow utilise des devices avec leurs propres IPs/sessions. Tant que tu respectes les rythmes humains (notre auto-warmup le fait pour toi), le risque est très faible. Aucune méthode n'est 100% sans risque." },
@@ -168,11 +167,10 @@ const APP_NAV: { id: string; ic: IconName; label: string }[] = [
   { id: 'mass', ic: 'zap', label: 'Publication' },
   { id: 'sched', ic: 'calendar', label: 'Automatisation' },
   { id: 'studio', ic: 'clapper', label: 'Studio vidéo' },
-  { id: 'cloud', ic: 'cloud', label: 'Cloud Phones' },
 ]
 
 const FOOT_COLS: { h: string; links: [string, string][] }[] = [
-  { h: 'Produit', links: [['#showcase', "L'app"], ['#cloud', 'Cloud Phones'], ['#features', 'Fonctionnalités'], ['#pricing', 'Tarifs']] },
+  { h: 'Produit', links: [['#showcase', "L'app"], ['#features', 'Fonctionnalités'], ['#pricing', 'Tarifs']] },
   { h: 'Ressources', links: [['#faq', 'Questions fréquentes'], ['#how', 'Comment ça marche'], [APP_URL, "Ouvrir l'app"]] },
   { h: 'Légal', links: [[APP_URL, "Conditions d'utilisation"], [APP_URL, 'Confidentialité'], [TG_URL, 'Contact']] },
 ]
@@ -799,103 +797,6 @@ function Features() {
   )
 }
 
-// ── Cloud Phones ─────────────────────────────────────────────────────────────
-function CloudPhones() {
-  const t = useTick()
-  const done = Math.max(0, Math.min(TOTAL, Math.floor(t)))
-  const [joined, setJoined] = useState(false)
-  const [wait, setWait] = useState(8)
-  const CTOT = 48
-  const cphase = Math.floor(t * 1.6) % (CTOT + 10)
-  const cloudOn = Math.max(0, Math.min(CTOT, cphase - 2))
-  const POINTS: { ic: IconName; title: string; text: string }[] = [
-    { ic: 'zap', title: 'Démarrage instantané', text: 'Un appareil prêt en quelques secondes, pas en minutes. Ta diffusion part sans attendre le boot.' },
-    { ic: 'infinity', title: 'Aucune limite', text: "Autant d'appareils que ton serveur peut en tenir. Plus de quota imposé par un tiers." },
-    { ic: 'lock', title: 'Chez toi', text: "Tes sessions, tes proxies, tes données. L'agent tourne sur ton propre serveur." },
-  ]
-  return (
-    <section id="cloud" className="sfl-sec sfl-bt sfl-cloud">
-      <div className="sfl-wrap">
-        <div className="sfl-cloud-grid">
-          <div>
-            <div className="sfl-rv"><span className="sfl-cbadge"><span className="sfl-pulse" />EN CONSTRUCTION<b>Q4 2026</b></span></div>
-            <h2 className="sfl-h2 sfl-rv" style={{ ...dl(60), marginTop: 20 }}>Nos propres <span style={{ color: 'var(--ac2)', whiteSpace: 'nowrap' }}>Cloud Phones</span> arrivent.</h2>
-            <p className="sfl-lead sfl-rv" style={dl(120)}>Fini de payer GeeLark. ScaleFlow héberge ses propres appareils Android : tu crées un phone en un clic, il démarre en quelques secondes, et tu n'as plus aucune limite de comptes.</p>
-            <div className="sfl-points">
-              {POINTS.map((p, i) => <div key={p.title} className="sfl-point sfl-rv" style={dl(160 + i * 70)}><span className="sfl-ico"><Ico n={p.ic} s={17} /></span><div><h3>{p.title}</h3><p>{p.text}</p></div></div>)}
-            </div>
-            <div className="sfl-wait sfl-rv" style={dl(200)}>
-              {!joined ? (
-                <button type="button" className="sfl-btn sfl-btn-p sfl-btn-lg" onClick={() => { setJoined(true); setWait(w => w + 1) }}>Rejoindre la liste d'attente<Ico n="arrow" s={16} className="sfl-arr" /></button>
-              ) : (
-                <span className="sfl-joined" role="status"><Ico n="check" s={16} />Tu es sur la liste — on te prévient au lancement</span>
-              )}
-              <small>{wait} agences déjà inscrites · accès prioritaire</small>
-              <small>Les premières inscrites testent avant tout le monde.</small>
-            </div>
-          </div>
-
-          <div className="sfl-phone-wrap sfl-rv" style={dl(120)}>
-            <div className="sfl-phone">
-              <div className="sfl-screen">
-                <span aria-hidden="true" style={{ position: 'absolute', top: 10, left: '50%', marginLeft: -28, width: 56, height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.12)' }} />
-                <div className="sfl-mono" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 18px 0', fontSize: 10, color: 'var(--t3)' }}>
-                  <span>09:41</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>4G<svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true"><rect x="0" y="7" width="2.5" height="3" rx="0.6" fill="currentColor" /><rect x="3.8" y="5" width="2.5" height="5" rx="0.6" fill="currentColor" /><rect x="7.6" y="2.5" width="2.5" height="7.5" rx="0.6" fill="currentColor" /><rect x="11.4" y="0" width="2.5" height="10" rx="0.6" fill="currentColor" /></svg></span>
-                </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, padding: '20px 14px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <LogoTile s={30} />
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span className="sfl-mono" style={{ fontSize: 11.5, color: 'var(--t1)' }}>sf-cloud-07</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--ok)' }}><span className="sfl-pulse" style={{ width: 5, height: 5 }} />démarré · Android 14</span>
-                    </span>
-                  </div>
-                  <div className="sfl-mc" style={{ padding: 11 }}>
-                    <div className="sfl-lbl" style={{ fontSize: 10 }}>Tâche en cours</div>
-                    <div style={{ marginTop: 5, fontSize: 12, fontWeight: 500 }}>Publication Reels</div>
-                    <div className="sfl-bar" style={{ marginTop: 10 }}><i style={{ transform: `scaleX(${done / TOTAL})` }} /></div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <div className="sfl-mc" style={{ padding: 10 }}><div className="sfl-lbl" style={{ fontSize: 10 }}>Proxy</div><div className="sfl-mono" style={{ marginTop: 4, fontSize: 11, color: 'var(--t1)' }}>FR-07</div></div>
-                    <div className="sfl-mc" style={{ padding: 10 }}><div className="sfl-lbl" style={{ fontSize: 10 }}>Boot</div><div className="sfl-mono" style={{ marginTop: 4, fontSize: 11, color: 'var(--ok)' }}>3,2 s</div></div>
-                  </div>
-                  <div className="sfl-mono" style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 4, padding: 10, borderRadius: 9, background: 'rgba(0,0,0,0.35)', border: '1px solid var(--b)', fontSize: 9.5, lineHeight: 1.5, color: 'var(--t3)' }}>
-                    <span>adb · connected</span><span>ig · session ok</span><span style={{ color: 'var(--ok)' }}>upload · {done} / {TOTAL}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="sfl-chips">
-              <span className="sfl-chip sfl-chip-a"><span className="sfl-ico sfl-ico-n" style={{ width: 30, height: 30 }}><Ico n="zap" s={15} /></span><span className="sfl-chip-t"><b>3,2 s</b><span>au démarrage</span></span></span>
-              <span className="sfl-chip sfl-chip-b"><span className="sfl-ico sfl-ico-n" style={{ width: 30, height: 30 }}><Ico n="infinity" s={15} /></span><span className="sfl-chip-t"><b>Illimité</b><span>appareils par serveur</span></span></span>
-              <span className="sfl-chip sfl-chip-c"><span className="sfl-ico sfl-ico-n" style={{ width: 30, height: 30 }}><Ico n="lock" s={15} /></span><span className="sfl-chip-t"><b>Tes données</b><span>sur ton serveur</span></span></span>
-            </div>
-          </div>
-        </div>
-
-        <div className="sfl-card sfl-farm sfl-rv">
-          <div className="sfl-farm-h">
-            <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.015em' }}>Ta ferme, en un écran</span>
-              <span style={{ fontSize: 12.5, color: 'var(--t4)' }}>CPU 34 % · RAM 11,2 / 32 Go · latence 18 ms</span>
-            </span>
-            <span className="sfl-badge sfl-ok"><span className="sfl-pulse" />agent connecté</span>
-          </div>
-          <div className="sfl-tiles" aria-hidden="true">
-            {Array.from({ length: CTOT }, (_, i) => { const rank = (i * 11 + 3) % CTOT; const on = rank < cphase - 2, boot = rank >= cphase - 2 && rank < cphase; return <div key={i} className={'sfl-tile' + (on ? ' on' : boot ? ' boot' : '')} /> })}
-          </div>
-          <div className="sfl-legend" style={{ padding: '16px 0 0' }}>
-            <span><i style={{ background: ACC_OK, borderRadius: 2 }} />démarré</span>
-            <span><i style={{ background: ACC_RUN, borderRadius: 2 }} />démarrage</span>
-            <span><i style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 2 }} />arrêté</span>
-            <span className="sfl-eta sfl-mono">{cloudOn} / 48 appareils démarrés</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
 
 // ── Avis ─────────────────────────────────────────────────────────────────────
 function Stars() {
@@ -1091,7 +992,7 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
         <div className="sfl-wrap sfl-hdr-in">
           <a href="#top" aria-label="ScaleFlow"><Brand /></a>
           <nav className="sfl-nav" aria-label="Navigation principale">
-            {NAV.map(([href, label]) => <a key={href} href={href}>{label}{href === '#cloud' && <span className="sfl-soon">Bientôt</span>}</a>)}
+            {NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}
           </nav>
           <div className="sfl-hdr-cta">
             <a href={WIN_URL} className="sfl-btn sfl-btn-s sfl-btn-sm sfl-hdr-dl">Télécharger</a>
@@ -1100,7 +1001,7 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
           </div>
         </div>
         <div id="sfl-menu" className={'sfl-menu' + (menu ? ' sfl-open' : '')}>
-          {NAV.map(([href, label]) => <a key={href} href={href} className="sfl-mlink" tabIndex={menu ? 0 : -1}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{label}{href === '#cloud' && <span className="sfl-soon">Bientôt</span>}</span><Ico n="arrow" s={15} style={{ color: 'var(--t4)' }} /></a>)}
+          {NAV.map(([href, label]) => <a key={href} href={href} className="sfl-mlink" tabIndex={menu ? 0 : -1}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{label}</span><Ico n="arrow" s={15} style={{ color: 'var(--t4)' }} /></a>)}
           <div className="sfl-menu-cta">
             <a href={WIN_URL} className="sfl-btn sfl-btn-s" tabIndex={menu ? 0 : -1}><Ico n="download" s={15} />Télécharger</a>
             <button type="button" className="sfl-btn sfl-btn-p" tabIndex={menu ? 0 : -1} onClick={() => { setMenu(false); onStudio() }}>Commencer</button>
@@ -1162,7 +1063,6 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
           </div>
         </section>
 
-        <CloudPhones />
         <Reviews />
         <Pricing />
         <Faq />
