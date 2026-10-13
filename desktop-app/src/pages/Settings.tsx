@@ -463,7 +463,7 @@ function IntegrationsTab({ theme, user, org, canManage }: { theme: Theme; user: 
   return (
     <Stack>
       {card('bearer', 'GeeLark', 'Indispensable : pilote tes téléphones et publie.', 'Token OpenAPI GeeLark…', <>GeeLark → OpenAPI → copier le token</>)}
-      {card('groq', 'IA (Groq)', 'Légendes, bios IA et sous-titres. Gratuit.', 'gsk_…', <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{ color: '#C4BBFB', textDecoration: 'none' }}>Créer une clé gratuite →</a>)}
+      {card('groq', 'IA (Groq)', 'Légendes IA et sous-titres automatiques. Gratuit.', 'gsk_…', <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{ color: '#C4BBFB', textDecoration: 'none' }}>Créer une clé gratuite →</a>)}
       <ProxyRotationPanel theme={theme} user={user} org={org} />
       <LinkDomainCard theme={theme} />
     </Stack>

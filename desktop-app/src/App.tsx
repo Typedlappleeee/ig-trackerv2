@@ -52,7 +52,6 @@ const Scheduled = lazy(() => import('@/pages/Scheduled'))
 const Links = lazy(() => import('@/pages/Links'))
 const ViralWatch = lazy(() => import('@/pages/ViralWatch'))
 const Explore = lazy(() => import('@/pages/Explore'))
-const AiTools = lazy(() => import('@/pages/AiTools'))
 // Annonce de lancement des Liens (bandeau en haut de chaque page) — passer à false pour la retirer.
 const SHOW_LINKS_LAUNCH = true
 
@@ -234,8 +233,6 @@ function AppInner({ user }: { user: User }) {
         ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
         : page === 'explore'
         ? <Explore theme={theme} infra={infra} isAdmin={license.isSuperAdmin} onOpen={openT} user={user} org={org} />
-        : page === 'ai'
-        ? <AiTools theme={theme} user={user} org={org} onGo={(p, a) => openTool(setPage, p, a)} />
         : page === 'viral'
         ? <ViralWatch theme={theme} user={user} org={org} isAdmin={license.isSuperAdmin} />
         : page === 'links'

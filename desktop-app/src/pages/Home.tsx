@@ -14,6 +14,8 @@ import {
 import type { PageKey } from '@/Shell'
 import { visibleTools, type Tool } from '@/lib/tools'
 import { openTool } from '@/lib/openTool'
+import { ToolCard, usePhotos, pickerFor } from '@/pages/Explore'
+import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
 
 // Tuiles « Lancer » — portées de _hub() (LAUNCH), par infrastructure.
 function launchTiles(infra: InfraKey): { id: string; label: string; hint: string; icon: string; page: PageKey }[] {
@@ -28,21 +30,6 @@ function launchTiles(infra: InfraKey): { id: string; label: string; hint: string
     { id: 'studio', label: 'Remixer une vidéo', hint: 'gratuit', icon: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z', page: 'studio' },
     { id: 'warm', label: 'Chauffer des comptes', hint: 'warmup', icon: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z', page: 'warmup' },
   ]
-}
-
-// Tuile d'outil du catalogue (même style que la galerie Explorer, en compact).
-function ToolTile({ t, onClick }: { t: Tool; onClick: () => void }) {
-  return (
-    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', textAlign: 'left', transition: 'background .12s ease, border-color .12s ease, transform .12s ease' }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'none' }}>
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, flexShrink: 0, borderRadius: 11, background: `linear-gradient(135deg, ${t.a}, ${t.b})`, color: '#fff', boxShadow: `0 8px 20px -10px ${t.a}` }}><Icon d={t.icon} size={18} /></span>
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5, fontWeight: 600, color: '#EDEDEF' }}>{t.label}{t.badge === 'Nouveau' && <span style={{ padding: '1px 6px', borderRadius: 99, background: '#EDEDEF', color: '#0A0A0B', fontSize: 10, fontWeight: 700 }}>Nouveau</span>}</span>
-        <span style={{ fontSize: 12, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.desc}</span>
-      </span>
-    </button>
-  )
 }
 
 function LaunchTile({ a, accent, onClick }: { a: ReturnType<typeof launchTiles>[number]; accent: string; onClick: () => void }) {
@@ -332,6 +319,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
   const picks = onOpenTool && infra !== 'cloud'
     ? (() => { const v = visibleTools(infra, isAdmin); return [...v.filter(t => t.badge === 'Populaire'), ...v.filter(t => t.badge === 'Nouveau')].slice(0, 6) })()
     : []
+  const photos = usePhotos(user, org)
   const TILES = launchTiles(infra).map(t => t.id === 'reels' && data && !loading ? { ...t, hint: `${fmtNumber(data.phoneCount)} comptes prêts` } : t)
   const STEPS = [
     { done: !!conns.bearer, title: 'Connecter GeeLark', text: 'Colle ton token GeeLark (OpenAPI) pour piloter tes téléphones.', cta: 'Ouvrir les réglages', page: 'settings' as PageKey },
@@ -399,8 +387,9 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
         {picks.length > 0 && <Btn theme={theme} sm label="Tous les outils →" onClick={() => onNavigate('explore')} />}
       </div>
       {picks.length > 0 ? (
-        <div data-rows="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(260px,100%),1fr))', gap: 10 }}>
-          {picks.map(t => <ToolTile key={t.id} t={t} onClick={() => onOpenTool!(t)} />)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(210px,100%),1fr))', gap: 12 }}>
+          <style>{SPOT_KEYFRAMES}</style>
+          {picks.map((t, i) => <ToolCard key={t.id} t={t} i={i} pick={pickerFor(t, i, photos)} fav={false} onOpen={() => onOpenTool!(t)} />)}
         </div>
       ) : (
         <div data-rows="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 12 }}>

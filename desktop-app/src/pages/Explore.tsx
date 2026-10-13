@@ -9,14 +9,15 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Icon, FIELD, useNarrow } from '@/lib/ui'
 import { CATS, searchTools, visibleTools, type Tool, type ToolCat } from '@/lib/tools'
 import { recentTools } from '@/lib/openTool'
-import { SPOT_KEYFRAMES, VisualLinks, VisualTikTok, VisualViral, VisualHome } from '@/components/LaunchSpotlight'
+import ToolArt from '@/components/ToolArt'
+import { SPOT_KEYFRAMES, VisualLinks, VisualTikTok, VisualViral } from '@/components/LaunchSpotlight'
 
 const FAV_KEY = 'sf-fav-tools'
 const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
 
 // Vraies photos pour les cartes : miniatures de la Veille Reels (via le proxy d'images,
 // Instagram bloque l'affichage direct) et de la banque de l'utilisateur.
-function usePhotos(user: User, org: OrgState): { viral: string[]; bank: string[] } {
+export function usePhotos(user: User, org: OrgState): { viral: string[]; bank: string[] } {
   const [viral, setViral] = useState<string[]>([])
   const [bank, setBank] = useState<string[]>([])
   const orgId = org.currentOrg?.id ?? null
@@ -43,10 +44,11 @@ function usePhotos(user: User, org: OrgState): { viral: string[]; bank: string[]
   }, [user.id, orgId])
   return { viral, bank }
 }
-/** Photo d'une carte : banque d'abord pour Créer / Banque, Veille d'abord ailleurs. */
-function photoFor(t: Tool, i: number, p: { viral: string[]; bank: string[] }): string | null {
+/** Sélecteur de photos d'une carte : banque d'abord pour Créer / Banque, Veille d'abord ailleurs ;
+ *  décalé par carte pour que deux cartes voisines n'aient pas les mêmes images. */
+export function pickerFor(t: Tool, i: number, p: { viral: string[]; bank: string[] }): (k: number) => string | null {
   const pool = t.cat === 'create' || t.cat === 'bank' ? [...p.bank, ...p.viral] : [...p.viral, ...p.bank]
-  return pool.length ? pool[i % pool.length] : null
+  return (k: number) => pool.length ? pool[(i * 3 + k) % pool.length] : null
 }
 
 // Visuel « À la une » de la Veille avec de VRAIES miniatures.
@@ -58,7 +60,7 @@ function RealReels({ photos }: { photos: string[] }) {
         const hot = i === 1
         return (
           <div key={x} style={{ position: 'relative', width: hot ? 150 : 118, height: hot ? 262 : 206, borderRadius: 16, overflow: 'hidden', border: `2px solid ${hot ? '#F472B6' : 'rgba(255,255,255,0.18)'}`, transform: `rotate(${rot}deg)`, boxShadow: hot ? '0 0 50px rgba(244,114,182,.45)' : '0 20px 40px -20px rgba(0,0,0,.6)', animation: `sfsPop .5s ${0.1 + i * 0.12}s both`, background: '#111' }}>
-            <img src={photos[i]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={photos[i]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `sfsKen ${8 + i}s ease-in-out ${-i * 2}s infinite alternate` }} />
             <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 99, background: hot ? '#F472B6' : 'rgba(0,0,0,.55)', color: '#fff', fontSize: 11.5, fontWeight: 800 }}>{x}</span>
             <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '22px 9px 9px', background: 'linear-gradient(to top,rgba(0,0,0,.8),transparent)', color: '#fff', fontSize: hot ? 16 : 13, fontWeight: 800 }}>▶ {v}</span>
           </div>
@@ -72,36 +74,30 @@ function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(
 interface Featured { tool: string; kicker: string; title: string; text: string; cta: string; a: string; b: string; visual: () => ReactNode }
 const FEATURED: Featured[] = [
   { tool: 'viral', kicker: 'Veille Reels', title: 'Repère les Reels qui explosent', text: 'FR et US, classés par vues, avec le badge « ×N la normale ». Télécharge, copie la légende, inspire-toi.', cta: 'Ouvrir la Veille', a: '#F97316', b: '#450A0A', visual: VisualViral },
-  { tool: 'ai-captions', kicker: 'Outils IA', title: 'Des dizaines de légendes en 10 secondes', text: 'Légendes, bios et pseudos générés dans le ton de ta niche, prêts pour tes posts et l’édition en masse.', cta: 'Générer des légendes', a: '#7C3AED', b: '#2E1065', visual: VisualHome },
   { tool: 'links', kicker: 'Liens ScaleFlow', title: 'Sache quel compte te rapporte', text: 'Une page de liens animée et un lien suivi par compte : visites, clics, pays, en direct.', cta: 'Voir mes liens', a: '#EC4899', b: '#4A044E', visual: VisualLinks },
   { tool: 'tiktok', kicker: 'TikTok', title: 'Instagram et TikTok, un seul outil', text: 'Une vidéo publiée sur tous tes comptes TikTok en parallèle, comme tes Reels.', cta: 'Publier sur TikTok', a: '#0EA5B7', b: '#3B0A1E', visual: VisualTikTok },
 ]
 
 // ── Carte d'outil : aperçu animé en dégradé + texte ───────────────────────────
-function ToolCard({ t, fav, onFav, onOpen, i, photo }: { t: Tool; fav: boolean; onFav: () => void; onOpen: () => void; i: number; photo: string | null }) {
+export function ToolCard({ t, fav, onFav, onOpen, i, pick }: { t: Tool; fav: boolean; onFav?: () => void; onOpen: () => void; i: number; pick: (k: number) => string | null }) {
   const [h, setH] = useState(false)
   return (
     <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter') onOpen() }}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ position: 'relative', display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', background: '#111113', border: `1px solid ${h ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)'}`, transform: h ? 'translateY(-3px)' : 'none', boxShadow: h ? `0 18px 40px -18px ${t.a}88` : 'none', transition: 'transform .2s ease, box-shadow .2s ease, border-color .2s ease', animation: `sfsPop .45s ${Math.min(i, 16) * 0.03}s both` }}>
-      <div style={{ position: 'relative', height: 132, overflow: 'hidden', background: `linear-gradient(135deg, ${t.a}, ${t.b})` }}>
-        {photo && <>
-          <img src={photo} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: h ? 'scale(1.08)' : 'scale(1.01)', transition: 'transform .5s cubic-bezier(.2,.8,.2,1)' }} />
-          <span style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${t.a}cc, ${t.b}aa)`, mixBlendMode: 'multiply' }} />
-          <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.45), transparent 60%)' }} />
-        </>}
-        <span style={{ position: 'absolute', width: 140, height: 140, borderRadius: 99, background: 'rgba(255,255,255,0.18)', filter: 'blur(28px)', top: -50, right: -30, animation: 'sfsGlow 7s ease-in-out infinite', animationDelay: `-${i % 7}s` }} />
-        <span style={{ position: 'absolute', width: 90, height: 90, borderRadius: 99, background: 'rgba(0,0,0,0.25)', filter: 'blur(24px)', bottom: -40, left: -20 }} />
-        <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: h ? 'scale(1.12) rotate(-4deg)' : 'none', transition: 'transform .35s cubic-bezier(.2,.8,.2,1)' }}>
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 16, background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(6px)', color: '#fff', boxShadow: '0 10px 30px -10px rgba(0,0,0,.5)' }}>
-            <Icon d={t.icon} size={24} sw={1.9} />
-          </span>
+      <div style={{ position: 'relative', height: 150, overflow: 'hidden', background: `radial-gradient(120% 120% at 80% 0%, ${t.a} 0%, ${t.b} 55%, #0A0A0B 100%)` }}>
+        <span style={{ position: 'absolute', width: 140, height: 140, borderRadius: 99, background: 'rgba(255,255,255,0.14)', filter: 'blur(30px)', top: -60, right: -30, animation: 'sfsGlow 7s ease-in-out infinite', animationDelay: `-${i % 7}s` }} />
+        {h && <span style={{ position: 'absolute', top: 0, bottom: 0, width: '40%', zIndex: 3, pointerEvents: 'none', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)', animation: 'sfsSheen .9s ease-out both' }} />}
+        {/* Aperçu propre à l'outil (vraies miniatures dedans quand on en a). */}
+        <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 8, transform: h ? 'scale(1.06)' : 'none', transition: 'transform .4s cubic-bezier(.2,.8,.2,1)' }}>
+          <ToolArt t={t} pick={pick} />
         </span>
+        <span style={{ position: 'absolute', left: 10, bottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(6px)', color: '#fff' }}><Icon d={t.icon} size={13} /></span>
         {t.badge && <span style={{ position: 'absolute', top: 10, left: 10, padding: '3px 8px', borderRadius: 99, fontSize: 10.5, fontWeight: 700, letterSpacing: '.02em', background: t.badge === 'Nouveau' ? '#fff' : 'rgba(0,0,0,0.45)', color: t.badge === 'Nouveau' ? '#0A0A0B' : '#fff', backdropFilter: 'blur(4px)' }}>{t.badge}</span>}
-        <button type="button" aria-label={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'} onClick={e => { e.stopPropagation(); onFav() }}
+        {onFav && <button type="button" aria-label={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'} onClick={e => { e.stopPropagation(); onFav() }}
           style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', color: fav ? '#FDE047' : 'rgba(255,255,255,0.8)', opacity: fav || h ? 1 : 0, transition: 'opacity .15s ease' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill={fav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
-        </button>
+        </button>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: '12px 14px 13px', flex: 1 }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{t.label}</span>
@@ -211,7 +207,7 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
         <section key={c?.k ?? 'all'} style={{ marginBottom: 28 }}>
           {c && <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 650, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{c.label} <span style={{ color: '#52525B', fontWeight: 500, fontSize: 13 }}>· {items.length}</span></h3>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: 14 }}>
-            {items.map(t => { const k = idx++; return <ToolCard key={t.id} t={t} i={k} photo={photoFor(t, k, photos)} fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)} /> })}
+            {items.map(t => { const k = idx++; return <ToolCard key={t.id} t={t} i={k} pick={pickerFor(t, k, photos)} fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)} /> })}
           </div>
         </section>
       ))}
