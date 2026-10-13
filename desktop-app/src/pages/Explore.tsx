@@ -113,7 +113,7 @@ function Carousel({ items, onOpen, pool }: { items: { s: Slide; t: Tool }[]; onO
     <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} style={{ position: 'relative', marginBottom: 18 }}>
       <div key={cur}><FeatureBanner kicker={s.kicker} line1={s.line1} line2={s.line2} text={s.text} cta={`${s.cta} →`} onCta={() => onOpen(t)} height={300} photos={[0, 1, 2, 3].map(i => pool.length ? pool[(cur * 4 + i) % pool.length] : null)} /></div>
       <span style={{ position: 'absolute', right: 22, bottom: 20, zIndex: 3, display: 'flex', gap: 6 }}>
-        {items.map((_, j) => <button key={j} type="button" aria-label={`À la une ${j + 1}`} onClick={() => setK(j)} style={{ width: j === cur ? 26 : 8, height: 8, padding: 0, border: 'none', borderRadius: 99, background: j === cur ? '#D9FF43' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'width .25s ease' }} />)}
+        {items.map((_, j) => <button key={j} type="button" aria-label={`À la une ${j + 1}`} onClick={() => setK(j)} style={{ width: j === cur ? 26 : 8, height: 8, padding: 0, border: 'none', borderRadius: 99, background: j === cur ? '#A78BFA' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'width .25s ease' }} />)}
       </span>
     </div>
   )
@@ -145,7 +145,7 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
       <style>{SPOT_KEYFRAMES}</style>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
         <div>
-          <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#D9FF43' }}>● {all.length} outils</span>
+          <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#A78BFA' }}>● {all.length} outils</span>
           <h1 style={{ margin: '8px 0 0', fontSize: 'clamp(30px, 3.4vw, 46px)', fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 0.95, textTransform: 'uppercase', color: '#F4F4F5' }}>Explorer <span style={{ color: '#71717A' }}>ScaleFlow</span></h1>
         </div>
         <span style={{ position: 'relative', width: 'min(340px, 100%)' }}>
