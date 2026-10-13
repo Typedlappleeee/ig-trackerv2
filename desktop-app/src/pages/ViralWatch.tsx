@@ -13,7 +13,8 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Empty, Icon, Modal, PageHead, Panel, PanelHead, Segmented, FIELD, TEXTAREA, toast, useNarrow } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
-import { fmtNumber } from '@/lib/data'
+import { fmtNumber, compact } from '@/lib/data'
+import { StatBar } from '@/components/CineHero'
 
 type Scope = 'public' | 'private'
 type Region = 'fr' | 'us'
@@ -121,8 +122,6 @@ function Badge({ score, big }: { score: number; big?: boolean }) {
   const hot = score >= 3
   return <span title={`×${ratio(score)} les vues habituelles du compte`} style={{ display: 'inline-flex', alignItems: 'center', height: big ? 28 : 22, padding: big ? '0 11px' : '0 8px', borderRadius: 99, fontSize: big ? 13.5 : 12, fontWeight: 800, letterSpacing: '-0.01em', background: hot ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'rgba(10,10,11,0.55)', border: hot ? 'none' : '1px solid rgba(255,255,255,0.16)', boxShadow: hot ? '0 6px 18px -6px rgba(236,72,153,.8)' : 'none', color: '#fff', backdropFilter: 'blur(8px)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{hot ? '🔥 ' : ''}×{ratio(score)}</span>
 }
-// Nombres compacts (1,6 M · 84 k) : plus lisibles sur les cartes.
-const compact = (n: number) => new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
 function Stat({ d, v }: { d: string; v: number }) {
   return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon d={d} size={12} />{compact(v)}</span>
 }
@@ -211,21 +210,6 @@ function AccountRail({ list, reels, value, onChange }: { list: Watch[]; reels: R
     <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '2px 2px 8px', marginBottom: 10, scrollbarWidth: 'thin' }}>
       <Bubble k="" label="Tous" on={!value} />
       {sorted.map(w => { const t = top.get(w.username); return <Bubble key={w.id} k={w.username} label={`@${w.username}`} thumb={t?.thumb} hot={!!t && t.score >= 3} on={value === w.username} /> })}
-    </div>
-  )
-}
-
-// Bandeau de chiffres (une seule barre, séparateurs fins).
-function StatStrip({ items }: { items: { l: string; v: string; c?: string }[] }) {
-  const narrow = useNarrow(760)
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, 1fr)' : `repeat(${items.length}, 1fr)`, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', background: '#0F0F11', marginBottom: 16 }}>
-      {items.map((x, i) => (
-        <div key={x.l} style={{ padding: narrow ? '14px 16px' : '18px 22px', borderLeft: (narrow ? i % 2 : i) ? '1px solid rgba(255,255,255,0.06)' : 'none', borderTop: narrow && i >= 2 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#71717A' }}>{x.l}</div>
-          <div style={{ marginTop: 6, fontSize: narrow ? 26 : 32, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, color: x.c ?? '#F4F4F5', fontVariantNumeric: 'tabular-nums' }}>{x.v}</div>
-        </div>
-      ))}
     </div>
   )
 }
@@ -503,7 +487,7 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
         : <WatchPanel theme={theme} title="Mes comptes suivis" sub="Visibles par toi et ton équipe" list={tabWatch} limit={MAX_PRIVATE} onAdd={addAccounts} onRemove={removeWatch} />)}
 
       {tabReels.length > 0 && <>
-        <StatStrip items={[
+        <StatBar items={[
           { l: 'Reels sur la période', v: fmtNumber(periodReels.length) },
           { l: 'Vues cumulées', v: compact(totalViews) },
           { l: 'Record', v: best > 0 ? `×${ratio(best)}` : '—', c: best >= 3 ? '#F472B6' : undefined },

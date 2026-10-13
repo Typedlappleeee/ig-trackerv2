@@ -264,6 +264,10 @@ export function firstNameFrom(displayName: string | null, email: string | undefi
 export function fmtNumber(n: number): string {
   return n.toLocaleString('fr-FR')
 }
+/** Nombre court pour les gros chiffres d'affichage : 1,6 M · 84 k. */
+export function compact(n: number): string {
+  return new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+}
 
 // Libellé d'affichage d'un téléphone : le NOM GeeLark d'abord (beaucoup de comptes
 // n'ont pas de @username), le compte IG en secondaire.
