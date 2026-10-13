@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from 'react'
+import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Chip, Icon, PageHead, Skeleton, SkeletonRows } from '@/lib/ui'
@@ -40,7 +41,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState; isSuperAdmin: boolean
 }) {
   // Relance des échecs (depuis Activité) : on ouvre directement le bon composer.
-  const [mode, setMode] = useState<string | null>(() => peekRelaunch()?.kind ?? null)
+  const [mode, setMode] = useState<string | null>(() => (takeOpenArg<{ mode?: string }>('publish')?.mode) ?? peekRelaunch()?.kind ?? null)
   // Cross-posting réservé au superadmin (pas à tout le monde — chaque owner d'orga
   // ne doit PAS y avoir accès automatiquement).
   const isAdmin = isSuperAdmin

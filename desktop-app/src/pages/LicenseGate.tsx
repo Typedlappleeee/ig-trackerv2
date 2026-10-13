@@ -29,8 +29,8 @@ export default function LicenseGate({ user, expired, onActivated, onSignOut }: {
     fontSize: 14, fontFamily: MONO, letterSpacing: '0.04em', textAlign: 'center',
   }
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto', background: '#0A0A0B' }}>
-      <div style={{ position: 'relative', width: '100%', maxWidth: 400, boxSizing: 'border-box', padding: 28, borderRadius: 10, background: '#111113', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+    <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', padding: 16, overflowY: 'auto', background: 'radial-gradient(80% 60% at 50% 0%, rgba(109,40,217,0.35) 0%, #0A0A0B 70%)' }}>
+      <div style={{ position: 'relative', width: '100%', maxWidth: 400, boxSizing: 'border-box', padding: 30, borderRadius: 16, background: '#111113', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 80px -30px rgba(0,0,0,.8)', textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <div style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 8, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)' }}>
             <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="#C4BBFB" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z" /></svg>
@@ -51,8 +51,8 @@ export default function LicenseGate({ user, expired, onActivated, onSignOut }: {
         {err && <div style={{ marginTop: 8, fontSize: 12, color: '#F87171' }}>{err}</div>}
 
         <button type="button" onClick={submit} disabled={loading || !key.trim()} style={{
-          width: '100%', marginTop: 12, height: 40, borderRadius: 6, border: '1px solid #EDEDEF', cursor: loading || !key.trim() ? 'not-allowed' : 'pointer',
-          fontSize: 13, fontWeight: 500, color: '#0A0A0B', background: '#EDEDEF',
+          width: '100%', marginTop: 12, height: 44, borderRadius: 10, border: 'none', cursor: loading || !key.trim() ? 'not-allowed' : 'pointer',
+          fontSize: 14, fontWeight: 650, color: '#fff', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
           opacity: loading || !key.trim() ? 0.4 : 1, transition: 'opacity .12s ease',
         }}>{loading ? 'Vérification…' : 'Activer la clé →'}</button>
 

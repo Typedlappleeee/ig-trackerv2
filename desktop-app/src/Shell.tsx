@@ -5,6 +5,8 @@ import { Icon, MONO, Skeleton } from '@/lib/ui'
 import { LangSwitch, UpdateBanner, UpdateChip, WhatsNewBar } from '@/components/AppUpdate'
 import { isReleased, releaseLabel } from '@/lib/releases'
 import { fmtNumber } from '@/lib/data'
+import { searchTools, visibleTools } from '@/lib/tools'
+import { openTool } from '@/lib/openTool'
 
 export type PageKey =
   | 'hub'
@@ -14,7 +16,7 @@ export type PageKey =
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
   | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
-  | 'scheduled' | 'links' | 'viral'
+  | 'scheduled' | 'links' | 'viral' | 'explore' | 'ai'
   | 'admin'
   | 'settings'
 
@@ -60,7 +62,11 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
     ? { k: 'cloud', l: 'Mes appareils', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined }
     : { k: 'phones', l: 'Téléphones GeeLark', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined }
   return [
-    { g: null, items: [{ k: 'hub', l: 'Accueil', i: 'M3 10.5 12 3l9 7.5|M5 10v10h14V10' }] },
+    { g: null, items: [
+      { k: 'hub', l: 'Accueil', i: 'M3 10.5 12 3l9 7.5|M5 10v10h14V10' },
+      // Explorer : tous les outils en galerie (façon Higgsfield).
+      { k: 'explore', l: 'Explorer', i: 'M3 3h7v7H3z|M14 3h7v7h-7z|M14 14h7v7h-7z|M3 14h7v7H3z', soon: 'Nouveau' },
+    ] },
     {
       g: 'Pilotage', items: [
         dev,
@@ -80,7 +86,10 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
         { k: 'warmup', l: 'Warmup', i: 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z' },
       ],
     },
-    { g: 'Production', items: [{ k: 'studio', l: 'Studio vidéo', i: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z' }] },
+    { g: 'Production', items: [
+      { k: 'studio', l: 'Studio vidéo', i: 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z' },
+      { k: 'ai', l: 'Outils IA', i: 'M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z', soon: 'Nouveau' },
+    ] },
     {
       // Analyse : disponible sur les DEUX infras. Chaque infra montre SES propres
       // données (GeeLark vs ScaleFlow Cloud), scopées par la présence de geelark_id.
@@ -129,6 +138,8 @@ const TITLES: Record<PageKey, string[]> = {
   scheduled: ['Diffusion', 'Programmé'],
   links: ['Analyse', 'Liens'],
   viral: ['Analyse', 'Veille Reels'],
+  explore: ['Explorer'],
+  ai: ['Production', 'Outils IA'],
   admin: ['Admin', 'Licences'],
   settings: ['Réglages'],
 }
@@ -333,7 +344,7 @@ export default function Shell({
                   <span style={{ display: 'block', height: '100%', width: `${balance === null ? 0 : Math.min(100, Math.round((balance / 5000) * 100))}%`, borderRadius: 99, background: T.accent }} />
                 </span>
               </span>
-              <button onClick={() => setPage('settings')} title="Acheter des crédits" style={{ height: 22, padding: '0 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, background: '#161618', color: '#EDEDEF', fontSize: 11, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>＋</button>
+              <button onClick={() => openTool(setPage, 'settings', { tab: 'billing' })} title="Acheter des crédits" style={{ height: 22, padding: '0 8px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 5, background: '#161618', color: '#EDEDEF', fontSize: 11, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>＋</button>
             </div>
           )}
 
@@ -457,27 +468,33 @@ export default function Shell({
 
       {/* ══════════ PALETTE DE COMMANDES (⌘K) ══════════ */}
       {paletteOpen && (() => {
-        const all = [...NAV.flatMap(s => s.items), { k: 'settings' as PageKey, l: 'Réglages', i: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z' }]
+        // Pages du menu + outils précis du catalogue (ouvre le bon onglet / format).
+        type Entry = { id: string; l: string; i: string; sub?: string; on: boolean; run: () => void }
+        const pages: Entry[] = [...NAV.flatMap(s => s.items), { k: 'settings' as PageKey, l: 'Réglages', i: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z' }]
+          .map(it => ({ id: `p:${it.k}`, l: it.l, i: it.i, on: page === it.k, run: () => setPage(it.k) }))
         const ql = paletteQ.trim().toLowerCase()
-        const list = ql ? all.filter(it => it.l.toLowerCase().includes(ql)) : all
+        const tools: Entry[] = searchTools(visibleTools(infra, !!isAdmin), paletteQ)
+          .map(t => ({ id: `t:${t.id}`, l: t.label, i: t.icon, sub: 'Outil', on: false, run: () => openTool(setPage, t.page, t.arg, t.id) }))
+        const list = [...(ql ? pages.filter(it => it.l.toLowerCase().includes(ql)) : pages), ...(ql ? tools : tools.slice(0, 8))]
         return (
           <div onClick={() => setPaletteOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh', background: 'rgba(0,0,0,0.6)', animation: 'aFade .14s ease both' }}>
             <div onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '92%', borderRadius: 10, overflow: 'hidden', background: '#111113', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.7)', animation: 'aPop .2s cubic-bezier(0.16,1,0.3,1) both' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 15px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#71717A" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.35-4.35" /></svg>
                 <input autoFocus value={paletteQ} onChange={e => setPaletteQ(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && list[0]) { setPage(list[0].k); setPaletteOpen(false) } }}
-                  placeholder="Aller à…" style={{ flex: 1, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 14, outline: 'none' }} />
+                  onKeyDown={e => { if (e.key === 'Enter' && list[0]) { list[0].run(); setPaletteOpen(false) } }}
+                  placeholder="Aller à une page ou ouvrir un outil…" style={{ flex: 1, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 14, outline: 'none' }} />
                 <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A' }}>ESC</span>
               </div>
               <div style={{ maxHeight: 340, overflowY: 'auto', padding: 6 }}>
                 {list.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12 }}>Aucun résultat.</div>
                   : list.map(it => (
-                    <button key={it.k} onClick={() => { setPage(it.k); setPaletteOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '9px 11px', border: 'none', borderRadius: 6, cursor: 'pointer', background: page === it.k ? 'rgba(255,255,255,0.07)' : 'transparent', color: page === it.k ? '#EDEDEF' : '#A1A1AA', fontSize: 13, fontWeight: 500, textAlign: 'left' }}
-                      onMouseEnter={e => { if (page !== it.k) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-                      onMouseLeave={e => { if (page !== it.k) e.currentTarget.style.background = 'transparent' }}>
-                      <span style={{ display: 'flex', color: page === it.k ? T.accentText : '#71717A' }}><Icon d={it.i} size={15} /></span>
-                      {it.l}
+                    <button key={it.id} onClick={() => { it.run(); setPaletteOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '9px 11px', border: 'none', borderRadius: 6, cursor: 'pointer', background: it.on ? 'rgba(255,255,255,0.07)' : 'transparent', color: it.on ? '#EDEDEF' : '#A1A1AA', fontSize: 13, fontWeight: 500, textAlign: 'left' }}
+                      onMouseEnter={e => { if (!it.on) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                      onMouseLeave={e => { if (!it.on) e.currentTarget.style.background = 'transparent' }}>
+                      <span style={{ display: 'flex', color: it.on ? T.accentText : '#71717A' }}><Icon d={it.i} size={15} /></span>
+                      <span style={{ flex: 1 }}>{it.l}</span>
+                      {it.sub && <span style={{ fontSize: 11, color: '#52525B' }}>{it.sub}</span>}
                     </button>
                   ))}
               </div>

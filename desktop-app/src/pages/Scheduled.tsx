@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { takeOpenArg } from '@/lib/openTool'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -40,7 +41,7 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
   const [busy, setBusy] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState<Sched | null>(null)
-  const [view, setView] = useState<'list' | 'calendar'>(() => { try { return localStorage.getItem('sf-sched-view') === 'calendar' ? 'calendar' : 'list' } catch { return 'list' } })
+  const [view, setView] = useState<'list' | 'calendar'>(() => { const o = takeOpenArg<{ view?: 'list' | 'calendar' }>('scheduled'); if (o?.view) return o.view; try { return localStorage.getItem('sf-sched-view') === 'calendar' ? 'calendar' : 'list' } catch { return 'list' } })
   const changeView = (v: 'list' | 'calendar') => { setView(v); try { localStorage.setItem('sf-sched-view', v) } catch { /* ignore */ } }
   // Calendrier : décale un post serveur en attente (même heure, autre jour).
   async function movePost(p: { id: string }, to: Date) {

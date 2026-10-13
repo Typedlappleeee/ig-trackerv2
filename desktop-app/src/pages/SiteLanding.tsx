@@ -10,7 +10,7 @@ import type { ReactNode, CSSProperties, MouseEvent as ReactMouseEvent } from 're
  * Styles : un bloc <style> préfixé « sfl- » (responsive + survols) + quelques styles inline.
  */
 
-const APP_URL = './login.dc.html'
+const APP_URL = './index.html?auth=login'
 const WIN_URL = 'https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-Setup.exe'
 const TG_URL = 'https://t.me/justquentin'
 

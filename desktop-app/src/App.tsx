@@ -11,8 +11,11 @@ import { fetchAllPhones, stopPhones } from '@/lib/geelark'
 import { useConnections } from '@/lib/connections'
 import RunWidget from '@/components/RunWidget'
 import LaunchSpotlight, { spotlightSeen } from '@/components/LaunchSpotlight'
+import { openTool } from '@/lib/openTool'
+import type { Tool } from '@/lib/tools'
 import Placeholder, { type PlaceholderSpec } from '@/pages/Placeholder'
 import LicenseGate from '@/pages/LicenseGate'
+import Auth, { type AuthMode } from '@/pages/Auth'
 import ComingSoon from '@/components/ComingSoon'
 import { Btn, Toaster, DialogHost } from '@/lib/ui'
 import { isReleased, releaseLabel } from '@/lib/releases'
@@ -48,6 +51,8 @@ const Admin = lazy(() => import('@/pages/Admin'))
 const Scheduled = lazy(() => import('@/pages/Scheduled'))
 const Links = lazy(() => import('@/pages/Links'))
 const ViralWatch = lazy(() => import('@/pages/ViralWatch'))
+const Explore = lazy(() => import('@/pages/Explore'))
+const AiTools = lazy(() => import('@/pages/AiTools'))
 // Annonce de lancement des Liens (bandeau en haut de chaque page) — passer à false pour la retirer.
 const SHOW_LINKS_LAUNCH = true
 
@@ -86,23 +91,43 @@ function Loader() {
   )
 }
 
+// Mode de l'écran de connexion demandé par l'URL (?auth=login|signup|reset).
+function authFromUrl(): AuthMode | null {
+  try {
+    const a = new URLSearchParams(window.location.search).get('auth')
+    if (!a) return null
+    return a === 'signup' ? 'signup' : a === 'reset' ? 'reset' : a === 'forgot' ? 'forgot' : 'login'
+  } catch { return null }
+}
+const cleanAuthUrl = () => { try { if (/[?&]auth=/.test(window.location.search) || window.location.hash.includes('access_token')) history.replaceState(null, '', window.location.pathname) } catch { /* ignore */ } }
+
 export default function App() {
   const [checking, setChecking] = useState(true)
   const [user, setUser] = useState<User | null>(null)
+  const [auth, setAuth] = useState<AuthMode | null>(authFromUrl)
+  // Retour du lien « mot de passe oublié » : on garde l'écran « Nouveau mot de passe ».
+  const [recovery, setRecovery] = useState(() => authFromUrl() === 'reset')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      // Pas connecté → on affiche la devanture commerciale (Landing), pas un renvoi
-      // direct vers le login. Depuis la Landing, les CTA mènent à login.dc.html.
       setUser(data.session?.user ?? null)
       setChecking(false)
     })
+    // Connexion (mot de passe, Google, lien email), déconnexion, réinitialisation.
+    const { data: sub } = supabase.auth.onAuthStateChange((ev, session) => {
+      if (ev === 'PASSWORD_RECOVERY') { setRecovery(true); setAuth('reset') }
+      setUser(session?.user ?? null)
+    })
+    return () => sub.subscription.unsubscribe()
   }, [])
 
   if (checking) return <Loader />
-  // Pas connecté → l'ancienne devanture commerciale (page publique scaleflow.company).
-  // Le CTA « Commencer » mène au login.
-  if (!user) return <Suspense fallback={<Loader />}><SiteLanding onStudio={() => window.location.assign('./login.dc.html')} /><FloatingLang /></Suspense>
+  if (recovery && user) return <><Auth initial="reset" onDone={() => { setRecovery(false); setAuth(null); cleanAuthUrl() }} /><FloatingLang /></>
+  // Pas connecté → devanture publique ; « Commencer » ouvre l'écran de connexion.
+  if (!user) {
+    if (auth) return <><Auth initial={auth === 'reset' ? 'login' : auth} onDone={cleanAuthUrl} /><FloatingLang /></>
+    return <Suspense fallback={<Loader />}><SiteLanding onStudio={() => setAuth('login')} /><FloatingLang /></Suspense>
+  }
   return <AppInner user={user} />
 }
 
@@ -113,6 +138,8 @@ function AppInner({ user }: { user: User }) {
   const [page, setPage] = useState<PageKey>('hub')
   // Écran « Nouveautés » : s'ouvre une fois à l'arrivée sur l'accueil, puis via la bannière.
   const [spot, setSpot] = useState(() => !spotlightSeen())
+  // Ouvre un outil précis du catalogue (Explorer, accueil) : bon onglet / format.
+  const openT = (t: Tool) => openTool(setPage, t.page, t.arg, t.id)
   const org = useOrg(user)
   const license = useLicense(user, org)
   const { data, loading, reload } = useHubData(user, org, infra)
@@ -144,7 +171,7 @@ function AppInner({ user }: { user: User }) {
   async function signOut() {
     await supabase.auth.signOut()
     localStorage.removeItem('sb-fvmkmkspfksscgqyvysl-auth-token')
-    location.replace('./login.dc.html')
+    location.replace('./index.html?auth=login')
   }
 
   // Porte de licence : connecté mais sans licence valide → écran d'activation, pas
@@ -175,7 +202,7 @@ function AppInner({ user }: { user: User }) {
       : page === 'insights' ? <Placeholder theme={theme} spec={SPECS.insights!} />
       : <BlowsomeHome user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />)
     : page === 'hub'
-    ? <Home theme={theme} infra={infra} user={user} org={org} data={data} loading={loading} reload={reload} onNavigate={setPage} />
+    ? <Home theme={theme} infra={infra} user={user} org={org} data={data} loading={loading} reload={reload} onNavigate={setPage} onOpenTool={openT} isAdmin={license.isSuperAdmin} />
     : (page === 'cloud' || page === 'phones')
       ? <Phones theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'bank'
@@ -205,6 +232,10 @@ function AppInner({ user }: { user: User }) {
         ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'scheduled'
         ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
+        : page === 'explore'
+        ? <Explore theme={theme} infra={infra} isAdmin={license.isSuperAdmin} onOpen={openT} />
+        : page === 'ai'
+        ? <AiTools theme={theme} user={user} org={org} onGo={(p, a) => openTool(setPage, p, a)} />
         : page === 'viral'
         ? <ViralWatch theme={theme} user={user} org={org} isAdmin={license.isSuperAdmin} />
         : page === 'links'
@@ -218,7 +249,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'automation'
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
         : page === 'admin'
-        ? (license.isSuperAdmin ? <Admin theme={theme} user={user} /> : <Home theme={theme} infra={infra} user={user} org={org} data={data} loading={loading} reload={reload} onNavigate={setPage} />)
+        ? (license.isSuperAdmin ? <Admin theme={theme} user={user} /> : <Home theme={theme} infra={infra} user={user} org={org} data={data} loading={loading} reload={reload} onNavigate={setPage} onOpenTool={openT} isAdmin={license.isSuperAdmin} />)
         : page === 'settings'
         ? <Settings theme={theme} user={user} org={org} onSignOut={signOut} onNavigate={(p) => setPage(p as PageKey)} />
         : <Placeholder theme={theme} spec={SPECS[page] ?? SPECS.settings!} />

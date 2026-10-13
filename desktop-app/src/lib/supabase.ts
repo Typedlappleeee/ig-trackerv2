@@ -12,7 +12,8 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    // Retours Google / lien « mot de passe oublié » : la session arrive dans l'URL.
+    detectSessionInUrl: true,
     storage: localStorage,
     // MÊME clé que le login → session partagée.
     storageKey: 'sb-fvmkmkspfksscgqyvysl-auth-token',

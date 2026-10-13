@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { takeOpenArg } from '@/lib/openTool'
 import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
@@ -179,7 +180,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [tab, setTab] = useState<TabKey>('video')
+  const [tab, setTab] = useState<TabKey>(() => (takeOpenArg<{ tab?: TabKey }>('bank')?.tab) ?? 'video')
   const [captions, setCaptions] = useState<Caption[]>([])
   const [capOpen, setCapOpen] = useState(false)
   const [capTitle, setCapTitle] = useState('')

@@ -8,6 +8,7 @@
 // Servi publiquement par api/l.js (/l/<code>, ou tapmylink.fr/<code>).
 // Tables : supabase/migrations/20261011_links.sql + 20261011b_links_v2.sql.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { takeOpenArg } from '@/lib/openTool'
 import { renderLinkPage, normalizeDesign, normalizeUrl, GRADIENTS, EFFECTS, type LinkDesign } from '../../api/_linkpage.js'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -79,7 +80,7 @@ export default function Links({ theme, user, org }: { theme: Theme; user: User; 
   const [clicks, setClicks] = useState<Click[]>([])
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState<'' | 'v1' | 'v2'>('')
-  const [tab, setTab] = useState<'dash' | 'links' | 'pages' | 'settings'>('dash')
+  const [tab, setTab] = useState<'dash' | 'links' | 'pages' | 'settings'>(() => (takeOpenArg<{ tab?: 'dash' | 'links' | 'pages' | 'settings' }>('links')?.tab) ?? 'dash')
   const [period, setPeriod] = useState<Period>('today')
   const [domain, setDomainState] = useState<LinkDomain>(loadDomain)
   const [edit, setEdit] = useState<(Omit<LinkPage, 'id'> & { id?: string }) | null>(null)

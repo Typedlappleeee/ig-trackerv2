@@ -1,727 +1,499 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
+// Réglages — 4 sections claires : Profil & sécurité, Équipe, Licence & crédits,
+// Intégrations (GeeLark, Groq, proxy, domaine des liens). Section mémorisée et
+// ouvrable directement (openTool('settings', { tab })). Retours toujours en toast.
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import ProxyRotationPanel from '@/components/ProxyRotationPanel'
 import { LangSwitch } from '@/components/AppUpdate'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, FIELD, MONO, Toggle, Skeleton, SkeletonRows, useNarrow, toast } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, PanelHead, PageHead, FIELD, MONO, Skeleton, SkeletonRows, useNarrow, toast, confirmDialog } from '@/lib/ui'
 import { supabase, type OrgRole } from '@/lib/supabase'
 import { fetchBalance, fetchOrgBalance, fmtNumber, type OrgState } from '@/lib/data'
+import { takeOpenArg } from '@/lib/openTool'
+import { geelarkFetch } from '@/lib/geelark'
+import { generateCaption } from '@/lib/ai'
 
-// ── Sections (portées de _settings() du prototype v10) ───────────────────────────
-type Tab = 'account' | 'org' | 'members' | 'billing' | 'proxy' | 'infra' | 'notif' | 'security'
-// On ne garde que les sections RÉELLES. Les onglets placeholder (Infrastructure /
-// Notifications / Sécurité, tous « à venir ») sont retirés : pas de config proxy à
-// gérer côté desktop (tout passe par GeeLark / la config web).
-const SECTIONS: { k: Tab; l: string; i: string }[] = [
-  { k: 'account', l: 'Profil', i: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
-  { k: 'org', l: 'Organisation', i: 'M3 21h18|M5 21V7l8-4v18|M19 21V11l-6-4' },
-  { k: 'members', l: 'Membres & rôles', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M22 21v-2a4 4 0 0 0-3-3.9|M16 3.1a4 4 0 0 1 0 7.8' },
-  { k: 'billing', l: 'Abonnement & crédits', i: 'M2 8h20v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z|M2 8l2-4h16l2 4|M12 12v4' },
-  { k: 'infra', l: 'Connexions & clés', i: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71|M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' },
-  { k: 'proxy', l: 'Proxy & rotation', i: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
+type Tab = 'profile' | 'team' | 'billing' | 'integrations'
+const SECTIONS: { k: Tab; l: string; d: string; i: string }[] = [
+  { k: 'profile', l: 'Profil & sécurité', d: 'Nom, langue, mot de passe', i: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+  { k: 'team', l: 'Équipe', d: 'Organisation, membres, rôles', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M22 21v-2a4 4 0 0 0-3-3.9|M16 3.1a4 4 0 0 1 0 7.8' },
+  { k: 'billing', l: 'Licence & crédits', d: 'Accès, solde, codes', i: 'M2 8h20v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z|M2 8l2-4h16l2 4|M12 12v4' },
+  { k: 'integrations', l: 'Intégrations', d: 'GeeLark, IA, proxy, liens', i: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71|M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' },
 ]
-
-// ── Rôles ────────────────────────────────────────────────────────────────────────
-const ROLE_LABEL: Record<OrgRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Membre', viewer: 'Viewer' }
-const ROLE_TONE: Record<OrgRole, 'violet' | 'info' | 'ok' | 'mute'> = { owner: 'violet', admin: 'info', member: 'ok', viewer: 'mute' }
-const ROLE_AV: Record<OrgRole, string> = { owner: '139,92,246', admin: '6,182,212', member: '16,185,129', viewer: '113,113,122' }
-
-interface MemberRow {
-  id: string
-  user_id: string
-  role: OrgRole
-  email: string | null
-  display_name: string | null
+type LinkDomain = 'tapmylink' | 'custom'
+const cleanDomain = (d: string) => d.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+const TAB_KEY = 'sf-settings-tab'
+const LEGACY: Record<string, Tab> = { account: 'profile', org: 'team', members: 'team', infra: 'integrations', proxy: 'integrations' }
+function initialTab(): Tab {
+  const o = takeOpenArg<{ tab?: string }>('settings')?.tab
+  const fromOpen = o ? (LEGACY[o] ?? o) : null
+  if (fromOpen && SECTIONS.some(s => s.k === fromOpen)) return fromOpen as Tab
+  try { const v = localStorage.getItem(TAB_KEY); if (v && SECTIONS.some(s => s.k === v)) return v as Tab } catch { /* ignore */ }
+  return 'profile'
 }
+
+const ROLE_LABEL: Record<OrgRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Membre', viewer: 'Lecture seule' }
+const ROLE_TONE: Record<OrgRole, 'violet' | 'info' | 'ok' | 'mute'> = { owner: 'violet', admin: 'info', member: 'ok', viewer: 'mute' }
+interface MemberRow { id: string; user_id: string; role: OrgRole; email: string | null; display_name: string | null }
 
 function initialsFrom(name: string | null, email: string | null): string {
   const src = (name?.trim() || email?.split('@')[0] || '?').replace(/[._-]/g, ' ')
-  const parts = src.split(/\s+/).filter(Boolean)
-  return (parts.map(w => w[0]).join('').slice(0, 2) || '?').toUpperCase()
+  return (src.split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2) || '?').toUpperCase()
 }
 
-// ── Ligne de réglage (label + valeur), visuel-only pour les sections statiques ────
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+// ── Briques de mise en page ───────────────────────────────────────────────────
+function Row({ label, hint, children, last }: { label: string; hint?: string; children: ReactNode; last?: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px 24px', flexWrap: 'wrap', minHeight: 60, boxSizing: 'border-box', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-      <span style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px 24px', flexWrap: 'wrap', padding: '14px 16px', borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.06)' }}>
+      <span style={{ flex: '0 1 220px', minWidth: 160, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{label}</span>
-        {hint ? <span style={{ fontSize: 12, color: '#8B8B94', lineHeight: 1.4 }}>{hint}</span> : null}
+        {hint && <span style={{ fontSize: 12, color: '#8B8B94', lineHeight: 1.45 }}>{hint}</span>}
       </span>
-      <span style={{ flex: '1 1 240px', minWidth: 0 }}>{children}</span>
+      <span style={{ flex: '1 1 260px', minWidth: 0 }}>{children}</span>
+    </div>
+  )
+}
+const Stack = ({ children }: { children: ReactNode }) => <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>
+function SecretInput({ value, onChange, placeholder, disabled }: { value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
+  const [show, setShow] = useState(false)
+  return (
+    <span style={{ display: 'flex', gap: 8 }}>
+      <input value={value} onChange={e => onChange(e.target.value)} type={show ? 'text' : 'password'} placeholder={placeholder} disabled={disabled} spellCheck={false} autoComplete="off" style={{ ...FIELD, fontFamily: MONO, fontSize: 12 }} />
+      <button type="button" onClick={() => setShow(s => !s)} aria-label={show ? 'Cacher' : 'Afficher'} style={{ flexShrink: 0, width: 34, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#A1A1AA', cursor: 'pointer' }}>
+        <Icon d={show ? 'M17.9 17.9A10 10 0 0 1 12 20c-7 0-10-8-10-8a18 18 0 0 1 5.1-5.9|M9.9 4.2A9 9 0 0 1 12 4c7 0 10 8 10 8a18 18 0 0 1-2.2 3.2|M1 1l22 22' : 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z|M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'} size={14} />
+      </button>
+    </span>
+  )
+}
+function Status({ ok, okText = 'Connecté', koText = 'À configurer' }: { ok: boolean; okText?: string; koText?: string }) {
+  return <Chip text={ok ? `✓ ${okText}` : koText} tone={ok ? 'ok' : 'warn'} />
+}
+
+export default function Settings({ theme, user, org, onSignOut }: {
+  theme: Theme; user: User; org: OrgState; onSignOut: () => void; onNavigate?: (p: string) => void
+}) {
+  const [tab, setTabState] = useState<Tab>(initialTab)
+  const setTab = (t: Tab) => { setTabState(t); try { localStorage.setItem(TAB_KEY, t) } catch { /* ignore */ } }
+  const narrow = useNarrow()
+  const canManage = org.role === 'owner' || org.role === 'admin' || !org.currentOrg
+
+  return (
+    <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
+      <PageHead title="Réglages" sub="Ton compte, ton équipe, ta licence et tes intégrations." />
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '240px minmax(0,1fr)', gap: narrow ? 14 : 24, alignItems: 'start' }}>
+        <nav style={{ position: narrow ? 'static' : 'sticky', top: 0, display: narrow ? 'grid' : 'flex', gridTemplateColumns: narrow ? 'repeat(2,minmax(0,1fr))' : undefined, flexDirection: 'column', gap: 4 }}>
+          {SECTIONS.map(x => {
+            const on = tab === x.k
+            return (
+              <button key={x.k} type="button" onClick={() => setTab(x.k)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', border: `1px solid ${on ? 'rgba(255,255,255,0.1)' : 'transparent'}`, borderRadius: 10, cursor: 'pointer', textAlign: 'left', background: on ? '#161618' : 'transparent', transition: 'background .12s ease' }}
+                onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+                onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent' }}>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, flexShrink: 0, borderRadius: 8, background: on ? theme.accent : '#18181B', color: on ? '#fff' : '#A1A1AA', border: '1px solid rgba(255,255,255,0.08)' }}><Icon d={x.i} size={15} /></span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: on ? '#EDEDEF' : '#D4D4D8' }}>{x.l}</span>
+                  {!narrow && <span style={{ fontSize: 11.5, color: '#71717A' }}>{x.d}</span>}
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+        <div key={tab} style={{ minWidth: 0, animation: 'aIn .25s both' }}>
+          {tab === 'profile' && <ProfileTab theme={theme} user={user} org={org} onSignOut={onSignOut} />}
+          {tab === 'team' && <TeamTab theme={theme} user={user} org={org} />}
+          {tab === 'billing' && <BillingTab theme={theme} user={user} org={org} />}
+          {tab === 'integrations' && <IntegrationsTab theme={theme} user={user} org={org} canManage={canManage} />}
+        </div>
+      </div>
     </div>
   )
 }
 
-// Champ texte lecture-seule (aucune donnée inventée : la vraie valeur ou « — »).
-function ReadValue({ value, mono }: { value: ReactNode; mono?: boolean }) {
-  return (
-    <span style={{
-      display: 'inline-block', verticalAlign: 'middle', height: 32, lineHeight: '30px', padding: '0 10px', borderRadius: 6, boxSizing: 'border-box',
-      background: '#161618', border: '1px solid rgba(255,255,255,0.09)', maxWidth: '100%', width: 320,
-      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      fontFamily: mono ? MONO : undefined, fontSize: mono ? 12 : 13, color: '#EDEDEF',
-    }}>{value}</span>
-  )
-}
-
-const DASH = <span style={{ color: '#5A5A63' }}>—</span>
-
-export default function Settings({ theme, user, org, onSignOut, onNavigate }: {
-  theme: Theme; user: User; org: OrgState; onSignOut: () => void; onNavigate?: (p: string) => void
-}) {
-  const [tab, setTab] = useState<Tab>('account')
-  const { currentOrg, role } = org
-  const canManage = role === 'owner' || role === 'admin'
-
-  // ── Profil : display_name réel (email vient déjà de la session) ──────────────────
-  const [displayName, setDisplayName] = useState<string | null>(null)
-  const [nameInput, setNameInput] = useState('')
-  const [savingName, setSavingName] = useState(false)
-  const narrow = useNarrow()
+// ══════════ PROFIL & SÉCURITÉ ══════════
+function ProfileTab({ theme, user, org, onSignOut }: { theme: Theme; user: User; org: OrgState; onSignOut: () => void }) {
+  const [name, setName] = useState<string | null>(null)
+  const [input, setInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [pw, setPw] = useState(''), [pw2, setPw2] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
   useEffect(() => {
     let alive = true
     supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
-      .then(({ data }) => { if (alive) { const n = (data as { display_name?: string } | null)?.display_name ?? null; setDisplayName(n); setNameInput(n ?? '') } })
+      .then(({ data }) => { if (alive) { const n = (data as { display_name?: string } | null)?.display_name ?? null; setName(n); setInput(n ?? '') } })
     return () => { alive = false }
   }, [user.id])
-
   async function saveName() {
-    setSavingName(true)
-    const { error } = await supabase.from('profiles').update({ display_name: nameInput.trim() || null }).eq('id', user.id)
-    setSavingName(false)
-    if (!error) { setDisplayName(nameInput.trim() || null); toast('Nom enregistré.', 'ok') }
-    else toast(`Échec : ${error.message}`, 'bad')
+    setSaving(true)
+    const { error } = await supabase.from('profiles').update({ display_name: input.trim() || null }).eq('id', user.id)
+    setSaving(false)
+    if (error) toast(`Échec : ${error.message}`, 'bad'); else { setName(input.trim() || null); toast('Nom enregistré.', 'ok') }
   }
+  async function changePassword() {
+    if (pw.length < 8) { toast('8 caractères minimum.', 'bad'); return }
+    if (pw !== pw2) { toast('Les deux mots de passe ne correspondent pas.', 'bad'); return }
+    setPwBusy(true)
+    const { error } = await supabase.auth.updateUser({ password: pw })
+    setPwBusy(false)
+    if (error) toast(`Échec : ${error.message}`, 'bad'); else { setPw(''); setPw2(''); toast('Mot de passe modifié.', 'ok') }
+  }
+  return (
+    <Stack>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 20, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: `linear-gradient(135deg, ${theme.accent}33, transparent 60%), #111113` }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 99, flexShrink: 0, background: `linear-gradient(135deg, ${theme.accent}, #F472B6)`, color: '#fff', fontSize: 19, fontWeight: 700 }}>{initialsFrom(name, user.email ?? null)}</span>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+          <span data-no-tr style={{ fontSize: 18, fontWeight: 650, color: '#EDEDEF', letterSpacing: '-0.02em' }}>{name === null ? <Skeleton w={120} h={18} /> : (name.trim() || user.email?.split('@')[0])}</span>
+          <span data-no-tr style={{ fontSize: 13, color: '#8B8B94' }}>{user.email}</span>
+        </span>
+        {org.role && <span style={{ marginLeft: 'auto' }}><Chip text={ROLE_LABEL[org.role]} tone={ROLE_TONE[org.role]} /></span>}
+      </div>
 
-  // ── Solde de crédits réel (org ou perso) ────────────────────────────────────────
-  const [balance, setBalance] = useState<number | null>(null)
-  const reloadBalance = useCallback(async () => {
-    const b = currentOrg ? await fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : await fetchBalance(user.id)
-    setBalance(b)
-  }, [currentOrg?.id, currentOrg?.owner_id, user.id])
-  useEffect(() => {
-    let alive = true
-    const p = currentOrg ? fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : fetchBalance(user.id)
-    p.then(b => { if (alive) setBalance(b) })
-    return () => { alive = false }
-  }, [currentOrg?.id, currentOrg?.owner_id, user.id])
+      <Panel theme={theme}>
+        <PanelHead title="Informations" />
+        <Row label="Nom affiché" hint="Visible par les membres de ton équipe">
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void saveName() }} placeholder="Ton nom" style={{ ...FIELD, flex: 1, minWidth: 180 }} />
+            <Btn theme={theme} tone="primary" label={saving ? '…' : 'Enregistrer'} disabled={saving || input.trim() === (name ?? '').trim()} onClick={() => void saveName()} />
+          </span>
+        </Row>
+        <Row label="Langue" hint="Langue de l’interface" last><LangSwitch theme={theme} /></Row>
+      </Panel>
 
-  // ── Membres réels (organization_members ⋈ profiles) ─────────────────────────────
+      <Panel theme={theme}>
+        <PanelHead title="Sécurité" sub="Mot de passe et session" />
+        <Row label="Nouveau mot de passe" hint="8 caractères minimum">
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Nouveau mot de passe" autoComplete="new-password" style={{ ...FIELD, flex: 1, minWidth: 160 }} />
+            <input type="password" value={pw2} onChange={e => setPw2(e.target.value)} placeholder="Confirmer" autoComplete="new-password" onKeyDown={e => { if (e.key === 'Enter') void changePassword() }} style={{ ...FIELD, flex: 1, minWidth: 160 }} />
+            <Btn theme={theme} label={pwBusy ? '…' : 'Modifier'} disabled={pwBusy || !pw} onClick={() => void changePassword()} />
+          </span>
+        </Row>
+        <Row label="Session" hint="Te déconnecte de cet appareil" last>
+          <Btn theme={theme} tone="danger" label="Se déconnecter" icon="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9" onClick={onSignOut} />
+        </Row>
+      </Panel>
+    </Stack>
+  )
+}
+
+// ══════════ ÉQUIPE ══════════
+function TeamTab({ theme, user, org }: { theme: Theme; user: User; org: OrgState }) {
+  const { currentOrg, role } = org
+  const canManage = role === 'owner' || role === 'admin'
   const [members, setMembers] = useState<MemberRow[] | null>(null)
-  const loadMembers = useCallback(async () => {
+  const [balance, setBalance] = useState<number | null>(null)
+  const [orgName, setOrgName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [email, setEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
+
+  const load = useCallback(async () => {
     if (!currentOrg) { setMembers(null); return }
     const { data: rows, error } = await supabase.from('organization_members').select('id, user_id, role').eq('org_id', currentOrg.id)
     if (error || !rows) { setMembers([]); return }
     const ids = (rows as { user_id: string }[]).map(r => r.user_id)
-    const profiles: Record<string, { email: string | null; display_name: string | null }> = {}
+    const profs: Record<string, { email: string | null; display_name: string | null }> = {}
     if (ids.length) {
-      const { data: profs } = await supabase.from('profiles').select('id, email, display_name').in('id', ids)
-      for (const p of (profs as { id: string; email: string | null; display_name: string | null }[]) ?? []) {
-        profiles[p.id] = { email: p.email, display_name: p.display_name }
-      }
+      const { data } = await supabase.from('profiles').select('id, email, display_name').in('id', ids)
+      for (const p of (data as { id: string; email: string | null; display_name: string | null }[]) ?? []) profs[p.id] = p
     }
-    const mapped: MemberRow[] = (rows as { id: string; user_id: string; role: OrgRole }[]).map(r => ({
-      id: r.id, user_id: r.user_id, role: r.role,
-      email: profiles[r.user_id]?.email ?? null,
-      display_name: profiles[r.user_id]?.display_name ?? null,
-    }))
-    // owner d'abord, puis admin, membre, viewer
     const order: Record<OrgRole, number> = { owner: 0, admin: 1, member: 2, viewer: 3 }
-    mapped.sort((a, b) => order[a.role] - order[b.role])
-    setMembers(mapped)
+    setMembers((rows as { id: string; user_id: string; role: OrgRole }[]).map(r => ({ ...r, email: profs[r.user_id]?.email ?? null, display_name: profs[r.user_id]?.display_name ?? null })).sort((a, b) => order[a.role] - order[b.role]))
   }, [currentOrg?.id])
-  useEffect(() => { loadMembers() }, [loadMembers])
-
-  const menu = (
-    <div style={{ position: narrow ? 'static' : 'sticky', top: 0, display: 'flex', flexDirection: narrow ? 'row' : 'column', flexWrap: narrow ? 'wrap' : 'nowrap', gap: 2 }}>
-      {SECTIONS.map(x => {
-        const on = tab === x.k
-        return (
-          <button key={x.k} onClick={() => setTab(x.k)} style={{
-            display: 'flex', alignItems: 'center', gap: 10, height: 32, padding: '0 10px', border: 'none',
-            borderRadius: 6, cursor: 'pointer', textAlign: 'left', width: narrow ? 'auto' : '100%',
-            background: on ? 'rgba(255,255,255,0.07)' : 'transparent', color: on ? '#EDEDEF' : '#A1A1AA',
-            fontSize: 13, fontWeight: 500, transition: 'background .12s ease, color .12s ease',
-          }}
-            onMouseEnter={e => { if (!on) { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#EDEDEF' } }}
-            onMouseLeave={e => { if (!on) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' } }}>
-            <span style={{ display: 'flex', flexShrink: 0, color: on ? theme.accentText : '#71717A' }}><Icon d={x.i} size={15} /></span>
-            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.l}</span>
-          </button>
-        )
-      })}
-    </div>
-  )
-
-  return (
-    <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead title="Réglages" sub="Ton profil, ton organisation, tes membres et ton abonnement." />
-      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '200px minmax(0,1fr)', gap: narrow ? 16 : 24, alignItems: 'start' }}>
-        {menu}
-        <div style={{ minWidth: 0 }}>
-          {tab === 'account' && <AccountTab theme={theme} user={user} displayName={displayName} onSignOut={onSignOut}
-            nameInput={nameInput} setNameInput={setNameInput} savingName={savingName} saveName={saveName} />}
-          {tab === 'org' && <OrgTab theme={theme} org={org} balance={balance} canManage={canManage} />}
-          {tab === 'members' && <MembersTab theme={theme} org={org} members={members} canManage={canManage} currentUserId={user.id} onReload={loadMembers} />}
-          {tab === 'billing' && <BillingTab theme={theme} user={user} org={org} balance={balance} canManage={canManage} onRedeemed={reloadBalance} />}
-          {tab === 'proxy' && <ProxyRotationPanel theme={theme} user={user} org={org} />}
-          {tab === 'infra' && <InfraTab theme={theme} user={user} org={org} canManage={canManage} />}
-          {tab === 'notif' && <NotifTab theme={theme} email={user.email ?? null} />}
-          {tab === 'security' && <SecurityTab theme={theme} />}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ══════════ PROFIL — c'est ici la déconnexion officielle ══════════
-function AccountTab({ theme, user, displayName, onSignOut, nameInput, setNameInput, savingName, saveName }: {
-  theme: Theme; user: User; displayName: string | null; onSignOut: () => void
-  nameInput: string; setNameInput: (v: string) => void; savingName: boolean; saveName: () => void
-}) {
-  const initial = initialsFrom(displayName, user.email ?? null)
-  return (
-    <>
-      <Panel theme={theme}>
-        <PanelHead title="Mon profil" sub="Ton compte ScaleFlow" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 99, flexShrink: 0,
-            background: '#18181B', border: '1px solid rgba(255,255,255,0.08)',
-            color: '#D4D4D8', fontSize: 14, fontWeight: 600,
-          }}>{initial}</span>
-          <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF' }}>
-              {displayName?.trim() || <span style={{ fontWeight: 500, color: '#71717A' }}>Aucun nom</span>}
-            </span>
-            <span style={{ fontSize: 12, color: '#8B8B94' }}>{user.email ?? '—'}</span>
-          </span>
-        </div>
-        <div style={{ marginBottom: -1 }}>
-          <Field label="Nom affiché" hint="Visible par les autres membres">
-            <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <input value={nameInput} onChange={e => setNameInput(e.target.value)} placeholder="Ton nom" style={{ ...FIELD, width: 320, maxWidth: '100%' }} />
-              <Btn label={savingName ? '…' : 'Enregistrer'} theme={theme} tone="primary" disabled={savingName || nameInput.trim() === (displayName ?? '').trim()} onClick={saveName} />
-            </span>
-          </Field>
-          <Field label="Adresse e-mail" hint="Identifiant de connexion">
-            <ReadValue value={user.email ?? DASH} />
-          </Field>
-          <Field label="Langue" hint="Langue de l’interface">
-            <LangSwitch theme={theme} />
-          </Field>
-        </div>
-      </Panel>
-
-      <div style={{ marginTop: 12 }}>
-        <Panel theme={theme}>
-          <PanelHead title="Session" />
-          <div style={{ marginBottom: -1 }}><Field label="Se déconnecter" hint="Ferme ta session sur cet appareil">
-            <Btn label="Se déconnecter" theme={theme} tone="danger" onClick={onSignOut}
-              icon="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9" />
-          </Field></div>
-        </Panel>
-      </div>
-    </>
-  )
-}
-
-// ══════════ ORGANISATION ══════════
-function OrgTab({ theme, org, balance, canManage }: {
-  theme: Theme; org: OrgState; balance: number | null; canManage: boolean
-}) {
-  const { currentOrg, role } = org
-  const [confirmDel, setConfirmDel] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [note, setNote] = useState<string | null>(null)
-  // Création d'organisation.
-  const [orgName, setOrgName] = useState('')
-  const [creating, setCreating] = useState(false)
+  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    if (!currentOrg) return
+    let alive = true
+    fetchOrgBalance(currentOrg.id, currentOrg.owner_id).then(b => { if (alive) setBalance(b) })
+    return () => { alive = false }
+  }, [currentOrg?.id, currentOrg?.owner_id])
 
   async function createOrg() {
     const name = orgName.trim()
     if (!name || creating) return
-    setCreating(true); setNote(null)
+    setCreating(true)
     const { data, error } = await supabase.rpc('create_org', { p_name: name })
     setCreating(false)
-    if (error) {
-      const msg = /org_limit_reached/.test(error.message) ? 'Tu possèdes déjà une organisation.'
-        : /name_required/.test(error.message) ? 'Nom requis.'
-        : error.message
-      setNote(`Échec : ${msg}`); return
-    }
-    // L'owner est ajouté comme membre par trigger. On bascule dessus et on recharge
-    // pour rafraîchir la liste des orgs (useOrg ne réexpose pas de reload).
-    if (typeof data === 'string') { localStorage.setItem('ig-tracker-current-org', data) }
+    if (error) { toast(`Échec : ${/org_limit_reached/.test(error.message) ? 'tu possèdes déjà une organisation.' : error.message}`, 'bad'); return }
+    // L'owner est ajouté par trigger ; on bascule dessus (la liste des orgs se recharge au démarrage).
+    if (typeof data === 'string') { try { localStorage.setItem('ig-tracker-current-org', data) } catch { /* ignore */ } }
     window.location.reload()
   }
-
-  async function deleteOrg() {
-    if (!currentOrg) return
-    setDeleting(true); setNote(null)
-    const { error } = await supabase.from('organizations').delete().eq('id', currentOrg.id)
-    setDeleting(false)
-    if (error) { setNote(`Échec : ${error.message}`); return }
-    org.switchOrg(null)
-  }
-  if (!currentOrg) {
-    return (
-      <Panel theme={theme}>
-        <PanelHead title="Organisation" />
-        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}><Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={15} /></span>
-            <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Espace personnel</span>
-              <span style={{ fontSize: 12, color: '#8B8B94' }}>Tu travailles hors organisation. Tes appareils et ton contenu sont privés.</span>
-            </span>
-          </div>
-
-          {/* Créer son organisation : l'owner devient le « chef » — ses crédits sont
-              partagés, et toute dépense d'un membre débite le solde du chef. */}
-          <div style={{ padding: 16, borderRadius: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', marginBottom: 4 }}>Créer une organisation</div>
-            <div style={{ fontSize: 12, color: '#8B8B94', lineHeight: 1.55, marginBottom: 12 }}>
-              Invite des membres et pilote leurs comptes. Les crédits sont ceux du chef d’orga (toi) : chaque publication d’un membre débite <b>ton</b> solde.
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <input value={orgName} onChange={e => { setOrgName(e.target.value); setNote(null) }}
-                onKeyDown={e => { if (e.key === 'Enter') createOrg() }}
-                placeholder="Nom de ton organisation" maxLength={60} spellCheck={false}
-                style={{ ...FIELD, flex: 1, minWidth: 180 }} />
-              <Btn theme={theme} tone="primary" label={creating ? 'Création…' : 'Créer'} disabled={creating || !orgName.trim()} onClick={createOrg} />
-            </div>
-            {note && <div style={{ marginTop: 8, fontSize: 12, color: '#F87171' }}>{note}</div>}
-          </div>
-        </div>
-      </Panel>
-    )
-  }
-  return (
-    <>
-      <Panel theme={theme}>
-        <PanelHead title="Identité" sub="Ce que voient tes membres" />
-        <div>
-          <Field label="Nom de l’organisation">
-            <ReadValue value={currentOrg.name || DASH} />
-          </Field>
-          <Field label="Identifiant" hint="Non modifiable · utilisé par l’API">
-            <ReadValue mono value={currentOrg.id} />
-          </Field>
-          <Field label="Ton rôle">
-            {role ? <Chip text={ROLE_LABEL[role]} tone={ROLE_TONE[role]} /> : DASH}
-          </Field>
-          <div style={{ marginBottom: -1 }}><Field label="Crédits de l’organisation">
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>
-              {balance === null ? <Skeleton w={56} h={14} /> : fmtNumber(balance)}
-            </span>
-          </Field></div>
-        </div>
-      </Panel>
-      {canManage && (
-        <div style={{ marginTop: 12 }}>
-          <Panel theme={theme}>
-            <PanelHead title="Zone sensible" />
-            <Field label="Transférer la propriété" hint="Un autre owner reprend l’organisation">
-              <Btn label="Transférer" theme={theme} sm tone="quiet" onClick={() => setNote('Le transfert de propriété se fait depuis la console d’administration — change le rôle d’un membre en « owner » dans l’onglet Membres.')} />
-            </Field>
-            <Field label="Supprimer l’organisation" hint="Irréversible">
-              {confirmDel
-                ? <span style={{ display: 'flex', gap: 6 }}>
-                    <Btn label={deleting ? 'Suppression…' : 'Confirmer'} theme={theme} sm tone="danger" disabled={deleting} onClick={deleteOrg} />
-                    <Btn label="Annuler" theme={theme} sm tone="quiet" onClick={() => setConfirmDel(false)} />
-                  </span>
-                : <Btn label="Supprimer" theme={theme} sm tone="danger" onClick={() => setConfirmDel(true)} />}
-            </Field>
-            {note && <div style={{ padding: '12px 16px', fontSize: 12, color: '#FBBF24', lineHeight: 1.5 }}>{note}</div>}
-          </Panel>
-        </div>
-      )}
-    </>
-  )
-}
-
-// ══════════ MEMBRES & RÔLES ══════════
-async function cycleMemberRole(id: string, cur: OrgRole, reload: () => void) {
-  const order: OrgRole[] = ['admin', 'member', 'viewer']
-  const next = order[(order.indexOf(cur) + 1) % order.length]
-  await supabase.from('organization_members').update({ role: next }).eq('id', id)
-  reload()
-}
-async function removeMember(id: string, reload: () => void) {
-  await supabase.from('organization_members').delete().eq('id', id)
-  reload()
-}
-
-// Invitation : ajoute un utilisateur EXISTANT (compte ScaleFlow) à l'org par email.
-function InviteBox({ theme, orgId, onReload }: { theme: Theme; orgId: string; onReload: () => void }) {
-  const [email, setEmail] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
-
   async function invite() {
     const e = email.trim().toLowerCase()
-    if (!e) return
-    setBusy(true); setMsg(null)
+    if (!e || !currentOrg) return
+    setInviting(true)
     try {
       const { data: prof } = await supabase.from('profiles').select('id').ilike('email', e).maybeSingle()
-      if (!prof?.id) { setMsg({ ok: false, t: "Aucun compte ScaleFlow avec cet email. La personne doit d'abord créer son compte." }); setBusy(false); return }
-      const { data: existing } = await supabase.from('organization_members').select('id').eq('org_id', orgId).eq('user_id', prof.id).maybeSingle()
-      if (existing) { setMsg({ ok: false, t: 'Cette personne est déjà membre.' }); setBusy(false); return }
-      const { error } = await supabase.from('organization_members').insert({ org_id: orgId, user_id: prof.id, role: 'member' })
-      if (error) { setMsg({ ok: false, t: `Échec : ${error.message}` }); setBusy(false); return }
-      setMsg({ ok: true, t: `${e} a été ajouté comme membre.` }); setEmail(''); onReload()
-    } catch (err) { setMsg({ ok: false, t: err instanceof Error ? err.message : 'Échec.' }) }
-    setBusy(false)
+      if (!prof?.id) { toast('Aucun compte ScaleFlow avec cet email — la personne doit d’abord créer son compte.', 'bad', 6000); return }
+      const { data: existing } = await supabase.from('organization_members').select('id').eq('org_id', currentOrg.id).eq('user_id', prof.id).maybeSingle()
+      if (existing) { toast('Cette personne est déjà membre.', 'info'); return }
+      const { error } = await supabase.from('organization_members').insert({ org_id: currentOrg.id, user_id: prof.id, role: 'member' })
+      if (error) { toast(`Échec : ${error.message}`, 'bad'); return }
+      toast(`${e} a rejoint l’équipe.`, 'ok'); setEmail(''); void load()
+    } finally { setInviting(false) }
+  }
+  async function setRole(m: MemberRow, r: OrgRole) {
+    const { error } = await supabase.from('organization_members').update({ role: r }).eq('id', m.id)
+    if (error) toast(`Échec : ${error.message}`, 'bad'); else { toast('Rôle mis à jour.', 'ok'); void load() }
+  }
+  async function remove(m: MemberRow) {
+    if (!await confirmDialog({ title: 'Retirer ce membre ?', text: `${m.display_name || m.email || 'Ce membre'} n’aura plus accès à l’organisation.`, confirmLabel: 'Retirer', danger: true })) return
+    const { error } = await supabase.from('organization_members').delete().eq('id', m.id)
+    if (error) toast(`Échec : ${error.message}`, 'bad'); else void load()
+  }
+  async function deleteOrg() {
+    if (!currentOrg) return
+    if (!await confirmDialog({ title: `Supprimer « ${currentOrg.name} » ?`, text: 'Irréversible : l’organisation et ses accès membres sont supprimés.', confirmLabel: 'Supprimer définitivement', danger: true })) return
+    const { error } = await supabase.from('organizations').delete().eq('id', currentOrg.id)
+    if (error) toast(`Échec : ${error.message}`, 'bad'); else org.switchOrg(null)
   }
 
-  return (
-    <Panel theme={theme} style={{ marginBottom: 12 }}>
-      <PanelHead title="Inviter dans l’organisation" sub="Ajoute un membre par son email de compte ScaleFlow" />
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: 16, flexWrap: 'wrap' }}>
-        <span style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Adresse e-mail</span>
-          <span style={{ ...FIELD, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ display: 'flex', color: '#71717A' }}><Icon d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z|M22 6l-10 7L2 6" size={13} /></span>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="prenom@agence.fr"
-              onKeyDown={e => { if (e.key === 'Enter') invite() }}
-              style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#EDEDEF', fontSize: 13 }} />
-          </span>
-        </span>
-        <Btn label={busy ? 'Ajout…' : 'Envoyer l’invitation'} theme={theme} tone="primary" disabled={busy} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={invite} />
-      </div>
-      {msg && <div style={{ padding: '0 16px 14px', fontSize: 12, color: msg.ok ? '#4ADE80' : '#FBBF24', lineHeight: 1.5 }}>{msg.t}</div>}
-    </Panel>
-  )
-}
-
-function MembersTab({ theme, org, members, canManage, currentUserId, onReload }: {
-  theme: Theme; org: OrgState; members: MemberRow[] | null; canManage: boolean; currentUserId: string; onReload: () => void
-}) {
-  if (!org.currentOrg) {
-    return (
+  if (!currentOrg) return (
+    <Stack>
       <Panel theme={theme}>
-        <Empty icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M22 21v-2a4 4 0 0 0-3-3.9|M16 3.1a4 4 0 0 1 0 7.8"
-          title="Aucune organisation" text="Crée ou rejoins une organisation pour inviter des membres et gérer les rôles." />
+        <PanelHead title="Espace personnel" sub="Tu travailles seul : tes appareils et ton contenu sont privés." />
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>Créer une organisation</span>
+          <span style={{ fontSize: 12.5, color: '#8B8B94', lineHeight: 1.55 }}>Invite des membres et pilote leurs comptes. Les crédits sont ceux du chef d’orga (toi) : chaque publication d’un membre débite <b>ton</b> solde.</span>
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input value={orgName} onChange={e => setOrgName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void createOrg() }} placeholder="Nom de ton organisation" maxLength={60} style={{ ...FIELD, flex: 1, minWidth: 180 }} />
+            <Btn theme={theme} tone="primary" label={creating ? 'Création…' : 'Créer'} disabled={creating || !orgName.trim()} onClick={() => void createOrg()} />
+          </span>
+        </div>
       </Panel>
-    )
-  }
-  const loading = members === null
+    </Stack>
+  )
+
   const list = members ?? []
   return (
-    <>
-      {canManage && org.currentOrg && (
-        <InviteBox theme={theme} orgId={org.currentOrg.id} onReload={onReload} />
-      )}
+    <Stack>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '16px 18px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: '#111113' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 11, background: `linear-gradient(135deg, ${theme.accent}, #22D3EE)`, color: '#fff', fontWeight: 700 }}>{initialsFrom(currentOrg.name, null)}</span>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0, flex: 1 }}>
+          <span data-no-tr style={{ fontSize: 16, fontWeight: 650, color: '#EDEDEF' }}>{currentOrg.name}</span>
+          <span style={{ fontSize: 12, color: '#8B8B94' }}>{members === null ? '…' : `${list.length} membre(s)`} · crédits partagés {balance === null ? '…' : fmtNumber(balance)}</span>
+        </span>
+        {role && <Chip text={ROLE_LABEL[role]} tone={ROLE_TONE[role]} />}
+        <Btn theme={theme} sm label="Copier l’ID" icon="M9 9h11v11H9z|M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" onClick={() => { void navigator.clipboard.writeText(currentOrg.id).then(() => toast('ID copié.', 'ok'), () => toast('Copie impossible.', 'bad')) }} />
+      </div>
 
-      <Panel theme={theme}>
-        <PanelHead title="Membres" right={<Chip text={loading ? '…' : String(list.length)} tone="mute" />} />
-        {loading ? (
-          <SkeletonRows rows={3} avatar />
-        ) : list.length === 0 ? (
-          <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: '#8B8B94' }}>Aucun membre.</div>
-        ) : (
-          <div data-rows="">
-            {list.map((m, i) => {
-              const isMe = m.user_id === currentUserId
-              return (
-                <div key={m.id} style={{
-                  display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) 108px 120px', gap: 12, alignItems: 'center',
-                  minHeight: 56, boxSizing: 'border-box', padding: '10px 16px', fontSize: 13, borderBottom: i < list.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                    <span style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 99, flexShrink: 0,
-                      background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8', fontSize: 11, fontWeight: 600,
-                    }}>{initialsFrom(m.display_name, m.email)}</span>
-                    <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {m.display_name?.trim() || m.email || m.user_id.slice(0, 8)}
-                      </span>
-                      <span style={{ fontSize: 12, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {m.email ?? '—'}
-                      </span>
-                    </span>
-                  </span>
-                  <span><Chip text={ROLE_LABEL[m.role]} tone={ROLE_TONE[m.role]} /></span>
-                  <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 5 }}>
-                    {isMe ? (
-                      <span style={{ fontSize: 12, color: '#5A5A63' }}>c’est toi</span>
-                    ) : canManage && m.role !== 'owner' ? (
-                      <>
-                        <Btn label="Changer le rôle" theme={theme} sm tone="quiet" icon="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" onClick={() => cycleMemberRole(m.id, m.role, onReload)} />
-                        <Btn label="Retirer" theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => removeMember(m.id, onReload)} />
-                      </>
-                    ) : null}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </Panel>
-
-      <div style={{ marginTop: 12 }}>
+      {canManage && (
         <Panel theme={theme}>
-          <PanelHead title="Ce que chaque rôle peut faire" />
-          <div data-rows="">
-            {([
-              { r: 'owner', d: 'Tout, y compris la facturation et la suppression', can: ['Facturation', 'Membres', 'Infrastructure', 'Publication', 'Contenu'] },
-              { r: 'admin', d: 'Tout sauf la facturation et la propriété', can: ['Membres', 'Infrastructure', 'Publication', 'Contenu'] },
-              { r: 'member', d: 'Publie et gère le contenu, ne touche pas aux réglages', can: ['Publication', 'Contenu'] },
-              { r: 'viewer', d: 'Consulte les performances, ne publie rien', can: ['Lecture seule'] },
-            ] as { r: OrgRole; d: string; can: string[] }[]).map((r, i, arr) => {
-              const tone = ROLE_AV[r.r]
-              return (
-                <div key={r.r} style={{ display: 'flex', alignItems: 'center', gap: '10px 24px', flexWrap: 'wrap', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-                  <span style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: 99, background: `rgb(${tone})` }} />
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{ROLE_LABEL[r.r]}</span>
-                    </span>
-                    <span style={{ fontSize: 12, lineHeight: 1.45, color: '#8B8B94' }}>{r.d}</span>
-                  </span>
-                  <span style={{ flex: '1 1 240px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {r.can.map(c => (
-                      <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 7px', boxSizing: 'border-box', borderRadius: 5, fontSize: 11, fontWeight: 500, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}>{c}</span>
-                    ))}
-                  </span>
-                </div>
-              )
-            })}
+          <PanelHead title="Inviter quelqu’un" sub="Par l’email de son compte ScaleFlow" />
+          <div style={{ display: 'flex', gap: 8, padding: 16, flexWrap: 'wrap' }}>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void invite() }} placeholder="prenom@agence.fr" style={{ ...FIELD, flex: 1, minWidth: 200 }} />
+            <Btn theme={theme} tone="primary" label={inviting ? 'Ajout…' : 'Inviter'} disabled={inviting || !email.trim()} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => void invite()} />
           </div>
         </Panel>
-      </div>
-    </>
-  )
-}
-
-// ══════════ ABONNEMENT & CRÉDITS ══════════
-function BillingTab({ theme, user, org, balance, canManage, onRedeemed }: {
-  theme: Theme; user: User; org: OrgState; balance: number | null; canManage: boolean; onRedeemed: () => void
-}) {
-  const { currentOrg } = org
-  const planLabel = currentOrg ? 'Organisation' : 'Espace personnel'
-  const [note, setNote] = useState(false)
-  // ── Utiliser un code de crédits ──
-  const [code, setCode] = useState('')
-  const [redeeming, setRedeeming] = useState(false)
-  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  async function redeem() {
-    const c = code.trim()
-    if (!c || redeeming) return
-    setRedeeming(true); setRedeemMsg(null)
-    const { redeemCreditCode, redeemCreditCodeForOrg } = await import('@/lib/credits')
-    const res = currentOrg ? await redeemCreditCodeForOrg(c, currentOrg.id) : await redeemCreditCode(c, user.id)
-    setRedeeming(false)
-    if (!res.ok) { setRedeemMsg({ ok: false, text: res.error ?? 'Code invalide ou déjà utilisé.' }); return }
-    setRedeemMsg({ ok: true, text: `+${res.amount ?? 0} crédits ajoutés.` })
-    setCode(''); onRedeemed()
-  }
-  return (
-    <>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 24, padding: '16px 20px', borderRadius: 8, marginBottom: 12, flexWrap: 'wrap',
-        background: theme.panelBg, border: `1px solid ${theme.panelEdge}`,
-      }}>
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Plan actuel</span>
-          <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, color: '#EDEDEF' }}>{planLabel}</span>
-        </span>
-        <span style={{ width: 1, height: 44, background: 'rgba(255,255,255,0.06)' }} />
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Crédits disponibles</span>
-          <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>
-            {balance === null ? <Skeleton w={80} h={22} r={5} /> : fmtNumber(balance)}
-          </span>
-        </span>
-        {canManage && (
-          <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <Btn label="Gérer" theme={theme} sm tone="primary" onClick={() => setNote(true)} />
-          </span>
-        )}
-      </div>
-      {note && (
-        <div style={{ padding: '10px 14px', marginBottom: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', fontSize: 12, color: '#A1A1AA', lineHeight: 1.55 }}>
-          L’achat de crédits et la gestion de l’abonnement se font sur l’espace web ScaleFlow (paiement sécurisé). Les crédits achetés sont partagés avec l’app de bureau instantanément.
-        </div>
       )}
 
       <Panel theme={theme}>
-        <PanelHead title="Solde" sub={balance === null ? undefined : `≈ ${fmtNumber(Math.floor(balance / 2))} publications restantes`} />
-        <div style={{ padding: 16 }}>
-          <span style={{ display: 'block', height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-            <span style={{ display: 'block', height: '100%', width: `${balance === null ? 0 : Math.min(100, Math.round((balance / 5000) * 100))}%`, borderRadius: 99, background: theme.accent }} />
-          </span>
-          <div style={{ marginTop: 12, fontSize: 12, color: '#8B8B94' }}>
-            Publication : 2 crédits / appareil · Story : 1 crédit / appareil · Tâches automatiques : 50 crédits / jour.
-          </div>
-        </div>
+        <PanelHead title="Membres" sub="Owner : tout · Admin : tout sauf facturation · Membre : publie · Lecture seule : consulte" />
+        {members === null ? <SkeletonRows rows={3} avatar /> : list.map((m, i) => {
+          const me = m.user_id === user.id
+          return (
+            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderTop: i ? '1px solid rgba(255,255,255,0.05)' : 'none', flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 99, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8', fontSize: 11.5, fontWeight: 600 }}>{initialsFrom(m.display_name, m.email)}</span>
+              <span style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span data-no-tr style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{m.display_name?.trim() || m.email || m.user_id.slice(0, 8)}{me && <span style={{ color: '#71717A', fontWeight: 400 }}> · toi</span>}</span>
+                <span data-no-tr style={{ fontSize: 12, color: '#8B8B94' }}>{m.email ?? '—'}</span>
+              </span>
+              {canManage && !me && m.role !== 'owner' ? (
+                <span style={{ display: 'flex', gap: 6 }}>
+                  <select value={m.role} onChange={e => void setRole(m, e.target.value as OrgRole)} style={{ ...FIELD, width: 'auto', height: 30, cursor: 'pointer' }}>
+                    {(['admin', 'member', 'viewer'] as OrgRole[]).map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+                  </select>
+                  <Btn theme={theme} sm tone="quiet" label="Retirer" onClick={() => void remove(m)} />
+                </span>
+              ) : <Chip text={ROLE_LABEL[m.role]} tone={ROLE_TONE[m.role]} />}
+            </div>
+          )
+        })}
       </Panel>
 
-      <Panel theme={theme} style={{ marginTop: 12 }}>
-        <PanelHead title="Utiliser un code de crédits" sub={currentOrg ? 'Crédité sur le solde de l’organisation.' : 'Crédité sur ton solde personnel.'} />
-        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input value={code} onChange={e => { setCode(e.target.value.toUpperCase()); setRedeemMsg(null) }}
-              onKeyDown={e => { if (e.key === 'Enter') redeem() }}
-              placeholder="CR-XXXX-XXXX" spellCheck={false} autoComplete="off"
-              style={{ ...FIELD, flex: 1, minWidth: 180, fontFamily: MONO, letterSpacing: '0.04em' }} />
-            <Btn theme={theme} tone="primary" label={redeeming ? 'Validation…' : 'Valider le code'} disabled={redeeming || !code.trim()} onClick={redeem} />
-          </div>
-          {redeemMsg && (
-            <div style={{ fontSize: 12, fontWeight: 500, color: redeemMsg.ok ? '#4ADE80' : '#F87171' }}>{redeemMsg.text}</div>
-          )}
-        </div>
-      </Panel>
-    </>
+      {role === 'owner' && (
+        <Panel theme={theme}>
+          <PanelHead title="Zone sensible" />
+          <Row label="Supprimer l’organisation" hint="Irréversible" last>
+            <Btn theme={theme} tone="danger" label="Supprimer" onClick={() => void deleteOrg()} />
+          </Row>
+        </Panel>
+      )}
+    </Stack>
   )
 }
 
-// ══════════ INFRASTRUCTURE (visuel-only) ══════════
-// Connexions & clés : enregistre le token GeeLark + la clé Groq dans org_config
-// (org) ou app_config (perso). C'est CE qui alimente useConnections() partout.
-function InfraTab({ theme, user, org, canManage }: { theme: Theme; user: User; org: OrgState; canManage: boolean }) {
+// ══════════ LICENCE & CRÉDITS ══════════
+function BillingTab({ theme, user, org }: { theme: Theme; user: User; org: OrgState }) {
   const { currentOrg } = org
-  const [bearer, setBearer] = useState('')
-  const [groq, setGroq] = useState('')
-  const [showBearer, setShowBearer] = useState(false)
-  const [showGroq, setShowGroq] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [msg, setMsg] = useState<string | null>(null)
-  const readOnly = !!currentOrg && !canManage
-
+  const [balance, setBalance] = useState<number | null>(null)
+  const [lic, setLic] = useState<{ key: string; expires_at: string | null; plan: string | null } | null | undefined>(undefined)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const reload = useCallback(async () => {
+    setBalance(currentOrg ? await fetchOrgBalance(currentOrg.id, currentOrg.owner_id) : await fetchBalance(user.id))
+  }, [currentOrg?.id, currentOrg?.owner_id, user.id])
+  useEffect(() => { void reload() }, [reload])
   useEffect(() => {
     let alive = true
-    setLoading(true)
+    supabase.from('license_keys').select('key, expires_at, plan').eq('user_id', user.id).eq('is_active', true).order('expires_at', { ascending: false, nullsFirst: true }).limit(1).maybeSingle()
+      .then(({ data, error }) => { if (alive) setLic(error ? null : (data as typeof lic) ?? null) })
+    return () => { alive = false }
+  }, [user.id])
+  async function redeem() {
+    const c = code.trim()
+    if (!c || busy) return
+    setBusy(true)
+    const { redeemCreditCode, redeemCreditCodeForOrg } = await import('@/lib/credits')
+    const res = currentOrg ? await redeemCreditCodeForOrg(c, currentOrg.id) : await redeemCreditCode(c, user.id)
+    setBusy(false)
+    if (!res.ok) { toast(res.error ?? 'Code invalide ou déjà utilisé.', 'bad'); return }
+    toast(`+${res.amount ?? 0} crédits ajoutés.`, 'ok'); setCode(''); void reload()
+  }
+  const exp = lic?.expires_at ? new Date(lic.expires_at) : null
+  const daysLeft = exp ? Math.ceil((exp.getTime() - Date.now()) / 86_400_000) : null
+  const masked = lic?.key ? `${lic.key.slice(0, 4)}-••••-••••-${lic.key.slice(-4)}` : null
+  const PRICES: [string, string][] = [['Reel / TikTok', '2 cr / compte'], ['Story', '1 cr / compte'], ['Tâche automatique', '50 cr / jour'], ['Studio & outils IA', 'gratuit']]
+  return (
+    <Stack>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+        <div style={{ padding: 18, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: `linear-gradient(135deg, ${theme.accent}40, transparent 70%), #111113` }}>
+          <div style={{ fontSize: 12, color: '#A1A1AA' }}>Crédits disponibles{currentOrg ? ' · organisation' : ''}</div>
+          <div style={{ marginTop: 8, fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{balance === null ? <Skeleton w={110} h={28} r={6} /> : fmtNumber(balance)}</div>
+          <div style={{ marginTop: 6, fontSize: 12.5, color: '#A1A1AA' }}>{balance === null ? '' : `≈ ${fmtNumber(Math.floor(balance / 2))} publications`}</div>
+        </div>
+        <div style={{ padding: 18, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: '#111113', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, color: '#A1A1AA' }}>Licence</span>
+            {lic === undefined ? <Skeleton w={60} h={18} /> : <Status ok={!!lic || !!currentOrg} okText={lic ? 'Active' : 'Via ton équipe'} koText="Aucune clé" />}
+          </span>
+          <span style={{ fontSize: 17, fontWeight: 650, color: '#EDEDEF' }}>{lic?.plan ? lic.plan.charAt(0).toUpperCase() + lic.plan.slice(1) : currentOrg ? 'Organisation' : 'Standard'}</span>
+          {masked && <span data-no-tr style={{ fontFamily: MONO, fontSize: 12, color: '#8B8B94' }}>{masked}</span>}
+          <span style={{ fontSize: 12.5, color: daysLeft !== null && daysLeft <= 7 ? '#FBBF24' : '#8B8B94' }}>
+            {exp ? `Expire le ${exp.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}${daysLeft !== null ? ` · ${Math.max(0, daysLeft)} jour(s)` : ''}` : lic ? 'Sans date d’expiration' : ''}
+          </span>
+        </div>
+      </div>
+
+      <Panel theme={theme}>
+        <PanelHead title="Utiliser un code de crédits" sub={currentOrg ? 'Crédité sur le solde de l’organisation.' : 'Crédité sur ton solde.'} />
+        <div style={{ display: 'flex', gap: 8, padding: 16, flexWrap: 'wrap' }}>
+          <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === 'Enter') void redeem() }} placeholder="CR-XXXX-XXXX" spellCheck={false} autoComplete="off" style={{ ...FIELD, flex: 1, minWidth: 180, fontFamily: MONO, letterSpacing: '0.04em' }} />
+          <Btn theme={theme} tone="primary" label={busy ? 'Validation…' : 'Valider'} disabled={busy || !code.trim()} onClick={() => void redeem()} />
+        </div>
+      </Panel>
+
+      <Panel theme={theme}>
+        <PanelHead title="Tarifs" right={<a href="https://t.me/justquentin" target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: '#C4BBFB', textDecoration: 'none', fontWeight: 500 }}>Acheter des crédits →</a>} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+          {PRICES.map(([l, v]) => (
+            <div key={l} style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: 12, color: '#8B8B94' }}>{l}</div>
+              <div style={{ marginTop: 4, fontSize: 14, fontWeight: 600, color: '#EDEDEF' }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+    </Stack>
+  )
+}
+
+// ══════════ INTÉGRATIONS ══════════
+// Les clés vivent dans org_config (orga) ou app_config (perso) et alimentent useConnections()
+// partout ; à l'enregistrement on prévient l'app (événement) → plus besoin de recharger.
+function IntegrationsTab({ theme, user, org, canManage }: { theme: Theme; user: User; org: OrgState; canManage: boolean }) {
+  const { currentOrg } = org
+  const [vals, setVals] = useState<{ bearer: string; groq: string } | null>(null)
+  const [saved, setSaved] = useState<{ bearer: string; groq: string }>({ bearer: '', groq: '' })
+  const [busy, setBusy] = useState<string | null>(null)
+  const readOnly = !canManage
+  useEffect(() => {
+    let alive = true
     const q = currentOrg
       ? supabase.from('org_config').select('bearer_token, groq_api_key').eq('org_id', currentOrg.id).maybeSingle()
       : supabase.from('app_config').select('bearer_token, groq_api_key').eq('user_id', user.id).maybeSingle()
     q.then(({ data }) => {
       if (!alive) return
       const d = data as { bearer_token?: string; groq_api_key?: string } | null
-      setBearer(d?.bearer_token ?? ''); setGroq(d?.groq_api_key ?? ''); setLoading(false)
+      const v = { bearer: d?.bearer_token ?? '', groq: d?.groq_api_key ?? '' }
+      setVals(v); setSaved(v)
     })
     return () => { alive = false }
   }, [currentOrg?.id, user.id])
 
-  async function save() {
-    setSaving(true); setMsg(null)
+  async function save(field: 'bearer' | 'groq') {
+    if (!vals) return
+    setBusy(`save-${field}`)
+    const col = field === 'bearer' ? { bearer_token: vals.bearer.trim() } : { groq_api_key: vals.groq.trim() }
+    const { error } = currentOrg
+      ? await supabase.from('org_config').upsert({ org_id: currentOrg.id, ...col }, { onConflict: 'org_id' })
+      : await supabase.from('app_config').upsert({ user_id: user.id, ...col }, { onConflict: 'user_id' })
+    setBusy(null)
+    if (error) { toast(`Échec : ${error.message}`, 'bad'); return }
+    setSaved(s => ({ ...s, [field]: vals[field].trim() }))
+    window.dispatchEvent(new Event('sf-conns-changed'))
+    toast('Enregistré — actif tout de suite.', 'ok')
+  }
+  async function test(field: 'bearer' | 'groq') {
+    if (!vals) return
+    setBusy(`test-${field}`)
+    let ok = false
     try {
-      const err = currentOrg
-        ? (await supabase.from('org_config').upsert({ org_id: currentOrg.id, bearer_token: bearer.trim(), groq_api_key: groq.trim() }, { onConflict: 'org_id' })).error
-        : (await supabase.from('app_config').upsert({ user_id: user.id, bearer_token: bearer.trim(), groq_api_key: groq.trim() }, { onConflict: 'user_id' })).error
-      if (err) throw new Error(err.message)
-      setMsg('Enregistré ✓ — recharge la page pour l’appliquer partout.')
-    } catch (e) { setMsg(`Échec : ${e instanceof Error ? e.message : 'erreur'}`) }
-    setSaving(false)
+      if (field === 'bearer') { const r = await geelarkFetch('/phone/list', { page: 1, pageSize: 1 }, vals.bearer.trim()); ok = Number(r['code']) === 0 }
+      else ok = !!(await generateCaption(vals.groq.trim(), 'test'))
+    } catch { ok = false }
+    setBusy(null)
+    toast(ok ? 'Connexion réussie ✓' : field === 'bearer' ? 'Token GeeLark refusé — vérifie-le dans GeeLark → OpenAPI.' : 'Clé Groq refusée — vérifie-la sur console.groq.com.', ok ? 'ok' : 'bad', 6000)
   }
 
-  const inp = { ...FIELD, fontSize: 12, fontFamily: MONO }
-  const eye = (on: boolean, set: (v: boolean) => void) => (
-    <button type="button" onClick={() => set(!on)} style={{ flexShrink: 0, height: 32, minWidth: 64, padding: '0 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#A1A1AA', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{on ? 'Cacher' : 'Voir'}</button>
-  )
-
-  return (
+  const card = (field: 'bearer' | 'groq', title: string, sub: string, placeholder: string, help: ReactNode) => (
     <Panel theme={theme}>
-      <PanelHead title="Connexions & clés"
-        sub={currentOrg ? `Partagées par l’organisation « ${currentOrg.name} »` : 'Ton espace perso'}
-        right={<Chip text={currentOrg ? 'Org' : 'Perso'} tone="violet" />} />
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {loading ? (
-          <div aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Skeleton w={160} h={12} /><Skeleton h={32} r={6} />
-            <Skeleton w={120} h={12} style={{ marginTop: 10 }} /><Skeleton h={32} r={6} />
-          </div>
-        ) : (
-          <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Token GeeLark (Bearer)</span>
-              <span style={{ fontSize: 12, color: '#8B8B94', marginTop: -2, marginBottom: 2 }}>Indispensable pour piloter les téléphones et publier. Depuis GeeLark → OpenAPI.</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input value={bearer} onChange={e => setBearer(e.target.value)} type={showBearer ? 'text' : 'password'} placeholder="Bearer token GeeLark…" style={inp} disabled={readOnly} spellCheck={false} autoComplete="off" />
-                {eye(showBearer, setShowBearer)}
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Clé API Groq</span>
-              <span style={{ fontSize: 12, color: '#8B8B94', marginTop: -2, marginBottom: 2 }}>Pour les légendes IA et les sous-titres (Whisper). Optionnelle.</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input value={groq} onChange={e => setGroq(e.target.value)} type={showGroq ? 'text' : 'password'} placeholder="gsk_…" style={inp} disabled={readOnly} spellCheck={false} autoComplete="off" />
-                {eye(showGroq, setShowGroq)}
-              </div>
-            </div>
-            {readOnly
-              ? <span style={{ fontSize: 12, color: '#FBBF24' }}>Seuls owner/admin de l’organisation peuvent modifier ces clés.</span>
-              : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={save} />
-                  {msg && <span style={{ fontSize: 12, color: msg.startsWith('Échec') ? '#F87171' : '#4ADE80' }}>{msg}</span>}
-                </div>
-              )}
-          </>
-        )}
+      <PanelHead title={title} sub={sub} right={vals ? <Status ok={!!saved[field]} /> : undefined} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16 }}>
+        {vals === null ? <Skeleton h={32} r={6} /> : <SecretInput value={vals[field]} onChange={v => setVals(x => x && { ...x, [field]: v })} placeholder={placeholder} disabled={readOnly} />}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {!readOnly && <Btn theme={theme} tone="primary" sm label={busy === `save-${field}` ? 'Enregistrement…' : 'Enregistrer'} disabled={!!busy || !vals || vals[field].trim() === saved[field]} onClick={() => void save(field)} />}
+          <Btn theme={theme} sm label={busy === `test-${field}` ? 'Test…' : 'Tester'} disabled={!!busy || !vals?.[field].trim()} onClick={() => void test(field)} />
+          <span style={{ fontSize: 12, color: '#71717A' }}>{help}</span>
+        </span>
+        {readOnly && <span style={{ fontSize: 12, color: '#FBBF24' }}>Seuls owner / admin de l’organisation peuvent modifier cette clé.</span>}
       </div>
     </Panel>
   )
-}
 
-// ══════════ NOTIFICATIONS (visuel-only) ══════════
-function NotifTab({ theme, email }: { theme: Theme; email: string | null }) {
-  const rows: { l: string; hint?: string; on: boolean }[] = [
-    { l: 'Diffusion terminée', on: true },
-    { l: 'Échec de publication', hint: 'Recommandé', on: true },
-    { l: 'Compte à risque', hint: 'Score de santé sous 70', on: true },
-    { l: 'Crédits bas', hint: 'Sous 500 crédits restants', on: true },
-    { l: 'Appareil hors ligne', on: false },
-    { l: 'Résumé hebdomadaire', hint: 'Chaque lundi matin', on: true },
-  ]
   return (
-    <>
-      <Panel theme={theme}>
-        <PanelHead title="Quand te prévenir" sub="Préférences à venir" />
-        {rows.map(r => <Field key={r.l} label={r.l} hint={r.hint}><Toggle on={r.on} onChange={() => {}} label={r.l} /></Field>)}
-      </Panel>
-      <div style={{ marginTop: 12 }}>
-        <Panel theme={theme}>
-          <PanelHead title="Canaux" />
-          <Field label="E-mail"><ReadValue value={email ?? DASH} /></Field>
-          <Field label="Webhook" hint="Reçoit chaque événement en JSON"><ReadValue value={DASH} /></Field>
-        </Panel>
-      </div>
-    </>
+    <Stack>
+      {card('bearer', 'GeeLark', 'Indispensable : pilote tes téléphones et publie.', 'Token OpenAPI GeeLark…', <>GeeLark → OpenAPI → copier le token</>)}
+      {card('groq', 'IA (Groq)', 'Légendes, bios IA et sous-titres. Gratuit.', 'gsk_…', <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{ color: '#C4BBFB', textDecoration: 'none' }}>Créer une clé gratuite →</a>)}
+      <ProxyRotationPanel theme={theme} user={user} org={org} />
+      <LinkDomainCard theme={theme} />
+    </Stack>
   )
 }
 
-// ══════════ SÉCURITÉ (visuel-only) ══════════
-function SecurityTab({ theme }: { theme: Theme }) {
+// Domaine des liens suivis (même stockage que Liens → Réglages).
+function LinkDomainCard({ theme }: { theme: Theme }) {
+  const read = (k: string, d: string) => { try { return localStorage.getItem(k) ?? d } catch { return d } }
+  const [mode, setMode] = useState<LinkDomain>(() => read('sf-link-domain', 'tapmylink') === 'custom' ? 'custom' : 'tapmylink')
+  const [custom, setCustom] = useState(() => read('sf-link-custom-domain', ''))
+  function save(m: LinkDomain) {
+    const d = cleanDomain(custom)
+    if (m === 'custom' && !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) { toast('Domaine invalide (ex. liens.monagence.fr).', 'bad'); return }
+    try { localStorage.setItem('sf-link-domain', m); if (m === 'custom') localStorage.setItem('sf-link-custom-domain', d) } catch { /* ignore */ }
+    setMode(m); toast(m === 'custom' ? `Domaine enregistré : ${d}` : 'Domaine : tapmylink.fr', 'ok')
+  }
   return (
-    <>
-      <Panel theme={theme}>
-        <PanelHead title="Accès" sub="À venir" />
-        <Field label="Authentification à deux facteurs" hint="Application d’authentification">
-          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Chip text="Inactive" tone="mute" />
-            <Btn label="Configurer" theme={theme} sm tone="quiet" />
-          </span>
-        </Field>
-        <Field label="Sessions actives">
-          <span style={{ fontSize: 13, color: '#5A5A63' }}>—</span>
-        </Field>
-        <Field label="Clés API">
-          <span style={{ fontFamily: MONO, fontSize: 12, color: '#5A5A63' }}>—</span>
-        </Field>
-      </Panel>
-      <div style={{ marginTop: 12 }}>
-        <Panel theme={theme}>
-          <PanelHead title="Journal d’audit" />
-          <Empty icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M9 15h6"
-            title="Aucune activité à afficher" text="Le journal d’audit détaillé sera branché prochainement." />
-        </Panel>
+    <Panel theme={theme}>
+      <PanelHead title="Domaine des liens" sub="L’adresse de tes liens suivis et pages de liens." right={<Chip text={mode === 'custom' ? cleanDomain(custom) || 'perso' : 'tapmylink.fr'} tone="violet" />} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16 }}>
+        <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Btn theme={theme} sm tone={mode === 'tapmylink' ? 'primary' : 'ghost'} label="tapmylink.fr (par défaut)" onClick={() => save('tapmylink')} />
+        </span>
+        <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input value={custom} onChange={e => setCustom(e.target.value)} placeholder="liens.monagence.fr" spellCheck={false} style={{ ...FIELD, flex: 1, minWidth: 200 }} />
+          <Btn theme={theme} sm tone={mode === 'custom' ? 'primary' : 'ghost'} label="Utiliser mon domaine" onClick={() => save('custom')} />
+        </span>
+        <span style={{ fontSize: 12, color: '#71717A', lineHeight: 1.5 }}>Domaine perso : ajoute un enregistrement CNAME vers <span style={{ fontFamily: MONO }}>cname.vercel-dns.com</span>, puis préviens-nous pour l’activer.</span>
       </div>
-    </>
+    </Panel>
   )
 }
