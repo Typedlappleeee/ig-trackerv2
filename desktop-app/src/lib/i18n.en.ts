@@ -2538,6 +2538,11 @@ export const EN: Dict = {
     "Renouveler": "Renew",
     "Comparer les offres": "Compare plans",
     "Pour souscrire ou changer d’offre, contacte-nous : tu reçois une clé à activer dans Réglages → Licence & crédits.": "To subscribe or change plan, contact us: you get a key to activate in Settings → License & credits.",
+    "Recommandé · Auto-contenu": "Recommended · Auto-content",
+    "des dizaines de variantes": "dozens of variants",
+    "Légende (pool + style), coupe, micro-vitesse, mode Tendance et spoof device/GPS — en un clic, chaque compte reçoit une vidéo unique.": "Caption (pool + style), trim, micro-speed, Trend mode and device/GPS spoof — in one click, every account gets a unique video.",
+    "Lancer l’Auto-contenu →": "Launch Auto-content →",
+    "GRATUIT": "FREE",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
