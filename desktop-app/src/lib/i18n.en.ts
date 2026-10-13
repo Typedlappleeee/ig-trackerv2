@@ -2749,6 +2749,10 @@ export const EN: Dict = {
     "Retirer la clé": "Remove key",
     "Lien Reel": "Reel link",
     "Ouvrir": "Open",
+    "Colle la clé complète copiée sur Higgsfield (format ID:SECRET, sans espaces).": "Paste the full key copied from Higgsfield (ID:SECRET format, no spaces).",
+    "Sur Higgsfield, clique": "On Higgsfield, click",
+    "« Copy API key »": "“Copy API key”",
+    "et colle-la ici telle quelle. Elle reste sur le serveur : personne ne peut la relire depuis l’app.": "and paste it here as is. It stays on the server: nobody can read it back from the app.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
