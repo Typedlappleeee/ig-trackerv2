@@ -1,18 +1,20 @@
 // Explorer : TOUS les outils de ScaleFlow en galerie (façon Higgsfield). Bandeau « À la
 // une » animé, recherche, catégories, favoris, récemment utilisés. Un clic ouvre l'outil
 // précis (onglet / format) via openTool. Catalogue : src/lib/tools.ts.
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Icon, FIELD, useNarrow } from '@/lib/ui'
+import { Icon, FIELD } from '@/lib/ui'
 import { CATS, searchTools, visibleTools, type Tool, type ToolCat } from '@/lib/tools'
 import { recentTools } from '@/lib/openTool'
 import ToolArt from '@/components/ToolArt'
-import { SPOT_KEYFRAMES, VisualLinks, VisualTikTok, VisualViral } from '@/components/LaunchSpotlight'
+import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
+import { FeatureBanner } from '@/components/CineHero'
 
 const FAV_KEY = 'sf-fav-tools'
+function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
 const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
 
 // Vraies photos pour les cartes : miniatures de la Veille Reels (via le proxy d'images,
@@ -51,33 +53,6 @@ export function pickerFor(t: Tool, i: number, p: { viral: string[]; bank: string
   return (k: number) => pool.length ? pool[(i * 3 + k) % pool.length] : null
 }
 
-// Visuel « À la une » de la Veille avec de VRAIES miniatures.
-function RealReels({ photos }: { photos: string[] }) {
-  const items: [string, string, number][] = [['×3.2', '384k', -6], ['×24', '1,5M', 0], ['×6.8', '442k', 6]]
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      {items.map(([x, v, rot], i) => {
-        const hot = i === 1
-        return (
-          <div key={x} style={{ position: 'relative', width: hot ? 150 : 118, height: hot ? 262 : 206, borderRadius: 16, overflow: 'hidden', border: `2px solid ${hot ? '#F472B6' : 'rgba(255,255,255,0.18)'}`, transform: `rotate(${rot}deg)`, boxShadow: hot ? '0 0 50px rgba(244,114,182,.45)' : '0 20px 40px -20px rgba(0,0,0,.6)', animation: `sfsPop .5s ${0.1 + i * 0.12}s both`, background: '#111' }}>
-            <img src={photos[i]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `sfsKen ${8 + i}s ease-in-out ${-i * 2}s infinite alternate` }} />
-            <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 99, background: hot ? '#F472B6' : 'rgba(0,0,0,.55)', color: '#fff', fontSize: 11.5, fontWeight: 800 }}>{x}</span>
-            <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '22px 9px 9px', background: 'linear-gradient(to top,rgba(0,0,0,.8),transparent)', color: '#fff', fontSize: hot ? 16 : 13, fontWeight: 800 }}>▶ {v}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
-
-interface Featured { tool: string; kicker: string; title: string; text: string; cta: string; a: string; b: string; visual: () => ReactNode }
-const FEATURED: Featured[] = [
-  { tool: 'viral', kicker: 'Veille Reels', title: 'Repère les Reels qui explosent', text: 'FR et US, classés par vues, avec le badge « ×N la normale ». Télécharge, copie la légende, inspire-toi.', cta: 'Ouvrir la Veille', a: '#F97316', b: '#450A0A', visual: VisualViral },
-  { tool: 'links', kicker: 'Liens ScaleFlow', title: 'Sache quel compte te rapporte', text: 'Une page de liens animée et un lien suivi par compte : visites, clics, pays, en direct.', cta: 'Voir mes liens', a: '#EC4899', b: '#4A044E', visual: VisualLinks },
-  { tool: 'tiktok', kicker: 'TikTok', title: 'Instagram et TikTok, un seul outil', text: 'Une vidéo publiée sur tous tes comptes TikTok en parallèle, comme tes Reels.', cta: 'Publier sur TikTok', a: '#0EA5B7', b: '#3B0A1E', visual: VisualTikTok },
-]
-
 // ── Carte d'outil : aperçu animé en dégradé + texte ───────────────────────────
 export function ToolCard({ t, fav, onFav, onOpen, i, pick }: { t: Tool; fav: boolean; onFav?: () => void; onOpen: () => void; i: number; pick: (k: number) => string | null }) {
   const [h, setH] = useState(false)
@@ -107,34 +82,39 @@ export function ToolCard({ t, fav, onFav, onOpen, i, pick }: { t: Tool; fav: boo
   )
 }
 
-// ── Bandeau « À la une » ─────────────────────────────────────────────────────
-function Hero({ items, onOpen }: { items: { f: Featured; t: Tool }[]; onOpen: (t: Tool) => void }) {
+// ── Bandeaux (photos plein cadre, aucun fond de couleur) ────────────────────
+interface Slide { tool: string; kicker: string; line1: string; line2: string; text: string; cta: string }
+const SLIDES: Slide[] = [
+  { tool: 'viral', kicker: 'À la une · Veille Reels', line1: 'Repère les Reels', line2: 'qui explosent', text: 'FR et US, classés par vues, avec le badge « ×N la normale ». Télécharge, copie la légende, inspire-toi.', cta: 'Ouvrir la Veille' },
+  { tool: 'links', kicker: 'À la une · Liens', line1: 'Sache quel compte', line2: 'te rapporte', text: 'Une page de liens animée et un lien suivi par compte : visites, clics, pays, en direct.', cta: 'Voir mes liens' },
+  { tool: 'tiktok', kicker: 'À la une · TikTok', line1: 'Instagram et TikTok,', line2: 'un seul outil', text: 'Une vidéo publiée sur tous tes comptes TikTok en parallèle, comme tes Reels.', cta: 'Publier sur TikTok' },
+  { tool: 'remix', kicker: 'À la une · Studio', line1: 'Une vidéo,', line2: '24 variantes uniques', text: 'Remix, spoof, sous-titres : chaque vidéo devient du contenu neuf pour chaque compte.', cta: 'Ouvrir le Remix' },
+]
+const CAT_BANNER: Record<ToolCat, { line1: string; line2: string; text: string }> = {
+  publish: { line1: 'Publie partout', line2: 'en un clic', text: 'Reels, Stories, TikTok et posts programmés, sur des dizaines de comptes en parallèle.' },
+  create: { line1: 'Du contenu unique', line2: 'à l’infini', text: 'Remix, spoof, sous-titres, montage : chaque vidéo devient des dizaines de variantes.' },
+  accounts: { line1: 'Tes comptes', line2: 'sans y toucher', text: 'Warmup, connexion auto, édition en masse et Flow Builder pour tout automatiser.' },
+  analyze: { line1: 'Ce qui marche,', line2: 'en direct', text: 'Veille Reels, liens trackés et activité : sache exactement ce qui performe.' },
+  bank: { line1: 'Ta banque', line2: 'de contenu', text: 'Vidéos, images et légendes rangées par dossiers, prêtes à publier.' },
+}
+
+function Carousel({ items, onOpen, pool }: { items: { s: Slide; t: Tool }[]; onOpen: (t: Tool) => void; pool: string[] }) {
   const [k, setK] = useState(0)
   const [paused, setPaused] = useState(false)
-  const narrow = useNarrow(820)
   useEffect(() => {
     if (paused || items.length < 2) return
     const id = setTimeout(() => setK(x => (x + 1) % items.length), 6500)
     return () => clearTimeout(id)
   }, [k, paused, items.length])
   if (!items.length) return null
-  const { f, t } = items[k % items.length]
+  const cur = k % items.length
+  const { s, t } = items[cur]
   return (
-    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
-      style={{ position: 'relative', display: 'flex', flexDirection: narrow ? 'column' : 'row', minHeight: narrow ? 0 : 300, borderRadius: 18, overflow: 'hidden', marginBottom: 22, border: '1px solid rgba(255,255,255,0.08)', background: `radial-gradient(120% 120% at 85% 20%, ${f.a} 0%, ${f.b} 50%, #0A0A0B 100%)`, transition: 'background .6s ease' }}>
-      <span style={{ position: 'absolute', width: 320, height: 320, borderRadius: 999, background: f.a, filter: 'blur(90px)', opacity: 0.35, top: -120, left: -80, animation: 'sfsGlow 9s ease-in-out infinite' }} />
-      <div key={`t${k}`} style={{ position: 'relative', flex: '1 1 50%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 12, padding: narrow ? '26px 22px 8px' : '36px 40px', animation: 'sfsPop .45s both' }}>
-        <span style={{ alignSelf: 'flex-start', padding: '4px 10px', borderRadius: 99, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)', fontSize: 11.5, fontWeight: 600, color: '#fff' }}>✨ À la une · {f.kicker}</span>
-        <h2 style={{ margin: 0, fontSize: narrow ? 24 : 32, lineHeight: 1.08, fontWeight: 700, letterSpacing: '-0.035em', color: '#fff', maxWidth: 460 }}>{f.title}</h2>
-        <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: 'rgba(255,255,255,0.75)', maxWidth: 440 }}>{f.text}</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 6 }}>
-          <button type="button" onClick={() => onOpen(t)} style={{ height: 40, padding: '0 18px', border: 'none', borderRadius: 10, background: '#fff', color: '#0A0A0B', fontSize: 14, fontWeight: 650, cursor: 'pointer' }}>{f.cta} →</button>
-          <span style={{ display: 'flex', gap: 6 }}>
-            {items.map((_, j) => <button key={j} type="button" aria-label={`À la une ${j + 1}`} onClick={() => setK(j)} style={{ width: j === k % items.length ? 22 : 8, height: 8, padding: 0, border: 'none', borderRadius: 99, background: j === k % items.length ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer', transition: 'width .25s ease' }} />)}
-          </span>
-        </div>
-      </div>
-      <div key={`v${k}`} onClick={() => onOpen(t)} style={{ position: 'relative', flex: '1 1 50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: narrow ? '10px 0 26px' : '24px 0', cursor: 'pointer', minHeight: narrow ? 240 : 0 }}><div style={{ transform: narrow ? 'scale(.72)' : 'none', transformOrigin: 'center' }}>{f.visual()}</div></div>
+    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} style={{ position: 'relative', marginBottom: 18 }}>
+      <div key={cur}><FeatureBanner kicker={s.kicker} line1={s.line1} line2={s.line2} text={s.text} cta={`${s.cta} →`} onCta={() => onOpen(t)} height={300} photos={[0, 1, 2, 3].map(i => pool.length ? pool[(cur * 4 + i) % pool.length] : null)} /></div>
+      <span style={{ position: 'absolute', right: 22, bottom: 20, zIndex: 3, display: 'flex', gap: 6 }}>
+        {items.map((_, j) => <button key={j} type="button" aria-label={`À la une ${j + 1}`} onClick={() => setK(j)} style={{ width: j === cur ? 26 : 8, height: 8, padding: 0, border: 'none', borderRadius: 99, background: j === cur ? '#D9FF43' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'width .25s ease' }} />)}
+      </span>
     </div>
   )
 }
@@ -147,7 +127,8 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
   const all = useMemo(() => visibleTools(infra, isAdmin), [infra, isAdmin])
   const byId = useMemo(() => new Map(all.map(t => [t.id, t])), [all])
   const recent = useMemo(() => recentTools().map(id => byId.get(id)).filter(Boolean) as Tool[], [byId])
-  const featured = FEATURED.map(f => ({ f: f.tool === 'viral' && photos.viral.length >= 3 ? { ...f, visual: () => <RealReels photos={photos.viral} /> } : f, t: byId.get(f.tool) })).filter((x): x is { f: Featured; t: Tool } => !!x.t)
+  const slides = SLIDES.map(s => ({ s, t: byId.get(s.tool) })).filter((x): x is { s: Slide; t: Tool } => !!x.t)
+  const pool = [...photos.viral, ...photos.bank]
   const toggleFav = (id: string) => setFavs(f => { const n = f.includes(id) ? f.filter(x => x !== id) : [...f, id]; try { localStorage.setItem(FAV_KEY, JSON.stringify(n)) } catch { /* ignore */ } return n })
 
   const found = searchTools(all, q)
@@ -164,8 +145,8 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
       <style>{SPOT_KEYFRAMES}</style>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 650, letterSpacing: '-0.03em', color: '#EDEDEF' }}>Explorer</h1>
-          <p style={{ margin: '6px 0 0', fontSize: 14, color: '#8B8B94' }}>{all.length} outils pour publier, créer, gérer et analyser — tout ScaleFlow au même endroit.</p>
+          <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#D9FF43' }}>● {all.length} outils</span>
+          <h1 style={{ margin: '8px 0 0', fontSize: 'clamp(30px, 3.4vw, 46px)', fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 0.95, textTransform: 'uppercase', color: '#F4F4F5' }}>Explorer <span style={{ color: '#71717A' }}>ScaleFlow</span></h1>
         </div>
         <span style={{ position: 'relative', width: 'min(340px, 100%)' }}>
           <span style={{ position: 'absolute', left: 11, top: 9, color: '#71717A', display: 'flex' }}><Icon d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z|M21 21l-4.3-4.3" size={15} /></span>
@@ -173,7 +154,7 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
         </span>
       </div>
 
-      {!q.trim() && cat === 'all' && <Hero items={featured} onOpen={onOpen} />}
+      {!q.trim() && cat === 'all' && <Carousel items={slides} onOpen={onOpen} pool={pool} />}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
         {chip('all', 'Tout', found.length)}
@@ -201,7 +182,8 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
         </div>
       ) : sections.map(({ c, items }) => (
         <section key={c?.k ?? 'all'} style={{ marginBottom: 28 }}>
-          {c && <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 650, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{c.label} <span style={{ color: '#52525B', fontWeight: 500, fontSize: 13 }}>· {items.length}</span></h3>}
+          {c && (() => { const B = CAT_BANNER[c.k]; const top = items.find(t => t.badge === 'Populaire') ?? items[0]; const off = CATS.findIndex(x => x.k === c.k) * 3
+            return <div style={{ marginBottom: 14 }}><FeatureBanner compact height={170} kicker={`${c.label} · ${items.length} outil(s)`} line1={B.line1} line2={B.line2} text={B.text} cta={`${top.label} →`} onCta={() => onOpen(top)} photos={[0, 1, 2, 3].map(i => pool.length ? pool[(off + i + 5) % pool.length] : null)} /></div> })()}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: 14 }}>
             {items.map(t => { const k = idx++; return <ToolCard key={t.id} t={t} i={k} pick={pickerFor(t, k, photos)} fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)} /> })}
           </div>

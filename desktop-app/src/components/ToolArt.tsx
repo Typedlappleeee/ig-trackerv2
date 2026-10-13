@@ -17,7 +17,7 @@ const At = ({ children, style }: { children: ReactNode; style: CSSProperties }) 
 /** Image plein cadre (ou dégradé), zoom lent en boucle. */
 function Media({ src, a, b, k = 0, style, filter, still }: { src: string | null; a: string; b: string; k?: number; style?: CSSProperties; filter?: string; still?: boolean }) {
   return (
-    <span style={{ position: 'relative', display: 'block', overflow: 'hidden', background: `linear-gradient(160deg, ${a}, ${b})`, ...style }}>
+    <span style={{ position: 'relative', display: 'block', overflow: 'hidden', background: '#17171A', ...style }}>
       {src && <img src={src} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter, animation: still ? undefined : an('sfsKen', 8 + (k % 4), k * 1.7, 'ease-in-out infinite alternate') }} />}
     </span>

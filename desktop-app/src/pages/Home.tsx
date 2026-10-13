@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import { Btn, Icon, MONO, Panel, PanelHead, Skeleton, SkeletonRows, useNarrow } from '@/lib/ui'
 import { fetchAllPhones } from '@/lib/geelark'
 import { useRuns } from '@/lib/runStore'
@@ -16,7 +16,7 @@ import { visibleTools, type Tool } from '@/lib/tools'
 import { openTool } from '@/lib/openTool'
 import { ToolCard, usePhotos, pickerFor } from '@/pages/Explore'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
-import { HomeHero, ViralShowcase, useTopReels } from '@/components/CineHero'
+import { HomeHero, ViralShowcase, useTopReels, CineSection, CineStat, FeatureBanner } from '@/components/CineHero'
 
 // Tuiles « Lancer » — portées de _hub() (LAUNCH), par infrastructure.
 function launchTiles(infra: InfraKey): { id: string; label: string; hint: string; icon: string; page: PageKey }[] {
@@ -101,6 +101,9 @@ function Onboarding({ theme, steps, onNavigate, onHide }: {
 }
 
 // ── Petits éléments du tableau de bord ───────────────────────────────────────
+function DarkCard({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+  return <div style={{ borderRadius: 16, background: '#121214', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', ...style }}>{children}</div>
+}
 const C_OK = '#8B7CF6', C_KO = '#E5484D'   // palette validée (fond #111113, daltonisme OK)
 
 function Delta({ now, prev, unit = '%', invert = false }: { now: number | null; prev: number | null; unit?: string; invert?: boolean }) {
@@ -231,7 +234,7 @@ function LiveRuns({ theme, onNavigate }: { theme: Theme; onNavigate: (p: PageKey
     ...flows.map(f => ({ id: f.id, label: f.flowName, done: f.phones.filter(p => p.status === 'done').length, failed: f.phones.filter(p => p.status === 'failed').length, total: f.phones.length, detail: undefined as string | undefined })),
   ]
   return (
-    <Panel theme={theme} style={{ display: 'flex', flexDirection: 'column' }}>
+    <DarkCard style={{ display: 'flex', flexDirection: 'column' }}>
       <PanelHead title={<span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>En direct{items.length > 0 && <span style={{ width: 6, height: 6, borderRadius: 99, background: '#4ADE80', animation: 'aPulse 1.6s ease-in-out infinite' }} />}</span>}
         sub={items.length ? `${items.length} automatisation(s) en cours` : 'Aucune automatisation en cours'} />
       {items.length === 0 ? (
@@ -263,7 +266,7 @@ function LiveRuns({ theme, onNavigate }: { theme: Theme; onNavigate: (p: PageKey
           })}
         </div>
       )}
-    </Panel>
+    </DarkCard>
   )
 }
 
@@ -322,6 +325,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
     : []
   const photos = usePhotos(user, org)
   const topReels = useTopReels(8)
+  const pool = [...(topReels ?? []).map(r => r.thumb), ...photos.viral, ...photos.bank].filter((x, i, a) => a.indexOf(x) === i).slice(2)
   const TILES = launchTiles(infra).map(t => t.id === 'reels' && data && !loading ? { ...t, hint: `${fmtNumber(data.phoneCount)} comptes prêts` } : t)
   const STEPS = [
     { done: !!conns.bearer, title: 'Connecter GeeLark', text: 'Colle ton token GeeLark (OpenAPI) pour piloter tes téléphones.', cta: 'Ouvrir les réglages', page: 'settings' as PageKey },
@@ -355,58 +359,62 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
 
       {showOnboard && <Onboarding theme={theme} steps={STEPS} onNavigate={p => p === 'settings' ? openTool(onNavigate, 'settings', { tab: 'integrations' }) : onNavigate(p)} onHide={() => { setHideOnboard(true); try { localStorage.setItem(ONBOARD_KEY, '1') } catch { /* ignore */ } }} />}
 
-      {/* Chiffres clés + tendance */}
-      <div data-rows="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(210px,100%),1fr))', gap: 12 }}>
-        <StatCard label="Comptes publiés · 7 jours" loading={sLoading} value={fmtNumber(series?.ok7 ?? 0)} spark={okSpark.slice(-7)}
-          sub={series && <Delta now={series.ok7} prev={series.okPrev7} />} onClick={() => onNavigate('activity')} />
-        <StatCard label="Taux de réussite · 7 jours" loading={sLoading} value={series?.rate7 === null || !series ? '—' : `${series.rate7} %`} accent={series?.rate7 !== null && series && series.rate7 < 80 ? '#FBBF24' : '#4ADE80'}
-          spark={series?.rate7 === null ? undefined : rateSpark.slice(-7).map(v => v * 100)}
-          sub={series && <Delta now={series.rate7} prev={series.ratePrev7} unit="pts" />} onClick={() => onNavigate('activity')} />
-        <StatCard label="Mes appareils" loading={loading || !data} value={fmtNumber(data?.phoneCount ?? 0)}
-          sub={<span style={{ fontSize: 11.5, color: '#71717A' }}>{onNow !== null ? `${fmtNumber(onNow)} allumé(s) maintenant` : `${fmtNumber(data?.videoCount ?? 0)} médias en banque`}</span>} onClick={() => onNavigate('phones')} />
-        <StatCard label="Crédits" loading={loading || balance === null} value={fmtNumber(balance ?? 0)} accent="#FBBF24"
-          sub={<span style={{ fontSize: 11.5, color: '#71717A' }}>{runway !== null ? `≈ ${fmtNumber(runway)} jour(s) au rythme actuel` : `≈ ${fmtNumber(Math.floor((balance ?? 0) / 2))} posts restants`}</span>} onClick={() => openTool(onNavigate, 'settings', { tab: 'billing' })} />
-      </div>
+      {/* Chiffres de la semaine */}
+      <CineSection kicker="Cette semaine" line1="Tes chiffres" line2="en un coup d’œil">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(200px,100%),1fr))', gap: 12 }}>
+          <CineStat label="Comptes publiés" value={sLoading ? '…' : fmtNumber(series?.ok7 ?? 0)} extra={!sLoading && <Spark values={okSpark.slice(-7)} color={C_OK} />}
+            sub={series && <Delta now={series.ok7} prev={series.okPrev7} />} onClick={() => onNavigate('activity')} />
+          <CineStat label="Taux de réussite" accent={series?.rate7 !== null && series && series.rate7 < 80 ? '#FBBF24' : '#4ADE80'} value={sLoading ? '…' : series?.rate7 === null || !series ? '—' : `${series.rate7} %`}
+            extra={!sLoading && series?.rate7 !== null && <Spark values={rateSpark.slice(-7).map(v => v * 100)} color="#4ADE80" />}
+            sub={series && <Delta now={series.rate7} prev={series.ratePrev7} unit="pts" />} onClick={() => onNavigate('activity')} />
+          <CineStat label="Appareils" value={loading || !data ? '…' : fmtNumber(data.phoneCount)}
+            sub={<span style={{ color: '#71717A' }}>{onNow !== null ? `${fmtNumber(onNow)} allumé(s) maintenant` : `${fmtNumber(data?.videoCount ?? 0)} médias en banque`}</span>} onClick={() => onNavigate('phones')} />
+          <CineStat label="Crédits" accent="#D9FF43" value={loading || balance === null ? '…' : fmtNumber(balance)}
+            sub={<span style={{ color: '#71717A' }}>{runway !== null ? `≈ ${fmtNumber(runway)} jour(s) au rythme actuel` : `≈ ${fmtNumber(Math.floor((balance ?? 0) / 2))} posts restants`}</span>} onClick={() => openTool(onNavigate, 'settings', { tab: 'billing' })} />
+        </div>
+      </CineSection>
 
-      {/* Graphique + en direct */}
-      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,2fr) minmax(0,1fr)', gap: 12, marginTop: 12 }}>
-        <Panel theme={theme}>
-          <PanelHead title="Publications · 14 jours" sub={series ? `${fmtNumber(series.days.reduce((s, d) => s + d.ok, 0))} comptes publiés · ${fmtNumber(series.days.reduce((s, d) => s + d.failed, 0))} échecs` : undefined}
-            right={<span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#A1A1AA' }}>
-              {([['Publiés', C_OK], ['Échecs', C_KO]] as [string, string][]).map(([l, c]) => <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: c }} />{l}</span>)}
-            </span>} />
-          <div style={{ padding: '12px 16px 10px' }}>
+      {/* Activité 14 jours + en direct */}
+      <CineSection kicker="Activité" line1="14 derniers jours" line2={series ? `${fmtNumber(series.days.reduce((s, d) => s + d.ok, 0))} publiés` : undefined}
+        right={<span style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: '#A1A1AA' }}>{([['Publiés', C_OK], ['Échecs', C_KO]] as [string, string][]).map(([l, c]) => <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: c }} />{l}</span>)}</span>}>
+        <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,2fr) minmax(0,1fr)', gap: 14 }}>
+          <div style={{ padding: '14px 14px 8px', borderRadius: 16, background: '#121214', border: '1px solid rgba(255,255,255,0.06)' }}>
             {sLoading ? <Skeleton h={200} r={6} /> : <ActivityChart days={daily} />}
+            {!sLoading && daily.every(d => d.ok + d.failed === 0) && <div style={{ padding: '4px 4px 8px', fontSize: 12.5, color: '#8B8B94' }}>Aucune publication sur 14 jours — lance ton premier Reel pour voir la courbe se remplir.</div>}
           </div>
-          {!sLoading && last7.every(d => d.ok + d.failed === 0) && daily.every(d => d.ok + d.failed === 0) && (
-            <div style={{ padding: '0 16px 14px', fontSize: 12.5, color: '#8B8B94' }}>Aucune publication sur 14 jours — lance ton premier Reel pour voir la courbe se remplir.</div>
-          )}
-        </Panel>
-        <LiveRuns theme={theme} onNavigate={onNavigate} />
-      </div>
+          <LiveRuns theme={theme} onNavigate={onNavigate} />
+        </div>
+      </CineSection>
 
       {/* Vitrine Veille Reels (grandes cartes plein cadre) */}
-      {topReels && topReels.length >= 2 && <div style={{ marginTop: 16 }}><ViralShowcase reels={topReels} onOpen={() => onNavigate('viral')} /></div>}
+      {topReels && topReels.length >= 2 && <ViralShowcase reels={topReels} onOpen={() => onNavigate('viral')} />}
 
-      {/* Lancer */}
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '24px 0 12px' }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>Lancer</span>
-        {picks.length > 0 && <Btn theme={theme} sm label="Tous les outils →" onClick={() => onNavigate('explore')} />}
-      </div>
-      {picks.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(210px,100%),1fr))', gap: 12 }}>
-          <style>{SPOT_KEYFRAMES}</style>
-          {picks.map((t, i) => <ToolCard key={t.id} t={t} i={i} pick={pickerFor(t, i, photos)} fav={false} onOpen={() => onOpenTool!(t)} />)}
-        </div>
-      ) : (
-        <div data-rows="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 12 }}>
-          {TILES.map(a => <LaunchTile key={a.id} a={a} accent={theme.accentText} onClick={() => onNavigate(a.page)} />)}
+      {/* Lancer : deux grands bandeaux + les outils phares */}
+      {infra !== 'cloud' && (
+        <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'repeat(2, minmax(0,1fr))', gap: 16, marginBottom: 16 }}>
+          <FeatureBanner compact height={200} kicker="Publier" line1="Un Reel," line2="sur tous tes comptes" text={data ? `${fmtNumber(data.phoneCount)} comptes prêts · 2 crédits par compte` : undefined}
+            cta="Publier un Reel" onCta={() => openTool(onNavigate, 'publish', { mode: 'reels' })} photos={pool.slice(0, 2)} />
+          <FeatureBanner compact height={200} kicker="TikTok" line1="La même vidéo," line2="sur TikTok" text="Publie en parallèle sur tous tes comptes TikTok."
+            cta="Publier sur TikTok" onCta={() => openTool(onNavigate, 'publish', { mode: 'tiktok' })} photos={pool.slice(2, 4)} />
         </div>
       )}
+      <CineSection kicker="Outils" line1="Lance" line2="en un clic" right={<button type="button" onClick={() => onNavigate('explore')} style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.06)', color: '#EDEDEF', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Tous les outils →</button>}>
+        {picks.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(220px,100%),1fr))', gap: 12 }}>
+            <style>{SPOT_KEYFRAMES}</style>
+            {picks.map((t, i) => <ToolCard key={t.id} t={t} i={i} pick={pickerFor(t, i, photos)} fav={false} onOpen={() => onOpenTool!(t)} />)}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 12 }}>
+            {TILES.map(a => <LaunchTile key={a.id} a={a} accent={theme.accentText} onClick={() => onNavigate(a.page)} />)}
+          </div>
+        )}
+      </CineSection>
 
-      {/* Programmé aujourd'hui + Activité récente */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(320px,100%),1fr))', gap: 12, marginTop: 12 }}>
-        <Panel theme={theme}>
+      {/* Aujourd'hui : programmé + activité récente */}
+      <CineSection kicker="Aujourd’hui" line1="Ce qui part" line2="et ce qui est parti">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(320px,100%),1fr))', gap: 14 }}>
+        <DarkCard>
           <PanelHead title="Programmé aujourd’hui" right={
             <Btn label="Voir le calendrier" theme={theme} sm tone="quiet"
               icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
@@ -435,9 +443,9 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
               ))}
             </div>
           )}
-        </Panel>
+        </DarkCard>
 
-        <Panel theme={theme}>
+        <DarkCard>
           <PanelHead title="Activité récente" right={
             <Btn label="Historique" theme={theme} sm tone="quiet" onClick={() => onNavigate('activity')} />
           } />
@@ -478,8 +486,9 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
               })}
             </div>
           )}
-        </Panel>
+        </DarkCard>
       </div>
+      </CineSection>
     </div>
   )
 }
