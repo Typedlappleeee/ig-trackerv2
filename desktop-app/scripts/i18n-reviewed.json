@@ -421,6 +421,7 @@
  "boot",
  "brightness(.55) saturate(.6)",
  "brightness(.6)",
+ "brightness(.62) saturate(.8) contrast(1.05)",
  "brightness(1.08)",
  "brightness(1.08) saturate(1.1)",
  "brightness(1.2)",

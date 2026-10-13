@@ -2753,6 +2753,7 @@ export const EN: Dict = {
     "Sur Higgsfield, clique": "On Higgsfield, click",
     "« Copy API key »": "“Copy API key”",
     "et colle-la ici telle quelle. Elle reste sur le serveur : personne ne peut la relire depuis l’app.": "and paste it here as is. It stays on the server: nobody can read it back from the app.",
+    "en pilote auto": "on autopilot",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

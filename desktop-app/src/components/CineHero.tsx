@@ -72,29 +72,49 @@ function PhoneWall({ photos, cols }: { photos: string[]; cols: number }) {
   )
 }
 
-export function HomeHero({ photos, kicker, line1, line2, sub, cta, onCta, secondary, onSecondary, footer }: {
-  photos: string[]; kicker: string; line1: ReactNode; line2: ReactNode; sub: ReactNode
+/** Hero de l'Accueil : texte à gauche sur noir profond (halo violet discret), mur de téléphones
+ *  à droite qui se fond dans le noir — photos atténuées pour que le texte reste roi. */
+export function HomeHero({ photos, kicker, line1, line2, sub, stats, cta, onCta, secondary, onSecondary, footer }: {
+  photos: string[]; kicker: string; line1: ReactNode; line2: ReactNode; sub?: ReactNode; stats?: { v: ReactNode; l: string }[]
   cta: string; onCta: () => void; secondary?: string; onSecondary?: () => void; footer?: ReactNode
 }) {
-  const narrow = useNarrow(760)
+  const narrow = useNarrow(860)
   return (
-    <section className="sf-cine" style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 24, border: '1px solid rgba(255,255,255,0.07)', background: '#0A0A0B', minHeight: narrow ? 380 : 440, display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+    <section className="sf-cine" style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 24, border: '1px solid rgba(255,255,255,0.07)', background: '#09090A', minHeight: narrow ? 400 : 420, display: 'flex', alignItems: 'center', marginBottom: 16 }}>
       <style>{CINE_KEYFRAMES + WALL_CSS}</style>
-      <PhoneWall photos={photos} cols={narrow ? 4 : 8} />
-      <span style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 62% 70% at 50% 50%, rgba(10,10,11,.95) 0%, rgba(10,10,11,.82) 45%, rgba(10,10,11,.4) 100%)' }} />
-      <div style={{ position: 'relative', zIndex: 2, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12, padding: narrow ? '36px 18px 24px' : '48px 24px 30px', maxWidth: 760, margin: '0 auto', animation: 'cineUp .6s cubic-bezier(.2,.8,.2,1) both' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 28, padding: '0 12px', borderRadius: 99, border: '1px solid rgba(167,139,250,.35)', background: 'rgba(167,139,250,.1)', fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#C4B5FD', backdropFilter: 'blur(8px)' }}>{kicker}</span>
-        <h1 style={{ ...H1, letterSpacing: '-0.055em', lineHeight: 0.9, fontSize: narrow ? 'clamp(28px, 8.4vw, 40px)' : 'clamp(48px, 5.6vw, 84px)' }}>
+      {/* Mur à droite (fondu vers la gauche) ; en mobile, derrière le texte, très assombri. */}
+      <span style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: narrow ? '100%' : '64%', WebkitMaskImage: narrow ? undefined : 'linear-gradient(to right, transparent 0%, #000 42%)', maskImage: narrow ? undefined : 'linear-gradient(to right, transparent 0%, #000 42%)', filter: 'brightness(.62) saturate(.8) contrast(1.05)' }}>
+        <PhoneWall photos={photos} cols={narrow ? 4 : 6} />
+      </span>
+      <span style={{ position: 'absolute', inset: 0, background: narrow
+        ? 'linear-gradient(180deg, rgba(9,9,10,.78), rgba(9,9,10,.9) 60%, #09090A)'
+        : 'linear-gradient(180deg, rgba(9,9,10,.55) 0%, transparent 22%, transparent 78%, rgba(9,9,10,.7) 100%), linear-gradient(90deg, #09090A 0%, rgba(9,9,10,.9) 30%, rgba(9,9,10,.15) 70%)' }} />
+      <span style={{ position: 'absolute', left: '-8%', top: '-30%', width: 620, height: 620, borderRadius: 999, background: 'radial-gradient(circle, rgba(139,92,246,.22), transparent 62%)', filter: 'blur(10px)', animation: 'cineGlow 7s ease-in-out infinite', pointerEvents: 'none' }} />
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 16, padding: narrow ? '34px 20px 26px' : '46px 48px 40px', maxWidth: narrow ? '100%' : 620, animation: 'cineUp .6s cubic-bezier(.2,.8,.2,1) both' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#C4B5FD' }}>
+          <span style={{ width: 7, height: 7, borderRadius: 99, background: '#A78BFA', boxShadow: '0 0 0 4px rgba(167,139,250,.2)' }} />{kicker}
+        </span>
+        <h1 style={{ ...H1, letterSpacing: '-0.055em', lineHeight: 0.9, fontSize: narrow ? 'clamp(34px, 10vw, 46px)' : 'clamp(46px, 5vw, 76px)' }}>
           <span style={{ display: 'block', color: '#F4F4F5' }}>{line1}</span>
           <span style={{ display: 'block', background: 'linear-gradient(90deg,#C4B5FD,#F472B6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{line2}</span>
         </h1>
-        <span style={{ fontSize: 14.5, fontWeight: 500, color: '#C4C4CC' }}>{sub}</span>
-        <span style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button type="button" onClick={onCta} style={{ height: 46, padding: '0 22px', border: 'none', borderRadius: 12, background: 'linear-gradient(135deg,#8B5CF6,#EC4899)', color: '#fff', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 0 #6D28D9, 0 16px 34px -12px rgba(236,72,153,.6)', transition: 'transform .12s ease' }}
+        {sub && <span style={{ fontSize: 15, lineHeight: 1.55, color: '#A1A1AA', maxWidth: 480 }}>{sub}</span>}
+        {stats && stats.length > 0 && (
+          <span style={{ display: 'flex', borderRadius: 14, border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(17,17,19,0.7)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', overflow: 'hidden', flexWrap: 'wrap' }}>
+            {stats.map((x, i) => (
+              <span key={x.l} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 16px', borderLeft: i ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
+                <b style={{ fontSize: 19, fontWeight: 900, letterSpacing: '-0.04em', color: '#F4F4F5', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{x.v}</b>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#71717A' }}>{x.l}</span>
+              </span>
+            ))}
+          </span>
+        )}
+        <span style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+          <button type="button" onClick={onCta} style={{ height: 48, padding: '0 22px', border: 'none', borderRadius: 13, background: 'linear-gradient(135deg,#8B5CF6,#EC4899)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 0 #6D28D9, 0 18px 36px -14px rgba(236,72,153,.65)', transition: 'transform .12s ease' }}
             onMouseDown={e => { e.currentTarget.style.transform = 'translateY(2px)' }} onMouseUp={e => { e.currentTarget.style.transform = 'none' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none' }}>{cta} →</button>
-          {secondary && onSecondary && <button type="button" onClick={onSecondary} style={{ height: 46, padding: '0 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.06)', color: '#EDEDEF', fontSize: 14.5, fontWeight: 650, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>{secondary}</button>}
+          {secondary && onSecondary && <button type="button" onClick={onSecondary} style={{ height: 48, padding: '0 20px', borderRadius: 13, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: '#EDEDEF', fontSize: 15, fontWeight: 650, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>{secondary}</button>}
         </span>
-        {footer && <span style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>{footer}</span>}
+        {footer && <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{footer}</span>}
       </div>
     </section>
   )
