@@ -882,9 +882,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         if (files.length) importFiles(files)
         else toast('Dépose des vidéos ou des images.', 'info')
       }}>
-      {showTrash && (
-        <div onClick={() => setShowTrash(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px,96vw)', maxHeight: '82vh', overflowY: 'auto', borderRadius: 10, background: '#111113', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.7)', padding: 18, boxSizing: 'border-box' }}>
+      {/* Portail vers <body> : le conteneur de la page est animé (transform), un « fixed » rendu
+          dedans se plaçait au milieu de la page entière au lieu de l'écran. Fenêtre en haut de
+          l'écran ; titre + actions + progression fixes, seule la liste défile. */}
+      {showTrash && createPortal(
+        <div onClick={() => setShowTrash(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '8vh 20px 20px', boxSizing: 'border-box' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px,96vw)', maxHeight: '84vh', display: 'flex', flexDirection: 'column', borderRadius: 14, background: '#111113', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.7)', padding: 18, boxSizing: 'border-box', animation: 'aIn .2s cubic-bezier(0.16,1,0.3,1) both' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
               <span style={{ fontSize: 15, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.015em' }}>🗑 Corbeille ({trash.length})</span>
               <button onClick={() => setShowTrash(false)} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: 'none', border: 'none', color: '#8B8B94', fontSize: 18, cursor: 'pointer' }}>×</button>
@@ -895,7 +898,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               <Btn theme={theme} sm tone="quiet" label="Vider définitivement" disabled={!!trashBusy || !trash.length} onClick={async () => { if (await confirmDialog({ title: `Supprimer DÉFINITIVEMENT les ${trash.length} médias de la corbeille ?`, confirmLabel: 'Vider définitivement', danger: true })) { await purgeMedia(trash); setShowTrash(false) } }} />
               {trashBusy && <span style={{ alignSelf: 'center', fontSize: 12.5, color: '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>{trashBusy}</span>}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', minHeight: 0, margin: '0 -6px', padding: '0 6px' }}>
               {trash.slice(0, 200).map(t => {
                 const days = t.deleted_at ? Math.max(0, 7 - Math.floor((Date.now() - new Date(t.deleted_at).getTime()) / 86400000)) : 7
                 return (
@@ -910,7 +913,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               {trash.length > 200 && <span style={{ padding: '8px 4px', fontSize: 12.5, color: '#71717A' }}>{`+ ${trash.length - 200} autre(s) — utilise « Tout restaurer » ou « Vider définitivement ».`}</span>}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
       {dragFiles && (
         <div style={{
