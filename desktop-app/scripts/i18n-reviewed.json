@@ -461,6 +461,8 @@
  "scale(0.8)",
  "scale(0.97)",
  "scale(1)",
+ "scale(1.01)",
+ "scale(1.08)",
  "scale(1.15)",
  "scale=iw*{0}:ih*{1},crop=iw/{2}:ih/{3},{4}",
  "scale=trunc(iw/2)*2:trunc(ih/2)*2",

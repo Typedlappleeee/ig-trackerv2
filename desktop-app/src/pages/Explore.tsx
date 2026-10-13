@@ -2,6 +2,9 @@
 // une » animé, recherche, catégories, favoris, récemment utilisés. Un clic ouvre l'outil
 // précis (onglet / format) via openTool. Catalogue : src/lib/tools.ts.
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { User } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
+import type { OrgState } from '@/lib/data'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Icon, FIELD, useNarrow } from '@/lib/ui'
 import { CATS, searchTools, visibleTools, type Tool, type ToolCat } from '@/lib/tools'
@@ -9,6 +12,61 @@ import { recentTools } from '@/lib/openTool'
 import { SPOT_KEYFRAMES, VisualLinks, VisualTikTok, VisualViral, VisualHome } from '@/components/LaunchSpotlight'
 
 const FAV_KEY = 'sf-fav-tools'
+const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
+
+// Vraies photos pour les cartes : miniatures de la Veille Reels (via le proxy d'images,
+// Instagram bloque l'affichage direct) et de la banque de l'utilisateur.
+function usePhotos(user: User, org: OrgState): { viral: string[]; bank: string[] } {
+  const [viral, setViral] = useState<string[]>([])
+  const [bank, setBank] = useState<string[]>([])
+  const orgId = org.currentOrg?.id ?? null
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const r = await supabase.from('viral_reels').select('thumb, views').order('views', { ascending: false }).limit(24)
+      const v = ((r.data ?? []) as { thumb: string | null }[]).map(x => x.thumb).filter((x): x is string => !!x)
+      if (alive) setViral([...new Set(v)].map(u => `${FN_URL}?img=${encodeURIComponent(u)}`))
+      const q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).limit(60)
+      const b = await (orgId ? q.eq('org_id', orgId) : q.eq('user_id', user.id).is('org_id', null))
+      const rows = ((b.data ?? []) as { thumbnail_url?: string | null; thumbnail_path?: string | null; storage_path?: string | null; media_type?: string | null; notes?: string | null }[])
+        .filter(x => !/^__sf_/.test(x.notes ?? ''))
+      const direct = rows.map(x => x.thumbnail_url).filter((x): x is string => !!x && /^https?:/.test(x))
+      const paths = rows.map(x => x.thumbnail_url ? null : x.thumbnail_path ?? (x.media_type === 'image' || /\.(jpe?g|png|webp)$/i.test(x.storage_path ?? '') ? x.storage_path : null)).filter((x): x is string => !!x).slice(0, 30)
+      let signed: string[] = []
+      if (paths.length) {
+        const { data } = await supabase.storage.from('content').createSignedUrls(paths, 3600)
+        signed = (data ?? []).map(d => d.signedUrl).filter((x): x is string => !!x)
+      }
+      if (alive) setBank([...direct, ...signed].slice(0, 30))
+    })().catch(() => {})
+    return () => { alive = false }
+  }, [user.id, orgId])
+  return { viral, bank }
+}
+/** Photo d'une carte : banque d'abord pour Créer / Banque, Veille d'abord ailleurs. */
+function photoFor(t: Tool, i: number, p: { viral: string[]; bank: string[] }): string | null {
+  const pool = t.cat === 'create' || t.cat === 'bank' ? [...p.bank, ...p.viral] : [...p.viral, ...p.bank]
+  return pool.length ? pool[i % pool.length] : null
+}
+
+// Visuel « À la une » de la Veille avec de VRAIES miniatures.
+function RealReels({ photos }: { photos: string[] }) {
+  const items: [string, string, number][] = [['×3.2', '384k', -6], ['×24', '1,5M', 0], ['×6.8', '442k', 6]]
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {items.map(([x, v, rot], i) => {
+        const hot = i === 1
+        return (
+          <div key={x} style={{ position: 'relative', width: hot ? 150 : 118, height: hot ? 262 : 206, borderRadius: 16, overflow: 'hidden', border: `2px solid ${hot ? '#F472B6' : 'rgba(255,255,255,0.18)'}`, transform: `rotate(${rot}deg)`, boxShadow: hot ? '0 0 50px rgba(244,114,182,.45)' : '0 20px 40px -20px rgba(0,0,0,.6)', animation: `sfsPop .5s ${0.1 + i * 0.12}s both`, background: '#111' }}>
+            <img src={photos[i]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 99, background: hot ? '#F472B6' : 'rgba(0,0,0,.55)', color: '#fff', fontSize: 11.5, fontWeight: 800 }}>{x}</span>
+            <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '22px 9px 9px', background: 'linear-gradient(to top,rgba(0,0,0,.8),transparent)', color: '#fff', fontSize: hot ? 16 : 13, fontWeight: 800 }}>▶ {v}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
 
 interface Featured { tool: string; kicker: string; title: string; text: string; cta: string; a: string; b: string; visual: () => ReactNode }
@@ -20,13 +78,18 @@ const FEATURED: Featured[] = [
 ]
 
 // ── Carte d'outil : aperçu animé en dégradé + texte ───────────────────────────
-function ToolCard({ t, fav, onFav, onOpen, i }: { t: Tool; fav: boolean; onFav: () => void; onOpen: () => void; i: number }) {
+function ToolCard({ t, fav, onFav, onOpen, i, photo }: { t: Tool; fav: boolean; onFav: () => void; onOpen: () => void; i: number; photo: string | null }) {
   const [h, setH] = useState(false)
   return (
     <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter') onOpen() }}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ position: 'relative', display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', background: '#111113', border: `1px solid ${h ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)'}`, transform: h ? 'translateY(-3px)' : 'none', boxShadow: h ? `0 18px 40px -18px ${t.a}88` : 'none', transition: 'transform .2s ease, box-shadow .2s ease, border-color .2s ease', animation: `sfsPop .45s ${Math.min(i, 16) * 0.03}s both` }}>
-      <div style={{ position: 'relative', height: 118, overflow: 'hidden', background: `linear-gradient(135deg, ${t.a}, ${t.b})` }}>
+      <div style={{ position: 'relative', height: 132, overflow: 'hidden', background: `linear-gradient(135deg, ${t.a}, ${t.b})` }}>
+        {photo && <>
+          <img src={photo} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: h ? 'scale(1.08)' : 'scale(1.01)', transition: 'transform .5s cubic-bezier(.2,.8,.2,1)' }} />
+          <span style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, ${t.a}cc, ${t.b}aa)`, mixBlendMode: 'multiply' }} />
+          <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.45), transparent 60%)' }} />
+        </>}
         <span style={{ position: 'absolute', width: 140, height: 140, borderRadius: 99, background: 'rgba(255,255,255,0.18)', filter: 'blur(28px)', top: -50, right: -30, animation: 'sfsGlow 7s ease-in-out infinite', animationDelay: `-${i % 7}s` }} />
         <span style={{ position: 'absolute', width: 90, height: 90, borderRadius: 99, background: 'rgba(0,0,0,0.25)', filter: 'blur(24px)', bottom: -40, left: -20 }} />
         <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: h ? 'scale(1.12) rotate(-4deg)' : 'none', transition: 'transform .35s cubic-bezier(.2,.8,.2,1)' }}>
@@ -84,14 +147,15 @@ function Hero({ items, onOpen }: { items: { f: Featured; t: Tool }[]; onOpen: (t
   )
 }
 
-export default function Explore({ infra, isAdmin, onOpen }: { theme: Theme; infra: InfraKey; isAdmin: boolean; onOpen: (t: Tool) => void }) {
+export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: Theme; infra: InfraKey; isAdmin: boolean; onOpen: (t: Tool) => void; user: User; org: OrgState }) {
+  const photos = usePhotos(user, org)
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<ToolCat | 'all' | 'fav'>('all')
   const [favs, setFavs] = useState<string[]>(loadFavs)
   const all = useMemo(() => visibleTools(infra, isAdmin), [infra, isAdmin])
   const byId = useMemo(() => new Map(all.map(t => [t.id, t])), [all])
   const recent = useMemo(() => recentTools().map(id => byId.get(id)).filter(Boolean) as Tool[], [byId])
-  const featured = FEATURED.map(f => ({ f, t: byId.get(f.tool) })).filter((x): x is { f: Featured; t: Tool } => !!x.t)
+  const featured = FEATURED.map(f => ({ f: f.tool === 'viral' && photos.viral.length >= 3 ? { ...f, visual: () => <RealReels photos={photos.viral} /> } : f, t: byId.get(f.tool) })).filter((x): x is { f: Featured; t: Tool } => !!x.t)
   const toggleFav = (id: string) => setFavs(f => { const n = f.includes(id) ? f.filter(x => x !== id) : [...f, id]; try { localStorage.setItem(FAV_KEY, JSON.stringify(n)) } catch { /* ignore */ } return n })
 
   const found = searchTools(all, q)
@@ -147,7 +211,7 @@ export default function Explore({ infra, isAdmin, onOpen }: { theme: Theme; infr
         <section key={c?.k ?? 'all'} style={{ marginBottom: 28 }}>
           {c && <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 650, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{c.label} <span style={{ color: '#52525B', fontWeight: 500, fontSize: 13 }}>· {items.length}</span></h3>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: 14 }}>
-            {items.map(t => <ToolCard key={t.id} t={t} i={idx++} fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)} />)}
+            {items.map(t => { const k = idx++; return <ToolCard key={t.id} t={t} i={k} photo={photoFor(t, k, photos)} fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)} /> })}
           </div>
         </section>
       ))}
