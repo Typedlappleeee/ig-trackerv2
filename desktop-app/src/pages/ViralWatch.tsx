@@ -7,7 +7,7 @@
 // bloque le navigateur), légende, stats, liens.
 // Tables : supabase/migrations/20261012*_viral*.sql. Données : HikerAPI (secret HIKERAPI_KEY).
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { takeOpenArg } from '@/lib/openTool'
+import { takeOpenArg, openTool } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
@@ -215,7 +215,7 @@ function AccountRail({ list, reels, value, onChange }: { list: Watch[]; reels: R
 }
 
 // ── Fiche d'un Reel : vidéo, stats, légende, actions, navigation ←/→ ──────────
-function ReelDetail({ theme, list, index, setIndex, onClose }: { theme: Theme; list: Reel[]; index: number; setIndex: (i: number) => void; onClose: () => void }) {
+function ReelDetail({ theme, list, index, setIndex, onClose, onRecast }: { theme: Theme; list: Reel[]; index: number; setIndex: (i: number) => void; onClose: () => void; onRecast?: (r: Reel) => void }) {
   const r = list[index]
   const narrow = useNarrow(760)
   const [media, setMedia] = useState<Media | null>(null)
@@ -300,6 +300,11 @@ function ReelDetail({ theme, list, index, setIndex, onClose }: { theme: Theme; l
             <Btn theme={theme} icon={I.external} label="Ouvrir sur Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
             <Btn theme={theme} icon={I.link} label="Copier le lien" onClick={() => void copyText(reelUrl(r), 'Lien copié.')} />
           </div>
+          {onRecast && (
+            <button type="button" onClick={() => onRecast(r)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: '#fff', background: 'linear-gradient(135deg,#8B5CF6,#EC4899)', boxShadow: '0 4px 0 #6D28D9' }}>
+              ✦ Recréer avec mes images (Genjutsu IA)
+            </button>
+          )}
         </div>
       </div>
     </Modal>
@@ -347,7 +352,7 @@ function WatchPanel({ theme, title, sub, list, onAdd, onRemove, limit }: {
   )
 }
 
-export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme; user: User; org: OrgState; isAdmin: boolean }) {
+export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { theme: Theme; user: User; org: OrgState; isAdmin: boolean; onNavigate?: (p: string) => void }) {
   const { currentOrg } = org
   const [watch, setWatch] = useState<Watch[]>([])
   const [reels, setReels] = useState<Reel[]>([])
@@ -529,7 +534,8 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
         </div>
       )}
 
-      {open !== null && shown[open] && <ReelDetail theme={theme} list={shown} index={open} setIndex={setOpen} onClose={() => setOpen(null)} />}
+      {open !== null && shown[open] && <ReelDetail theme={theme} list={shown} index={open} setIndex={setOpen} onClose={() => setOpen(null)}
+        onRecast={isAdmin && onNavigate ? r => { setOpen(null); openTool(onNavigate, 'genjutsu', { reel: { code: r.code, thumb: r.thumb, username: r.username, views: r.views, score: r.score } }) } : undefined} />}
     </div>
   )
 }

@@ -51,6 +51,7 @@ const Admin = lazy(() => import('@/pages/Admin'))
 const Scheduled = lazy(() => import('@/pages/Scheduled'))
 const Links = lazy(() => import('@/pages/Links'))
 const ViralWatch = lazy(() => import('@/pages/ViralWatch'))
+const Genjutsu = lazy(() => import('@/pages/Genjutsu'))
 const Explore = lazy(() => import('@/pages/Explore'))
 const Pricing = lazy(() => import('@/pages/Pricing'))
 // Annonce de lancement des Liens (bandeau en haut de chaque page) — passer à false pour la retirer.
@@ -237,7 +238,9 @@ function AppInner({ user }: { user: User }) {
         : page === 'explore'
         ? <Explore theme={theme} infra={infra} isAdmin={license.isSuperAdmin} onOpen={openT} user={user} org={org} />
         : page === 'viral'
-        ? <ViralWatch theme={theme} user={user} org={org} isAdmin={license.isSuperAdmin} />
+        ? <ViralWatch theme={theme} user={user} org={org} isAdmin={license.isSuperAdmin} onNavigate={(p) => setPage(p as PageKey)} />
+        : page === 'genjutsu' && license.isSuperAdmin
+        ? <Genjutsu theme={theme} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'links'
         ? <Links theme={theme} user={user} org={org} />
         : page === 'insights'
