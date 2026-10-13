@@ -38,63 +38,64 @@ export const CINE_KEYFRAMES = `
   @media (prefers-reduced-motion: reduce){.sf-cine *{animation:none!important}}
 `
 
-// Mur de téléphones (même esprit que le site) : colonnes de cartes 9:16 qui défilent en sens
-// alternés, en perspective, avec les vraies miniatures. CSS pur, aucun re-rendu.
-const WALL_CSS = `
-  .sf-wall{position:absolute;inset:-12% -8%;perspective:1300px;overflow:hidden;pointer-events:none}
-  .sf-wall-in{position:absolute;left:50%;top:50%;display:flex;gap:16px;transform:translate(-50%,-50%) rotateX(20deg) rotateZ(-11deg) scale(1.05)}
-  .sf-wall-col{display:flex;flex-direction:column;gap:16px;width:150px;animation:sfWallUp 52s linear infinite;will-change:transform}
-  .sf-wall-col.dn{animation-name:sfWallDn}
-  .sf-wall-ph{position:relative;aspect-ratio:9/17;border-radius:20px;overflow:hidden;background:#141416;border:1px solid rgba(255,255,255,.1);box-shadow:0 0 0 3px #0E0E10}
-  .sf-wall-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-  .sf-wall-ph i{position:absolute;top:6px;left:50%;width:34%;height:9px;margin-left:-17%;border-radius:99px;background:#000}
-  .sf-wall-ph b{position:absolute;left:8px;top:22px;padding:3px 7px;border-radius:99px;font-size:9.5px;font-weight:800;color:#0A0A0B;background:#fff}
-  .sf-wall-ph b.run{color:#fff;background:rgba(139,92,246,.9)}
-  @keyframes sfWallUp{from{transform:translateY(0)}to{transform:translateY(calc(-50% - 8px))}}
-  @keyframes sfWallDn{from{transform:translateY(calc(-50% - 8px))}to{transform:translateY(0)}}
-  @media (prefers-reduced-motion: reduce){.sf-wall-col{animation:none!important}}
+// Collage photo du hero : sélection FIXE de portraits (public/site, même style que le site),
+// en colonnes décalées qui flottent doucement — propre, quelles que soient les photos de la Banque.
+const SITE = (n: number) => `${import.meta.env.BASE_URL}site/c${n}.webp`
+const COLLAGE: { n: number; chip?: 'ok' | 'run' }[][] = [[{ n: 9 }, { n: 4, chip: 'run' }], [{ n: 3, chip: 'ok' }, { n: 11 }], [{ n: 13 }, { n: 6, chip: 'ok' }]]
+const COLLAGE_CSS = `
+  @keyframes sfColA{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+  @keyframes sfColB{0%,100%{transform:translateY(-10px)}50%{transform:translateY(8px)}}
+  @media (prefers-reduced-motion: reduce){.sf-col{animation:none!important}}
 `
-function PhoneWall({ photos, cols }: { photos: string[]; cols: number }) {
-  const at = (n: number) => photos.length ? photos[n % photos.length] : null
+export function HeroCollage({ height = 440 }: { height?: number }) {
   return (
-    <div className="sf-wall" aria-hidden="true">
-      <div className="sf-wall-in">
-        {Array.from({ length: cols }, (_, c) => (
-          <div key={c} className={'sf-wall-col' + (c % 2 ? ' dn' : '')} style={{ animationDuration: `${48 + (c % 3) * 8}s` }}>
-            {[0, 1].map(d => Array.from({ length: 4 }, (_, i) => {
-              const n = c * 3 + i * 2, src = at(n)
-              return <span key={`${d}-${i}`} className="sf-wall-ph">{src && <img src={src} alt="" loading="lazy" />}<i />{(c + i) % 3 === 0 && <b className={(c + i) % 2 ? 'run' : ''}>{(c + i) % 2 ? 'Publication…' : '✓ Publié'}</b>}</span>
-            }))}
+    <div aria-hidden="true" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '60%', overflow: 'hidden', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 34%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 34%)' }}>
+      <style>{COLLAGE_CSS}</style>
+      <div style={{ position: 'absolute', right: -30, top: '50%', transform: 'translateY(-50%) rotate(-4deg)', display: 'flex', gap: 14 }}>
+        {COLLAGE.map((col, c) => (
+          <div key={c} className="sf-col" style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: c === 1 ? -70 : 40, animation: `${c % 2 ? 'sfColB' : 'sfColA'} ${9 + c * 2}s ease-in-out infinite` }}>
+            {col.map(ph => (
+              <span key={ph.n} style={{ position: 'relative', display: 'block', width: Math.round(height * 0.42), aspectRatio: '3 / 4', borderRadius: 20, overflow: 'hidden', background: '#141416', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 60px -30px rgba(0,0,0,.9)' }}>
+                <img src={SITE(ph.n)} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `cineKen ${14 + ph.n % 5}s ease-in-out ${-ph.n}s infinite alternate` }} />
+                <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 55%, rgba(0,0,0,.55))' }} />
+                {ph.chip && (
+                  <span style={{ position: 'absolute', left: 10, bottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 800, whiteSpace: 'nowrap',
+                    background: ph.chip === 'ok' ? 'rgba(255,255,255,.95)' : 'rgba(139,92,246,.92)', color: ph.chip === 'ok' ? '#0A0A0B' : '#fff', boxShadow: '0 8px 20px -8px rgba(0,0,0,.6)' }}>
+                    {ph.chip === 'ok' ? '✓ Reel publié' : 'Publication…'}
+                  </span>
+                )}
+              </span>
+            ))}
           </div>
         ))}
       </div>
+      {/* Étalonnage : légère teinte violette + assombrissement en bas/haut. */}
+      <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(9,9,10,.55) 0%, transparent 20%, transparent 80%, rgba(9,9,10,.65) 100%), linear-gradient(120deg, rgba(139,92,246,.10), rgba(236,72,153,.06))' }} />
     </div>
   )
 }
 
-/** Hero de l'Accueil : texte à gauche sur noir profond (halo violet discret), mur de téléphones
- *  à droite qui se fond dans le noir — photos atténuées pour que le texte reste roi. */
-export function HomeHero({ photos, kicker, line1, line2, sub, stats, cta, onCta, secondary, onSecondary, footer }: {
-  photos: string[]; kicker: string; line1: ReactNode; line2: ReactNode; sub?: ReactNode; stats?: { v: ReactNode; l: string }[]
+/** Hero de l'Accueil : texte à gauche sur noir profond (halo violet), orbite des comptes à droite.
+ *  Fond : grille de points discrète, aucune photo (plus propre que des miniatures au hasard). */
+export function HomeHero({ kicker, line1, line2, sub, stats, visual, cta, onCta, secondary, onSecondary, footer }: {
+  photos?: string[]; kicker: string; line1: ReactNode; line2: ReactNode; sub?: ReactNode; stats?: { v: ReactNode; l: string }[]; visual?: ReactNode
   cta: string; onCta: () => void; secondary?: string; onSecondary?: () => void; footer?: ReactNode
 }) {
-  const narrow = useNarrow(860)
+  const narrow = useNarrow(980)
+  const mid = useNarrow(1340)
   return (
-    <section className="sf-cine" style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 24, border: '1px solid rgba(255,255,255,0.07)', background: '#09090A', minHeight: narrow ? 400 : 420, display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-      <style>{CINE_KEYFRAMES + WALL_CSS}</style>
-      {/* Mur à droite (fondu vers la gauche) ; en mobile, derrière le texte, très assombri. */}
-      <span style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: narrow ? '100%' : '64%', WebkitMaskImage: narrow ? undefined : 'linear-gradient(to right, transparent 0%, #000 42%)', maskImage: narrow ? undefined : 'linear-gradient(to right, transparent 0%, #000 42%)', filter: 'brightness(.62) saturate(.8) contrast(1.05)' }}>
-        <PhoneWall photos={photos} cols={narrow ? 4 : 6} />
-      </span>
-      <span style={{ position: 'absolute', inset: 0, background: narrow
-        ? 'linear-gradient(180deg, rgba(9,9,10,.78), rgba(9,9,10,.9) 60%, #09090A)'
-        : 'linear-gradient(180deg, rgba(9,9,10,.55) 0%, transparent 22%, transparent 78%, rgba(9,9,10,.7) 100%), linear-gradient(90deg, #09090A 0%, rgba(9,9,10,.9) 30%, rgba(9,9,10,.15) 70%)' }} />
-      <span style={{ position: 'absolute', left: '-8%', top: '-30%', width: 620, height: 620, borderRadius: 999, background: 'radial-gradient(circle, rgba(139,92,246,.22), transparent 62%)', filter: 'blur(10px)', animation: 'cineGlow 7s ease-in-out infinite', pointerEvents: 'none' }} />
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 16, padding: narrow ? '34px 20px 26px' : '46px 48px 40px', maxWidth: narrow ? '100%' : 620, animation: 'cineUp .6s cubic-bezier(.2,.8,.2,1) both' }}>
+    <section className="sf-cine" style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 24, border: '1px solid rgba(255,255,255,0.07)', background: '#09090A', minHeight: narrow ? 0 : 440, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, marginBottom: 16 }}>
+      <style>{CINE_KEYFRAMES}</style>
+      {!narrow && <HeroCollage />}
+      {narrow && <span style={{ position: 'absolute', inset: 0, opacity: 0.28, backgroundImage: `url(${SITE(3)})`, backgroundSize: 'cover', backgroundPosition: 'center 30%' }} />}
+      {narrow && <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(9,9,10,.55), #09090A 85%)' }} />}
+      <span style={{ position: 'absolute', left: '-10%', top: '-35%', width: 640, height: 640, borderRadius: 999, background: 'radial-gradient(circle, rgba(139,92,246,.2), transparent 62%)', animation: 'cineGlow 7s ease-in-out infinite', pointerEvents: 'none' }} />
+      <span style={{ position: 'absolute', right: '-6%', bottom: '-40%', width: 560, height: 560, borderRadius: 999, background: 'radial-gradient(circle, rgba(236,72,153,.1), transparent 62%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'relative', zIndex: 2, flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 16, padding: narrow ? '34px 20px 26px' : mid ? '40px 0 34px 36px' : '46px 0 40px 48px', maxWidth: narrow ? '100%' : 620, animation: 'cineUp .6s cubic-bezier(.2,.8,.2,1) both' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#C4B5FD' }}>
           <span style={{ width: 7, height: 7, borderRadius: 99, background: '#A78BFA', boxShadow: '0 0 0 4px rgba(167,139,250,.2)' }} />{kicker}
         </span>
-        <h1 style={{ ...H1, letterSpacing: '-0.055em', lineHeight: 0.9, fontSize: narrow ? 'clamp(34px, 10vw, 46px)' : 'clamp(46px, 5vw, 76px)' }}>
+        <h1 style={{ ...H1, letterSpacing: '-0.055em', lineHeight: 0.9, fontSize: narrow ? 'clamp(34px, 10vw, 52px)' : mid ? 'clamp(40px, 3.9vw, 56px)' : 'clamp(56px, 4.6vw, 76px)' }}>
           <span style={{ display: 'block', color: '#F4F4F5' }}>{line1}</span>
           <span style={{ display: 'block', background: 'linear-gradient(90deg,#C4B5FD,#F472B6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{line2}</span>
         </h1>
@@ -116,6 +117,7 @@ export function HomeHero({ photos, kicker, line1, line2, sub, stats, cta, onCta,
         </span>
         {footer && <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{footer}</span>}
       </div>
+      {!narrow && visual && <div style={{ position: 'relative', zIndex: 1, flexShrink: 0, marginRight: mid ? 20 : 36, animation: 'cineUp .8s .1s cubic-bezier(.2,.8,.2,1) both' }}>{visual}</div>}
     </section>
   )
 }
