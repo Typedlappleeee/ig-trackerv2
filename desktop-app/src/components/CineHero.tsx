@@ -7,7 +7,7 @@ import { fmtNumber } from '@/lib/data'
 import { useNarrow } from '@/lib/ui'
 
 const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
-const LIME = '#D9FF43'
+const LIME = '#A78BFA'   // accent ScaleFlow (violet)
 export interface TopReel { thumb: string; username: string; views: number; score: number }
 const proxied = (u: string) => `${FN_URL}?img=${encodeURIComponent(u)}`
 
@@ -68,7 +68,7 @@ export function HomeHero({ photos, kicker, line1, line2, sub, cta, onCta, second
         </h1>
         <span style={{ fontSize: 14.5, fontWeight: 500, color: '#A1A1AA' }}>{sub}</span>
         <span style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button type="button" onClick={onCta} style={{ height: 42, padding: '0 20px', border: 'none', borderRadius: 11, background: LIME, color: '#0A0A0B', fontSize: 14, fontWeight: 750, cursor: 'pointer', boxShadow: '0 4px 0 #9CBF1E, 0 14px 30px -10px rgba(217,255,67,.55)', transition: 'transform .12s ease' }}
+          <button type="button" onClick={onCta} style={{ height: 42, padding: '0 20px', border: 'none', borderRadius: 11, background: LIME, color: '#fff', fontSize: 14, fontWeight: 750, cursor: 'pointer', boxShadow: '0 4px 0 #6D28D9, 0 14px 30px -10px rgba(167,139,250,.55)', transition: 'transform .12s ease' }}
             onMouseDown={e => { e.currentTarget.style.transform = 'translateY(2px)' }} onMouseUp={e => { e.currentTarget.style.transform = 'none' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none' }}>{cta}</button>
           {secondary && onSecondary && <button type="button" onClick={onSecondary} style={{ height: 42, padding: '0 18px', borderRadius: 11, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.06)', color: '#EDEDEF', fontSize: 14, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(6px)' }}>{secondary}</button>}
         </span>
@@ -88,7 +88,7 @@ export function ViralShowcase({ reels, onOpen }: { reels: TopReel[]; onOpen: () 
     <section className="sf-cine" style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, border: '1px solid rgba(255,255,255,0.07)', background: '#0C0C0D', marginBottom: 16 }}>
       <style>{CINE_KEYFRAMES}</style>
       <span style={{ position: 'absolute', top: -120, left: '20%', width: 260, height: 520, background: `linear-gradient(90deg, transparent, ${LIME}55, transparent)`, filter: 'blur(28px)', animation: 'cineStreak 7s ease-in-out infinite' }} />
-      <span style={{ position: 'absolute', top: -80, left: '45%', width: 380, height: 380, borderRadius: 999, background: 'radial-gradient(circle, rgba(217,255,67,.12), transparent 70%)', animation: 'cineGlow 5s ease-in-out infinite' }} />
+      <span style={{ position: 'absolute', top: -80, left: '45%', width: 380, height: 380, borderRadius: 999, background: 'radial-gradient(circle, rgba(167,139,250,.12), transparent 70%)', animation: 'cineGlow 5s ease-in-out infinite' }} />
       <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', padding: narrow ? '24px 18px 18px' : '30px 30px 22px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
         <div>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: LIME }}>● Veille Reels</span>
@@ -99,7 +99,7 @@ export function ViralShowcase({ reels, onOpen }: { reels: TopReel[]; onOpen: () 
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: LIME }}>Meilleur ratio · ×{best >= 10 ? Math.round(best) : best.toFixed(1)} la normale</span>
-          <span style={{ display: 'flex', gap: 14, padding: '9px 16px', borderRadius: 11, border: `1px solid ${LIME}55`, background: 'rgba(217,255,67,0.06)', fontFamily: "'JetBrains Mono', monospace", fontSize: 15, fontWeight: 700, color: LIME }}>
+          <span style={{ display: 'flex', gap: 14, padding: '9px 16px', borderRadius: 11, border: `1px solid ${LIME}55`, background: 'rgba(167,139,250,0.06)', fontFamily: "'JetBrains Mono', monospace", fontSize: 15, fontWeight: 700, color: LIME }}>
             <span>{fmtNumber(reels.length)} REELS</span><span style={{ opacity: 0.5 }}>:</span><span>{total >= 1e6 ? `${(total / 1e6).toFixed(1)}M` : `${Math.round(total / 1e3)}K`} VUES</span>
           </span>
         </div>
@@ -188,7 +188,7 @@ export function FeatureBanner({ kicker, line1, line2, text, cta, onCta, photos, 
         </h2>
         {text && <span style={{ fontSize: 13.5, lineHeight: 1.5, color: '#C4C4CC', maxWidth: 440 }}>{text}</span>}
         {(cta || meta) && <span style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
-          {cta && <button type="button" onClick={e => { e.stopPropagation(); onCta?.() }} style={{ height: 38, padding: '0 16px', border: 'none', borderRadius: 10, background: LIME, color: '#0A0A0B', fontSize: 13.5, fontWeight: 750, cursor: 'pointer', boxShadow: '0 3px 0 #9CBF1E' }}>{cta}</button>}
+          {cta && <button type="button" onClick={e => { e.stopPropagation(); onCta?.() }} style={{ height: 38, padding: '0 16px', border: 'none', borderRadius: 10, background: LIME, color: '#fff', fontSize: 13.5, fontWeight: 750, cursor: 'pointer', boxShadow: '0 3px 0 #6D28D9' }}>{cta}</button>}
           {meta && <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: '#D4D4D8', letterSpacing: '.04em' }}>{meta}</span>}
         </span>}
       </div>

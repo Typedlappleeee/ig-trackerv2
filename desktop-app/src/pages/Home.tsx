@@ -369,7 +369,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
             sub={series && <Delta now={series.rate7} prev={series.ratePrev7} unit="pts" />} onClick={() => onNavigate('activity')} />
           <CineStat label="Appareils" value={loading || !data ? '…' : fmtNumber(data.phoneCount)}
             sub={<span style={{ color: '#71717A' }}>{onNow !== null ? `${fmtNumber(onNow)} allumé(s) maintenant` : `${fmtNumber(data?.videoCount ?? 0)} médias en banque`}</span>} onClick={() => onNavigate('phones')} />
-          <CineStat label="Crédits" accent="#D9FF43" value={loading || balance === null ? '…' : fmtNumber(balance)}
+          <CineStat label="Crédits" accent="#A78BFA" value={loading || balance === null ? '…' : fmtNumber(balance)}
             sub={<span style={{ color: '#71717A' }}>{runway !== null ? `≈ ${fmtNumber(runway)} jour(s) au rythme actuel` : `≈ ${fmtNumber(Math.floor((balance ?? 0) / 2))} posts restants`}</span>} onClick={() => openTool(onNavigate, 'settings', { tab: 'billing' })} />
         </div>
       </CineSection>
