@@ -55,3 +55,22 @@ describe('connexion', () => {
     expect(passwordScore('Abcdefgh12!x')).toBe(4)
   })
 })
+
+describe('banque — pagination et quota', () => {
+  it('lit toutes les pages au-delà de 1000 lignes', async () => {
+    const { fetchAllRows } = await import('./bankStorage')
+    const all = Array.from({ length: 2345 }, (_, i) => ({ id: i }))
+    const make = () => ({ range: async (a: number, b: number) => ({ data: all.slice(a, b + 1), error: null }) })
+    const r = await fetchAllRows<{ id: number }>(make)
+    expect(r.data).toHaveLength(2345)
+    expect(r.error).toBeNull()
+  })
+  it('bloque au-delà de la limite, jamais en illimité', async () => {
+    const { quotaIssue } = await import('./bankStorage')
+    const G = 1024 ** 3
+    expect(quotaIssue({ used: 4 * G, quota: 5 * G, plan: 'standard' }, 0.5 * G)).toBeNull()
+    expect(quotaIssue({ used: 4.8 * G, quota: 5 * G, plan: 'standard' }, 0.5 * G)).toMatch(/Pas assez/)
+    expect(quotaIssue({ used: 5 * G, quota: 5 * G, plan: 'standard' }, 1)).toMatch(/Espace plein/)
+    expect(quotaIssue({ used: 999 * G, quota: null, plan: 'organisation' }, G)).toBeNull()
+  })
+})

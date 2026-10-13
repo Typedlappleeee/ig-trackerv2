@@ -10,6 +10,7 @@ import { Btn, Chip, Icon, Panel, PanelHead, PageHead, FIELD, MONO, Skeleton, Ske
 import { supabase, type OrgRole } from '@/lib/supabase'
 import { fetchBalance, fetchOrgBalance, fmtNumber, type OrgState } from '@/lib/data'
 import { takeOpenArg } from '@/lib/openTool'
+import { useBankUsage, fmtBytes, PLAN_LABEL } from '@/lib/bankStorage'
 import { geelarkFetch } from '@/lib/geelark'
 import { generateCaption } from '@/lib/ai'
 
@@ -352,6 +353,8 @@ function BillingTab({ theme, user, org }: { theme: Theme; user: User; org: OrgSt
   const exp = lic?.expires_at ? new Date(lic.expires_at) : null
   const daysLeft = exp ? Math.ceil((exp.getTime() - Date.now()) / 86_400_000) : null
   const masked = lic?.key ? `${lic.key.slice(0, 4)}-••••-••••-${lic.key.slice(-4)}` : null
+  const { usage } = useBankUsage(currentOrg?.id ?? null)
+  const pct = usage?.quota ? Math.min(100, Math.round((usage.used / usage.quota) * 100)) : 0
   const PRICES: [string, string][] = [['Reel / TikTok', '2 cr / compte'], ['Story', '1 cr / compte'], ['Tâche automatique', '50 cr / jour'], ['Studio & outils IA', 'gratuit']]
   return (
     <Stack>
@@ -373,6 +376,20 @@ function BillingTab({ theme, user, org }: { theme: Theme; user: User; org: OrgSt
           </span>
         </div>
       </div>
+
+      {usage && (
+        <Panel theme={theme}>
+          <PanelHead title="Espace de la banque" sub={usage.quota ? `Abonnement ${PLAN_LABEL[usage.plan] ?? usage.plan} · Standard 5 Go · Pro 15 Go · Organisation 50 Go` : 'Espace illimité'} />
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <b style={{ color: '#EDEDEF' }}>{usage.quota ? `${fmtBytes(usage.used)} / ${fmtBytes(usage.quota)}` : fmtBytes(usage.used)}</b>
+              {usage.quota !== null && <span style={{ color: pct >= 80 ? '#FBBF24' : '#8B8B94' }}>{pct} %</span>}
+            </span>
+            {usage.quota !== null && <span style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${Math.max(2, pct)}%`, background: pct >= 100 ? '#F87171' : pct >= 80 ? '#FBBF24' : theme.accent }} /></span>}
+            <span style={{ fontSize: 12, color: '#71717A' }}>La corbeille compte jusqu’à ce qu’elle soit vidée (7 jours). Au-delà de la limite, les nouveaux envois sont bloqués.</span>
+          </div>
+        </Panel>
+      )}
 
       <Panel theme={theme}>
         <PanelHead title="Utiliser un code de crédits" sub={currentOrg ? 'Crédité sur le solde de l’organisation.' : 'Crédité sur ton solde.'} />

@@ -143,9 +143,11 @@ export function useHubData(user: User, org: OrgState, infra: InfraKey) {
     phonesQ = scopeInfra(phonesQ, infra)
     if (restrictedGroups) phonesQ = phonesQ.in('group_name', restrictedGroups)
 
-    const bankQ = currentOrg
+    // Même compte que la Banque : sans la corbeille ni les marqueurs de dossiers vides.
+    const bankQ = (currentOrg
       ? supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('org_id', currentOrg.id)
-      : supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null)
+      : supabase.from('content_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('org_id', null))
+      .is('deleted_at', null).or('storage_path.not.is.null,file_url.not.is.null')
 
     const spQ = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const prQ = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)

@@ -124,7 +124,7 @@ vi.mock('@/lib/supabase', () => {
     const b: Record<string, unknown> = {}
     const chain = () => b
     Object.assign(b, {
-      select: chain, eq: chain, is: chain, order: chain, upsert: chain, delete: chain,
+      select: chain, eq: chain, is: chain, order: chain, upsert: chain, delete: chain, range: chain,
       in: (_c: string, ids: string[]) => { st.ids = ids; return b },
       update: () => { st.op = 'update'; return b },
       then: (res: (v: unknown) => void) => {
