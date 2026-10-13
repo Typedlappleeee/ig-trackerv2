@@ -2,8 +2,9 @@
 // une » animé, recherche, catégories, favoris, récemment utilisés. Un clic ouvre l'outil
 // précis (onglet / format) via openTool. Catalogue : src/lib/tools.ts.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { User } from '@supabase/supabase-js'
+import { CURATED } from '@/lib/curated'
 import { supabase } from '@/lib/supabase'
+import type { User } from '@supabase/supabase-js'
 import type { OrgState } from '@/lib/data'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Icon, FIELD } from '@/lib/ui'
@@ -15,36 +16,25 @@ import { FeatureBanner } from '@/components/CineHero'
 
 const FAV_KEY = 'sf-fav-tools'
 function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
-const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
 
-// Vraies photos pour les cartes : miniatures de la Veille Reels (via le proxy d'images,
-// Instagram bloque l'affichage direct) et de la banque de l'utilisateur.
-export function usePhotos(user: User, org: OrgState): { viral: string[]; bank: string[] } {
-  const [viral, setViral] = useState<string[]>([])
-  const [bank, setBank] = useState<string[]>([])
-  const orgId = org.currentOrg?.id ?? null
+// Photos des visuels (cartes, bandeaux, collage de l'accueil) : les VRAIES miniatures des Reels
+// de la Veille (les plus vus d'abord, via le proxy d'images) — plus de photos de la Banque prises
+// au hasard. Repli sur la sélection maison (lib/curated) tant que la Veille est vide.
+const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
+let reelCache: string[] | null = null
+export function usePhotos(_user?: User, _org?: OrgState): { viral: string[]; bank: string[] } {
+  const [reels, setReels] = useState<string[]>(reelCache ?? [])
   useEffect(() => {
+    if (reelCache) return
     let alive = true
-    void (async () => {
-      const r = await supabase.from('viral_reels').select('thumb, views').order('views', { ascending: false }).limit(24)
-      const v = ((r.data ?? []) as { thumb: string | null }[]).map(x => x.thumb).filter((x): x is string => !!x)
-      if (alive) setViral([...new Set(v)].map(u => `${FN_URL}?img=${encodeURIComponent(u)}`))
-      const q = supabase.from('content_bank').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(60)
-      const b = await (orgId ? q.eq('org_id', orgId) : q.eq('user_id', user.id).is('org_id', null))
-      const rows = ((b.data ?? []) as { thumbnail_url?: string | null; thumbnail_path?: string | null; storage_path?: string | null; media_type?: string | null; notes?: string | null }[])
-        .filter(x => !/^__sf_/.test(x.notes ?? ''))
-      const direct = rows.map(x => x.thumbnail_url).filter((x): x is string => !!x && /^https?:/.test(x))
-      const paths = rows.map(x => x.thumbnail_url ? null : x.thumbnail_path ?? (x.media_type === 'image' || /\.(jpe?g|png|webp)$/i.test(x.storage_path ?? '') ? x.storage_path : null)).filter((x): x is string => !!x).slice(0, 30)
-      let signed: string[] = []
-      if (paths.length) {
-        const { data } = await supabase.storage.from('content').createSignedUrls(paths, 3600)
-        signed = (data ?? []).map(d => d.signedUrl).filter((x): x is string => !!x)
-      }
-      if (alive) setBank([...direct, ...signed].slice(0, 30))
-    })().catch(() => {})
+    void supabase.from('viral_reels').select('thumb, views').order('views', { ascending: false }).limit(40).then(({ data }) => {
+      const v = [...new Set(((data ?? []) as { thumb: string | null }[]).map(x => x.thumb).filter((x): x is string => !!x))]
+      reelCache = v.map(u => `${FN_URL}?img=${encodeURIComponent(u)}`)
+      if (alive) setReels(reelCache)
+    })
     return () => { alive = false }
-  }, [user.id, orgId])
-  return { viral, bank }
+  }, [])
+  return { viral: reels.length >= 4 ? reels : CURATED, bank: [] }
 }
 /** Sélecteur de photos d'une carte : banque d'abord pour Créer / Banque, Veille d'abord ailleurs ;
  *  décalé par carte pour que deux cartes voisines n'aient pas les mêmes images. */

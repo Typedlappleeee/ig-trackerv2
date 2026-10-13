@@ -1,10 +1,11 @@
 import { lazy, Suspense, useState } from 'react'
-import { ToolPreview } from '@/components/ToolArt'
+import { BigCard, ToolTabs } from '@/components/BigCard'
+import { HomeHero } from '@/components/CineHero'
 import { usePhotos } from '@/pages/Explore'
 import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Chip, Icon, PageHead, Skeleton, SkeletonRows } from '@/lib/ui'
+import { Icon, Skeleton, SkeletonRows } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { peekRelaunch } from '@/lib/runHistory'
 // Chaque composer n'est chargé qu'à l'ouverture de son format.
@@ -51,56 +52,45 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
   const visible = (f: { id: string }) => isAdmin || (f.id !== 'cross' && f.id !== 'photo')
   const photos = usePhotos(user, org)
 
-  if (mode === 'reels') return <Suspense fallback={<Wait />}><ReelsComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
-  if (mode === 'tiktok') return <Suspense fallback={<Wait />}><ReelsComposer key="tiktok" platform="tiktok" theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
-  if (mode === 'story') return <Suspense fallback={<Wait />}><StoryComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
-  if (mode === 'photo' && isAdmin) return <Suspense fallback={<Wait />}><PhotoComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
-  if (mode === 'cross' && isAdmin) return <Suspense fallback={<Wait />}><CrossComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
+  const FORMAT_TABS = FORMATS.filter(visible).map(f => ({ k: f.id, t: f.t, i: f.icon }))
+  // Un format ouvert : barre des formats en haut (le format actif bien visible, 1 clic pour changer).
+  const tabs = (k: string) => <ToolTabs backLabel="Publication" onBack={() => setMode(null)} items={FORMAT_TABS} current={k} onPick={setMode} />
+  if (mode === 'reels') return <>{tabs('reels')}<Suspense fallback={<Wait />}><ReelsComposer key="reels" theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
+  if (mode === 'tiktok') return <>{tabs('tiktok')}<Suspense fallback={<Wait />}><ReelsComposer key="tiktok" platform="tiktok" theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
+  if (mode === 'story') return <>{tabs('story')}<Suspense fallback={<Wait />}><StoryComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
+  if (mode === 'photo' && isAdmin) return <>{tabs('photo')}<Suspense fallback={<Wait />}><PhotoComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
+  if (mode === 'cross' && isAdmin) return <>{tabs('cross')}<Suspense fallback={<Wait />}><CrossComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
 
+  const pool = [...photos.viral, ...photos.bank]
+  let n = 0
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead title="Publication" sub="Choisis un format. Les comptes et le contenu se règlent à l'étape suivante." />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        {PLATS.filter(pl => FORMATS.some(f => f.plat === pl.k && visible(f))).map(pl => (
-          <section key={pl.k}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, flexShrink: 0, background: '#161618', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}><Icon d={pl.icon} size={13} /></span>
-              <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{pl.label}</span>
-                <span style={{ fontSize: 12, color: '#71717A' }}>{pl.sub}</span>
+      <HomeHero photos={photos.viral} kicker="Publication" line1="Publie partout" line2="en un clic"
+        sub="Choisis un format : les comptes, la vidéo et la légende se règlent à l’étape suivante. Chaque téléphone publie en parallèle."
+        stats={[{ v: '2 cr', l: 'par Reel / compte' }, { v: '1 cr', l: 'par Story / compte' }, { v: '24/7', l: 'programmable' }]}
+        cta="Publier un Reel" onCta={() => setMode('reels')} secondary="Publier une Story" onSecondary={() => setMode('story')} />
+      {PLATS.filter(pl => FORMATS.some(f => f.plat === pl.k && visible(f))).map(pl => (
+        <section key={pl.k} style={{ marginBottom: 26 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', margin: '6px 2px 14px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 11, flexShrink: 0, background: `${pl.color}1F`, border: `1px solid ${pl.color}55`, color: pl.color }}><Icon d={pl.icon} size={17} /></span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, textTransform: 'uppercase', color: '#F4F4F5' }}>{pl.label}</span>
+                <span style={{ fontSize: 12.5, color: '#8B8B94' }}>{pl.sub}</span>
               </span>
-            </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(260px,100%),1fr))', gap: 12 }}>
-        {FORMATS.filter(f => f.plat === pl.k && visible(f)).map((f, fi) => {
-          const adminOnly = (f.id === 'cross' || f.id === 'photo') && !isAdmin
-          const locked = !f.ready || adminOnly
-          return (
-          <button key={f.id} disabled={locked} onClick={locked ? undefined : f.id === 'reels' ? () => setMode('reels') : f.id === 'tiktok' ? () => setMode('tiktok') : f.id === 'story' ? () => setMode('story') : f.id === 'photo' ? () => setMode('photo') : f.id === 'cross' ? () => setMode('cross') : undefined} style={{
-            display: 'flex', flexDirection: 'column', gap: 12, padding: 16, borderRadius: 8, background: '#111113',
-            border: '1px solid rgba(255,255,255,0.07)', cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.5 : 1,
-            textAlign: 'left', transition: 'background .12s ease, border-color .12s ease', boxSizing: 'border-box', fontFamily: 'inherit',
-          }}
-            onMouseEnter={e => { if (locked) return; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#161618' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
-            <ToolPreview id={f.id} pick={k => { const pool = [...photos.viral, ...photos.bank]; return pool.length ? pool[(f.id === 'reels' ? k : fi * 3 + k + f.id.length + 3) % pool.length] : null }} />
-            <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
-                <Icon d={f.icon} size={15} />
-              </span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.t}</span>
             </span>
-            <span style={{ flex: 1, fontSize: 12.5, lineHeight: 1.55, color: '#8B8B94' }}>{adminOnly ? 'Réservé au superadmin.' : f.d}</span>
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <Chip text={adminOnly ? 'Admin' : f.ready ? f.cost : 'Bientôt'} tone={adminOnly ? 'violet' : 'mute'} />
-              {!locked && <span style={{ display: 'flex', color: '#71717A' }}><Icon d="M5 12h14|M13 6l6 6-6 6" size={14} /></span>}
-            </span>
-          </button>
-          )
-        })}
-      </div>
-          </section>
-        ))}
-      </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(300px,100%),1fr))', gap: 14 }}>
+            {FORMATS.filter(f => f.plat === pl.k && visible(f)).map(f => {
+              const k = n++
+              return (
+                <BigCard key={f.id} i={k} preview={f.id} icon={f.icon} title={f.t} desc={f.d} foot={f.cost} tag={f.id === 'reels' ? 'Populaire' : undefined}
+                  onOpen={() => setMode(f.id)} pick={j => pool.length ? pool[(f.id === 'reels' ? j : k * 3 + j + 2) % pool.length] : null} />
+              )
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }

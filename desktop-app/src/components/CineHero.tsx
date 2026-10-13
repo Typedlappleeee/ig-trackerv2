@@ -4,6 +4,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { compact } from '@/lib/data'
+import { curated as SITE } from '@/lib/curated'
 import { useNarrow } from '@/lib/ui'
 
 const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
@@ -40,23 +41,25 @@ export const CINE_KEYFRAMES = `
 
 // Collage photo du hero : sélection FIXE de portraits (public/site, même style que le site),
 // en colonnes décalées qui flottent doucement — propre, quelles que soient les photos de la Banque.
-const SITE = (n: number) => `${import.meta.env.BASE_URL}site/c${n}.webp`
 const COLLAGE: { n: number; chip?: 'ok' | 'run' }[][] = [[{ n: 9 }, { n: 4, chip: 'run' }], [{ n: 3, chip: 'ok' }, { n: 11 }], [{ n: 13 }, { n: 6, chip: 'ok' }]]
 const COLLAGE_CSS = `
   @keyframes sfColA{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
   @keyframes sfColB{0%,100%{transform:translateY(-10px)}50%{transform:translateY(8px)}}
   @media (prefers-reduced-motion: reduce){.sf-col{animation:none!important}}
 `
-export function HeroCollage({ height = 440 }: { height?: number }) {
+export function HeroCollage({ height = 440, photos }: { height?: number; photos?: string[] }) {
+  // Vraies miniatures (Veille) si on en a assez, sinon la sélection maison.
+  const src = (n: number, slot: number) => photos && photos.length >= 6 ? photos[slot % photos.length] : SITE(n)
+  let slot = 0
   return (
     <div aria-hidden="true" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '60%', overflow: 'hidden', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 34%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 34%)' }}>
       <style>{COLLAGE_CSS}</style>
       <div style={{ position: 'absolute', right: -30, top: '50%', transform: 'translateY(-50%) rotate(-4deg)', display: 'flex', gap: 14 }}>
         {COLLAGE.map((col, c) => (
           <div key={c} className="sf-col" style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: c === 1 ? -70 : 40, animation: `${c % 2 ? 'sfColB' : 'sfColA'} ${9 + c * 2}s ease-in-out infinite` }}>
-            {col.map(ph => (
+            {col.map(ph => { const url = src(ph.n, slot++); return (
               <span key={ph.n} style={{ position: 'relative', display: 'block', width: Math.round(height * 0.42), aspectRatio: '3 / 4', borderRadius: 20, overflow: 'hidden', background: '#141416', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 60px -30px rgba(0,0,0,.9)' }}>
-                <img src={SITE(ph.n)} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `cineKen ${14 + ph.n % 5}s ease-in-out ${-ph.n}s infinite alternate` }} />
+                <img src={url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `cineKen ${14 + ph.n % 5}s ease-in-out ${-ph.n}s infinite alternate` }} />
                 <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 55%, rgba(0,0,0,.55))' }} />
                 {ph.chip && (
                   <span style={{ position: 'absolute', left: 10, bottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 800, whiteSpace: 'nowrap',
@@ -65,7 +68,7 @@ export function HeroCollage({ height = 440 }: { height?: number }) {
                   </span>
                 )}
               </span>
-            ))}
+            ) })}
           </div>
         ))}
       </div>
@@ -77,7 +80,7 @@ export function HeroCollage({ height = 440 }: { height?: number }) {
 
 /** Hero de l'Accueil : texte à gauche sur noir profond (halo violet), orbite des comptes à droite.
  *  Fond : grille de points discrète, aucune photo (plus propre que des miniatures au hasard). */
-export function HomeHero({ kicker, line1, line2, sub, stats, visual, cta, onCta, secondary, onSecondary, footer }: {
+export function HomeHero({ photos, kicker, line1, line2, sub, stats, visual, cta, onCta, secondary, onSecondary, footer }: {
   photos?: string[]; kicker: string; line1: ReactNode; line2: ReactNode; sub?: ReactNode; stats?: { v: ReactNode; l: string }[]; visual?: ReactNode
   cta: string; onCta: () => void; secondary?: string; onSecondary?: () => void; footer?: ReactNode
 }) {
@@ -86,8 +89,8 @@ export function HomeHero({ kicker, line1, line2, sub, stats, visual, cta, onCta,
   return (
     <section className="sf-cine" style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 24, border: '1px solid rgba(255,255,255,0.07)', background: '#09090A', minHeight: narrow ? 0 : 440, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, marginBottom: 16 }}>
       <style>{CINE_KEYFRAMES}</style>
-      {!narrow && <HeroCollage />}
-      {narrow && <span style={{ position: 'absolute', inset: 0, opacity: 0.28, backgroundImage: `url(${SITE(3)})`, backgroundSize: 'cover', backgroundPosition: 'center 30%' }} />}
+      {!narrow && <HeroCollage photos={photos} />}
+      {narrow && <span style={{ position: 'absolute', inset: 0, opacity: 0.28, backgroundImage: `url(${photos && photos.length ? photos[0] : SITE(3)})`, backgroundSize: 'cover', backgroundPosition: 'center 30%' }} />}
       {narrow && <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(9,9,10,.55), #09090A 85%)' }} />}
       <span style={{ position: 'absolute', left: '-10%', top: '-35%', width: 640, height: 640, borderRadius: 999, background: 'radial-gradient(circle, rgba(139,92,246,.2), transparent 62%)', animation: 'cineGlow 7s ease-in-out infinite', pointerEvents: 'none' }} />
       <span style={{ position: 'absolute', right: '-6%', bottom: '-40%', width: 560, height: 560, borderRadius: 999, background: 'radial-gradient(circle, rgba(236,72,153,.1), transparent 62%)', pointerEvents: 'none' }} />

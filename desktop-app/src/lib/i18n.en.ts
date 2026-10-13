@@ -2758,6 +2758,10 @@ export const EN: Dict = {
     "Story publiée": "Story posted",
     "Warmup terminé": "Warmup done",
     "✓ Reel publié": "✓ Reel posted",
+    "Choisis un format : les comptes, la vidéo et la légende se règlent à l’étape suivante. Chaque téléphone publie en parallèle.": "Pick a format: accounts, video and caption are set in the next step. Every phone posts in parallel.",
+    "par Reel / compte": "per Reel / account",
+    "par Story / compte": "per Story / account",
+    "programmable": "schedulable",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
