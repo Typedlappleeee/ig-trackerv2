@@ -389,6 +389,17 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, ...r }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
 
+    // ── Genjutsu (Higgsfield) : recréer un Reel avec ses images de référence. Super-admin
+    // uniquement pour l'instant ; clé en secrets HIGGSFIELD_KEY_ID / HIGGSFIELD_KEY_SECRET. ──
+    if ((body?.genjutsu === 'submit' || body?.genjutsu === 'status') && filterUserId) {
+      const { data: prof } = await db.from('profiles').select('email, is_super_admin').eq('id', filterUserId).maybeSingle()
+      const admin = !!prof?.is_super_admin || prof?.email === 'tintin.aunea@gmail.com'
+      if (!admin) return new Response(JSON.stringify({ ok: false, error: 'Réservé aux admins.' }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+      const { genjutsuSubmit, genjutsuStatus } = await import('./genjutsu.ts')
+      const out = body.genjutsu === 'submit' ? await genjutsuSubmit(db, filterUserId, body) : await genjutsuStatus(db, filterUserId, body)
+      return new Response(JSON.stringify(out), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
+
     // ── Veille Reels : fiche d'un Reel (vidéo fraîche + légende) et proxy vidéo
     // (lecture / téléchargement : le CDN Instagram bloque le navigateur en CORS) ──
     if (body?.viral === 'media' && filterUserId && typeof body.code === 'string') {

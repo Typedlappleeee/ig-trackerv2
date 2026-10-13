@@ -74,6 +74,7 @@ export const TOOLS: Tool[] = [
   { id: 'overlay', label: 'Incrustation', desc: 'Place une photo ou une vidéo par-dessus ta vidéo.', cat: 'create', page: 'studio', arg: { tool: 'overlay' }, icon: I.layers, a: '#93C5FD', b: '#1E40AF', cost: 'gratuit' },
   { id: 'montage', label: 'Montage', desc: 'Coupe, ordonne, transitions simples.', cat: 'create', page: 'studio', arg: { tool: 'montage' }, icon: I.scissors, a: '#FCA5A5', b: '#991B1B', cost: 'gratuit' },
   { id: 'mixer', label: 'Texte sur vidéo', desc: 'Une légende incrustée par-dessus ta vidéo.', cat: 'create', page: 'studio', arg: { tool: 'mixer' }, icon: I.type, a: '#C4B5FD', b: '#4C1D95', cost: 'gratuit' },
+  { id: 'genjutsu', label: 'Genjutsu IA', desc: 'Recrée un Reel avec tes images de référence (Higgsfield).', cat: 'create', page: 'genjutsu', icon: I.wand, a: '#C4B5FD', b: '#7C3AED', badge: 'Nouveau', cost: 'IA', gate: 'admin' },
   { id: 'autocontent', label: 'Auto-contenu', desc: 'Une source → des variantes uniques avec légendes.', cat: 'create', page: 'blowContent', icon: I.wand, a: '#F0ABFC', b: '#86198F', badge: 'Bêta', cost: 'gratuit' },
   // ── Comptes
   { id: 'warmup', label: 'Warmup', desc: 'Sessions de scroll, likes et follows pour chauffer tes comptes.', cat: 'accounts', page: 'warmup', arg: { tab: 'warm' }, icon: I.flame, a: '#FB923C', b: '#7C2D12', badge: 'Populaire', infra: GL },
