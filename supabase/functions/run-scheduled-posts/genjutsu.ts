@@ -3,7 +3,7 @@
 // le casting est reconstruit à partir de 1 à 8 images de référence (Banque).
 // API asynchrone : submit → request_id + status_url → poll → video.url (MP4).
 // À la fin, la vidéo est copiée dans la Banque (dossier « IA ») — une seule fois par request_id.
-// Secrets Supabase : HIGGSFIELD_KEY_ID + HIGGSFIELD_KEY_SECRET. Réservé au super-admin (pour l'instant).
+// Clé : saisie dans l'app (table sf_secrets) ou secrets HIGGSFIELD_KEY_ID + HIGGSFIELD_KEY_SECRET. Super-admin seulement.
 // Docs : https://docs.higgsfield.ai/docs/models/genjutsu/motion-transfer
 // deno-lint-ignore-file no-explicit-any
 
@@ -11,10 +11,14 @@ const API = 'https://api.higgsfield.ai'
 const MODEL = 'higgsfield/genjutsu/motion-transfer/v1.0'
 const RESOLUTIONS = ['480p', '720p', '1080p'] as const
 
-function authHeader(): string | null {
+// Clé : secrets d'environnement, sinon celle saisie dans l'app (table sf_secrets, « ID:SECRET »).
+async function authHeader(db: any): Promise<string | null> {
   const id = Deno.env.get('HIGGSFIELD_KEY_ID') ?? ''
   const secret = Deno.env.get('HIGGSFIELD_KEY_SECRET') ?? ''
-  return id && secret ? `Key ${id}:${secret}` : null
+  if (id && secret) return `Key ${id}:${secret}`
+  const { data } = await db.from('sf_secrets').select('value').eq('name', 'higgsfield').maybeSingle()
+  const v = String(data?.value ?? '').trim()
+  return /^[^:\s]+:[^:\s]+$/.test(v) ? `Key ${v}` : null
 }
 
 /** Ligne de la Banque appartenant à l'utilisateur (perso) ou à son organisation. */
@@ -41,7 +45,7 @@ async function isMember(db: any, orgId: string, userId: string): Promise<boolean
 const json = (b: unknown) => b
 
 export async function genjutsuSubmit(db: any, userId: string, body: any): Promise<unknown> {
-  const auth = authHeader()
+  const auth = await authHeader(db)
   if (!auth) return json({ ok: false, error: 'missing_key' })
   const orgId: string | null = typeof body.org_id === 'string' ? body.org_id : null
   if (orgId && !(await isMember(db, orgId, userId))) return json({ ok: false, error: 'Organisation non autorisée.' })
@@ -83,7 +87,7 @@ export async function genjutsuSubmit(db: any, userId: string, body: any): Promis
 }
 
 export async function genjutsuStatus(db: any, userId: string, body: any): Promise<unknown> {
-  const auth = authHeader()
+  const auth = await authHeader(db)
   if (!auth) return json({ ok: false, error: 'missing_key' })
   const requestId = typeof body.request_id === 'string' ? body.request_id : ''
   const statusUrl = typeof body.status_url === 'string' ? body.status_url : ''
