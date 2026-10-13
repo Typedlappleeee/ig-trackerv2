@@ -8,6 +8,7 @@
 // Servi publiquement par api/l.js (/l/<code>, ou tapmylink.fr/<code>).
 // Tables : supabase/migrations/20261011_links.sql + 20261011b_links_v2.sql.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { fetchAllRows } from '@/lib/bankStorage'
 import { takeOpenArg } from '@/lib/openTool'
 import { renderLinkPage, normalizeDesign, normalizeUrl, GRADIENTS, EFFECTS, type LinkDesign } from '../../api/_linkpage.js'
 import type { User } from '@supabase/supabase-js'
@@ -78,6 +79,7 @@ export default function Links({ theme, user, org }: { theme: Theme; user: User; 
   const [groups, setGroups] = useState<Group[]>([])
   const [phones, setPhones] = useState<Phone[]>([])
   const [clicks, setClicks] = useState<Click[]>([])
+  const clicksRef = useRef<Click[]>([])
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState<'' | 'v1' | 'v2'>('')
   const [tab, setTab] = useState<'dash' | 'links' | 'pages' | 'settings'>(() => (takeOpenArg<{ tab?: 'dash' | 'links' | 'pages' | 'settings' }>('links')?.tab) ?? 'dash')
@@ -93,18 +95,22 @@ export default function Links({ theme, user, org }: { theme: Theme; user: User; 
   const load = useCallback(async (bg = false) => {
     if (!bg) setLoading(true)
     const since = new Date(Date.now() - 31 * DAY).toISOString()
+    const newest = bg ? clicksRef.current[0]?.created_at : undefined
     const [pg, ln, gr, ph, ck] = await Promise.all([
       scope(supabase.from('link_pages').select('*')).order('created_at'),
       scope(supabase.from('tracked_links').select('*')).order('created_at'),
       scope(supabase.from('link_groups').select('id,name')).order('created_at'),
       scope(supabase.from('phones').select('id,phone_name,ig_username,geelark_id')).order('phone_name'),
-      supabase.from('link_clicks').select('*').eq('bot', false).gte('created_at', since).order('created_at', { ascending: false }).limit(50000),
+      // Clics : colonnes utiles seulement, paginés (le plafond de 1 000 lignes tronquait les stats).
+      // En rafraîchissement auto, on ne récupère que les clics plus récents que le dernier connu.
+      fetchAllRows<Click>(() => { const q = supabase.from('link_clicks').select('link_id,page_id,button,created_at,device,country,visit_id').eq('bot', false); return (newest ? q.gt('created_at', newest) : q.gte('created_at', since)).order('created_at', { ascending: false }) }),
     ])
     const noTable = (e: { message: string } | null) => !!e && /relation|does not exist|schema cache|column/i.test(e.message)
     setMissing(noTable(pg.error) ? 'v1' : noTable(gr.error) ? 'v2' : '')
     setPages(((pg.data ?? []) as LinkPage[]).map(p => ({ ...p, theme: p.theme ?? 'dark' })))
     setLinks(((ln.data ?? []) as TLink[]).map(l => ({ ...l, kind: l.kind ?? 'landing', notes: l.notes ?? '', overrides: l.overrides ?? {} })))
-    setGroups((gr.data ?? []) as Group[]); setPhones((ph.data ?? []) as Phone[]); setClicks((ck.data ?? []) as Click[])
+    setGroups((gr.data ?? []) as Group[]); setPhones((ph.data ?? []) as Phone[]); const next = newest ? [...ck.data, ...clicksRef.current.filter(c => c.created_at >= since)] : ck.data
+    clicksRef.current = next; setClicks(next)
     setLoading(false)
   }, [scope])
   useEffect(() => { void load() }, [load])

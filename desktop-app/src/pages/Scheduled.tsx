@@ -108,7 +108,8 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
   }
 
   const cell: CSSProperties = { fontSize: 13, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }
-  const upcoming = rows.filter(r => new Date(r.scheduled_at).getTime() > Date.now())
+  // À venir : le plus proche d'abord (la requête trie du plus récent au plus ancien).
+  const upcoming = rows.filter(r => new Date(r.scheduled_at).getTime() > Date.now()).sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))
   const past = rows.filter(r => new Date(r.scheduled_at).getTime() <= Date.now())
 
   const rowView = (s: Sched, i = 0) => {
@@ -126,8 +127,11 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
           <div style={{ fontSize: 12, color: '#71717A' }}>{n} compte{n > 1 ? 's' : ''}</div>
         </span>
         <span style={{ ...cell, minWidth: 150 }}>{new Date(s.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}</span>
-        <span style={{ flex: 1, minWidth: 120, fontSize: 12, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.caption || '—'}</span>
-        <Chip text={st.label} tone={st.tone} />
+        <span style={{ flex: 1, minWidth: 120, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+          <span data-no-tr style={{ fontSize: 12, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.caption || '—'}</span>
+          {s.error_msg && <span data-no-tr title={s.error_msg} style={{ fontSize: 11.5, color: '#F87171', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.error_msg}</span>}
+        </span>
+        <span title={s.error_msg ?? undefined}><Chip text={st.label} tone={st.tone} /></span>
         {(cancellable || cancelServer) && <Btn theme={theme} sm tone="danger" label={busy === s.id ? '…' : 'Annuler'} disabled={busy === s.id} onClick={() => setConfirmCancel(s)} />}
       </div>
     )

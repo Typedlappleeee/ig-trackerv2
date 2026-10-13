@@ -47,6 +47,8 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
   // Cross-posting réservé au superadmin (pas à tout le monde — chaque owner d'orga
   // ne doit PAS y avoir accès automatiquement).
   const isAdmin = isSuperAdmin
+  // Formats réservés au superadmin : masqués (au lieu d'une carte grisée) pour les autres.
+  const visible = (f: { id: string }) => isAdmin || (f.id !== 'cross' && f.id !== 'photo')
   const photos = usePhotos(user, org)
 
   if (mode === 'reels') return <Suspense fallback={<Wait />}><ReelsComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
@@ -59,7 +61,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <PageHead title="Publication" sub="Choisis un format. Les comptes et le contenu se règlent à l'étape suivante." />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        {PLATS.map(pl => (
+        {PLATS.filter(pl => FORMATS.some(f => f.plat === pl.k && visible(f))).map(pl => (
           <section key={pl.k}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, flexShrink: 0, background: '#161618', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}><Icon d={pl.icon} size={13} /></span>
@@ -69,7 +71,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
               </span>
             </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(260px,100%),1fr))', gap: 12 }}>
-        {FORMATS.filter(f => f.plat === pl.k).map((f, fi) => {
+        {FORMATS.filter(f => f.plat === pl.k && visible(f)).map((f, fi) => {
           const adminOnly = (f.id === 'cross' || f.id === 'photo') && !isAdmin
           const locked = !f.ready || adminOnly
           return (

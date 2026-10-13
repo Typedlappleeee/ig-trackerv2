@@ -7,6 +7,7 @@ import { isReleased, releaseLabel } from '@/lib/releases'
 import { fmtNumber } from '@/lib/data'
 import { searchTools, visibleTools } from '@/lib/tools'
 import { openTool } from '@/lib/openTool'
+import { useRuns } from '@/lib/runStore'
 
 export type PageKey =
   | 'hub'
@@ -53,7 +54,6 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       ] },
       { g: 'Parc', items: [
         { k: 'blowParc', l: 'Phone Farm', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined },
-        { k: 'insights', l: 'Performances', i: 'M22 12h-4l-3 9L9 3l-3 9H2' },
       ] },
     ]
   }
@@ -93,7 +93,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       // Analyse : disponible sur les DEUX infras. Chaque infra montre SES propres
       // données (GeeLark vs ScaleFlow Cloud), scopées par la présence de geelark_id.
       g: 'Analyse', items: [
-        { k: 'insights' as PageKey, l: 'Performances', i: 'M3 3v18h18|M7 15l4-6 4 3 5-8' },
+        // « Performances » masquée tant que la page est un placeholder (stats Meta à venir).
         { k: 'links' as PageKey, l: 'Liens', i: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1', soon: 'Nouveau' },
         // Veille Reels : sélection ScaleFlow (gérée par le super-admin) + comptes suivis par chacun.
         { k: 'viral' as PageKey, l: 'Veille Reels', i: 'M2 12h4l3-9 6 18 3-9h4', soon: 'Nouveau' },
@@ -167,6 +167,9 @@ export default function Shell({
   const [userMenu, setUserMenu] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [paletteQ, setPaletteQ] = useState('')
+  const runs = useRuns()
+  const live = runs.filter(r => r.status === 'running')
+  const bellRuns = [...live, ...runs.filter(r => r.status !== 'running')].slice(0, 5)
   const [bellOpen, setBellOpen] = useState(false)
   const inf = INFRAS[infra]
   const T = theme
@@ -373,7 +376,7 @@ export default function Shell({
               </button>
               <button onClick={onSignOut} style={{ ...menuItemStyle, color: '#F87171' }}>
                 <span style={{ display: 'flex' }}><Icon d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9" size={14} /></span>
-                Changer de compte
+                Se déconnecter
               </button>
             </div>
           )}
@@ -428,11 +431,12 @@ export default function Shell({
               cursor: 'pointer', overflow: 'hidden', flexShrink: 0, transition: 'background .12s ease',
             }}>
               <span style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 1.5, height: 10, flexShrink: 0, color: T.accentText }}>
-                <span style={{ width: 2, height: 6, borderRadius: 99, background: 'currentColor', animation: 'aBeat 1.1s ease-in-out infinite' }} />
-                <span style={{ width: 2, height: 10, borderRadius: 99, background: 'currentColor', animation: 'aBeat 1.1s ease-in-out 0.16s infinite' }} />
-                <span style={{ width: 2, height: 4, borderRadius: 99, background: 'currentColor', animation: 'aBeat 1.1s ease-in-out 0.32s infinite' }} />
+                <span style={{ width: 2, height: 6, borderRadius: 99, background: 'currentColor', animation: live.length ? 'aBeat 1.1s ease-in-out infinite' : 'none' }} />
+                <span style={{ width: 2, height: 10, borderRadius: 99, background: 'currentColor', animation: live.length ? 'aBeat 1.1s ease-in-out 0.16s infinite' : 'none' }} />
+                <span style={{ width: 2, height: 4, borderRadius: 99, background: 'currentColor', animation: live.length ? 'aBeat 1.1s ease-in-out 0.32s infinite' : 'none' }} />
               </span>
               <span style={{ position: 'relative', fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap' }}>Activité</span>
+              {live.length > 0 && <span style={{ position: 'relative', fontSize: 11, fontWeight: 700, padding: '0 6px', borderRadius: 99, background: 'rgba(167,139,250,0.2)', color: '#C4B5FD' }}>{live.length}</span>}
             </button>}
             <span style={{ position: 'relative' }}>
               <button onClick={() => setBellOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, background: bellOpen ? 'rgba(255,255,255,0.07)' : 'transparent', color: bellOpen ? '#EDEDEF' : '#8B8B94', cursor: 'pointer', transition: 'background .12s ease' }}
@@ -442,7 +446,17 @@ export default function Shell({
               {bellOpen && (
                 <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 260, zIndex: 50, borderRadius: 8, overflow: 'hidden', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)', animation: 'aIn 0.18s cubic-bezier(0.16,1,0.3,1) both' }}>
                   <div style={{ padding: '11px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>Notifications</div>
-                  <div style={{ padding: '22px 13px', textAlign: 'center', color: '#71717A', fontSize: 12 }}>Tu es à jour — rien de nouveau.</div>
+                  {bellRuns.length === 0
+                    ? <div style={{ padding: '22px 13px', textAlign: 'center', color: '#71717A', fontSize: 12 }}>Tu es à jour — rien de nouveau.</div>
+                    : bellRuns.map(r => (
+                      <div key={r.id} style={{ padding: '10px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#EDEDEF' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: r.status === 'running' ? '#A78BFA' : r.failed ? '#FBBF24' : '#4ADE80', animation: r.status === 'running' ? 'aPulse 1.6s ease-in-out infinite' : 'none' }} />
+                          <span data-no-tr style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+                        </span>
+                        <span style={{ fontSize: 11.5, color: '#8B8B94', paddingLeft: 13 }}>{r.status === 'running' ? `En cours · ${r.done}/${r.total}` : `Terminé · ${r.done - r.failed}/${r.total} OK${r.failed ? ` · ${r.failed} échec(s)` : ''}`}</span>
+                      </div>
+                    ))}
                   <button onClick={() => { setPage('activity'); setBellOpen(false) }} style={{ ...menuItemStyle, borderTop: '1px solid rgba(255,255,255,0.05)', justifyContent: 'center', color: T.accentText, fontWeight: 600 }}>Voir l'activité</button>
                 </div>
               )}

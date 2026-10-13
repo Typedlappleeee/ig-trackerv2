@@ -41,7 +41,9 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
   const [phones, setPhones] = useState<Phone[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [sel, setSel] = useState<Set<string>>(new Set())
+  // Ouverture depuis Téléphones (« Chauffer ») : onglet + téléphones déjà cochés.
+  const [openArg] = useState(() => takeOpenArg<{ tab?: WTab; phones?: string[] }>('warmup'))
+  const [sel, setSel] = useState<Set<string>>(() => new Set(openArg?.phones ?? []))
   const [dur, setDur] = useState(30)
   const [keyword, setKeyword] = useState('')
 
@@ -50,7 +52,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
   const [runItems, setRunItems] = useState<RunItem[]>([])
   const [logs, setLogs] = useState<string[]>([])
   // Ouverture directe depuis Explorer : bon onglet.
-  const [wtab, setWtab] = useState<WTab>(() => takeOpenArg<{ tab?: WTab }>('warmup')?.tab ?? 'warm')
+  const [wtab, setWtab] = useState<WTab>(() => openArg?.tab ?? 'warm')
   const [wgroup, setWgroup] = useState('Tous')
   const [rotationConfigured, setRotationConfigured] = useState(false)
   const [rotationOn, setRotationOn] = useState(false)
