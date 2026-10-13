@@ -80,7 +80,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
           }}
             onMouseEnter={e => { if (locked) return; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#161618' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
-            <ToolPreview id={f.id} pick={k => { const pool = [...photos.viral, ...photos.bank]; return pool.length ? pool[(fi * 3 + k + f.id.length) % pool.length] : null }} />
+            <ToolPreview id={f.id} pick={k => { const pool = [...photos.viral, ...photos.bank]; return pool.length ? pool[(f.id === 'reels' ? k : fi * 3 + k + f.id.length + 3) % pool.length] : null }} />
             <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
                 <Icon d={f.icon} size={15} />
