@@ -2543,6 +2543,7 @@ export const EN: Dict = {
     "Légende (pool + style), coupe, micro-vitesse, mode Tendance et spoof device/GPS — en un clic, chaque compte reçoit une vidéo unique.": "Caption (pool + style), trim, micro-speed, Trend mode and device/GPS spoof — in one click, every account gets a unique video.",
     "Lancer l’Auto-contenu →": "Launch Auto-content →",
     "GRATUIT": "FREE",
+    "Suppression impossible : ces médias appartiennent à un autre membre (seuls owner / admin peuvent les supprimer).": "Can’t delete: these media belong to another member (only owner / admin can delete them).",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -2967,5 +2968,8 @@ export const EN: Dict = {
     ["{0} · {1} outil(s)", "{0} · {1} tool(s)"],
     ["{0} publiés", "{0} posted"],
     ["{0} comptes prêts · 2 crédits par compte", "{0} accounts ready · 2 credits per account"],
+    ["Suppression impossible : {0}", "Can’t delete: {0}"],
+    ["{0}/{1} média(s) → corbeille. Les autres appartiennent à un autre membre.", "{0}/{1} media → trash. The others belong to another member."],
+    ["Restauration impossible : {0}", "Can’t restore: {0}"],
   ],
 }

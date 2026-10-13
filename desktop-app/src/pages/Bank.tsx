@@ -523,38 +523,37 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     let deleted = 0; let firstErr: string | null = null
     const nowIso = new Date().toISOString()
     for (const part of chunk(ids, 200)) {
-      let q = supabase.from('content_bank').update({ deleted_at: nowIso }).in('id', part).select('id')
-      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-      const { data, error } = await q
+      // Pas de filtre d'espace ici : les droits (RLS) décident déjà qui peut supprimer quoi.
+      // Le filtre d'espace faisait échouer en silence les médias rangés dans l'autre espace.
+      const { data, error } = await supabase.from('content_bank').update({ deleted_at: nowIso }).in('id', part).select('id')
       if (error) { if (!firstErr) firstErr = error.message } else { deleted += (data?.length ?? 0) }
     }
 
     setDeleting(false); setConfirmDel(null)
     if (deleted === 0) {
-      setNotice(firstErr
-        ? `Échec de la mise en corbeille : ${firstErr}`
-        : "Aucun média mis en corbeille — ils appartiennent à un autre compte ou à une organisation où tu n'es pas admin.")
+      toast(firstErr
+        ? `Suppression impossible : ${firstErr}`
+        : "Suppression impossible : ces médias appartiennent à un autre membre (seuls owner / admin peuvent les supprimer).", 'bad', 9000)
       setSel(new Set()); load(); return
     }
-    setNotice(deleted < ids.length
-      ? `${deleted}/${ids.length} média(s) → corbeille (restaurable 7 j) — les autres ne t'appartiennent pas.`
-      : `${deleted} média(s) → corbeille (restaurable 7 j).`)
+    // Retrait immédiat de l'écran, sans attendre le rechargement.
+    setItems(cur => cur.filter(i => !ids.includes(i.id)))
+    toast(deleted < ids.length
+      ? `${deleted}/${ids.length} média(s) → corbeille. Les autres appartiennent à un autre membre.`
+      : `${deleted} média(s) → corbeille (restaurable 7 j).`, deleted < ids.length ? 'info' : 'ok')
     setSel(new Set()); load()
   }
 
   // Corbeille : restaurer (deleted_at = null) ou supprimer DÉFINITIVEMENT (row + fichier).
   async function restoreMedia(ids: string[]) {
     if (!ids.length) return
-    let q = supabase.from('content_bank').update({ deleted_at: null }).in('id', ids)
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    await q; load()
+    const { error } = await supabase.from('content_bank').update({ deleted_at: null }).in('id', ids)
+    if (error) toast(`Restauration impossible : ${error.message}`, 'bad'); load()
   }
   async function purgeMedia(items: ContentItem[]) {
     const ids = items.map(i => i.id)
     if (!ids.length) return
-    let q = supabase.from('content_bank').delete().in('id', ids).select('id')
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data: gone, error } = await q
+    const { data: gone, error } = await supabase.from('content_bank').delete().in('id', ids).select('id')
     if (error) { toast(`Échec : ${error.message}`, 'bad'); return }
     const goneIds = new Set(((gone ?? []) as { id: string }[]).map(r => r.id))
     const paths = items.filter(i => goneIds.has(i.id)).flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
