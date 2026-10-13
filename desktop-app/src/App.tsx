@@ -233,7 +233,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'scheduled'
         ? <Scheduled theme={theme} infra={infra} user={user} org={org} />
         : page === 'explore'
-        ? <Explore theme={theme} infra={infra} isAdmin={license.isSuperAdmin} onOpen={openT} />
+        ? <Explore theme={theme} infra={infra} isAdmin={license.isSuperAdmin} onOpen={openT} user={user} org={org} />
         : page === 'ai'
         ? <AiTools theme={theme} user={user} org={org} onGo={(p, a) => openTool(setPage, p, a)} />
         : page === 'viral'
