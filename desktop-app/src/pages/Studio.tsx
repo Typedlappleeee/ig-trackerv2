@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ToolPreview } from '@/components/ToolArt'
+import { FeatureBanner } from '@/components/CineHero'
 import { usePhotos } from '@/pages/Explore'
 import { fetchAllRows } from '@/lib/bankStorage'
 import { takeOpenArg } from '@/lib/openTool'
@@ -210,20 +211,14 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
     return (
       <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
         <PageHead title="Studio vidéo" sub="Une vidéo source, tous tes outils VIP — incrustation, montage, mixer, remix, spoof, sous-titres. Tout est gratuit, aucun crédit consommé." />
+        {/* Auto-contenu mis en avant : grand bandeau photo plein cadre. */}
         {onNavigate && (
-          <button onClick={() => onNavigate('blowContent')} style={{
-            display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: 16, marginBottom: 12, borderRadius: 8, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
-            background: '#111113', border: '1px solid rgba(255,255,255,0.07)', transition: 'background .12s ease, border-color .12s ease',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#161618' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: '#4ADE80' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={15} /></span>
-            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>Auto-contenu</span><Chip text="Recommandé" tone="ok" /></span>
-              <span style={{ fontSize: 12.5, lineHeight: 1.55, color: '#8B8B94' }}>Une source → X variantes uniques en un clic : légende (pool + style), coupe, micro-vitesse, mode Tendance et spoof (device/GPS).</span>
-            </span>
-            <span style={{ display: 'flex', color: '#71717A' }}><Icon d="M9 18l6-6-6-6" size={16} /></span>
-          </button>
+          <div style={{ marginBottom: 16 }}>
+            <FeatureBanner height={240} kicker="Recommandé · Auto-contenu" line1="Une vidéo," line2="des dizaines de variantes"
+              text="Légende (pool + style), coupe, micro-vitesse, mode Tendance et spoof device/GPS — en un clic, chaque compte reçoit une vidéo unique."
+              cta="Lancer l’Auto-contenu →" onCta={() => onNavigate('blowContent')} meta="GRATUIT"
+              photos={[0, 1, 2, 3].map(k => { const pool = [...photos.bank, ...photos.viral]; return pool.length ? pool[(k + 1) % pool.length] : null })} />
+          </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 12 }}>
           {TOOLS.map((t, ti) => (
