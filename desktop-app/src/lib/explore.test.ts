@@ -6,7 +6,7 @@ import { openTool, takeOpenArg, recentTools } from './openTool'
 function mem() { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k), clear: () => m.clear() } }
 beforeEach(() => { Object.assign(globalThis, { sessionStorage: mem(), localStorage: mem() }) })
 
-const PAGES = ['hub', 'publish', 'scheduled', 'studio', 'blowContent', 'warmup', 'flowBuilder', 'phones', 'viral', 'links', 'activity', 'bank']
+const PAGES = ['hub', 'publish', 'scheduled', 'studio', 'blowContent', 'warmup', 'flowBuilder', 'phones', 'viral', 'links', 'activity', 'bank', 'genjutsu']
 
 describe('catalogue d’outils', () => {
   it('ids uniques, pages connues', () => {
@@ -19,6 +19,8 @@ describe('catalogue d’outils', () => {
     expect(visibleTools('geelark', true, now).some(t => t.id === 'cross')).toBe(true)
     expect(visibleTools('geelark', false, new Date('2026-10-01')).some(t => t.id === 'mass-edit')).toBe(false)
     expect(visibleTools('cloud', false, now).some(t => t.id === 'reels')).toBe(false)
+    expect(visibleTools('geelark', false, now).some(t => t.id === 'genjutsu')).toBe(false)
+    expect(visibleTools('geelark', true, now).some(t => t.id === 'genjutsu')).toBe(true)
   })
   it('recherche sans accents', () => {
     expect(searchTools(TOOLS, 'legendes').map(t => t.id)).toContain('bank-captions')
