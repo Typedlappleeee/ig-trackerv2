@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ToolPreview } from '@/components/ToolArt'
+import { usePhotos } from '@/pages/Explore'
 import { fetchAllRows } from '@/lib/bankStorage'
 import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
@@ -42,6 +44,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
 }) {
   const { currentOrg } = org
   const conns = useConnections(user, org)
+  const photos = usePhotos(user, org)
   const [tool, setTool] = useState<string | null>(() => (takeOpenArg<{ tool?: string }>('studio')?.tool) ?? null)
   const [videos, setVideos] = useState<Video[]>([])
   const [src, setSrc] = useState<Set<string>>(new Set())
@@ -223,13 +226,14 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
           </button>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 12 }}>
-          {TOOLS.map(t => (
+          {TOOLS.map((t, ti) => (
             <button key={t.k} onClick={() => { setTool(t.k); setSrc(new Set()); setResults([]); setLogs([]); setOverlayImgs([]) }} style={{
               display: 'flex', flexDirection: 'column', gap: 12, padding: 16, borderRadius: 8, background: '#111113', textAlign: 'left',
               border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', transition: 'background .12s ease, border-color .12s ease', boxSizing: 'border-box',
             }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#161618' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
+              <ToolPreview id={t.k} pick={k => { const pool = [...photos.bank, ...photos.viral]; return pool.length ? pool[(ti * 3 + k) % pool.length] : null }} />
               <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
                   <Icon d={t.i} size={15} />

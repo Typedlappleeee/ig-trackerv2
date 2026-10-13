@@ -1,4 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
+import { ToolPreview } from '@/components/ToolArt'
+import { usePhotos } from '@/pages/Explore'
 import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
@@ -45,6 +47,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
   // Cross-posting réservé au superadmin (pas à tout le monde — chaque owner d'orga
   // ne doit PAS y avoir accès automatiquement).
   const isAdmin = isSuperAdmin
+  const photos = usePhotos(user, org)
 
   if (mode === 'reels') return <Suspense fallback={<Wait />}><ReelsComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
   if (mode === 'tiktok') return <Suspense fallback={<Wait />}><ReelsComposer key="tiktok" platform="tiktok" theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense>
@@ -66,7 +69,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
               </span>
             </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(260px,100%),1fr))', gap: 12 }}>
-        {FORMATS.filter(f => f.plat === pl.k).map(f => {
+        {FORMATS.filter(f => f.plat === pl.k).map((f, fi) => {
           const adminOnly = (f.id === 'cross' || f.id === 'photo') && !isAdmin
           const locked = !f.ready || adminOnly
           return (
@@ -77,6 +80,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
           }}
             onMouseEnter={e => { if (locked) return; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.background = '#161618' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
+            <ToolPreview id={f.id} pick={k => { const pool = [...photos.viral, ...photos.bank]; return pool.length ? pool[(fi * 3 + k + f.id.length) % pool.length] : null }} />
             <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}>
                 <Icon d={f.icon} size={15} />
