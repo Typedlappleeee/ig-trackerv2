@@ -151,8 +151,8 @@ export function useNarrow(px = 860): boolean {
 export function Panel({ theme, style, children }: { theme: Theme; style?: CSSProperties; children: ReactNode }) {
   return (
     <div style={{
-      borderRadius: 8, background: theme.panelBg,
-      border: `1px solid ${theme.panelEdge}`, overflow: 'hidden',
+      borderRadius: 16, background: '#111113',
+      border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden',
       ...style,
     }}>{children}</div>
   )
@@ -161,11 +161,11 @@ export function Panel({ theme, style, children }: { theme: Theme; style?: CSSPro
 export function PanelHead({ title, right, sub }: { title: ReactNode; right?: ReactNode; sub?: string }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', minHeight: 48, boxSizing: 'border-box',
+      display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', minHeight: 52, boxSizing: 'border-box',
       borderBottom: '1px solid rgba(255,255,255,0.06)',
     }}>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{title}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#EDEDEF', letterSpacing: '-0.015em' }}>{title}</span>
         {sub ? <span style={{ fontSize: 12, color: '#8B8B94', lineHeight: 1.45 }}>{sub}</span> : null}
       </span>
       {right ? <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>{right}</span> : null}
@@ -178,8 +178,9 @@ export function PageHead({ title, sub, actions }: { title: ReactNode; sub?: Reac
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
       <div style={{ minWidth: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.2, color: '#EDEDEF' }}>{title}</h1>
-        {sub ? <p style={{ margin: '6px 0 0', fontSize: 13, lineHeight: 1.55, color: '#8B8B94', maxWidth: 620 }}>{sub}</p> : null}
+        <span style={{ display: 'block', width: 28, height: 3, borderRadius: 9, background: 'linear-gradient(90deg,#A78BFA,#F472B6)', marginBottom: 12 }} />
+        <h1 style={{ margin: 0, fontSize: 'clamp(26px, 2.8vw, 38px)', fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 0.98, textTransform: 'uppercase', color: '#F4F4F5' }}>{title}</h1>
+        {sub ? <p style={{ margin: '10px 0 0', fontSize: 13.5, lineHeight: 1.55, color: '#8B8B94', maxWidth: 660 }}>{sub}</p> : null}
       </div>
       {actions ? <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{actions}</div> : null}
     </div>
