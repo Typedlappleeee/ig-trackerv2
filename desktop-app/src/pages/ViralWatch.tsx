@@ -11,8 +11,7 @@ import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { FeatureBanner, CineStat } from '@/components/CineHero'
-import { Btn, Empty, Icon, Modal, PageHead, Panel, PanelHead, SkeletonRows, Segmented, FIELD, TEXTAREA, toast, useNarrow } from '@/lib/ui'
+import { Btn, Empty, Icon, Modal, PageHead, Panel, PanelHead, Segmented, FIELD, TEXTAREA, toast, useNarrow } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber } from '@/lib/data'
 
@@ -117,61 +116,116 @@ function IconBtn({ d, title, onClick }: { d: string; title: string; onClick: () 
     </button>
   )
 }
-function Badge({ score }: { score: number }) {
+function Badge({ score, big }: { score: number; big?: boolean }) {
   if (!(score > 0)) return null
   const hot = score >= 3
-  return <span style={{ padding: '3px 8px', borderRadius: 99, fontSize: 12, fontWeight: 700, background: hot ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'rgba(10,10,11,0.6)', boxShadow: hot ? '0 4px 14px -4px rgba(236,72,153,.7)' : 'none', color: '#fff', backdropFilter: 'blur(4px)', whiteSpace: 'nowrap' }}>×{ratio(score)} la normale</span>
+  return <span title={`×${ratio(score)} les vues habituelles du compte`} style={{ display: 'inline-flex', alignItems: 'center', height: big ? 28 : 22, padding: big ? '0 11px' : '0 8px', borderRadius: 99, fontSize: big ? 13.5 : 12, fontWeight: 800, letterSpacing: '-0.01em', background: hot ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'rgba(10,10,11,0.55)', border: hot ? 'none' : '1px solid rgba(255,255,255,0.16)', boxShadow: hot ? '0 6px 18px -6px rgba(236,72,153,.8)' : 'none', color: '#fff', backdropFilter: 'blur(8px)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{hot ? '🔥 ' : ''}×{ratio(score)}</span>
 }
+// Nombres compacts (1,6 M · 84 k) : plus lisibles sur les cartes.
+const compact = (n: number) => new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
 function Stat({ d, v }: { d: string; v: number }) {
-  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon d={d} size={12} />{fmtNumber(v)}</span>
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon d={d} size={12} />{compact(v)}</span>
 }
 
-function ReelCard({ r, rank, onOpen }: { r: Reel; rank: number; onOpen: () => void }) {
+// Carte d'un Reel. « big » = n°1 de la sélection (grande carte, actions toujours visibles).
+function ReelCard({ r, rank, big, onOpen }: { r: Reel; rank: number; big?: boolean; onOpen: () => void }) {
   const [hover, setHover] = useState(false)
   const touch = useNarrow(760)
-  const hot = r.score >= 3
+  const showActs = big || hover || touch
   const podium = rank <= 3
-  const showActs = hover || touch
   return (
     <div role="button" tabIndex={0} title="Voir le Reel" onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter') onOpen() }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: '#121214',
-        border: `1px solid ${hover ? 'rgba(167,139,250,0.55)' : hot ? 'rgba(236,72,153,0.35)' : 'rgba(255,255,255,0.07)'}`,
-        transform: hover ? 'translateY(-4px)' : 'none', boxShadow: hover ? '0 22px 50px -24px rgba(139,92,246,0.7)' : 'none',
-        transition: 'transform .25s cubic-bezier(0.16,1,0.3,1), box-shadow .25s ease, border-color .25s ease', animation: `aIn .45s cubic-bezier(0.16,1,0.3,1) ${Math.min(rank, 16) * 25}ms both` }}>
-      {r.thumb && <img src={img(r.thumb)} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: hover ? 'scale(1.06)' : 'scale(1)', transition: 'transform .6s cubic-bezier(0.16,1,0.3,1)' }} />}
-      <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.55) 0%, transparent 22%, transparent 48%, rgba(0,0,0,.92) 100%)' }} />
+      style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: big ? 22 : 16, overflow: 'hidden', cursor: 'pointer', background: '#121214', outline: 'none',
+        gridColumn: big ? 'span 2' : undefined, gridRow: big ? 'span 2' : undefined,
+        border: `1px solid ${hover ? 'rgba(167,139,250,0.6)' : 'rgba(255,255,255,0.07)'}`,
+        transform: hover ? 'translateY(-3px)' : 'none', boxShadow: hover ? '0 24px 50px -26px rgba(139,92,246,0.75)' : '0 1px 0 rgba(255,255,255,0.03) inset',
+        transition: 'transform .3s cubic-bezier(0.16,1,0.3,1), box-shadow .3s ease, border-color .3s ease', animation: `aIn .5s cubic-bezier(0.16,1,0.3,1) ${Math.min(rank, 18) * 22}ms both` }}>
+      {r.thumb
+        ? <img src={img(r.thumb)} alt="" loading={rank <= 8 ? 'eager' : 'lazy'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: hover ? 'scale(1.05)' : 'scale(1)', transition: 'transform .8s cubic-bezier(0.16,1,0.3,1)' }} />
+        : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3F3F46' }}><Icon d={I.play} size={28} /></span>}
+      <span style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, rgba(0,0,0,.5) 0%, transparent ${big ? 18 : 24}%, transparent ${big ? 55 : 45}%, rgba(0,0,0,.94) 100%)` }} />
 
-      <span style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
-        <span style={{ fontSize: podium ? 26 : 15, fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 1, color: '#fff', fontVariantNumeric: 'tabular-nums',
-          ...(podium ? { background: 'linear-gradient(135deg,#C4B5FD,#F472B6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,.6))' } : { textShadow: '0 1px 6px rgba(0,0,0,.7)' }) }}>#{rank}</span>
-        <Badge score={r.score} />
-      </span>
-
-      <span style={{ position: 'absolute', top: 44, right: 10, display: 'flex', flexDirection: 'column', gap: 6, opacity: showActs ? 1 : 0, transform: showActs ? 'none' : 'translateX(6px)', transition: 'opacity .2s ease, transform .2s ease', pointerEvents: showActs ? 'auto' : 'none' }}>
-        <IconBtn d={I.download} title="Télécharger la vidéo" onClick={() => void downloadReel(r)} />
-        <IconBtn d={I.link} title="Copier le lien" onClick={() => void copyText(reelUrl(r), 'Lien copié.')} />
-        <IconBtn d={I.external} title="Ouvrir sur Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
-      </span>
-
-      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0, transition: 'opacity .2s ease', pointerEvents: 'none' }}>
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: 99, background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.35)', backdropFilter: 'blur(8px)', color: '#fff' }}><Icon d={I.play} size={20} /></span>
-      </span>
-
-      <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 5, color: '#fff' }}>
-        <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{fmtNumber(r.views)}</span>
-          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#C4C4CC' }}>vues</span>
+      {/* Rang + ratio */}
+      <span style={{ position: 'absolute', top: big ? 16 : 10, left: big ? 16 : 10, right: big ? 16 : 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', height: big ? 28 : 22, padding: big ? '0 11px' : '0 8px', borderRadius: 99, fontFamily: "'JetBrains Mono', monospace", fontSize: big ? 13 : 11.5, fontWeight: 800, color: podium ? '#0A0A0B' : '#fff',
+          background: podium ? (rank === 1 ? '#F4F4F5' : 'rgba(244,244,245,0.82)') : 'rgba(10,10,11,0.55)', border: podium ? 'none' : '1px solid rgba(255,255,255,0.16)', backdropFilter: 'blur(8px)' }}>
+          {big ? 'N°1 · TOP VUES' : String(rank).padStart(2, '0')}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5, fontWeight: 600, color: '#D4D4D8' }}>
+        <Badge score={r.score} big={big} />
+      </span>
+
+      {/* Lecture au survol */}
+      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0, transform: hover ? 'scale(1)' : 'scale(.9)', transition: 'opacity .25s ease, transform .25s ease', pointerEvents: 'none' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: big ? 68 : 52, height: big ? 68 : 52, borderRadius: 99, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.4)', backdropFilter: 'blur(10px)', color: '#fff' }}><Icon d={I.play} size={big ? 24 : 20} /></span>
+      </span>
+
+      {/* Infos */}
+      <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: big ? '0 20px 20px' : '0 12px 12px', display: 'flex', flexDirection: 'column', gap: big ? 10 : 6, color: '#fff' }}>
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+          <span style={{ fontSize: big ? 'clamp(40px, 4.4vw, 60px)' : 26, fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 0.9, fontVariantNumeric: 'tabular-nums' }}>{compact(r.views)}</span>
+          <span style={{ fontSize: big ? 12 : 10.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#A1A1AA' }}>vues</span>
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: big ? 14 : 10, fontSize: big ? 13 : 11.5, fontWeight: 600, color: '#D4D4D8' }}>
           <Stat d={I.heart} v={r.likes} /><Stat d={I.comment} v={r.comments} />
-          <span style={{ marginLeft: 'auto', color: '#A1A1AA' }}>{engagement(r)} %</span>
+          <span style={{ color: '#A1A1AA' }}>{engagement(r)} %</span>
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#A1A1AA', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-          <span data-no-tr style={{ fontWeight: 650, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{r.username}</span>
-          <span style={{ marginLeft: 'auto', flexShrink: 0 }}>{fmtDate(r.taken_at)}</span>
+        <span style={{ height: 1, background: 'rgba(255,255,255,0.1)' }} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 30 }}>
+          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span data-no-tr style={{ fontSize: big ? 14 : 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{r.username}</span>
+            <span style={{ fontSize: 11.5, color: '#8B8B94' }}>{fmtDate(r.taken_at)}</span>
+          </span>
+          <span style={{ display: showActs ? 'flex' : 'none', gap: 5, animation: big || touch ? 'none' : 'aIn .2s ease both' }}>
+            <IconBtn d={I.download} title="Télécharger la vidéo" onClick={() => void downloadReel(r)} />
+            <IconBtn d={I.link} title="Copier le lien" onClick={() => void copyText(reelUrl(r), 'Lien copié.')} />
+            <IconBtn d={I.external} title="Ouvrir sur Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
+          </span>
         </span>
       </span>
+    </div>
+  )
+}
+
+// Bulles des comptes suivis (photo = leur meilleur Reel). Clic = filtrer sur ce compte.
+function AccountRail({ list, reels, value, onChange }: { list: Watch[]; reels: Reel[]; value: string; onChange: (u: string) => void }) {
+  const top = useMemo(() => {
+    const m = new Map<string, Reel>()
+    for (const r of reels) { const c = m.get(r.username); if (!c || r.views > c.views) m.set(r.username, r) }
+    return m
+  }, [reels])
+  const sorted = useMemo(() => [...list].sort((a, b) => (top.get(b.username)?.views ?? 0) - (top.get(a.username)?.views ?? 0)), [list, top])
+  if (list.length < 2) return null
+  const Bubble = ({ k, label, thumb, hot, on }: { k: string; label: string; thumb?: string | null; hot?: boolean; on: boolean }) => (
+    <button type="button" onClick={() => onChange(on && k ? '' : k)} title={label}
+      style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 72, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', color: on ? '#F4F4F5' : '#8B8B94' }}>
+      <span style={{ padding: 2.5, borderRadius: 99, background: on ? 'linear-gradient(135deg,#A78BFA,#F472B6)' : hot ? 'linear-gradient(135deg,rgba(167,139,250,.55),rgba(244,114,182,.55))' : 'rgba(255,255,255,0.1)', transition: 'transform .2s ease', transform: on ? 'scale(1.04)' : 'none' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 99, overflow: 'hidden', background: '#161618', border: '2.5px solid #0A0A0B', fontSize: 12, fontWeight: 800, color: '#F4F4F5' }}>
+          {thumb ? <img src={img(thumb)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : label === 'Tous' ? 'TOUS' : label.slice(1, 3).toUpperCase()}
+        </span>
+      </span>
+      <span data-no-tr={k ? true : undefined} style={{ maxWidth: '100%', fontSize: 11.5, fontWeight: on ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+    </button>
+  )
+  return (
+    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '2px 2px 8px', marginBottom: 10, scrollbarWidth: 'thin' }}>
+      <Bubble k="" label="Tous" on={!value} />
+      {sorted.map(w => { const t = top.get(w.username); return <Bubble key={w.id} k={w.username} label={`@${w.username}`} thumb={t?.thumb} hot={!!t && t.score >= 3} on={value === w.username} /> })}
+    </div>
+  )
+}
+
+// Bandeau de chiffres (une seule barre, séparateurs fins).
+function StatStrip({ items }: { items: { l: string; v: string; c?: string }[] }) {
+  const narrow = useNarrow(760)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, 1fr)' : `repeat(${items.length}, 1fr)`, borderRadius: 18, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', background: '#0F0F11', marginBottom: 16 }}>
+      {items.map((x, i) => (
+        <div key={x.l} style={{ padding: narrow ? '14px 16px' : '18px 22px', borderLeft: (narrow ? i % 2 : i) ? '1px solid rgba(255,255,255,0.06)' : 'none', borderTop: narrow && i >= 2 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#71717A' }}>{x.l}</div>
+          <div style={{ marginTop: 6, fontSize: narrow ? 26 : 32, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, color: x.c ?? '#F4F4F5', fontVariantNumeric: 'tabular-nums' }}>{x.v}</div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -386,8 +440,9 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
   const totalViews = periodReels.reduce((a, r) => a + r.views, 0)
   const best = periodReels.reduce((a, r) => Math.max(a, r.score), 0)
   const avgEng = periodReels.length ? Math.round(periodReels.reduce((a, r) => a + engagement(r), 0) / periodReels.length * 10) / 10 : 0
-  const heroPhotos = useMemo(() => [...periodReels].sort((a, b) => b.views - a.views).filter(r => r.thumb).slice(0, 4).map(r => img(r.thumb as string)), [periodReels])
   const showRefresh = tab === 'mine' ? tabWatch.length > 0 && !noScope : admin
+  const lastFetch = tabWatch.reduce<string | null>((a, w) => w.fetched_at && (!a || w.fetched_at > a) ? w.fetched_at : a, null)
+  const sinceTxt = lastFetch ? (() => { const m = Math.round((Date.now() - Date.parse(lastFetch)) / 60000); return m < 1 ? 'à l’instant' : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j` })() : null
 
   if (missing) return (
     <div><PageHead title="Veille Reels" sub="Les Reels qui explosent chez tes comptes de référence." />
@@ -396,35 +451,49 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <FeatureBanner kicker={tab === 'public' ? 'Veille Reels · Sélection ScaleFlow' : 'Veille Reels · Mes comptes'}
-        line1="Ce qui explose" line2="en ce moment"
-        text={tab === 'public' ? 'Les Reels qui cartonnent chez les comptes de référence choisis par ScaleFlow. Regarde, télécharge, inspire-toi.' : 'Suis tes comptes (ou ceux de tes modèles) et vois quelles vidéos marchent le mieux.'}
-        photos={heroPhotos} height={240}
-        meta={periodReels.length ? `${fmtNumber(periodReels.length)} REELS · ${fmtNumber(totalViews)} VUES` : undefined} />
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '14px 0 12px' }}>
-        <Segmented value={tab} onChange={setTab} options={[
-          { v: 'public', l: 'Sélection ScaleFlow', n: watch.filter(w => w.scope === 'public').length },
-          { v: 'mine', l: 'Mes comptes', n: watch.filter(w => w.scope === 'private').length },
-        ]} />
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* En-tête */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
+        <div style={{ minWidth: 0 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#A78BFA' }}>
+            <span style={{ width: 7, height: 7, borderRadius: 99, background: '#A78BFA', boxShadow: '0 0 0 4px rgba(167,139,250,.18)', animation: 'aPulse 1.8s ease-in-out infinite' }} />
+            Veille Reels{sinceTxt ? ` · relevé ${sinceTxt}` : ''}
+          </span>
+          <h1 style={{ margin: '10px 0 0', fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 0.92, textTransform: 'uppercase', fontSize: 'clamp(32px, 4vw, 56px)', color: '#F4F4F5' }}>
+            Ce qui explose <span style={{ color: '#52525B' }}>en ce moment</span>
+          </h1>
+          <p style={{ margin: '12px 0 0', fontSize: 14, lineHeight: 1.55, color: '#8B8B94', maxWidth: 620 }}>
+            {tab === 'public' ? 'Les Reels qui cartonnent chez les comptes de référence choisis par ScaleFlow. Regarde, télécharge, inspire-toi.' : 'Suis tes comptes (ou ceux de tes modèles) et vois quelles vidéos marchent le mieux.'}
+          </p>
+        </div>
+        <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {isAdmin && <Segmented value={userView ? 'user' : 'admin'} onChange={v => setUserView(v === 'user')} options={[{ v: 'admin', l: 'Admin' }, { v: 'user', l: 'Vue utilisateur' }]} />}
           {showRefresh && <Btn theme={theme} tone="primary" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={busy ? 'Relevé en cours…' : 'Actualiser maintenant'} disabled={busy} onClick={refresh} />}
         </span>
       </div>
 
+      {/* Source : sélection ScaleFlow / mes comptes */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        {([['public', 'Sélection ScaleFlow', watch.filter(w => w.scope === 'public').length], ['mine', 'Mes comptes', watch.filter(w => w.scope === 'private').length]] as const).map(([v, l, n]) => (
+          <button key={v} type="button" onClick={() => setTab(v)}
+            style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: tab === v ? '#F4F4F5' : '#71717A' }}>
+            {l}<span style={{ fontSize: 11.5, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: tab === v ? 'rgba(167,139,250,.18)' : 'rgba(255,255,255,0.06)', color: tab === v ? '#C4B5FD' : '#71717A' }}>{n}</span>
+            <span style={{ position: 'absolute', left: 10, right: 10, bottom: -1, height: 2, borderRadius: 2, background: tab === v ? 'linear-gradient(90deg,#A78BFA,#F472B6)' : 'transparent' }} />
+          </button>
+        ))}
+      </div>
+
       {isAdmin && userView && (
-        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(139,124,246,0.1)', border: '1px solid rgba(139,124,246,0.3)', fontSize: 12.5, color: '#C4BBFA' }}>
+        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: 'rgba(139,124,246,0.1)', border: '1px solid rgba(139,124,246,0.3)', fontSize: 12.5, color: '#C4BBFA' }}>
           Aperçu : c’est ce que voient les utilisateurs.
         </div>
       )}
       {isAdmin && noRegion && !noScope && !userView && (
-        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 12.5, color: '#FCD34D' }}>
+        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 12.5, color: '#FCD34D' }}>
           Pour activer le filtre FR / US, colle supabase/migrations/20261012d_viral_region.sql dans Supabase → SQL Editor → Run.
         </div>
       )}
       {isAdmin && noScope && !userView && (
-        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 12.5, color: '#FCD34D' }}>
+        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 12.5, color: '#FCD34D' }}>
           Pour activer « Mes comptes », colle supabase/migrations/20261012c_viral_scopes.sql dans Supabase → SQL Editor → Run.
         </div>
       )}
@@ -433,33 +502,46 @@ export default function ViralWatch({ theme, user, org, isAdmin }: { theme: Theme
         ? <WatchPanel theme={theme} title="Sélection ScaleFlow" sub="Visible par tous les utilisateurs" list={tabWatch} onAdd={addAccounts} onRemove={removeWatch} />
         : <WatchPanel theme={theme} title="Mes comptes suivis" sub="Visibles par toi et ton équipe" list={tabWatch} limit={MAX_PRIVATE} onAdd={addAccounts} onRemove={removeWatch} />)}
 
-      {tabReels.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(170px,46%),1fr))', gap: 10, marginBottom: 14 }}>
-          <CineStat label="Reels sur la période" value={fmtNumber(periodReels.length)} sub={<span style={{ color: '#71717A' }}>{fmtNumber(tabWatch.length)} compte(s) suivi(s)</span>} />
-          <CineStat label="Vues cumulées" value={fmtNumber(totalViews)} />
-          <CineStat label="Meilleur ratio" value={best > 0 ? `×${ratio(best)}` : '—'} accent={best >= 3 ? '#F472B6' : undefined} sub={<span style={{ color: '#71717A' }}>vs vues habituelles</span>} />
-          <CineStat label="Engagement moyen" value={`${avgEng} %`} />
+      {tabReels.length > 0 && <>
+        <StatStrip items={[
+          { l: 'Reels sur la période', v: fmtNumber(periodReels.length) },
+          { l: 'Vues cumulées', v: compact(totalViews) },
+          { l: 'Record', v: best > 0 ? `×${ratio(best)}` : '—', c: best >= 3 ? '#F472B6' : undefined },
+          { l: 'Engagement moyen', v: `${avgEng} %` },
+        ]} />
+        <AccountRail list={tabWatch} reels={tabReels} value={fAccount} onChange={setFAccount} />
+      </>}
+
+      {/* Filtres */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        {!noRegion && <Segmented value={fRegion || 'all'} onChange={v => setFRegion(v === 'all' ? '' : v)} options={[{ v: 'all' as const, l: 'Tous' }, ...REGIONS]} />}
+        <Segmented value={range} onChange={setRange} options={[{ v: '1', l: '24 h' }, { v: '7', l: '7 jours' }, { v: '30', l: '30 jours' }]} />
+        {niches.length > 1 && <select value={fNiche} onChange={e => setFNiche(e.target.value)} style={{ ...FIELD, width: 'auto', height: 30 }}><option value="">Toutes les niches</option>{niches.map(n => <option key={n} value={n}>{n}</option>)}</select>}
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: '#71717A' }}>Trier</span>
+          <Segmented value={sort} onChange={setSort} options={[{ v: 'views', l: 'Vues' }, { v: 'score', l: '×Normale' }, { v: 'likes', l: 'Likes' }, { v: 'recent', l: 'Récents' }]} />
+        </span>
+      </div>
+      {fAccount && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 12.5, color: '#A1A1AA' }}>
+          Compte : <b data-no-tr style={{ color: '#F4F4F5' }}>@{fAccount}</b>
+          <button type="button" onClick={() => setFAccount('')} style={{ border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#A1A1AA', borderRadius: 99, height: 22, padding: '0 9px', fontSize: 11.5, cursor: 'pointer' }}>Tout afficher</button>
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-        {!noRegion && <Segmented value={fRegion || 'all'} onChange={v => setFRegion(v === 'all' ? '' : v)} options={[{ v: 'all' as const, l: 'Tous' }, ...REGIONS]} />}
-        <Segmented value={range} onChange={setRange} options={[{ v: '1', l: '24 h' }, { v: '7', l: '7 jours' }, { v: '30', l: '30 jours' }]} />
-        <Segmented value={sort} onChange={setSort} options={[{ v: 'views', l: 'Plus de vues' }, { v: 'score', l: 'Au-dessus de la normale' }, { v: 'likes', l: 'Plus de likes' }, { v: 'recent', l: 'Plus récents' }]} />
-        {niches.length > 1 && <select value={fNiche} onChange={e => setFNiche(e.target.value)} style={{ ...FIELD, width: 'auto', height: 30 }}><option value="">Toutes les niches</option>{niches.map(n => <option key={n} value={n}>{n}</option>)}</select>}
-        {tabWatch.length > 1 && <select value={fAccount} onChange={e => setFAccount(e.target.value)} style={{ ...FIELD, width: 'auto', height: 30 }}><option value="">Tous les comptes</option>{tabWatch.map(w => <option key={w.id} value={w.username}>@{w.username}</option>)}</select>}
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A' }}>{fmtNumber(shown.length)} Reel(s)</span>
-      </div>
-
-      {loading ? <Panel theme={theme}><SkeletonRows rows={4} /></Panel> : shown.length === 0 ? (
+      {loading ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(180px,46%),1fr))', gap: 14 }}>
+          {Array.from({ length: 10 }, (_, i) => <div key={i} style={{ aspectRatio: '9 / 16', borderRadius: 16, background: 'linear-gradient(110deg,#121214 30%,#1A1A1D 50%,#121214 70%)', backgroundSize: '200% 100%', animation: 'aShimmer 1.4s linear infinite' }} />)}
+        </div>
+      ) : shown.length === 0 ? (
         <Panel theme={theme}><Empty icon={I.pulse} title="Aucun Reel pour l’instant" text={
           tab === 'mine'
             ? (noScope ? 'Bientôt disponible.' : tabWatch.length ? 'Clique « Actualiser maintenant » pour relever les derniers Reels de tes comptes suivis.' : 'Ajoute tes comptes (ou ceux de tes modèles) pour voir quelles vidéos marchent le mieux.')
             : admin ? (tabWatch.length ? 'Clique « Actualiser maintenant » pour relever les derniers Reels de tes comptes suivis.' : 'Ajoute des comptes de référence (modèles, concurrents) pour voir leurs Reels qui cartonnent.')
             : 'Les Reels viraux des comptes de référence apparaîtront ici dès le prochain relevé.'} /></Panel>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(190px,46%),1fr))', gap: 14 }}>
-          {shown.map((r, i) => <ReelCard key={`${r.watch_id}-${r.code}`} r={r} rank={i + 1} onOpen={() => setOpen(i)} />)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(180px,46%),1fr))', gridAutoFlow: 'dense', gap: 14 }}>
+          {shown.map((r, i) => <ReelCard key={`${r.watch_id}-${r.code}`} r={r} rank={i + 1} big={i === 0 && sort === 'views' && shown.length >= 5} onOpen={() => setOpen(i)} />)}
         </div>
       )}
 

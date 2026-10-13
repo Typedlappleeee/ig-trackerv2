@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FeatureBanner, CineStat } from '@/components/CineHero'
-import { usePhotos } from '@/pages/Explore'
+import { CineStat } from '@/components/CineHero'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ScheduledPost, type PostRun } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
@@ -70,7 +69,6 @@ export default function Activity({ theme, infra, user, org, onNavigate }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
 }) {
   const { currentOrg } = org
-  const photos = usePhotos(user, org)
   const [runs, setRuns] = useState<RunItem[]>([])
   const [kpi, setKpi] = useState({ count7: 0, rate: 0, failed7: 0, credits7: 0 })
   const [loading, setLoading] = useState(true)
@@ -260,10 +258,7 @@ export default function Activity({ theme, infra, user, org, onNavigate }: {
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <div style={{ marginBottom: 18 }}>
-        <FeatureBanner compact height={190} kicker="Activité" line1="Chaque run," line2="chaque compte" text="L'historique de tous tes runs. Relance les comptes échoués en 1 clic, sans reconstruire la diffusion."
-          photos={[...photos.viral, ...photos.bank].slice(0, 4)} />
-      </div>
+      <PageHead title="Activité" sub="L'historique de tous tes runs. Relance les comptes échoués en 1 clic, sans reconstruire la diffusion." />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(170px,46%),1fr))', gap: 10, marginBottom: 16 }}>
         <CineStat label="Runs · 7 jours" value={kpi.count7} />

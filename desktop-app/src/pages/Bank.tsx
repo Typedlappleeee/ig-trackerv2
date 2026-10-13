@@ -5,10 +5,8 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
+import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, PageHead, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
-import { FeatureBanner } from '@/components/CineHero'
-import { usePhotos } from '@/pages/Explore'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABEL } from '@/lib/bankStorage'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -108,6 +106,7 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
   selecting?: boolean; idx?: number; broken?: boolean
 }) {
   const [failed, setFailed] = useState(false)
+  const [ready, setReady] = useState(false)
   const ext = ((item.storage_path ?? item.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)
   const fresh = (item.used_count ?? 0) === 0
   const dur = type === 'video' ? fmtDuration(item.duration) : ''
@@ -149,9 +148,9 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
         : type === 'video'
           // Vidéo : aperçu (1re image) monté SEULEMENT si la tuile est visible → limite
           // le nombre de <video> décodés en même temps. Hors écran → placeholder.
-          ? (media && inView
-              ? <video src={`${media}#t=0.1`} muted playsInline preload="metadata" onError={() => setFailed(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <span style={placeholder} />)
+          // Le repli (format + icône) reste dessous tant que la 1re image n'est pas peinte :
+          // jamais de tuile noire vide pendant le chargement (ou si le navigateur ne décode pas).
+          ? <>{fallback}{media && inView && <video src={`${media}#t=0.1`} muted playsInline preload="metadata" onError={() => setFailed(true)} onLoadedData={e => setReady(e.currentTarget.videoWidth > 0)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: ready ? 1 : 0, transition: 'opacity .25s ease' }} />}</>
           : media && inView
             ? <img src={media} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={placeholder} />}
@@ -185,7 +184,6 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState; onNavigate?: (p: string) => void
 }) {
   const { currentOrg } = org
-  const bankPhotos = usePhotos(user, org)
   const [items, setItems] = useState<ContentItem[]>([])
   const [trash, setTrash] = useState<ContentItem[]>([])
   const [showTrash, setShowTrash] = useState(false)
@@ -268,8 +266,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [signTick, setSignTick] = useState(0)
   useEffect(() => { const id = setInterval(() => setSignTick(t => t + 1), 5 * 3600_000); return () => clearInterval(id) }, [])
   useEffect(() => {
-    const thumbPaths = [...items, ...trash].filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
-    const mediaPaths = [...items, ...trash].filter(i => i.storage_path).map(i => i.storage_path as string)
+    const thumbPaths = items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
+    const mediaPaths = items.filter(i => i.storage_path).map(i => i.storage_path as string)
     const paths = [...new Set([...thumbPaths, ...mediaPaths])]
     if (paths.length === 0) return
     let cancelled = false
@@ -294,7 +292,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       if (!cancelled) setMissing(new Set(lost))
     })()
     return () => { cancelled = true }
-  }, [items, trash, signTick])
+  }, [items, signTick])
 
   function thumbFor(i: ContentItem): string | null {
     if (i.thumbnail_url) return i.thumbnail_url
@@ -548,21 +546,49 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }
 
   // Corbeille : restaurer (deleted_at = null) ou supprimer DÉFINITIVEMENT (row + fichier).
+  // Par lots de 200 (une seule requête avec des milliers d'ids dépasse la taille d'URL et échoue).
+  const [trashBusy, setTrashBusy] = useState<string | null>(null)
+  const chunkOf = <T,>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
   async function restoreMedia(ids: string[]) {
     if (!ids.length) return
-    const { error } = await supabase.from('content_bank').update({ deleted_at: null }).in('id', ids)
-    if (error) toast(`Restauration impossible : ${error.message}`, 'bad'); load()
-  }
-  async function purgeMedia(items: ContentItem[]) {
-    const ids = items.map(i => i.id)
-    if (!ids.length) return
-    const { data: gone, error } = await supabase.from('content_bank').delete().in('id', ids).select('id')
-    if (error) { toast(`Échec : ${error.message}`, 'bad'); return }
-    const goneIds = new Set(((gone ?? []) as { id: string }[]).map(r => r.id))
-    const paths = items.filter(i => goneIds.has(i.id)).flatMap(i => [i.storage_path, i.thumbnail_path].filter(Boolean) as string[])
-    for (const part of ((a: string[], n: number) => { const o: string[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o })(paths, 100)) {
-      try { if (part.length) await supabase.storage.from('content').remove(part) } catch { /* best-effort */ }
+    let done = 0; let firstErr: string | null = null
+    for (const part of chunkOf(ids, 200)) {
+      if (ids.length > 200) setTrashBusy(`Restauration… ${done}/${ids.length}`)
+      const { data, error } = await supabase.from('content_bank').update({ deleted_at: null }).in('id', part).select('id')
+      if (error) { firstErr ??= error.message } else done += data?.length ?? 0
     }
+    setTrashBusy(null)
+    if (!done) toast(`Restauration impossible${firstErr ? ` : ${firstErr}` : ''}`, 'bad')
+    else if (ids.length > 1) toast(`${done} média(s) restauré(s).`, 'ok')
+    load()
+  }
+  async function purgeMedia(list: ContentItem[]) {
+    if (!list.length) return
+    const goneIds = new Set<string>(); let firstErr: string | null = null
+    for (const part of chunkOf(list.map(i => i.id), 200)) {
+      if (list.length > 200) setTrashBusy(`Suppression… ${goneIds.size}/${list.length}`)
+      const { data, error } = await supabase.from('content_bank').delete().in('id', part).select('id')
+      if (error) firstErr ??= error.message
+      else ((data ?? []) as { id: string }[]).forEach(r => goneIds.add(r.id))
+    }
+    // Ne supprime JAMAIS un fichier encore utilisé par un autre média (copie, doublon) :
+    // vérifié sur les médias chargés puis en base (même règle que la purge serveur).
+    const keep = new Set([...items, ...trash.filter(t => !goneIds.has(t.id))].flatMap(i => [i.storage_path, i.thumbnail_path]).filter(Boolean) as string[])
+    const candidates = [...new Set(list.filter(i => goneIds.has(i.id)).flatMap(i => [i.storage_path, i.thumbnail_path]).filter((x): x is string => !!x && !keep.has(x)))]
+    for (const part of chunkOf(candidates, 100)) {
+      setTrashBusy(`Nettoyage des fichiers… ${goneIds.size}/${list.length}`)
+      const [a, b] = await Promise.all([
+        supabase.from('content_bank').select('storage_path').in('storage_path', part),
+        supabase.from('content_bank').select('thumbnail_path').in('thumbnail_path', part),
+      ])
+      if (a.error || b.error) continue // doute → on garde les fichiers
+      const used = new Set([...(a.data ?? []).map(r => r.storage_path), ...(b.data ?? []).map(r => r.thumbnail_path)])
+      const free = part.filter(x => !used.has(x))
+      try { if (free.length) await supabase.storage.from('content').remove(free) } catch { /* best-effort */ }
+    }
+    setTrashBusy(null)
+    if (!goneIds.size) toast(`Suppression impossible${firstErr ? ` : ${firstErr}` : ''}`, 'bad')
+    else if (list.length > 1) toast(`${goneIds.size} média(s) supprimé(s) définitivement.`, 'ok')
     void reloadUsage()
     load()
   }
@@ -865,11 +891,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             </div>
             <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#8B8B94' }}>Médias supprimés — restaurables 7 jours puis purgés définitivement.</p>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              <Btn theme={theme} sm tone="primary" label="Tout restaurer" onClick={() => { restoreMedia(trash.map(t => t.id)); setShowTrash(false) }} />
-              <Btn theme={theme} sm tone="quiet" label="Vider définitivement" onClick={async () => { if (await confirmDialog({ title: 'Supprimer DÉFINITIVEMENT tous les médias de la corbeille ?', confirmLabel: 'Vider définitivement', danger: true })) { purgeMedia(trash); setShowTrash(false) } }} />
+              <Btn theme={theme} sm tone="primary" label="Tout restaurer" disabled={!!trashBusy || !trash.length} onClick={async () => { await restoreMedia(trash.map(t => t.id)); setShowTrash(false) }} />
+              <Btn theme={theme} sm tone="quiet" label="Vider définitivement" disabled={!!trashBusy || !trash.length} onClick={async () => { if (await confirmDialog({ title: `Supprimer DÉFINITIVEMENT les ${trash.length} médias de la corbeille ?`, confirmLabel: 'Vider définitivement', danger: true })) { await purgeMedia(trash); setShowTrash(false) } }} />
+              {trashBusy && <span style={{ alignSelf: 'center', fontSize: 12.5, color: '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>{trashBusy}</span>}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {trash.map(t => {
+              {trash.slice(0, 200).map(t => {
                 const days = t.deleted_at ? Math.max(0, 7 - Math.floor((Date.now() - new Date(t.deleted_at).getTime()) / 86400000)) : 7
                 return (
                   <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px 6px 12px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -880,6 +907,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   </div>
                 )
               })}
+              {trash.length > 200 && <span style={{ padding: '8px 4px', fontSize: 12.5, color: '#71717A' }}>{`+ ${trash.length - 200} autre(s) — utilise « Tout restaurer » ou « Vider définitivement ».`}</span>}
             </div>
           </div>
         </div>
@@ -897,20 +925,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         </div>
       )}
       {/* En-tête */}
-      <div style={{ marginBottom: 14 }}>
-        <FeatureBanner compact height={190} kicker="Banque" line1="Ton contenu," line2="prêt à publier"
-          text={`${counts.video} vidéo(s) · ${counts.image} image(s) · ${captions.length} légende(s)`}
-          cta="Importer des fichiers" onCta={() => fileRef.current?.click()}
-          photos={[...items.map(i => thumbFor(i) ?? (inferType(i) === 'image' ? mediaFor(i) : null)).filter((x): x is string => !!x).slice(0, 4), ...bankPhotos.viral].slice(0, 4)} />
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-        {!loading && neverPublished > 0 && <span style={{ fontSize: 12.5, color: '#8B8B94' }}>{`${neverPublished} média(s) jamais publié(s)`}</span>}
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <PageHead title="Banque de contenu"
+        sub={loading || total === 0 ? 'Toutes tes vidéos et images, organisées par dossier.' : <>{`${counts.video} vidéo(s) · ${counts.image} image(s) · ${captions.length} légende(s)`}{neverPublished > 0 && <span style={{ color: '#A78BFA' }}>{` · ${neverPublished} média(s) jamais publié(s)`}</span>}</>}
+        actions={<>
           {trash.length > 0 && <Btn label={`Corbeille (${trash.length})`} theme={theme} icon="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" onClick={() => setShowTrash(true)} />}
           <Btn label="Actualiser" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
           <Btn label={uploading ? uploading : "Importer"} theme={theme} tone="primary" icon="M12 5v14|M5 12h14" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
-        </span>
-      </div>
+        </>} />
 
       {/* Espace utilisé (limite de l'abonnement) + fichiers vides à nettoyer */}
       {(usage || broken.length > 0) && (

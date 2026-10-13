@@ -4,6 +4,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, FIELD, Icon, Kpi, Panel, PageHead, Segmented, Skeleton, StatusDot, Modal, SkeletonRows, toast, confirmDialog } from '@/lib/ui'
+import { openTool } from '@/lib/openTool'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, scopeInfra } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -178,7 +179,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
   // absents (supprimés côté GeeLark), puis upsert (RPC qui préserve ig_username/liens).
   const syncFromGeelark = useCallback(async () => {
     if (syncing) return
-    if (!bearer) { setError('Token GeeLark manquant — configure-le dans les Réglages de l’app web.'); return }
+    if (!bearer) { setError('Token GeeLark manquant — configure-le dans Réglages → Intégrations.'); return }
     setSyncing(true); setError(null)
     try {
       const items = await fetchAllPhones(bearer)
@@ -382,7 +383,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
             text={isCloud
               ? 'Aucun appareil pour le moment. Crée ton premier appareil cloud pour commencer.'
               : 'Aucun téléphone pour le moment. Connecte GeeLark et synchronise pour importer tes cloud phones.'}
-            action={<Btn label={isCloud ? 'Créer un appareil' : (syncing ? 'Synchro…' : 'Sync GeeLark')} theme={theme} tone="primary" disabled={!isCloud && syncing} onClick={isCloud ? undefined : syncFromGeelark} />}
+            action={<Btn label={isCloud ? 'Créer un appareil' : (syncing ? 'Synchro…' : 'Sync GeeLark')} theme={theme} tone="primary" disabled={!isCloud && syncing} onClick={isCloud ? () => setCreateOpen(true) : syncFromGeelark} />}
           />
         ) : shown.length === 0 ? (
           <Empty
@@ -477,7 +478,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
           </span>
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)', margin: '0 2px' }} />
           <Btn label="Publier" theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
-          <Btn label="Chauffer" theme={theme} sm icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" onClick={() => onNavigate?.('warmup')} />
+          <Btn label="Chauffer" theme={theme} sm icon="M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z" onClick={() => onNavigate && openTool(onNavigate, 'warmup', { tab: 'warm', phones: [...sel] })} />
           <Btn label="Groupe" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setGroupModal(true)} />
           {!isCloud && (() => {
             const ids = rows.filter(p => sel.has(p.id) && p.powered && p.geelark_id).map(p => String(p.geelark_id))
@@ -506,7 +507,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
               <p style={{ margin: '0 0 10px' }}>Les téléphones sont créés dans ton <b>tableau de bord GeeLark</b> (cloud phones). Une fois créés :</p>
               <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <li>Crée / loue tes cloud phones sur geelark.com</li>
-                <li>Assure-toi que ton token GeeLark est configuré (Réglages app web)</li>
+                <li>Assure-toi que ton token GeeLark est configuré (Réglages → Intégrations)</li>
                 <li>Clique <b>Synchroniser</b> ci-dessous — ils apparaîtront ici</li>
               </ol>
             </div>
@@ -538,7 +539,13 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
           onClose={() => setGroupModal(false)}
           onApply={async (name) => {
             const ids = [...sel]
-            await supabase.from('phones').update({ group_name: name || null }).in('id', ids)
+            let err: string | null = null
+            for (let i = 0; i < ids.length; i += 200) {
+              const { error } = await supabase.from('phones').update({ group_name: name || null }).in('id', ids.slice(i, i + 200))
+              if (error) { err = error.message; break }
+            }
+            if (err) toast(`Groupe non appliqué : ${err}`, 'bad')
+            else toast(name ? `${ids.length} téléphone(s) → groupe « ${name} ».` : `${ids.length} téléphone(s) retiré(s) de leur groupe.`, 'ok')
             setGroupModal(false); setSel(new Set()); load()
           }} />
       )}
