@@ -2748,6 +2748,7 @@ export const EN: Dict = {
     ". Ils restent sur le serveur, personne ne peut les relire depuis l’app.": ". They stay on the server; nobody can read them back from the app.",
     "Retirer la clé": "Remove key",
     "Lien Reel": "Reel link",
+    "Ouvrir": "Open",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
