@@ -325,7 +325,8 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
     : []
   const photos = usePhotos(user, org)
   const topReels = useTopReels(8)
-  const pool = [...(topReels ?? []).map(r => r.thumb), ...photos.viral, ...photos.bank].filter((x, i, a) => a.indexOf(x) === i).slice(2)
+  // Meilleures miniatures d'abord (Reels les plus vus) : la n°1 va au bandeau « Publier un Reel ».
+  const best = [...(topReels ?? []).map(r => r.thumb), ...photos.viral, ...photos.bank].filter((x, i, a) => a.indexOf(x) === i)
   const TILES = launchTiles(infra).map(t => t.id === 'reels' && data && !loading ? { ...t, hint: `${fmtNumber(data.phoneCount)} comptes prêts` } : t)
   const STEPS = [
     { done: !!conns.bearer, title: 'Connecter GeeLark', text: 'Colle ton token GeeLark (OpenAPI) pour piloter tes téléphones.', cta: 'Ouvrir les réglages', page: 'settings' as PageKey },
@@ -342,7 +343,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* Bandeau « cinéma » : vraies miniatures de part et d'autre, titre XXL, action principale. */}
       <HomeHero
-        photos={(topReels ?? []).map(r => r.thumb).concat(photos.viral).slice(0, 2)}
+        photos={best.slice(2, 4)}
         kicker={`${hello}, ${firstName}`}
         line1={infra === 'cloud' ? 'Ton parc' : 'Tes comptes'}
         line2="en pilote automatique"
@@ -393,9 +394,9 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
       {infra !== 'cloud' && (
         <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'repeat(2, minmax(0,1fr))', gap: 16, marginBottom: 16 }}>
           <FeatureBanner compact height={200} kicker="Publier" line1="Un Reel," line2="sur tous tes comptes" text={data ? `${fmtNumber(data.phoneCount)} comptes prêts · 2 crédits par compte` : undefined}
-            cta="Publier un Reel" onCta={() => openTool(onNavigate, 'publish', { mode: 'reels' })} photos={pool.slice(0, 2)} />
+            cta="Publier un Reel" onCta={() => openTool(onNavigate, 'publish', { mode: 'reels' })} photos={best.slice(0, 2)} />
           <FeatureBanner compact height={200} kicker="TikTok" line1="La même vidéo," line2="sur TikTok" text="Publie en parallèle sur tous tes comptes TikTok."
-            cta="Publier sur TikTok" onCta={() => openTool(onNavigate, 'publish', { mode: 'tiktok' })} photos={pool.slice(2, 4)} />
+            cta="Publier sur TikTok" onCta={() => openTool(onNavigate, 'publish', { mode: 'tiktok' })} photos={best.slice(4, 6)} />
         </div>
       )}
       <CineSection kicker="Outils" line1="Lance" line2="en un clic" right={<button type="button" onClick={() => onNavigate('explore')} style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.06)', color: '#EDEDEF', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Tous les outils →</button>}>
