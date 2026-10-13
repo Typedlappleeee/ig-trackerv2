@@ -4,7 +4,8 @@
 // banque) ; sans photo, un dégradé de l'outil prend le relais.
 // Animations : SPOT_KEYFRAMES (LaunchSpotlight) ; coupées si « réduire les animations ».
 import type { CSSProperties, ReactNode } from 'react'
-import type { Tool } from '@/lib/tools'
+import { TOOLS, type Tool } from '@/lib/tools'
+import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
 
 type Pick = (k: number) => string | null
 const an = (name: string, dur: number, delay = 0, extra = 'ease-in-out infinite') => `${name} ${dur}s ${extra} ${-delay}s`
@@ -96,4 +97,11 @@ function Art({ t, pick }: { t: Tool; pick: Pick }) {
 
 export default function ToolArt({ t, pick }: { t: Tool; pick: Pick }) {
   return <span className="sf-art" style={{ ...FILL, display: 'block', overflow: 'hidden' }}><Art t={t} pick={pick} /></span>
+}
+
+/** Aperçu animé plein cadre en tête d'une carte (Studio, Publication…), collé aux bords. */
+export function ToolPreview({ id, pick, height = 132 }: { id: string; pick: Pick; height?: number }) {
+  const t = TOOLS.find(x => x.id === id)
+  if (!t) return null
+  return <span style={{ position: 'relative', display: 'block', height, margin: '-16px -16px 2px', borderRadius: '8px 8px 0 0', overflow: 'hidden', background: '#0A0A0B' }}><style>{SPOT_KEYFRAMES}</style><ToolArt t={t} pick={pick} /></span>
 }
