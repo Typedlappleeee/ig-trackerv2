@@ -346,8 +346,12 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
         photos={best}
         kicker={`${hello}, ${firstName}`}
         line1={infra === 'cloud' ? 'Ton parc' : 'Tes comptes'}
-        line2="en pilote automatique"
-        sub={<>{data ? `${fmtNumber(data.phoneCount)} comptes prêts` : '…'} · {balance === null ? '…' : `${fmtNumber(balance)} crédits`} · {cap}</>}
+        line2="en pilote auto"
+        stats={[
+          { v: data ? fmtNumber(data.phoneCount) : '…', l: 'comptes prêts' },
+          { v: balance === null ? '…' : fmtNumber(balance), l: 'crédits' },
+          { v: cap, l: 'aujourd’hui' },
+        ]}
         cta={infra === 'cloud' ? 'Ouvrir mes appareils' : 'Publier un Reel'}
         onCta={() => infra === 'cloud' ? onNavigate('cloud') : openTool(onNavigate, 'publish', { mode: 'reels' })}
         secondary="Explorer les outils" onSecondary={() => onNavigate('explore')}
