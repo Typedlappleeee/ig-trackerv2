@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ToolPreview } from '@/components/ToolArt'
+import { BigCard, ToolTabs } from '@/components/BigCard'
 import { FeatureBanner } from '@/components/CineHero'
 import { usePhotos } from '@/pages/Explore'
 import { fetchAllRows } from '@/lib/bankStorage'
@@ -38,44 +38,6 @@ const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 function isVid(v: Video): boolean {
   const ext = (v.storage_path ?? v.file_url ?? '').toLowerCase().split('.').pop() ?? ''
   return !IMG_EXT.includes(ext)
-}
-
-// Carte d'outil du Studio : aperçu animé, survol bien visible (soulèvement, contour violet,
-// zoom de l'aperçu, bouton « Ouvrir » qui s'allume) et focus clavier.
-function StudioCard({ t, ti, pick, onOpen }: { t: Tool; ti: number; pick: (k: number) => string | null; onOpen: () => void }) {
-  const [h, setH] = useState(false)
-  return (
-    <button type="button" onClick={onOpen} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} onFocus={() => setH(true)} onBlur={() => setH(false)}
-      style={{
-        position: 'relative', display: 'flex', flexDirection: 'column', padding: 0, borderRadius: 18, overflow: 'hidden', textAlign: 'left', cursor: 'pointer', boxSizing: 'border-box', outline: 'none',
-        background: h ? '#151418' : '#111113', border: `1px solid ${h ? 'rgba(167,139,250,0.7)' : 'rgba(255,255,255,0.07)'}`,
-        transform: h ? 'translateY(-4px)' : 'none', boxShadow: h ? '0 24px 50px -24px rgba(139,92,246,0.75)' : 'none',
-        transition: 'transform .25s cubic-bezier(0.16,1,0.3,1), box-shadow .25s ease, border-color .2s ease, background .2s ease',
-        animation: `aIn .4s cubic-bezier(0.16,1,0.3,1) ${ti * 40}ms both`,
-      }}>
-      <span style={{ display: 'block', padding: '16px 16px 0' }}>
-        <span style={{ display: 'block', transform: h ? 'scale(1.02)' : 'none', transition: 'transform .5s cubic-bezier(0.16,1,0.3,1)' }}>
-          <ToolPreview id={t.k} pick={pick} height={150} />
-        </span>
-      </span>
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 16px 16px', flex: 1 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: h ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : '#18181B', border: h ? 'none' : '1px solid rgba(255,255,255,0.08)', color: h ? '#fff' : '#C4B5FD', transition: 'background .2s ease' }}>
-            <Icon d={t.i} size={15} />
-          </span>
-          <span style={{ fontSize: 16, fontWeight: 800, color: '#F4F4F5', letterSpacing: '-0.02em' }}>{t.t}</span>
-          <span style={{ marginLeft: 'auto', padding: '3px 8px', borderRadius: 99, fontSize: 11, fontWeight: 700, color: '#A1A1AA', background: 'rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }}>{t.tag}</span>
-        </span>
-        <span style={{ fontSize: 13, lineHeight: 1.55, color: '#9A9AA3' }}>{t.d}</span>
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 6 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: '#71717A' }}>Gratuit</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', borderRadius: 9, fontSize: 12.5, fontWeight: 800, color: h ? '#fff' : '#A1A1AA', background: h ? '#8B5CF6' : 'rgba(255,255,255,0.05)', transition: 'all .2s ease' }}>
-            Ouvrir<Icon d="M5 12h14|M13 6l6 6-6 6" size={13} />
-          </span>
-        </span>
-      </span>
-    </button>
-  )
 }
 
 export default function Studio({ theme, infra, user, org, onNavigate }: {
@@ -263,7 +225,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(300px,100%),1fr))', gap: 14 }}>
           {TOOLS.map((t, ti) => (
-            <StudioCard key={t.k} t={t} ti={ti} onOpen={() => openTool(t.k)}
+            <BigCard key={t.k} i={ti} preview={t.k} icon={t.i} title={t.t} tag={t.tag} desc={t.d} foot="Gratuit" onOpen={() => openTool(t.k)}
               pick={k => { const pool = [...photos.bank, ...photos.viral]; return pool.length ? pool[(ti * 3 + k) % pool.length] : null }} />
           ))}
         </div>
@@ -285,25 +247,7 @@ export default function Studio({ theme, infra, user, org, onNavigate }: {
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* Barre des outils : l'outil ouvert est bien visible, on passe d'un outil à l'autre en 1 clic. */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', margin: '0 -4px 18px', padding: '8px 4px', background: 'rgba(10,10,11,0.85)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', scrollbarWidth: 'none' }}>
-        <button type="button" onClick={() => setTool(null)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#A1A1AA', fontSize: 13, fontWeight: 650, cursor: 'pointer' }}>
-          <Icon d="M15 18l-6-6 6-6" size={14} />Studio
-        </button>
-        <span style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.1)', flexShrink: 0, margin: '0 4px' }} />
-        {TOOLS.map(x => {
-          const on = x.k === tool
-          return (
-            <button key={x.k} type="button" onClick={() => { if (!on) openTool(x.k) }} aria-current={on ? 'page' : undefined}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0, height: 36, padding: '0 13px', borderRadius: 10, cursor: on ? 'default' : 'pointer', fontSize: 13, fontWeight: on ? 800 : 600,
-                border: on ? 'none' : '1px solid rgba(255,255,255,0.08)', color: on ? '#fff' : '#D4D4D8',
-                background: on ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : '#111113', boxShadow: on ? '0 3px 0 #6D28D9' : 'none', transition: 'background .15s ease, border-color .15s ease' }}
-              onMouseEnter={e => { if (!on) { e.currentTarget.style.borderColor = 'rgba(167,139,250,0.6)'; e.currentTarget.style.background = '#17151C' } }}
-              onMouseLeave={e => { if (!on) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.background = '#111113' } }}>
-              <Icon d={x.i} size={14} />{x.t}
-            </button>
-          )
-        })}
-      </div>
+      <ToolTabs backLabel="Studio" onBack={() => setTool(null)} items={TOOLS.map(x => ({ k: x.k, t: x.t, i: x.i }))} current={tool} onPick={openTool} />
       <PageHead title={T.t} sub={T.d} actions={<Chip text="Gratuit · 0 crédit" tone="ok" />} />
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.4fr) minmax(0,1fr)', gap: 12, alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

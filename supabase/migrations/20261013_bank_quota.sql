@@ -80,10 +80,16 @@ create policy "content_insert" on storage.objects for insert with check (
 -- ── Corbeille : seulement ses propres médias, ou avec le droit « bank_delete » ────
 create or replace function public.bank_guard_trash()
 returns trigger language plpgsql security definer set search_path = public as $$
+declare v_ok boolean := false;
 begin
   if auth.uid() is null then return new; end if;   -- service (cron, edge function)
-  if new.deleted_at is distinct from old.deleted_at and old.org_id is not null
-     and old.user_id <> auth.uid() and not public.member_can_action(old.org_id, 'bank_delete') then
+  if new.deleted_at is not distinct from old.deleted_at then return new; end if;
+  if old.org_id is null or old.user_id = auth.uid() then return new; end if;
+  -- Sans dépendance externe (member_can_action n'existe pas partout) : owner / admin.
+  select exists (select 1 from public.organizations o where o.id = old.org_id and o.owner_id = auth.uid())
+      or exists (select 1 from public.organization_members m where m.org_id = old.org_id and m.user_id = auth.uid() and m.role in ('owner', 'admin'))
+    into v_ok;
+  if not v_ok then
     raise exception 'Tu n''as pas le droit de supprimer les médias des autres membres.';
   end if;
   return new;
