@@ -29,7 +29,7 @@ export function usePhotos(user: User, org: OrgState): { viral: string[]; bank: s
       const r = await supabase.from('viral_reels').select('thumb, views').order('views', { ascending: false }).limit(24)
       const v = ((r.data ?? []) as { thumb: string | null }[]).map(x => x.thumb).filter((x): x is string => !!x)
       if (alive) setViral([...new Set(v)].map(u => `${FN_URL}?img=${encodeURIComponent(u)}`))
-      const q = supabase.from('content_bank').select('thumbnail_url,thumbnail_path,storage_path,media_type,notes').is('deleted_at', null).order('created_at', { ascending: false }).limit(60)
+      const q = supabase.from('content_bank').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(60)
       const b = await (orgId ? q.eq('org_id', orgId) : q.eq('user_id', user.id).is('org_id', null))
       const rows = ((b.data ?? []) as { thumbnail_url?: string | null; thumbnail_path?: string | null; storage_path?: string | null; media_type?: string | null; notes?: string | null }[])
         .filter(x => !/^__sf_/.test(x.notes ?? ''))
