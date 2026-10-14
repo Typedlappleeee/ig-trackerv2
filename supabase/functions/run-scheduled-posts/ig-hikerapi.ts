@@ -44,6 +44,15 @@ export async function hikerReels(userId: string): Promise<any | null> {
   return j && Array.isArray(j.items) ? j : null
 }
 
+// Feed (posts photo / carrousel / vidéo) : /v1/user/medias/chunk → [ [Media…], curseur ].
+// deno-lint-ignore no-explicit-any
+export async function hikerFeed(userId: string): Promise<any[] | null> {
+  if (!userId) return null
+  const j = await hikerGet('/v1/user/medias/chunk', { user_id: userId })
+  if (Array.isArray(j)) return Array.isArray(j[0]) ? j[0] : j.filter(x => x && typeof x === 'object' && !Array.isArray(x))
+  return j && Array.isArray(j.items) ? j.items : null
+}
+
 // Solde restant (diagnostic).
 // deno-lint-ignore no-explicit-any
 export function hikerBalance(): Promise<any | null> { return hikerGet('/sys/balance', {}) }

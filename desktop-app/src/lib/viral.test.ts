@@ -53,3 +53,43 @@ describe('veille des Reels — filtre pays', () => {
     expect(codes('')).toEqual(['1', '2', '3'])
   })
 })
+
+describe('Veille v4 — médias, score, midi Paris', async () => {
+  const { parseMedia, scoreBy, lastParisNoon } = await import('../../../supabase/functions/run-scheduled-posts/viral-score')
+  it('lit un Reel HikerAPI avec vidéo, légende et durée', () => {
+    const m = parseMedia({ code: 'DAbC12_xYz', media_type: 2, product_type: 'clips', play_count: 1200, like_count: 50, comment_count: 3, taken_at: 1760000000, thumbnail_url: 'https://x.cdninstagram.com/t.jpg', video_url: 'https://x.cdninstagram.com/v.mp4', caption_text: 'hello', video_duration: 14.2 }, 'reel')
+    expect(m?.kind).toBe('reel'); expect(m?.views).toBe(1200); expect(m?.videoUrl).toContain('v.mp4'); expect(m?.caption).toBe('hello'); expect(m?.duration).toBe(14.2)
+    expect(m?.url).toBe('https://www.instagram.com/reel/DAbC12_xYz/'); expect(m?.postedAt).toBe(new Date(1760000000 * 1000).toISOString())
+  })
+  it('lit un carrousel du feed avec ses images', () => {
+    const m = parseMedia({ code: 'C9xYz-12AB', media_type: 8, like_count: 900, resources: [{ thumbnail_url: 'https://a/1.jpg' }, { thumbnail_url: 'https://a/2.jpg' }], taken_at: '2026-10-10T10:00:00Z' })
+    expect(m?.kind).toBe('feed'); expect(m?.images).toEqual(['https://a/1.jpg', 'https://a/2.jpg']); expect(m?.url).toBe('https://www.instagram.com/p/C9xYz-12AB/')
+  })
+  it('ignore un média sans code valide', () => { expect(parseMedia({ like_count: 3 })).toBeNull() })
+  it('score par métrique (médiane)', () => {
+    const s = scoreBy([{ v: 10 }, { v: 20 }, { v: 30 }], x => x.v)
+    expect(s[1].baseline).toBe(20); expect(s[2].score).toBe(1.5)
+  })
+  it('dernier midi à Paris (été et hiver)', () => {
+    expect(lastParisNoon(new Date('2026-07-15T13:00:00Z')).toISOString()).toBe('2026-07-15T10:00:00.000Z') // 15h Paris → midi du jour
+    expect(lastParisNoon(new Date('2026-07-15T09:00:00Z')).toISOString()).toBe('2026-07-14T10:00:00.000Z') // 11h Paris → midi la veille
+    expect(lastParisNoon(new Date('2026-12-15T12:30:00Z')).toISOString()).toBe('2026-12-15T11:00:00.000Z') // hiver : UTC+1
+    expect(lastParisNoon(new Date('2026-12-15T23:30:00Z')).toISOString()).toBe('2026-12-15T11:00:00.000Z') // 00h30 Paris le 16 → midi du 15
+  })
+})
+
+describe('Veille v4 — pas de doublon, Reels / feed séparés', () => {
+  it('un même Reel suivi deux fois n’apparaît qu’une fois ; le feed est filtré à part', () => {
+    const now = Date.parse('2026-10-12T12:00:00Z')
+    const base = { likes: 0, comments: 0, taken_at: '2026-10-12T08:00:00Z', thumb: null, url: null, baseline: 10, score: 2 }
+    const reels = [
+      { ...base, watch_id: 'pub', code: 'X', username: 'a', views: 100 },
+      { ...base, watch_id: 'priv', code: 'X', username: 'a', views: 120 },
+      { ...base, watch_id: 'pub', code: 'P', username: 'a', views: 0, likes: 50, kind: 'feed' as const },
+    ]
+    const watch = [{ id: 'pub', username: 'a', niche: '', fetched_at: null, last_error: null }, { id: 'priv', username: 'a', niche: '', fetched_at: null, last_error: null }]
+    const r = filterReels(reels, watch, { range: '7', niche: '', account: '', sort: 'views', kind: 'reel' }, now)
+    expect(r.map(x => x.code)).toEqual(['X']); expect(r[0].views).toBe(120)
+    expect(filterReels(reels, watch, { range: '7', niche: '', account: '', sort: 'views', kind: 'feed' }, now).map(x => x.code)).toEqual(['P'])
+  })
+})
