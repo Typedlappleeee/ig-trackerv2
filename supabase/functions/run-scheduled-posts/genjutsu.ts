@@ -97,8 +97,12 @@ async function pollJob(db: any, job: any, auth: string): Promise<void> {
   const j: any = await r.json().catch(() => ({}))
   if (!r.ok) return
   const status = String(j.status ?? job.status)
-  if (status === 'failed' || status === 'nsfw' || status === 'cancelled') {
-    await upd(db, job.id, { status: 'failed', error: status === 'nsfw' ? 'Refusé par Higgsfield (contenu).' : String(j?.error ?? 'Échec de la génération.').slice(0, 400) }); return
+  // Statuts terminaux Higgsfield : failed · nsfw (modération) · canceled (doc : un seul « l »).
+  if (status === 'failed' || status === 'nsfw' || status === 'canceled' || status === 'cancelled') {
+    const error = status === 'nsfw'
+      ? 'Refusé par la modération de Higgsfield : la vidéo source, une image de référence ou le résultat a été jugé trop explicite. Essaie un autre Reel ou des photos plus couvertes.'
+      : status === 'failed' ? String(j?.error ?? 'Échec de la génération chez Higgsfield.').slice(0, 400) : 'Annulé chez Higgsfield.'
+    await upd(db, job.id, { status: 'failed', error }); return
   }
   if (status !== 'completed') { if (status !== job.status) await upd(db, job.id, { status }); return }
   const videoUrl: string | null = j?.video?.url ?? null
@@ -174,6 +178,16 @@ export async function genjutsuAction(db: any, userId: string, body: any): Promis
   if (body.genjutsu === 'tick') {
     const r = await tickSpace(db, userId, orgId, Date.now() + 25_000)
     return { ok: true, ...(r.missingKey ? { error: 'missing_key' } : {}) }
+  }
+
+  // Relancer une génération en échec (même source, mêmes images, mêmes réglages).
+  if (body.genjutsu === 'retry' && typeof body.job_id === 'string') {
+    const j = await scopeQ(db.from('genjutsu_jobs').select('id, status').eq('id', body.job_id), userId, orgId).maybeSingle()
+    if (!j.data) return { ok: false, error: 'Génération introuvable.' }
+    if (j.data.status !== 'failed') return { ok: false, error: 'Seule une génération en échec peut être relancée.' }
+    await upd(db, j.data.id, { status: 'waiting', request_id: null, status_url: null, error: null, video_url: null })
+    await tickSpace(db, userId, orgId, Date.now() + 20_000)
+    return { ok: true }
   }
 
   if (body.genjutsu === 'remove' && typeof body.job_id === 'string') {
