@@ -13,27 +13,36 @@ import { CATS, searchTools, visibleTools, type Tool, type ToolCat } from '@/lib/
 import { recentTools } from '@/lib/openTool'
 import ToolArt, { AutoContentArt } from '@/components/ToolArt'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
-import { useTopReels, sharpest, type TopReel } from '@/components/CineHero'
+import { useTopReels, useFeedPhotos, sharpest, type TopReel } from '@/components/CineHero'
 
 const FAV_KEY = 'sf-fav-tools'
 function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
 
-// Photos des visuels (aperçus d'outils, tuiles) : les VRAIS Reels qui explosent (Veille, les plus
-// vus de la semaine, un par compte pour varier), images propres uniquement, les plus nettes d'abord. Repli sur la sélection maison (lib/curated)
-// tant qu'il n'y en a pas assez. Signature gardée.
-export function usePhotos(_user?: User, _org?: OrgState): { viral: string[]; bank: string[]; real: boolean } {
+// Photos des visuels (aperçus d'outils, tuiles) : les VRAIES photos du feed des comptes suivis
+// (posts photo les plus likés, nets et cadrés : plus beaux que les images de Reels), complétées
+// par les Reels qui explosent. Images propres uniquement, les plus nettes d'abord. Repli sur la
+// sélection maison (lib/curated) tant qu'il n'y en a pas assez. Signature gardée.
+export interface Photos { viral: string[]; bank: string[]; real?: boolean; carousel?: string[] | null }
+export function usePhotos(_user?: User, _org?: OrgState): Photos {
+  const feed = useFeedPhotos(40)
   const top = useTopReels(40)
-  // Images les plus nettes d'abord (déjà filtrées : seules les miniatures propres arrivent ici).
-  const real = sharpest(top, 40).map(r => r.thumb)
-  return real.length >= 6 ? { viral: real, bank: [], real: true } : { viral: CURATED, bank: [], real: false }
+  const f = sharpest(feed, 40), r = sharpest(top, 40).map(x => x.thumb)
+  const pool = f.length >= 8 ? f.map(x => x.thumb) : [...f.map(x => x.thumb), ...r]
+  // Post photo : un vrai carrousel (3 slides d'un même post du feed).
+  const carousel = f.find(x => (x.images?.length ?? 0) >= 3)?.images?.slice(0, 3) ?? null
+  return pool.length >= 6 ? { viral: pool, bank: [], real: true, carousel } : { viral: CURATED, bank: [], real: false, carousel: null }
 }
 // Carte Story : image FIXE (portrait) quand on n'a que la sélection maison.
 export const STORY_PICK = (k: number): string => curated(k ? 6 : 13)
 /** Sélecteur de photos d'une carte, décalé par carte pour que deux voisines n'aient pas les mêmes images. */
-export function pickerFor(t: Tool, i: number, p: { viral: string[]; bank: string[]; real?: boolean }): (k: number) => string | null {
+export function pickerFor(t: Tool, i: number, p: Photos): (k: number) => string | null {
   if (t.id === 'story' && !p.real) return STORY_PICK
   const pool = t.cat === 'create' || t.cat === 'bank' ? [...p.bank, ...p.viral] : [...p.viral, ...p.bank]
-  return (k: number) => pool.length ? pool[(i * 3 + k) % pool.length] : null
+  const at = (k: number) => pool.length ? pool[(i * 3 + k) % pool.length] : null
+  // Post photo : les 3 slides du carrousel (k = 4, 7, 10), la 1re aussi en photo de profil.
+  const c = p.carousel
+  if (t.id === 'photo' && c && c.length >= 3) return (k: number) => k === 7 ? c[1] : k === 10 ? c[2] : k === 4 || k === 1 ? c[0] : at(k)
+  return at
 }
 
 const STAR = 'M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z'

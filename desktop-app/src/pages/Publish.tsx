@@ -3,7 +3,7 @@ import { usePhotos, pickerFor, ToolCard, SectionHead } from '@/pages/Explore'
 import { TOOLS } from '@/lib/tools'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
-import { takeOpenArg, openTool } from '@/lib/openTool'
+import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Icon, Skeleton, SkeletonRows, useNarrow } from '@/lib/ui'
@@ -40,9 +40,8 @@ const PLATS: { k: Plat; label: string; sub: string; color: string; icon: string 
   { k: 'tiktok', label: 'TikTok', sub: 'Vidéos sur tes comptes TikTok (les téléphones doivent être connectés à TikTok).', color: '#25F4EE', icon: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5' },
   { k: 'other', label: 'Autres réseaux', sub: 'Facebook, YouTube Shorts, X, Threads, Reddit, Pinterest.', color: '#A1A1AA', icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
 ]
-const SCHED_ICON = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M12 6v6l4 2'
 
-export default function Publish({ theme, infra, user, org, isSuperAdmin, onNavigate }: {
+export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState; isSuperAdmin: boolean; onNavigate?: (p: string) => void
 }) {
   // Relance des échecs (depuis Activité) : on ouvre directement le bon composer.
@@ -70,7 +69,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin, onNavig
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <style>{SPOT_KEYFRAMES}</style>
       <PageHeader kicker="Diffusion" title="Publication" sub="Choisis un format : les comptes, la vidéo et la légende se règlent à l’étape suivante. Chaque téléphone publie en parallèle, ou plus tard (programmé)." />
-      {/* Catégories par plateforme (tous les formats), puis la programmation */}
+      {/* Catégories par plateforme (tous les formats) ; la programmation a son propre onglet */}
       {(() => {
         const head = (label: string, color: string, icon: string, count: number, sub: string) => (
           <SectionHead title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}><span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 9, background: `${color}1F`, border: `1px solid ${color}55`, color }}><Icon d={icon} size={14} /></span>{label}</span>} count={count}
@@ -78,7 +77,6 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin, onNavig
         )
         const grid = (cards: React.ReactNode) => <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 260}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>{cards}</div>
         let n = 0
-        const sched = onNavigate ? ['scheduled', 'calendar'].map(tool) : []
         return <>
           {PLATS.filter(pl => FORMATS.some(f => f.plat === pl.k && visible(f))).map(pl => {
             const list = FORMATS.filter(f => f.plat === pl.k && visible(f))
@@ -89,12 +87,6 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin, onNavig
               </section>
             )
           })}
-          {sched.length > 0 && (
-            <section style={{ marginBottom: 40 }}>
-              {head('Programmation', '#A78BFA', SCHED_ICON, sched.length, 'Tout ce qui part plus tard, même PC éteint.')}
-              {grid(sched.map(t => { const k = n++; return <ToolCard key={t.id} t={t} i={k} pick={pickerFor(t, k, photos)} fav={false} onOpen={() => openTool(onNavigate!, t.page, t.arg, t.id)} /> }))}
-            </section>
-          )}
         </>
       })()}
     </div>
