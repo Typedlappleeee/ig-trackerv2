@@ -18,7 +18,7 @@ import { type HubData, firstNameFrom, fmtNumber, compact, fmtTime, fmtDay, phone
 import type { PageKey } from '@/Shell'
 import { visibleTools, type Tool } from '@/lib/tools'
 import { openTool } from '@/lib/openTool'
-import { useTopReels, type TopReel } from '@/components/CineHero'
+import { useTopReels, useFeedPhotos, sharpest, type TopReel } from '@/components/CineHero'
 import { smoothPath } from '@/lib/chart'
 
 const C_OK = '#8B7CF6', C_KO = '#E5484D'   // palette validée (daltonisme OK)
@@ -98,10 +98,14 @@ const I = {
   refresh: 'M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.7-3|M21 3v6h-6|M3 21v-6h6',
   arrow: 'M5 12h14|M13 6l6 6-6 6',
   play: 'M6 4l14 8-14 8V4z',
+  heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z',
 }
 const ScoreChip = ({ s, sm }: { s: number; sm?: boolean }) => s > 0 ? (
   <span style={{ height: sm ? 20 : 22, padding: sm ? '0 7px' : '0 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 99, background: s >= 3 ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'rgba(10,10,11,.6)', color: '#fff', fontSize: sm ? 10.5 : 11.5, fontWeight: 800, backdropFilter: 'blur(6px)', boxShadow: s >= 3 ? '0 6px 16px -6px rgba(236,72,153,.8)' : 'none', whiteSpace: 'nowrap' }}>{s >= 3 ? '🔥 ' : ''}×{fmtScore(s)}</span>
 ) : null
+
+/** Chiffre d'un média : ▶ vues (Reel) ou ♥ likes (photo du feed). */
+const Stat = ({ r, size, sw }: { r: TopReel; size: number; sw: number }) => <><Icon d={r.feed ? I.heart : I.play} size={size} sw={sw} />{compact(r.feed ? r.likes ?? 0 : r.views)}</>
 
 // ── Éventail des vrais Reels qui explosent (bandeau) ─────────────────────────
 function ReelFan({ reels, onOpen, small }: { reels: TopReel[]; onOpen: () => void; small?: boolean }) {
@@ -111,7 +115,7 @@ function ReelFan({ reels, onOpen, small }: { reels: TopReel[]; onOpen: () => voi
   const W = small ? 104 : 120
   const step = h ? W * 0.86 : W * 0.56
   return (
-    <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} aria-label="Les Reels qui explosent"
+    <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} aria-label="Ce qui explose en ce moment"
       style={{ position: 'relative', flexShrink: 0, width: W + (n - 1) * step, height: (W * 16) / 9 + 34, transition: 'width .45s cubic-bezier(.2,.8,.2,1)' }}>
       {list.map((r, i) => {
         const off = i - (n - 1) / 2
@@ -126,7 +130,7 @@ function ReelFan({ reels, onOpen, small }: { reels: TopReel[]; onOpen: () => voi
             <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.25), transparent 25%, transparent 55%, rgba(0,0,0,.85))' }} />
             <span style={{ position: 'absolute', top: 8, left: 8 }}><ScoreChip s={r.score} sm /></span>
             <span style={{ position: 'absolute', left: 9, right: 9, bottom: 9, display: 'flex', flexDirection: 'column', gap: 1, textAlign: 'left' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fff', fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em' }}><Icon d={I.play} size={10} sw={2.6} />{compact(r.views)}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fff', fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em' }}><Stat r={r} size={10} sw={2.6} /></span>
               <span data-no-tr style={{ fontSize: 10.5, fontWeight: 650, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{r.username}</span>
             </span>
           </button>
@@ -355,7 +359,7 @@ function ReelsCard({ reels, onOpen, cols, delay }: { reels: TopReel[]; onOpen: (
             <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.3) 0%, transparent 22%, transparent 55%, rgba(0,0,0,.88) 100%)' }} />
             <span style={{ position: 'absolute', top: 8, right: 8 }}><ScoreChip s={r.score} sm /></span>
             <span style={{ position: 'absolute', left: 10, right: 10, bottom: 10, display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#fff', fontSize: 16, fontWeight: 800, letterSpacing: '-0.03em' }}><Icon d={I.play} size={11} sw={2.4} />{compact(r.views)}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#fff', fontSize: 16, fontWeight: 800, letterSpacing: '-0.03em' }}><Stat r={r} size={11} sw={2.4} /></span>
               <span data-no-tr style={{ fontSize: 11.5, fontWeight: 650, color: '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{r.username}</span>
             </span>
           </button>
@@ -375,7 +379,10 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
   const narrow = useNarrow(760)
   const mid = useNarrow(1180)
   const { series, reloadSeries } = useActivitySeries(user, org)
-  const reels = useTopReels(16)
+  // Photos du feed les plus likées (vraies photos, plus belles), sinon les Reels qui explosent.
+  const feed = useFeedPhotos(24)
+  const topReels = useTopReels(16)
+  const reels = feed && feed.length >= 3 ? sharpest(feed, 16) : topReels
   const firstName = firstNameFrom(data?.displayName ?? null, user.email)
   const balance = data?.balance ?? null
   const now = new Date()
@@ -424,9 +431,9 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
     <div className="sf-db" style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <style>{KEYFRAMES}</style>
 
-      {/* Bandeau : aurore animée + éventail des vrais Reels qui explosent */}
+      {/* Bandeau : aurore animée + éventail des vraies photos / Reels qui explosent */}
       <section style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 26, border: '1px solid rgba(255,255,255,0.08)', background: '#0B0B0D', marginBottom: 14, animation: 'dbRise .5s cubic-bezier(.2,.8,.2,1) both' }}>
-        {/* Couleurs du meilleur Reel, très floutées, en fond à droite */}
+        {/* Couleurs de la meilleure photo, très floutées, en fond à droite */}
         {hasReels && <img src={reels![0].thumb} alt="" aria-hidden="true" style={{ position: 'absolute', zIndex: -2, right: '-5%', top: '-30%', width: '60%', height: '160%', objectFit: 'cover', filter: 'blur(60px) saturate(1.4)', opacity: 0.45 }} />}
         <span style={{ position: 'absolute', zIndex: -1, left: '-8%', top: '-60%', width: '55%', height: '220%', borderRadius: 999, background: 'radial-gradient(circle, rgba(139,92,246,0.45), transparent 62%)', filter: 'blur(20px)', animation: 'dbAuroraA 14s ease-in-out infinite' }} />
         <span style={{ position: 'absolute', zIndex: -1, right: '-10%', top: '-80%', width: '55%', height: '240%', borderRadius: 999, background: 'radial-gradient(circle, rgba(236,72,153,0.3), transparent 62%)', filter: 'blur(24px)', animation: 'dbAuroraB 17s ease-in-out infinite' }} />
@@ -479,7 +486,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
         <div style={span(4, 3)}><RateCard rate={series?.rate7 ?? null} prev={series?.ratePrev7 ?? null} ok={series?.ok7 ?? 0} failed={series?.failed7 ?? 0} loading={sLoading} onOpen={() => onNavigate('activity')} /></div>
         <div style={span(6, 3)}><CreditsCard balance={loading ? null : balance} runway={runway} spent7={series ? series.ok7 * 2 : null} onOpen={() => openTool(onNavigate, 'settings', { tab: 'billing' })} /></div>
         <div style={span(6, 3)}><LiveCard onNavigate={onNavigate} delay={0.2} /></div>
-        {/* Pas deux fois les mêmes Reels : la rangée prend ceux qui ne sont pas déjà dans l'éventail du haut. */}
+        {/* Pas deux fois les mêmes images : la rangée prend celles qui ne sont pas déjà dans l'éventail du haut. */}
         {reels && reels.length >= 2 && (() => {
           const cols = narrow ? 2 : mid ? 4 : 6
           const fanN = !narrow && hasReels ? (mid ? 3 : 5) : 0

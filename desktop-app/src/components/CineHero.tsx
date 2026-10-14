@@ -10,55 +10,69 @@ import { measureAll, isClean } from '@/lib/imageQuality'
 
 const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
 const LIME = '#A78BFA'   // accent ScaleFlow (violet)
-export interface TopReel { thumb: string; username: string; views: number; score: number; sharp?: number }
+/** Un média de la Veille : Reel (vues) ou post photo du feed (likes, slides du carrousel). */
+export interface TopReel { thumb: string; username: string; views: number; score: number; sharp?: number; likes?: number; feed?: boolean; images?: string[] }
 const proxied = (u: string) => `${FN_URL}?img=${encodeURIComponent(u)}`
 
-/** Reels les plus vus des 7 derniers jours (Sélection ScaleFlow + comptes de l'équipe) :
- *  un Reel par compte d'abord (variété), puis on complète. Seules les miniatures PROPRES sont
- *  gardées (nettes, assez grandes, bien exposées, sans bandes : lib/imageQuality). Partagé
- *  (cache 5 min) entre l'Explorer, le tableau de bord et les visuels qui réutilisent les vraies images. */
-let topCache: { at: number; rows: TopReel[] } | null = null
-let topInflight: Promise<TopReel[]> | null = null
-async function loadTopReels(): Promise<TopReel[]> {
-  if (topCache && Date.now() - topCache.at < 5 * 60_000) return topCache.rows
-  if (topInflight) return topInflight
-  topInflight = (async () => {
-    const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
-    let r = await supabase.from('viral_reels').select('*').gte('taken_at', since).order('views', { ascending: false }).limit(80)
-    if (!r.error && (r.data ?? []).length < 4) r = await supabase.from('viral_reels').select('*').order('views', { ascending: false }).limit(80)
-    const rows = ((r.data ?? []) as (TopReel & { kind?: string })[]).filter(x => x.thumb && (x.kind ?? 'reel') === 'reel')
+/** Reels les plus vus des 7 derniers jours, ou posts PHOTO du feed les plus likés des 30 derniers
+ *  jours (Sélection ScaleFlow + comptes de l'équipe) : un par compte d'abord (variété), puis on
+ *  complète. Seules les images PROPRES sont gardées (nettes, assez grandes, bien exposées, sans
+ *  bandes : lib/imageQuality). Partagé (cache 5 min) entre l'Explorer, le Studio, la Publication
+ *  et le tableau de bord. Les photos du feed (vraies photos, cadrées) servent aux visuels. */
+type Kind = 'reel' | 'feed'
+const caches: Record<Kind, { at: number; rows: TopReel[] } | null> = { reel: null, feed: null }
+const inflight: Record<Kind, Promise<TopReel[]> | null> = { reel: null, feed: null }
+async function loadMedia(kind: Kind): Promise<TopReel[]> {
+  const c = caches[kind]
+  if (c && Date.now() - c.at < 5 * 60_000) return c.rows
+  if (inflight[kind]) return inflight[kind]!
+  inflight[kind] = (async () => {
+    const by = kind === 'reel' ? 'views' : 'likes'
+    const since = new Date(Date.now() - (kind === 'reel' ? 7 : 30) * 86_400_000).toISOString()
+    const base = () => supabase.from('viral_reels').select('*').eq('kind', kind)
+    let r = await base().gte('taken_at', since).order(by, { ascending: false }).limit(120)
+    if (!r.error && (r.data ?? []).length < 4) r = await base().order(by, { ascending: false }).limit(120)
+    // SQL v4 pas encore passé (pas de colonne kind) : Reels seulement, comme avant.
+    if (r.error && kind === 'reel') r = await supabase.from('viral_reels').select('*').order('views', { ascending: false }).limit(80)
+    type Row = { thumb: string | null; username: string; views: number; likes?: number; score: number; kind?: string; images?: string[] | null }
+    const rows = ((r.error ? [] : r.data ?? []) as Row[]).filter(x => x.thumb && (x.kind ?? 'reel') === kind)
     const seen = new Set<string>(), users = new Set<string>(), first: TopReel[] = [], rest: TopReel[] = []
     for (const x of rows) {
-      if (seen.has(x.thumb)) continue
-      seen.add(x.thumb)
-      const item = { thumb: proxied(x.thumb), username: x.username, views: x.views, score: x.score }
+      if (seen.has(x.thumb!)) continue
+      seen.add(x.thumb!)
+      const item: TopReel = { thumb: proxied(x.thumb!), username: x.username, views: x.views ?? 0, score: x.score, likes: x.likes ?? 0,
+        ...(kind === 'feed' ? { feed: true, images: (Array.isArray(x.images) ? x.images : []).filter(Boolean).map(proxied) } : {}) }
       ;(users.has(x.username) ? rest : first).push(item); users.add(x.username)
     }
     const all = [...first, ...rest].slice(0, 48)
     const qs = await measureAll(all.map(x => x.thumb))
     // Mesure impossible (hors ligne, canvas bloqué) → gardée ; sinon il faut une image propre.
     const out = all.map((x, i) => ({ ...x, sharp: qs[i]?.sharp })).filter((x, i) => !qs[i] || isClean(qs[i]!))
-    topCache = { at: Date.now(), rows: out }
+    caches[kind] = { at: Date.now(), rows: out }
     return out
-  })().finally(() => { topInflight = null })
-  return topInflight
+  })().finally(() => { inflight[kind] = null })
+  return inflight[kind]!
 }
-/** Les n Reels aux images les plus nettes (comptes différents d'abord) : visuels mis en avant. */
+/** Les n médias aux images les plus nettes (comptes différents d'abord) : visuels mis en avant. */
 export function sharpest(list: TopReel[] | null, n: number): TopReel[] {
   const sorted = [...(list ?? [])].sort((a, b) => (b.sharp ?? 0) - (a.sharp ?? 0))
   const users = new Set<string>(), first: TopReel[] = [], rest: TopReel[] = []
   for (const r of sorted) { (users.has(r.username) ? rest : first).push(r); users.add(r.username) }
   return [...first, ...rest].slice(0, n)
 }
-export function useTopReels(n = 8): TopReel[] | null {
-  const [list, setList] = useState<TopReel[] | null>(() => topCache ? topCache.rows.slice(0, n) : null)
+function useMedia(kind: Kind, n: number): TopReel[] | null {
+  const [list, setList] = useState<TopReel[] | null>(() => caches[kind] ? caches[kind]!.rows.slice(0, n) : null)
   useEffect(() => {
     let alive = true
-    void loadTopReels().then(rows => { if (alive) setList(rows.slice(0, n)) }).catch(() => { if (alive) setList([]) })
+    void loadMedia(kind).then(rows => { if (alive) setList(rows.slice(0, n)) }).catch(() => { if (alive) setList([]) })
     return () => { alive = false }
-  }, [n])
+  }, [kind, n])
   return list
 }
+/** Reels qui explosent (vues). */
+export const useTopReels = (n = 8) => useMedia('reel', n)
+/** Posts photo du feed les plus likés (vraies photos, plus belles que les images de Reels). */
+export const useFeedPhotos = (n = 8) => useMedia('feed', n)
 
 const H1: React.CSSProperties = { margin: 0, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 0.95, textTransform: 'uppercase' }
 export const CINE_KEYFRAMES = `
