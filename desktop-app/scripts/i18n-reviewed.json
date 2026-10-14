@@ -563,6 +563,7 @@
  "text/csv;charset=utf-8",
  "timestamp_granularities[]",
  "upload ·",
+ "url(#dbBlur)",
  "url({0})",
  "video/*",
  "videos/{0}/linkpic-{1}.{2}",

@@ -136,7 +136,8 @@ function AppInner({ user }: { user: User }) {
   // On ouvre sur l'infra GeeLark : c'est là que sont tes données aujourd'hui.
   // ScaleFlow Cloud (auto-hébergé) reste vide tant que tu n'as pas branché tes serveurs.
   const [infra, setInfra] = useState<InfraKey>('geelark')
-  const [page, setPage] = useState<PageKey>('hub')
+  // L'app s'ouvre sur l'Explorer (tous les outils, visuels « wow ») ; le tableau de bord est à côté.
+  const [page, setPage] = useState<PageKey>('explore')
   // Écran « Nouveautés » : s'ouvre une fois à l'arrivée sur l'accueil, puis via la bannière.
   const [spot, setSpot] = useState(() => !spotlightSeen())
   // Ouvre un outil précis du catalogue (Explorer, accueil) : bon onglet / format.
@@ -282,7 +283,7 @@ function AppInner({ user }: { user: User }) {
         </div>
       )}
       <Suspense fallback={<PageLoader />}>{content}</Suspense>
-      {spot && page === 'hub' && <LaunchSpotlight onClose={() => setSpot(false)} onNavigate={p => setPage(p)} />}
+      {spot && (page === 'hub' || page === 'explore') && <LaunchSpotlight onClose={() => setSpot(false)} onNavigate={p => setPage(p)} />}
       <RunWidget theme={theme} />
       <Toaster />
       <DialogHost theme={theme} />

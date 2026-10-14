@@ -14,15 +14,15 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     id: '2026-10-14b',
     date: '2026-10-14',
-    title: { fr: '✨ Accueil et Explorer refaits', en: '✨ Home and Explore redesigned' },
+    title: { fr: '✨ Nouvel Explorer + nouveau Tableau de bord', en: '✨ New Explore + new Dashboard' },
     items: {
       fr: [
-        'Accueil épuré : tes chiffres clés, les outils phares en grandes tuiles, les Reels qui explosent cette semaine, puis ton activité, ce qui tourne en direct et ce qui part aujourd’hui.',
-        'Explorer : une grande recherche, des onglets clairs, « À la une » en grandes tuiles et tous les outils rangés par catégorie.',
+        'ScaleFlow s’ouvre sur l’Explorer : une grande recherche, « À la une » avec les vrais Reels qui explosent, et tous les outils rangés par catégorie.',
+        'L’Accueil devient le Tableau de bord : courbe animée de tes publications, taux de réussite, tes crédits et leur autonomie, ce qui tourne et ce qui part aujourd’hui.',
       ],
       en: [
-        'Cleaner Home: your key numbers, the main tools as big tiles, this week’s exploding Reels, then your activity, what’s running live and what goes out today.',
-        'Explore: a big search, clear tabs, “Featured” big tiles and every tool sorted by category.',
+        'ScaleFlow now opens on Explore: a big search, “Featured” with the real exploding Reels, and every tool sorted by category.',
+        'Home becomes the Dashboard: animated chart of your posts, success rate, your credits and how long they last, what’s running and what goes out today.',
       ],
     },
   },

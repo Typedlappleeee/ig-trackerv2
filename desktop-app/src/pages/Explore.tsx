@@ -13,6 +13,7 @@ import { CATS, searchTools, visibleTools, type Tool, type ToolCat } from '@/lib/
 import { recentTools } from '@/lib/openTool'
 import ToolArt from '@/components/ToolArt'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
+import { useTopReels, type TopReel } from '@/components/CineHero'
 
 const FAV_KEY = 'sf-fav-tools'
 function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
@@ -48,14 +49,35 @@ function FavBtn({ on, show, onClick }: { on: boolean; show: boolean; onClick: ()
   )
 }
 
+// ── Visuel « vrais Reels » : les Reels qui explosent vraiment (Veille), avec leurs chiffres ──
+const fmtScore = (s: number) => s >= 10 ? String(Math.round(s)) : s.toFixed(1).replace('.', ',')
+export function ReelsArt({ reels, n = 3, offset = 0 }: { reels: TopReel[]; n?: number; offset?: number }) {
+  const list = Array.from({ length: Math.min(n, reels.length) }, (_, i) => reels[(offset + i) % reels.length])
+  return (
+    <span style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${list.length}, 1fr)`, gap: 3, background: '#0A0A0B' }}>
+      {list.map((r, i) => (
+        <span key={`${r.thumb}-${i}`} style={{ position: 'relative', overflow: 'hidden' }}>
+          <img src={r.thumb} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `sfsKen ${9 + i * 2}s ease-in-out ${-i * 2}s infinite alternate` }} />
+          <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.45), transparent 30%)' }} />
+          <span style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
+            {r.score > 0 && <span style={{ height: 21, padding: '0 7px', display: 'inline-flex', alignItems: 'center', borderRadius: 99, background: r.score >= 3 ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'rgba(10,10,11,.6)', color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: r.score >= 3 ? '0 6px 16px -6px rgba(236,72,153,.8)' : 'none' }}>{r.score >= 3 ? '🔥 ' : ''}×{fmtScore(r.score)}</span>}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#fff', fontSize: 12.5, fontWeight: 800, textShadow: '0 1px 6px rgba(0,0,0,.7)' }}>▶ {compactFr(r.views)}</span>
+          </span>
+        </span>
+      ))}
+    </span>
+  )
+}
+const compactFr = (n: number) => new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+
 // ── Carte d'outil : aperçu animé arrondi, texte dessous (sans cadre autour) ──────
-export function ToolCard({ t, fav, onFav, onOpen, i, pick }: { t: Tool; fav: boolean; onFav?: () => void; onOpen: () => void; i: number; pick: (k: number) => string | null }) {
+export function ToolCard({ t, fav, onFav, onOpen, i, pick, art }: { t: Tool; fav: boolean; onFav?: () => void; onOpen: () => void; i: number; pick: (k: number) => string | null; art?: ReactNode }) {
   const [h, setH] = useState(false)
   return (
     <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter') onOpen() }} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{ display: 'flex', flexDirection: 'column', gap: 12, cursor: 'pointer', outline: 'none', animation: `sfsPop .45s ${Math.min(i, 16) * 0.025}s both` }}>
       <div style={{ position: 'relative', aspectRatio: '16 / 10', borderRadius: 16, overflow: 'hidden', background: '#0F0F11', boxShadow: h ? '0 0 0 1px rgba(255,255,255,0.22), 0 24px 48px -28px rgba(0,0,0,0.9)' : '0 0 0 1px rgba(255,255,255,0.06)', transition: 'box-shadow .2s ease' }}>
-        <span style={{ position: 'absolute', inset: 0, transform: h ? 'scale(1.035)' : 'none', transition: 'transform .6s cubic-bezier(.2,.8,.2,1)' }}><ToolArt t={t} pick={pick} /></span>
+        <span style={{ position: 'absolute', inset: 0, transform: h ? 'scale(1.035)' : 'none', transition: 'transform .6s cubic-bezier(.2,.8,.2,1)' }}>{art ?? <ToolArt t={t} pick={pick} />}</span>
         {t.badge && <span style={{ position: 'absolute', zIndex: 4, top: 10, left: 10 }}><Badge b={t.badge} /></span>}
         {onFav && <FavBtn on={fav} show={h} onClick={onFav} />}
       </div>
@@ -75,9 +97,9 @@ export function ToolCard({ t, fav, onFav, onOpen, i, pick }: { t: Tool; fav: boo
 }
 
 // ── Tuile plein cadre (aperçu animé + texte par-dessus) : À la une, Accueil ─────
-export function ToolTile({ t, pick, onOpen, size = 'md', kicker, title, text, cta, fav, onFav, i = 0, style }: {
+export function ToolTile({ t, pick, onOpen, size = 'md', kicker, title, text, cta, fav, onFav, i = 0, style, art }: {
   t: Tool; pick: (k: number) => string | null; onOpen: () => void; size?: 'xl' | 'md' | 'sm'
-  kicker?: string; title?: ReactNode; text?: ReactNode; cta?: string; fav?: boolean; onFav?: () => void; i?: number; style?: React.CSSProperties
+  kicker?: string; title?: ReactNode; text?: ReactNode; cta?: string; fav?: boolean; onFav?: () => void; i?: number; style?: React.CSSProperties; art?: ReactNode
 }) {
   const [h, setH] = useState(false)
   const xl = size === 'xl', sm = size === 'sm'
@@ -86,7 +108,7 @@ export function ToolTile({ t, pick, onOpen, size = 'md', kicker, title, text, ct
       style={{ position: 'relative', overflow: 'hidden', borderRadius: sm ? 18 : 22, cursor: 'pointer', outline: 'none', background: '#0F0F11', minHeight: 0,
         boxShadow: h ? '0 0 0 1px rgba(255,255,255,0.24), 0 30px 60px -30px rgba(0,0,0,0.95)' : '0 0 0 1px rgba(255,255,255,0.06)', transform: h ? 'translateY(-3px)' : 'none',
         transition: 'transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease', animation: `sfsPop .5s ${Math.min(i, 10) * 0.04}s both`, ...style }}>
-      <span style={{ position: 'absolute', inset: 0, transform: h ? 'scale(1.04)' : 'none', transition: 'transform .8s cubic-bezier(.2,.8,.2,1)' }}><ToolArt t={t} pick={pick} /></span>
+      <span style={{ position: 'absolute', inset: 0, transform: h ? 'scale(1.04)' : 'none', transition: 'transform .8s cubic-bezier(.2,.8,.2,1)' }}>{art ?? <ToolArt t={t} pick={pick} />}</span>
       {/* Fondu presque opaque en bas : le texte ne se mélange pas aux étiquettes de l'aperçu. */}
       <span style={{ position: 'absolute', inset: 0, zIndex: 3, background: xl
         ? 'linear-gradient(180deg, rgba(8,8,9,0) 34%, rgba(8,8,9,0.78) 60%, rgba(8,8,9,0.97) 80%)'
@@ -161,7 +183,17 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
   const recent = useMemo(() => recentTools().map(id => byId.get(id)).filter(Boolean) as Tool[], [byId])
   const featured = FEATURED.map(f => ({ f, t: byId.get(f.tool) })).filter((x): x is { f: typeof FEATURED[number]; t: Tool } => !!x.t).slice(0, 3)
   const toggleFav = (id: string) => setFavs(f => { const n = f.includes(id) ? f.filter(x => x !== id) : [...f, id]; try { localStorage.setItem(FAV_KEY, JSON.stringify(n)) } catch { /* ignore */ } return n })
-  const pickOf = (t: Tool, k: number) => pickerFor(t, k, photos)
+  // Vraies images des Reels qui explosent (Veille) : visuel de la Veille, source de Genjutsu…
+  const top = useTopReels(12)
+  const real = top && top.length >= 3 ? top : null
+  const pickOf = (t: Tool, k: number) => {
+    const base = pickerFor(t, k, photos)
+    if (!real) return base
+    if (t.id === 'genjutsu') return (j: number) => j === 0 ? real[k % real.length].thumb : base(j)
+    if (t.id === 'viral-mine') return (j: number) => j === 3 ? real[(k + 4) % real.length].thumb : base(j)
+    return base
+  }
+  const artOf = (t: Tool, n: number, offset = 0) => real && t.id === 'viral' ? <ReelsArt reels={real} n={n} offset={offset} /> : undefined
   const goCat = (c: typeof cat) => { setCat(c); try { document.querySelector('main')?.scrollTo?.({ top: 0, behavior: 'smooth' }) } catch { /* ignore */ } }
 
   const found = searchTools(all, q)
@@ -171,7 +203,7 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
   const tabs: [typeof cat, string, number][] = [['all', 'Tout', found.length], ...CATS.map(c => [c.k, c.label, found.filter(t => t.cat === c.k).length] as [ToolCat, string, number]), ['fav', '★ Favoris', found.filter(t => favs.includes(t.id)).length]]
   const grid = (items: Tool[], base: number) => (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 250}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>
-      {items.map((t, j) => <ToolCard key={t.id} t={t} i={base + j} pick={pickOf(t, base + j)} fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)} />)}
+      {items.map((t, j) => <ToolCard key={t.id} t={t} i={base + j} pick={pickOf(t, base + j)} art={artOf(t, 3, 3)} fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)} />)}
     </div>
   )
   let idx = 0
@@ -218,7 +250,7 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
         <section style={{ marginBottom: 40 }}>
           <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : mid ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1.9fr) minmax(0,1fr)', gridTemplateRows: narrow || mid ? undefined : '220px 220px', gap: narrow ? 12 : 16 }}>
             {featured.map(({ f, t }, j) => (
-              <ToolTile key={t.id} t={t} i={j} pick={pickOf(t, j * 4 + 1)} size={j === 0 ? 'xl' : 'md'} kicker={f.kicker} title={f.title} text={f.text} cta={j === 0 ? f.cta : undefined}
+              <ToolTile key={t.id} t={t} i={j} pick={pickOf(t, j * 4 + 1)} art={artOf(t, narrow ? 2 : 3)} size={j === 0 ? 'xl' : 'md'} kicker={f.kicker} title={f.title} text={f.text} cta={j === 0 ? f.cta : undefined}
                 fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)}
                 style={j === 0 ? (narrow ? { height: 340 } : mid ? { gridColumn: 'span 2', height: 380 } : { gridRow: 'span 2' }) : (narrow || mid ? { height: 230 } : undefined)} />
             ))}

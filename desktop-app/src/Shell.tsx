@@ -63,9 +63,9 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
     : { k: 'phones', l: 'Téléphones GeeLark', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined }
   return [
     { g: null, items: [
-      { k: 'hub', l: 'Accueil', i: 'M3 10.5 12 3l9 7.5|M5 10v10h14V10' },
-      // Explorer : tous les outils en galerie (façon Higgsfield).
-      { k: 'explore', l: 'Explorer', i: 'M3 3h7v7H3z|M14 3h7v7h-7z|M14 14h7v7h-7z|M3 14h7v7H3z', soon: 'Nouveau' },
+      // Explorer : page d'ouverture, tous les outils en galerie (façon Higgsfield).
+      { k: 'explore', l: 'Explorer', i: 'M3 3h7v7H3z|M14 3h7v7h-7z|M14 14h7v7h-7z|M3 14h7v7H3z' },
+      { k: 'hub', l: 'Tableau de bord', i: 'M3 3v18h18|M7 15l4-6 4 3 5-8' },
     ] },
     {
       g: 'Pilotage', items: [
@@ -108,7 +108,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
 }
 
 const TITLES: Record<PageKey, string[]> = {
-  hub: ['Accueil'],
+  hub: ['Tableau de bord'],
   cloud: ['Pilotage', 'Mes appareils'],
   phones: ['Pilotage', 'Téléphones'],
   proxies: ['Pilotage', 'Proxies'],
@@ -258,7 +258,7 @@ export default function Shell({
               {Object.values(INFRAS).filter(o => (o.k !== 'blowsome' && o.k !== 'cloud' && o.k !== 'iremotech') || canBlowsome || isAdmin).map(o => {
                 const on = infra === o.k
                 return (
-                  <button key={o.k} onClick={() => { setInfra(o.k); setInfraOpen(false); setPage(o.k === 'iremotech' ? 'irtPhones' : 'hub') }}
+                  <button key={o.k} onClick={() => { setInfra(o.k); setInfraOpen(false); setPage(o.k === 'iremotech' ? 'irtPhones' : o.k === 'blowsome' ? 'hub' : 'explore') }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 12px', border: 'none', cursor: 'pointer', textAlign: 'left',
                       background: on ? 'rgba(255,255,255,0.07)' : 'transparent', transition: 'background .14s ease', boxSizing: 'border-box',
