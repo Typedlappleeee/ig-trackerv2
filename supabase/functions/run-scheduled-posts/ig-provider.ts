@@ -3,7 +3,7 @@
 // si l'un ne répond pas, l'autre prend le relais. Les deux renvoient du JSON brut
 // lu par les mêmes parseurs tolérants (parseProfile / parseReels / reelInfo).
 import { igPost, deepArray } from './ig-rapidapi.ts'
-import { hikerKey, hikerProfile, hikerReels } from './ig-hikerapi.ts'
+import { hikerKey, hikerProfile, hikerReels, hikerFeed } from './ig-hikerapi.ts'
 
 export function rapidKey(): string { return (Deno.env.get('RAPIDAPI_KEY') ?? '').trim() }
 
@@ -41,4 +41,13 @@ export async function igReels(username: string, customRapidKey = ''): Promise<an
   const key = customRapidKey || rapidKey()
   if (!key) return null
   return igPost(key, 'reels', username, { maxId: '' })
+}
+
+/** Feed d'un compte (HikerAPI uniquement ; pas de repli RapidAPI pour le feed). */
+// deno-lint-ignore no-explicit-any
+export async function igFeed(username: string): Promise<any[] | null> {
+  if (!hikerKey()) return null
+  let pk = pkCache.get(norm(username))
+  if (!pk) { const p = await hikerProfile(username); if (p?.pk) { pk = String(p.pk); pkCache.set(norm(username), pk) } }
+  return pk ? await hikerFeed(pk) : null
 }

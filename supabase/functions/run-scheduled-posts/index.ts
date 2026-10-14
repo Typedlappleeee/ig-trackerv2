@@ -224,6 +224,25 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Proxy VIDÉO public en streaming (fiche de la Veille) : <video> ne peut pas envoyer de jeton,
+  // donc GET public — CDN Instagram uniquement. L'en-tête Range est transmis (lecture immédiate,
+  // avance rapide) ; &dl=1 force le téléchargement.
+  {
+    const u = new URL(req.url)
+    const vid = u.searchParams.get('vid')
+    if (vid) {
+      const { isIgCdn } = await import('./viral-score.ts')
+      if (!isIgCdn(vid)) return new Response('forbidden', { status: 403, headers: CORS })
+      const range = req.headers.get('range')
+      const r = await fetch(vid, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.instagram.com/', ...(range ? { Range: range } : {}) } }).catch(() => null)
+      if (!r || !r.body || (r.status !== 200 && r.status !== 206)) return new Response('', { status: r?.status ?? 502, headers: CORS })
+      const h: Record<string, string> = { ...CORS, 'Content-Type': r.headers.get('content-type') ?? 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=3600', 'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges' }
+      for (const k of ['content-length', 'content-range']) { const v = r.headers.get(k); if (v) h[k === 'content-length' ? 'Content-Length' : 'Content-Range'] = v }
+      if (u.searchParams.get('dl')) h['Content-Disposition'] = `attachment; filename="${(u.searchParams.get('name') ?? 'reel').replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80)}.mp4"`
+      return new Response(r.body, { status: r.status, headers: h })
+    }
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const cronSecret  = Deno.env.get('CRON_SECRET') ?? ''
@@ -376,16 +395,18 @@ Deno.serve(async (req) => {
       })
     }
 
-    // ── Veille des Reels viraux : relevé immédiat. Super-admin → tous les comptes
-    // (sélection ScaleFlow comprise) ; utilisateur → ses comptes privés, au plus 1×/15 min
-    // par compte et 30 comptes (coût HikerAPI maîtrisé). ──
+    // ── Veille : relevé COMPLET. Le client envoie `since` (heure du clic) et relance tant que
+    // `remaining` > 0 → tous les comptes y passent (45 s par appel, 1 appel HikerAPI par @).
+    // Super-admin → tous les comptes ; agence → ses comptes privés, au plus 1×/15 min. ──
     if (body?.viral === 'refresh' && filterUserId) {
       const { data: prof } = await db.from('profiles').select('email, is_super_admin').eq('id', filterUserId).maybeSingle()
       const admin = !!prof?.is_super_admin || prof?.email === 'tintin.aunea@gmail.com'
       const { runViralWatch } = await import('./viral.ts')
+      const since = typeof body.since === 'string' && !Number.isNaN(Date.parse(body.since)) ? new Date(Math.min(Date.parse(body.since), Date.now())).toISOString() : new Date().toISOString()
+      const orgId = typeof body.org_id === 'string' ? body.org_id : null
       const r = admin
-        ? await runViralWatch(db, Date.now() + 50_000, { minAgeMs: 0, max: 300 })
-        : await runViralWatch(db, Date.now() + 50_000, { userId: filterUserId, minAgeMs: 15 * 60_000, max: 30 })
+        ? await runViralWatch(db, Date.now() + 45_000, { before: since })
+        : await runViralWatch(db, Date.now() + 45_000, { userId: filterUserId, orgId, before: new Date(Math.min(Date.parse(since), Date.now() - 15 * 60_000)).toISOString(), max: 60 })
       return new Response(JSON.stringify({ ok: true, ...r }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
 
@@ -402,6 +423,8 @@ Deno.serve(async (req) => {
     if (body?.viral === 'media' && filterUserId && typeof body.code === 'string') {
       const { reelMedia } = await import('./viral.ts')
       const m = await reelMedia(body.code)
+      // URL vidéo fraîche réenregistrée : les prochaines ouvertures n'ont plus besoin de HikerAPI.
+      if (m?.videoUrl) { try { await db.from('viral_reels').update({ video_url: m.videoUrl, ...(m.caption ? { caption: m.caption } : {}) }).eq('code', body.code) } catch { /* colonnes absentes */ } }
       return new Response(JSON.stringify(m ? { ok: true, ...m } : { ok: false, error: 'reel introuvable' }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
     if (body?.viral === 'video' && filterUserId && typeof body.url === 'string') {
@@ -616,7 +639,7 @@ Deno.serve(async (req) => {
     if (n > 0) summary['account_sync'] = `${n} compte(s) synchronisé(s)`
   } catch { /* ignore */ }
 
-  // ── Étape 0-viral : veille des Reels viraux (comptes pas relevés depuis 20 h, ≤ 20 s) ──
+  // ── Étape 0-viral : relevé quotidien à MIDI (Paris) — comptes relevés avant le dernier midi, ≤ 20 s par tick ──
   if (!filterUserId) {
     try {
       const { runViralWatch } = await import('./viral.ts')
