@@ -36,27 +36,33 @@ export default function Studio({ theme, user, org, onNavigate }: {
 
   if (!tool) {
     const extras = TOOLS.filter(t => t.id === 'autocontent')
+    const auto = extras[0]
     return (
       <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
         <style>{SPOT_KEYFRAMES}</style>
-        <PageHeader kicker={`${STUDIO.length} outils · gratuits`} title="Studio vidéo" sub="Rends chaque vidéo unique, ajoute du texte, une photo, des sous-titres, coupe et assemble. Tout tourne sur ton ordinateur, aucun crédit." />
-        <section style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.9fr) minmax(0,1fr)', gridTemplateRows: narrow ? undefined : '210px 210px', gap: narrow ? 12 : 16, marginBottom: 40 }}>
-          {(['remix', 'mixer', 'subs'] as StudioToolId[]).map((id, j) => {
+        <PageHeader kicker={`${STUDIO.length + (onNavigate ? 1 : 0)} outils · gratuits`} title="Studio vidéo" sub="Rends chaque vidéo unique, ajoute du texte, une photo, des sous-titres, coupe et assemble. Tout tourne sur ton ordinateur, aucun crédit." />
+        {/* À la une : Auto-contenu (recommandé) en grand, Remix et Texte sur vidéo à côté */}
+        <section style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.9fr) minmax(0,1fr)', gridTemplateRows: narrow ? undefined : '230px 230px', gap: narrow ? 12 : 16, marginBottom: 40 }}>
+          {auto && onNavigate ? (
+            <ToolTile t={auto} i={0} pick={pickerFor(auto, 2, photos)} size="xl" kicker="✦ Recommandé · gratuit"
+              title="Une vidéo → des dizaines de vidéos uniques"
+              text="Légendes (pool + style), coupe, micro-vitesse, mode Tendance et spoof appareil / GPS : en un clic, chaque compte reçoit sa propre vidéo, prête à poster."
+              cta="Lancer l’Auto-contenu" onOpen={() => openTool(onNavigate, auto.page, auto.arg, auto.id)}
+              style={narrow ? { height: 380 } : { gridRow: 'span 2' }} />
+          ) : (
+            <ToolTile t={STUDIO[0]} i={0} pick={pickerFor(STUDIO[0], 2, photos)} size="xl" kicker="Le plus utilisé" title="Une vidéo, 24 variantes uniques"
+              text="Couleurs, recadrage, vitesse, miroir : chaque compte publie une version différente. Métadonnées effacées, appareil et GPS réécrits."
+              cta="Ouvrir le Remix" onOpen={() => go('remix')} style={narrow ? { height: 340 } : { gridRow: 'span 2' }} />
+          )}
+          {(auto && onNavigate ? (['remix', 'mixer'] as StudioToolId[]) : (['mixer', 'subs'] as StudioToolId[])).map((id, j) => {
             const t = STUDIO.find(x => x.id === id)!
-            return (
-              <ToolTile key={id} t={t} i={j} pick={pickerFor(t, j * 4 + 1, photos)} size={j === 0 ? 'xl' : 'md'}
-                kicker={j === 0 ? 'Le plus utilisé' : undefined}
-                title={j === 0 ? 'Une vidéo, 24 variantes uniques' : undefined}
-                text={j === 0 ? 'Couleurs, recadrage, vitesse, miroir : chaque compte publie une version différente. Métadonnées effacées, appareil et GPS réécrits.' : undefined}
-                cta={j === 0 ? 'Ouvrir le Remix' : undefined} onOpen={() => go(id)}
-                style={j === 0 ? (narrow ? { height: 340 } : { gridRow: 'span 2' }) : (narrow ? { height: 220 } : undefined)} />
-            )
+            return <ToolTile key={id} t={t} i={j + 1} pick={pickerFor(t, j * 5 + 7, photos)} size="md" onOpen={() => go(id)} style={narrow ? { height: 220 } : undefined} />
           })}
         </section>
         <SectionHead title="Tous les outils" count={STUDIO.length + (onNavigate ? extras.length : 0)} />
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 250}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>
-          {STUDIO.map((t, i) => <ToolCard key={t.id} t={t} i={i} pick={pickerFor(t, i, photos)} fav={false} onOpen={() => go(t.id as StudioToolId)} />)}
-          {onNavigate && extras.map((t, i) => <ToolCard key={t.id} t={t} i={STUDIO.length + i} pick={pickerFor(t, STUDIO.length + i, photos)} fav={false} onOpen={() => openTool(onNavigate, t.page, t.arg, t.id)} />)}
+          {onNavigate && extras.map((t, i) => <ToolCard key={t.id} t={t} i={i} pick={pickerFor(t, 11 + i, photos)} fav={false} onOpen={() => openTool(onNavigate, t.page, t.arg, t.id)} />)}
+          {STUDIO.map((t, i) => <ToolCard key={t.id} t={t} i={i + 1} pick={pickerFor(t, i + 3, photos)} fav={false} onOpen={() => go(t.id as StudioToolId)} />)}
         </div>
         <Results results={results} onClear={() => { results.forEach(r => URL.revokeObjectURL(r.url)); setResults([]) }}
           onBank={onNavigate ? () => openTool(onNavigate, 'bank', { tab: 'video' }) : undefined} onPublish={onNavigate ? () => openTool(onNavigate, 'publish', { mode: 'reels' }) : undefined} />

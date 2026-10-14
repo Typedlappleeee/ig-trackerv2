@@ -6,7 +6,7 @@ import type { InfraKey } from '@/lib/theme'
 import { isReleased, type ReleaseKey } from '@/lib/releases'
 
 export type ToolCat = 'publish' | 'create' | 'accounts' | 'analyze' | 'bank'
-export type ToolBadge = 'Nouveau' | 'Populaire' | 'Bêta'
+export type ToolBadge = 'Nouveau' | 'Populaire' | 'Bêta' | 'Recommandé'
 export interface Tool {
   id: string; label: string; desc: string; cat: ToolCat
   page: PageKey; arg?: Record<string, unknown>
@@ -67,6 +67,7 @@ export const TOOLS: Tool[] = [
   { id: 'scheduled', label: 'Posts programmés', desc: 'Tout ce qui part plus tard, annulable et remboursé.', cat: 'publish', page: 'scheduled', arg: { view: 'list' }, icon: I.clock, a: '#60A5FA', b: '#312E81', infra: GL },
   { id: 'calendar', label: 'Calendrier', desc: 'Semaine / mois, glisse un post pour le décaler.', cat: 'publish', page: 'scheduled', arg: { view: 'calendar' }, icon: I.cal, a: '#34D399', b: '#065F46', infra: GL },
   // ── Créer
+  { id: 'autocontent', label: 'Auto-contenu', desc: 'Une vidéo → des dizaines de vidéos uniques, prêtes à poster : légendes, coupe, vitesse, spoof.', cat: 'create', page: 'blowContent', icon: I.wand, a: '#F0ABFC', b: '#86198F', badge: 'Recommandé', cost: 'gratuit' },
   { id: 'remix', label: 'Remix', desc: 'Une vidéo → jusqu’à 24 variantes uniques : couleurs, recadrage, vitesse, miroir.', cat: 'create', page: 'studio', arg: { tool: 'remix' }, icon: I.shuffle, a: '#FB923C', b: '#9F1239', badge: 'Populaire', cost: 'gratuit' },
   { id: 'spoof', label: 'Spoof vidéo', desc: 'Anti-empreinte : métadonnées effacées, appareil et GPS réécrits, micro-recadrage.', cat: 'create', page: 'studio', arg: { tool: 'spoof' }, icon: I.shield, a: '#4ADE80', b: '#14532D', cost: 'gratuit' },
   { id: 'imgspoof', label: 'Spoof image', desc: 'Des photos rendues uniques en .jpg : EXIF effacé puis appareil et GPS réécrits.', cat: 'create', page: 'studio', arg: { tool: 'imgspoof' }, icon: I.image, a: '#86EFAC', b: '#166534', cost: 'gratuit' },
@@ -75,7 +76,6 @@ export const TOOLS: Tool[] = [
   { id: 'montage', label: 'Montage', desc: 'Coupe une vidéo, ou assemble-en plusieurs dans l’ordre.', cat: 'create', page: 'studio', arg: { tool: 'montage' }, icon: I.scissors, a: '#FCA5A5', b: '#991B1B', cost: 'gratuit' },
   { id: 'mixer', label: 'Texte sur vidéo', desc: 'Une légende incrustée, placée où tu veux, une différente par vidéo.', cat: 'create', page: 'studio', arg: { tool: 'mixer' }, icon: I.type, a: '#C4B5FD', b: '#4C1D95', cost: 'gratuit' },
   { id: 'genjutsu', label: 'Genjutsu IA', desc: 'Recrée un Reel avec tes images de référence (Higgsfield).', cat: 'create', page: 'genjutsu', icon: I.wand, a: '#C4B5FD', b: '#7C3AED', badge: 'Nouveau', cost: 'ta clé Higgsfield', gate: 'admin' },
-  { id: 'autocontent', label: 'Auto-contenu', desc: 'Une source → des variantes uniques avec légendes.', cat: 'create', page: 'blowContent', icon: I.wand, a: '#F0ABFC', b: '#86198F', badge: 'Bêta', cost: 'gratuit' },
   // ── Comptes
   { id: 'warmup', label: 'Warmup', desc: 'Sessions de scroll, likes et follows pour chauffer tes comptes.', cat: 'accounts', page: 'warmup', arg: { tab: 'warm' }, icon: I.flame, a: '#FB923C', b: '#7C2D12', badge: 'Populaire', infra: GL },
   { id: 'mass-edit', label: 'Édition en masse', desc: '@, photo, nom, bio et lien sur tous tes comptes.', cat: 'accounts', page: 'warmup', arg: { tab: 'edit' }, icon: I.user, a: '#818CF8', b: '#312E81', gate: 'release:massEdit', infra: GL },
