@@ -20,7 +20,40 @@ import { StatBar } from '@/components/CineHero'
 type Scope = 'public' | 'private'
 type Region = 'fr' | 'us'
 type Kind = 'reel' | 'feed'
-const REGIONS: { v: Region; l: string }[] = [{ v: 'fr', l: '🇫🇷 FR' }, { v: 'us', l: '🇺🇸 US' }]
+// Drapeaux dessinés (les emoji 🇫🇷 / 🇺🇸 s'affichent en « FR » / « US » sur Windows).
+function Flag({ c }: { c: Region }) {
+  const S: React.CSSProperties = { display: 'block', borderRadius: 2, boxShadow: '0 0 0 1px rgba(255,255,255,0.15)', flexShrink: 0 }
+  if (c === 'fr') return <svg viewBox="0 0 3 2" width="18" height="12" style={S} aria-hidden="true"><rect width="1" height="2" fill="#2B4BA8" /><rect x="1" width="1" height="2" fill="#F4F4F5" /><rect x="2" width="1" height="2" fill="#E1394B" /></svg>
+  return (
+    <svg viewBox="0 0 19 10" width="18" height="12" style={S} aria-hidden="true" preserveAspectRatio="none">
+      {Array.from({ length: 13 }, (_, i) => <rect key={i} y={(i * 10) / 13} width="19" height={10 / 13} fill={i % 2 ? '#F4F4F5' : '#D63A48'} />)}
+      <rect width="7.6" height={70 / 13} fill="#2B4BA8" />
+    </svg>
+  )
+}
+const REGION_LABEL: Record<Region, string> = { fr: 'France', us: 'USA' }
+const REGIONS: { v: Region; l: React.ReactNode }[] = (['fr', 'us'] as Region[]).map(v => ({ v, l: <><Flag c={v} />{REGION_LABEL[v]}</> }))
+
+/** Filtres en pilules (plus lisibles que le segmenté compact) avec un petit intitulé. */
+function Pills<T extends string>({ label, value, onChange, options }: { label?: string; value: T; onChange: (v: T) => void; options: { v: T; l: React.ReactNode }[] }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: 4, borderRadius: 12, background: '#0F0F11', border: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap' }}>
+      {label && <span style={{ padding: '0 8px 0 6px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#5A5A63' }}>{label}</span>}
+      {options.map(o => {
+        const on = o.v === value
+        return (
+          <button key={o.v} type="button" aria-pressed={on} onClick={() => onChange(o.v)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px', borderRadius: 9, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 13, fontWeight: on ? 750 : 600,
+              background: on ? '#F4F4F5' : 'transparent', color: on ? '#0A0A0B' : '#A1A1AA', transition: 'background .15s ease, color .15s ease' }}
+            onMouseEnter={e => { if (!on) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#EDEDEF' } }}
+            onMouseLeave={e => { if (!on) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' } }}>
+            {o.l}
+          </button>
+        )
+      })}
+    </span>
+  )
+}
 interface Watch { id: string; username: string; niche: string; fetched_at: string | null; last_error: string | null; scope?: Scope; region?: Region; user_id?: string; org_id?: string | null }
 export interface Reel {
   watch_id: string; code: string; username: string; views: number; likes: number; comments: number; taken_at: string | null; thumb: string | null; url: string | null; baseline: number; score: number
@@ -406,7 +439,7 @@ function WatchPanel({ theme, list, onAdd, onRemove }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <textarea value={adding} onChange={e => setAdding(e.target.value)} rows={3} placeholder={'Colle des @ ou liens Instagram (un par ligne)\n@modele1\nhttps://instagram.com/modele2'} style={TEXTAREA} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <Segmented value={region} onChange={setRegion} options={REGIONS} />
+            <Pills value={region} onChange={setRegion} options={REGIONS} />
             <input value={niche} onChange={e => setNiche(e.target.value)} placeholder="Niche (ex. Modèles FR)" style={FIELD} />
             <Btn theme={theme} label="Ajouter" icon="M12 5v14|M5 12h14" onClick={() => void add()} />
           </div>
@@ -416,7 +449,7 @@ function WatchPanel({ theme, list, onAdd, onRemove }: {
           {list.map(w => (
             <span key={w.id} title={w.last_error ?? (w.fetched_at ? `Relevé le ${new Date(w.fetched_at).toLocaleString('fr-FR')}` : 'Pas encore relevé')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 4px 0 10px', borderRadius: 99, background: '#161618', border: `1px solid ${w.last_error ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.09)'}`, fontSize: 12, color: '#EDEDEF' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#8B8B94' }}>{(w.region ?? 'fr').toUpperCase()}</span>
+              <Flag c={w.region ?? 'fr'} />
               <span data-no-tr>@{w.username}</span>
               <button type="button" onClick={() => onRemove(w)} aria-label="Retirer" style={{ display: 'flex', border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer', padding: 2 }}><Icon d="M18 6L6 18|M6 6l12 12" size={11} /></button>
             </span>
@@ -602,7 +635,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
     ? <Panel theme={theme}><Empty icon={feed ? I.image : I.pulse} title={feed ? 'Aucun post pour l’instant' : 'Aucun Reel pour l’instant'} text={feed && noV4 ? 'Le feed arrive avec la mise à jour de la base (SQL 20261016) et le prochain relevé.' : 'Les nouveautés des comptes suivis apparaîtront ici après le prochain relevé (chaque jour à midi).'} /></Panel>
     : (
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill,minmax(min(${feed ? 210 : 180}px,46%),1fr))`, gridAutoFlow: 'dense', gap: 14 }}>
-        {list.map((r, i) => <MediaCard key={`${r.watch_id}-${r.code}`} r={r} rank={i + 1} big={!feed && i === 0 && sort === 'views' && list.length >= 5} fav={favSet.has(r.code)}
+        {list.map((r, i) => <MediaCard key={`${r.watch_id}-${r.code}`} r={r} rank={i + 1} fav={favSet.has(r.code)}
           onOpen={() => setOpen({ list, i })} onRecast={onNavigate ? () => recast(r) : undefined} onFav={() => void toggleFav(r)} />)}
       </div>
     )
@@ -610,12 +643,11 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
     <>
       <AccountRail list={srcWatch} reels={srcReels.filter(r => (r.kind ?? 'reel') === (feed ? 'feed' : 'reel'))} value={fAccount} onChange={setFAccount} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-        {!noRegion && <Segmented value={fRegion || 'all'} onChange={v => setFRegion(v === 'all' ? '' : v)} options={[{ v: 'all' as const, l: 'Tous' }, ...REGIONS]} />}
-        <Segmented value={range} onChange={setRange} options={[{ v: '1', l: '24 h' }, { v: '7', l: '7 jours' }, { v: '30', l: '30 jours' }]} />
+        {!noRegion && <Pills label="Pays" value={fRegion || 'all'} onChange={v => setFRegion(v === 'all' ? '' : v)} options={[{ v: 'all' as const, l: 'Tous' }, ...REGIONS]} />}
+        <Pills label="Période" value={range} onChange={setRange} options={[{ v: '1', l: '24 h' }, { v: '7', l: '7 jours' }, { v: '30', l: '30 jours' }]} />
         {niches.length > 1 && <select value={fNiche} onChange={e => setFNiche(e.target.value)} style={{ ...FIELD, width: 'auto', height: 30 }}><option value="">Toutes les niches</option>{niches.map(n => <option key={n} value={n}>{n}</option>)}</select>}
         <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, color: '#71717A' }}>Trier</span>
-          <Segmented value={sort} onChange={setSort} options={feed ? [{ v: 'views', l: 'Likes' }, { v: 'score', l: '×Normale' }, { v: 'recent', l: 'Récents' }] : [{ v: 'views', l: 'Vues' }, { v: 'score', l: '×Normale' }, { v: 'likes', l: 'Likes' }, { v: 'recent', l: 'Récents' }]} />
+          <Pills label="Trier" value={sort} onChange={setSort} options={feed ? [{ v: 'views', l: 'Likes' }, { v: 'score', l: '×Normale' }, { v: 'recent', l: 'Récents' }] : [{ v: 'views', l: 'Vues' }, { v: 'score', l: '×Normale' }, { v: 'likes', l: 'Likes' }, { v: 'recent', l: 'Récents' }]} />
         </span>
       </div>
     </>
@@ -741,7 +773,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
                 <div key={q.id} style={{ padding: '12px 0', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                     <b data-no-tr style={{ fontSize: 14, color: '#EDEDEF' }}>{q.requester ?? 'Agence'}</b>
-                    <span style={{ fontSize: 11.5, color: '#71717A' }}>{new Date(q.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · {(q.region ?? 'fr').toUpperCase()}</span>
+                    <span style={{ fontSize: 11.5, color: '#71717A' }}>{new Date(q.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · {REGION_LABEL[q.region ?? 'fr']}</span>
                   </span>
                   <span data-no-tr style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{q.usernames.map(u => <span key={u} style={{ padding: '2px 8px', borderRadius: 99, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', fontSize: 12, color: '#EDEDEF' }}>@{u}</span>)}</span>
                   {q.note && <span data-no-tr style={{ fontSize: 12.5, color: '#A1A1AA' }}>« {q.note} »</span>}
@@ -758,7 +790,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
               <span style={{ fontSize: 13, color: '#A1A1AA', lineHeight: 1.55 }}>Envoie les comptes à suivre (les tiens ou ceux de tes modèles). L’équipe ScaleFlow les active pour toi : ils seront relevés chaque jour à midi, visibles par toute ton équipe.</span>
               <textarea value={reqText} onChange={e => setReqText(e.target.value)} rows={4} placeholder={'Colle des @ ou liens Instagram (un par ligne)\n@moncompte\nhttps://instagram.com/monmodele'} style={TEXTAREA} />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Segmented value={reqRegion} onChange={setReqRegion} options={REGIONS} />
+                <Pills value={reqRegion} onChange={setReqRegion} options={REGIONS} />
                 <input value={reqNote} onChange={e => setReqNote(e.target.value)} placeholder="Note (facultatif)" maxLength={500} style={{ ...FIELD, flex: '1 1 160px' }} />
                 <Btn theme={theme} tone="primary" label="Envoyer la demande" disabled={!reqText.trim()} onClick={() => void sendRequest()} />
               </div>
