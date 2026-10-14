@@ -19,7 +19,7 @@ describe('catalogue d’outils', () => {
     expect(visibleTools('geelark', true, now).some(t => t.id === 'cross')).toBe(true)
     expect(visibleTools('geelark', false, new Date('2026-10-01')).some(t => t.id === 'mass-edit')).toBe(false)
     expect(visibleTools('cloud', false, now).some(t => t.id === 'reels')).toBe(false)
-    expect(visibleTools('geelark', false, now).some(t => t.id === 'genjutsu')).toBe(true)
+    expect(visibleTools('geelark', false, now).some(t => t.id === 'genjutsu')).toBe(false)   // admins uniquement
     expect(visibleTools('geelark', true, now).some(t => t.id === 'genjutsu')).toBe(true)
   })
   it('recherche sans accents', () => {

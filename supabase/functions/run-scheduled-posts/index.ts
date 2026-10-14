@@ -411,8 +411,12 @@ Deno.serve(async (req) => {
     }
 
     // ── Genjutsu (Higgsfield) : recréer des Reels avec ses images de référence / un Modèle.
-    // Pour tous, chacun avec la clé de SON espace (table api_keys). File côté serveur. ──
+    // Réservé aux super-admins (clé de l'espace dans api_keys). File côté serveur. ──
     if (typeof body?.genjutsu === 'string' && filterUserId) {
+      const { data: gprof } = await db.from('profiles').select('email, is_super_admin').eq('id', filterUserId).maybeSingle()
+      if (!gprof?.is_super_admin && gprof?.email !== 'tintin.aunea@gmail.com') {
+        return new Response(JSON.stringify({ ok: false, error: 'Genjutsu est réservé aux admins.' }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+      }
       const { genjutsuAction } = await import('./genjutsu.ts')
       const out = await genjutsuAction(db, filterUserId, body)
       return new Response(JSON.stringify(out), { headers: { ...CORS, 'Content-Type': 'application/json' } })

@@ -973,6 +973,8 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
   const onProfileLoaded = useCallback((u: string, p: Partial<Watch>) => setWatch(ws => ws.map(w => w.username === u ? { ...w, ...p } : w)), [])
   const setOpenIndex = useCallback((i: number) => setOpen(o => o && { ...o, i }), [])
   const closeViewer = useCallback(() => setOpen(null), [])
+  // « Recréer avec mes images » (Genjutsu) : réservé aux admins.
+  const canRecast = admin && !!onNavigate
   const recast = (r: Reel) => { if (onNavigate) openTool(onNavigate, 'genjutsu', { reel: { code: r.code, thumb: r.thumb, username: r.username, views: r.views, score: r.score } }) }
   async function toggleFav(r: Reel) {
     if (favSet.has(r.code)) {
@@ -1053,7 +1055,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
     : (
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill,minmax(min(${feed ? 210 : 180}px,46%),1fr))`, gridAutoFlow: 'dense', gap: 14 }}>
         {list.map((r, i) => <MediaCard key={`${r.watch_id}-${r.code}`} r={r} rank={i + 1} fav={favSet.has(r.code)}
-          onOpen={() => setOpen({ list, i })} onRecast={onNavigate ? () => recast(r) : undefined} onFav={() => void toggleFav(r)} />)}
+          onOpen={() => setOpen({ list, i })} onRecast={canRecast ? () => recast(r) : undefined} onFav={() => void toggleFav(r)} />)}
       </div>
     )
   const filters = (feed?: boolean) => (
@@ -1140,7 +1142,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
           {dash.hot.length > 0 && <>
             <SectionTitle kicker={dash.today.length >= 3 ? 'Aujourd’hui' : '7 derniers jours'} title={<>Les plus chauds <span style={{ color: '#52525B' }}>du moment</span></>} right={<Btn theme={theme} sm label="Tous les Reels →" onClick={() => setTab('reels')} />} />
             <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, minmax(0,1fr))' : 'repeat(5, minmax(0,1fr))', gap: 14, marginBottom: 22 }}>
-              {dash.hot.map((r, i) => <MediaCard key={r.code} r={r} rank={i + 1} fav={favSet.has(r.code)} onOpen={() => setOpen({ list: dash.hot, i })} onRecast={onNavigate ? () => recast(r) : undefined} onFav={() => void toggleFav(r)} />)}
+              {dash.hot.map((r, i) => <MediaCard key={r.code} r={r} rank={i + 1} fav={favSet.has(r.code)} onOpen={() => setOpen({ list: dash.hot, i })} onRecast={canRecast ? () => recast(r) : undefined} onFav={() => void toggleFav(r)} />)}
             </div>
           </>}
           <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.2fr) minmax(0,1fr)', gap: 16, marginBottom: 20 }}>
@@ -1171,7 +1173,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
           {favReels.length > 0 && <>
             <SectionTitle kicker="Favoris" title={<>Tes favoris <span style={{ color: '#52525B' }}>récents</span></>} right={<Btn theme={theme} sm label="Tous les favoris →" onClick={() => setTab('favs')} />} />
             <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, minmax(0,1fr))' : 'repeat(6, minmax(0,1fr))', gap: 12 }}>
-              {favReels.slice(0, 6).map((r, i) => <MediaCard key={r.code} r={r} rank={i + 1} fav onOpen={() => setOpen({ list: favReels.slice(0, 6), i })} onRecast={onNavigate ? () => recast(r) : undefined} onFav={() => void toggleFav(r)} />)}
+              {favReels.slice(0, 6).map((r, i) => <MediaCard key={r.code} r={r} rank={i + 1} fav onOpen={() => setOpen({ list: favReels.slice(0, 6), i })} onRecast={canRecast ? () => recast(r) : undefined} onFav={() => void toggleFav(r)} />)}
             </div>
           </>}
         </>
@@ -1250,7 +1252,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
     </div>
     )}
     {open && open.list[open.i] && <ReelViewer theme={theme} list={open.list} index={open.i} setIndex={setOpenIndex} onClose={closeViewer}
-      onRecast={onNavigate ? r => { setOpen(null); recast(r) } : undefined} isFav={c => favSet.has(c)} onFav={r => void toggleFav(r)} onProfile={openAccount} accountOf={accountOf} moreOf={moreOf} onJump={(list, i) => setOpen({ list, i })} />}
+      onRecast={canRecast ? r => { setOpen(null); recast(r) } : undefined} isFav={c => favSet.has(c)} onFav={r => void toggleFav(r)} onProfile={openAccount} accountOf={accountOf} moreOf={moreOf} onJump={(list, i) => setOpen({ list, i })} />}
     </AccountCtx.Provider>
   )
 }
