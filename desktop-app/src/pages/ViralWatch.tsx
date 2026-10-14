@@ -131,11 +131,11 @@ async function callFn(body: Record<string, unknown>): Promise<Response> {
   return fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token ?? ''}` }, body: JSON.stringify(body) })
 }
 /** URL vidéo fraîche (HikerAPI) — seulement si celle stockée a expiré ; réenregistrée côté serveur. */
-const freshCache = new Map<string, { videoUrl: string | null; caption: string; duration: number }>()
+const freshCache = new Map<string, { videoUrl: string | null; caption: string; duration: number; images?: string[] }>()
 async function freshMedia(code: string) {
   const hit = freshCache.get(code); if (hit) return hit
   try {
-    const j = await (await callFn({ viral: 'media', code })).json() as { ok?: boolean; videoUrl: string | null; caption: string; duration: number }
+    const j = await (await callFn({ viral: 'media', code })).json() as { ok?: boolean; videoUrl: string | null; caption: string; duration: number; images?: string[] }
     if (!j?.ok) return null
     freshCache.set(code, j); return j
   } catch { return null }
@@ -216,7 +216,7 @@ function MediaCard({ r, rank, big, fav, onOpen, onRecast, onFav }: { r: Reel; ra
             {big ? 'N°1 · TOP' : String(rank).padStart(2, '0')}
           </span>
           {fav && <span style={{ display: 'inline-flex', color: '#FBBF24', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,.7))' }}><Icon d={I.star} size={15} /></span>}
-          {feed && slides > 1 && <span style={{ height: 22, padding: '0 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 99, background: 'rgba(10,10,11,0.6)', color: '#fff', fontSize: 11, fontWeight: 800 }}>1/{slides}</span>}
+          {feed && (slides > 1 || r.images?.length === 0) && <span title="Carrousel" style={{ height: 22, padding: '0 8px', display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 99, background: 'rgba(10,10,11,0.6)', color: '#fff', fontSize: 11, fontWeight: 800 }}><Icon d="M8 8h12v12H8z|M4 16V4h12" size={11} />{slides > 1 ? slides : ''}</span>}
         </span>
         <Badge score={r.score} big={big} />
       </span>
@@ -264,7 +264,18 @@ function MediaDetail({ theme, list, index, setIndex, onClose, onRecast, isFav, o
   const [caption, setCaption] = useState<string>(r.caption ?? '')
   const [duration, setDuration] = useState<number>(r.duration ?? 0)
   const [slide, setSlide] = useState(0)
-  const slides = feed ? (r.images?.length ? r.images : r.thumb ? [r.thumb] : []) : []
+  // Slides du carrousel : stockées au relevé ; sinon (liste « légère ») récupérées à l'ouverture.
+  const [fetched, setFetched] = useState<string[] | null>(null)
+  const [loadingSlides, setLoadingSlides] = useState(false)
+  const slides = feed ? (fetched?.length ? fetched : r.images?.length ? r.images : r.thumb ? [r.thumb] : []) : []
+  useEffect(() => {
+    setFetched(null)
+    if (!feed || (r.images?.length ?? 0) > 1) return
+    let alive = true
+    setLoadingSlides(true)
+    void freshMedia(r.code).then(m => { if (alive && (m?.images?.length ?? 0) > 1) setFetched(m!.images!) }).finally(() => { if (alive) setLoadingSlides(false) })
+    return () => { alive = false }
+  }, [r.code, r.images, feed])
 
   useEffect(() => {
     let alive = true
@@ -323,7 +334,9 @@ function MediaDetail({ theme, list, index, setIndex, onClose, onRecast, isFav, o
         <div style={{ position: 'relative', width: narrow ? '100%' : 300, maxWidth: narrow ? 260 : 340, alignSelf: 'center', aspectRatio: feed ? '4 / 5' : '9 / 16', borderRadius: 14, overflow: 'hidden', background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
           {feed ? (
             <>
-              {slides[slide] && <img src={img(slides[slide])} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+              {slides[slide] && <img key={slides[slide]} src={img(slides[slide])} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: 'aIn .25s ease both' }} />}
+              {slides.length > 1 && <span style={{ position: 'absolute', top: 10, right: 10, padding: '3px 8px', borderRadius: 99, background: 'rgba(10,10,11,.65)', color: '#fff', fontSize: 11.5, fontWeight: 800 }}>{slide + 1}/{slides.length}</span>}
+              {loadingSlides && slides.length <= 1 && <span style={{ position: 'absolute', top: 10, right: 10, padding: '3px 8px', borderRadius: 99, background: 'rgba(10,10,11,.65)', color: '#fff', fontSize: 11.5, fontWeight: 700 }}>Chargement des images…</span>}
               {slides.length > 1 && <>
                 {slide > 0 && <button type="button" aria-label="Image précédente" onClick={() => setSlide(s => s - 1)} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: 99, border: 'none', background: 'rgba(10,10,11,.6)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon d={I.left} size={15} /></button>}
                 {slide < slides.length - 1 && <button type="button" aria-label="Image suivante" onClick={() => setSlide(s => s + 1)} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: 99, border: 'none', background: 'rgba(10,10,11,.6)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon d={I.right} size={15} /></button>}
@@ -353,6 +366,15 @@ function MediaDetail({ theme, list, index, setIndex, onClose, onRecast, isFav, o
               </div>
             ))}
           </div>
+          {feed && slides.length > 1 && (
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+              {slides.map((u, i) => (
+                <button key={u} type="button" onClick={() => setSlide(i)} aria-label={`Image ${i + 1}`} style={{ position: 'relative', flexShrink: 0, width: 54, aspectRatio: '4 / 5', padding: 0, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: '#161618', border: 'none', boxShadow: i === slide ? `0 0 0 2px ${V}` : '0 0 0 1px rgba(255,255,255,0.1)', opacity: i === slide ? 1 : 0.7 }}>
+                  <img src={img(u)} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                </button>
+              ))}
+            </div>
+          )}
           {r.score > 0 && (
             <div style={{ fontSize: 12.5, color: '#A1A1AA', lineHeight: 1.5 }}>
               {feed ? 'Ce post fait ' : 'Ce Reel fait '}<b style={{ color: r.score >= 3 ? '#F472B6' : '#EDEDEF' }}>×{ratio(r.score)}</b>{feed ? ' les likes habituels du compte.' : ' les vues habituelles du compte.'}

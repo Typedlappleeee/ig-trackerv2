@@ -84,12 +84,12 @@ export async function runViralWatch(db: any, deadline: number, o: { userId?: str
 
 // Détail d'un Reel à la demande (fiche) : URL vidéo fraîche (les liens CDN expirent),
 // légende et stats à jour. HikerAPI /v1/media/by/code, repli /v1/media/by/url.
-export interface ReelMedia { videoUrl: string | null; caption: string; duration: number; views: number; likes: number; comments: number; thumb: string | null }
+export interface ReelMedia { videoUrl: string | null; caption: string; duration: number; views: number; likes: number; comments: number; thumb: string | null; images: string[] }
 export async function reelMedia(code: string): Promise<ReelMedia | null> {
   if (!/^[A-Za-z0-9_-]{5,40}$/.test(code)) return null
   // deno-lint-ignore no-explicit-any
   let m: any = await hikerGet('/v1/media/by/code', { code })
-  if (!m || typeof m !== 'object') m = await hikerGet('/v1/media/by/url', { url: `https://www.instagram.com/reel/${code}/` })
+  if (!m || typeof m !== 'object') m = await hikerGet('/v1/media/by/url', { url: `https://www.instagram.com/p/${code}/` })
   if (!m || typeof m !== 'object') return null
   const n = (...v: unknown[]) => { for (const x of v) { const k = Number(x); if (Number.isFinite(k) && k > 0) return k } return 0 }
   return {
@@ -100,5 +100,7 @@ export async function reelMedia(code: string): Promise<ReelMedia | null> {
     likes: n(m.like_count),
     comments: n(m.comment_count),
     thumb: m.thumbnail_url ?? m?.image_versions2?.candidates?.[0]?.url ?? null,
+    // Slides d'un carrousel (fiche du feed).
+    images: parseMedia(m, 'feed')?.images ?? [],
   }
 }

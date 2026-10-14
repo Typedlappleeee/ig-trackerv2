@@ -424,7 +424,11 @@ Deno.serve(async (req) => {
       const { reelMedia } = await import('./viral.ts')
       const m = await reelMedia(body.code)
       // URL vidéo fraîche réenregistrée : les prochaines ouvertures n'ont plus besoin de HikerAPI.
-      if (m?.videoUrl) { try { await db.from('viral_reels').update({ video_url: m.videoUrl, ...(m.caption ? { caption: m.caption } : {}) }).eq('code', body.code) } catch { /* colonnes absentes */ } }
+      if (m?.videoUrl || (m?.images?.length ?? 0) > 1) {
+        try {
+          await db.from('viral_reels').update({ ...(m!.videoUrl ? { video_url: m!.videoUrl } : {}), ...(m!.caption ? { caption: m!.caption } : {}), ...((m!.images?.length ?? 0) > 1 ? { images: m!.images } : {}) }).eq('code', body.code)
+        } catch { /* colonnes absentes */ }
+      }
       return new Response(JSON.stringify(m ? { ok: true, ...m } : { ok: false, error: 'reel introuvable' }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
     if (body?.viral === 'video' && filterUserId && typeof body.url === 'string') {

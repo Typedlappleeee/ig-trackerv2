@@ -2883,6 +2883,8 @@ export const EN: Dict = {
     "Voir leurs Reels →": "See their Reels →",
     "USA": "USA",
     "Période": "Period",
+    "Carrousel": "Carousel",
+    "Chargement des images…": "Loading images…",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
