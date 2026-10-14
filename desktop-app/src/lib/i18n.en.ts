@@ -2809,6 +2809,8 @@ export const EN: Dict = {
     "1 à 8 photos : visage net, plusieurs angles, la tenue et le décor voulus.": "1 to 8 photos: sharp face, several angles, the outfit and setting you want.",
     "Enregistrer le modèle": "Save model",
     "Recréer avec mes images (Genjutsu)": "Recreate with my images (Genjutsu)",
+    "Génération relancée.": "Generation restarted.",
+    "Relancer": "Retry",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

@@ -265,6 +265,11 @@ export default function Genjutsu({ theme, user, org, onNavigate }: { theme: Them
     const { error } = await supabase.from('genjutsu_models').delete().eq('id', m.id)
     if (error) toast(`Suppression impossible : ${error.message}`, 'bad'); else void loadModels()
   }
+  async function retryJob(j: Job) {
+    const r = await callFn({ genjutsu: 'retry', job_id: j.id, org_id: orgId })
+    if (r.error === 'missing_key') { setNudge(true); return }
+    if (!r.ok) toast(String(r.error ?? 'Impossible.'), 'bad'); else { toast('Génération relancée.', 'ok'); void loadJobs() }
+  }
   async function removeJob(j: Job) {
     const r = await callFn({ genjutsu: 'remove', job_id: j.id, org_id: orgId })
     if (!r.ok) toast(String(r.error ?? 'Impossible.'), 'bad'); else void loadJobs()
@@ -452,6 +457,7 @@ export default function Genjutsu({ theme, user, org, onNavigate }: { theme: Them
                     <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 'auto' }}>
                       {done && j.video_url && <Btn theme={theme} sm label="Télécharger" onClick={() => window.open(j.video_url!, '_blank', 'noopener')} />}
                       {done && j.bank_id && <Btn theme={theme} sm tone="primary" label="Publier" onClick={() => openTool(onNavigate, 'publish', { mode: 'reels' })} />}
+                      {j.status === 'failed' && <Btn theme={theme} sm label="Relancer" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" onClick={() => void retryJob(j)} />}
                       {!(j.status === 'queued' || j.status === 'in_progress') && <Btn theme={theme} sm tone="quiet" label={j.status === 'waiting' ? 'Retirer de la file' : 'Effacer'} onClick={() => void removeJob(j)} />}
                     </span>
                   </span>
