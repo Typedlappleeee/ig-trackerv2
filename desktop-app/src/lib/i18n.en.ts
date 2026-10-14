@@ -2881,6 +2881,8 @@ export const EN: Dict = {
     "Aucun compte suivi pour l’instant — envoie une demande.": "No followed accounts yet — send a request.",
     "Ne plus suivre": "Unfollow",
     "Voir leurs Reels →": "See their Reels →",
+    "USA": "USA",
+    "Période": "Period",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
