@@ -3,10 +3,10 @@ import { usePhotos, pickerFor, ToolCard, ToolTile, SectionHead } from '@/pages/E
 import { TOOLS } from '@/lib/tools'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
-import { takeOpenArg } from '@/lib/openTool'
+import { takeOpenArg, openTool } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Icon, Skeleton, SkeletonRows, useNarrow } from '@/lib/ui'
+import { Skeleton, SkeletonRows, useNarrow } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { peekRelaunch } from '@/lib/runHistory'
 // Chaque composer n'est chargé qu'à l'ouverture de son format.
@@ -35,14 +35,9 @@ const FORMATS: Format[] = [
   { id: 'tiktok', plat: 'tiktok', t: 'Vidéo TikTok', d: 'Une vidéo sur des dizaines de comptes TikTok, en parallèle.', cost: '2 crédits / compte', ready: true, icon: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5' },
   { id: 'cross', plat: 'other', t: 'Cross-posting', d: 'Facebook, Shorts, X, Threads, Reddit et Pinterest en une fois.', cost: '2 crédits / compte / réseau', ready: true, icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
 ]
-const PLATS: { k: Plat; label: string; sub: string; color: string; icon: string }[] = [
-  { k: 'instagram', label: 'Instagram', sub: 'Reels, Stories et posts photo sur tes comptes Instagram.', color: '#E1306C', icon: 'M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5z|M16 11.4A4 4 0 1 1 12.6 8 4 4 0 0 1 16 11.4z|M17.5 6.5h.01' },
-  { k: 'tiktok', label: 'TikTok', sub: 'Vidéos sur tes comptes TikTok (les téléphones doivent être connectés à TikTok).', color: '#25F4EE', icon: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5' },
-  { k: 'other', label: 'Autres réseaux', sub: 'Facebook, YouTube Shorts, X, Threads, Reddit, Pinterest.', color: '#A1A1AA', icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
-]
 
-export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
-  theme: Theme; infra: InfraKey; user: User; org: OrgState; isSuperAdmin: boolean
+export default function Publish({ theme, infra, user, org, isSuperAdmin, onNavigate }: {
+  theme: Theme; infra: InfraKey; user: User; org: OrgState; isSuperAdmin: boolean; onNavigate?: (p: string) => void
 }) {
   // Relance des échecs (depuis Activité) : on ouvre directement le bon composer.
   const [mode, setMode] = useState<string | null>(() => (takeOpenArg<{ mode?: string }>('publish')?.mode) ?? peekRelaunch()?.kind ?? null)
@@ -84,18 +79,23 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
           )
         })}
       </section>
-      {PLATS.filter(pl => FORMATS.some(f => f.plat === pl.k && visible(f))).map(pl => {
-        const list = FORMATS.filter(f => f.plat === pl.k && visible(f))
+      {/* Autres options (sans répéter les 3 tuiles du haut) : formats admin + programmation */}
+      {(() => {
+        const featured = ['reels', 'story', 'tiktok']
+        const more = [
+          ...FORMATS.filter(f => visible(f) && !featured.includes(f.id)).map(f => ({ t: { ...tool(f.id), desc: f.d, cost: f.cost }, go: () => open(f.id) })),
+          ...(onNavigate ? ['scheduled', 'calendar'].map(id => ({ t: tool(id), go: () => { const t = tool(id); openTool(onNavigate, t.page, t.arg, t.id) } })) : []),
+        ]
+        if (!more.length) return null
         return (
-          <section key={pl.k} style={{ marginBottom: 40 }}>
-            <SectionHead title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}><span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 9, background: `${pl.color}1F`, border: `1px solid ${pl.color}55`, color: pl.color }}><Icon d={pl.icon} size={14} /></span>{pl.label}</span>} count={list.length}
-              right={<span style={{ fontSize: 12.5, color: '#71717A', maxWidth: 420, textAlign: 'right' }}>{pl.sub}</span>} />
+          <section style={{ marginBottom: 40 }}>
+            <SectionHead title="Plus d’options" count={more.length} />
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 260}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>
-              {list.map(f => { const t = tool(f.id); const k = n++; return <ToolCard key={f.id} t={{ ...t, desc: f.d, cost: f.cost }} i={k} pick={pickerFor(t, k, photos)} fav={false} onOpen={() => open(f.id)} /> })}
+              {more.map((m, k) => <ToolCard key={m.t.id} t={m.t} i={k} pick={pickerFor(m.t, k + 3, photos)} fav={false} onOpen={m.go} />)}
             </div>
           </section>
         )
-      })}
+      })()}
     </div>
   )
 }

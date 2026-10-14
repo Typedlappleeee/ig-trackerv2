@@ -202,7 +202,9 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
   const found = searchTools(all, q)
   const list = cat === 'all' ? found : cat === 'fav' ? found.filter(t => favs.includes(t.id)) : found.filter(t => t.cat === cat)
   const home = cat === 'all' && !q.trim()
-  const sections = home ? CATS.map(c => ({ c, items: list.filter(t => t.cat === c.k) })).filter(s => s.items.length) : [{ c: null, items: list }]
+  // Vue « Tout » : les outils déjà « À la une » ne sont pas répétés dans les catégories.
+  const featuredIds = new Set(featured.map(x => x.t.id))
+  const sections = home ? CATS.map(c => ({ c, items: list.filter(t => t.cat === c.k && !featuredIds.has(t.id)) })).filter(s => s.items.length) : [{ c: null, items: list }]
   const tabs: [typeof cat, string, number][] = [['all', 'Tout', found.length], ...CATS.map(c => [c.k, c.label, found.filter(t => t.cat === c.k).length] as [ToolCat, string, number]), ['fav', '★ Favoris', found.filter(t => favs.includes(t.id)).length]]
   const grid = (items: Tool[], base: number) => (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 250}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>

@@ -199,7 +199,7 @@ function AppInner({ user }: { user: User }) {
       : page === 'blowAuto' ? <BlowAutoPilot user={user} org={org} />
       : page === 'blowContent' ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'blowTools' ? <Studio theme={theme} infra={infra} user={user} org={org} />
-      : page === 'publish' ? <Publish theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} />
+      : page === 'publish' ? <Publish theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'bank' ? <Bank theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'insights' ? <Placeholder theme={theme} spec={SPECS.insights!} />
       : <BlowsomeHome user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />)
@@ -218,7 +218,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'recipes'
         ? <Recipes theme={theme} infra={infra} user={user} org={org} />
         : page === 'publish'
-        ? <Publish theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} />
+        ? <Publish theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'warmup'
         ? <Warmup theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} />
         : page === 'flowBuilder'
