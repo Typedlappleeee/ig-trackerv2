@@ -51,3 +51,12 @@ export async function igFeed(username: string): Promise<any[] | null> {
   if (!pk) { const p = await hikerProfile(username); if (p?.pk) { pk = String(p.pk); pkCache.set(norm(username), pk) } }
   return pk ? await hikerFeed(pk) : null
 }
+
+/** Profil via HikerAPI uniquement (met le pk en cache → Reels / feed sans appel de plus). */
+// deno-lint-ignore no-explicit-any
+export async function igProfileHiker(username: string): Promise<any | null> {
+  if (!hikerKey()) return null
+  const j = await hikerProfile(username)
+  if (j?.pk) pkCache.set(norm(username), String(j.pk))
+  return j
+}

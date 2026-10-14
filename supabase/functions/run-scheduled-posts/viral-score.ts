@@ -78,3 +78,26 @@ export function lastParisNoon(now = new Date()): Date {
   if (noon > now.getTime()) noon -= 86400_000
   return new Date(noon)
 }
+
+// ── Profil Instagram (HikerAPI /v1/user/by/username, instagrapi) — pur et testé ──
+export interface ProfileInfo {
+  full_name: string | null; biography: string | null; profile_pic: string | null; external_url: string | null
+  followers: number | null; following: number | null; media_count: number | null; is_verified: boolean
+}
+// deno-lint-ignore no-explicit-any
+export function parseProfile(raw: any): ProfileInfo | null {
+  const u = raw?.user ?? raw?.data?.user ?? raw
+  if (!u || typeof u !== 'object' || !(u.username || u.pk)) return null
+  const n = (...v: unknown[]) => { for (const x of v) { const k = Number(x); if (Number.isFinite(k) && k >= 0 && x !== null && x !== undefined && x !== '') return k } return null }
+  const str = (v: unknown) => typeof v === 'string' && v.trim() ? v.trim() : null
+  return {
+    full_name: str(u.full_name),
+    biography: str(u.biography)?.slice(0, 600) ?? null,
+    profile_pic: str(u.profile_pic_url_hd) ?? str(u?.hd_profile_pic_url_info?.url) ?? str(u.profile_pic_url),
+    external_url: str(u.external_url) ?? str(u?.bio_links?.[0]?.url),
+    followers: n(u.follower_count, u?.edge_followed_by?.count, u.followers),
+    following: n(u.following_count, u?.edge_follow?.count, u.following),
+    media_count: n(u.media_count, u?.edge_owner_to_timeline_media?.count),
+    is_verified: !!u.is_verified,
+  }
+}

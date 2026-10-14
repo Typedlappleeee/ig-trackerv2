@@ -98,3 +98,23 @@ describe('Veille v4 — pas de doublon, Reels / feed séparés', () => {
     expect(filterReels(reels, watch, { range: '7', niche: '', account: '', sort: 'views', kind: 'feed' }, now).map(x => x.code)).toEqual(['P'])
   })
 })
+
+describe('Veille v5 — profil façon Instagram', async () => {
+  const { parseProfile } = await import('../../../supabase/functions/run-scheduled-posts/viral-score')
+  it('lit le profil HikerAPI (photo HD, bio, abonnés, lien)', () => {
+    const p = parseProfile({ user: { pk: '1', username: 'lea', full_name: 'Léa', biography: 'Paris ✨', profile_pic_url: 'https://x/s.jpg', profile_pic_url_hd: 'https://x/hd.jpg', follower_count: 48200, following_count: 310, media_count: 1234, is_verified: true, bio_links: [{ url: 'https://linktr.ee/lea' }] } })
+    expect(p).toMatchObject({ full_name: 'Léa', biography: 'Paris ✨', profile_pic: 'https://x/hd.jpg', followers: 48200, following: 310, media_count: 1234, is_verified: true, external_url: 'https://linktr.ee/lea' })
+  })
+  it('profil vide ou invalide → null', () => {
+    expect(parseProfile(null)).toBeNull()
+    expect(parseProfile({ detail: 'not found' })).toBeNull()
+  })
+  it('chiffres clés du compte (médiane, meilleur, viraux, rythme)', async () => {
+    const { profileStats } = await import('@/pages/ViralWatch')
+    const now = Date.parse('2026-10-14T12:00:00Z')
+    const r = (code: string, views: number, score: number, daysAgo: number, kind: 'reel' | 'feed' = 'reel') => ({ watch_id: 'w', code, username: 'lea', views, likes: views / 10, comments: 0, taken_at: new Date(now - daysAgo * 86400000).toISOString(), thumb: null, url: null, baseline: 0, score, kind })
+    const s = profileStats([r('a', 1000, 0.5, 1), r('b', 3000, 1.5, 3), r('c', 90000, 45, 10), r('d', 2000, 1, 60), r('p', 0, 9, 2, 'feed')], now)
+    expect(s.avg).toBe(2500); expect(s.best?.code).toBe('c'); expect(s.record).toBe(45); expect(s.viral).toBe(1)
+    expect(s.eng).toBe(10); expect(s.perWeek).toBe(0.7)
+  })
+})
