@@ -5,7 +5,8 @@ import type { User } from '@supabase/supabase-js'
 import { startRunHistory, peekRelaunch, takeRelaunch } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, Icon, Modal, toast, confirmDialog, promptDialog, FIELD, FIELD_SM, TEXTAREA, Toggle, Segmented, MONO, useNarrow, Skeleton, SkeletonRows, Empty } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, Icon, Modal, toast, confirmDialog, promptDialog, FIELD, FIELD_SM, TEXTAREA, Toggle, Segmented, MONO, useNarrow, Skeleton, SkeletonRows, Empty } from '@/lib/ui'
+import { PageHeader } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub, fetchBalance, fetchOrgBalance } from '@/lib/data'
 import { deriveHealth } from '@/lib/health'
@@ -419,22 +420,19 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead
+      <PageHeader
         title={tiktok ? 'Publier sur TikTok' : 'Publier un Reel'}
         sub={`${platLabel} · ${nSel} compte${nSel > 1 ? 's' : ''} · ${nVid} vidéo${nVid > 1 ? 's' : ''}`}
-        actions={<>
-          <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
+      />
       {relaunch && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.08)', boxShadow: `inset 2px 0 0 ${theme.accent}`, fontSize: 13, color: '#A1A1AA' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 14px', borderRadius: 14, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.25)', fontSize: 13, color: '#A1A1AA' }}>
           <Icon d="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" size={14} />
           <span>Relance de <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{relaunch.phoneIds.length}</b> compte(s) échoué(s) — comptes et vidéos déjà sélectionnés.</span>
         </div>
       )}
-        </>}
-      />
 
       {!bearer && !conns.loading && (
-        <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(251,191,36,0.22)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>
+        <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 14, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.28)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>
           Connecte ton compte GeeLark (token) dans les Réglages de l'app web pour publier.
         </div>
       )}
@@ -735,7 +733,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
       )}
 
       {/* ── Barre d'action fixe : récap + navigation entre étapes ── */}
-      <div style={{ position: 'sticky', bottom: 0, zIndex: 5, marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 0', background: '#0A0A0B', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      <div style={{ position: 'sticky', bottom: 12, zIndex: 5, marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 14px 12px 18px', borderRadius: 18, background: 'rgba(18,18,20,0.86)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 60px -18px rgba(0,0,0,0.85)' }}>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>
             {nSel} compte{nSel > 1 ? 's' : ''} · {nVid} vidéo{nVid > 1 ? 's' : ''} · {cost} crédits

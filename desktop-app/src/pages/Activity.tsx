@@ -1,14 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CineStat } from '@/components/CineHero'
+import { StatBar } from '@/components/CineHero'
+import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ScheduledPost, type PostRun } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PageHead, Empty, Modal, SkeletonRows, Segmented, toast } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, Empty, Modal, SkeletonRows, toast } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
 import { queryTaskResults } from '@/lib/geelark'
 import { counts, runState, relaunchFromDetails, setRelaunch, type HistoryEntry } from '@/lib/runHistory'
 import { recoverLast24h } from '@/lib/recoverHistory'
+
+// Libellé du jour d'un run (regroupement de la liste).
+function dayLabel(ts: number): string {
+  const d = new Date(ts), t = new Date(); t.setHours(0, 0, 0, 0)
+  const k = new Date(d); k.setHours(0, 0, 0, 0)
+  const diff = Math.round((t.getTime() - k.getTime()) / 86400000)
+  if (diff === 0) return 'Aujourd’hui'
+  if (diff === 1) return 'Hier'
+  const s = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
 
 // ── Un « run » unifié (post_runs directs + scheduled_posts exécutés) ────────────
 interface AccountResult { name: string; ok: boolean; error?: string; pending?: boolean }
@@ -258,22 +270,19 @@ export default function Activity({ theme, infra, user, org, onNavigate }: {
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead title="Activité" sub="L'historique de tous tes runs. Relance les comptes échoués en 1 clic, sans reconstruire la diffusion." />
+      <PageHeader kicker="Historique" title="Activité" sub="Tous tes runs, du plus récent au plus ancien. Relance les comptes échoués en 1 clic, sans reconstruire la diffusion."
+        actions={<Btn theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={recovering ? 'Récupération…' : 'Récupérer les dernières 24 h'} disabled={!bearer || recovering} onClick={() => recover(false)} />} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(170px,46%),1fr))', gap: 10, marginBottom: 16 }}>
-        <CineStat label="Runs · 7 jours" value={kpi.count7} />
-        <CineStat label="Taux de succès" value={kpi.count7 ? `${kpi.rate} %` : '—'} accent={kpi.count7 ? '#4ADE80' : undefined} />
-        <CineStat label="Comptes échoués" value={kpi.failed7} accent={kpi.failed7 ? '#FBBF24' : undefined} sub={kpi.failed7 ? <span style={{ color: '#71717A' }}>relançables en un clic</span> : undefined} />
-        <CineStat label="Crédits · 7 jours" value={kpi.credits7.toLocaleString('fr-FR')} accent="#A78BFA" />
-      </div>
+      <StatBar items={[
+        { l: 'Runs · 7 jours', v: kpi.count7 },
+        { l: 'Taux de succès', v: kpi.count7 ? `${kpi.rate} %` : '—', c: kpi.count7 ? (kpi.rate < 80 ? '#FBBF24' : '#4ADE80') : undefined },
+        { l: 'Comptes échoués', v: kpi.failed7, c: kpi.failed7 ? '#FBBF24' : undefined, sub: kpi.failed7 ? <span style={{ color: '#71717A' }}>relançables en un clic</span> : <span style={{ color: '#4ADE80' }}>aucun</span>, onClick: kpi.failed7 ? () => setFilter('ko') : undefined },
+        { l: 'Crédits · 7 jours', v: kpi.credits7.toLocaleString('fr-FR'), c: '#C4B5FD' },
+      ]} />
+
+      <UnderlineTabs<Filter> value={filter} onChange={setFilter} items={filters.map(f => ({ k: f.k, l: f.l, n: f.n }))} />
 
       <Panel theme={theme}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
-          <Segmented<Filter> value={filter} onChange={setFilter} options={filters.map(f => ({ v: f.k, l: f.l, n: f.n }))} />
-          <span style={{ flex: 1 }} />
-          <Btn theme={theme} sm tone="ghost" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={recovering ? 'Récupération…' : 'Récupérer les dernières 24 h'}
-            disabled={!bearer || recovering} onClick={() => recover(false)} />
-        </div>
 
         {loading ? (
           <SkeletonRows rows={5} avatar />
@@ -284,43 +293,48 @@ export default function Activity({ theme, infra, user, org, onNavigate }: {
         ) : shown.map((r, i) => {
           const ok = r.total > 0 && r.ok === r.total
           const pct = r.total ? Math.round((r.ok / r.total) * 100) : 0
+          const day = dayLabel(r.ts), prevDay = i ? dayLabel(shown[i - 1].ts) : null
           return (
-            <div key={r.id} style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', minHeight: 52, boxSizing: 'border-box', flexWrap: 'wrap',
-              borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', transition: 'background .12s ease',
+            <div key={r.id}>
+            {day !== prevDay && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px 8px', borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                <span style={{ fontSize: 13, fontWeight: 750, color: '#F4F4F5', letterSpacing: '-0.01em' }}>{day}</span>
+                <span style={{ fontSize: 12, color: '#5A5A63' }}>{shown.filter(x => dayLabel(x.ts) === day).length} run(s)</span>
+              </div>
+            )}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 14, padding: '10px 20px', minHeight: 62, boxSizing: 'border-box', flexWrap: 'wrap',
+              transition: 'background .12s ease',
             }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
               <span style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-                background: '#18181B',
-                border: '1px solid rgba(255,255,255,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 99, flexShrink: 0,
+                background: ok ? 'rgba(74,222,128,0.1)' : 'rgba(251,191,36,0.1)',
                 color: ok ? '#4ADE80' : '#FBBF24',
-              }}><Icon d={ok ? 'M20 6L9 17l-5-5' : 'M12 9v4|M12 17h.01|M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'} size={13} /></span>
+              }}><Icon d={ok ? 'M20 6L9 17l-5-5' : 'M12 7v6|M12 17h.01'} size={16} sw={2.6} /></span>
               <span style={{ flex: '1 1 200px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
-                  {/* Sticker infra : d'où vient le run. (Tous GeeLark aujourd'hui ; ScaleFlow Cloud se taguera quand l'infra sera active.) */}
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 18, padding: '0 6px', boxSizing: 'border-box', borderRadius: 4, flexShrink: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 500, color: '#A1A1AA' }}>
-                    <span style={{ width: 5, height: 5, borderRadius: 99, background: theme.accent }} />GeeLark
-                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 650, color: '#F4F4F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
                   {r.state === 'running' && <Chip text="En cours" tone="info" />}
                   {r.state === 'interrupted' && <Chip text="Interrompu" tone="warn" />}
                   {r.recovered && <Chip text="Récupéré" />}
                 </span>
                 <span style={{ fontSize: 12, color: '#71717A' }}>{r.meta}</span>
               </span>
-              <span style={{ width: 90, display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-                <span style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                  <span style={{ display: 'block', height: '100%', width: `${pct}%`, borderRadius: 99, background: ok ? '#4ADE80' : '#FBBF24' }} />
+              <span style={{ width: 120, display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
+                <span style={{ display: 'flex', height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', gap: r.ok && r.ok < r.total ? 2 : 0 }}>
+                  <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#22C55E,#4ADE80)' }} />
+                  {r.total > r.ok && <span style={{ display: 'block', height: '100%', width: `${100 - pct}%`, background: '#E5484D', opacity: r.state === 'running' ? 0.35 : 0.85 }} />}
                 </span>
-                <span style={{ fontSize: 11.5, fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: ok ? '#4ADE80' : '#FBBF24' }}>{r.ok} / {r.total}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: ok ? '#4ADE80' : '#FBBF24', fontFamily: "'JetBrains Mono', monospace" }}>{r.ok}/{r.total}</span>
               </span>
               <span style={{ fontSize: 12, color: '#71717A', minWidth: 84, textAlign: 'right', flexShrink: 0 }}>{r.when}</span>
-              <span style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+              <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 5, flexShrink: 0, minWidth: 230 }}>
                 <Btn theme={theme} sm tone="quiet" icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6" label="Détails" onClick={() => setDetail(r)} />
                 {!ok && r.state !== 'running' && <Btn theme={theme} sm icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={`Relancer ${r.total - r.ok}`} onClick={() => relancer(r)} />}
               </span>
+            </div>
             </div>
           )
         })}

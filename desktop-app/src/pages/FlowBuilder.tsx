@@ -2,7 +2,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSPr
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Modal, PageHead, Panel, PanelHead, StatusDot, FIELD, TEXTAREA, MONO, SkeletonRows } from '@/lib/ui'
+import { Btn, Chip, Icon, Modal, Panel, PanelHead, StatusDot, FIELD, TEXTAREA, MONO, SkeletonRows } from '@/lib/ui'
+import { PageHeader } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { scopeInfra, phoneLabel } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -243,7 +244,8 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <style>{LAYOUT_CSS}</style>
-      <PageHead
+      <PageHeader
+        kicker="Automatisation"
         title="Flow Builder"
         sub="Assemble tes automatisations bloc par bloc, puis lance-les sur tes comptes."
         actions={<>
@@ -255,7 +257,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
       />
 
       {!bearer && !conns.loading && (
-        <div style={{ padding: '10px 12px', marginBottom: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', color: '#FBBF24', fontSize: 13 }}>
+        <div style={{ padding: '12px 14px', marginBottom: 14, borderRadius: 14, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.28)', color: '#FBBF24', fontSize: 13 }}>
           Connecte d'abord ton compte GeeLark (token) dans les Réglages pour pouvoir lancer un flow.
         </div>
       )}
@@ -541,7 +543,7 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
       onDragEnd={onDragEnd}
       onClick={e => { e.stopPropagation(); onSelect() }}
       style={{
-        width: 290, borderRadius: 8, cursor: 'pointer', background: off ? '#0F0F11' : '#111113', opacity: off && !selected ? 0.6 : 1,
+        width: 290, borderRadius: 14, overflow: 'hidden', cursor: 'pointer', background: off ? '#0F0F11' : '#121214', opacity: off && !selected ? 0.6 : 1, boxShadow: selected ? '0 0 0 3px rgba(167,139,250,0.18), 0 16px 34px -18px rgba(0,0,0,0.9)' : '0 12px 28px -20px rgba(0,0,0,0.9)',
         borderTop: `1px ${off ? 'dashed' : 'solid'} ${edge}`, borderRight: `1px ${off ? 'dashed' : 'solid'} ${edge}`, borderBottom: `1px ${off ? 'dashed' : 'solid'} ${edge}`,
         borderLeft: `2px ${off ? 'dashed' : 'solid'} ${off ? 'rgba(255,255,255,0.14)' : `rgba(${def.color},0.75)`}`,
         transition: 'border-color .12s ease, background .12s ease, opacity .12s ease',
@@ -549,8 +551,10 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 10px 10px 12px' }}>
         <BlockIcon def={block.type} size={28} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 500, color: '#8B8B94' }}>{off ? '⏸ Désactivé' : `⚡ ${def.label}`}</div>
-          <div style={{ marginTop: 2, fontSize: 13, fontWeight: 600, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: off ? 'line-through' : undefined }}>{blockName(block)}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', height: 18, padding: '0 7px', borderRadius: 99, fontSize: 10.5, fontWeight: 700, letterSpacing: '.02em', background: off ? 'rgba(255,255,255,0.05)' : `rgba(${def.color},0.14)`, color: off ? '#71717A' : `rgb(${def.color})` }}>{off ? 'Désactivé' : def.label}</span>
+          </div>
+          <div style={{ marginTop: 4, fontSize: 13.5, fontWeight: 650, color: '#F4F4F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: off ? 'line-through' : undefined }}>{blockName(block)}</div>
           <div style={{ marginTop: 2, fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{fmtMinutes(blockEstimate(block))}{def.credits > 0 ? ` · ${def.credits} cr` : ''}</div>
         </div>
         <span style={{ fontSize: 11.5, fontWeight: 500, color: '#5A5A63', fontVariantNumeric: 'tabular-nums' }}>{index + 1}</span>

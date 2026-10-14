@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-14c',
+    date: '2026-10-14',
+    title: { fr: '🎬 Studio vidéo refait + de vrais outils', en: '🎬 Video Studio redesigned + real tools' },
+    items: {
+      fr: [
+        'Remix fait enfin de vraies variantes : couleurs, recadrage, vitesse, miroir — jusqu’à 24 versions différentes par vidéo.',
+        'Aperçu en direct : glisse ta légende ou ta photo sur la vidéo, règle la coupe sur la timeline. Montage peut maintenant assembler plusieurs vidéos.',
+        'Glisser-déposer, progression claire avec Annuler, résultats en miniatures avec « Tout télécharger ». Et tous les onglets (Téléphones, Banque, Activité, Programmé, Publication, Warmup, Flow Builder) ont le nouveau style.',
+      ],
+      en: [
+        'Remix finally makes real variants: colors, crop, speed, mirror — up to 24 different versions per video.',
+        'Live preview: drag your caption or photo on the video, set the cut on the timeline. Montage can now join several videos.',
+        'Drag & drop, clear progress with Cancel, results as thumbnails with “Download all”. And every tab (Phones, Bank, Activity, Scheduled, Publish, Warmup, Flow Builder) gets the new look.',
+      ],
+    },
+  },
+  {
     id: '2026-10-14b',
     date: '2026-10-14',
     title: { fr: '✨ Nouvel Explorer + nouveau Tableau de bord', en: '✨ New Explore + new Dashboard' },

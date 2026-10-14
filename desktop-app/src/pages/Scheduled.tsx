@@ -4,7 +4,9 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal, SkeletonRows, toast, Segmented } from '@/lib/ui'
+import { Btn, Chip, Icon, Panel, Empty, Modal, SkeletonRows, toast } from '@/lib/ui'
+import { PageHeader, UnderlineTabs } from '@/components/Kit'
+import { StatBar } from '@/components/CineHero'
 import ScheduleCalendar from '@/components/ScheduleCalendar'
 import type { OrgState } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -111,6 +113,13 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
   // À venir : le plus proche d'abord (la requête trie du plus récent au plus ancien).
   const upcoming = rows.filter(r => new Date(r.scheduled_at).getTime() > Date.now()).sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))
   const past = rows.filter(r => new Date(r.scheduled_at).getTime() <= Date.now())
+  const [showPast, setShowPast] = useState(false)
+  const todayKey = new Date().toDateString()
+  const todayN = upcoming.filter(r => new Date(r.scheduled_at).toDateString() === todayKey).length
+  const committed = upcoming.reduce((t, r) => t + (r.result?.credits_total ?? 0), 0)
+  const failedN = past.filter(r => statusInfo(r).tone === 'bad').length
+  const dayOf = (iso: string) => { const d = new Date(iso); const t = new Date(); t.setHours(0, 0, 0, 0); const k = new Date(d); k.setHours(0, 0, 0, 0); const diff = Math.round((k.getTime() - t.getTime()) / 86400000); if (diff === 0) return 'Aujourd’hui'; if (diff === 1) return 'Demain'; if (diff === -1) return 'Hier'; const s = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); return s.charAt(0).toUpperCase() + s.slice(1) }
+  const grouped = (list: Sched[]) => list.map((r, i) => ({ r, head: i === 0 || dayOf(list[i - 1].scheduled_at) !== dayOf(r.scheduled_at) ? dayOf(r.scheduled_at) : null }))
 
   const rowView = (s: Sched, i = 0) => {
     const st = statusInfo(s)
@@ -118,15 +127,15 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
     const cancellable = s.status === 'geelark' && new Date(s.scheduled_at).getTime() > Date.now()
     const cancelServer = s.status === 'pending'
     return (
-      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', minHeight: 52, boxSizing: 'border-box', borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none', flexWrap: 'wrap', transition: 'background .12s ease' }}
+      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 20px', minHeight: 62, boxSizing: 'border-box', borderTop: i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none', flexWrap: 'wrap', transition: 'background .12s ease' }}
         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
         onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: theme.accentText }}><Icon d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" size={14} /></span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 700, color: '#C4B5FD', minWidth: 50, fontVariantNumeric: 'tabular-nums' }}>{new Date(s.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 99, flexShrink: 0, background: 'rgba(167,139,250,0.1)', color: '#C4B5FD' }}><Icon d={s.type === 'story' ? 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1' : 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z'} size={14} /></span>
         <span style={{ minWidth: 130, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{TYPE_LABEL[s.type] ?? s.type}</span>{s.result?.platform && s.result.platform !== 'instagram' && <Chip text={s.result.platform} tone="mute" />}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 14, fontWeight: 650, color: '#F4F4F5' }}>{TYPE_LABEL[s.type] ?? s.type}</span>{s.result?.platform && s.result.platform !== 'instagram' && <Chip text={s.result.platform} tone="mute" />}</div>
           <div style={{ fontSize: 12, color: '#71717A' }}>{n} compte{n > 1 ? 's' : ''}</div>
         </span>
-        <span style={{ ...cell, minWidth: 150 }}>{new Date(s.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}</span>
         <span style={{ flex: 1, minWidth: 120, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
           <span data-no-tr style={{ fontSize: 12, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.caption || '—'}</span>
           {s.error_msg && <span data-no-tr title={s.error_msg} style={{ fontSize: 11.5, color: '#F87171', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.error_msg}</span>}
@@ -139,12 +148,18 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead title="Programmé" sub="Toutes tes publications programmées (PC éteint, via GeeLark). Annule ici pour récupérer les crédits."
-        actions={<>
-          <Segmented value={view} onChange={changeView} options={[{ v: 'list', l: 'Liste' }, { v: 'calendar', l: 'Calendrier' }]} />
-          <Btn theme={theme} sm tone="quiet" icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Rafraîchir" onClick={() => load()} />
-        </>} />
-      {loadError && <div style={{ padding: '10px 12px', marginBottom: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(248,113,113,0.25)', color: '#F87171', fontSize: 13 }}>Impossible de charger les programmations : {loadError}</div>}
+      <PageHeader kicker={loading ? 'Diffusion' : `${upcoming.length} à venir`} title="Programmé" sub="Toutes tes publications programmées : elles partent même PC éteint. Annule ici pour récupérer les crédits."
+        actions={<Btn theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Rafraîchir" onClick={() => load()} />} />
+      {loadError && <div style={{ padding: '12px 14px', marginBottom: 14, borderRadius: 14, background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.28)', color: '#F87171', fontSize: 13 }}>Impossible de charger les programmations : {loadError}</div>}
+      {!loading && rows.length > 0 && (
+        <StatBar items={[
+          { l: 'À venir', v: upcoming.length, sub: <span style={{ color: '#71717A' }}>publications</span> },
+          { l: 'Aujourd’hui', v: todayN, c: todayN ? '#C4B5FD' : undefined },
+          { l: 'Crédits engagés', v: committed.toLocaleString('fr-FR'), sub: <span style={{ color: '#71717A' }}>remboursés si annulés</span> },
+          { l: 'Échecs', v: failedN, c: failedN ? '#F87171' : undefined, sub: failedN ? <span style={{ color: '#71717A' }}>dans les passées</span> : <span style={{ color: '#4ADE80' }}>aucun</span> },
+        ]} />
+      )}
+      <UnderlineTabs value={view} onChange={changeView} items={[{ k: 'list', l: 'Liste', icon: 'M8 6h13|M8 12h13|M8 18h13|M3 6h.01|M3 12h.01|M3 18h.01' }, { k: 'calendar', l: 'Calendrier', icon: 'M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z' }]} />
       {confirmCancel && (
         <Modal theme={theme} title="Annuler cette programmation ?" sub={`${confirmCancel.phones?.length ?? 0} compte(s) · ${new Date(confirmCancel.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}`} icon="M18 6L6 18|M6 6l12 12" width={460}
           onClose={() => setConfirmCancel(null)}
@@ -160,16 +175,23 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
           <Panel theme={theme}><Empty icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
             title="Aucune publication programmée" text="Depuis Posting / Story / Cross-post, clique « Programmer (PC éteint) » — elles apparaîtront ici." /></Panel>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <Panel theme={theme}>
-              <PanelHead title="À venir" sub={`${upcoming.length}`} />
-              {upcoming.length === 0 ? <div style={{ padding: '24px 16px', textAlign: 'center', color: '#8B8B94', fontSize: 13 }}>Rien de programmé pour l'instant.</div> : upcoming.map((s, i) => rowView(s, i))}
+              {upcoming.length === 0 ? <div style={{ padding: '28px 16px', textAlign: 'center', color: '#8B8B94', fontSize: 13 }}>Rien de programmé pour l'instant.</div> : grouped(upcoming).map(({ r, head }, i) => (
+                <div key={r.id}>
+                  {head && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px 6px', borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none' }}><span style={{ fontSize: 13, fontWeight: 750, color: '#F4F4F5' }}>{head}</span><span style={{ fontSize: 12, color: '#5A5A63' }}>{upcoming.filter(x => dayOf(x.scheduled_at) === head).length}</span></div>}
+                  {rowView(r, head ? 0 : 1)}
+                </div>
+              ))}
             </Panel>
             {past.length > 0 && (
-              <Panel theme={theme}>
-                <PanelHead title="Passées" sub={`${past.length}`} />
-                {past.slice(0, 60).map((s, i) => rowView(s, i))}
-              </Panel>
+              <div>
+                <button type="button" onClick={() => setShowPast(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 36, padding: '0 6px', border: 'none', background: 'transparent', color: '#A1A1AA', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                  <span style={{ display: 'flex', transform: showPast ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease' }}><Icon d="M9 18l6-6-6-6" size={14} sw={2.2} /></span>
+                  Passées <span style={{ color: '#5A5A63', fontWeight: 600 }}>{past.length}</span>
+                </button>
+                {showPast && <Panel theme={theme} style={{ marginTop: 8 }}>{past.slice(0, 60).map((s, i) => rowView(s, i))}</Panel>}
+              </div>
             )}
           </div>
         )}

@@ -4,7 +4,8 @@ import type { User } from '@supabase/supabase-js'
 import { startRunHistory, peekRelaunch, takeRelaunch } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Icon, Btn, Chip, StatusDot, Panel, PanelHead, PageHead, FIELD, FIELD_SM, Toggle, Segmented, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
+import { Icon, Btn, Chip, StatusDot, Panel, PanelHead, FIELD, FIELD_SM, Toggle, Segmented, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
+import { PageHeader } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -259,26 +260,25 @@ export default function StoryComposer({ theme, user, org, onBack }: {
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead
+      <PageHeader
         title="Publier une Story"
         sub="Une image et un sticker lien propre à chaque compte. 1 crédit par compte."
         actions={<>
-          <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
-      {relaunch && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.08)', boxShadow: `inset 2px 0 0 ${theme.accent}`, fontSize: 13, color: '#A1A1AA' }}>
-          <Icon d="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" size={14} />
-          <span>Relance de <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{relaunch.phoneIds.length}</b> compte(s) échoué(s) — comptes et images déjà sélectionnés.</span>
-        </div>
-      )}
           <Btn theme={theme} tone="ghost" disabled={!ready} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
             label="Programmer" onClick={() => setSchedOpen(true)} />
           <Btn theme={theme} tone="primary" disabled={!ready} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z"
             label={running ? 'Publication…' : ready ? `Publier sur ${nLinked}${nMissing > 0 ? ` (${nMissing} sans lien)` : ''}` : 'Publier'} onClick={() => launch()} />
         </>}
       />
+      {relaunch && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 14px', borderRadius: 14, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.25)', fontSize: 13, color: '#A1A1AA' }}>
+          <Icon d="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" size={14} />
+          <span>Relance de <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{relaunch.phoneIds.length}</b> compte(s) échoué(s) — comptes et images déjà sélectionnés.</span>
+        </div>
+      )}
 
       {!bearer && !conns.loading && (
-        <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(251,191,36,0.22)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>
+        <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 14, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.28)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>
           Connecte ton compte GeeLark (token) dans les Réglages de l'app web pour publier.
         </div>
       )}

@@ -4,6 +4,8 @@ import { supabase } from './supabase'
 import { runFfmpeg, fetchInput } from './ffmpeg'
 import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
+import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, type RemixIntensity, type RemixToggles } from './studioFilters'
+export { remixParams, captionLines, captionFor, type RemixToggles } from './studioFilters'
 
 export interface SourceRef { id?: string; title: string; storage_path?: string | null; file_url?: string | null }
 
@@ -163,9 +165,23 @@ export async function runSpoof(input: Uint8Array, seed: number, h?: Hooks, opts?
   })
 }
 
-// ── Remix : plusieurs variantes uniques (spoof plus prononcé, seeds différents) ─
-export async function runRemixVariant(input: Uint8Array, seed: number, h?: Hooks, opts?: SpoofOpts): Promise<Uint8Array> {
-  return runSpoof(input, seed * 7.3 + 1.1, h, opts)
+// ── Remix : VRAIES variations (recadrage, couleurs, teinte, vitesse, micro-coupe, miroir)
+// en une passe, + métadonnées effacées / GPS / appareil. Variations tirées par remixParams.
+export async function runRemix(input: Uint8Array, seed: number, h?: Hooks, opts?: SpoofOpts & { toggles?: RemixToggles }): Promise<Uint8Array> {
+  const p = remixParams(seed, (opts?.intensity ?? 'normal') as RemixIntensity, opts?.toggles)
+  const meta: string[] = ['-map_metadata', '-1']
+  if (opts?.gps) { const loc = iso6709(opts.gps.lat, opts.gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
+  meta.push(...deviceMetaArgs(opts?.device))
+  const af = remixAudioFilter(p)
+  return runFfmpeg({
+    input, inputName: 'in.mp4',
+    args: [...(p.trim > 0 ? ['-ss', String(p.trim)] : []), '-vf', remixFilter(p), ...(af ? ['-af', af] : []), ...meta, ...H264],
+    onProgress: h?.onProgress, onLog: h?.onLog,
+  })
+}
+/** Compat : ancienne signature (Remix = variante avec recadrage + couleurs + vitesse). */
+export function runRemixVariant(input: Uint8Array, seed: number, h?: Hooks, opts?: SpoofOpts): Promise<Uint8Array> {
+  return runRemix(input, seed, h, opts)
 }
 
 // ── Variante Auto-contenu : coupe + vitesse + spoof + légende en UNE passe ────
@@ -283,10 +299,26 @@ export async function runMontage(input: Uint8Array, start: number, end: number |
   return runFfmpeg({ input, args, onProgress: h?.onProgress, onLog: h?.onLog })
 }
 
-// ── Incrustation photo : overlay d'une image (largeur fixe) centrée sur la vidéo ─
-export async function runOverlay(input: Uint8Array, image: Uint8Array, imageExt: string, opts: { widthPx: number; from: number; to: number | null }, h?: Hooks): Promise<Uint8Array> {
-  const enable = opts.to != null ? `:enable='between(t,${opts.from},${opts.to})'` : (opts.from > 0 ? `:enable='gte(t,${opts.from})'` : '')
-  const filter = `[1:v]scale=${Math.round(opts.widthPx)}:-1[ov];[0:v][ov]overlay=(W-w)/2:(H-h)/2${enable},${EVEN}[v]`
+// ── Assemblage : plusieurs vidéos → une seule (même format 1080×1920, dans l'ordre).
+// Avec le son si toutes les vidéos en ont ; sinon on relance sans le son (signalé).
+export async function runConcat(inputs: Uint8Array[], h?: Hooks): Promise<{ data: Uint8Array; withAudio: boolean }> {
+  if (inputs.length < 2) throw new Error('Choisis au moins 2 vidéos à assembler.')
+  const extra = inputs.slice(1).map((d, i) => ({ name: `c${i + 1}.mp4`, data: d }))
+  const ins = extra.flatMap(e => ['-i', e.name])
+  const go = (withAudio: boolean) => runFfmpeg({
+    input: inputs[0], inputName: 'in.mp4', extra,
+    args: [...ins, '-filter_complex', concatFilter(inputs.length, withAudio), '-map', '[v]', ...(withAudio ? ['-map', '[a]'] : []), ...H264],
+    onProgress: h?.onProgress, onLog: h?.onLog,
+  })
+  try { return { data: await go(true), withAudio: true } }
+  catch { h?.onLog?.('Une des vidéos n’a pas de son : assemblage sans le son.'); return { data: await go(false), withAudio: false } }
+}
+
+// ── Incrustation photo : image placée (centre en % de l'image), taille (% de la largeur),
+// affichée de `from` à `to` secondes (to = null → jusqu'à la fin). Vidéo mise à 1080 de large
+// d'abord : la position / taille correspondent exactement à l'aperçu du Studio.
+export async function runOverlay(input: Uint8Array, image: Uint8Array, imageExt: string, opts: { x?: number; y?: number; sizePct?: number; from: number; to: number | null }, h?: Hooks): Promise<Uint8Array> {
+  const filter = overlayFilter({ x: opts.x ?? 50, y: opts.y ?? 50, sizePct: opts.sizePct ?? 40, from: opts.from, to: opts.to })
   return runFfmpeg({
     input, inputName: 'in.mp4',
     extra: [{ name: `ov.${imageExt}`, data: image }],
@@ -295,10 +327,10 @@ export async function runOverlay(input: Uint8Array, image: Uint8Array, imageExt:
   })
 }
 
-// ── Mixer : incruste une légende (PNG canvas 1080px) sur la vidéo ──────────────
+// ── Texte sur vidéo : incruste une légende (PNG canvas 1080px) sur la vidéo ──────
 export type CaptionPos = 'top' | 'center' | 'bottom' | { x: number; y: number }
-export async function runCaption(input: Uint8Array, text: string, pos: CaptionPos, h?: Hooks): Promise<Uint8Array> {
-  const png = await textToPng(text, 1080)
+export async function runCaption(input: Uint8Array, text: string, pos: CaptionPos, h?: Hooks, style: CaptionStyle = 'outline'): Promise<Uint8Array> {
+  const png = await textToPng(text, 1080, false, style)
   // Placement : preset (top/center/bottom) OU manuel (x,y en % de l'image, centre du PNG).
   let x = '(W-w)/2', y: string
   if (typeof pos === 'object') {
@@ -307,7 +339,10 @@ export async function runCaption(input: Uint8Array, text: string, pos: CaptionPo
   } else {
     y = pos === 'top' ? 'H*0.06' : pos === 'center' ? '(H-h)/2' : 'H-h-H*0.06'
   }
-  const filter = `[0:v][1:v]overlay=${x}:${y},${EVEN}[v]`
+  if (style === 'snapchat') x = '0'   // bande pleine largeur → collée aux bords
+  // Vidéo mise à 1080 de large (= largeur du PNG) AVANT l'overlay : sinon la légende est
+  // décalée / trop grande sur les vidéos qui ne font pas 1080 px (comme l'Auto-contenu).
+  const filter = `[0:v]scale=1080:-2,setsar=1[b];[b][1:v]overlay=${x}:${y},${EVEN}[v]`
   return runFfmpeg({
     input, inputName: 'in.mp4',
     extra: [{ name: 'cap.png', data: png }],

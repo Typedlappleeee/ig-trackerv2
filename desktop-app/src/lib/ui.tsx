@@ -44,9 +44,9 @@ export function Chip({ text, tone = 'mute' }: { text: ReactNode; tone?: ChipTone
   const T = CHIP_T[tone] || CHIP_T.mute
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 7px', boxSizing: 'border-box',
-      borderRadius: 5, background: T[0], border: `1px solid ${T[1]}`, color: T[2],
-      fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', lineHeight: 1,
+      display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px', boxSizing: 'border-box',
+      borderRadius: 99, background: T[0], border: `1px solid ${T[1]}`, color: T[2],
+      fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', lineHeight: 1,
     }}>{text}</span>
   )
 }
@@ -60,16 +60,16 @@ export function Btn({ label, theme, tone = 'ghost', sm, icon, onClick, disabled 
 }) {
   void theme
   const base: CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 6, height: sm ? 28 : 32,
-    padding: icon && !label ? '0' : `0 ${sm ? 10 : 12}px`,
-    width: icon && !label ? (sm ? 28 : 32) : 'auto',
-    justifyContent: 'center', borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
-    fontSize: sm ? 12 : 13, fontWeight: 500, whiteSpace: 'nowrap', letterSpacing: '-0.005em',
+    display: 'inline-flex', alignItems: 'center', gap: 7, height: sm ? 30 : 36,
+    padding: icon && !label ? '0' : `0 ${sm ? 11 : 14}px`,
+    width: icon && !label ? (sm ? 30 : 36) : 'auto',
+    justifyContent: 'center', borderRadius: sm ? 9 : 10, cursor: disabled ? 'not-allowed' : 'pointer',
+    fontSize: sm ? 12.5 : 13.5, fontWeight: 650, whiteSpace: 'nowrap', letterSpacing: '-0.01em',
     transition: 'background .12s ease, border-color .12s ease, color .12s ease', opacity: disabled ? 0.4 : 1, boxSizing: 'border-box',
   }
   const TONES: Record<BtnTone, CSSProperties> = {
-    primary: { background: '#EDEDEF', border: '1px solid #EDEDEF', color: '#0A0A0B' },
-    ghost: { background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#E4E4E7' },
+    primary: { background: '#F4F4F5', border: '1px solid #F4F4F5', color: '#0A0A0B' },
+    ghost: { background: '#151517', border: '1px solid rgba(255,255,255,0.1)', color: '#E4E4E7' },
     quiet: { background: 'transparent', border: '1px solid transparent', color: '#A1A1AA' },
     danger: { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' },
   }
@@ -96,23 +96,23 @@ export function Btn({ label, theme, tone = 'ghost', sm, icon, onClick, disabled 
 export const MONO = "'JetBrains Mono',monospace"
 /** Style de champ standard (input / select / textarea) — hauteur 32 (28 en sm). */
 export const FIELD: CSSProperties = {
-  height: 32, padding: '0 10px', borderRadius: 6, boxSizing: 'border-box', width: '100%',
-  background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF',
-  fontSize: 13, outline: 'none', fontFamily: 'inherit',
+  height: 36, padding: '0 12px', borderRadius: 10, boxSizing: 'border-box', width: '100%',
+  background: '#141416', border: '1px solid rgba(255,255,255,0.09)', color: '#EDEDEF',
+  fontSize: 13.5, outline: 'none', fontFamily: 'inherit',
 }
-export const FIELD_SM: CSSProperties = { ...FIELD, height: 28, fontSize: 12.5 }
-export const TEXTAREA: CSSProperties = { ...FIELD, height: 'auto', minHeight: 72, padding: '8px 10px', lineHeight: 1.5, resize: 'vertical' }
+export const FIELD_SM: CSSProperties = { ...FIELD, height: 30, fontSize: 12.5, borderRadius: 9 }
+export const TEXTAREA: CSSProperties = { ...FIELD, height: 'auto', minHeight: 72, padding: '10px 12px', lineHeight: 1.5, resize: 'vertical' }
 
 export function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label?: string }) {
   return (
     <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled}
       onClick={e => { e.stopPropagation(); if (!disabled) onChange(!on) }}
       style={{
-        position: 'relative', width: 30, height: 18, borderRadius: 99, padding: 0, flexShrink: 0,
+        position: 'relative', width: 36, height: 21, borderRadius: 99, padding: 0, flexShrink: 0,
         border: `1px solid ${on ? '#8B7CF6' : 'rgba(255,255,255,0.12)'}`, background: on ? '#8B7CF6' : '#1C1C1F',
         cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1, transition: 'background .15s ease, border-color .15s ease',
       }}>
-      <span style={{ position: 'absolute', top: 2, left: on ? 14 : 2, width: 12, height: 12, borderRadius: 99, background: on ? '#FFFFFF' : '#A1A1AA', transition: 'left .15s ease, background .15s ease' }} />
+      <span style={{ position: 'absolute', top: 2, left: on ? 17 : 2, width: 15, height: 15, borderRadius: 99, background: on ? '#FFFFFF' : '#A1A1AA', boxShadow: '0 1px 3px rgba(0,0,0,.4)', transition: 'left .18s cubic-bezier(.2,.8,.2,1), background .15s ease' }} />
     </button>
   )
 }
@@ -121,17 +121,17 @@ export function Segmented<T extends string>({ value, options, onChange, sm }: {
   value: T; options: { v: T; l: ReactNode; n?: number }[]; onChange: (v: T) => void; sm?: boolean
 }) {
   return (
-    <span style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', flexWrap: 'wrap' }}>
+    <span style={{ display: 'inline-flex', gap: 2, padding: 3, borderRadius: 11, background: '#111113', border: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap' }}>
       {options.map(o => {
         const on = o.v === value
         return (
           <button key={o.v} type="button" onClick={() => onChange(o.v)} aria-pressed={on} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, height: sm ? 22 : 26, padding: sm ? '0 8px' : '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
-            background: on ? 'rgba(255,255,255,0.08)' : 'transparent', color: on ? '#EDEDEF' : '#8B8B94',
-            fontSize: 12, fontWeight: 500, transition: 'background .12s ease, color .12s ease', whiteSpace: 'nowrap',
+            display: 'inline-flex', alignItems: 'center', gap: 6, height: sm ? 24 : 30, padding: sm ? '0 9px' : '0 12px', border: 'none', borderRadius: 8, cursor: 'pointer',
+            background: on ? '#F4F4F5' : 'transparent', color: on ? '#0A0A0B' : '#A1A1AA',
+            fontSize: sm ? 12 : 12.5, fontWeight: on ? 700 : 600, transition: 'background .15s ease, color .15s ease', whiteSpace: 'nowrap',
           }}>
             {o.l}
-            {o.n !== undefined && <span style={{ color: on ? '#A1A1AA' : '#5A5A63', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{o.n}</span>}
+            {o.n !== undefined && <span style={{ color: on ? '#52525B' : '#5A5A63', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{o.n}</span>}
           </button>
         )
       })}
@@ -151,7 +151,7 @@ export function useNarrow(px = 860): boolean {
 export function Panel({ theme, style, children }: { theme: Theme; style?: CSSProperties; children: ReactNode }) {
   return (
     <div style={{
-      borderRadius: 16, background: '#111113',
+      borderRadius: 18, background: '#0F0F11',
       border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden',
       ...style,
     }}>{children}</div>
@@ -161,11 +161,11 @@ export function Panel({ theme, style, children }: { theme: Theme; style?: CSSPro
 export function PanelHead({ title, right, sub }: { title: ReactNode; right?: ReactNode; sub?: string }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', minHeight: 52, boxSizing: 'border-box',
+      display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', minHeight: 56, boxSizing: 'border-box',
       borderBottom: '1px solid rgba(255,255,255,0.06)',
     }}>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: '#EDEDEF', letterSpacing: '-0.015em' }}>{title}</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F5', letterSpacing: '-0.02em' }}>{title}</span>
         {sub ? <span style={{ fontSize: 12, color: '#8B8B94', lineHeight: 1.45 }}>{sub}</span> : null}
       </span>
       {right ? <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>{right}</span> : null}
@@ -216,27 +216,27 @@ export function Modal({ title, sub, icon, theme, onClose, footer, width, childre
   return createPortal(
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 90, display: 'flex', justifyContent: 'center', padding: 24, overflowY: 'auto',
-      background: 'rgba(0,0,0,0.6)', animation: 'aFade .14s ease both',
+      background: 'rgba(0,0,0,0.66)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', animation: 'aFade .14s ease both',
     }}>
       <div role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()} style={{
-        display: 'flex', flexDirection: 'column', width: width ?? 560, maxWidth: '100%', maxHeight: 'calc(100vh - 48px)', margin: 'auto', borderRadius: 10, overflow: 'hidden',
-        background: '#111113', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.7)',
+        display: 'flex', flexDirection: 'column', width: width ?? 560, maxWidth: '100%', maxHeight: 'calc(100vh - 48px)', margin: 'auto', borderRadius: 20, overflow: 'hidden',
+        background: '#101012', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px -24px rgba(0,0,0,0.85)',
         animation: 'aPop .18s cubic-bezier(0.16,1,0.3,1) both',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-          {icon && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 7, flexShrink: 0, background: '#1A1A1D', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8' }}><Icon d={icon} size={15} /></span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+          {icon && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 11, flexShrink: 0, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.22)', color: '#C4B5FD' }}><Icon d={icon} size={16} /></span>}
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.015em' }}>{title}</span>
+            <span style={{ fontSize: 16.5, fontWeight: 750, color: '#F4F4F5', letterSpacing: '-0.025em' }}>{title}</span>
             {sub && <span style={{ fontSize: 12.5, color: '#8B8B94' }}>{sub}</span>}
           </span>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: '#8B8B94', cursor: 'pointer', flexShrink: 0 }}
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 99, border: 'none', background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', cursor: 'pointer', flexShrink: 0 }}
             onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#EDEDEF' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8B8B94' }}>
             <Icon d="M18 6L6 18|M6 6l12 12" size={14} />
           </button>
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 18 }}>{children}</div>
-        {footer && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0E0E10', flexShrink: 0 }}>{footer}</div>}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 20 }}>{children}</div>
+        {footer && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '14px 20px', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0C0C0E', flexShrink: 0 }}>{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -268,10 +268,10 @@ export function Empty({ icon, title, text, action }: { icon: string; title: stri
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '52px 24px', textAlign: 'center' }}>
       <span style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 8,
-        background: '#161618', border: '1px solid rgba(255,255,255,0.08)', color: '#8B8B94',
-      }}><Icon d={icon} size={18} /></span>
-      <div style={{ marginTop: 4, fontSize: 14, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.01em' }}>{title}</div>
+        display: 'flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 99,
+        background: 'radial-gradient(circle at 30% 25%, rgba(167,139,250,0.18), rgba(255,255,255,0.03))', border: '1px solid rgba(255,255,255,0.1)', color: '#C4B5FD',
+      }}><Icon d={icon} size={21} /></span>
+      <div style={{ marginTop: 6, fontSize: 16, fontWeight: 750, color: '#F4F4F5', letterSpacing: '-0.02em' }}>{title}</div>
       <div style={{ fontSize: 13, lineHeight: 1.55, color: '#8B8B94', maxWidth: 340 }}>{text}</div>
       {action ? <div style={{ marginTop: 6 }}>{action}</div> : null}
     </div>
