@@ -7,7 +7,7 @@
 //     vidéo est lue EN STREAMING via le proxy public ?vid= (plus de téléchargement complet).
 //   • Favoris par agence (perso ou organisation), avec un instantané du Reel.
 // Tables : supabase/migrations/20261012*_viral*.sql + 20261016_viral_v4.sql. Données : HikerAPI.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { takeOpenArg, openTool } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -189,6 +189,20 @@ function SectionTitle({ kicker, title, right }: { kicker: string; title: React.R
   )
 }
 
+// Ouvrir la vue d'un compte (ses Reels / posts) depuis n'importe quelle carte ou fiche.
+const AccountCtx = createContext<((username: string) => void) | null>(null)
+function AccountLink({ username, size = 12.5, color = '#fff' }: { username: string; size?: number; color?: string }) {
+  const openAccount = useContext(AccountCtx)
+  if (!openAccount) return <span data-no-tr style={{ fontSize: size, fontWeight: 700, color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{username}</span>
+  return (
+    <button type="button" data-no-tr title={`Voir tous les posts de @${username}`} onClick={e => { e.stopPropagation(); openAccount(username) }}
+      style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: size, fontWeight: 700, color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.25)', textUnderlineOffset: 3 }}
+      onMouseEnter={e => { e.currentTarget.style.textDecorationColor = '#A78BFA' }} onMouseLeave={e => { e.currentTarget.style.textDecorationColor = 'rgba(255,255,255,0.25)' }}>
+      @{username}
+    </button>
+  )
+}
+
 // ── Carte d'un Reel (9:16) ou d'un post du feed (4:5) ────────────────────────
 function MediaCard({ r, rank, big, fav, onOpen, onRecast, onFav }: { r: Reel; rank: number; big?: boolean; fav: boolean; onOpen: () => void; onRecast?: () => void; onFav: () => void }) {
   const [hover, setHover] = useState(false)
@@ -237,16 +251,17 @@ function MediaCard({ r, rank, big, fav, onOpen, onRecast, onFav }: { r: Reel; ra
         <span style={{ height: 1, background: 'rgba(255,255,255,0.1)' }} />
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 30 }}>
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span data-no-tr style={{ fontSize: big ? 14 : 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{r.username}</span>
+            <AccountLink username={r.username} size={big ? 14 : 12.5} />
             <span style={{ fontSize: 11.5, color: '#8B8B94' }}>{fmtDate(r.taken_at)}</span>
           </span>
-          <span style={{ display: showActs ? 'flex' : 'none', gap: 5 }}>
-            <IconBtn d={I.star} title={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'} on={fav} onClick={onFav} />
-            {onRecast && !feed && <IconBtn d={I.wand} title="Recréer avec mes images (Genjutsu)" onClick={onRecast} />}
-            {!feed && <IconBtn d={I.download} title="Télécharger la vidéo" onClick={() => void downloadReel(r)} />}
-            <IconBtn d={I.external} title="Ouvrir sur Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
-          </span>
         </span>
+      </span>
+      {/* Actions en colonne sur le côté (ne masquent plus le pseudo) */}
+      <span style={{ position: 'absolute', right: big ? 16 : 10, top: big ? 54 : 42, display: 'flex', flexDirection: 'column', gap: 6, opacity: showActs ? 1 : 0, transform: showActs ? 'none' : 'translateX(6px)', transition: 'opacity .2s ease, transform .2s ease', pointerEvents: showActs ? 'auto' : 'none' }}>
+        <IconBtn d={I.star} title={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'} on={fav} onClick={onFav} />
+        {onRecast && !feed && <IconBtn d={I.wand} title="Recréer avec mes images (Genjutsu)" onClick={onRecast} />}
+        {!feed && <IconBtn d={I.download} title="Télécharger la vidéo" onClick={() => void downloadReel(r)} />}
+        <IconBtn d={I.external} title="Ouvrir sur Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
       </span>
     </div>
   )
@@ -323,6 +338,7 @@ function MediaDetail({ theme, list, index, setIndex, onClose, onRecast, isFav, o
     ? [['Likes', fmtNumber(r.likes)], ['Commentaires', fmtNumber(r.comments)], ['Moyenne du compte', fmtNumber(r.baseline)], ['Slides', String(slides.length || 1)]]
     : [['Vues', fmtNumber(r.views)], ['Likes', fmtNumber(r.likes)], ['Commentaires', fmtNumber(r.comments)], ['Engagement', `${engagement(r)} %`], ['Moyenne du compte', fmtNumber(r.baseline)], ['Durée', fmtDur(duration)]]
   const fav = isFav(r.code)
+  const openAccount = useContext(AccountCtx)
 
   return (
     <Modal theme={theme} width={900} title={`@${r.username}`} sub={`${feed ? 'Post' : 'Reel'} du ${fmtDate(r.taken_at)} · ${index + 1} / ${list.length}`} icon={feed ? I.image : I.play} onClose={onClose}
@@ -396,6 +412,7 @@ function MediaDetail({ theme, list, index, setIndex, onClose, onRecast, isFav, o
               : <Btn theme={theme} icon={I.download} label="Télécharger la vidéo" onClick={() => void downloadReel(r)} />}
             <Btn theme={theme} icon={I.external} label="Ouvrir sur Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
             <Btn theme={theme} icon={I.link} label="Copier le lien" onClick={() => void copyText(reelUrl(r), 'Lien copié.')} />
+            {openAccount && <Btn theme={theme} icon={I.users} label={`Tous les posts de @${r.username}`} onClick={() => openAccount(r.username)} />}
           </div>
           {onRecast && !feed && (
             <button type="button" onClick={() => onRecast(r)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: '#fff', background: GRAD, boxShadow: '0 4px 0 #6D28D9' }}>
@@ -441,6 +458,41 @@ function Spark({ values }: { values: number[] }) {
   const max = Math.max(1, ...values)
   const pts = values.map((v, i) => `${(i / Math.max(1, values.length - 1)) * 100},${30 - (v / max) * 26}`).join(' ')
   return <svg viewBox="0 0 100 32" width="90" height="28" preserveAspectRatio="none" aria-hidden="true"><polyline points={pts} fill="none" stroke={V} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" /></svg>
+}
+
+// En-tête d'un compte sélectionné : ses chiffres sur 30 jours + accès Reels / feed / Instagram.
+function AccountHeader({ theme, username, reels, kind, onKind, onClear }: { theme: Theme; username: string; reels: Reel[]; kind: Kind; onKind: (k: Kind) => void; onClear: () => void }) {
+  const mine = reels.filter(r => r.username === username)
+  const rs = mine.filter(r => (r.kind ?? 'reel') === 'reel'), fs = mine.filter(r => r.kind === 'feed')
+  const best = [...mine].sort((a, b) => (b.views || b.likes) - (a.views || a.likes))[0]
+  const views = rs.reduce((t, r) => t + r.views, 0)
+  const avg = rs[0]?.baseline ?? 0
+  const record = rs.reduce((m, r) => Math.max(m, r.score), 0)
+  const narrow = useNarrow(760)
+  return (
+    <section style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: narrow ? 14 : '16px 18px', marginBottom: 14, borderRadius: 20, background: '#0F0F11', border: '1px solid rgba(167,139,250,0.35)', boxShadow: '0 20px 50px -30px rgba(139,92,246,.7)' }}>
+      <span style={{ padding: 2.5, borderRadius: 99, background: 'linear-gradient(135deg,#A78BFA,#F472B6)', flexShrink: 0 }}>
+        <span style={{ display: 'block', width: 58, height: 58, borderRadius: 99, overflow: 'hidden', border: '2.5px solid #0A0A0B', background: '#161618' }}>{best?.thumb && <img src={img(best.thumb)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</span>
+      </span>
+      <span style={{ flex: '1 1 160px', minWidth: 0 }}>
+        <span data-no-tr style={{ display: 'block', fontSize: 22, fontWeight: 900, letterSpacing: '-0.04em', color: '#F4F4F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{username}</span>
+        <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#8B8B94' }}>{rs.length} Reel(s) · {fs.length} post(s) photo · 30 derniers jours</span>
+      </span>
+      <span style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+        {([['Vues', compact(views)], ['Moyenne', compact(avg)], ['Record', record > 0 ? `×${ratio(record)}` : '—']] as [string, string][]).map(([l, v]) => (
+          <span key={l} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#71717A' }}>{l}</span>
+            <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.04em', color: l === 'Record' && record >= 3 ? '#F472B6' : '#F4F4F5' }}>{v}</span>
+          </span>
+        ))}
+      </span>
+      <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Pills value={kind} onChange={onKind} options={[{ v: 'reel', l: `Reels · ${rs.length}` }, { v: 'feed', l: `Feed · ${fs.length}` }]} />
+        <Btn theme={theme} icon={I.external} label="Instagram" onClick={() => window.open(`https://www.instagram.com/${username}/`, '_blank', 'noopener')} />
+        <Btn theme={theme} tone="quiet" icon="M18 6L6 18|M6 6l12 12" label="Tous les comptes" onClick={onClear} />
+      </span>
+    </section>
+  )
 }
 
 // ── Gestion de la Sélection ScaleFlow (super-admin) ──────────────────────────
@@ -578,6 +630,11 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
   const sinceTxt = lastFetch ? (() => { const m = Math.round((Date.now() - Date.parse(lastFetch)) / 60000); return m < 1 ? 'à l’instant' : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j` })() : null
 
   // ── Actions ──
+  // Vue d'un compte : filtre sur ce @, 30 jours, onglet Reels (ou Feed si on y est).
+  const openAccount = useCallback((u: string) => {
+    setOpen(null); setFAccount(u); setRange('30'); setTab(t => t === 'feed' ? 'feed' : 'reels')
+    try { document.querySelector('main')?.scrollTo?.({ top: 0, behavior: 'smooth' }) } catch { /* ignore */ }
+  }, [])
   const recast = (r: Reel) => { if (onNavigate) openTool(onNavigate, 'genjutsu', { reel: { code: r.code, thumb: r.thumb, username: r.username, views: r.views, score: r.score } }) }
   async function toggleFav(r: Reel) {
     if (favSet.has(r.code)) {
@@ -663,7 +720,9 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
     )
   const filters = (feed?: boolean) => (
     <>
-      <AccountRail list={srcWatch} reels={srcReels.filter(r => (r.kind ?? 'reel') === (feed ? 'feed' : 'reel'))} value={fAccount} onChange={setFAccount} />
+      {fAccount
+        ? <AccountHeader theme={theme} username={fAccount} reels={srcReels} kind={feed ? 'feed' : 'reel'} onKind={k => setTab(k === 'feed' ? 'feed' : 'reels')} onClear={() => setFAccount('')} />
+        : <AccountRail list={srcWatch} reels={srcReels.filter(r => (r.kind ?? 'reel') === (feed ? 'feed' : 'reel'))} value={fAccount} onChange={u => u ? openAccount(u) : setFAccount('')} />}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         {!noRegion && <Pills label="Pays" value={fRegion || 'all'} onChange={v => setFRegion(v === 'all' ? '' : v)} options={[{ v: 'all' as const, l: 'Tous' }, ...REGIONS]} />}
         <Pills label="Période" value={range} onChange={setRange} options={[{ v: '1', l: '24 h' }, { v: '7', l: '7 jours' }, { v: '30', l: '30 jours' }]} />
@@ -685,6 +744,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
   const favReels: Reel[] = favs.map(f => reels.find(r => r.code === f.code) ?? ({ watch_id: f.watch_id ?? '', code: f.code, username: f.username ?? '', views: f.views, likes: f.likes, comments: 0, taken_at: f.created_at, thumb: f.thumb, url: f.url, baseline: 0, score: f.score, kind: f.kind } as Reel))
 
   return (
+    <AccountCtx.Provider value={openAccount}>
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* En-tête */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -746,7 +806,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
             <section style={{ borderRadius: 20, background: '#0F0F11', border: '1px solid rgba(255,255,255,0.07)', padding: 16 }}>
               <SectionTitle kicker="7 jours" title={<>Comptes <span style={{ color: '#52525B' }}>en forme</span></>} />
               {dash.leaders.length === 0 ? <div style={{ fontSize: 13, color: '#71717A', padding: 8 }}>Pas encore de données.</div> : dash.leaders.map(([u, a], i) => (
-                <button key={u} type="button" onClick={() => { setFAccount(u); setTab('reels') }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '9px 6px', border: 'none', borderTop: i ? '1px solid rgba(255,255,255,0.05)' : 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', color: 'inherit' }}>
+                <button key={u} type="button" onClick={() => openAccount(u)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '9px 6px', border: 'none', borderTop: i ? '1px solid rgba(255,255,255,0.05)' : 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', color: 'inherit' }}>
                   <span style={{ width: 22, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 800, color: i < 3 ? V : '#52525B' }}>{String(i + 1).padStart(2, '0')}</span>
                   <span style={{ width: 34, height: 34, borderRadius: 99, overflow: 'hidden', background: '#161618', flexShrink: 0 }}>{a.thumb && <img src={img(a.thumb)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
@@ -849,5 +909,6 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
       {open && open.list[open.i] && <MediaDetail theme={theme} list={open.list} index={open.i} setIndex={i => setOpen(o => o && { ...o, i })} onClose={() => setOpen(null)}
         onRecast={onNavigate ? r => { setOpen(null); recast(r) } : undefined} isFav={c => favSet.has(c)} onFav={r => void toggleFav(r)} />}
     </div>
+    </AccountCtx.Provider>
   )
 }

@@ -2885,6 +2885,8 @@ export const EN: Dict = {
     "Période": "Period",
     "Carrousel": "Carousel",
     "Chargement des images…": "Loading images…",
+    "Reel(s) ·": "Reel(s) ·",
+    "post(s) photo · 30 derniers jours": "photo post(s) · last 30 days",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3360,5 +3362,9 @@ export const EN: Dict = {
     ["Mes comptes{0}", "My accounts{0}"],
     ["· {0} demande(s)", "· {0} request(s)"],
     ["Accepter ({0})", "Accept ({0})"],
+    ["Voir tous les posts de @{0}", "See all posts from @{0}"],
+    ["Tous les posts de @{0}", "All posts from @{0}"],
+    ["Reels · {0}", "Reels · {0}"],
+    ["Feed · {0}", "Feed · {0}"],
   ],
 }
