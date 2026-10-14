@@ -14,48 +14,10 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     id: '2026-10-14d',
     date: '2026-10-14',
-    title: { fr: '📸 Visuels plus propres : vrais Reels, images nettes', en: '📸 Cleaner visuals: real Reels, sharp images' },
+    title: { fr: '🎨 Travail sur l’interface de ScaleFlow', en: '🎨 Work on the ScaleFlow interface' },
     items: {
-      fr: [
-        'Les visuels (Explorer, Studio, tableau de bord) n’affichent plus que des miniatures nettes : les images floues, trop petites, trop sombres ou à bandes noires sont écartées automatiquement.',
-        'Auto-contenu : 3 vrais Reels qui explosent, chacun avec un texte différent, pour voir tout de suite à quoi sert l’outil.',
-      ],
-      en: [
-        'Visuals (Explorer, Studio, dashboard) now only show sharp thumbnails: blurry, tiny, too dark or letterboxed images are filtered out automatically.',
-        'Auto-content: 3 real trending Reels, each with a different text, so you see right away what the tool does.',
-      ],
-    },
-  },
-  {
-    id: '2026-10-14c',
-    date: '2026-10-14',
-    title: { fr: '🎬 Studio vidéo refait + de vrais outils', en: '🎬 Video Studio redesigned + real tools' },
-    items: {
-      fr: [
-        'Remix fait enfin de vraies variantes : couleurs, recadrage, vitesse, miroir — jusqu’à 24 versions différentes par vidéo.',
-        'Aperçu en direct : glisse ta légende ou ta photo sur la vidéo, règle la coupe sur la timeline. Montage peut maintenant assembler plusieurs vidéos.',
-        'Glisser-déposer, progression claire avec Annuler, résultats en miniatures avec « Tout télécharger ». Et tous les onglets (Téléphones, Banque, Activité, Programmé, Publication, Warmup, Flow Builder) ont le nouveau style.',
-      ],
-      en: [
-        'Remix finally makes real variants: colors, crop, speed, mirror — up to 24 different versions per video.',
-        'Live preview: drag your caption or photo on the video, set the cut on the timeline. Montage can now join several videos.',
-        'Drag & drop, clear progress with Cancel, results as thumbnails with “Download all”. And every tab (Phones, Bank, Activity, Scheduled, Publish, Warmup, Flow Builder) gets the new look.',
-      ],
-    },
-  },
-  {
-    id: '2026-10-14b',
-    date: '2026-10-14',
-    title: { fr: '✨ Nouvel Explorer + nouveau Tableau de bord', en: '✨ New Explore + new Dashboard' },
-    items: {
-      fr: [
-        'ScaleFlow s’ouvre sur l’Explorer : une grande recherche, « À la une » avec les vrais Reels qui explosent, et tous les outils rangés par catégorie.',
-        'L’Accueil devient le Tableau de bord : courbe animée de tes publications, taux de réussite, tes crédits et leur autonomie, ce qui tourne et ce qui part aujourd’hui.',
-      ],
-      en: [
-        'ScaleFlow now opens on Explore: a big search, “Featured” with the real exploding Reels, and every tool sorted by category.',
-        'Home becomes the Dashboard: animated chart of your posts, success rate, your credits and how long they last, what’s running and what goes out today.',
-      ],
+      fr: ['Travail sur l’interface de ScaleFlow : Explorer, Tableau de bord, Studio vidéo et tous les onglets.'],
+      en: ['Work on the ScaleFlow interface: Explore, Dashboard, Video Studio and every tab.'],
     },
   },
   {
