@@ -420,6 +420,12 @@ Deno.serve(async (req) => {
 
     // ── Veille Reels : fiche d'un Reel (vidéo fraîche + légende) et proxy vidéo
     // (lecture / téléchargement : le CDN Instagram bloque le navigateur en CORS) ──
+    // Page profil d'un compte suivi (photo, bio, abonnés) — HikerAPI au plus toutes les 6 h.
+    if (body?.viral === 'profile' && filterUserId && typeof body.username === 'string') {
+      const { accountProfile } = await import('./viral.ts')
+      const p = await accountProfile(db, body.username).catch(() => null)
+      return new Response(JSON.stringify(p ? { ok: true, ...p } : { ok: false, error: 'profil introuvable' }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
     if (body?.viral === 'media' && filterUserId && typeof body.code === 'string') {
       const { reelMedia } = await import('./viral.ts')
       const m = await reelMedia(body.code)

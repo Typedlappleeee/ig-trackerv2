@@ -1,4 +1,6 @@
-// Veille des Reels viraux (v4) — onglets Tableau de bord · Reels · Feed · Favoris · Mes comptes.
+// Veille des Reels viraux (v5) — onglets Tableau de bord · Reels · Feed · Favoris · Mes comptes.
+//   • Clic sur un @ (carte, fiche, comptes en ronds, classement) → page profil façon Instagram
+//     (photo, bio, abonnés, « à la une », analyse ScaleFlow, grille Reels / Publications).
 //   • Sources : « Sélection ScaleFlow » (scope public, gérée par le super-admin) + les comptes
 //     de l'agence (scope private), ajoutés SUR DEMANDE (l'agence demande, l'admin accepte).
 //   • Relevé quotidien à midi (Paris) côté serveur ; « Actualiser » relève TOUS les comptes
@@ -6,13 +8,14 @@
 //   • Vidéo, légende et durée sont stockées au relevé : la fiche s'ouvre instantanément, la
 //     vidéo est lue EN STREAMING via le proxy public ?vid= (plus de téléchargement complet).
 //   • Favoris par agence (perso ou organisation), avec un instantané du Reel.
-// Tables : supabase/migrations/20261012*_viral*.sql + 20261016_viral_v4.sql. Données : HikerAPI.
+// Tables : supabase/migrations/20261012*_viral*.sql + 20261016_viral_v4.sql + 20261017_viral_profiles.sql. Données : HikerAPI.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { takeOpenArg, openTool } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Empty, Icon, Modal, PageHead, Panel, PanelHead, Segmented, FIELD, TEXTAREA, toast, useNarrow } from '@/lib/ui'
+import { Btn, Empty, Icon, PageHead, Panel, PanelHead, Segmented, FIELD, TEXTAREA, toast, useNarrow } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { fmtNumber, compact } from '@/lib/data'
 import { StatBar } from '@/components/CineHero'
@@ -54,7 +57,12 @@ function Pills<T extends string>({ label, value, onChange, options }: { label?: 
     </span>
   )
 }
-interface Watch { id: string; username: string; niche: string; fetched_at: string | null; last_error: string | null; scope?: Scope; region?: Region; user_id?: string; org_id?: string | null }
+interface Watch {
+  id: string; username: string; niche: string; fetched_at: string | null; last_error: string | null; scope?: Scope; region?: Region; user_id?: string; org_id?: string | null
+  // Profil Instagram (SQL 20261017) : rempli au relevé.
+  full_name?: string | null; biography?: string | null; profile_pic?: string | null; external_url?: string | null
+  followers?: number | null; following?: number | null; media_count?: number | null; is_verified?: boolean; profile_at?: string | null
+}
 export interface Reel {
   watch_id: string; code: string; username: string; views: number; likes: number; comments: number; taken_at: string | null; thumb: string | null; url: string | null; baseline: number; score: number
   kind?: Kind; video_url?: string | null; caption?: string | null; duration?: number | null; images?: string[] | null; fetched_at?: string
@@ -119,6 +127,7 @@ export function engagement(r: { views: number; likes: number; comments: number }
   return r.views > 0 ? Math.round(((r.likes + r.comments) / r.views) * 1000) / 10 : 0
 }
 
+const pct = (n: number) => `${n.toLocaleString('fr-FR')} %`
 const fmtDur = (s: number) => s > 0 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : '—'
 const fmtDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '—'
 const reelUrl = (r: { url: string | null; code: string; kind?: Kind }) => r.url ?? `https://www.instagram.com/${r.kind === 'feed' ? 'p' : 'reel'}/${r.code}/`
@@ -189,16 +198,18 @@ function SectionTitle({ kicker, title, right }: { kicker: string; title: React.R
   )
 }
 
-// Ouvrir la vue d'un compte (ses Reels / posts) depuis n'importe quelle carte ou fiche.
-const AccountCtx = createContext<((username: string) => void) | null>(null)
-function AccountLink({ username, size = 12.5, color = '#fff' }: { username: string; size?: number; color?: string }) {
-  const openAccount = useContext(AccountCtx)
-  if (!openAccount) return <span data-no-tr style={{ fontSize: size, fontWeight: 700, color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{username}</span>
+// Ouvrir le profil d'un compte depuis n'importe quelle carte ou fiche (+ sa photo de profil).
+const AccountCtx = createContext<{ open: (username: string) => void; pic: (username: string) => string | null } | null>(null)
+function AccountLink({ username, size = 12.5, color = '#fff', avatar }: { username: string; size?: number; color?: string; avatar?: number }) {
+  const ctx = useContext(AccountCtx)
+  const pic = avatar ? ctx?.pic(username) : null
+  const face = avatar ? <span style={{ width: avatar, height: avatar, borderRadius: 99, overflow: 'hidden', flexShrink: 0, background: '#1A1A1D', boxShadow: '0 0 0 1.5px rgba(255,255,255,0.5)' }}>{pic && <img src={img(pic)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}</span> : null
+  if (!ctx) return <span data-no-tr style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0, fontSize: size, fontWeight: 700, color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{face}@{username}</span>
   return (
-    <button type="button" data-no-tr title={`Voir tous les posts de @${username}`} onClick={e => { e.stopPropagation(); openAccount(username) }}
-      style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: size, fontWeight: 700, color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.25)', textUnderlineOffset: 3 }}
-      onMouseEnter={e => { e.currentTarget.style.textDecorationColor = '#A78BFA' }} onMouseLeave={e => { e.currentTarget.style.textDecorationColor = 'rgba(255,255,255,0.25)' }}>
-      @{username}
+    <button type="button" data-no-tr title={`Voir le profil de @${username}`} onClick={e => { e.stopPropagation(); ctx.open(username) }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: '100%', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: size, fontWeight: 700, color }}
+      onMouseEnter={e => { e.currentTarget.style.color = '#C4B5FD' }} onMouseLeave={e => { e.currentTarget.style.color = color }}>
+      {face}<span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{username}</span>
     </button>
   )
 }
@@ -246,12 +257,12 @@ function MediaCard({ r, rank, big, fav, onOpen, onRecast, onFav }: { r: Reel; ra
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: big ? 14 : 10, fontSize: big ? 13 : 11.5, fontWeight: 600, color: '#D4D4D8' }}>
           {!feed && <Stat d={I.heart} v={r.likes} />}<Stat d={I.comment} v={r.comments} />
-          {!feed && <span style={{ color: '#A1A1AA' }}>{engagement(r)} %</span>}
+          {!feed && <span style={{ color: '#A1A1AA' }}>{pct(engagement(r))}</span>}
         </span>
         <span style={{ height: 1, background: 'rgba(255,255,255,0.1)' }} />
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 30 }}>
-          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <AccountLink username={r.username} size={big ? 14 : 12.5} />
+          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <AccountLink username={r.username} size={big ? 14 : 12.5} avatar={big ? 24 : 20} />
             <span style={{ fontSize: 11.5, color: '#8B8B94' }}>{fmtDate(r.taken_at)}</span>
           </span>
         </span>
@@ -267,22 +278,62 @@ function MediaCard({ r, rank, big, fav, onOpen, onRecast, onFav }: { r: Reel; ra
   )
 }
 
-// ── Fiche (Reel : vidéo en streaming ; post : diaporama) ──────────────────────
-function MediaDetail({ theme, list, index, setIndex, onClose, onRecast, isFav, onFav }: {
-  theme: Theme; list: Reel[]; index: number; setIndex: (i: number) => void; onClose: () => void; onRecast?: (r: Reel) => void; isFav: (code: string) => boolean; onFav: (r: Reel) => void
+// ── Fiche façon Instagram : média à gauche (vidéo en streaming / diaporama), panneau à droite
+//    (compte cliquable → profil, légende, analyse ScaleFlow, actions). Rendu en portail. ─────────
+const timeAgo = (iso: string | null | undefined) => {
+  if (!iso) return ''
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000))
+  return m < 1 ? 'à l’instant' : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : m < 43200 ? `il y a ${Math.round(m / 1440)} j` : fmtDate(iso)
+}
+/** Légende avec #hashtags et @mentions mis en valeur. */
+function RichCaption({ text }: { text: string }) {
+  const parts = text.split(/([#@][\p{L}\p{N}_.]+)/u)
+  return <>{parts.map((p, i) => /^[#@][\p{L}\p{N}_.]+$/u.test(p) ? <span key={i} style={{ color: '#C4B5FD' }}>{p}</span> : <span key={i}>{p}</span>)}</>
+}
+function Verified({ size = 14 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" aria-label="Compte vérifié" style={{ flexShrink: 0 }}><path fill="#3B82F6" d="M12 1l2.6 2.2 3.4-.4.9 3.3 3 1.7-1.2 3.2 1.2 3.2-3 1.7-.9 3.3-3.4-.4L12 23l-2.6-2.2-3.4.4-.9-3.3-3-1.7L3.3 13 2.1 9.8l3-1.7.9-3.3 3.4.4z" /><path d="M8 12.3l2.6 2.6L16.2 9" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+}
+const IG_RING = 'linear-gradient(45deg,#F59E0B,#EC4899 55%,#8B5CF6)'
+function Avatar({ src, size, ring = true, hot = true, letter }: { src: string | null; size: number; ring?: boolean; hot?: boolean; letter?: string }) {
+  return (
+    <span style={{ padding: ring ? Math.max(2, Math.round(size / 30)) : 0, borderRadius: 99, background: ring ? (hot ? IG_RING : 'rgba(255,255,255,0.2)') : 'transparent', flexShrink: 0, display: 'inline-flex' }}>
+      <span style={{ width: size, height: size, borderRadius: 99, overflow: 'hidden', background: '#1A1A1D', border: ring ? `${Math.max(2, Math.round(size / 32))}px solid #0A0A0B` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717A', fontSize: size * 0.36, fontWeight: 800, boxSizing: 'border-box' }}>
+        {src ? <img src={src} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <span data-no-tr>{(letter ?? '').slice(0, 1).toUpperCase()}</span>}
+      </span>
+    </span>
+  )
+}
+function ActionBtn({ d, label, onClick, on }: { d: string; label: string; onClick: () => void; on?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} title={label}
+      style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '9px 4px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', background: on ? 'rgba(251,191,36,0.12)' : '#141416', color: on ? '#FBBF24' : '#EDEDEF', cursor: 'pointer', transition: 'border-color .15s ease' }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(167,139,250,0.5)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)' }}>
+      <Icon d={d} size={17} />
+      <span style={{ fontSize: 11, fontWeight: 650, color: on ? '#FBBF24' : '#A1A1AA', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{label}</span>
+    </button>
+  )
+}
+
+function ReelViewer({ theme, list, index, setIndex, onClose, onRecast, isFav, onFav, onProfile, accountOf, moreOf, onJump }: {
+  theme: Theme; list: Reel[]; index: number; setIndex: (i: number) => void; onClose: () => void; onRecast?: (r: Reel) => void
+  isFav: (code: string) => boolean; onFav: (r: Reel) => void; onProfile?: (username: string) => void; accountOf: (username: string) => Watch | undefined
+  moreOf?: (username: string) => Reel[]; onJump?: (list: Reel[], i: number) => void
 }) {
   const r = list[index]
   const feed = (r.kind ?? 'reel') === 'feed'
-  const narrow = useNarrow(760)
+  const narrow = useNarrow(900)
+  const [vh, setVh] = useState(() => window.innerHeight)
+  useEffect(() => { const f = () => setVh(window.innerHeight); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f) }, [])
   const [src, setSrc] = useState<string | null>(null)
   const [state, setState] = useState<'load' | 'ok' | 'err'>('load')
   const [caption, setCaption] = useState<string>(r.caption ?? '')
   const [duration, setDuration] = useState<number>(r.duration ?? 0)
   const [slide, setSlide] = useState(0)
-  // Slides du carrousel : stockées au relevé ; sinon (liste « légère ») récupérées à l'ouverture.
   const [fetched, setFetched] = useState<string[] | null>(null)
   const [loadingSlides, setLoadingSlides] = useState(false)
   const slides = feed ? (fetched?.length ? fetched : r.images?.length ? r.images : r.thumb ? [r.thumb] : []) : []
+
+  // Carrousel : slides stockées au relevé ; sinon récupérées à l'ouverture (1 fois, puis gardées).
   useEffect(() => {
     setFetched(null)
     if (!feed || (r.images?.length ?? 0) > 1) return
@@ -291,32 +342,23 @@ function MediaDetail({ theme, list, index, setIndex, onClose, onRecast, isFav, o
     void freshMedia(r.code).then(m => { if (alive && (m?.images?.length ?? 0) > 1) setFetched(m!.images!) }).finally(() => { if (alive) setLoadingSlides(false) })
     return () => { alive = false }
   }, [r.code, r.images, feed])
-
+  // Vidéo : URL stockée au relevé, lue en streaming ; sinon (ancienne ligne) → URL fraîche.
   useEffect(() => {
     let alive = true
     setSlide(0); setCaption(r.caption ?? ''); setDuration(r.duration ?? 0)
     if (feed) { setSrc(null); setState('ok'); return }
-    // Lecture immédiate : URL stockée au relevé, servie en streaming. Sinon (ancienne ligne) → HikerAPI.
     if (r.video_url) { setSrc(vid(r.video_url)); setState('load') }
     else {
       setSrc(null); setState('load')
       void freshMedia(r.code).then(m => {
         if (!alive) return
-        if (m?.videoUrl) { setSrc(vid(m.videoUrl)); if (m.caption) setCaption(m.caption); if (m.duration) setDuration(m.duration) }
-        else setState('err')
+        if (m?.videoUrl) { setSrc(vid(m.videoUrl)); if (m.caption) setCaption(m.caption); if (m.duration) setDuration(m.duration) } else setState('err')
       })
     }
     return () => { alive = false }
   }, [r.code, r.video_url, r.caption, r.duration, feed])
-
   // Vidéo stockée expirée → URL fraîche (une seule fois).
-  const onVideoError = () => {
-    void freshMedia(r.code).then(m => {
-      const next = m?.videoUrl ? vid(m.videoUrl) : null
-      if (next && next !== src) setSrc(next); else setState('err')
-    })
-  }
-
+  const onVideoError = () => { void freshMedia(r.code).then(m => { const next = m?.videoUrl ? vid(m.videoUrl) : null; if (next && next !== src) setSrc(next); else setState('err') }) }
   // Préchargement de la vidéo suivante.
   useEffect(() => {
     const n = list[index + 1]
@@ -324,7 +366,6 @@ function MediaDetail({ theme, list, index, setIndex, onClose, onRecast, isFav, o
     const l = document.createElement('link'); l.rel = 'preload'; l.as = 'video'; l.href = vid(n.video_url)
     document.head.appendChild(l); return () => { l.remove() }
   }, [index, list])
-
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft' && index > 0) setIndex(index - 1)
@@ -334,121 +375,443 @@ function MediaDetail({ theme, list, index, setIndex, onClose, onRecast, isFav, o
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k)
   }, [index, list.length, setIndex, onClose])
 
-  const stats: [string, string][] = feed
-    ? [['Likes', fmtNumber(r.likes)], ['Commentaires', fmtNumber(r.comments)], ['Moyenne du compte', fmtNumber(r.baseline)], ['Slides', String(slides.length || 1)]]
-    : [['Vues', fmtNumber(r.views)], ['Likes', fmtNumber(r.likes)], ['Commentaires', fmtNumber(r.comments)], ['Engagement', `${engagement(r)} %`], ['Moyenne du compte', fmtNumber(r.baseline)], ['Durée', fmtDur(duration)]]
+  const acc = accountOf(r.username)
+  const avatar = acc?.profile_pic ? img(acc.profile_pic) : r.thumb ? img(r.thumb) : null
   const fav = isFav(r.code)
-  const openAccount = useContext(AccountCtx)
+  const MH = Math.min(vh * 0.9, 860)
+  const aspect = feed ? 4 / 5 : 9 / 16
+  const stats: [string, string][] = feed
+    ? [['Likes', compact(r.likes)], ['Commentaires', compact(r.comments)], ['Moyenne du compte', compact(r.baseline)], ['Images', String(slides.length || 1)]]
+    : [['Vues', compact(r.views)], ['Likes', compact(r.likes)], ['Commentaires', compact(r.comments)], ['Engagement', pct(engagement(r))], ['Moyenne du compte', compact(r.baseline)], ['Durée', fmtDur(duration)]]
+  const goProfile = onProfile ? () => onProfile(r.username) : undefined
+  // « Plus de @compte » (comme sous un post Instagram) : ses autres Reels / posts les plus vus.
+  const moreAll = useMemo(() => moreOf?.(r.username) ?? [], [moreOf, r.username])
+  const more = moreAll.filter(x => x.code !== r.code).slice(0, 6)
+  const arrow = (dir: -1 | 1) => {
+    const ok = dir < 0 ? index > 0 : index < list.length - 1
+    return ok && !narrow ? (
+      <button type="button" aria-label={dir < 0 ? 'Précédent' : 'Suivant'} onClick={e => { e.stopPropagation(); setIndex(index + dir) }}
+        style={{ position: 'fixed', top: '50%', [dir < 0 ? 'left' : 'right']: 18, transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: 99, border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0A0A0B', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, boxShadow: '0 8px 24px rgba(0,0,0,.5)' }}>
+        <Icon d={dir < 0 ? I.left : I.right} size={18} sw={2.4} />
+      </button>
+    ) : null
+  }
+  const slideBtn = (dir: -1 | 1) => (
+    <button type="button" aria-label={dir < 0 ? 'Image précédente' : 'Image suivante'} onClick={() => setSlide(x => x + dir)}
+      style={{ position: 'absolute', [dir < 0 ? 'left' : 'right']: 10, top: '50%', transform: 'translateY(-50%)', width: 30, height: 30, borderRadius: 99, border: 'none', background: 'rgba(255,255,255,0.85)', color: '#0A0A0B', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Icon d={dir < 0 ? I.left : I.right} size={14} sw={2.4} />
+    </button>
+  )
 
-  return (
-    <Modal theme={theme} width={900} title={`@${r.username}`} sub={`${feed ? 'Post' : 'Reel'} du ${fmtDate(r.taken_at)} · ${index + 1} / ${list.length}`} icon={feed ? I.image : I.play} onClose={onClose}
-      footer={<>
-        <Btn theme={theme} sm icon={I.left} label="Précédent" disabled={index === 0} onClick={() => setIndex(index - 1)} />
-        <Btn theme={theme} sm icon={I.right} label="Suivant" disabled={index >= list.length - 1} onClick={() => setIndex(index + 1)} />
-      </>}>
-      <div style={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', gap: 18, alignItems: narrow ? 'stretch' : 'flex-start' }}>
-        <div style={{ position: 'relative', width: narrow ? '100%' : 300, maxWidth: narrow ? 260 : 340, alignSelf: 'center', aspectRatio: feed ? '4 / 5' : '9 / 16', borderRadius: 14, overflow: 'hidden', background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-          {feed ? (
-            <>
-              {slides[slide] && <img key={slides[slide]} src={img(slides[slide])} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: 'aIn .25s ease both' }} />}
-              {slides.length > 1 && <span style={{ position: 'absolute', top: 10, right: 10, padding: '3px 8px', borderRadius: 99, background: 'rgba(10,10,11,.65)', color: '#fff', fontSize: 11.5, fontWeight: 800 }}>{slide + 1}/{slides.length}</span>}
-              {loadingSlides && slides.length <= 1 && <span style={{ position: 'absolute', top: 10, right: 10, padding: '3px 8px', borderRadius: 99, background: 'rgba(10,10,11,.65)', color: '#fff', fontSize: 11.5, fontWeight: 700 }}>Chargement des images…</span>}
-              {slides.length > 1 && <>
-                {slide > 0 && <button type="button" aria-label="Image précédente" onClick={() => setSlide(s => s - 1)} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: 99, border: 'none', background: 'rgba(10,10,11,.6)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon d={I.left} size={15} /></button>}
-                {slide < slides.length - 1 && <button type="button" aria-label="Image suivante" onClick={() => setSlide(s => s + 1)} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: 99, border: 'none', background: 'rgba(10,10,11,.6)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon d={I.right} size={15} /></button>}
-                <span style={{ position: 'absolute', bottom: 10, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 4 }}>{slides.map((_, i) => <span key={i} style={{ width: 6, height: 6, borderRadius: 9, background: i === slide ? '#fff' : 'rgba(255,255,255,.4)' }} />)}</span>
-              </>}
-            </>
-          ) : src ? (
-            <video key={src} src={src} poster={r.thumb ? img(r.thumb) : undefined} controls autoPlay loop playsInline preload="auto"
-              onCanPlay={() => setState('ok')} onError={onVideoError} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          ) : (
-            <>
-              {r.thumb && <img src={img(r.thumb)} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(.6)' }} />}
-              <span style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: '#fff', fontSize: 12.5, padding: 20, textAlign: 'center' }}>
-                {state === 'err' ? 'Vidéo indisponible ici — ouvre-la sur Instagram.' : <><span style={{ width: 26, height: 26, borderRadius: 99, border: '2px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', animation: 'aSpin .8s linear infinite' }} />Chargement…</>}
-              </span>
-            </>
-          )}
-          <span style={{ position: 'absolute', top: 10, left: 10 }}><Badge score={r.score} /></span>
+  const media = (
+    <div style={{ position: 'relative', width: narrow ? '100%' : MH * aspect, height: narrow ? undefined : MH, aspectRatio: narrow ? `${aspect}` : undefined, maxHeight: narrow ? '74vh' : undefined, background: '#000', flexShrink: 0, overflow: 'hidden' }}>
+      {feed ? (
+        <>
+          {slides[slide] && <img key={slides[slide]} src={img(slides[slide])} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', animation: 'aIn .25s ease both' }} />}
+          {slides.length > 1 && <>
+            {slide > 0 && slideBtn(-1)}
+            {slide < slides.length - 1 && slideBtn(1)}
+            <span style={{ position: 'absolute', bottom: 12, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 5 }}>{slides.map((_, i) => <span key={i} style={{ width: 6, height: 6, borderRadius: 9, background: i === slide ? '#fff' : 'rgba(255,255,255,.4)' }} />)}</span>
+            <span style={{ position: 'absolute', top: 12, right: 12, padding: '3px 9px', borderRadius: 99, background: 'rgba(10,10,11,.65)', color: '#fff', fontSize: 12, fontWeight: 800 }}>{slide + 1}/{slides.length}</span>
+          </>}
+          {loadingSlides && slides.length <= 1 && <span style={{ position: 'absolute', top: 12, right: 12, padding: '3px 9px', borderRadius: 99, background: 'rgba(10,10,11,.65)', color: '#fff', fontSize: 11.5, fontWeight: 700 }}>Chargement des images…</span>}
+        </>
+      ) : src ? (
+        <video key={src} src={src} poster={r.thumb ? img(r.thumb) : undefined} controls autoPlay loop playsInline preload="auto"
+          onCanPlay={() => setState('ok')} onError={onVideoError} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
+      ) : (
+        <>
+          {r.thumb && <img src={img(r.thumb)} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(.55)' }} />}
+          <span style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: '#fff', fontSize: 13, padding: 20, textAlign: 'center' }}>
+            {state === 'err' ? 'Vidéo indisponible ici — ouvre-la sur Instagram.' : <><span style={{ width: 28, height: 28, borderRadius: 99, border: '2px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', animation: 'aSpin .8s linear infinite' }} />Chargement…</>}
+          </span>
+        </>
+      )}
+      {r.score > 0 && <span style={{ position: 'absolute', top: 12, left: 12 }}><Badge score={r.score} /></span>}
+    </div>
+  )
+
+  const panel = (
+    <div style={{ width: narrow ? '100%' : 390, display: 'flex', flexDirection: 'column', minHeight: narrow ? undefined : 0, flexShrink: narrow ? 0 : undefined, maxHeight: narrow ? undefined : MH, background: '#0C0C0D' }}>
+      {/* Compte : clic sur la photo ou le pseudo → profil */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <button type="button" onClick={goProfile} disabled={!goProfile} aria-label={`Profil de @${r.username}`} style={{ padding: 0, border: 'none', background: 'transparent', cursor: goProfile ? 'pointer' : 'default', display: 'flex' }}><Avatar src={avatar} size={38} letter={r.username} /></button>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+            <button type="button" data-no-tr onClick={goProfile} disabled={!goProfile} title={goProfile ? 'Voir le profil' : undefined}
+              style={{ padding: 0, border: 'none', background: 'transparent', cursor: goProfile ? 'pointer' : 'default', fontSize: 14.5, fontWeight: 800, color: '#F4F4F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#C4B5FD' }} onMouseLeave={e => { e.currentTarget.style.color = '#F4F4F5' }}>{r.username}</button>
+            {acc?.is_verified && <Verified />}
+          </span>
+          <span style={{ display: 'block', fontSize: 12, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc?.full_name ? <span data-no-tr>{acc.full_name} · </span> : null}{timeAgo(r.taken_at)}</span>
+        </span>
+        {goProfile && <button type="button" onClick={goProfile} style={{ flexShrink: 0, height: 32, padding: '0 12px', borderRadius: 9, border: 'none', background: '#F4F4F5', color: '#0A0A0B', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>Voir le profil</button>}
+      </div>
+      {/* Légende + analyse */}
+      <div style={{ flex: narrow ? 'none' : 1, minHeight: 0, overflowY: narrow ? 'visible' : 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Avatar src={avatar} size={28} ring={false} letter={r.username} />
+          <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, lineHeight: 1.55, color: '#E4E4E7', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} data-no-tr>
+            <b style={{ color: '#F4F4F5', marginRight: 6 }}>{r.username}</b>
+            {caption ? <RichCaption text={caption} /> : <span style={{ color: '#5A5A63' }}>—</span>}
+            <span style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: '#71717A' }}>{fmtDate(r.taken_at)}</span>
+          </div>
         </div>
-
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${feed ? 2 : 3}, minmax(0,1fr))`, gap: 8 }}>
+        {!!caption && <span><Btn theme={theme} sm icon={I.copy} label="Copier la légende" onClick={() => void copyText(caption, 'Légende copiée.')} /></span>}
+        <div style={{ borderRadius: 14, background: '#121214', border: '1px solid rgba(255,255,255,0.07)', padding: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: V }}>● Analyse ScaleFlow</span>
+            {r.score > 0 && <span style={{ fontSize: 12.5, color: '#A1A1AA' }}><b style={{ color: r.score >= 3 ? '#F472B6' : '#F4F4F5', fontSize: 15 }}>×{ratio(r.score)}</b> {feed ? 'ses likes habituels' : 'ses vues habituelles'}</span>}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${feed ? 2 : 3}, minmax(0,1fr))`, gap: 6 }}>
             {stats.map(([l, v]) => (
-              <div key={l} style={{ padding: '10px 12px', borderRadius: 10, background: '#161618', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 11.5, color: '#8B8B94' }}>{l}</div>
-                <div style={{ marginTop: 4, fontSize: 17, fontWeight: 700, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{v}</div>
+              <div key={l} style={{ padding: '8px 10px', borderRadius: 10, background: '#0C0C0D' }}>
+                <div style={{ fontSize: 10.5, color: '#71717A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</div>
+                <div style={{ marginTop: 3, fontSize: 16, fontWeight: 850, letterSpacing: '-0.02em', color: '#F4F4F5', fontVariantNumeric: 'tabular-nums' }}>{v}</div>
               </div>
             ))}
           </div>
-          {feed && slides.length > 1 && (
-            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-              {slides.map((u, i) => (
-                <button key={u} type="button" onClick={() => setSlide(i)} aria-label={`Image ${i + 1}`} style={{ position: 'relative', flexShrink: 0, width: 54, aspectRatio: '4 / 5', padding: 0, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: '#161618', border: 'none', boxShadow: i === slide ? `0 0 0 2px ${V}` : '0 0 0 1px rgba(255,255,255,0.1)', opacity: i === slide ? 1 : 0.7 }}>
-                  <img src={img(u)} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+        {more.length > 0 && onJump && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: '#A1A1AA' }}>Plus de <span data-no-tr style={{ color: '#F4F4F5' }}>{r.username}</span></span>
+              {goProfile && <button type="button" onClick={goProfile} style={{ padding: 0, border: 'none', background: 'transparent', color: '#C4B5FD', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Tout voir</button>}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 4 }}>
+              {more.map(x => (
+                <button key={x.code} type="button" onClick={() => onJump(moreAll, moreAll.indexOf(x))} title={(x.kind ?? 'reel') === 'feed' ? 'Voir le post' : 'Voir le Reel'}
+                  style={{ position: 'relative', aspectRatio: '3 / 4', padding: 0, border: 'none', borderRadius: 6, overflow: 'hidden', background: '#161618', cursor: 'pointer' }}>
+                  {x.thumb && <img src={img(x.thumb)} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  <span style={{ position: 'absolute', left: 6, bottom: 5, display: 'inline-flex', alignItems: 'center', gap: 3, color: '#fff', fontSize: 11.5, fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,.8)' }}>
+                    {(x.kind ?? 'reel') === 'feed' ? <><Filled d={I.heart} size={11} />{compact(x.likes)}</> : <><Icon d={I.play} size={11} sw={2.4} />{compact(x.views)}</>}
+                  </span>
                 </button>
               ))}
             </div>
-          )}
-          {r.score > 0 && (
-            <div style={{ fontSize: 12.5, color: '#A1A1AA', lineHeight: 1.5 }}>
-              {feed ? 'Ce post fait ' : 'Ce Reel fait '}<b style={{ color: r.score >= 3 ? '#F472B6' : '#EDEDEF' }}>×{ratio(r.score)}</b>{feed ? ' les likes habituels du compte.' : ' les vues habituelles du compte.'}
-            </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Légende</span>
-              {!!caption && <Btn theme={theme} sm icon={I.copy} label="Copier la légende" onClick={() => void copyText(caption, 'Légende copiée.')} />}
-            </div>
-            <div data-no-tr style={{ maxHeight: 160, overflowY: 'auto', padding: '10px 12px', borderRadius: 10, background: '#0E0E10', border: '1px solid rgba(255,255,255,0.06)', fontSize: 13, color: caption ? '#D4D4D8' : '#5A5A63', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {caption || '—'}
-            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Btn theme={theme} tone={fav ? 'quiet' : 'primary'} icon={I.star} label={fav ? 'Dans tes favoris' : 'Ajouter aux favoris'} onClick={() => onFav(r)} />
-            {feed
-              ? slides[slide] && <Btn theme={theme} icon={I.download} label="Télécharger l’image" onClick={() => void downloadImage(slides[slide], `${r.username}_${r.code}_${slide + 1}.jpg`)} />
-              : <Btn theme={theme} icon={I.download} label="Télécharger la vidéo" onClick={() => void downloadReel(r)} />}
-            <Btn theme={theme} icon={I.external} label="Ouvrir sur Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
-            <Btn theme={theme} icon={I.link} label="Copier le lien" onClick={() => void copyText(reelUrl(r), 'Lien copié.')} />
-            {openAccount && <Btn theme={theme} icon={I.users} label={`Tous les posts de @${r.username}`} onClick={() => openAccount(r.username)} />}
-          </div>
-          {onRecast && !feed && (
-            <button type="button" onClick={() => onRecast(r)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: '#fff', background: GRAD, boxShadow: '0 4px 0 #6D28D9' }}>
-              ✦ Recréer avec mes images (Genjutsu IA)
-            </button>
-          )}
-        </div>
+        )}
       </div>
-    </Modal>
+      {/* Actions */}
+      <div style={{ padding: '12px 16px 14px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <ActionBtn d={I.star} label={fav ? 'Favori' : 'Favoris'} on={fav} onClick={() => onFav(r)} />
+          {feed
+            ? <ActionBtn d={I.download} label="Image" onClick={() => { if (slides[slide]) void downloadImage(slides[slide], `${r.username}_${r.code}_${slide + 1}.jpg`) }} />
+            : <ActionBtn d={I.download} label="Télécharger" onClick={() => void downloadReel(r)} />}
+          <ActionBtn d={I.link} label="Lien" onClick={() => void copyText(reelUrl(r), 'Lien copié.')} />
+          <ActionBtn d={I.external} label="Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
+        </div>
+        {onRecast && !feed && (
+          <button type="button" onClick={() => onRecast(r)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 800, color: '#fff', background: GRAD, boxShadow: '0 4px 0 #6D28D9' }}>
+            ✦ Recréer avec mes images
+          </button>
+        )}
+        {narrow && list.length > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Btn theme={theme} sm icon={I.left} label="Précédent" disabled={index === 0} onClick={() => setIndex(index - 1)} />
+            <span style={{ fontSize: 12, color: '#71717A' }}>{index + 1} / {list.length}</span>
+            <Btn theme={theme} sm icon={I.right} label="Suivant" disabled={index >= list.length - 1} onClick={() => setIndex(index + 1)} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  return createPortal(
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 95, background: 'rgba(0,0,0,0.86)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: narrow ? 'stretch' : 'center', justifyContent: 'center', padding: narrow ? 0 : '0 76px', animation: 'aIn .18s ease both' }}>
+      <button type="button" aria-label="Fermer" onClick={onClose} style={{ position: 'fixed', top: 14, right: 16, width: 38, height: 38, borderRadius: 99, border: 'none', background: 'rgba(20,20,22,0.7)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}><Icon d="M18 6L6 18|M6 6l12 12" size={17} sw={2.2} /></button>
+      {!narrow && list.length > 1 && <span style={{ position: 'fixed', top: 22, left: 22, fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>{index + 1} / {list.length}</span>}
+      {arrow(-1)}{arrow(1)}
+      <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', width: narrow ? '100%' : undefined, height: narrow ? '100%' : undefined, overflowY: narrow ? 'auto' : 'hidden', borderRadius: narrow ? 0 : 16, border: narrow ? 'none' : '1px solid rgba(255,255,255,0.08)', boxShadow: '0 40px 120px -30px rgba(0,0,0,.95)', background: '#0C0C0D', animation: 'aIn .25s cubic-bezier(0.16,1,0.3,1) both' }}>
+        {media}{panel}
+      </div>
+    </div>,
+    document.body,
   )
 }
 
-// Bulles des comptes (photo = leur meilleur média). Clic = filtrer sur ce compte.
-function AccountRail({ list, reels, value, onChange }: { list: Watch[]; reels: Reel[]; value: string; onChange: (u: string) => void }) {
-  const top = useMemo(() => {
-    const m = new Map<string, Reel>()
-    for (const r of reels) { const c = m.get(r.username); if (!c || r.views + r.likes > c.views + c.likes) m.set(r.username, r) }
-    return m
-  }, [reels])
-  const names = useMemo(() => [...new Set(list.map(w => w.username))].sort((a, b) => ((top.get(b)?.views ?? 0) + (top.get(b)?.likes ?? 0)) - ((top.get(a)?.views ?? 0) + (top.get(a)?.likes ?? 0))), [list, top])
-  if (names.length < 2) return null
-  const Bubble = ({ k, label, thumb, hot, on }: { k: string; label: string; thumb?: string | null; hot?: boolean; on: boolean }) => (
-    <button type="button" onClick={() => onChange(on && k ? '' : k)} title={label}
-      style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 72, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', color: on ? '#F4F4F5' : '#8B8B94' }}>
-      <span style={{ padding: 2.5, borderRadius: 99, background: on ? 'linear-gradient(135deg,#A78BFA,#F472B6)' : hot ? 'linear-gradient(135deg,rgba(167,139,250,.55),rgba(244,114,182,.55))' : 'rgba(255,255,255,0.1)' }}>
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 54, height: 54, borderRadius: 99, overflow: 'hidden', background: '#161618', border: '2.5px solid #0A0A0B', fontSize: 12, fontWeight: 800, color: '#F4F4F5' }}>
-          {thumb ? <img src={img(thumb)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : label === 'Tous' ? 'TOUS' : label.slice(1, 3).toUpperCase()}
+// ── Profil d'un compte, façon Instagram ──────────────────────────────────────
+type Prof = Pick<Watch, 'full_name' | 'biography' | 'profile_pic' | 'external_url' | 'followers' | 'following' | 'media_count' | 'is_verified' | 'profile_at'>
+const median = (xs: number[]) => {
+  const s = xs.filter(x => x > 0).sort((a, b) => a - b)
+  return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : 0
+}
+/** Pur : chiffres clés d'un compte à partir de ses Reels relevés. */
+export function profileStats(all: Reel[], now = Date.now()) {
+  const rs = all.filter(r => (r.kind ?? 'reel') === 'reel')
+  const best = rs.reduce<Reel | null>((b, r) => !b || r.views > b.views ? r : b, null)
+  const last30 = rs.filter(r => r.taken_at && now - Date.parse(r.taken_at) <= 30 * 86400000).length
+  return {
+    avg: median(rs.map(r => r.views)),
+    best,
+    record: rs.reduce((m, r) => Math.max(m, r.score), 0),
+    viral: rs.filter(r => r.score >= 3).length,
+    eng: rs.length ? Math.round((rs.reduce((s, r) => s + engagement(r), 0) / rs.length) * 10) / 10 : 0,
+    perWeek: Math.round((last30 / 30) * 7 * 10) / 10,
+  }
+}
+const cleanUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')
+function Filled({ d, size = 18 }: { d: string; size?: number }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" style={{ flexShrink: 0 }}><path d={d} /></svg>
+}
+const CAROUSEL = 'M8 8h12v12H8z|M4 16V4h12'
+
+// Case de la grille (Reels 9:16 avec ▶ vues ; posts 3:4). Survol : ♥ likes · 💬 commentaires.
+function GridTile({ r, i, fav, onClick }: { r: Reel; i: number; fav: boolean; onClick: () => void }) {
+  const [hover, setHover] = useState(false)
+  const feed = (r.kind ?? 'reel') === 'feed'
+  const multi = feed && ((r.images?.length ?? 0) > 1 || r.images?.length === 0)
+  return (
+    <button type="button" onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} aria-label={feed ? 'Voir le post' : 'Voir le Reel'}
+      style={{ position: 'relative', display: 'block', width: '100%', aspectRatio: feed ? '3 / 4' : '9 / 16', padding: 0, border: 'none', borderRadius: 4, background: '#141416', cursor: 'pointer', overflow: 'hidden', animation: `aIn .4s ease ${Math.min(i, 24) * 14}ms both` }}>
+      {r.thumb
+        ? <img src={img(r.thumb)} alt="" loading={i < 12 ? 'eager' : 'lazy'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3F3F46' }}><Icon d={feed ? I.image : I.play} size={26} /></span>}
+      {!feed && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '28%', background: 'linear-gradient(180deg,transparent,rgba(0,0,0,.6))' }} />}
+      {!feed && <span style={{ position: 'absolute', left: 9, bottom: 8, display: 'inline-flex', alignItems: 'center', gap: 5, color: '#fff', fontSize: 13.5, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,.6)' }}><Icon d={I.play} size={13} sw={2.2} />{compact(r.views)}</span>}
+      <span style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <span>{r.score >= 2 && <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 7px', borderRadius: 99, fontSize: 11, fontWeight: 850, color: '#fff', background: r.score >= 3 ? GRAD : 'rgba(10,10,11,0.6)', backdropFilter: 'blur(6px)', fontVariantNumeric: 'tabular-nums' }}>{r.score >= 3 ? '🔥 ' : ''}×{ratio(r.score)}</span>}</span>
+        <span style={{ display: 'inline-flex', gap: 6, color: '#fff', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.7))' }}>
+          {fav && <span style={{ color: '#FBBF24', display: 'flex' }}><Filled d={I.star} size={15} /></span>}
+          {multi && <Icon d={CAROUSEL} size={16} sw={2} />}
         </span>
       </span>
-      <span data-no-tr={k ? true : undefined} style={{ maxWidth: '100%', fontSize: 11.5, fontWeight: on ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 22, background: 'rgba(0,0,0,0.42)', color: '#fff', fontSize: 15, fontWeight: 800, opacity: hover ? 1 : 0, transition: 'opacity .15s ease' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><Filled d={I.heart} size={19} />{compact(r.likes)}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><Filled d={I.comment} size={18} />{compact(r.comments)}</span>
+      </span>
     </button>
   )
+}
+
+function ProfileView({ theme, username, rows, reels, favSet, onBack, onOpen, onLoaded }: {
+  theme: Theme; username: string; rows: Watch[]; reels: Reel[]; favSet: Set<string>; onBack: () => void
+  onOpen: (list: Reel[], i: number) => void; onLoaded: (username: string, p: Prof) => void
+}) {
+  const narrow = useNarrow(760)
+  const acc = rows.find(w => w.profile_at) ?? rows[0]
+  const [prof, setProf] = useState<Prof | null>(acc?.profile_at ? acc : null)
+  const [loadingProf, setLoadingProf] = useState(false)
+  const [extra, setExtra] = useState<Reel[]>([])
+  const [tab, setTab] = useState<Kind>('reel')
+  const [sort, setSort] = useState<'recent' | 'views' | 'score'>('recent')
+  const ids = rows.map(w => w.id).join(',')
+
+  // Profil (photo, bio, abonnés) : stocké au relevé ; re-demandé s'il a plus de 12 h.
+  useEffect(() => {
+    let alive = true
+    const a = rows.find(w => w.profile_at) ?? rows[0]
+    setProf(a?.profile_at ? a : null); setTab('reel'); setExtra([])
+    if (a?.profile_at && Date.now() - Date.parse(a.profile_at) < 12 * 3600_000) return
+    setLoadingProf(true)
+    void callFn({ viral: 'profile', username }).then(res => res.json()).then((j: Prof & { ok?: boolean }) => {
+      if (alive && j?.ok) { const p: Prof = { full_name: j.full_name, biography: j.biography, profile_pic: j.profile_pic, external_url: j.external_url, followers: j.followers, following: j.following, media_count: j.media_count, is_verified: j.is_verified, profile_at: j.profile_at }; setProf(p); onLoaded(username, p) }
+    }).catch(() => { /* profil facultatif */ }).finally(() => { if (alive) setLoadingProf(false) })
+    return () => { alive = false }
+  }, [username]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Tout l'historique relevé du compte (au-delà des 31 jours chargés par la Veille).
+  useEffect(() => {
+    if (!ids) return
+    let alive = true
+    void supabase.from('viral_reels').select('*').in('watch_id', ids.split(',')).order('taken_at', { ascending: false }).limit(400)
+      .then(({ data }) => { if (alive && data) setExtra(data as Reel[]) })
+    return () => { alive = false }
+  }, [ids])
+
+  const all = useMemo(() => {
+    const metric = (r: Reel) => (r.kind ?? 'reel') === 'feed' ? r.likes : r.views
+    const m = new Map<string, Reel>()
+    for (const r of [...reels.filter(x => x.username === username), ...extra]) { const c = m.get(r.code); if (!c || metric(r) > metric(c)) m.set(r.code, r) }
+    return [...m.values()]
+  }, [reels, extra, username])
+  const t = (r: Reel) => r.taken_at ? Date.parse(r.taken_at) : 0
+  const listOf = (k: Kind) => all.filter(r => (r.kind ?? 'reel') === k).sort((a, b) =>
+    sort === 'recent' ? t(b) - t(a) : sort === 'score' ? b.score - a.score : (k === 'feed' ? b.likes - a.likes : b.views - a.views))
+  const rs = useMemo(() => listOf('reel'), [all, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  const fs = useMemo(() => listOf('feed'), [all, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  const effTab: Kind = tab === 'reel' && !rs.length && fs.length ? 'feed' : tab
+  const list = effTab === 'feed' ? fs : rs
+  const st = useMemo(() => profileStats(all), [all])
+  const highlights = useMemo(() => [...all].filter(r => r.score > 0).sort((a, b) => b.score - a.score).slice(0, 8), [all])
+  const avatar = prof?.profile_pic ? img(prof.profile_pic) : st.best?.thumb ? img(st.best.thumb) : null
+  const igUrl = `https://www.instagram.com/${username}/`
+  const w0 = rows[0]
+  const category = [w0?.niche, w0?.region ? REGION_LABEL[w0.region] : null, w0?.scope === 'private' ? 'Ton compte suivi' : 'Sélection ScaleFlow'].filter(Boolean).join(' · ')
+  const oldest = all.reduce<string | null>((o, r) => r.taken_at && (!o || r.taken_at < o) ? r.taken_at : o, null)
+  const fetchedAt = rows.reduce<string | null>((a, w) => w.fetched_at && (!a || w.fetched_at > a) ? w.fetched_at : a, null)
+
+  const counts: [string, string][] = prof
+    ? [[compact(prof.media_count ?? 0), 'publications'], [compact(prof.followers ?? 0), 'followers'], [compact(prof.following ?? 0), 'suivi(e)s']]
+    : [[String(rs.length), 'Reels relevés'], [String(fs.length), 'posts relevés'], [st.avg ? compact(st.avg) : '—', 'vues / Reel']]
+  const Count = ({ v, l }: { v: string; l: string }) => narrow
+    ? <span style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}><b style={{ fontSize: 17, fontWeight: 800, color: '#F5F5F5', fontVariantNumeric: 'tabular-nums' }}>{v}</b><span style={{ fontSize: 12.5, color: '#A8A8A8' }}>{l}</span></span>
+    : <span style={{ fontSize: 16, color: '#E4E4E7', whiteSpace: 'nowrap' }}><b style={{ fontWeight: 800, color: '#F5F5F5', fontVariantNumeric: 'tabular-nums' }}>{v}</b> {l}</span>
+  const igBtn = (label: string, onClick: () => void, blue?: boolean, d?: string) => (
+    <button type="button" onClick={onClick} title={label} style={{ flex: narrow ? 1 : undefined, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, padding: '0 16px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', background: blue ? '#0095F6' : '#262628', color: '#F5F5F5', transition: 'filter .15s ease' }}
+      onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.15)' }} onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}>
+      {d && <Icon d={d} size={14} sw={2} />}{label}
+    </button>
+  )
+  const buttons = (
+    <span style={{ display: 'flex', gap: 8, flexWrap: narrow ? 'nowrap' : 'wrap' }}>
+      {igBtn('Ouvrir sur Instagram', () => window.open(igUrl, '_blank', 'noopener'), true)}
+      {igBtn('Copier le lien', () => void copyText(igUrl, 'Lien du profil copié.'))}
+    </span>
+  )
+  const bio = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 14, lineHeight: 1.45, color: '#F5F5F5' }}>
+      {prof?.full_name && <b data-no-tr style={{ fontWeight: 700 }}>{prof.full_name}</b>}
+      {category && <span style={{ fontSize: 13.5, color: '#A8A8A8' }}>{category}</span>}
+      {prof?.biography && <span data-no-tr style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}><RichCaption text={prof.biography} /></span>}
+      {prof?.external_url && (
+        <a href={prof.external_url} target="_blank" rel="noopener noreferrer" data-no-tr style={{ display: 'inline-flex', alignItems: 'center', gap: 5, width: 'fit-content', maxWidth: '100%', color: '#E0F1FF', fontWeight: 700, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <Icon d={I.link} size={13} sw={2} />{cleanUrl(prof.external_url)}
+        </a>
+      )}
+      {!prof && loadingProf && <span style={{ display: 'block', width: 220, height: 12, marginTop: 4, borderRadius: 6, background: 'linear-gradient(110deg,#141416 30%,#1E1E21 50%,#141416 70%)', backgroundSize: '200% 100%', animation: 'aShimmer 1.4s linear infinite' }} />}
+    </div>
+  )
+  const insights: [string, string, string, (() => void)?][] = [
+    ['Vues habituelles', st.avg ? compact(st.avg) : '—', 'médiane par Reel'],
+    ['Meilleur Reel', st.best ? compact(st.best.views) : '—', st.best?.score ? `×${ratio(st.best.score)} la normale` : '—', st.best ? () => { const i = rs.findIndex(r => r.code === st.best!.code); onOpen(rs, Math.max(0, i)) } : undefined],
+    ['Reels viraux', String(st.viral), '≥ ×3 la normale'],
+    ['Engagement', pct(st.eng), 'moyen par Reel'],
+    ['Rythme', st.perWeek.toLocaleString('fr-FR'), 'Reels / semaine'],
+  ]
+
   return (
-    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '2px 2px 8px', marginBottom: 10, scrollbarWidth: 'thin' }}>
-      <Bubble k="" label="Tous" on={!value} />
-      {names.map(u => { const t = top.get(u); return <Bubble key={u} k={u} label={`@${u}`} thumb={t?.thumb} hot={!!t && t.score >= 3} on={value === u} /> })}
+    <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
+      {/* Barre du haut (reste visible au défilement) */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 6, display: 'flex', alignItems: 'center', gap: 10, height: 54, margin: narrow ? '-20px -16px 0' : '-28px -32px 0', padding: narrow ? '0 10px' : '0 24px', background: 'rgba(10,10,11,0.86)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <button type="button" onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 10px', borderRadius: 9, border: 'none', background: 'transparent', color: '#E4E4E7', cursor: 'pointer', fontSize: 13.5, fontWeight: 700 }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+          <Icon d={I.left} size={17} sw={2.2} />{narrow ? '' : 'Veille Reels'}
+        </button>
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <b data-no-tr style={{ fontSize: 16, fontWeight: 800, color: '#F5F5F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{username}</b>
+          {prof?.is_verified && <Verified size={15} />}
+        </span>
+        <button type="button" onClick={() => window.open(igUrl, '_blank', 'noopener')} title="Ouvrir sur Instagram" aria-label="Ouvrir sur Instagram" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, border: 'none', background: 'transparent', color: '#E4E4E7', cursor: 'pointer' }}><Icon d={I.external} size={16} /></button>
+      </div>
+
+      <div style={{ maxWidth: 975, margin: '0 auto' }}>
+        {/* En-tête du profil */}
+        <header style={{ display: 'flex', alignItems: narrow ? 'center' : 'flex-start', gap: narrow ? 20 : 'clamp(28px, 6vw, 84px)', padding: narrow ? '20px 2px 14px' : '38px 24px 28px' }}>
+          <span style={{ width: narrow ? undefined : 'clamp(140px, 22%, 210px)', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+            <Avatar src={avatar} size={narrow ? 82 : 154} hot={st.viral > 0} letter={username} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: narrow ? 10 : 18 }}>
+            {!narrow && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                  <span data-no-tr style={{ fontSize: 21, fontWeight: 500, color: '#F5F5F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{username}</span>
+                  {prof?.is_verified && <Verified size={18} />}
+                </span>
+                {buttons}
+              </span>
+            )}
+            {narrow && <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span data-no-tr style={{ fontSize: 18, fontWeight: 600, color: '#F5F5F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{username}</span>{prof?.is_verified && <Verified size={16} />}</span>}
+            <span style={{ display: 'flex', gap: narrow ? 4 : 38, flexWrap: narrow ? 'nowrap' : 'wrap' }}>{counts.map(([v, l]) => <Count key={l} v={v} l={l} />)}</span>
+            {!narrow && bio}
+          </div>
+        </header>
+        {narrow && <div style={{ padding: '0 2px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>{bio}{buttons}</div>}
+
+        {/* « À la une » : ses posts qui ont le plus surperformé */}
+        {highlights.length > 0 && (
+          <div style={{ display: 'flex', gap: narrow ? 14 : 30, overflowX: 'auto', padding: narrow ? '4px 2px 16px' : '4px 40px 26px', scrollbarWidth: 'none' }}>
+            {highlights.map((r, i) => (
+              <button key={r.code} type="button" onClick={() => onOpen(highlights, i)} title={(r.kind ?? 'reel') === 'feed' ? 'Voir le post' : 'Voir le Reel'}
+                style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+                <span style={{ padding: 2, borderRadius: 99, background: r.score >= 3 ? IG_RING : 'rgba(255,255,255,0.22)' }}>
+                  <span style={{ display: 'block', width: narrow ? 60 : 78, height: narrow ? 60 : 78, borderRadius: 99, overflow: 'hidden', border: '3px solid #0A0A0B', background: '#161618' }}>
+                    {r.thumb && <img src={img(r.thumb)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  </span>
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: r.score >= 3 ? '#F9A8D4' : '#E4E4E7', fontVariantNumeric: 'tabular-nums' }}>{r.score >= 3 ? '🔥 ' : ''}×{ratio(r.score)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Analyse ScaleFlow du compte */}
+        <section style={{ margin: narrow ? '0 0 18px' : '0 8px 26px', borderRadius: 16, background: '#0F0F11', border: '1px solid rgba(255,255,255,0.07)', padding: narrow ? 12 : '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: V }}>● Analyse ScaleFlow</span>
+            <span style={{ fontSize: 11.5, color: '#71717A' }}>{fetchedAt ? `Relevé ${timeAgo(fetchedAt)}` : 'Pas encore relevé'}{oldest ? ` · depuis le ${fmtDate(oldest)}` : ''}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, minmax(0,1fr))' : 'repeat(5, minmax(0,1fr))', gap: 8 }}>
+            {insights.map(([l, v, sub, go], k) => (
+              <button key={l} type="button" onClick={go} disabled={!go} style={{ gridColumn: narrow && k === insights.length - 1 && insights.length % 2 ? 'span 2' : undefined, textAlign: 'left', padding: '10px 12px', borderRadius: 11, border: '1px solid transparent', background: '#141416', cursor: go ? 'pointer' : 'default', color: 'inherit' }}
+                onMouseEnter={e => { if (go) e.currentTarget.style.borderColor = 'rgba(167,139,250,0.45)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent' }}>
+                <span style={{ display: 'block', fontSize: 11, color: '#8B8B94', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</span>
+                <span style={{ display: 'block', marginTop: 3, fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em', color: l === 'Reels viraux' && st.viral > 0 ? '#F472B6' : '#F4F4F5', fontVariantNumeric: 'tabular-nums' }}>{v}</span>
+                <span style={{ display: 'block', marginTop: 1, fontSize: 11, color: '#5A5A63', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Onglets façon Instagram */}
+        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', gap: narrow ? 0 : 60, borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+          {([['reel', 'Reels', 'M3 3h18v18H3z|M3 8h18|M8 3l3 5|M14 3l3 5|M10 11.5v6l5-3z', rs.length], ['feed', 'Publications', I.grid, fs.length]] as [Kind, string, string, number][]).map(([k, l, d, n]) => {
+            const on = effTab === k
+            return (
+              <button key={k} type="button" onClick={() => setTab(k)} aria-pressed={on}
+                style={{ flex: narrow ? 1 : undefined, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 52, marginTop: -1, padding: '0 4px', border: 'none', borderTop: `1px solid ${on ? '#F5F5F5' : 'transparent'}`, background: 'transparent', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: narrow ? 11.5 : 12.5, fontWeight: 700, letterSpacing: narrow ? '.04em' : '.08em', textTransform: 'uppercase', color: on ? '#F5F5F5' : '#8B8B94' }}>
+                <Icon d={d} size={14} sw={2} />{l}<span style={{ fontWeight: 600, color: '#71717A', letterSpacing: 0 }}>· {n}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', margin: '2px 0 12px' }}>
+          <span style={{ fontSize: 12, color: '#71717A' }}>{!list.length ? '' : effTab === 'feed' ? `${list.length} post(s) relevé(s) par ScaleFlow` : `${list.length} Reel(s) relevé(s) par ScaleFlow`}</span>
+          {list.length > 1 && <Pills value={sort} onChange={setSort} options={[{ v: 'recent', l: 'Récents' }, { v: 'views', l: effTab === 'feed' ? 'Plus likés' : 'Plus vus' }, { v: 'score', l: '×Normale' }]} />}
+        </div>
+        {list.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '56px 16px', textAlign: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 62, height: 62, borderRadius: 99, border: '2px solid #F5F5F5', color: '#F5F5F5' }}><Icon d={effTab === 'feed' ? I.image : I.play} size={26} /></span>
+            <b style={{ fontSize: 20, fontWeight: 800, color: '#F5F5F5' }}>{effTab === 'feed' ? 'Aucun post relevé' : 'Aucun Reel relevé'}</b>
+            <span style={{ fontSize: 13.5, color: '#8B8B94', maxWidth: 360 }}>Ils apparaîtront ici après le prochain relevé (chaque jour à midi).</span>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${narrow ? 3 : effTab === 'feed' ? 3 : 4}, minmax(0,1fr))`, gap: narrow ? 2 : 4 }}>
+            {list.map((r, i) => <GridTile key={r.code} r={r} i={i} fav={favSet.has(r.code)} onClick={() => onOpen(list, i)} />)}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Comptes en ronds façon « stories » (photo de profil, anneau dégradé s'il a un Reel viral).
+function StoriesTray({ list, reels, picOf, onOpen }: { list: Watch[]; reels: Reel[]; picOf: (u: string) => string | null; onOpen: (u: string) => void }) {
+  const top = useMemo(() => {
+    const m = new Map<string, { best: Reel; hot: boolean; score: number }>()
+    for (const r of reels) {
+      const c = m.get(r.username)
+      const v = r.views + r.likes
+      if (!c) m.set(r.username, { best: r, hot: r.score >= 3, score: v })
+      else { if (v > c.score) { c.best = r; c.score = v } if (r.score >= 3) c.hot = true }
+    }
+    return m
+  }, [reels])
+  const names = useMemo(() => [...new Set(list.map(w => w.username))].sort((a, b) => (top.get(b)?.score ?? 0) - (top.get(a)?.score ?? 0)), [list, top])
+  if (!names.length) return null
+  return (
+    <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '2px 2px 10px', marginBottom: 12, scrollbarWidth: 'thin' }}>
+      {names.map(u => {
+        const tp = top.get(u)
+        const pic = picOf(u) ?? tp?.best.thumb ?? null
+        return (
+          <button key={u} type="button" onClick={() => onOpen(u)} title={`Voir le profil de @${u}`}
+            style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 76, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}>
+            <Avatar src={pic ? img(pic) : null} size={62} hot={!!tp?.hot} letter={u} />
+            <span data-no-tr style={{ maxWidth: '100%', fontSize: 11.5, fontWeight: 600, color: tp ? '#E4E4E7' : '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u}</span>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -458,41 +821,6 @@ function Spark({ values }: { values: number[] }) {
   const max = Math.max(1, ...values)
   const pts = values.map((v, i) => `${(i / Math.max(1, values.length - 1)) * 100},${30 - (v / max) * 26}`).join(' ')
   return <svg viewBox="0 0 100 32" width="90" height="28" preserveAspectRatio="none" aria-hidden="true"><polyline points={pts} fill="none" stroke={V} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" /></svg>
-}
-
-// En-tête d'un compte sélectionné : ses chiffres sur 30 jours + accès Reels / feed / Instagram.
-function AccountHeader({ theme, username, reels, kind, onKind, onClear }: { theme: Theme; username: string; reels: Reel[]; kind: Kind; onKind: (k: Kind) => void; onClear: () => void }) {
-  const mine = reels.filter(r => r.username === username)
-  const rs = mine.filter(r => (r.kind ?? 'reel') === 'reel'), fs = mine.filter(r => r.kind === 'feed')
-  const best = [...mine].sort((a, b) => (b.views || b.likes) - (a.views || a.likes))[0]
-  const views = rs.reduce((t, r) => t + r.views, 0)
-  const avg = rs[0]?.baseline ?? 0
-  const record = rs.reduce((m, r) => Math.max(m, r.score), 0)
-  const narrow = useNarrow(760)
-  return (
-    <section style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: narrow ? 14 : '16px 18px', marginBottom: 14, borderRadius: 20, background: '#0F0F11', border: '1px solid rgba(167,139,250,0.35)', boxShadow: '0 20px 50px -30px rgba(139,92,246,.7)' }}>
-      <span style={{ padding: 2.5, borderRadius: 99, background: 'linear-gradient(135deg,#A78BFA,#F472B6)', flexShrink: 0 }}>
-        <span style={{ display: 'block', width: 58, height: 58, borderRadius: 99, overflow: 'hidden', border: '2.5px solid #0A0A0B', background: '#161618' }}>{best?.thumb && <img src={img(best.thumb)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</span>
-      </span>
-      <span style={{ flex: '1 1 160px', minWidth: 0 }}>
-        <span data-no-tr style={{ display: 'block', fontSize: 22, fontWeight: 900, letterSpacing: '-0.04em', color: '#F4F4F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{username}</span>
-        <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#8B8B94' }}>{rs.length} Reel(s) · {fs.length} post(s) photo · 30 derniers jours</span>
-      </span>
-      <span style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-        {([['Vues', compact(views)], ['Moyenne', compact(avg)], ['Record', record > 0 ? `×${ratio(record)}` : '—']] as [string, string][]).map(([l, v]) => (
-          <span key={l} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#71717A' }}>{l}</span>
-            <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.04em', color: l === 'Record' && record >= 3 ? '#F472B6' : '#F4F4F5' }}>{v}</span>
-          </span>
-        ))}
-      </span>
-      <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Pills value={kind} onChange={onKind} options={[{ v: 'reel', l: `Reels · ${rs.length}` }, { v: 'feed', l: `Feed · ${fs.length}` }]} />
-        <Btn theme={theme} icon={I.external} label="Instagram" onClick={() => window.open(`https://www.instagram.com/${username}/`, '_blank', 'noopener')} />
-        <Btn theme={theme} tone="quiet" icon="M18 6L6 18|M6 6l12 12" label="Tous les comptes" onClick={onClear} />
-      </span>
-    </section>
-  )
 }
 
 // ── Gestion de la Sélection ScaleFlow (super-admin) ──────────────────────────
@@ -558,7 +886,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
   const [range, setRange] = useState<Range>('7')
   const [sort, setSort] = useState<Sort>('views')
   const [fNiche, setFNiche] = useState('')
-  const [fAccount, setFAccount] = useState('')
+  const [profile, setProfile] = useState<string | null>(null)   // @ dont on regarde le profil
   const [open, setOpen] = useState<{ list: Reel[]; i: number } | null>(null)
   const [refreshing, setRefreshing] = useState<string | null>(null)
   const [reqText, setReqText] = useState('')
@@ -568,11 +896,10 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
 
   const load = useCallback(async () => {
     setLoading(true)
-    const base = 'id,username,niche,fetched_at,last_error,scope,user_id,org_id'
-    let w: { data: unknown[] | null; error: { message: string } | null } = await supabase.from('viral_watch').select(`${base},region`).order('username')
-    const regionMissing = !!w.error && /region/i.test(w.error.message)
-    if (regionMissing) w = await supabase.from('viral_watch').select(base).order('username')
-    setNoRegion(regionMissing)
+    // select('*') : les colonnes de profil (SQL 20261017) arrivent quand elles existent, sans casser avant.
+    const w = await supabase.from('viral_watch').select('*').order('username')
+    const rows0 = (w.data ?? []) as Record<string, unknown>[]
+    setNoRegion(rows0.length > 0 && !('region' in rows0[0]))
     setMissing(!!w.error && /relation|does not exist|schema cache/i.test(w.error.message))
     // Visibles : Sélection ScaleFlow + comptes privés de l'espace courant.
     const list = ((w.data ?? []) as Watch[]).map(x => ({ ...x, scope: x.scope ?? 'public' }))
@@ -601,9 +928,17 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
   const srcWatch = useMemo(() => watch.filter(w => source === 'all' || w.scope === source), [watch, source])
   const srcReels = useMemo(() => { const ids = new Set(srcWatch.map(w => w.id)); return reels.filter(r => ids.has(r.watch_id)) }, [reels, srcWatch])
   const niches = [...new Set(srcWatch.map(w => w.niche).filter(Boolean))]
-  const opts = { range, region: fRegion, niche: fNiche, account: fAccount, sort }
-  const shownReels = useMemo(() => filterReels(srcReels, srcWatch, { ...opts, kind: 'reel' }).slice(0, 120), [srcReels, srcWatch, range, fRegion, fNiche, fAccount, sort]) // eslint-disable-line react-hooks/exhaustive-deps
-  const shownFeed = useMemo(() => filterReels(srcReels, srcWatch, { ...opts, kind: 'feed' }).slice(0, 120), [srcReels, srcWatch, range, fRegion, fNiche, fAccount, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  const opts = { range, region: fRegion, niche: fNiche, account: '', sort }
+  const shownReels = useMemo(() => filterReels(srcReels, srcWatch, { ...opts, kind: 'reel' }).slice(0, 120), [srcReels, srcWatch, range, fRegion, fNiche, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  const shownFeed = useMemo(() => filterReels(srcReels, srcWatch, { ...opts, kind: 'feed' }).slice(0, 120), [srcReels, srcWatch, range, fRegion, fNiche, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Photo de profil par @ (SQL 20261017 + relevé) ; à défaut, les ronds prennent la meilleure vignette.
+  const picOf = useMemo(() => { const m = new Map<string, string>(); for (const w of watch) if (w.profile_pic) m.set(w.username, w.profile_pic); return (u: string) => m.get(u) ?? null }, [watch])
+  const moreOf = useCallback((u: string) => {
+    const m = new Map<string, Reel>()
+    for (const r of reels) if (r.username === u && !m.has(r.code)) m.set(r.code, r)
+    return [...m.values()].sort((a, b) => (b.views || b.likes * 10) - (a.views || a.likes * 10)).slice(0, 30)
+  }, [reels])
+  const accountOf = useCallback((u: string) => watch.find(w => w.username === u && w.profile_at) ?? watch.find(w => w.username === u), [watch])
   const mine = watch.filter(w => w.scope === 'private')
   const myReqs = reqs.filter(r => r.user_id === user.id || (orgId && r.org_id === orgId))
   const pending = reqs.filter(r => r.status === 'pending')
@@ -630,11 +965,14 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
   const sinceTxt = lastFetch ? (() => { const m = Math.round((Date.now() - Date.parse(lastFetch)) / 60000); return m < 1 ? 'à l’instant' : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j` })() : null
 
   // ── Actions ──
-  // Vue d'un compte : filtre sur ce @, 30 jours, onglet Reels (ou Feed si on y est).
-  const openAccount = useCallback((u: string) => {
-    setOpen(null); setFAccount(u); setRange('30'); setTab(t => t === 'feed' ? 'feed' : 'reels')
-    try { document.querySelector('main')?.scrollTo?.({ top: 0, behavior: 'smooth' }) } catch { /* ignore */ }
-  }, [])
+  // Profil d'un compte (façon Instagram) : remplace la page, retour = là où on était.
+  const scrollTop = () => { try { document.querySelector('main')?.scrollTo?.({ top: 0 }) } catch { /* ignore */ } }
+  const openAccount = useCallback((u: string) => { setOpen(null); setProfile(u); scrollTop() }, [])
+  const closeProfile = () => { setProfile(null); scrollTop() }
+  const ctx = useMemo(() => ({ open: openAccount, pic: picOf }), [openAccount, picOf])
+  const onProfileLoaded = useCallback((u: string, p: Partial<Watch>) => setWatch(ws => ws.map(w => w.username === u ? { ...w, ...p } : w)), [])
+  const setOpenIndex = useCallback((i: number) => setOpen(o => o && { ...o, i }), [])
+  const closeViewer = useCallback(() => setOpen(null), [])
   const recast = (r: Reel) => { if (onNavigate) openTool(onNavigate, 'genjutsu', { reel: { code: r.code, thumb: r.thumb, username: r.username, views: r.views, score: r.score } }) }
   async function toggleFav(r: Reel) {
     if (favSet.has(r.code)) {
@@ -720,9 +1058,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
     )
   const filters = (feed?: boolean) => (
     <>
-      {fAccount
-        ? <AccountHeader theme={theme} username={fAccount} reels={srcReels} kind={feed ? 'feed' : 'reel'} onKind={k => setTab(k === 'feed' ? 'feed' : 'reels')} onClear={() => setFAccount('')} />
-        : <AccountRail list={srcWatch} reels={srcReels.filter(r => (r.kind ?? 'reel') === (feed ? 'feed' : 'reel'))} value={fAccount} onChange={u => u ? openAccount(u) : setFAccount('')} />}
+      <StoriesTray list={srcWatch} reels={srcReels.filter(r => (r.kind ?? 'reel') === (feed ? 'feed' : 'reel'))} picOf={picOf} onOpen={openAccount} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         {!noRegion && <Pills label="Pays" value={fRegion || 'all'} onChange={v => setFRegion(v === 'all' ? '' : v)} options={[{ v: 'all' as const, l: 'Tous' }, ...REGIONS]} />}
         <Pills label="Période" value={range} onChange={setRange} options={[{ v: '1', l: '24 h' }, { v: '7', l: '7 jours' }, { v: '30', l: '30 jours' }]} />
@@ -744,7 +1080,11 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
   const favReels: Reel[] = favs.map(f => reels.find(r => r.code === f.code) ?? ({ watch_id: f.watch_id ?? '', code: f.code, username: f.username ?? '', views: f.views, likes: f.likes, comments: 0, taken_at: f.created_at, thumb: f.thumb, url: f.url, baseline: 0, score: f.score, kind: f.kind } as Reel))
 
   return (
-    <AccountCtx.Provider value={openAccount}>
+    <AccountCtx.Provider value={ctx}>
+    {profile ? (
+      <ProfileView key={profile} theme={theme} username={profile} rows={watch.filter(w => w.username === profile)} reels={reels} favSet={favSet} onBack={closeProfile}
+        onOpen={(list, i) => setOpen({ list, i })} onLoaded={onProfileLoaded} />
+    ) : (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* En-tête */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -790,6 +1130,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
         </div>
       ) : tab === 'dash' ? (
         <>
+          <StoriesTray list={srcWatch} reels={dash.all7} picOf={picOf} onOpen={openAccount} />
           <StatBar items={[
             { l: 'Reels aujourd’hui', v: fmtNumber(dash.today.length), sub: <span style={{ color: '#71717A' }}>{fmtNumber(dash.all7.length)} sur 7 jours</span>, onClick: () => { setRange('1'); setTab('reels') } },
             { l: 'Vues cumulées · 7 j', v: compact(dash.views7) },
@@ -808,7 +1149,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
               {dash.leaders.length === 0 ? <div style={{ fontSize: 13, color: '#71717A', padding: 8 }}>Pas encore de données.</div> : dash.leaders.map(([u, a], i) => (
                 <button key={u} type="button" onClick={() => openAccount(u)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '9px 6px', border: 'none', borderTop: i ? '1px solid rgba(255,255,255,0.05)' : 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', color: 'inherit' }}>
                   <span style={{ width: 22, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 800, color: i < 3 ? V : '#52525B' }}>{String(i + 1).padStart(2, '0')}</span>
-                  <span style={{ width: 34, height: 34, borderRadius: 99, overflow: 'hidden', background: '#161618', flexShrink: 0 }}>{a.thumb && <img src={img(a.thumb)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</span>
+                  <Avatar src={(picOf(u) ?? a.thumb) ? img((picOf(u) ?? a.thumb) as string) : null} size={32} hot={a.best >= 3} letter={u} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span data-no-tr style={{ display: 'block', fontSize: 13.5, fontWeight: 750, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{u}</span>
                     <span style={{ display: 'block', fontSize: 11.5, color: '#8B8B94' }}>{a.n} Reel(s) · record ×{ratio(a.best)}</span>
@@ -895,7 +1236,7 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
                 {mine.map(w => (
                   <span key={w.id} title={w.last_error ?? (w.fetched_at ? `Relevé le ${new Date(w.fetched_at).toLocaleString('fr-FR')}` : 'Pas encore relevé')}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 4px 0 10px', borderRadius: 99, background: '#161618', border: `1px solid ${w.last_error ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.09)'}`, fontSize: 12.5, color: '#EDEDEF' }}>
-                    <span data-no-tr>@{w.username}</span>
+                    <button type="button" data-no-tr onClick={() => openAccount(w.username)} title="Voir le profil" style={{ padding: 0, border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 12.5 }}>@{w.username}</button>
                     <button type="button" onClick={() => void removeWatch(w)} aria-label="Ne plus suivre" title="Ne plus suivre" style={{ display: 'flex', border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer', padding: 2 }}><Icon d="M18 6L6 18|M6 6l12 12" size={11} /></button>
                   </span>
                 ))}
@@ -906,9 +1247,10 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
         </div>
       )}
 
-      {open && open.list[open.i] && <MediaDetail theme={theme} list={open.list} index={open.i} setIndex={i => setOpen(o => o && { ...o, i })} onClose={() => setOpen(null)}
-        onRecast={onNavigate ? r => { setOpen(null); recast(r) } : undefined} isFav={c => favSet.has(c)} onFav={r => void toggleFav(r)} />}
     </div>
+    )}
+    {open && open.list[open.i] && <ReelViewer theme={theme} list={open.list} index={open.i} setIndex={setOpenIndex} onClose={closeViewer}
+      onRecast={onNavigate ? r => { setOpen(null); recast(r) } : undefined} isFav={c => favSet.has(c)} onFav={r => void toggleFav(r)} onProfile={openAccount} accountOf={accountOf} moreOf={moreOf} onJump={(list, i) => setOpen({ list, i })} />}
     </AccountCtx.Provider>
   )
 }

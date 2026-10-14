@@ -3,12 +3,12 @@
 // la normale » = vues / médiane des vues du compte.
 // Déployée automatiquement par .github/workflows/deploy-functions.yml (push sur main,
 // secret GitHub SUPABASE_ACCESS_TOKEN requis).
-import { igReels, igFeed } from './ig-provider.ts'
+import { igReels, igFeed, igProfileHiker } from './ig-provider.ts'
 import { deepArray } from './ig-rapidapi.ts'
 import { hikerGet } from './ig-hikerapi.ts'
 
 export { scoreReels, isIgCdn, lastParisNoon, type ScoredReel } from './viral-score.ts'
-import { parseMedia, scoreBy, lastParisNoon, type ParsedMedia } from './viral-score.ts'
+import { parseMedia, scoreBy, lastParisNoon, parseProfile, type ParsedMedia, type ProfileInfo } from './viral-score.ts'
 
 type WatchRow = { id: string; username: string }
 
@@ -19,6 +19,8 @@ export async function refreshAccount(db: any, username: string, rows: WatchRow[]
   const nowIso = new Date().toISOString()
   const ids = rows.map(r => r.id)
   try {
+    // Profil d'abord (photo, bio, abonnés) : son pk sert ensuite aux Reels et au feed, sans appel de plus.
+    try { const prof = parseProfile(await igProfileHiker(username)); if (prof) await saveProfile(db, ids, prof) } catch { /* profil facultatif */ }
     const rawReels = deepArray(await igReels(username), ['items', 'reels', 'edges', 'data']) ?? []
     const reels = scoreBy(rawReels.slice(0, 15).map(m => parseMedia(m, 'reel')).filter((x): x is ParsedMedia => !!x), x => x.views)
     let feed: (ParsedMedia & { baseline: number; score: number })[] = []
@@ -50,6 +52,27 @@ export async function refreshAccount(db: any, username: string, rows: WatchRow[]
     return { ok: false, n: 0, error: msg }
   }
 }
+// deno-lint-ignore no-explicit-any
+async function saveProfile(db: any, ids: string[], p: ProfileInfo): Promise<void> {
+  const { error } = await db.from('viral_watch').update({ ...p, profile_at: new Date().toISOString() }).in('id', ids)
+  if (error && !/column|schema cache/i.test(error.message)) throw new Error(error.message)
+}
+
+/** Profil d'un compte suivi, à la demande (page profil) : stocké, re-relevé au plus toutes les 6 h. */
+// deno-lint-ignore no-explicit-any
+export async function accountProfile(db: any, username: string): Promise<(ProfileInfo & { profile_at: string | null }) | null> {
+  const u = username.toLowerCase().replace(/^@/, '')
+  if (!/^[a-z0-9._]{1,30}$/.test(u)) return null
+  const { data: rows } = await db.from('viral_watch').select('*').eq('username', u)
+  if (!rows?.length) return null                      // uniquement des comptes suivis (coût HikerAPI maîtrisé)
+  const r0 = rows[0]
+  if (r0.profile_at && Date.now() - Date.parse(r0.profile_at) < 6 * 3600_000) return { ...(parseProfile({ username: u, ...r0, profile_pic_url: r0.profile_pic, follower_count: r0.followers, following_count: r0.following }) as ProfileInfo), profile_at: r0.profile_at }
+  const prof = parseProfile(await igProfileHiker(u))
+  if (!prof) return null
+  try { await saveProfile(db, rows.map((x: { id: string }) => x.id), prof) } catch { /* colonnes absentes : renvoyé quand même */ }
+  return { ...prof, profile_at: new Date().toISOString() }
+}
+
 /** Compat : relève une seule ligne. */
 // deno-lint-ignore no-explicit-any
 export function refreshWatch(db: any, w: WatchRow) { return refreshAccount(db, w.username, [w]) }

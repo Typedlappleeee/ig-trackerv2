@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-14',
+    date: '2026-10-14',
+    title: { fr: '📸 Veille Reels : les profils comme sur Instagram', en: '📸 Reels Watch: profiles just like Instagram' },
+    items: {
+      fr: [
+        'Clique sur un @ (carte, fiche, ronds des comptes) : tu arrives sur son profil comme sur Instagram — photo, bio, abonnés, posts « à la une », grille Reels / Publications.',
+        'Sur chaque profil, l’analyse ScaleFlow : vues habituelles, meilleur Reel, Reels viraux, engagement et rythme de publication.',
+        'Nouvelle fiche d’un Reel : vidéo en grand, légende, analyse, et « Plus de @compte » pour enchaîner ses autres vidéos.',
+      ],
+      en: [
+        'Click an @ (card, detail, account circles) to land on their profile just like Instagram — photo, bio, followers, highlights, Reels / Posts grid.',
+        'On every profile, the ScaleFlow analysis: usual views, best Reel, viral Reels, engagement and posting pace.',
+        'New Reel detail: big video, caption, analysis, and “More from @account” to binge their other videos.',
+      ],
+    },
+  },
+  {
     id: '2026-10-13',
     date: '2026-10-13',
     title: { fr: '✨ Refonte de l’application', en: '✨ App redesign' },
