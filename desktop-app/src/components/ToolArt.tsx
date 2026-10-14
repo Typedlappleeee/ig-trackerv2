@@ -6,6 +6,8 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { TOOLS, type Tool } from '@/lib/tools'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
+import { curated } from '@/lib/curated'
+import { useTopReels, sharpest } from '@/components/CineHero'
 
 type Pick = (k: number) => string | null
 const an = (name: string, dur: number, delay = 0, extra = 'ease-in-out infinite') => `${name} ${dur}s ${extra} ${-delay}s`
@@ -28,6 +30,45 @@ function Media({ src, a, b, k = 0, style, filter, still }: { src: string | null;
 const Back = ({ m, shade = 0.55 }: { m: ReactNode; shade?: number }) => <>{m}<span style={{ ...FILL, background: `linear-gradient(to top, rgba(0,0,0,${shade}), rgba(0,0,0,0.05) 60%)` }} /></>
 /** Bandes verticales (variantes, montage, mosaïques). */
 const Strips = ({ n, render, gap = 2 }: { n: number; render: (i: number) => ReactNode; gap?: number }) => <span style={{ ...FILL, display: 'grid', gridTemplateColumns: `repeat(${n}, 1fr)`, gap, background: '#0A0A0B' }}>{Array.from({ length: n }, (_, i) => <span key={i} style={{ position: 'relative', overflow: 'hidden' }}>{render(i)}</span>)}</span>
+
+// Auto-contenu : 3 téléphones, chacun avec un VRAI Reel qui explose (les images les plus nettes
+// de la Veille) et un texte différent incrusté. Repli : 3 photos maison distinctes.
+// `side` : tuile « côte à côte » (texte à gauche) → téléphones serrés sur la droite.
+const AUTO_HOOKS: { t: string; s: 'band' | 'outline' | 'pill' }[] = [
+  { t: 'POV : jusqu’à la fin 👀', s: 'band' }, { t: 'Attends la fin…', s: 'outline' }, { t: 'Personne n’en parle 🤫', s: 'pill' },
+]
+/** 3 images nettes et différentes : vrais Reels (Veille) sinon photos maison ; null = chargement. */
+export function useAutoImages(): string[] | null {
+  const top = useTopReels(24)
+  if (!top) return null
+  const real = sharpest(top, 3).map(r => r.thumb)
+  return real.length >= 3 ? real : [curated(3), curated(9), curated(13)]
+}
+export function AutoContentArt({ side }: { side?: boolean }) {
+  const imgs = useAutoImages()
+  const w = side ? 19 : 27 // largeur d'un téléphone, en % de l'aperçu
+  const cx = (i: number) => side ? [62, 76.5, 90][i] : 50 + (i - 1) * w * 1.04 // centre, en %
+  return <>
+    <span style={{ ...FILL, overflow: 'hidden', background: '#120A10' }}>
+      {imgs && <img src={imgs[1]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(18px) saturate(1.25) brightness(.5)', transform: 'scale(1.3)' }} />}
+      <span style={{ ...FILL, background: 'radial-gradient(70% 90% at 50% 40%, rgba(240,171,252,.22), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.45))' }} />
+    </span>
+    {AUTO_HOOKS.map((h, i) => (
+      <span key={i} style={{ position: 'absolute', zIndex: i === 1 ? 2 : 1, left: `${cx(i) - w / 2}%`, top: `${(side ? [24, 14, 24] : [19, 12, 19])[i]}%`, width: `${w}%`, rotate: `${(i - 1) * (side ? 4 : 6)}deg`,
+        animation: an('sfsFloat', 5, i * 1.6), containerType: 'inline-size' }}>
+        <span style={{ position: 'relative', display: 'block', aspectRatio: '9 / 16', borderRadius: '13% / 7.3%', overflow: 'hidden', background: '#17171A', border: '2px solid #0A0A0B', boxShadow: '0 0 0 1px rgba(255,255,255,.3), 0 16px 32px -10px rgba(0,0,0,.85)' }}>
+          {imgs && <img src={imgs[i]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%', animation: 'sfsPop .5s ease both' }} />}
+          <span style={{ position: 'absolute', left: '7%', top: '4.5%', padding: '1px 5px', borderRadius: 99, fontSize: '8.5cqw', fontWeight: 800, whiteSpace: 'nowrap', ...(i === 1 ? { background: '#fff', color: '#0A0A0B' } : { background: 'rgba(10,10,11,.6)', color: '#fff' }) }}>{`Compte ${i + 1}`}</span>
+          <span style={{ position: 'absolute', left: 0, right: 0, top: '56%', display: 'flex', justifyContent: 'center', textAlign: 'center', lineHeight: 1.2, color: '#fff', padding: side ? ['0 24% 0 0', '0', '0 0 0 24%'][i] : 0 }}>
+            {h.s === 'band' && <span style={{ width: '100%', padding: '3cqw 5cqw', background: 'rgba(20,20,22,.66)', fontSize: '10cqw', fontWeight: 600 }}>{h.t}</span>}
+            {h.s === 'outline' && <span style={{ padding: '0 6cqw', fontSize: '13cqw', fontWeight: 900, WebkitTextStroke: '0.4px #000', textShadow: '0 1px 4px rgba(0,0,0,.75)' }}>{h.t}</span>}
+            {h.s === 'pill' && <span style={{ margin: '0 7cqw', padding: '2cqw 5cqw', borderRadius: 5, background: '#fff', color: '#0A0A0B', fontSize: '10cqw', fontWeight: 750 }}>{h.t}</span>}
+          </span>
+        </span>
+      </span>
+    ))}
+  </>
+}
 
 function Art({ t, pick }: { t: Tool; pick: Pick }) {
   const { a, b } = t
@@ -80,12 +121,7 @@ function Art({ t, pick }: { t: Tool; pick: Pick }) {
       <At style={{ left: 10, right: 10, bottom: 10, height: 5, borderRadius: 9, background: 'rgba(255,255,255,.3)', overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', background: '#fff', animation: an('sfsFill', 3.4, 0, 'linear infinite') }} /></At></>
     case 'mixer': return <><Back m={M(3)} shade={0.3} />
       <At style={{ left: '50%', top: '42%', translate: '-50% -50%', padding: '6px 10px', borderRadius: 8, background: '#fff', color: '#111', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap', boxShadow: '0 8px 20px rgba(0,0,0,.35)', animation: an('sfsBeat', 2.2) }}>POV : ton crush t’écrit 😳</At></>
-    // Auto-contenu : la même vidéo en 3 variantes, chacune avec un TEXTE différent incrusté.
-    case 'autocontent': return <><Strips n={3} gap={3} render={i => <>{M(0, undefined, ['none', 'saturate(1.15) brightness(1.04)', 'contrast(1.06) hue-rotate(-6deg)'][i], true)}
-      <span style={{ ...FILL, background: 'linear-gradient(180deg, rgba(0,0,0,.4), transparent 28%)' }} />
-      <At style={{ left: 8, top: 34 }}>{label(`V${i + 1}`, i === 1 ? { background: '#fff', color: '#0A0A0B' } : undefined)}</At>
-      <At style={{ left: 0, right: 0, top: '40%', padding: i === 1 ? '0 6px' : '4px 6px', background: i === 1 ? 'transparent' : 'rgba(40,40,40,.62)', textAlign: 'center', fontSize: i === 1 ? 12 : 10, fontWeight: i === 1 ? 900 : 600, lineHeight: 1.2, color: '#fff', WebkitTextStroke: i === 1 ? '0.6px #000' : undefined, textShadow: i === 1 ? '0 2px 5px rgba(0,0,0,.7)' : undefined }}>{['POV : jusqu’à la fin 👀', 'Attends la fin…', 'Personne n’en parle 🤫'][i]}</At>
-    </>} /></>
+    case 'autocontent': return <AutoContentArt />
     case 'warmup': return <><Back m={M(1)} shade={0.35} />
       {([['❤', 22, 0], ['❤', 64, 0.9], ['＋', 40, 1.8], ['❤', 78, 2.6]] as [string, number, number][]).map(([i, x, d], n) => <At key={n} style={{ left: `${x}%`, bottom: 14, fontSize: 18, color: i === '❤' ? '#F43F5E' : '#fff', textShadow: '0 1px 6px rgba(0,0,0,.6)', animation: an('sfsRise', 3.4, d, 'ease-out infinite') }}>{i}</At>)}
       <At style={{ left: 10, top: 34 }}><Pill>🔥 Session 30 min</Pill></At></>

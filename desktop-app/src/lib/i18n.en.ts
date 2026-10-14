@@ -3103,6 +3103,7 @@ export const EN: Dict = {
     "Une vidéo → des dizaines de vidéos uniques,": "One video → dozens of unique videos,",
     "chacune avec son propre texte": "each with its own text",
     "Ta vidéo": "Your video",
+    "Tes vidéos": "Your videos",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

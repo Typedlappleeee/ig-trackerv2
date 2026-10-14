@@ -6,15 +6,17 @@ import { supabase } from '@/lib/supabase'
 import { compact } from '@/lib/data'
 import { curated as SITE } from '@/lib/curated'
 import { useNarrow } from '@/lib/ui'
+import { measureAll, isClean } from '@/lib/imageQuality'
 
 const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
 const LIME = '#A78BFA'   // accent ScaleFlow (violet)
-export interface TopReel { thumb: string; username: string; views: number; score: number }
+export interface TopReel { thumb: string; username: string; views: number; score: number; sharp?: number }
 const proxied = (u: string) => `${FN_URL}?img=${encodeURIComponent(u)}`
 
 /** Reels les plus vus des 7 derniers jours (Sélection ScaleFlow + comptes de l'équipe) :
- *  un Reel par compte d'abord (variété), puis on complète. Partagé (cache 5 min) entre
- *  l'Explorer, le tableau de bord et les visuels qui réutilisent les vraies images. */
+ *  un Reel par compte d'abord (variété), puis on complète. Seules les miniatures PROPRES sont
+ *  gardées (nettes, assez grandes, bien exposées, sans bandes : lib/imageQuality). Partagé
+ *  (cache 5 min) entre l'Explorer, le tableau de bord et les visuels qui réutilisent les vraies images. */
 let topCache: { at: number; rows: TopReel[] } | null = null
 let topInflight: Promise<TopReel[]> | null = null
 async function loadTopReels(): Promise<TopReel[]> {
@@ -32,11 +34,21 @@ async function loadTopReels(): Promise<TopReel[]> {
       const item = { thumb: proxied(x.thumb), username: x.username, views: x.views, score: x.score }
       ;(users.has(x.username) ? rest : first).push(item); users.add(x.username)
     }
-    const out = [...first, ...rest]
+    const all = [...first, ...rest].slice(0, 48)
+    const qs = await measureAll(all.map(x => x.thumb))
+    // Mesure impossible (hors ligne, canvas bloqué) → gardée ; sinon il faut une image propre.
+    const out = all.map((x, i) => ({ ...x, sharp: qs[i]?.sharp })).filter((x, i) => !qs[i] || isClean(qs[i]!))
     topCache = { at: Date.now(), rows: out }
     return out
   })().finally(() => { topInflight = null })
   return topInflight
+}
+/** Les n Reels aux images les plus nettes (comptes différents d'abord) : visuels mis en avant. */
+export function sharpest(list: TopReel[] | null, n: number): TopReel[] {
+  const sorted = [...(list ?? [])].sort((a, b) => (b.sharp ?? 0) - (a.sharp ?? 0))
+  const users = new Set<string>(), first: TopReel[] = [], rest: TopReel[] = []
+  for (const r of sorted) { (users.has(r.username) ? rest : first).push(r); users.add(r.username) }
+  return [...first, ...rest].slice(0, n)
 }
 export function useTopReels(n = 8): TopReel[] | null {
   const [list, setList] = useState<TopReel[] | null>(() => topCache ? topCache.rows.slice(0, n) : null)

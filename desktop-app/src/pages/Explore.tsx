@@ -11,19 +11,20 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Icon, useNarrow } from '@/lib/ui'
 import { CATS, searchTools, visibleTools, type Tool, type ToolCat } from '@/lib/tools'
 import { recentTools } from '@/lib/openTool'
-import ToolArt from '@/components/ToolArt'
+import ToolArt, { AutoContentArt } from '@/components/ToolArt'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
-import { useTopReels, type TopReel } from '@/components/CineHero'
+import { useTopReels, sharpest, type TopReel } from '@/components/CineHero'
 
 const FAV_KEY = 'sf-fav-tools'
 function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
 
 // Photos des visuels (aperçus d'outils, tuiles) : les VRAIS Reels qui explosent (Veille, les plus
-// vus de la semaine, un par compte pour varier). Repli sur la sélection maison (lib/curated)
+// vus de la semaine, un par compte pour varier), images propres uniquement, les plus nettes d'abord. Repli sur la sélection maison (lib/curated)
 // tant qu'il n'y en a pas assez. Signature gardée.
 export function usePhotos(_user?: User, _org?: OrgState): { viral: string[]; bank: string[]; real: boolean } {
   const top = useTopReels(40)
-  const real = (top ?? []).map(r => r.thumb)
+  // Images les plus nettes d'abord (déjà filtrées : seules les miniatures propres arrivent ici).
+  const real = sharpest(top, 40).map(r => r.thumb)
   return real.length >= 6 ? { viral: real, bank: [], real: true } : { viral: CURATED, bank: [], real: false }
 }
 // Carte Story : image FIXE (portrait) quand on n'a que la sélection maison.
@@ -99,9 +100,11 @@ export function ToolCard({ t, fav, onFav, onOpen, i, pick, art }: { t: Tool; fav
 }
 
 // ── Tuile plein cadre (aperçu animé + texte par-dessus) : À la une, Accueil ─────
-export function ToolTile({ t, pick, onOpen, size = 'md', kicker, title, text, cta, fav, onFav, i = 0, style, art }: {
+export function ToolTile({ t, pick, onOpen, size = 'md', kicker, title, text, cta, fav, onFav, i = 0, style, art, split }: {
   t: Tool; pick: (k: number) => string | null; onOpen: () => void; size?: 'xl' | 'md' | 'sm'
   kicker?: string; title?: ReactNode; text?: ReactNode; cta?: string; fav?: boolean; onFav?: () => void; i?: number; style?: React.CSSProperties; art?: ReactNode
+  /** Texte à gauche, aperçu bien visible à droite (au lieu du texte par-dessus en bas). */
+  split?: boolean
 }) {
   const [h, setH] = useState(false)
   const xl = size === 'xl', sm = size === 'sm'
@@ -112,18 +115,20 @@ export function ToolTile({ t, pick, onOpen, size = 'md', kicker, title, text, ct
         transition: 'transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease', animation: `sfsPop .5s ${Math.min(i, 10) * 0.04}s both`, ...style }}>
       <span style={{ position: 'absolute', inset: 0, transform: h ? 'scale(1.04)' : 'none', transition: 'transform .8s cubic-bezier(.2,.8,.2,1)' }}>{art ?? <ToolArt t={t} pick={pick} />}</span>
       {/* Fondu presque opaque en bas : le texte ne se mélange pas aux étiquettes de l'aperçu. */}
-      <span style={{ position: 'absolute', inset: 0, zIndex: 3, background: xl
+      <span style={{ position: 'absolute', inset: 0, zIndex: 3, background: split
+        ? 'linear-gradient(90deg, rgba(8,8,9,0.96) 0%, rgba(8,8,9,0.9) 42%, rgba(8,8,9,0) 60%)'
+        : xl
         ? 'linear-gradient(180deg, rgba(8,8,9,0) 34%, rgba(8,8,9,0.78) 60%, rgba(8,8,9,0.97) 80%)'
         : sm ? 'linear-gradient(180deg, rgba(8,8,9,0) 40%, rgba(8,8,9,0.84) 66%, rgba(8,8,9,0.98) 82%)'
         : 'linear-gradient(180deg, rgba(8,8,9,0.05) 10%, rgba(8,8,9,0.8) 48%, rgba(8,8,9,0.97) 72%)', pointerEvents: 'none' }} />
       {onFav && <FavBtn on={!!fav} show={h} onClick={onFav} />}
-      <span style={{ position: 'absolute', zIndex: 4, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', gap: xl ? 10 : sm ? 4 : 6, padding: xl ? '0 28px 26px' : sm ? '0 14px 14px' : '0 20px 18px', pointerEvents: 'none' }}>
+      <span style={{ position: 'absolute', zIndex: 4, left: 0, right: split ? '47%' : 0, bottom: 0, display: 'flex', flexDirection: 'column', gap: xl ? 10 : sm ? 4 : 6, padding: xl ? '0 28px 26px' : sm ? '0 14px 14px' : '0 20px 18px', pointerEvents: 'none' }}>
         {kicker && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#C4B5FD' }}>{kicker}</span>}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: xl ? 'clamp(26px, 2.6vw, 36px)' : sm ? 15 : 20, fontWeight: 800, letterSpacing: xl ? '-0.04em' : '-0.025em', lineHeight: 1.08, color: '#fff' }}>
-          {!xl && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: sm ? 24 : 28, height: sm ? 24 : 28, borderRadius: sm ? 7 : 8, flexShrink: 0, background: `linear-gradient(135deg, ${t.a}, ${t.b})`, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)' }}><Icon d={t.icon} size={sm ? 12 : 13} /></span>}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: xl ? 'clamp(26px, 2.6vw, 36px)' : sm ? 15 : split ? 'clamp(16px, 1.25vw, 19px)' : 20, fontWeight: 800, letterSpacing: xl ? '-0.04em' : '-0.025em', lineHeight: 1.12, color: '#fff' }}>
+          {!xl && !split && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: sm ? 24 : 28, height: sm ? 24 : 28, borderRadius: sm ? 7 : 8, flexShrink: 0, background: `linear-gradient(135deg, ${t.a}, ${t.b})`, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)' }}><Icon d={t.icon} size={sm ? 12 : 13} /></span>}
           <span style={{ minWidth: 0 }}>{title ?? t.label}</span>
         </span>
-        {!sm && (text ?? t.desc) && <span style={{ maxWidth: xl ? 460 : 340, fontSize: xl ? 14.5 : 13, lineHeight: 1.5, color: '#D4D4D8', display: '-webkit-box', WebkitLineClamp: xl ? 3 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text ?? t.desc}</span>}
+        {!sm && (text ?? t.desc) && <span style={{ maxWidth: xl ? 460 : 340, fontSize: xl ? 14.5 : split ? 12.5 : 13, lineHeight: 1.5, color: '#D4D4D8', display: '-webkit-box', WebkitLineClamp: xl || split ? 3 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text ?? t.desc}</span>}
         {sm && <span style={{ minHeight: 15, fontSize: 11.5, fontWeight: 600, color: '#A1A1AA' }}>{t.cost ?? ''}</span>}
         {cta && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content', marginTop: 6, height: 40, padding: '0 16px', borderRadius: 11, background: '#F4F4F5', color: '#0A0A0B', fontSize: 14, fontWeight: 750 }}>
@@ -253,7 +258,7 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
         <section style={{ marginBottom: 40 }}>
           <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : mid ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1.9fr) minmax(0,1fr)', gridTemplateRows: narrow || mid ? undefined : '220px 220px', gap: narrow ? 12 : 16 }}>
             {featured.map(({ f, t }, j) => (
-              <ToolTile key={t.id} t={t} i={j} pick={pickOf(t, j * 4 + 1)} art={artOf(t, narrow ? 2 : 3)} size={j === 0 ? 'xl' : 'md'} kicker={f.kicker} title={f.title} text={f.text} cta={j === 0 ? f.cta : undefined}
+              <ToolTile key={t.id} t={t} i={j} pick={pickOf(t, j * 4 + 1)} art={t.id === 'autocontent' ? <AutoContentArt side={j > 0} /> : artOf(t, narrow ? 2 : 3)} split={t.id === 'autocontent' && j > 0} size={j === 0 ? 'xl' : 'md'} kicker={f.kicker} title={f.title} text={f.text} cta={j === 0 ? f.cta : undefined}
                 fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)}
                 style={j === 0 ? (narrow ? { height: 340 } : mid ? { gridColumn: 'span 2', height: 380 } : { gridRow: 'span 2' }) : (narrow || mid ? { height: 230 } : undefined)} />
             ))}
