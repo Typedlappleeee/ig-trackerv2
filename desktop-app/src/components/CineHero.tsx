@@ -12,19 +12,37 @@ const LIME = '#A78BFA'   // accent ScaleFlow (violet)
 export interface TopReel { thumb: string; username: string; views: number; score: number }
 const proxied = (u: string) => `${FN_URL}?img=${encodeURIComponent(u)}`
 
-/** Reels les plus vus des 7 derniers jours (Sélection ScaleFlow + comptes de l'équipe). */
+/** Reels les plus vus des 7 derniers jours (Sélection ScaleFlow + comptes de l'équipe) :
+ *  un Reel par compte d'abord (variété), puis on complète. Partagé (cache 5 min) entre
+ *  l'Explorer, le tableau de bord et les visuels qui réutilisent les vraies images. */
+let topCache: { at: number; rows: TopReel[] } | null = null
+let topInflight: Promise<TopReel[]> | null = null
+async function loadTopReels(): Promise<TopReel[]> {
+  if (topCache && Date.now() - topCache.at < 5 * 60_000) return topCache.rows
+  if (topInflight) return topInflight
+  topInflight = (async () => {
+    const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
+    let r = await supabase.from('viral_reels').select('*').gte('taken_at', since).order('views', { ascending: false }).limit(80)
+    if (!r.error && (r.data ?? []).length < 4) r = await supabase.from('viral_reels').select('*').order('views', { ascending: false }).limit(80)
+    const rows = ((r.data ?? []) as (TopReel & { kind?: string })[]).filter(x => x.thumb && (x.kind ?? 'reel') === 'reel')
+    const seen = new Set<string>(), users = new Set<string>(), first: TopReel[] = [], rest: TopReel[] = []
+    for (const x of rows) {
+      if (seen.has(x.thumb)) continue
+      seen.add(x.thumb)
+      const item = { thumb: proxied(x.thumb), username: x.username, views: x.views, score: x.score }
+      ;(users.has(x.username) ? rest : first).push(item); users.add(x.username)
+    }
+    const out = [...first, ...rest]
+    topCache = { at: Date.now(), rows: out }
+    return out
+  })().finally(() => { topInflight = null })
+  return topInflight
+}
 export function useTopReels(n = 8): TopReel[] | null {
-  const [list, setList] = useState<TopReel[] | null>(null)
+  const [list, setList] = useState<TopReel[] | null>(() => topCache ? topCache.rows.slice(0, n) : null)
   useEffect(() => {
     let alive = true
-    void (async () => {
-      const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
-      let r = await supabase.from('viral_reels').select('thumb, username, views, score').gte('taken_at', since).order('views', { ascending: false }).limit(n * 2)
-      if (!r.error && (r.data ?? []).length < 4) r = await supabase.from('viral_reels').select('thumb, username, views, score').order('views', { ascending: false }).limit(n * 2)
-      const seen = new Set<string>()
-      const out = ((r.data ?? []) as TopReel[]).filter(x => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb)).slice(0, n).map(x => ({ ...x, thumb: proxied(x.thumb) }))
-      if (alive) setList(out)
-    })().catch(() => { if (alive) setList([]) })
+    void loadTopReels().then(rows => { if (alive) setList(rows.slice(0, n)) }).catch(() => { if (alive) setList([]) })
     return () => { alive = false }
   }, [n])
   return list
