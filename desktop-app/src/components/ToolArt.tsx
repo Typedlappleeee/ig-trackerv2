@@ -80,7 +80,12 @@ function Art({ t, pick }: { t: Tool; pick: Pick }) {
       <At style={{ left: 10, right: 10, bottom: 10, height: 5, borderRadius: 9, background: 'rgba(255,255,255,.3)', overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', background: '#fff', animation: an('sfsFill', 3.4, 0, 'linear infinite') }} /></At></>
     case 'mixer': return <><Back m={M(3)} shade={0.3} />
       <At style={{ left: '50%', top: '42%', translate: '-50% -50%', padding: '6px 10px', borderRadius: 8, background: '#fff', color: '#111', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap', boxShadow: '0 8px 20px rgba(0,0,0,.35)', animation: an('sfsBeat', 2.2) }}>POV : ton crush t’écrit 😳</At></>
-    case 'autocontent': return <><Strips n={4} render={i => <>{M(0, undefined, ['none', 'saturate(1.5)', 'hue-rotate(25deg)', 'brightness(1.2)'][i], true)}{i > 0 && <span style={{ ...FILL, background: 'rgba(0,0,0,.45)', animation: an('sfsBlink', 3, (i - 1) * 1) }} />}<At style={{ left: '50%', bottom: 10, translate: '-50% 0' }}>{label(i ? `#${i}` : 'Source', i ? undefined : { background: '#fff', color: '#0A0A0B' })}</At></>} /></>
+    // Auto-contenu : la même vidéo en 3 variantes, chacune avec un TEXTE différent incrusté.
+    case 'autocontent': return <><Strips n={3} gap={3} render={i => <>{M(0, undefined, ['none', 'saturate(1.15) brightness(1.04)', 'contrast(1.06) hue-rotate(-6deg)'][i], true)}
+      <span style={{ ...FILL, background: 'linear-gradient(180deg, rgba(0,0,0,.4), transparent 28%)' }} />
+      <At style={{ left: 8, top: 34 }}>{label(`V${i + 1}`, i === 1 ? { background: '#fff', color: '#0A0A0B' } : undefined)}</At>
+      <At style={{ left: 0, right: 0, top: '40%', padding: i === 1 ? '0 6px' : '4px 6px', background: i === 1 ? 'transparent' : 'rgba(40,40,40,.62)', textAlign: 'center', fontSize: i === 1 ? 12 : 10, fontWeight: i === 1 ? 900 : 600, lineHeight: 1.2, color: '#fff', WebkitTextStroke: i === 1 ? '0.6px #000' : undefined, textShadow: i === 1 ? '0 2px 5px rgba(0,0,0,.7)' : undefined }}>{['POV : jusqu’à la fin 👀', 'Attends la fin…', 'Personne n’en parle 🤫'][i]}</At>
+    </>} /></>
     case 'warmup': return <><Back m={M(1)} shade={0.35} />
       {([['❤', 22, 0], ['❤', 64, 0.9], ['＋', 40, 1.8], ['❤', 78, 2.6]] as [string, number, number][]).map(([i, x, d], n) => <At key={n} style={{ left: `${x}%`, bottom: 14, fontSize: 18, color: i === '❤' ? '#F43F5E' : '#fff', textShadow: '0 1px 6px rgba(0,0,0,.6)', animation: an('sfsRise', 3.4, d, 'ease-out infinite') }}>{i}</At>)}
       <At style={{ left: 10, top: 34 }}><Pill>🔥 Session 30 min</Pill></At></>

@@ -67,7 +67,7 @@ export const TOOLS: Tool[] = [
   { id: 'scheduled', label: 'Posts programmés', desc: 'Tout ce qui part plus tard, annulable et remboursé.', cat: 'publish', page: 'scheduled', arg: { view: 'list' }, icon: I.clock, a: '#60A5FA', b: '#312E81', infra: GL },
   { id: 'calendar', label: 'Calendrier', desc: 'Semaine / mois, glisse un post pour le décaler.', cat: 'publish', page: 'scheduled', arg: { view: 'calendar' }, icon: I.cal, a: '#34D399', b: '#065F46', infra: GL },
   // ── Créer
-  { id: 'autocontent', label: 'Auto-contenu', desc: 'Une vidéo → des dizaines de vidéos uniques, prêtes à poster : légendes, coupe, vitesse, spoof.', cat: 'create', page: 'blowContent', icon: I.wand, a: '#F0ABFC', b: '#86198F', badge: 'Recommandé', cost: 'gratuit' },
+  { id: 'autocontent', label: 'Auto-contenu', desc: 'Une vidéo → des variantes uniques, chacune avec un texte différent, prêtes à poster.', cat: 'create', page: 'blowContent', icon: I.wand, a: '#F0ABFC', b: '#86198F', badge: 'Recommandé', cost: 'gratuit' },
   { id: 'remix', label: 'Remix', desc: 'Une vidéo → jusqu’à 24 variantes uniques : couleurs, recadrage, vitesse, miroir.', cat: 'create', page: 'studio', arg: { tool: 'remix' }, icon: I.shuffle, a: '#FB923C', b: '#9F1239', badge: 'Populaire', cost: 'gratuit' },
   { id: 'spoof', label: 'Spoof vidéo', desc: 'Anti-empreinte : métadonnées effacées, appareil et GPS réécrits, micro-recadrage.', cat: 'create', page: 'studio', arg: { tool: 'spoof' }, icon: I.shield, a: '#4ADE80', b: '#14532D', cost: 'gratuit' },
   { id: 'imgspoof', label: 'Spoof image', desc: 'Des photos rendues uniques en .jpg : EXIF effacé puis appareil et GPS réécrits.', cat: 'create', page: 'studio', arg: { tool: 'imgspoof' }, icon: I.image, a: '#86EFAC', b: '#166534', cost: 'gratuit' },
