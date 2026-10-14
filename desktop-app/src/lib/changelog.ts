@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-14b',
+    date: '2026-10-14',
+    title: { fr: '✨ Accueil et Explorer refaits', en: '✨ Home and Explore redesigned' },
+    items: {
+      fr: [
+        'Accueil épuré : tes chiffres clés, les outils phares en grandes tuiles, les Reels qui explosent cette semaine, puis ton activité, ce qui tourne en direct et ce qui part aujourd’hui.',
+        'Explorer : une grande recherche, des onglets clairs, « À la une » en grandes tuiles et tous les outils rangés par catégorie.',
+      ],
+      en: [
+        'Cleaner Home: your key numbers, the main tools as big tiles, this week’s exploding Reels, then your activity, what’s running live and what goes out today.',
+        'Explore: a big search, clear tabs, “Featured” big tiles and every tool sorted by category.',
+      ],
+    },
+  },
+  {
     id: '2026-10-14',
     date: '2026-10-14',
     title: { fr: '📸 Veille Reels : les profils comme sur Instagram', en: '📸 Reels Watch: profiles just like Instagram' },

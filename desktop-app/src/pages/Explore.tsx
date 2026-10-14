@@ -1,17 +1,18 @@
-// Explorer : TOUS les outils de ScaleFlow en galerie (façon Higgsfield). Bandeau « À la
-// une » animé, recherche, catégories, favoris, récemment utilisés. Un clic ouvre l'outil
-// précis (onglet / format) via openTool. Catalogue : src/lib/tools.ts.
-import { useEffect, useMemo, useRef, useState } from 'react'
+// Explorer : TOUS les outils de ScaleFlow, version épurée (façon Higgsfield).
+//   • En-tête sobre + grande recherche (« / »), onglets soulignés qui restent en haut.
+//   • « À la une » : une grande tuile + deux moyennes (aperçus animés plein cadre).
+//   • Récemment utilisés, puis chaque catégorie : titre, « Tout voir », grille de cartes.
+// Un clic ouvre l'outil précis (onglet / format) via openTool. Catalogue : src/lib/tools.ts.
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CURATED, curated } from '@/lib/curated'
 import type { User } from '@supabase/supabase-js'
 import type { OrgState } from '@/lib/data'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Icon, FIELD } from '@/lib/ui'
+import { Icon, useNarrow } from '@/lib/ui'
 import { CATS, searchTools, visibleTools, type Tool, type ToolCat } from '@/lib/tools'
 import { recentTools } from '@/lib/openTool'
 import ToolArt from '@/components/ToolArt'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
-import { FeatureBanner } from '@/components/CineHero'
 
 const FAV_KEY = 'sf-fav-tools'
 function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
@@ -22,94 +23,127 @@ function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(
 export function usePhotos(_user?: User, _org?: OrgState): { viral: string[]; bank: string[] } {
   return { viral: CURATED, bank: [] }
 }
-/** Sélecteur de photos d'une carte : banque d'abord pour Créer / Banque, Veille d'abord ailleurs ;
- *  décalé par carte pour que deux cartes voisines n'aient pas les mêmes images. */
-// Carte Story : image FIXE (portrait) — les miniatures de la Veille peuvent être n'importe quoi.
+// Carte Story : image FIXE (portrait).
 export const STORY_PICK = (k: number): string => curated(k ? 6 : 13)
+/** Sélecteur de photos d'une carte, décalé par carte pour que deux voisines n'aient pas les mêmes images. */
 export function pickerFor(t: Tool, i: number, p: { viral: string[]; bank: string[] }): (k: number) => string | null {
   if (t.id === 'story') return STORY_PICK
   const pool = t.cat === 'create' || t.cat === 'bank' ? [...p.bank, ...p.viral] : [...p.viral, ...p.bank]
   return (k: number) => pool.length ? pool[(i * 3 + k) % pool.length] : null
 }
 
-// ── Carte d'outil : aperçu animé en dégradé + texte ───────────────────────────
+const STAR = 'M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z'
+const ARROW = 'M5 12h14|M13 6l6 6-6 6'
+function Badge({ b }: { b: Tool['badge'] }) {
+  if (!b) return null
+  const nu = b === 'Nouveau'
+  return <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 99, fontSize: 10.5, fontWeight: 750, letterSpacing: '.01em', background: nu ? '#F4F4F5' : 'rgba(10,10,11,0.55)', color: nu ? '#0A0A0B' : '#F4F4F5', border: nu ? 'none' : '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)', whiteSpace: 'nowrap' }}>{b}</span>
+}
+function FavBtn({ on, show, onClick }: { on: boolean; show: boolean; onClick: () => void }) {
+  return (
+    <button type="button" aria-label={on ? 'Retirer des favoris' : 'Ajouter aux favoris'} title={on ? 'Retirer des favoris' : 'Ajouter aux favoris'} onClick={e => { e.stopPropagation(); onClick() }}
+      style={{ position: 'absolute', zIndex: 4, top: 10, right: 10, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 99, border: 'none', cursor: 'pointer', background: 'rgba(10,10,11,0.55)', backdropFilter: 'blur(8px)', color: on ? '#FDE047' : '#fff', opacity: on || show ? 1 : 0, transition: 'opacity .15s ease' }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d={STAR} /></svg>
+    </button>
+  )
+}
+
+// ── Carte d'outil : aperçu animé arrondi, texte dessous (sans cadre autour) ──────
 export function ToolCard({ t, fav, onFav, onOpen, i, pick }: { t: Tool; fav: boolean; onFav?: () => void; onOpen: () => void; i: number; pick: (k: number) => string | null }) {
   const [h, setH] = useState(false)
   return (
-    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter') onOpen() }}
-      onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ position: 'relative', display: 'flex', flexDirection: 'column', borderRadius: 16, overflow: 'hidden', cursor: 'pointer', background: '#111113', border: `1px solid ${h ? 'rgba(167,139,250,0.55)' : 'rgba(255,255,255,0.07)'}`, transform: h ? 'translateY(-4px)' : 'none', boxShadow: h ? '0 22px 44px -22px rgba(139,92,246,0.7)' : 'none', transition: 'transform .2s ease, box-shadow .2s ease, border-color .2s ease', animation: `sfsPop .45s ${Math.min(i, 16) * 0.03}s both` }}>
-      <div style={{ position: 'relative', height: 180, overflow: 'hidden', background: '#0A0A0B' }}>
-        {/* Aperçu plein cadre propre à l'outil (vraies miniatures, animé). */}
-        <span style={{ position: 'absolute', inset: 0, transform: h ? 'scale(1.04)' : 'none', transition: 'transform .5s cubic-bezier(.2,.8,.2,1)' }}><ToolArt t={t} pick={pick} /></span>
-        {h && <span style={{ position: 'absolute', top: 0, bottom: 0, width: '40%', zIndex: 3, pointerEvents: 'none', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)', animation: 'sfsSheen .9s ease-out both' }} />}
-        {t.badge && <span style={{ position: 'absolute', zIndex: 4, top: 10, left: 10, padding: '3px 8px', borderRadius: 99, fontSize: 10.5, fontWeight: 700, letterSpacing: '.02em', background: t.badge === 'Nouveau' ? '#fff' : 'rgba(0,0,0,0.45)', color: t.badge === 'Nouveau' ? '#0A0A0B' : '#fff', backdropFilter: 'blur(4px)' }}>{t.badge}</span>}
-        {onFav && <button type="button" aria-label={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'} onClick={e => { e.stopPropagation(); onFav() }}
-          style={{ position: 'absolute', zIndex: 4, top: 8, right: 8, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'rgba(0,0,0,0.3)', color: fav ? '#FDE047' : 'rgba(255,255,255,0.8)', opacity: fav || h ? 1 : 0, transition: 'opacity .15s ease' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill={fav ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" /></svg>
-        </button>}
+    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter') onOpen() }} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{ display: 'flex', flexDirection: 'column', gap: 12, cursor: 'pointer', outline: 'none', animation: `sfsPop .45s ${Math.min(i, 16) * 0.025}s both` }}>
+      <div style={{ position: 'relative', aspectRatio: '16 / 10', borderRadius: 16, overflow: 'hidden', background: '#0F0F11', boxShadow: h ? '0 0 0 1px rgba(255,255,255,0.22), 0 24px 48px -28px rgba(0,0,0,0.9)' : '0 0 0 1px rgba(255,255,255,0.06)', transition: 'box-shadow .2s ease' }}>
+        <span style={{ position: 'absolute', inset: 0, transform: h ? 'scale(1.035)' : 'none', transition: 'transform .6s cubic-bezier(.2,.8,.2,1)' }}><ToolArt t={t} pick={pick} /></span>
+        {t.badge && <span style={{ position: 'absolute', zIndex: 4, top: 10, left: 10 }}><Badge b={t.badge} /></span>}
+        {onFav && <FavBtn on={fav} show={h} onClick={onFav} />}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: '12px 14px 13px', flex: 1 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 750, color: '#F4F4F5', letterSpacing: '-0.02em' }}><span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, background: `linear-gradient(135deg, ${t.a}, ${t.b})`, color: '#fff', flexShrink: 0 }}><Icon d={t.icon} size={12} /></span>{t.label}</span>
-        <span style={{ fontSize: 12.5, color: '#8B8B94', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.desc}</span>
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 6 }}>
-          <span style={{ fontSize: 11.5, color: '#71717A' }}>{t.cost ?? ''}</span>
-          <span style={{ display: 'flex', color: h ? '#EDEDEF' : '#52525B', transform: h ? 'translateX(2px)' : 'none', transition: 'all .15s ease' }}><Icon d="M5 12h14|M13 6l6 6-6 6" size={14} /></span>
+      <div style={{ display: 'flex', gap: 11, padding: '0 2px' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 9, flexShrink: 0, background: `linear-gradient(135deg, ${t.a}, ${t.b})`, color: '#fff', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.15)' }}><Icon d={t.icon} size={14} /></span>
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14.5, fontWeight: 700, letterSpacing: '-0.015em', color: '#F4F4F5' }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.label}</span>
+            <span style={{ display: 'flex', color: h ? '#F4F4F5' : 'transparent', transform: h ? 'translateX(0)' : 'translateX(-4px)', transition: 'all .18s ease', flexShrink: 0 }}><Icon d={ARROW} size={13} sw={2} /></span>
+          </span>
+          <span style={{ fontSize: 12.5, lineHeight: 1.45, color: '#8B8B94', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.desc}</span>
+          {t.cost && <span style={{ marginTop: 2, fontSize: 11.5, fontWeight: 600, color: '#5A5A63' }}>{t.cost}</span>}
         </span>
       </div>
     </div>
   )
 }
 
-// ── Bandeaux (photos plein cadre, aucun fond de couleur) ────────────────────
-interface Slide { tool: string; kicker: string; line1: string; line2: string; text: string; cta: string }
-const SLIDES: Slide[] = [
-  { tool: 'viral', kicker: 'À la une · Veille Reels', line1: 'Repère les Reels', line2: 'qui explosent', text: 'FR et US, classés par vues, avec le badge « ×N la normale ». Télécharge, copie la légende, inspire-toi.', cta: 'Ouvrir la Veille' },
-  { tool: 'links', kicker: 'À la une · Liens', line1: 'Sache quel compte', line2: 'te rapporte', text: 'Une page de liens animée et un lien suivi par compte : visites, clics, pays, en direct.', cta: 'Voir mes liens' },
-  { tool: 'tiktok', kicker: 'À la une · TikTok', line1: 'Instagram et TikTok,', line2: 'un seul outil', text: 'Une vidéo publiée sur tous tes comptes TikTok en parallèle, comme tes Reels.', cta: 'Publier sur TikTok' },
-  { tool: 'remix', kicker: 'À la une · Studio', line1: 'Une vidéo,', line2: '24 variantes uniques', text: 'Remix, spoof, sous-titres : chaque vidéo devient du contenu neuf pour chaque compte.', cta: 'Ouvrir le Remix' },
-]
-const CAT_BANNER: Record<ToolCat, { line1: string; line2: string; text: string }> = {
-  publish: { line1: 'Publie partout', line2: 'en un clic', text: 'Reels, Stories, TikTok et posts programmés, sur des dizaines de comptes en parallèle.' },
-  create: { line1: 'Du contenu unique', line2: 'à l’infini', text: 'Remix, spoof, sous-titres, montage : chaque vidéo devient des dizaines de variantes.' },
-  accounts: { line1: 'Tes comptes', line2: 'sans y toucher', text: 'Warmup, connexion auto, édition en masse et Flow Builder pour tout automatiser.' },
-  analyze: { line1: 'Ce qui marche,', line2: 'en direct', text: 'Veille Reels, liens trackés et activité : sache exactement ce qui performe.' },
-  bank: { line1: 'Ta banque', line2: 'de contenu', text: 'Vidéos, images et légendes rangées par dossiers, prêtes à publier.' },
-}
-
-function Carousel({ items, onOpen, pool }: { items: { s: Slide; t: Tool }[]; onOpen: (t: Tool) => void; pool: string[] }) {
-  const [k, setK] = useState(0)
-  const [paused, setPaused] = useState(false)
-  useEffect(() => {
-    if (paused || items.length < 2) return
-    const id = setTimeout(() => setK(x => (x + 1) % items.length), 6500)
-    return () => clearTimeout(id)
-  }, [k, paused, items.length])
-  if (!items.length) return null
-  const cur = k % items.length
-  const { s, t } = items[cur]
+// ── Tuile plein cadre (aperçu animé + texte par-dessus) : À la une, Accueil ─────
+export function ToolTile({ t, pick, onOpen, size = 'md', kicker, title, text, cta, fav, onFav, i = 0, style }: {
+  t: Tool; pick: (k: number) => string | null; onOpen: () => void; size?: 'xl' | 'md' | 'sm'
+  kicker?: string; title?: ReactNode; text?: ReactNode; cta?: string; fav?: boolean; onFav?: () => void; i?: number; style?: React.CSSProperties
+}) {
+  const [h, setH] = useState(false)
+  const xl = size === 'xl', sm = size === 'sm'
   return (
-    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} style={{ position: 'relative', marginBottom: 18 }}>
-      <div key={cur}><FeatureBanner kicker={s.kicker} line1={s.line1} line2={s.line2} text={s.text} cta={`${s.cta} →`} onCta={() => onOpen(t)} height={300} photos={[0, 1, 2, 3].map(i => pool.length ? pool[(cur * 4 + i) % pool.length] : null)} /></div>
-      <style>{'@keyframes sfExFill{from{transform:scaleX(0)}to{transform:scaleX(1)}}'}</style>
-      <span style={{ position: 'absolute', right: 20, bottom: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
-        {items.map((_, j) => (
-          <button key={j} type="button" aria-label={`À la une ${j + 1}`} onClick={() => setK(j)} style={{ position: 'relative', width: 34, height: 4, padding: 0, border: 'none', borderRadius: 99, overflow: 'hidden', background: 'rgba(255,255,255,0.25)', cursor: 'pointer' }}>
-            {j < cur && <span style={{ position: 'absolute', inset: 0, background: '#fff' }} />}
-            {j === cur && <span key={`${cur}-${paused}`} style={{ position: 'absolute', inset: 0, background: '#A78BFA', transformOrigin: 'left', animation: paused ? 'none' : 'sfExFill 6.5s linear both', transform: paused ? 'scaleX(1)' : undefined }} />}
-          </button>
-        ))}
-        {items.length > 1 && ([['M15 18l-6-6 6-6', -1], ['M9 18l6-6-6-6', 1]] as [string, number][]).map(([d, dir]) => (
-          <button key={dir} type="button" aria-label={dir < 0 ? 'Précédent' : 'Suivant'} onClick={() => setK(x => (x + dir + items.length) % items.length)}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 99, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(10,10,11,0.55)', color: '#fff', cursor: 'pointer', backdropFilter: 'blur(8px)' }}><Icon d={d} size={14} /></button>
-        ))}
+    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={e => { if (e.key === 'Enter') onOpen() }} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{ position: 'relative', overflow: 'hidden', borderRadius: sm ? 18 : 22, cursor: 'pointer', outline: 'none', background: '#0F0F11', minHeight: 0,
+        boxShadow: h ? '0 0 0 1px rgba(255,255,255,0.24), 0 30px 60px -30px rgba(0,0,0,0.95)' : '0 0 0 1px rgba(255,255,255,0.06)', transform: h ? 'translateY(-3px)' : 'none',
+        transition: 'transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease', animation: `sfsPop .5s ${Math.min(i, 10) * 0.04}s both`, ...style }}>
+      <span style={{ position: 'absolute', inset: 0, transform: h ? 'scale(1.04)' : 'none', transition: 'transform .8s cubic-bezier(.2,.8,.2,1)' }}><ToolArt t={t} pick={pick} /></span>
+      {/* Fondu presque opaque en bas : le texte ne se mélange pas aux étiquettes de l'aperçu. */}
+      <span style={{ position: 'absolute', inset: 0, zIndex: 3, background: xl
+        ? 'linear-gradient(180deg, rgba(8,8,9,0) 34%, rgba(8,8,9,0.78) 60%, rgba(8,8,9,0.97) 80%)'
+        : sm ? 'linear-gradient(180deg, rgba(8,8,9,0) 40%, rgba(8,8,9,0.84) 66%, rgba(8,8,9,0.98) 82%)'
+        : 'linear-gradient(180deg, rgba(8,8,9,0.05) 10%, rgba(8,8,9,0.8) 48%, rgba(8,8,9,0.97) 72%)', pointerEvents: 'none' }} />
+      {onFav && <FavBtn on={!!fav} show={h} onClick={onFav} />}
+      <span style={{ position: 'absolute', zIndex: 4, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', gap: xl ? 10 : sm ? 4 : 6, padding: xl ? '0 28px 26px' : sm ? '0 14px 14px' : '0 20px 18px', pointerEvents: 'none' }}>
+        {kicker && <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#C4B5FD' }}>{kicker}</span>}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: xl ? 'clamp(26px, 2.6vw, 36px)' : sm ? 15 : 20, fontWeight: 800, letterSpacing: xl ? '-0.04em' : '-0.025em', lineHeight: 1.08, color: '#fff' }}>
+          {!xl && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: sm ? 24 : 28, height: sm ? 24 : 28, borderRadius: sm ? 7 : 8, flexShrink: 0, background: `linear-gradient(135deg, ${t.a}, ${t.b})`, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)' }}><Icon d={t.icon} size={sm ? 12 : 13} /></span>}
+          <span style={{ minWidth: 0 }}>{title ?? t.label}</span>
+        </span>
+        {!sm && (text ?? t.desc) && <span style={{ maxWidth: xl ? 460 : 340, fontSize: xl ? 14.5 : 13, lineHeight: 1.5, color: '#D4D4D8', display: '-webkit-box', WebkitLineClamp: xl ? 3 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text ?? t.desc}</span>}
+        {sm && <span style={{ minHeight: 15, fontSize: 11.5, fontWeight: 600, color: '#A1A1AA' }}>{t.cost ?? ''}</span>}
+        {cta && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content', marginTop: 6, height: 40, padding: '0 16px', borderRadius: 11, background: '#F4F4F5', color: '#0A0A0B', fontSize: 14, fontWeight: 750 }}>
+            {cta}<Icon d={ARROW} size={14} sw={2.2} />
+          </span>
+        )}
       </span>
     </div>
   )
 }
 
+// ── Titre de section : nom, compte, lien à droite ─────────────────────────────
+export function SectionHead({ title, count, right }: { title: ReactNode; count?: number; right?: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '0 2px 14px' }}>
+      <h2 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 19, fontWeight: 750, letterSpacing: '-0.025em', color: '#F4F4F5' }}>
+        {title}{count !== undefined && <span style={{ fontSize: 14, fontWeight: 600, color: '#5A5A63' }}>{count}</span>}
+      </h2>
+      {right}
+    </div>
+  )
+}
+export function LinkBtn({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 9, border: 'none', background: 'transparent', color: '#A1A1AA', fontSize: 13, fontWeight: 650, cursor: 'pointer', transition: 'background .15s ease, color .15s ease' }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#F4F4F5' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}>
+      {label}<Icon d={ARROW} size={13} sw={2} />
+    </button>
+  )
+}
+
+// « À la une » : textes des tuiles mises en avant.
+const FEATURED: { tool: string; kicker: string; title: string; text: string; cta: string }[] = [
+  { tool: 'viral', kicker: 'À la une', title: 'Repère les Reels qui explosent', text: 'FR et US, classés par vues, avec le badge « ×N la normale ». Ouvre un compte comme sur Instagram, télécharge, inspire-toi.', cta: 'Ouvrir la Veille' },
+  { tool: 'genjutsu', kicker: 'Nouveau', title: 'Recrée un Reel avec tes images', text: 'Le mouvement d’un Reel viral, appliqué à tes photos de référence.', cta: 'Essayer' },
+  { tool: 'links', kicker: 'Analyse', title: 'Sache quel compte te rapporte', text: 'Un lien suivi par compte : visites, clics et pays en direct.', cta: 'Voir mes liens' },
+  { tool: 'remix', kicker: 'Studio', title: 'Une vidéo, 24 variantes', text: 'Chaque compte publie une version unique.', cta: 'Ouvrir le Remix' },
+  { tool: 'warmup', kicker: 'Comptes', title: 'Chauffe tes comptes', text: 'Scroll, likes et follows automatiques.', cta: 'Lancer un warmup' },
+]
+
 export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: Theme; infra: InfraKey; isAdmin: boolean; onOpen: (t: Tool) => void; user: User; org: OrgState }) {
   const photos = usePhotos(user, org)
+  const narrow = useNarrow(760)
+  const mid = useNarrow(1100)
   const [q, setQ] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
   // « / » place le curseur dans la recherche (hors champ de saisie).
@@ -125,54 +159,82 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
   const all = useMemo(() => visibleTools(infra, isAdmin), [infra, isAdmin])
   const byId = useMemo(() => new Map(all.map(t => [t.id, t])), [all])
   const recent = useMemo(() => recentTools().map(id => byId.get(id)).filter(Boolean) as Tool[], [byId])
-  const slides = SLIDES.map(s => ({ s, t: byId.get(s.tool) })).filter((x): x is { s: Slide; t: Tool } => !!x.t)
-  const pool = [...photos.viral, ...photos.bank]
+  const featured = FEATURED.map(f => ({ f, t: byId.get(f.tool) })).filter((x): x is { f: typeof FEATURED[number]; t: Tool } => !!x.t).slice(0, 3)
   const toggleFav = (id: string) => setFavs(f => { const n = f.includes(id) ? f.filter(x => x !== id) : [...f, id]; try { localStorage.setItem(FAV_KEY, JSON.stringify(n)) } catch { /* ignore */ } return n })
+  const pickOf = (t: Tool, k: number) => pickerFor(t, k, photos)
+  const goCat = (c: typeof cat) => { setCat(c); try { document.querySelector('main')?.scrollTo?.({ top: 0, behavior: 'smooth' }) } catch { /* ignore */ } }
 
   const found = searchTools(all, q)
   const list = cat === 'all' ? found : cat === 'fav' ? found.filter(t => favs.includes(t.id)) : found.filter(t => t.cat === cat)
-  const sections = cat === 'all' && !q.trim() ? CATS.map(c => ({ c, items: list.filter(t => t.cat === c.k) })).filter(s => s.items.length) : [{ c: null, items: list }]
-  const chip = (k: typeof cat, label: string, n: number) => (
-    <button key={k} type="button" onClick={() => setCat(k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, height: 34, padding: '0 14px', borderRadius: 99, cursor: 'pointer', fontSize: 13, fontWeight: 650, border: `1px solid ${cat === k ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.1)'}`, background: cat === k ? '#EDEDEF' : '#111113', color: cat === k ? '#0A0A0B' : '#D4D4D8', transition: 'all .15s ease' }}>
-      {label}<span style={{ fontSize: 11.5, opacity: 0.6 }}>{n}</span>
-    </button>
+  const home = cat === 'all' && !q.trim()
+  const sections = home ? CATS.map(c => ({ c, items: list.filter(t => t.cat === c.k) })).filter(s => s.items.length) : [{ c: null, items: list }]
+  const tabs: [typeof cat, string, number][] = [['all', 'Tout', found.length], ...CATS.map(c => [c.k, c.label, found.filter(t => t.cat === c.k).length] as [ToolCat, string, number]), ['fav', '★ Favoris', found.filter(t => favs.includes(t.id)).length]]
+  const grid = (items: Tool[], base: number) => (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 250}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>
+      {items.map((t, j) => <ToolCard key={t.id} t={t} i={base + j} pick={pickOf(t, base + j)} fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)} />)}
+    </div>
   )
   let idx = 0
+
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <style>{SPOT_KEYFRAMES}</style>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', marginBottom: 20 }}>
+      {/* En-tête */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 22 }}>
         <div style={{ minWidth: 0 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#A78BFA' }}>
-            <span style={{ width: 7, height: 7, borderRadius: 99, background: '#A78BFA', boxShadow: '0 0 0 4px rgba(167,139,250,.18)' }} />Explorer · {all.length} outils
-          </span>
-          <h1 style={{ margin: '10px 0 0', fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 0.92, textTransform: 'uppercase', fontSize: 'clamp(32px, 4vw, 56px)', color: '#F4F4F5' }}>
-            Tous tes outils <span style={{ color: '#52525B' }}>au même endroit</span>
-          </h1>
-          <p style={{ margin: '12px 0 0', fontSize: 14, lineHeight: 1.55, color: '#8B8B94', maxWidth: 560 }}>Publier, créer, gérer tes comptes, analyser : choisis un outil et lance-toi.</p>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#71717A' }}>{all.length} outils</span>
+          <h1 style={{ margin: '4px 0 0', fontSize: narrow ? 30 : 38, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, color: '#F4F4F5' }}>Explorer</h1>
+          <p style={{ margin: '8px 0 0', fontSize: 14.5, lineHeight: 1.5, color: '#8B8B94' }}>Publier, créer, gérer tes comptes, analyser : choisis un outil et lance-toi.</p>
         </div>
-        <span style={{ position: 'relative', width: 'min(380px, 100%)' }}>
-          <span style={{ position: 'absolute', left: 14, top: 13, color: '#71717A', display: 'flex' }}><Icon d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z|M21 21l-4.3-4.3" size={16} /></span>
-          <input ref={searchRef} value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') { setQ(''); e.currentTarget.blur() } }} placeholder="Rechercher un outil…" style={{ ...FIELD, height: 42, paddingLeft: 40, paddingRight: 40, borderRadius: 12, fontSize: 14 }} />
-          <kbd style={{ position: 'absolute', right: 10, top: 11, height: 20, minWidth: 20, padding: '0 6px', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.14)', fontSize: 11, color: '#8B8B94', fontFamily: 'inherit' }}>/</kbd>
+        <span style={{ position: 'relative', width: narrow ? '100%' : 'min(420px, 100%)' }}>
+          <span style={{ position: 'absolute', left: 15, top: 14, color: '#71717A', display: 'flex' }}><Icon d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z|M21 21l-4.3-4.3" size={17} /></span>
+          <input ref={searchRef} value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') { setQ(''); e.currentTarget.blur() } }} placeholder="Rechercher un outil…" aria-label="Rechercher un outil"
+            style={{ width: '100%', boxSizing: 'border-box', height: 46, padding: '0 44px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.09)', background: '#111113', color: '#F4F4F5', fontSize: 14.5, outline: 'none' }} />
+          {q
+            ? <button type="button" aria-label="Effacer" onClick={() => setQ('')} style={{ position: 'absolute', right: 10, top: 11, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, border: 'none', background: 'rgba(255,255,255,0.08)', color: '#A1A1AA', cursor: 'pointer' }}><Icon d="M18 6L6 18|M6 6l12 12" size={12} sw={2.2} /></button>
+            : <kbd style={{ position: 'absolute', right: 12, top: 13, height: 20, minWidth: 20, padding: '0 6px', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.14)', fontSize: 11, color: '#8B8B94', fontFamily: 'inherit' }}>/</kbd>}
         </span>
       </div>
 
-      {!q.trim() && cat === 'all' && <Carousel items={slides} onOpen={onOpen} pool={pool} />}
-
-      <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -4px 20px', padding: '10px 4px', background: 'rgba(10,10,11,0.82)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', scrollbarWidth: 'none' }}>
-        {chip('all', 'Tout', found.length)}
-        {CATS.map(c => chip(c.k, c.label, found.filter(t => t.cat === c.k).length))}
-        {chip('fav', '★ Favoris', found.filter(t => favs.includes(t.id)).length)}
+      {/* Onglets (restent visibles au défilement) */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 6, margin: narrow ? '0 -16px 24px' : '0 -32px 28px', padding: narrow ? '0 16px' : '0 32px', background: 'rgba(10,10,11,0.86)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {tabs.map(([k, l, n]) => {
+            const on = cat === k
+            return (
+              <button key={k} type="button" onClick={() => goCat(k)} aria-pressed={on}
+                style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0, height: 48, padding: '0 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: on ? 700 : 600, color: on ? '#F4F4F5' : '#71717A', transition: 'color .15s ease' }}
+                onMouseEnter={e => { if (!on) e.currentTarget.style.color = '#D4D4D8' }} onMouseLeave={e => { if (!on) e.currentTarget.style.color = '#71717A' }}>
+                {l}<span style={{ fontSize: 12, fontWeight: 600, color: on ? '#A1A1AA' : '#52525B' }}>{n}</span>
+                <span style={{ position: 'absolute', left: 12, right: 12, bottom: -1, height: 2, borderRadius: 2, background: on ? '#F4F4F5' : 'transparent' }} />
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {!q.trim() && cat === 'all' && recent.length > 0 && (
-        <section style={{ marginBottom: 24 }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: 11.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#8B8B94' }}>Récemment utilisés</h3>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+      {/* À la une : une grande tuile + deux moyennes */}
+      {home && featured.length > 0 && (
+        <section style={{ marginBottom: 40 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : mid ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1.9fr) minmax(0,1fr)', gridTemplateRows: narrow || mid ? undefined : '220px 220px', gap: narrow ? 12 : 16 }}>
+            {featured.map(({ f, t }, j) => (
+              <ToolTile key={t.id} t={t} i={j} pick={pickOf(t, j * 4 + 1)} size={j === 0 ? 'xl' : 'md'} kicker={f.kicker} title={f.title} text={f.text} cta={j === 0 ? f.cta : undefined}
+                fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)}
+                style={j === 0 ? (narrow ? { height: 340 } : mid ? { gridColumn: 'span 2', height: 380 } : { gridRow: 'span 2' }) : (narrow || mid ? { height: 230 } : undefined)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Récemment utilisés */}
+      {home && recent.length > 0 && (
+        <section style={{ marginBottom: 40 }}>
+          <SectionHead title="Récemment utilisés" />
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
             {recent.map(t => (
-              <button key={t.id} type="button" onClick={() => onOpen(t)} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, flexShrink: 0, height: 42, padding: '0 14px 0 6px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: '#111113', color: '#EDEDEF', fontSize: 13, fontWeight: 550, cursor: 'pointer' }}>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, background: `linear-gradient(135deg, ${t.a}, ${t.b})`, color: '#fff' }}><Icon d={t.icon} size={15} /></span>
+              <button key={t.id} type="button" onClick={() => onOpen(t)} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexShrink: 0, height: 48, padding: '0 16px 0 8px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', background: '#111113', color: '#EDEDEF', fontSize: 13.5, fontWeight: 650, cursor: 'pointer', transition: 'border-color .15s ease, background .15s ease' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'; e.currentTarget.style.background = '#161618' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = '#111113' }}>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, background: `linear-gradient(135deg, ${t.a}, ${t.b})`, color: '#fff' }}><Icon d={t.icon} size={15} /></span>
                 {t.label}
               </button>
             ))}
@@ -181,18 +243,20 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
       )}
 
       {list.length === 0 ? (
-        <div style={{ padding: '48px 16px', textAlign: 'center', color: '#71717A', fontSize: 14, border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 14 }}>
-          {cat === 'fav' ? 'Aucun favori pour l’instant — touche l’étoile d’un outil pour l’épingler ici.' : 'Aucun outil ne correspond à ta recherche.'}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '64px 16px', textAlign: 'center' }}>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: 99, border: '1px solid rgba(255,255,255,0.12)', color: '#A1A1AA' }}><Icon d={cat === 'fav' ? STAR : 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z|M21 21l-4.3-4.3'} size={20} /></span>
+          <b style={{ fontSize: 17, fontWeight: 750, color: '#F4F4F5' }}>{cat === 'fav' ? 'Aucun favori pour l’instant' : 'Aucun outil trouvé'}</b>
+          <span style={{ fontSize: 13.5, color: '#8B8B94', maxWidth: 360 }}>{cat === 'fav' ? 'Touche l’étoile d’un outil pour l’épingler ici.' : 'Essaie un autre mot : « story », « tiktok », « légendes »…'}</span>
         </div>
-      ) : sections.map(({ c, items }) => (
-        <section key={c?.k ?? 'all'} style={{ marginBottom: 28 }}>
-          {c && (() => { const B = CAT_BANNER[c.k]; const top = items.find(t => t.badge === 'Populaire') ?? items[0]; const off = CATS.findIndex(x => x.k === c.k) * 3
-            return <div style={{ marginBottom: 14 }}><FeatureBanner compact height={140} kicker={`${c.label} · ${items.length} outil(s)`} line1={B.line1} line2={B.line2} text={B.text} cta={`${top.label} →`} onCta={() => onOpen(top)} photos={[0, 1, 2, 3].map(i => pool.length ? pool[(off + i + 5) % pool.length] : null)} /></div> })()}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: 14 }}>
-            {items.map(t => { const k = idx++; return <ToolCard key={t.id} t={t} i={k} pick={pickerFor(t, k, photos)} fav={favs.includes(t.id)} onFav={() => toggleFav(t.id)} onOpen={() => onOpen(t)} /> })}
-          </div>
-        </section>
-      ))}
+      ) : sections.map(({ c, items }) => {
+        const base = idx; idx += items.length
+        return (
+          <section key={c?.k ?? 'all'} style={{ marginBottom: 44 }}>
+            {c && <SectionHead title={c.label} count={items.length} right={<LinkBtn label="Tout voir" onClick={() => goCat(c.k)} />} />}
+            {grid(items, base)}
+          </section>
+        )
+      })}
     </div>
   )
 }
