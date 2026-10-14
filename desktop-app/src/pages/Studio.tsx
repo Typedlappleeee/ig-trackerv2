@@ -8,7 +8,7 @@ import type { OrgState } from '@/lib/data'
 import { takeOpenArg, openTool } from '@/lib/openTool'
 import { TOOLS } from '@/lib/tools'
 import { Icon, useNarrow } from '@/lib/ui'
-import { curated } from '@/lib/curated'
+import { useAutoImages } from '@/components/ToolArt'
 import { usePhotos, pickerFor, ToolCard, SectionHead } from '@/pages/Explore'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
@@ -32,14 +32,14 @@ const AUTO_CSS = `
   @keyframes acIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion: reduce){.sf-ac *{animation:none!important}}
 `
-function Phone({ img, w, text, style, label, filter, pos, rot = 0, delay = 0 }: { img: string; w: number; text?: string; style?: 'snap' | 'outline'; label: string; filter?: string; pos?: string; rot?: number; delay?: number }) {
+function Phone({ img, w, text, style, label, filter, pos, rot = 0, delay = 0 }: { img?: string; w: number; text?: string; style?: 'snap' | 'outline'; label: string; filter?: string; pos?: string; rot?: number; delay?: number }) {
   return (
     <span style={{ position: 'relative', display: 'block', flexShrink: 0, width: w, aspectRatio: '9 / 16', borderRadius: Math.round(w / 7), overflow: 'hidden', background: '#141416', border: '2px solid rgba(255,255,255,0.16)', boxShadow: '0 30px 60px -24px rgba(0,0,0,.95)', transform: `rotate(${rot}deg)`, animation: `acIn .6s ${delay}s cubic-bezier(.2,.8,.2,1) both` }}>
       <span style={{ position: 'absolute', inset: 0, animation: `acFloat ${5 + delay * 4}s ease-in-out ${-delay * 3}s infinite` }}>
-        <img src={img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: pos ?? 'center 30%', filter }} />
+        {img && <img src={img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: pos ?? 'center 30%', filter, animation: 'acIn .5s ease both' }} />}
       </span>
       <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.35), transparent 22%, transparent 70%, rgba(0,0,0,.35))' }} />
-      <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 99, background: text ? 'rgba(10,10,11,.7)' : '#F4F4F5', color: text ? '#fff' : '#0A0A0B', fontSize: Math.max(9.5, w / 13), fontWeight: 800, backdropFilter: 'blur(6px)', whiteSpace: 'nowrap' }}>{label}</span>
+      {label && <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 99, background: text ? 'rgba(10,10,11,.7)' : '#F4F4F5', color: text ? '#fff' : '#0A0A0B', fontSize: Math.max(9.5, w / 13), fontWeight: 800, backdropFilter: 'blur(6px)', whiteSpace: 'nowrap' }}>{label}</span>}
       {text && (style === 'snap'
         ? <span style={{ position: 'absolute', left: 0, right: 0, top: '60%', padding: `${Math.round(w / 28)}px ${Math.round(w / 14)}px`, background: 'rgba(40,40,40,0.62)', color: '#fff', fontSize: Math.max(9.5, w / 11.5), fontWeight: 500, lineHeight: 1.25, textAlign: 'center', fontFamily: 'Helvetica, Arial, sans-serif' }}>{text}</span>
         : <span style={{ position: 'absolute', left: 6, right: 6, top: '64%', color: '#fff', fontSize: Math.max(11, w / 9), fontWeight: 900, lineHeight: 1.15, textAlign: 'center', WebkitTextStroke: '0.5px #000', textShadow: '0 1px 0 #000, 0 0 3px #000, 0 2px 8px rgba(0,0,0,.8)', fontFamily: 'system-ui, Arial, sans-serif' }}>{text}</span>)}
@@ -48,7 +48,8 @@ function Phone({ img, w, text, style, label, filter, pos, rot = 0, delay = 0 }: 
 }
 function AutoContentHero({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
   const [h, setH] = useState(false)
-  const img = curated(9)
+  // Vrais Reels qui explosent (les 3 images les plus nettes de la Veille), sinon photos maison.
+  const imgs = useAutoImages()
   const W = narrow ? 84 : 118
   const steps = ['Choisis une ou plusieurs vidéos.', 'Écris tes textes, un par ligne.', 'Génère : chaque variante reçoit un texte différent, plus une coupe, une vitesse et des métadonnées uniques.']
   return (
@@ -80,13 +81,17 @@ function AutoContentHero({ narrow, onOpen }: { narrow: boolean; onOpen: () => vo
       </div>
       {/* Visuel : ta vidéo → 3 comptes, 3 textes */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: narrow ? 8 : 16, minWidth: 0 }}>
-        {!narrow && <Phone img={img} w={Math.round(W * 0.9)} label="Ta vidéo" />}
+        {!narrow && (
+          <span style={{ position: 'relative', display: 'block', flexShrink: 0 }}>
+            {[2, 1].map(k => <span key={k} style={{ position: 'absolute', inset: 0, transform: `translateX(${k === 2 ? 14 : -14}px) rotate(${k === 2 ? 7 : -7}deg) scale(.94)`, opacity: 0.7 }}><Phone img={imgs?.[k]} w={Math.round(W * 0.9)} label="" /></span>)}
+            <span style={{ position: 'relative', display: 'block' }}><Phone img={imgs?.[0]} w={Math.round(W * 0.9)} label="Tes vidéos" /></span>
+          </span>
+        )}
         {!narrow && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 99, background: 'linear-gradient(135deg,#8B5CF6,#EC4899)', color: '#fff', boxShadow: '0 10px 24px -10px rgba(236,72,153,.9)' }}><Icon d="M5 12h14|M13 6l6 6-6 6" size={16} sw={2.6} /></span>}
         <div style={{ display: 'flex', alignItems: 'center', gap: narrow ? 6 : 10 }}>
           {AUTO_TEXTS.map((x, i) => (
             <span key={i} style={{ position: 'relative', display: 'block', zIndex: i === 1 ? 3 : 2, marginTop: i === 1 ? 0 : narrow ? 12 : 20 }}>
-              <Phone img={img} w={W} text={x.t} style={x.style} label={`Compte ${i + 1}`} rot={(i - 1) * 3} delay={0.1 + i * 0.12}
-                pos={['center 22%', 'center 34%', 'center 28%'][i]} filter={['saturate(1.12) brightness(1.03)', 'none', 'contrast(1.06) hue-rotate(-6deg)'][i]} />
+              <Phone img={imgs?.[i]} w={W} text={x.t} style={x.style} label={`Compte ${i + 1}`} rot={(i - 1) * 3} delay={0.1 + i * 0.12} />
             </span>
           ))}
         </div>

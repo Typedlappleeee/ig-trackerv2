@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-14d',
+    date: '2026-10-14',
+    title: { fr: '📸 Visuels plus propres : vrais Reels, images nettes', en: '📸 Cleaner visuals: real Reels, sharp images' },
+    items: {
+      fr: [
+        'Les visuels (Explorer, Studio, tableau de bord) n’affichent plus que des miniatures nettes : les images floues, trop petites, trop sombres ou à bandes noires sont écartées automatiquement.',
+        'Auto-contenu : 3 vrais Reels qui explosent, chacun avec un texte différent, pour voir tout de suite à quoi sert l’outil.',
+      ],
+      en: [
+        'Visuals (Explorer, Studio, dashboard) now only show sharp thumbnails: blurry, tiny, too dark or letterboxed images are filtered out automatically.',
+        'Auto-content: 3 real trending Reels, each with a different text, so you see right away what the tool does.',
+      ],
+    },
+  },
+  {
     id: '2026-10-14c',
     date: '2026-10-14',
     title: { fr: '🎬 Studio vidéo refait + de vrais outils', en: '🎬 Video Studio redesigned + real tools' },
