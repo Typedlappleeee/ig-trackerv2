@@ -37,9 +37,6 @@ export default function Studio({ theme, user, org, onNavigate }: {
   if (!tool) {
     const extras = TOOLS.filter(t => t.id === 'autocontent')
     const auto = extras[0]
-    // Les tuiles du haut (Auto-contenu, Remix, Texte sur vidéo) ne sont pas répétées dessous.
-    const top3 = auto && onNavigate ? ['remix', 'mixer'] : ['remix', 'mixer', 'subs']
-    const rest = STUDIO.filter(t => !top3.includes(t.id))
     return (
       <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
         <style>{SPOT_KEYFRAMES}</style>
@@ -62,9 +59,10 @@ export default function Studio({ theme, user, org, onNavigate }: {
             return <ToolTile key={id} t={t} i={j + 1} pick={pickerFor(t, j * 5 + 7, photos)} size="md" onOpen={() => go(id)} style={narrow ? { height: 220 } : undefined} />
           })}
         </section>
-        <SectionHead title="Autres outils" count={rest.length} />
+        <SectionHead title="Tous les outils" count={STUDIO.length + (onNavigate ? extras.length : 0)} />
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 250}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>
-          {rest.map((t, i) => <ToolCard key={t.id} t={t} i={i} pick={pickerFor(t, i + 3, photos)} fav={false} onOpen={() => go(t.id as StudioToolId)} />)}
+          {onNavigate && extras.map((t, i) => <ToolCard key={t.id} t={t} i={i} pick={pickerFor(t, 11 + i, photos)} fav={false} onOpen={() => openTool(onNavigate, t.page, t.arg, t.id)} />)}
+          {STUDIO.map((t, i) => <ToolCard key={t.id} t={t} i={i + 1} pick={pickerFor(t, i + 3, photos)} fav={false} onOpen={() => go(t.id as StudioToolId)} />)}
         </div>
         <Results results={results} onClear={() => { results.forEach(r => URL.revokeObjectURL(r.url)); setResults([]) }}
           onBank={onNavigate ? () => openTool(onNavigate, 'bank', { tab: 'video' }) : undefined} onPublish={onNavigate ? () => openTool(onNavigate, 'publish', { mode: 'reels' }) : undefined} />

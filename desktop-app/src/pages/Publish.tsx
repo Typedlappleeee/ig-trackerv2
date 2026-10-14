@@ -1,12 +1,12 @@
 import { lazy, Suspense, useState } from 'react'
-import { usePhotos, pickerFor, ToolCard, ToolTile, SectionHead } from '@/pages/Explore'
+import { usePhotos, pickerFor, ToolCard, SectionHead } from '@/pages/Explore'
 import { TOOLS } from '@/lib/tools'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
 import { takeOpenArg, openTool } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Skeleton, SkeletonRows, useNarrow } from '@/lib/ui'
+import { Icon, Skeleton, SkeletonRows, useNarrow } from '@/lib/ui'
 import type { OrgState } from '@/lib/data'
 import { peekRelaunch } from '@/lib/runHistory'
 // Chaque composer n'est chargé qu'à l'ouverture de son format.
@@ -35,6 +35,12 @@ const FORMATS: Format[] = [
   { id: 'tiktok', plat: 'tiktok', t: 'Vidéo TikTok', d: 'Une vidéo sur des dizaines de comptes TikTok, en parallèle.', cost: '2 crédits / compte', ready: true, icon: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5' },
   { id: 'cross', plat: 'other', t: 'Cross-posting', d: 'Facebook, Shorts, X, Threads, Reddit et Pinterest en une fois.', cost: '2 crédits / compte / réseau', ready: true, icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
 ]
+const PLATS: { k: Plat; label: string; sub: string; color: string; icon: string }[] = [
+  { k: 'instagram', label: 'Instagram', sub: 'Reels, Stories et posts photo sur tes comptes Instagram.', color: '#E1306C', icon: 'M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5z|M16 11.4A4 4 0 1 1 12.6 8 4 4 0 0 1 16 11.4z|M17.5 6.5h.01' },
+  { k: 'tiktok', label: 'TikTok', sub: 'Vidéos sur tes comptes TikTok (les téléphones doivent être connectés à TikTok).', color: '#25F4EE', icon: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5' },
+  { k: 'other', label: 'Autres réseaux', sub: 'Facebook, YouTube Shorts, X, Threads, Reddit, Pinterest.', color: '#A1A1AA', icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
+]
+const SCHED_ICON = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M12 6v6l4 2'
 
 export default function Publish({ theme, infra, user, org, isSuperAdmin, onNavigate }: {
   theme: Theme; infra: InfraKey; user: User; org: OrgState; isSuperAdmin: boolean; onNavigate?: (p: string) => void
@@ -60,41 +66,36 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin, onNavig
   if (mode === 'photo' && isAdmin) return <>{tabs('photo')}<Suspense fallback={<Wait />}><PhotoComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
   if (mode === 'cross' && isAdmin) return <>{tabs('cross')}<Suspense fallback={<Wait />}><CrossComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
 
-  let n = 0
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <style>{SPOT_KEYFRAMES}</style>
       <PageHeader kicker="Diffusion" title="Publication" sub="Choisis un format : les comptes, la vidéo et la légende se règlent à l’étape suivante. Chaque téléphone publie en parallèle, ou plus tard (programmé)." />
-      {/* À la une : Reels en grand, Story et TikTok à côté */}
-      <section style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.9fr) minmax(0,1fr)', gridTemplateRows: narrow ? undefined : '210px 210px', gap: narrow ? 12 : 16, marginBottom: 40 }}>
-        {(['reels', 'story', 'tiktok'] as const).map((id, j) => {
-          const t = tool(id)
-          return (
-            <ToolTile key={id} t={t} i={j} pick={pickerFor(t, j * 4, photos)} size={j === 0 ? 'xl' : 'md'}
-              kicker={j === 0 ? 'Le plus utilisé · 2 cr / compte' : t.cost}
-              title={j === 0 ? 'Un Reel sur tous tes comptes' : undefined}
-              text={j === 0 ? 'Choisis tes comptes, une ou plusieurs vidéos et une légende : chaque téléphone publie en parallèle. Programmable, même PC éteint.' : undefined}
-              cta={j === 0 ? 'Publier un Reel' : undefined} onOpen={() => open(id)}
-              style={j === 0 ? (narrow ? { height: 340 } : { gridRow: 'span 2' }) : (narrow ? { height: 220 } : undefined)} />
-          )
-        })}
-      </section>
-      {/* Autres options (sans répéter les 3 tuiles du haut) : formats admin + programmation */}
+      {/* Catégories par plateforme (tous les formats), puis la programmation */}
       {(() => {
-        const featured = ['reels', 'story', 'tiktok']
-        const more = [
-          ...FORMATS.filter(f => visible(f) && !featured.includes(f.id)).map(f => ({ t: { ...tool(f.id), desc: f.d, cost: f.cost }, go: () => open(f.id) })),
-          ...(onNavigate ? ['scheduled', 'calendar'].map(id => ({ t: tool(id), go: () => { const t = tool(id); openTool(onNavigate, t.page, t.arg, t.id) } })) : []),
-        ]
-        if (!more.length) return null
-        return (
-          <section style={{ marginBottom: 40 }}>
-            <SectionHead title="Plus d’options" count={more.length} />
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 260}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>
-              {more.map((m, k) => <ToolCard key={m.t.id} t={m.t} i={k} pick={pickerFor(m.t, k + 3, photos)} fav={false} onOpen={m.go} />)}
-            </div>
-          </section>
+        const head = (label: string, color: string, icon: string, count: number, sub: string) => (
+          <SectionHead title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}><span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 9, background: `${color}1F`, border: `1px solid ${color}55`, color }}><Icon d={icon} size={14} /></span>{label}</span>} count={count}
+            right={narrow ? undefined : <span style={{ fontSize: 12.5, color: '#71717A', maxWidth: 420, textAlign: 'right' }}>{sub}</span>} />
         )
+        const grid = (cards: React.ReactNode) => <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 260}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>{cards}</div>
+        let n = 0
+        const sched = onNavigate ? ['scheduled', 'calendar'].map(tool) : []
+        return <>
+          {PLATS.filter(pl => FORMATS.some(f => f.plat === pl.k && visible(f))).map(pl => {
+            const list = FORMATS.filter(f => f.plat === pl.k && visible(f))
+            return (
+              <section key={pl.k} style={{ marginBottom: 40 }}>
+                {head(pl.label, pl.color, pl.icon, list.length, pl.sub)}
+                {grid(list.map(f => { const t = tool(f.id); const k = n++; return <ToolCard key={f.id} t={{ ...t, desc: f.d, cost: f.cost }} i={k} pick={pickerFor(t, k, photos)} fav={false} onOpen={() => open(f.id)} /> }))}
+              </section>
+            )
+          })}
+          {sched.length > 0 && (
+            <section style={{ marginBottom: 40 }}>
+              {head('Programmation', '#A78BFA', SCHED_ICON, sched.length, 'Tout ce qui part plus tard, même PC éteint.')}
+              {grid(sched.map(t => { const k = n++; return <ToolCard key={t.id} t={t} i={k} pick={pickerFor(t, k, photos)} fav={false} onOpen={() => openTool(onNavigate!, t.page, t.arg, t.id)} /> }))}
+            </section>
+          )}
+        </>
       })()}
     </div>
   )

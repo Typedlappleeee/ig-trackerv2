@@ -3090,6 +3090,7 @@ export const EN: Dict = {
     "Légendes (pool + style), coupe, micro-vitesse, mode Tendance et spoof appareil / GPS : en un clic, chaque compte reçoit sa propre vidéo, prête à poster.": "Captions (pool + style), cut, micro-speed, Trend mode and device / GPS spoof: in one click, every account gets its own video, ready to post.",
     "Plus d’options": "More options",
     "Autres outils": "Other tools",
+    "Tout ce qui part plus tard, même PC éteint.": "Everything that goes out later, even with your PC off.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
