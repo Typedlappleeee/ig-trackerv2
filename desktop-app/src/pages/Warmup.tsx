@@ -3,7 +3,8 @@ import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Chip, Empty, StatusDot, Panel, PanelHead, PageHead, FIELD, FIELD_SM, TEXTAREA, MONO, Toggle, Segmented, SkeletonRows, useNarrow } from '@/lib/ui'
+import { Btn, Chip, Empty, StatusDot, Panel, PanelHead, FIELD, FIELD_SM, TEXTAREA, MONO, Toggle, Segmented, SkeletonRows, useNarrow } from '@/lib/ui'
+import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { scopeInfra, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -186,7 +187,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
   const groups = ['Tous', ...[...new Set(phones.map(p => p.group_name).filter(Boolean) as string[])].sort()]
   const shownWarm = phones.filter(p => wgroup === 'Tous' || p.group_name === wgroup)
 
-  const TABS: [WTab, string][] = [['login', 'Connexion'], ['edit', isReleased('massEdit') ? 'Édition en masse' : `Édition en masse · ${releaseLabel('massEdit')}`], ['warm', 'Warmup']]
+  const TABS: [WTab, string, string][] = [['warm', 'Warmup', 'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z'], ['edit', isReleased('massEdit') ? 'Édition en masse' : `Édition en masse · ${releaseLabel('massEdit')}`, 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'], ['login', 'Connexion auto', 'M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z']]
   const subFor: Record<WTab, string> = {
     login: 'Connecte automatiquement tes comptes Instagram sur les appareils (auto-login).',
     edit: 'Édite en masse le profil de tes comptes (nom, bio, lien, photo).',
@@ -195,21 +196,21 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead
-        title="Automatisations comptes"
+      <PageHeader
+        kicker="Comptes"
+        title="Warmup"
         sub={subFor[wtab]}
-        actions={wtab === 'warm' ? <Chip text={`${nSel} sélectionnés`} tone="mute" /> : undefined}
+        actions={wtab === 'warm' && nSel > 0 ? <Chip text={`${nSel} sélectionné(s)`} tone="violet" /> : undefined}
       />
 
-      {/* Onglets Connexion / Édition en masse / Warmup */}
-      <div style={{ marginBottom: 16 }}>
-        <Segmented value={wtab} onChange={setWtab} options={TABS.map(([v, l]) => ({ v, l }))} />
-      </div>
+      {/* Onglets Warmup / Édition en masse / Connexion auto */}
+      <UnderlineTabs value={wtab} onChange={setWtab} items={TABS.map(([k, l, icon]) => ({ k, l, icon }))} />
 
       {/* Rotation d'IP proxy — même toggle que les composers (Reels/Story/Photo…). */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', marginBottom: 12, borderRadius: 8, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', marginBottom: 14, borderRadius: 16, background: '#0F0F11', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 99, flexShrink: 0, background: rotationOn ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.05)', color: rotationOn ? '#C4B5FD' : '#8B8B94' }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg></span>
         <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>Rotation d’IP proxy</span>
+          <span style={{ fontSize: 13.5, fontWeight: 650, color: '#F4F4F5' }}>Rotation d’IP proxy</span>
           <span style={{ fontSize: 12, color: '#8B8B94' }}>{!rotationConfigured ? 'Aucun proxy — configure dans Paramètres → Proxy & rotation' : rotationOn ? 'IP changée avant chaque téléphone (envoi en série)' : 'Désactivée pour ce run'}</span>
         </span>
         <span title={rotationConfigured ? '' : 'Configure d’abord un proxy rotatif dans les Paramètres'}>
@@ -393,12 +394,12 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                 const act = dur === d.v
                 return (
                   <button key={d.v} onClick={() => setDur(d.v)} style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 20px', minWidth: 104, borderRadius: 8, cursor: 'pointer',
-                    background: act ? 'rgba(255,255,255,0.07)' : '#161618',
-                    border: '1px solid ' + (act ? theme.selEdge : 'rgba(255,255,255,0.08)'), transition: 'background .12s ease, border-color .12s ease',
+                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, padding: '14px 18px', minWidth: 120, flex: '1 1 120px', borderRadius: 14, cursor: 'pointer', textAlign: 'left',
+                    background: act ? 'rgba(167,139,250,0.1)' : 'rgba(255,255,255,0.02)', boxShadow: act ? '0 0 0 3px rgba(167,139,250,0.12)' : 'none',
+                    border: '1px solid ' + (act ? 'rgba(167,139,250,0.55)' : 'rgba(255,255,255,0.08)'), transition: 'background .15s ease, border-color .15s ease',
                   }}>
-                    <span style={{ fontSize: 16, fontWeight: 600, color: act ? '#EDEDEF' : '#A1A1AA', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{d.v < 60 ? `${d.v} min` : `${d.v / 60} h`}</span>
-                    <span style={{ fontSize: 11.5, fontWeight: 400, color: act ? theme.accentText : '#71717A' }}>{d.h}</span>
+                    <span style={{ fontSize: 22, fontWeight: 850, color: act ? '#F4F4F5' : '#D4D4D8', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>{d.v < 60 ? `${d.v} min` : `${d.v / 60} h`}</span>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: act ? '#C4B5FD' : '#71717A' }}>{d.h}</span>
                   </button>
                 )
               })}

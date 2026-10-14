@@ -34,7 +34,7 @@ export function movedDate(origIso: string, day: Date): Date {
 
 const TYPE: Record<string, { label: string; color: string }> = {
   mass_posting: { label: 'Reel', color: '#E1306C' }, posting: { label: 'Reel', color: '#E1306C' },
-  story: { label: 'Story', color: '#E1306C' }, tiktok: { label: 'TikTok', color: '#25F4EE' }, cross: { label: 'Cross-post', color: '#A1A1AA' },
+  story: { label: 'Story', color: '#A78BFA' }, tiktok: { label: 'TikTok', color: '#25F4EE' }, cross: { label: 'Cross-post', color: '#A1A1AA' },
 }
 
 export default function ScheduleCalendar({ theme, posts, onMove, onOpen }: {
@@ -77,7 +77,7 @@ export default function ScheduleCalendar({ theme, posts, onMove, onOpen }: {
         onClick={() => onOpen?.(p)}
         title={movable ? 'Glisse pour changer de jour' : p.status === 'geelark' ? 'Programmé chez GeeLark — annule puis reprogramme pour le déplacer' : ''}
         style={{
-          display: 'flex', alignItems: 'center', gap: 6, width: '100%', minWidth: 0, padding: compact ? '3px 6px' : '6px 8px', borderRadius: 6,
+          display: 'flex', alignItems: 'center', gap: 6, width: '100%', minWidth: 0, padding: compact ? '3px 6px' : '6px 8px', borderRadius: 9,
           border: '1px solid rgba(255,255,255,0.08)', background: dragId === p.id ? 'rgba(255,255,255,0.08)' : '#161618', cursor: movable ? 'grab' : 'pointer',
           textAlign: 'left', color: '#EDEDEF', fontSize: compact ? 11 : 12, opacity: ['done', 'cancelled'].includes(p.status) ? 0.55 : 1, boxSizing: 'border-box',
         }}>
@@ -105,7 +105,7 @@ export default function ScheduleCalendar({ theme, posts, onMove, onOpen }: {
           {view === 'week' && <span style={{ fontSize: 11.5, color: '#71717A', textTransform: 'capitalize' }}>{d.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>}
           <span style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 22, height: 22, borderRadius: 99, fontSize: 12, fontWeight: 600,
-            background: isToday ? '#EDEDEF' : 'transparent', color: isToday ? '#0A0A0B' : out ? '#5A5A63' : '#A1A1AA', fontVariantNumeric: 'tabular-nums',
+            background: isToday ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'transparent', color: isToday ? '#fff' : out ? '#5A5A63' : '#A1A1AA', fontVariantNumeric: 'tabular-nums', boxShadow: isToday ? '0 4px 12px -4px rgba(236,72,153,.7)' : 'none',
           }}>{d.getDate()}</span>
           {list.length > 0 && view === 'week' && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#71717A' }}>{list.length}</span>}
         </div>
@@ -116,7 +116,7 @@ export default function ScheduleCalendar({ theme, posts, onMove, onOpen }: {
   }
 
   return (
-    <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)', background: '#111113', overflow: 'hidden' }}>
+    <div style={{ borderRadius: 22, border: '1px solid rgba(255,255,255,0.07)', background: '#0E0E10', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
         <Btn theme={theme} sm tone="ghost" icon="M15 18l-6-6 6-6" onClick={() => shift(-1)} />
         <Btn theme={theme} sm tone="ghost" label="Aujourd’hui" onClick={() => setAnchor(new Date())} />

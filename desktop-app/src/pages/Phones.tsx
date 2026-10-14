@@ -3,7 +3,9 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, FIELD, Icon, Kpi, Panel, PageHead, Segmented, Skeleton, StatusDot, Modal, SkeletonRows, toast, confirmDialog } from '@/lib/ui'
+import { Btn, Empty, FIELD, Icon, Panel, Segmented, Skeleton, Modal, SkeletonRows, toast, confirmDialog } from '@/lib/ui'
+import { PageHeader } from '@/components/Kit'
+import { StatBar } from '@/components/CineHero'
 import { openTool } from '@/lib/openTool'
 import { fetchAllRows } from '@/lib/bankStorage'
 import type { OrgState } from '@/lib/data'
@@ -47,7 +49,7 @@ function fmtViews(n: number | null): string {
   return String(n)
 }
 
-const COLS = '28px 30px minmax(0,1.4fr) 110px 96px 210px'
+const COLS = '30px 30px minmax(0,1.4fr) 130px 120px 120px'
 
 const POWER_ICON = 'M18.36 6.64a9 9 0 1 1-12.73 0|M12 2v10'
 
@@ -295,26 +297,23 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* En-tête */}
-      <PageHead title={title} sub={sub} actions={isCloud
+      <PageHeader kicker={loading ? '…' : `${fmtNumber(total)} appareil${total > 1 ? 's' : ''} · ${fmtNumber(online)} en ligne`} title={title} sub={sub} actions={isCloud
         ? <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
         : <Btn label={syncing ? 'Synchro…' : 'Sync GeeLark'} theme={theme} tone="primary" disabled={syncing} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={syncFromGeelark} />} />
 
       {isSuperAdmin && serverLate && (
-        <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(251,191,36,0.25)', fontSize: 13, color: '#FBBF24' }}>
+        <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 14, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.28)', fontSize: 13, color: '#FBBF24' }}>
           Le garde-fou serveur ne répond pas (téléphones éteints par l’app à sa place) : redéploie la fonction run-scheduled-posts et vérifie son cron.
         </div>
       )}
 
-      {/* KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>
-        <Kpi theme={theme} label="Total" value={loading ? el : fmtNumber(total)} />
-        <Kpi theme={theme} label="En ligne" value={loading ? el : fmtNumber(online)} color="#4ADE80" />
-        <Kpi theme={theme} label="Hors ligne" value={loading ? el : fmtNumber(offline)} color="#A1A1AA" />
-        <Kpi theme={theme} label="À risque" value={loading ? el : fmtNumber(atRisk)}
-          color={atRisk > 0 ? '#F87171' : undefined}
-          hint={loading ? undefined : (atRisk > 0 ? 'santé sous 70 · action requise' : 'tout va bien')}
-          hintColor={atRisk > 0 ? '#F87171' : '#4ADE80'} />
-      </div>
+      {/* Chiffres (cliquables : filtrent la liste) */}
+      <StatBar items={[
+        { l: 'Total', v: loading ? el : fmtNumber(total), sub: <span style={{ color: '#71717A' }}>{filter === 'all' ? 'affichés' : 'voir tout'}</span>, onClick: () => setFilter('all') },
+        { l: 'En ligne', v: loading ? el : fmtNumber(online), c: '#4ADE80', sub: <span style={{ color: '#71717A' }}>allumés maintenant</span>, onClick: () => setFilter('on') },
+        { l: 'Hors ligne', v: loading ? el : fmtNumber(offline), c: '#A1A1AA', sub: <span style={{ color: '#71717A' }}>éteints</span>, onClick: () => setFilter('off') },
+        { l: 'À risque', v: loading ? el : fmtNumber(atRisk), c: atRisk > 0 ? '#F87171' : '#F4F4F5', sub: loading ? undefined : <span style={{ color: atRisk > 0 ? '#F87171' : '#4ADE80' }}>{atRisk > 0 ? 'santé sous 70 · à vérifier' : 'tout va bien'}</span>, onClick: () => setFilter('risk') },
+      ]} />
 
       <Panel theme={theme}>
         {/* Barre d'outils : recherche + groupe + pills */}
@@ -323,16 +322,16 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
           borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap',
         }}>
           <span style={{
-            display: 'flex', alignItems: 'center', gap: 8, height: 32, boxSizing: 'border-box',
-            padding: '0 10px', borderRadius: 6, flex: 1, minWidth: 180, maxWidth: 280,
-            border: `1px solid ${q ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.09)'}`,
-            background: '#161618', transition: 'border-color .12s ease',
+            display: 'flex', alignItems: 'center', gap: 8, height: 36, boxSizing: 'border-box',
+            padding: '0 12px', borderRadius: 10, flex: 1, minWidth: 180, maxWidth: 320,
+            border: `1px solid ${q ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.09)'}`,
+            background: '#141416', transition: 'border-color .12s ease',
           }}>
             <span style={{ display: 'flex', color: q ? '#A1A1AA' : '#71717A' }}>
               <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-4.35-4.35" size={13} sw={2} />
             </span>
             <input
-              type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Filtrer…"
+              type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un téléphone ou un @…"
               style={{ flex: 1, minWidth: 0, border: 'none', background: 'none', outline: 'none', color: '#EDEDEF', fontSize: 13 }}
             />
           </span>
@@ -366,7 +365,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
         <div style={{ overflowX: 'auto' }}><div style={{ minWidth: !loading && !error && shown.length > 0 ? 680 : undefined }}>
         <div style={{
           display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
-          padding: '0 16px', height: 36, borderBottom: '1px solid rgba(255,255,255,0.06)',
+          padding: '0 18px', height: 38, borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
           <span />
           <span><Check on={allOn} mid={someOn} accent={theme.accent} onClick={toggleAll} /></span>
@@ -407,7 +406,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
                   onClick={() => toggle(p.id)}
                   style={{
                     display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
-                    padding: '0 16px', minHeight: 48, boxSizing: 'border-box', fontSize: 13, cursor: 'pointer',
+                    padding: '0 18px', minHeight: 60, boxSizing: 'border-box', fontSize: 13, cursor: 'pointer',
                     borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                     background: on ? 'rgba(255,255,255,0.04)' : 'transparent',
                     transition: 'background .12s ease',
@@ -422,21 +421,15 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
 
                   {/* Appareil : avatar + NOM DU TÉLÉPHONE (GeeLark) en avant + @compte en dessous */}
                   <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                    {p.pp_url ? (
-                      <img src={p.pp_url} alt="" referrerPolicy="no-referrer" style={{
-                        width: 24, height: 24, borderRadius: 6, objectFit: 'cover', flexShrink: 0,
-                        border: '1px solid rgba(255,255,255,0.08)',
-                      }} />
-                    ) : (
-                      <span style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                        background: '#18181B',
-                        border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 500, color: '#A1A1AA',
-                      }}>{(p.phone_name || p.ig_username || '?').charAt(0).toUpperCase()}</span>
-                    )}
+                    <span style={{ padding: 2, borderRadius: 99, flexShrink: 0, background: p.status === 'online' ? 'linear-gradient(135deg,#4ADE80,#22D3EE)' : 'rgba(255,255,255,0.1)' }}>
+                      {p.pp_url ? (
+                        <img src={p.pp_url} alt="" referrerPolicy="no-referrer" style={{ display: 'block', width: 34, height: 34, borderRadius: 99, objectFit: 'cover', border: '2px solid #0F0F11' }} />
+                      ) : (
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 99, boxSizing: 'border-box', background: '#1A1A1D', border: '2px solid #0F0F11', fontSize: 13, fontWeight: 700, color: '#A1A1AA' }}>{(p.phone_name || p.ig_username || '?').charAt(0).toUpperCase()}</span>
+                      )}
+                    </span>
                     <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 650, color: '#F4F4F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.phone_name || 'Appareil'}
                       </span>
                       <span style={{ fontSize: 11.5, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -451,9 +444,12 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
                   </span>
 
                   {/* Statut */}
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <StatusDot kind={dotKind(p.status)} />
-                    <span style={{ fontSize: 12, color: '#A1A1AA' }}>{STATUS_LABEL[p.status] ?? p.status}</span>
+                  <span>
+                    {(() => { const c = p.status === 'online' ? '#4ADE80' : p.status === 'warming' ? '#A78BFA' : p.status === 'limited' ? '#FBBF24' : p.status === 'error' ? '#F87171' : '#A1A1AA'; return (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 99, background: `${c}14`, border: `1px solid ${c}33`, color: c, fontSize: 12, fontWeight: 650, whiteSpace: 'nowrap' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 99, background: c, boxShadow: p.status === 'online' ? `0 0 6px ${c}` : 'none' }} />{STATUS_LABEL[p.status] ?? p.status}
+                      </span>
+                    ) })()}
                   </span>
 
                   {/* Actions : GeeLark sert à l'automatisation — pas de démarrage manuel. */}
@@ -472,9 +468,9 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
       {sel.size > 0 && (
         <div style={{
           position: 'sticky', bottom: 16, marginTop: 16, display: 'flex',
-          alignItems: 'center', gap: 8, padding: '8px 10px 8px 14px', borderRadius: 8,
-          background: '#161618', border: '1px solid rgba(255,255,255,0.1)',
-          boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)', flexWrap: 'wrap',
+          alignItems: 'center', gap: 8, padding: '9px 10px 9px 18px', borderRadius: 16,
+          background: 'rgba(22,22,24,0.88)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 24px 60px -16px rgba(0,0,0,0.8)', flexWrap: 'wrap',
           animation: 'aPop .22s cubic-bezier(0.16,1,0.3,1) both',
         }}>
           <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>

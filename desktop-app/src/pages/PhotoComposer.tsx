@@ -4,7 +4,8 @@ import type { User } from '@supabase/supabase-js'
 import { startRunHistory } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, FIELD_SM, TEXTAREA, Toggle, Segmented, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, FIELD_SM, TEXTAREA, Toggle, Segmented, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
+import { PageHeader } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs, phoneLabel, phoneSub } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -211,11 +212,10 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead
+      <PageHeader
         title="Publier une Photo"
         sub="Une photo (ou carrousel) avec description sur tes comptes Instagram. 2 crédits / compte."
         actions={<>
-          <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
           <Btn theme={theme} tone="ghost" disabled={!ready} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
             label="Programmer" onClick={() => setSchedOpen(true)} />
           <Btn theme={theme} tone="primary" disabled={!ready} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z"
@@ -224,7 +224,7 @@ export default function PhotoComposer({ theme, user, org, onBack }: {
       />
 
       {!bearer && !conns.loading && (
-        <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(251,191,36,0.22)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>
+        <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 14, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.28)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>
           Connecte ton compte GeeLark (token) dans les Réglages pour publier.
         </div>
       )}

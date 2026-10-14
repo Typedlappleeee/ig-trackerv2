@@ -4,7 +4,8 @@ import type { User } from '@supabase/supabase-js'
 import { startRunHistory } from '@/lib/runHistory'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
-import { Btn, Chip, StatusDot, Panel, PanelHead, PageHead, TEXTAREA, Toggle, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
+import { Btn, Chip, StatusDot, Panel, PanelHead, TEXTAREA, Toggle, MONO, useNarrow, SkeletonRows, Empty } from '@/lib/ui'
+import { PageHeader } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { phoneLabel, phoneSub, useBankThumbs } from '@/lib/data'
 import { useConnections } from '@/lib/connections'
@@ -171,13 +172,12 @@ export default function CrossComposer({ theme, user, org, onBack }: {
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead title="Cross-posting" sub="Une vidéo sur plusieurs réseaux (TikTok, Threads, Facebook, Shorts, X, Reddit, Pinterest)."
+      <PageHeader title="Cross-posting" sub="Une vidéo sur plusieurs réseaux (TikTok, Threads, Facebook, Shorts, X, Reddit, Pinterest)."
         actions={<>
-          <Btn theme={theme} tone="quiet" label="Retour" onClick={onBack} />
           <Btn theme={theme} tone="ghost" disabled={!ready} icon="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" label="Programmer" onClick={() => setSchedOpen(true)} />
           <Btn theme={theme} tone="primary" disabled={!ready} icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" label={running ? 'Publication…' : ready ? `Publier (${cost} cr.)` : 'Publier'} onClick={() => launch()} />
         </>} />
-      {!bearer && !conns.loading && <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: '#111113', border: '1px solid rgba(251,191,36,0.22)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>Connecte ton token GeeLark (Réglages app web) pour publier.</div>}
+      {!bearer && !conns.loading && <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 14, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.28)', fontSize: 12.5, lineHeight: 1.5, color: '#FBBF24' }}>Connecte ton token GeeLark (Réglages app web) pour publier.</div>}
 
       <Panel theme={theme} style={{ marginBottom: 12 }}>
         <PanelHead title="Réseaux" sub={`${plats.size} sélectionné${plats.size > 1 ? 's' : ''}`} />
