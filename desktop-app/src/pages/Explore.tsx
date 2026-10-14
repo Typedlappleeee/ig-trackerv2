@@ -2,8 +2,7 @@
 // une » animé, recherche, catégories, favoris, récemment utilisés. Un clic ouvre l'outil
 // précis (onglet / format) via openTool. Catalogue : src/lib/tools.ts.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CURATED } from '@/lib/curated'
-import { supabase } from '@/lib/supabase'
+import { CURATED, curated } from '@/lib/curated'
 import type { User } from '@supabase/supabase-js'
 import type { OrgState } from '@/lib/data'
 import type { Theme, InfraKey } from '@/lib/theme'
@@ -17,28 +16,18 @@ import { FeatureBanner } from '@/components/CineHero'
 const FAV_KEY = 'sf-fav-tools'
 function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
 
-// Photos des visuels (cartes, bandeaux, collage de l'accueil) : les VRAIES miniatures des Reels
-// de la Veille (les plus vus d'abord, via le proxy d'images) — plus de photos de la Banque prises
-// au hasard. Repli sur la sélection maison (lib/curated) tant que la Veille est vide.
-const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
-let reelCache: string[] | null = null
+// Photos des visuels (aperçus d'outils, bandeaux) : TOUJOURS la sélection maison (lib/curated,
+// portraits sûrs). Les miniatures de la Veille peuvent montrer n'importe quoi (animaux, jambes,
+// plateaux TV…) : elles restent réservées à la Veille elle-même. Signature gardée.
 export function usePhotos(_user?: User, _org?: OrgState): { viral: string[]; bank: string[] } {
-  const [reels, setReels] = useState<string[]>(reelCache ?? [])
-  useEffect(() => {
-    if (reelCache) return
-    let alive = true
-    void supabase.from('viral_reels').select('thumb, views').order('views', { ascending: false }).limit(40).then(({ data }) => {
-      const v = [...new Set(((data ?? []) as { thumb: string | null }[]).map(x => x.thumb).filter((x): x is string => !!x))]
-      reelCache = v.map(u => `${FN_URL}?img=${encodeURIComponent(u)}`)
-      if (alive) setReels(reelCache)
-    })
-    return () => { alive = false }
-  }, [])
-  return { viral: reels.length >= 4 ? reels : CURATED, bank: [] }
+  return { viral: CURATED, bank: [] }
 }
 /** Sélecteur de photos d'une carte : banque d'abord pour Créer / Banque, Veille d'abord ailleurs ;
  *  décalé par carte pour que deux cartes voisines n'aient pas les mêmes images. */
+// Carte Story : image FIXE (portrait) — les miniatures de la Veille peuvent être n'importe quoi.
+export const STORY_PICK = (k: number): string => curated(k ? 6 : 13)
 export function pickerFor(t: Tool, i: number, p: { viral: string[]; bank: string[] }): (k: number) => string | null {
+  if (t.id === 'story') return STORY_PICK
   const pool = t.cat === 'create' || t.cat === 'bank' ? [...p.bank, ...p.viral] : [...p.viral, ...p.bank]
   return (k: number) => pool.length ? pool[(i * 3 + k) % pool.length] : null
 }

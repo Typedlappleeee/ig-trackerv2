@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from 'react'
 import { BigCard, ToolTabs } from '@/components/BigCard'
 import { HomeHero } from '@/components/CineHero'
+import { STORY_PICK } from '@/pages/Explore'
 import { usePhotos } from '@/pages/Explore'
 import { takeOpenArg } from '@/lib/openTool'
 import type { User } from '@supabase/supabase-js'
@@ -65,7 +66,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
   let n = 0
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <HomeHero photos={photos.viral} kicker="Publication" line1="Publie partout" line2="en un clic"
+      <HomeHero kicker="Publication" line1="Publie partout" line2="en un clic"
         sub="Choisis un format : les comptes, la vidéo et la légende se règlent à l’étape suivante. Chaque téléphone publie en parallèle."
         stats={[{ v: '2 cr', l: 'par Reel / compte' }, { v: '1 cr', l: 'par Story / compte' }, { v: '24/7', l: 'programmable' }]}
         cta="Publier un Reel" onCta={() => setMode('reels')} secondary="Publier une Story" onSecondary={() => setMode('story')} />
@@ -85,7 +86,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
               const k = n++
               return (
                 <BigCard key={f.id} i={k} preview={f.id} icon={f.icon} title={f.t} desc={f.d} foot={f.cost} tag={f.id === 'reels' ? 'Populaire' : undefined}
-                  onOpen={() => setMode(f.id)} pick={j => pool.length ? pool[(f.id === 'reels' ? j : k * 3 + j + 2) % pool.length] : null} />
+                  onOpen={() => setMode(f.id)} pick={j => f.id === 'story' ? STORY_PICK(j) : pool.length ? pool[(f.id === 'reels' ? j : k * 3 + j + 2) % pool.length] : null} />
               )
             })}
           </div>

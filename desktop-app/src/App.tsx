@@ -239,7 +239,7 @@ function AppInner({ user }: { user: User }) {
         ? <Explore theme={theme} infra={infra} isAdmin={license.isSuperAdmin} onOpen={openT} user={user} org={org} />
         : page === 'viral'
         ? <ViralWatch theme={theme} user={user} org={org} isAdmin={license.isSuperAdmin} onNavigate={(p) => setPage(p as PageKey)} />
-        : page === 'genjutsu' && license.isSuperAdmin
+        : page === 'genjutsu'
         ? <Genjutsu theme={theme} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'links'
         ? <Links theme={theme} user={user} org={org} />
