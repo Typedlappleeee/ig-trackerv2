@@ -40,6 +40,7 @@ const I = {
   copy: 'M9 9h11v11H9z|M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1',
   left: 'M15 18l-6-6 6-6', right: 'M9 18l6-6-6-6',
   pulse: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  wand: 'M15 4V2|M15 16v-2|M8 9h2|M20 9h2|M17.8 11.8L19 13|M15 9h.01|M17.8 6.2L19 5|M3 21l9-9|M12.2 6.2L11 5',
 }
 
 /** Pur : filtre période / pays / niche / compte puis tri. */
@@ -127,7 +128,7 @@ function Stat({ d, v }: { d: string; v: number }) {
 }
 
 // Carte d'un Reel. « big » = n°1 de la sélection (grande carte, actions toujours visibles).
-function ReelCard({ r, rank, big, onOpen }: { r: Reel; rank: number; big?: boolean; onOpen: () => void }) {
+function ReelCard({ r, rank, big, onOpen, onRecast }: { r: Reel; rank: number; big?: boolean; onOpen: () => void; onRecast?: () => void }) {
   const [hover, setHover] = useState(false)
   const touch = useNarrow(760)
   const showActs = big || hover || touch
@@ -176,6 +177,7 @@ function ReelCard({ r, rank, big, onOpen }: { r: Reel; rank: number; big?: boole
             <span style={{ fontSize: 11.5, color: '#8B8B94' }}>{fmtDate(r.taken_at)}</span>
           </span>
           <span style={{ display: showActs ? 'flex' : 'none', gap: 5, animation: big || touch ? 'none' : 'aIn .2s ease both' }}>
+            {onRecast && <IconBtn d={I.wand} title="Recréer avec mes images (Genjutsu)" onClick={onRecast} />}
             <IconBtn d={I.download} title="Télécharger la vidéo" onClick={() => void downloadReel(r)} />
             <IconBtn d={I.link} title="Copier le lien" onClick={() => void copyText(reelUrl(r), 'Lien copié.')} />
             <IconBtn d={I.external} title="Ouvrir sur Instagram" onClick={() => window.open(reelUrl(r), '_blank', 'noopener')} />
@@ -433,6 +435,9 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
   const lastFetch = tabWatch.reduce<string | null>((a, w) => w.fetched_at && (!a || w.fetched_at > a) ? w.fetched_at : a, null)
   const sinceTxt = lastFetch ? (() => { const m = Math.round((Date.now() - Date.parse(lastFetch)) / 60000); return m < 1 ? 'à l’instant' : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j` })() : null
 
+  // « Recréer avec mes images » : ouvre Genjutsu avec ce Reel déjà dans la file.
+  const recast = (r: Reel) => { if (onNavigate) openTool(onNavigate, 'genjutsu', { reel: { code: r.code, thumb: r.thumb, username: r.username, views: r.views, score: r.score } }) }
+
   if (missing) return (
     <div><PageHead title="Veille Reels" sub="Les Reels qui explosent chez tes comptes de référence." />
       <Panel theme={theme}><Empty icon="M12 9v4|M12 17h.01" title="Activation requise" text={isAdmin ? 'Colle supabase/migrations/20261012_viral.sql dans Supabase → SQL Editor → Run, puis recharge.' : 'Bientôt disponible.'} /></Panel></div>
@@ -530,12 +535,12 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
             : 'Les Reels viraux des comptes de référence apparaîtront ici dès le prochain relevé.'} /></Panel>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(180px,46%),1fr))', gridAutoFlow: 'dense', gap: 14 }}>
-          {shown.map((r, i) => <ReelCard key={`${r.watch_id}-${r.code}`} r={r} rank={i + 1} big={i === 0 && sort === 'views' && shown.length >= 5} onOpen={() => setOpen(i)} />)}
+          {shown.map((r, i) => <ReelCard key={`${r.watch_id}-${r.code}`} r={r} rank={i + 1} big={i === 0 && sort === 'views' && shown.length >= 5} onOpen={() => setOpen(i)} onRecast={onNavigate ? () => recast(r) : undefined} />)}
         </div>
       )}
 
       {open !== null && shown[open] && <ReelDetail theme={theme} list={shown} index={open} setIndex={setOpen} onClose={() => setOpen(null)}
-        onRecast={isAdmin && onNavigate ? r => { setOpen(null); openTool(onNavigate, 'genjutsu', { reel: { code: r.code, thumb: r.thumb, username: r.username, views: r.views, score: r.score } }) } : undefined} />}
+        onRecast={onNavigate ? r => { setOpen(null); recast(r) } : undefined} />}
     </div>
   )
 }

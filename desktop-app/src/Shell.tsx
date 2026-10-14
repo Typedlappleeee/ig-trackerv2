@@ -186,10 +186,10 @@ export default function Shell({
   }, [])
 
   // Compteurs de nav = vrais counts (téléphones, banque) ; null tant que non chargés.
-  // Genjutsu IA (Higgsfield) : réservé au super-admin pour l'instant, rangé dans Production.
-  const GENJUTSU: NavItem = { k: 'genjutsu', l: 'Genjutsu IA', i: 'M15 4V2|M15 16v-2|M8 9h2|M20 9h2|M17.8 11.8L19 13|M15 9h.01|M17.8 6.2L19 5|M3 21l9-9|M12.2 6.2L11 5', soon: 'Admin' }
+  // Genjutsu IA (Higgsfield) : pour tous (chacun avec sa clé), rangé dans Production.
+  const GENJUTSU: NavItem = { k: 'genjutsu', l: 'Genjutsu IA', i: 'M15 4V2|M15 16v-2|M8 9h2|M20 9h2|M17.8 11.8L19 13|M15 9h.01|M17.8 6.2L19 5|M3 21l9-9|M12.2 6.2L11 5', soon: 'Nouveau' }
   const NAV = [
-    ...navFor(infra, phoneCount, videoCount).map(g => isAdmin && g.g === 'Production' ? { ...g, items: [...g.items, GENJUTSU] } : g),
+    ...navFor(infra, phoneCount, videoCount).map(g => g.g === 'Production' ? { ...g, items: [...g.items, GENJUTSU] } : g),
     ...(isAdmin ? [{ g: 'Admin', items: [
       { k: 'admin' as PageKey, l: 'Admin · Licences', i: 'M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z' },
     ] }] : []),

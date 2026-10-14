@@ -389,14 +389,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, ...r }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
 
-    // ── Genjutsu (Higgsfield) : recréer un Reel avec ses images de référence. Super-admin
-    // uniquement pour l'instant ; clé en secrets HIGGSFIELD_KEY_ID / HIGGSFIELD_KEY_SECRET. ──
-    if ((body?.genjutsu === 'submit' || body?.genjutsu === 'status') && filterUserId) {
-      const { data: prof } = await db.from('profiles').select('email, is_super_admin').eq('id', filterUserId).maybeSingle()
-      const admin = !!prof?.is_super_admin || prof?.email === 'tintin.aunea@gmail.com'
-      if (!admin) return new Response(JSON.stringify({ ok: false, error: 'Réservé aux admins.' }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
-      const { genjutsuSubmit, genjutsuStatus } = await import('./genjutsu.ts')
-      const out = body.genjutsu === 'submit' ? await genjutsuSubmit(db, filterUserId, body) : await genjutsuStatus(db, filterUserId, body)
+    // ── Genjutsu (Higgsfield) : recréer des Reels avec ses images de référence / un Modèle.
+    // Pour tous, chacun avec la clé de SON espace (table api_keys). File côté serveur. ──
+    if (typeof body?.genjutsu === 'string' && filterUserId) {
+      const { genjutsuAction } = await import('./genjutsu.ts')
+      const out = await genjutsuAction(db, filterUserId, body)
       return new Response(JSON.stringify(out), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
 
@@ -626,6 +623,15 @@ Deno.serve(async (req) => {
       const r = await runViralWatch(db, Date.now() + 20_000)
       if (r.accounts > 0) summary['viral_watch'] = `${r.accounts} compte(s) · ${r.reels} reel(s)`
     } catch { /* tables absentes / fournisseur indisponible : ignoré */ }
+  }
+
+  // ── Étape 0-genjutsu : file Genjutsu (une génération à la fois par espace), app fermée ──
+  if (!filterUserId) {
+    try {
+      const { genjutsuCron } = await import('./genjutsu.ts')
+      const n = await genjutsuCron(db, Date.now() + 15_000)
+      if (n > 0) summary['genjutsu'] = `${n} espace(s)`
+    } catch { /* table absente (SQL 20261015 pas passé) : ignoré */ }
   }
 
   // ── Étape 0-stats : sync serveur des stats (followers/posts) par lots ──

@@ -341,7 +341,6 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* Bandeau « cinéma » : vraies miniatures de part et d'autre, titre XXL, action principale. */}
       <HomeHero
-        photos={topReels && topReels.length >= 6 ? topReels.map(r => r.thumb) : photos.viral}
         kicker={`${hello}, ${firstName}`}
         line1={infra === 'cloud' ? 'Ton parc' : 'Tes comptes'}
         line2="en pilote auto"
