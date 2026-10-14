@@ -375,7 +375,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
   const narrow = useNarrow(760)
   const mid = useNarrow(1180)
   const { series, reloadSeries } = useActivitySeries(user, org)
-  const reels = useTopReels(8)
+  const reels = useTopReels(16)
   const firstName = firstNameFrom(data?.displayName ?? null, user.email)
   const balance = data?.balance ?? null
   const now = new Date()
@@ -479,7 +479,13 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
         <div style={span(4, 3)}><RateCard rate={series?.rate7 ?? null} prev={series?.ratePrev7 ?? null} ok={series?.ok7 ?? 0} failed={series?.failed7 ?? 0} loading={sLoading} onOpen={() => onNavigate('activity')} /></div>
         <div style={span(6, 3)}><CreditsCard balance={loading ? null : balance} runway={runway} spent7={series ? series.ok7 * 2 : null} onOpen={() => openTool(onNavigate, 'settings', { tab: 'billing' })} /></div>
         <div style={span(6, 3)}><LiveCard onNavigate={onNavigate} delay={0.2} /></div>
-        {reels && reels.length >= 2 && <div style={span(12, 6)}><ReelsCard reels={reels} onOpen={goViral} cols={narrow ? 2 : mid ? 4 : 6} delay={0.25} /></div>}
+        {/* Pas deux fois les mêmes Reels : la rangée prend ceux qui ne sont pas déjà dans l'éventail du haut. */}
+        {reels && reels.length >= 2 && (() => {
+          const cols = narrow ? 2 : mid ? 4 : 6
+          const fanN = !narrow && hasReels ? (mid ? 3 : 5) : 0
+          const rest = reels.length - fanN >= cols ? reels.slice(fanN) : reels
+          return <div style={span(12, 6)}><ReelsCard reels={rest} onOpen={goViral} cols={cols} delay={0.25} /></div>
+        })()}
 
         {/* Aujourd'hui */}
         <div style={span(5, 6)}>
