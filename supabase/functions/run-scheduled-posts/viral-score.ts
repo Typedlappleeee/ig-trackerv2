@@ -33,7 +33,7 @@ function tsOf(n: any): string | null {
   return null
 }
 // deno-lint-ignore no-explicit-any
-const imgOf = (n: any): string | null => n?.thumbnail_url ?? n?.image_versions2?.candidates?.[0]?.url ?? n?.display_url ?? null
+const imgOf = (n: any): string | null => n?.thumbnail_url ?? n?.image_versions2?.candidates?.[0]?.url ?? n?.image_versions?.items?.[0]?.url ?? n?.display_url ?? n?.thumbnail_src ?? null
 /** Un média brut → données utiles. `forceKind` : 'reel' pour les clips, sinon déduit. */
 // deno-lint-ignore no-explicit-any
 export function parseMedia(raw: any, forceKind?: 'reel' | 'feed'): ParsedMedia | null {
@@ -45,6 +45,7 @@ export function parseMedia(raw: any, forceKind?: 'reel' | 'feed'): ParsedMedia |
   const slides = (n.resources ?? n.carousel_media ?? []) as unknown[]
   const images = (Array.isArray(slides) ? slides : []).map(imgOf).filter((x): x is string => !!x).slice(0, 20)
   const caption = String(n.caption_text ?? n?.caption?.text ?? (typeof n.caption === 'string' ? n.caption : '') ?? '')
+  const album = Number(n.media_type) === 8 || n.product_type === 'carousel_container' || Number(n.carousel_media_count) > 1
   return {
     code, kind, postedAt: tsOf(n),
     views: num(n.play_count, n.view_count, n.ig_play_count, n.video_view_count),
@@ -52,7 +53,9 @@ export function parseMedia(raw: any, forceKind?: 'reel' | 'feed'): ParsedMedia |
     thumb: imgOf(n) ?? images[0] ?? null,
     url: `https://www.instagram.com/${kind === 'reel' ? 'reel' : 'p'}/${code}/`,
     videoUrl: n.video_url ?? n?.video_versions?.[0]?.url ?? null,
-    caption: caption.slice(0, 2200), duration: num(n.video_duration), images: kind === 'feed' ? (images.length ? images : [imgOf(n)].filter((x): x is string => !!x)) : [],
+    caption: caption.slice(0, 2200), duration: num(n.video_duration),
+    // Carrousel dont les slides ne sont pas fournies (liste « légère ») → [] = à récupérer à l'ouverture.
+    images: kind !== 'feed' ? [] : images.length ? images : album ? [] : [imgOf(n)].filter((x): x is string => !!x),
   }
 }
 

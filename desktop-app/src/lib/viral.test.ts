@@ -66,6 +66,11 @@ describe('Veille v4 — médias, score, midi Paris', async () => {
     expect(m?.kind).toBe('feed'); expect(m?.images).toEqual(['https://a/1.jpg', 'https://a/2.jpg']); expect(m?.url).toBe('https://www.instagram.com/p/C9xYz-12AB/')
   })
   it('ignore un média sans code valide', () => { expect(parseMedia({ like_count: 3 })).toBeNull() })
+  it('carrousel sans slides fournies → [] (récupérées à l’ouverture) ; photo seule → sa vignette', () => {
+    expect(parseMedia({ code: 'C9xYz-12AB', media_type: 8, thumbnail_url: 'https://a/c.jpg', like_count: 1 })?.images).toEqual([])
+    expect(parseMedia({ code: 'C9xYz-12AC', media_type: 1, thumbnail_url: 'https://a/p.jpg', like_count: 1 })?.images).toEqual(['https://a/p.jpg'])
+    expect(parseMedia({ code: 'C9xYz-12AD', media_type: 8, carousel_media: [{ image_versions2: { candidates: [{ url: 'https://a/1.jpg' }] } }, { image_versions2: { candidates: [{ url: 'https://a/2.jpg' }] } }] })?.images).toEqual(['https://a/1.jpg', 'https://a/2.jpg'])
+  })
   it('score par métrique (médiane)', () => {
     const s = scoreBy([{ v: 10 }, { v: 20 }, { v: 30 }], x => x.v)
     expect(s[1].baseline).toBe(20); expect(s[2].score).toBe(1.5)
