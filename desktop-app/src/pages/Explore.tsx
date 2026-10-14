@@ -18,17 +18,19 @@ import { useTopReels, type TopReel } from '@/components/CineHero'
 const FAV_KEY = 'sf-fav-tools'
 function loadFavs(): string[] { try { const v = JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }
 
-// Photos des visuels (aperçus d'outils, bandeaux) : TOUJOURS la sélection maison (lib/curated,
-// portraits sûrs). Les miniatures de la Veille peuvent montrer n'importe quoi (animaux, jambes,
-// plateaux TV…) : elles restent réservées à la Veille elle-même. Signature gardée.
-export function usePhotos(_user?: User, _org?: OrgState): { viral: string[]; bank: string[] } {
-  return { viral: CURATED, bank: [] }
+// Photos des visuels (aperçus d'outils, tuiles) : les VRAIS Reels qui explosent (Veille, les plus
+// vus de la semaine, un par compte pour varier). Repli sur la sélection maison (lib/curated)
+// tant qu'il n'y en a pas assez. Signature gardée.
+export function usePhotos(_user?: User, _org?: OrgState): { viral: string[]; bank: string[]; real: boolean } {
+  const top = useTopReels(40)
+  const real = (top ?? []).map(r => r.thumb)
+  return real.length >= 6 ? { viral: real, bank: [], real: true } : { viral: CURATED, bank: [], real: false }
 }
-// Carte Story : image FIXE (portrait).
+// Carte Story : image FIXE (portrait) quand on n'a que la sélection maison.
 export const STORY_PICK = (k: number): string => curated(k ? 6 : 13)
 /** Sélecteur de photos d'une carte, décalé par carte pour que deux voisines n'aient pas les mêmes images. */
-export function pickerFor(t: Tool, i: number, p: { viral: string[]; bank: string[] }): (k: number) => string | null {
-  if (t.id === 'story') return STORY_PICK
+export function pickerFor(t: Tool, i: number, p: { viral: string[]; bank: string[]; real?: boolean }): (k: number) => string | null {
+  if (t.id === 'story' && !p.real) return STORY_PICK
   const pool = t.cat === 'create' || t.cat === 'bank' ? [...p.bank, ...p.viral] : [...p.viral, ...p.bank]
   return (k: number) => pool.length ? pool[(i * 3 + k) % pool.length] : null
 }
@@ -37,8 +39,8 @@ const STAR = 'M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9
 const ARROW = 'M5 12h14|M13 6l6 6-6 6'
 function Badge({ b }: { b: Tool['badge'] }) {
   if (!b) return null
-  const nu = b === 'Nouveau'
-  return <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 99, fontSize: 10.5, fontWeight: 750, letterSpacing: '.01em', background: nu ? '#F4F4F5' : 'rgba(10,10,11,0.55)', color: nu ? '#0A0A0B' : '#F4F4F5', border: nu ? 'none' : '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)', whiteSpace: 'nowrap' }}>{b}</span>
+  const nu = b === 'Nouveau', reco = b === 'Recommandé'
+  return <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 99, fontSize: 10.5, fontWeight: 750, letterSpacing: '.01em', background: reco ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : nu ? '#F4F4F5' : 'rgba(10,10,11,0.55)', color: nu ? '#0A0A0B' : '#F4F4F5', border: nu || reco ? 'none' : '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)', whiteSpace: 'nowrap', boxShadow: reco ? '0 6px 16px -6px rgba(236,72,153,.8)' : 'none' }}>{reco ? '✦ ' : ''}{b}</span>
 }
 function FavBtn({ on, show, onClick }: { on: boolean; show: boolean; onClick: () => void }) {
   return (
@@ -156,6 +158,7 @@ export function LinkBtn({ label, onClick }: { label: string; onClick: () => void
 // « À la une » : textes des tuiles mises en avant.
 const FEATURED: { tool: string; kicker: string; title: string; text: string; cta: string }[] = [
   { tool: 'viral', kicker: 'À la une', title: 'Repère les Reels qui explosent', text: 'FR et US, classés par vues, avec le badge « ×N la normale ». Ouvre un compte comme sur Instagram, télécharge, inspire-toi.', cta: 'Ouvrir la Veille' },
+  { tool: 'autocontent', kicker: '✦ Recommandé', title: 'Une vidéo → des dizaines de vidéos uniques', text: 'Légendes, coupe, vitesse et spoof en un clic : chaque compte reçoit sa propre vidéo.', cta: 'Lancer l’Auto-contenu' },
   { tool: 'genjutsu', kicker: 'Nouveau', title: 'Recrée un Reel avec tes images', text: 'Le mouvement d’un Reel viral, appliqué à tes photos de référence.', cta: 'Essayer' },
   { tool: 'links', kicker: 'Analyse', title: 'Sache quel compte te rapporte', text: 'Un lien suivi par compte : visites, clics et pays en direct.', cta: 'Voir mes liens' },
   { tool: 'remix', kicker: 'Studio', title: 'Une vidéo, 24 variantes', text: 'Chaque compte publie une version unique.', cta: 'Ouvrir le Remix' },

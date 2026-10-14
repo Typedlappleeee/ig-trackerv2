@@ -3081,6 +3081,13 @@ export const EN: Dict = {
     "Le plus utilisé": "Most used",
     "Une vidéo, 24 variantes uniques": "One video, 24 unique variants",
     "Couleurs, recadrage, vitesse, miroir : chaque compte publie une version différente. Métadonnées effacées, appareil et GPS réécrits.": "Colors, crop, speed, mirror: every account posts a different version. Metadata wiped, device and GPS rewritten.",
+    "Une vidéo → des dizaines de vidéos uniques, prêtes à poster : légendes, coupe, vitesse, spoof.": "One video → dozens of unique videos, ready to post: captions, cut, speed, spoof.",
+    "✦ Recommandé": "✦ Recommended",
+    "Une vidéo → des dizaines de vidéos uniques": "One video → dozens of unique videos",
+    "Légendes, coupe, vitesse et spoof en un clic : chaque compte reçoit sa propre vidéo.": "Captions, cut, speed and spoof in one click: every account gets its own video.",
+    "Lancer l’Auto-contenu": "Start Auto-content",
+    "✦ Recommandé · gratuit": "✦ Recommended · free",
+    "Légendes (pool + style), coupe, micro-vitesse, mode Tendance et spoof appareil / GPS : en un clic, chaque compte reçoit sa propre vidéo, prête à poster.": "Captions (pool + style), cut, micro-speed, Trend mode and device / GPS spoof: in one click, every account gets its own video, ready to post.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
