@@ -136,11 +136,16 @@ export function pauseRepairs(): () => void {
   let done = false
   return () => { if (!done) { done = true; paused-- } }
 }
+/** Vide la file (on quitte la Banque) : rien ne tourne en arrière-plan sur les autres pages. */
+let gen = 0
+export function cancelRepairs(): void { gen++ }
 export function repairThumb(id: string, storagePath: string, url: string, onDone?: (thumbPath: string) => void): void {
   if (tried.has(id)) return
   tried.add(id)
+  const mine = gen
   chain = chain.then(async () => {
     await waitResume()
+    if (mine !== gen) { tried.delete(id); return }
     const th = await frameOf(url)
     if (!th) return
     const tp = thumbPathFor(storagePath)

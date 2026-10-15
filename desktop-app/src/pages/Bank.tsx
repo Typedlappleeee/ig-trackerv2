@@ -11,7 +11,7 @@ import { MediaThumb } from '@/components/MediaThumb'
 import { VideoPlayerModal } from '@/components/VideoPlayer'
 import { setRelaunch } from '@/lib/runHistory'
 import type { OrgState } from '@/lib/data'
-import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, addToBank, PLAN_LABEL } from '@/lib/bankStorage'
+import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, addToBank, cancelRepairs, PLAN_LABEL } from '@/lib/bankStorage'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -190,6 +190,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }, [currentOrg?.id, user.id, org.loading])
 
   useEffect(() => { load() }, [load])
+  // En quittant la Banque, les miniatures en attente ne se créent plus en arrière-plan.
+  useEffect(() => () => cancelRepairs(), [])
 
   // ── Légendes (caption_bank) ──────────────────────────────────────────────────
   const loadCaptions = useCallback(async () => {
