@@ -3,6 +3,7 @@
 import { supabase } from './supabase'
 import { runFfmpeg, fetchInput } from './ffmpeg'
 import { addToBank } from './bankStorage'
+import { getLocal, putLocal } from './localMedia'
 import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
 import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, type RemixIntensity, type RemixToggles } from './studioFilters'
@@ -11,11 +12,19 @@ export { remixParams, captionLines, captionFor, type RemixToggles } from './stud
 export interface SourceRef { id?: string; title: string; storage_path?: string | null; file_url?: string | null }
 
 // Récupère les octets d'une source (URL signée banque OU fichier PC).
+// Copie locale d'abord (lib/localMedia) : une vidéo déjà sur ce PC n'est pas retéléchargée ;
+// sinon téléchargée puis gardée pour la fois suivante.
 export async function resolveSourceBytes(v: SourceRef, file?: File): Promise<Uint8Array> {
   if (file) return fetchInput(file)
   if (v.storage_path) {
+    const local = await getLocal(v.storage_path)
+    if (local) return new Uint8Array(await local.arrayBuffer())
     const { data } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600)
-    if (data?.signedUrl) return fetchInput(data.signedUrl)
+    if (data?.signedUrl) {
+      const bytes = await fetchInput(data.signedUrl)
+      void putLocal(v.storage_path, new Blob([bytes as BlobPart]))
+      return bytes
+    }
   }
   if (v.file_url) return fetchInput(v.file_url)
   throw new Error('Source introuvable')

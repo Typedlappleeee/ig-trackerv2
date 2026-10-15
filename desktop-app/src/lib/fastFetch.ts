@@ -2,8 +2,8 @@
 // morceaux de 4 Mo, plusieurs en parallèle (requêtes Range). Une seule connexion au stockage
 // plafonne bien en dessous du débit du wifi : une vidéo 4K (40–80 Mo) « mettait du temps à
 // charger » en lecture directe. Fait EN ARRIÈRE-PLAN pendant que la lecture directe reste
-// disponible ; une fois complète, la vidéo est lue depuis la mémoire (fluide) et gardée en
-// cache (LRU) — la génération réutilise aussi ces octets au lieu de retélécharger.
+// disponible ; une fois complète, la vidéo est lue depuis la mémoire (fluide) et gardée sur le
+// PC (lib/localMedia) — la génération réutilise aussi ces octets au lieu de retélécharger.
 
 export interface FetchProgress { loaded: number; total: number | null }
 type Fetch = typeof fetch
@@ -60,27 +60,4 @@ async function readAll(res: Response, type: string, onProgress?: (p: FetchProgre
     onProgress?.({ loaded, total })
   }
   return new Blob(chunks, { type })
-}
-
-// ── Cache mémoire des vidéos déjà ouvertes (URL blob), clé = chemin sans le jeton ──
-const MAX_BYTES = 400 * 1024 * 1024
-const cache = new Map<string, { url: string; size: number }>()
-export const cacheKey = (url: string) => url.split('?')[0]
-export function cachedVideo(url: string): string | null {
-  const k = cacheKey(url), hit = cache.get(k)
-  if (!hit) return null
-  cache.delete(k); cache.set(k, hit)                    // le plus récent en dernier
-  return hit.url
-}
-export function rememberVideo(url: string, blob: Blob): string {
-  const k = cacheKey(url)
-  const old = cache.get(k); if (old) { URL.revokeObjectURL(old.url); cache.delete(k) }
-  const entry = { url: URL.createObjectURL(blob), size: blob.size }
-  cache.set(k, entry)
-  let sum = [...cache.values()].reduce((s, e) => s + e.size, 0)
-  for (const [key, e] of cache) {
-    if (sum <= MAX_BYTES || key === k) break
-    URL.revokeObjectURL(e.url); cache.delete(key); sum -= e.size
-  }
-  return entry.url
 }

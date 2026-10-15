@@ -14,7 +14,8 @@ import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
 import { addToBank, pauseRepairs } from '@/lib/bankStorage'
-import { fetchFast, cachedVideo, rememberVideo } from '@/lib/fastFetch'
+import { fetchFast } from '@/lib/fastFetch'
+import { getLocal, putLocal } from '@/lib/localMedia'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
@@ -557,23 +558,26 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [unplayable, setUnplayable] = useState<Set<string>>(new Set())
   // Sur cette page, aucune création de miniature en arrière-plan : toute la connexion va aux aperçus.
   useEffect(() => pauseRepairs(), [])
-  // Copie locale des sources (téléchargées en accéléré, en arrière-plan, une à la fois) :
-  // aperçu fluide + génération qui ne retélécharge pas. id → URL blob ; progression en %.
+  // Copie LOCALE des sources (lib/localMedia, sur ce PC) : une vidéo importée d'ici ou déjà
+  // lue une fois s'affiche et se génère instantanément, sans retéléchargement. Sinon elle est
+  // récupérée en accéléré (morceaux parallèles) en arrière-plan, puis gardée sur le PC.
+  // id → URL blob ; progression en %.
   const [localSrc, setLocalSrc] = useState<Record<string, string>>({})
   const [preProg, setPreProg] = useState<Record<string, number | null>>({})
+  const blobUrls = useRef<string[]>([])
+  useEffect(() => () => { blobUrls.current.forEach(u => URL.revokeObjectURL(u)) }, [])
+  const toUrl = (b: Blob) => { const u = URL.createObjectURL(b); blobUrls.current.push(u); return u }
   useEffect(() => {
     const ac = new AbortController()
     ;(async () => {
       for (const x of sources.slice(0, 3)) {
         const media = previews[x.id]?.media
-        if (!media || ac.signal.aborted) continue
-        const hit = cachedVideo(media)
-        if (hit) { setLocalSrc(m => m[x.id] === hit ? m : { ...m, [x.id]: hit }); continue }
+        if (!media || !x.storage_path || localSrc[x.id] || ac.signal.aborted) continue
         try {
           const blob = await fetchFast(media, p => setPreProg(m => ({ ...m, [x.id]: p.total ? Math.round((p.loaded / p.total) * 100) : null })), ac.signal, fetch, 400 * 1024 * 1024)
           if (ac.signal.aborted) return
-          const u = rememberVideo(media, blob)
-          setLocalSrc(m => ({ ...m, [x.id]: u }))
+          void putLocal(x.storage_path, blob)
+          setLocalSrc(m => ({ ...m, [x.id]: toUrl(blob) }))
         } catch { /* trop lourde / réseau : la lecture directe reste */ }
         finally { setPreProg(m => { const n = { ...m }; delete n[x.id]; return n }) }
       }
@@ -584,6 +588,9 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     let alive = true
     ;(async () => {
       const list = sources.slice(0, 8)
+      // Copies déjà sur le PC : prêtes AVANT l'affichage de l'aperçu (lecture instantanée).
+      const locals: Record<string, string> = {}
+      await Promise.all(list.map(async x => { if (localSrc[x.id]) return; const b = await getLocal(x.storage_path); if (b && alive) locals[x.id] = toUrl(b) }))
       const paths = [...new Set(list.flatMap(x => [x.storage_path, x.thumbnail_url ? null : x.thumbnail_path]).filter((p): p is string => !!p))]
       const signed: Record<string, string> = {}
       if (paths.length) {
@@ -595,6 +602,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         thumb: x.thumbnail_url ?? (x.thumbnail_path ? signed[x.thumbnail_path] ?? null : null),
         media: x.storage_path ? signed[x.storage_path] ?? null : x.file_url,
       }
+      if (alive && Object.keys(locals).length) setLocalSrc(m => ({ ...m, ...locals }))
       if (alive) setPreviews(out)
     })()
     return () => { alive = false }

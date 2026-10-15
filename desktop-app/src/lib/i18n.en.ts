@@ -3117,6 +3117,7 @@ export const EN: Dict = {
     "Lire sans attendre": "Play without waiting",
     "aperçu indisponible": "preview unavailable",
     "Préparation de la lecture fluide": "Preparing smooth playback",
+    "indexedDB indisponible": "indexedDB unavailable",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
