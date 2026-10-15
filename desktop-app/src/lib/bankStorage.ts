@@ -49,26 +49,19 @@ export function useBankUsage(orgId: string | null): { usage: BankUsage | null; r
   return { usage, reload }
 }
 
-// ── Miniature + durée d'une vidéo, générées dans le navigateur ───────────────────
-/** Capture une image d'une vidéo (fichier local OU URL signée) : JPEG 360 px + durée.
- *  null si le navigateur ne décode pas la vidéo (ex. .MOV HEVC d'iPhone). Une URL
- *  distante est lue en CORS (canvas non « teinté ») avec une URL distincte, pour ne pas
- *  empoisonner le cache de la lecture normale. */
-export function frameOf(src: Blob | string, at = 0.6): Promise<{ blob: Blob; duration: number } | null> {
+// ── Miniature + durée d'une vidéo, générées dans le navigateur à l'envoi ─────────
+export function videoThumb(file: Blob, at = 0.6): Promise<{ blob: Blob; duration: number } | null> {
   return new Promise(resolve => {
-    const local = typeof src !== 'string'
-    const url = local ? URL.createObjectURL(src) : src + (src.includes('?') ? '&' : '?') + 'sf_frame=1'
+    const url = URL.createObjectURL(file)
     const v = document.createElement('video')
     let done = false
-    const finish = (r: { blob: Blob; duration: number } | null) => { if (done) return; done = true; if (local) URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); resolve(r) }
-    const timer = setTimeout(() => finish(null), local ? 12_000 : 20_000)
+    const finish = (r: { blob: Blob; duration: number } | null) => { if (done) return; done = true; URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); resolve(r) }
+    const timer = setTimeout(() => finish(null), 12_000)
     v.muted = true; v.playsInline = true; v.preload = 'metadata'
-    if (!local) v.crossOrigin = 'anonymous'
     v.onerror = () => { clearTimeout(timer); finish(null) }   // ex. HEVC non décodable : pas de miniature, pas grave
     v.onloadedmetadata = () => { try { v.currentTime = Math.min(at, Math.max(0, (v.duration || 1) / 2)) } catch { finish(null) } }
     v.onseeked = () => {
       try {
-        if (!v.videoWidth) { clearTimeout(timer); finish(null); return }
         const w = 360, h = Math.round(w * (v.videoHeight / Math.max(1, v.videoWidth))) || 640
         const c = document.createElement('canvas'); c.width = w; c.height = h
         c.getContext('2d')!.drawImage(v, 0, 0, w, h)
@@ -77,46 +70,4 @@ export function frameOf(src: Blob | string, at = 0.6): Promise<{ blob: Blob; dur
     }
     v.src = url
   })
-}
-/** Miniature + durée d'un fichier vidéo local (à l'envoi). */
-export const videoThumb = (file: Blob, at = 0.6) => frameOf(file, at)
-
-export const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
-const MIME: Record<string, string> = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', m4v: 'video/mp4', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', heic: 'image/heic' }
-/** Chemin de la miniature d'un média : à côté du fichier, suffixe _thumb.jpg. */
-export const thumbPathFor = (storagePath: string) => storagePath.replace(/\.[a-z0-9]+$/i, '') + '_thumb.jpg'
-
-/** Ajoute un fichier à la banque (bucket content + ligne content_bank) AVEC sa miniature et
- *  sa durée pour une vidéo. Seul point d'entrée : import Banque, Studio, sélecteur, Auto-contenu,
- *  sorties générées (avant, seules les vidéos importées depuis la Banque avaient une miniature
- *  → vignettes et aperçus noirs pour tout le reste). Si la ligne est refusée, les fichiers sont
- *  retirés du stockage (pas d'orphelins). */
-export async function addToBank(o: { userId: string; orgId: string | null; file: Blob; name: string; title?: string; ext?: string; folder?: string | null }): Promise<{ id: string | null; storagePath: string | null; error?: string }> {
-  const scopeFolder = o.orgId ? `orgs/${o.orgId}` : `users/${o.userId}`
-  let ext = (o.ext ?? o.name.split('.').pop() ?? '').toLowerCase()
-  if (!ext || ext.length > 5) ext = o.file.type.startsWith('image') ? 'jpg' : 'mp4'
-  const isImage = o.file.type.startsWith('image') || IMG_EXT.includes(ext)
-  const id = crypto.randomUUID()
-  const storagePath = `videos/${scopeFolder}/${id}.${ext}`
-  const up = await supabase.storage.from('content').upload(storagePath, o.file, { contentType: o.file.type || MIME[ext] || undefined, upsert: false })
-  if (up.error) return { id: null, storagePath: null, error: /row-level security|policy/i.test(up.error.message) ? 'espace plein ou accès refusé' : up.error.message }
-  let thumbPath: string | null = null, duration: number | null = null
-  if (!isImage) {
-    const th = await frameOf(o.file)
-    if (th) {
-      duration = th.duration || null
-      const tp = thumbPathFor(storagePath)
-      const tu = await supabase.storage.from('content').upload(tp, th.blob, { contentType: 'image/jpeg', upsert: false })
-      if (!tu.error) thumbPath = tp
-    }
-  }
-  const ins = await supabase.from('content_bank').insert({
-    user_id: o.userId, org_id: o.orgId, title: o.title ?? o.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: thumbPath,
-    file_url: null, folder: o.folder || null, duration, tags: [], notes: null, used_count: 0,
-  }).select('id').maybeSingle()
-  if (ins.error) {
-    await supabase.storage.from('content').remove([storagePath, ...(thumbPath ? [thumbPath] : [])]).catch(() => {})
-    return { id: null, storagePath: null, error: ins.error.message }
-  }
-  return { id: (ins.data as { id?: string } | null)?.id ?? null, storagePath }
 }

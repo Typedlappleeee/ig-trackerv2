@@ -1,6 +1,6 @@
 // Fabriques d'éléments portées à l'identique du prototype ScaleFlow.dc.html.
 // _icon / _statusDot / _chip / _btn / _panel / _panelHead / _pageHead / _kpi / _empty
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Theme } from './theme'
@@ -211,19 +211,6 @@ export function Modal({ title, sub, icon, theme, onClose, footer, width, childre
   footer?: ReactNode; width?: number; children: ReactNode
 }) {
   void theme
-  // Échap ferme la fenêtre (la plus récente seulement si plusieurs sont ouvertes).
-  const closeRef = useRef(onClose); closeRef.current = onClose
-  useEffect(() => {
-    const f = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      const all = document.querySelectorAll('[data-sf-modal]')
-      if (all.length && all[all.length - 1] !== boxRef.current) return
-      e.stopPropagation(); closeRef.current()
-    }
-    window.addEventListener('keydown', f)
-    return () => window.removeEventListener('keydown', f)
-  }, [])
-  const boxRef = useRef<HTMLDivElement>(null)
   // Portal vers <body> : une modale doit être relative à l'écran, pas au conteneur
   // de page (qui a un transform d'animation → il piégeait le position:fixed).
   return createPortal(
@@ -231,7 +218,7 @@ export function Modal({ title, sub, icon, theme, onClose, footer, width, childre
       position: 'fixed', inset: 0, zIndex: 90, display: 'flex', justifyContent: 'center', padding: 24, overflowY: 'auto',
       background: 'rgba(0,0,0,0.66)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', animation: 'aFade .14s ease both',
     }}>
-      <div ref={boxRef} data-sf-modal="" role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()} style={{
+      <div role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()} style={{
         display: 'flex', flexDirection: 'column', width: width ?? 560, maxWidth: '100%', maxHeight: 'calc(100vh - 48px)', margin: 'auto', borderRadius: 20, overflow: 'hidden',
         background: '#101012', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px -24px rgba(0,0,0,0.85)',
         animation: 'aPop .18s cubic-bezier(0.16,1,0.3,1) both',

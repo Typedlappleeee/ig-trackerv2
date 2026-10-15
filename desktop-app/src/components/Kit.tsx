@@ -3,7 +3,6 @@
 // cartes de choix, journal repliable, bandeau GeeLark. Purement visuel — aucune logique métier.
 import { useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import { Icon, Toggle, useNarrow } from '@/lib/ui'
-import { MediaThumb } from '@/components/MediaThumb'
 
 // ── En-tête de page : sur-titre, titre (casse normale), sous-titre, actions ─────
 export function PageHeader({ kicker, title, sub, actions, style }: { kicker?: ReactNode; title: ReactNode; sub?: ReactNode; actions?: ReactNode; style?: CSSProperties }) {
@@ -26,11 +25,8 @@ export function UnderlineTabs<T extends string>({ items, value, onChange, back, 
   items: TabItem<T>[]; value: T; onChange: (k: T) => void; back?: { label: string; onClick: () => void }; right?: ReactNode; sticky?: boolean; style?: CSSProperties
 }) {
   const narrow = useNarrow(760)
-  // Marges calées sur celles de la page (Shell : 16 px sous 860 px, sinon 32 px) : pas de
-  // débordement horizontal entre 760 et 860 px.
-  const tight = useNarrow(860)
   return (
-    <div style={{ position: sticky ? 'sticky' : 'relative', top: 0, zIndex: 6, margin: tight ? '0 -16px 22px' : '0 -32px 26px', padding: tight ? '0 16px' : '0 32px', background: 'rgba(10,10,11,0.86)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(255,255,255,0.07)', ...style }}>
+    <div style={{ position: sticky ? 'sticky' : 'relative', top: 0, zIndex: 6, margin: narrow ? '0 -16px 22px' : '0 -32px 26px', padding: narrow ? '0 16px' : '0 32px', background: 'rgba(10,10,11,0.86)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(255,255,255,0.07)', ...style }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         {back && (
           <>
@@ -117,11 +113,14 @@ export function MediaTile({ thumb, video, title, sub, aspect = '9 / 16', onRemov
   thumb?: string | null; video?: string | null; title?: string; sub?: ReactNode; aspect?: string; onRemove?: () => void; onClick?: () => void; badge?: ReactNode; selected?: boolean; style?: CSSProperties
 }) {
   const [h, setH] = useState(false)
+  const vref = useRef<HTMLVideoElement>(null)
   return (
-    <div onClick={onClick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+    <div onClick={onClick} onMouseEnter={() => { setH(true); void vref.current?.play().catch(() => {}) }} onMouseLeave={() => { setH(false); if (vref.current) { vref.current.pause() } }}
       style={{ position: 'relative', aspectRatio: aspect, borderRadius: 14, overflow: 'hidden', background: '#141416', cursor: onClick ? 'pointer' : 'default', boxShadow: selected ? '0 0 0 2px #A78BFA' : h ? '0 0 0 1px rgba(255,255,255,0.22)' : '0 0 0 1px rgba(255,255,255,0.06)', transition: 'box-shadow .15s ease', ...style }}>
-      {/* Miniature → 1re image vidéo → repli lisible (jamais noir) ; lecture au survol. */}
-      <MediaThumb id={title ?? thumb ?? video ?? 'media'} thumb={thumb ?? null} media={video ?? null} video={!!video || !thumb} small playing={h && !!video} />
+      {video
+        ? <video ref={vref} src={video} poster={thumb ?? undefined} muted loop playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        : thumb ? <img src={thumb} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3F3F46' }}><Icon d="m22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z" size={22} /></span>}
       {(title || sub) && <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 55%, rgba(0,0,0,.82))', pointerEvents: 'none' }} />}
       {badge && <span style={{ position: 'absolute', top: 7, left: 7 }}>{badge}</span>}
       {onRemove && (

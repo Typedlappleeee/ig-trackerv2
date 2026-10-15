@@ -2,8 +2,6 @@
 // source (banque ou PC) et produit un mp4 prêt à poster, enregistré dans la banque.
 import { supabase } from './supabase'
 import { runFfmpeg, fetchInput } from './ffmpeg'
-import { addToBank } from './bankStorage'
-import { getLocal, putLocal } from './localMedia'
 import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
 import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, type RemixIntensity, type RemixToggles } from './studioFilters'
@@ -12,30 +10,30 @@ export { remixParams, captionLines, captionFor, type RemixToggles } from './stud
 export interface SourceRef { id?: string; title: string; storage_path?: string | null; file_url?: string | null }
 
 // Récupère les octets d'une source (URL signée banque OU fichier PC).
-// Copie locale d'abord (lib/localMedia) : une source déjà sur ce PC n'est pas retéléchargée ;
-// sinon téléchargement normal (comme avant), puis la source est gardée (jamais les sorties).
 export async function resolveSourceBytes(v: SourceRef, file?: File): Promise<Uint8Array> {
   if (file) return fetchInput(file)
   if (v.storage_path) {
-    const local = await getLocal(v.storage_path)
-    if (local) return new Uint8Array(await local.arrayBuffer())
     const { data } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600)
-    if (data?.signedUrl) {
-      const bytes = await fetchInput(data.signedUrl)
-      void putLocal(v.storage_path, new Blob([bytes as BlobPart]))
-      return bytes
-    }
+    if (data?.signedUrl) return fetchInput(data.signedUrl)
   }
   if (v.file_url) return fetchInput(v.file_url)
   throw new Error('Source introuvable')
 }
 
-// Enregistre un fichier de sortie dans la banque (bucket content + content_bank), avec sa
-// miniature et sa durée (sinon vignette noire dans la Banque et les aperçus).
+// Enregistre un mp4 de sortie dans la banque (bucket content + content_bank).
 export async function saveOutputToBank(userId: string, orgId: string | null, bytes: Uint8Array, title: string, ext = 'mp4', folder: string | null = null): Promise<string | null> {
+  const scopeFolder = orgId ? `orgs/${orgId}` : `users/${userId}`
+  const id = crypto.randomUUID()
+  const storagePath = `videos/${scopeFolder}/${id}.${ext}`
   const mime = ext === 'mov' ? 'video/quicktime' : ext === 'mp4' ? 'video/mp4' : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'application/octet-stream'
-  const r = await addToBank({ userId, orgId, file: new Blob([bytes as BlobPart], { type: mime }), name: `${title}.${ext}`, title, ext, folder })
-  return r.storagePath
+  const blob = new Blob([bytes as BlobPart], { type: mime })
+  const up = await supabase.storage.from('content').upload(storagePath, blob, { contentType: blob.type, upsert: false })
+  if (up.error) return null
+  await supabase.from('content_bank').insert({
+    user_id: userId, org_id: orgId, title, storage_path: storagePath,
+    file_url: null, folder: folder || null, duration: null, tags: [], notes: null, used_count: 0,
+  })
+  return storagePath
 }
 
 // Encodage h264/aac rapide (wasm). '-c:a aac' est ignoré s'il n'y a pas d'audio.
