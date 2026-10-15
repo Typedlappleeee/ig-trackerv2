@@ -374,6 +374,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     while (taken.has(name)) name = `${base}_${n++}.${ext}`
     taken.add(name); return name
   }
+  const mo = (n: number) => `${Math.round(n / 1024 / 1024)} Mo`
   async function downloadMedia(ids: string[]) {
     if (ids.length === 0) return
     const targets = ids.map(id => items.find(x => x.id === id)).filter((x): x is ContentItem => !!x)
@@ -410,28 +411,29 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           const { downloadZip } = await import('client-zip')
           const taken = new Set<string>()
           let done = 0, ok = 0
-          // Fichier entier par un fetch normal (comme avant) ; les 2 suivants sont lancés
-          // PENDANT l'écriture du courant → le ZIP n'attend plus entre deux vidéos.
-          const get = async (it: ContentItem): Promise<Blob | null> => {
-            const url = mediaFor(it) ?? await urlForItem(it); if (!url) return null
-            try { const r = await fetch(url); return r.ok ? await r.blob() : null } catch { return null }
-          }
-          const pending = new Map<number, Promise<Blob | null>>()
-          const start = (i: number) => { if (i < targets.length && !pending.has(i)) pending.set(i, get(targets[i])) }
           async function* gen() {
-            for (let i = 0; i < targets.length; i++) {
-              for (let k = i; k <= i + 2; k++) start(k)
-              setNotice(`ZIP : ${++done}/${targets.length}…`)
-              const blob = await pending.get(i)!; pending.delete(i)
-              if (!blob) continue
+            for (const it of targets) {
+              setNotice(`ZIP : ${++done}/${targets.length} · ${mo(written)} écrits…`)
+              const url = mediaFor(it) ?? await urlForItem(it); if (!url) continue
+              let resp: Response
+              try { resp = await fetch(url) } catch { continue }
+              if (!resp.ok || !resp.body) continue
               ok++
-              yield { name: fileNameFor(targets[i], taken), input: blob }
+              yield { name: fileNameFor(it, taken), input: resp }
             }
           }
+          // Écriture AU FIL DE L'EAU (comme avant) + compteur de Mo écrits visible dans l'app
+          // (l'Explorateur Windows affiche 0 Ko tant que le fichier n'est pas terminé).
+          let written = 0, last = 0
+          const count = new TransformStream<Uint8Array, Uint8Array>({ transform(chunk, ctl) {
+            written += chunk.byteLength
+            if (written - last > 8 * 1024 * 1024) { last = written; setNotice(`ZIP : ${done}/${targets.length} · ${mo(written)} écrits…`) }
+            ctl.enqueue(chunk)
+          } })
           const zipResp = downloadZip(gen())
           const writable = await handle.createWritable()
-          await zipResp.body!.pipeTo(writable as unknown as WritableStream)
-          setNotice(ok > 0 ? `ZIP enregistré — ${ok} fichier(s).` : 'Aucun fichier récupéré (réseau/CORS ?).')
+          await zipResp.body!.pipeThrough(count).pipeTo(writable as unknown as WritableStream)
+          setNotice(ok > 0 ? `ZIP enregistré — ${ok} fichier(s), ${mo(written)}.` : 'Aucun fichier récupéré (réseau/CORS ?).')
         } catch (e) { setNotice(`Échec du ZIP : ${e instanceof Error ? e.message : String(e)}`) }
         return
       }
