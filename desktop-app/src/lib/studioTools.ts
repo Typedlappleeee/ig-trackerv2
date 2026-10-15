@@ -2,6 +2,7 @@
 // source (banque ou PC) et produit un mp4 prêt à poster, enregistré dans la banque.
 import { supabase } from './supabase'
 import { runFfmpeg, fetchInput } from './ffmpeg'
+import { addToBank } from './bankStorage'
 import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
 import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, type RemixIntensity, type RemixToggles } from './studioFilters'
@@ -20,20 +21,12 @@ export async function resolveSourceBytes(v: SourceRef, file?: File): Promise<Uin
   throw new Error('Source introuvable')
 }
 
-// Enregistre un mp4 de sortie dans la banque (bucket content + content_bank).
+// Enregistre un fichier de sortie dans la banque (bucket content + content_bank), avec sa
+// miniature et sa durée (sinon vignette noire dans la Banque et les aperçus).
 export async function saveOutputToBank(userId: string, orgId: string | null, bytes: Uint8Array, title: string, ext = 'mp4', folder: string | null = null): Promise<string | null> {
-  const scopeFolder = orgId ? `orgs/${orgId}` : `users/${userId}`
-  const id = crypto.randomUUID()
-  const storagePath = `videos/${scopeFolder}/${id}.${ext}`
   const mime = ext === 'mov' ? 'video/quicktime' : ext === 'mp4' ? 'video/mp4' : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'application/octet-stream'
-  const blob = new Blob([bytes as BlobPart], { type: mime })
-  const up = await supabase.storage.from('content').upload(storagePath, blob, { contentType: blob.type, upsert: false })
-  if (up.error) return null
-  await supabase.from('content_bank').insert({
-    user_id: userId, org_id: orgId, title, storage_path: storagePath,
-    file_url: null, folder: folder || null, duration: null, tags: [], notes: null, used_count: 0,
-  })
-  return storagePath
+  const r = await addToBank({ userId, orgId, file: new Blob([bytes as BlobPart], { type: mime }), name: `${title}.${ext}`, title, ext, folder })
+  return r.storagePath
 }
 
 // Encodage h264/aac rapide (wasm). '-c:a aac' est ignoré s'il n'y a pas d'audio.

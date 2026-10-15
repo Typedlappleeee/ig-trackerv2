@@ -3104,6 +3104,10 @@ export const EN: Dict = {
     "chacune avec son propre texte": "each with its own text",
     "Ta vidéo": "Your video",
     "Tes vidéos": "Your videos",
+    "Un import est déjà en cours : attends qu’il se termine.": "An import is already running: wait for it to finish.",
+    "Fichier introuvable dans le stockage.": "File not found in storage.",
+    "ou lâche-les sur un dossier à gauche": "or drop them on a folder on the left",
+    "Actions du dossier": "Folder actions",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3614,5 +3618,8 @@ export const EN: Dict = {
     ["{0} à venir", "{0} upcoming"],
     ["{0} outils · gratuits", "{0} tools · free"],
     ["{0} sélectionné(s)", "{0} selected"],
+    ["{0} · aperçu indisponible", "{0} · preview unavailable"],
+    ["{0} · clic pour lire", "{0} · click to play"],
+    ["⚠ {0} : lecture impossible dans l’app (format HEVC ?) — la génération fonctionne quand même.", "⚠ {0}: can’t play in the app (HEVC format?) — generation still works."],
   ],
 }

@@ -13,6 +13,8 @@ import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
+import { addToBank } from '@/lib/bankStorage'
+import { MediaThumb } from '@/components/MediaThumb'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
@@ -489,7 +491,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
 
   // ── Générateur auto : sources banque → N variantes uniques (spoof) + légende IA ──
   const [picker, setPicker] = useState(false)
-  const [sources, setSources] = useState<{ id: string; title: string; storage_path: string | null; file_url: string | null }[]>([])
+  type Src = { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_path?: string | null; thumbnail_url?: string | null }
+  const [sources, setSources] = useState<Src[]>([])
   const [variants, setVariants] = useState(3)
   // Anti-détection : intensité du spoof + localisation GPS (métadonnées mp4).
   const [intensity, setIntensity] = useState<SpoofIntensity>('normal')
@@ -523,15 +526,25 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [speedMax, setSpeedMax] = useState('1.02')
   // Dossier de destination des sorties (banque).
   const [destFolder, setDestFolder] = useState('')
-  // Aperçu : URL signée par vidéo source (pour voir la vidéo + la caption dessus).
-  const [previews, setPreviews] = useState<Record<string, string>>({})
+  // Aperçu : miniature + URL signée de chaque vidéo source (voir la vidéo + la légende dessus).
+  // La miniature s'affiche tout de suite ; une vidéo que le navigateur ne décode pas (HEVC)
+  // garde un repli lisible au lieu d'un cadre noir.
+  const [previews, setPreviews] = useState<Record<string, { thumb: string | null; media: string | null }>>({})
+  const [playing, setPlaying] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const out: Record<string, string> = {}
-      for (const s of sources.slice(0, 8)) {
-        if (s.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(s.storage_path, 3600); if (data?.signedUrl) out[s.id] = data.signedUrl }
-        else if (s.file_url) out[s.id] = s.file_url
+      const list = sources.slice(0, 8)
+      const paths = [...new Set(list.flatMap(x => [x.storage_path, x.thumbnail_url ? null : x.thumbnail_path]).filter((p): p is string => !!p))]
+      const signed: Record<string, string> = {}
+      if (paths.length) {
+        const { data } = await supabase.storage.from('content').createSignedUrls(paths, 3600)
+        ;(data ?? []).forEach(d => { if (d.path && d.signedUrl) signed[d.path] = d.signedUrl })
+      }
+      const out: Record<string, { thumb: string | null; media: string | null }> = {}
+      for (const x of list) out[x.id] = {
+        thumb: x.thumbnail_url ?? (x.thumbnail_path ? signed[x.thumbnail_path] ?? null : null),
+        media: x.storage_path ? signed[x.storage_path] ?? null : x.file_url,
       }
       if (alive) setPreviews(out)
     })()
@@ -546,27 +559,21 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   async function applyPicker(r: PickerResult) {
     if (r.kind !== 'videos' || r.ids.length === 0) return
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', r.ids)
-    setSources((data ?? []) as any[])
+    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_path,thumbnail_url')).in('id', r.ids)
+    setSources((data ?? []) as Src[])
   }
 
   // Import « Mon PC » : upload vers le bucket content + content_bank, puis ajout aux sources.
   async function importFromPC(files: FileList | File[]) {
     const list = Array.from(files).filter(f => f.type.startsWith('video')); if (list.length === 0) return
-    const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
-    const added: { id: string; title: string; storage_path: string | null; file_url: string | null }[] = []
+    const added: Src[] = []
     let done = 0
     for (const file of list) {
       setUploading(`${file.name} (${++done}/${list.length})`)
       try {
-        const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase()
-        const id = crypto.randomUUID()
-        const storagePath = `videos/${scopeFolder}/${id}.${ext}`
-        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
-        if (up.error) continue
         const title = file.name.replace(/\.[a-z0-9]+$/i, '')
-        const ins = await supabase.from('content_bank').insert({ user_id: user.id, org_id: currentOrg?.id ?? null, title, storage_path: storagePath, file_url: null, folder: destFolder || null, tags: [], notes: null, used_count: 0 }).select('id').single()
-        added.push({ id: (ins.data as any)?.id ?? id, title, storage_path: storagePath, file_url: null })
+        const r = await addToBank({ userId: user.id, orgId: currentOrg?.id ?? null, file, name: file.name, folder: destFolder || null })
+        if (r.id && r.storagePath) added.push({ id: r.id, title, storage_path: r.storagePath, file_url: null, thumbnail_path: null, thumbnail_url: null })
       } catch { /* ignore */ }
     }
     setUploading(null)
@@ -780,18 +787,17 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           <Grp title="Aperçu">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {sources.slice(0, 8).map(s => {
-                const url = previews[s.id]
+                const pv = previews[s.id]
+                const url = pv?.media ?? null
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
                 const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
                 return (
-                  <div key={s.id} title={s.title} onClick={e => {
-                    const v = e.currentTarget.querySelector('video'); if (!v) return
-                    if (v.paused) { e.currentTarget.parentElement?.querySelectorAll('video').forEach(o => { if (o !== v) o.pause() }); v.muted = false; v.play() } else v.pause()
-                  }}
+                  <div key={s.id} title={`${s.title} · clic pour lire`} onClick={() => { if (url) setPlaying(p => p === s.id ? null : s.id) }}
                     style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 6, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${EDGE}`, cursor: url ? 'pointer' : 'default' }}>
-                    {url
-                      ? <video src={url + '#t=0.3'} playsInline loop preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
+                    <MediaThumb id={s.id} thumb={pv?.thumb ?? null} media={url} video small
+                      ext={((s.storage_path ?? s.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)}
+                      repair={s.storage_path && !s.thumbnail_path && !s.thumbnail_url ? { id: s.id, storagePath: s.storage_path } : null}
+                      playing={playing === s.id} playMuted={false} onPlayError={() => { setPlaying(null); push(`⚠ ${s.title} : lecture impossible dans l’app (format HEVC ?) — la génération fonctionne quand même.`) }} />
                     {capPrev && (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
                         <span style={{ display: 'inline-block', maxWidth: '100%', textAlign: 'center', color: '#fff', fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: capStyle === 'outline' ? 700 : 400, fontSize: 8.5, lineHeight: 1.25, padding: capStyle === 'snapchat' ? '2px 4px' : '0 3px', width: capStyle === 'snapchat' ? '100%' : 'auto', background: capStyle === 'snapchat' ? 'rgba(48,48,48,0.5)' : 'transparent', textShadow: capStyle === 'outline' ? '0 0 2px #000,0 0 2px #000' : 'none', boxSizing: 'border-box' }}>{capPrev}</span>

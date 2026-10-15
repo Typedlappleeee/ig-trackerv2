@@ -251,7 +251,11 @@ export function useBankThumbs(items: BankThumbItem[]) {
     if (i.storage_path && thumbs[i.storage_path]) return thumbs[i.storage_path]
     return null
   }, [thumbs])
-  return { thumbFor }
+  /** Miniature enregistrée seulement (null si le média n'en a pas). */
+  const imageFor = useCallback((i: BankThumbItem): string | null => i.thumbnail_url ?? (i.thumbnail_path ? thumbs[i.thumbnail_path] ?? null : null), [thumbs])
+  /** URL signée du média lui-même. */
+  const mediaFor = useCallback((i: BankThumbItem & { file_url?: string | null }): string | null => (i.storage_path ? thumbs[i.storage_path] ?? null : null) ?? (i.file_url && /^https?:/i.test(i.file_url) ? i.file_url : null), [thumbs])
+  return { thumbFor, imageFor, mediaFor }
 }
 
 // ── Helpers d'affichage ──────────────────────────────────────────────────────

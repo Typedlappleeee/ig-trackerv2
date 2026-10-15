@@ -105,7 +105,7 @@ export default function Studio({ theme, user, org, onNavigate }: {
 }) {
   const narrow = useNarrow(760)
   const photos = usePhotos(user, org)
-  const [openArg] = useState(() => takeOpenArg<{ tool?: string; ids?: string[] }>('studio'))
+  const [openArg] = useState(() => takeOpenArg<{ tool?: string; ids?: string[] }>('studio') ?? takeOpenArg<{ tool?: string; ids?: string[] }>('blowTools'))
   const [tool, setTool] = useState<StudioToolId | null>(() => isStudioTool(openArg?.tool) ? openArg!.tool as StudioToolId : null)
   const [results, setResults] = useState<StudioResult[]>([])
   // Les fichiers générés restent jusqu'à la sortie du Studio ; on libère alors la mémoire.

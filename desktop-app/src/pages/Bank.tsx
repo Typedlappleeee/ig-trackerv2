@@ -7,8 +7,10 @@ import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
+import { MediaThumb } from '@/components/MediaThumb'
+import { setRelaunch } from '@/lib/runHistory'
 import type { OrgState } from '@/lib/data'
-import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABEL } from '@/lib/bankStorage'
+import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, addToBank, PLAN_LABEL } from '@/lib/bankStorage'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -55,14 +57,6 @@ function fmtDuration(s: number | null): string {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-// Teinte déterministe par item (portée du prototype _tile) — même id ⇒ même teinte.
-const HUES = ['139,92,246', '6,182,212', '236,72,153', '16,185,129', '245,158,11', '99,102,241']
-function hueFor(id: string): string {
-  let h = 0
-  for (let k = 0; k < id.length; k++) h = (h * 31 + id.charCodeAt(k)) >>> 0
-  return HUES[h % HUES.length]
-}
-
 type TabKey = 'video' | 'image' | 'caption'
 interface Caption { id: string; title: string | null; content: string; used_count: number | null; created_at: string }
 type SortKey = 'recent' | 'name' | 'used'
@@ -84,50 +78,17 @@ function TileCheck({ on, onToggle, accent = '#8B7CF6' }: { on: boolean; onToggle
   )
 }
 
-// ── Aperçu vidéo LAZY : on ne monte le <video> QUE lorsque la tuile est visible.
-//    Sans ça, chaque vidéo montait un <video> en permanence ; au-delà de ~75 décodages
-//    simultanés le navigateur en abandonne → miniatures blanches ET lecture noire
-//    (décodeurs saturés). On NE touche PAS à crossOrigin (ça empoisonnait le cache de
-//    l'URL → la lecture devenait noire). Hors écran → placeholder. ────────────────────
-function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin = '400px'): boolean {
-  const [inView, setInView] = useState(false)
-  useEffect(() => {
-    const el = ref.current; if (!el) return
-    const io = new IntersectionObserver(entries => setInView(!!entries[0]?.isIntersecting), { rootMargin })
-    io.observe(el)
-    return () => io.disconnect()
-  }, [ref, rootMargin])
-  return inView
-}
-
-// ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
-//    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
+// ── Vignette 9/16 (vidéo) ou 4/5 (image) : components/MediaThumb (miniature, 1re image
+//    vidéo, sinon repli lisible — jamais de tuile noire). ──────────────────────────
 function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx, broken = false }: {
   item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: (e: React.MouseEvent) => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
   selecting?: boolean; idx?: number; broken?: boolean
 }) {
-  const [failed, setFailed] = useState(false)
-  const [ready, setReady] = useState(false)
   const ext = ((item.storage_path ?? item.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)
   const fresh = (item.used_count ?? 0) === 0
   const dur = type === 'video' ? fmtDuration(item.duration) : ''
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const inView = useInView(btnRef)
-  const placeholder: CSSProperties = {
-    position: 'absolute', inset: 0,
-    background: '#161618',
-  }
-  // Vignette de repli lisible (jamais un carré vide) : format non lisible par le navigateur
-  // (ex. .MOV HEVC d'iPhone), ou fichier introuvable dans le stockage.
-  const fallback = (
-    <span style={{ ...placeholder, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, background: broken ? 'repeating-linear-gradient(135deg,#1A1215,#1A1215 8px,#16101299 8px,#16101299 16px)' : `linear-gradient(160deg, rgba(${hueFor(item.id)},0.28), #161618)`, color: broken ? '#F87171' : 'rgba(255,255,255,0.7)' }}>
-      <Icon d={broken ? 'M12 9v4|M12 17h.01|M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z' : type === 'video' ? 'M6 4l14 8-14 8V4z' : 'M3 3h18v18H3z|M21 15l-5-5L5 21'} size={18} />
-      <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.04em' }}>{broken ? 'Fichier introuvable' : ext || (type === 'video' ? 'VIDÉO' : 'IMAGE')}</span>
-    </span>
-  )
   return (
     <button
-      ref={btnRef}
       data-tile-idx={idx}
       // Mode sélection (≥ 1 média coché) : un clic n'importe où sur la vignette la coche.
       onClick={selecting ? onToggle : onOpen}
@@ -138,23 +99,16 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
       style={{
         position: 'relative', aspectRatio: type === 'image' ? '4 / 5' : '9 / 16', borderRadius: 14, padding: 0,
         cursor: 'pointer', overflow: 'hidden', transition: 'border-color .15s ease, transform .15s ease, box-shadow .15s ease',
-        border: `1px solid ${on ? '#A78BFA' : 'rgba(255,255,255,0.07)'}`,
-        boxShadow: on ? '0 0 0 2px #A78BFA' : 'none', transform: on ? 'scale(0.97)' : 'none',
+        border: `1px solid ${on ? theme.accent : 'rgba(255,255,255,0.07)'}`,
+        boxShadow: on ? `0 0 0 2px ${theme.accent}` : 'none', transform: on ? 'scale(0.97)' : 'none',
         WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none',
         background: '#161618',
       }}
     >
-      {broken || failed ? fallback : thumb
-        ? <img src={thumb} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        : type === 'video'
-          // Vidéo : aperçu (1re image) monté SEULEMENT si la tuile est visible → limite
-          // le nombre de <video> décodés en même temps. Hors écran → placeholder.
-          // Le repli (format + icône) reste dessous tant que la 1re image n'est pas peinte :
-          // jamais de tuile noire vide pendant le chargement (ou si le navigateur ne décode pas).
-          ? <>{fallback}{media && inView && <video src={`${media}#t=0.1`} muted playsInline preload="metadata" onError={() => setFailed(true)} onLoadedData={e => setReady(e.currentTarget.videoWidth > 0)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: ready ? 1 : 0, transition: 'opacity .25s ease' }} />}</>
-          : media && inView
-            ? <img src={media} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={placeholder} />}
+      {/* Miniature → 1re image vidéo en fondu → repli lisible (jamais de tuile noire). Les vidéos
+          sans miniature en base la reçoivent dès qu'elles se décodent (auto-réparation). */}
+      <MediaThumb id={item.id} thumb={thumb} media={media} video={type === 'video'} ext={ext} broken={broken}
+        repair={type === 'video' && item.storage_path && !item.thumbnail_path && !item.thumbnail_url ? { id: item.id, storagePath: item.storage_path } : null} />
 
       <TileCheck on={on} onToggle={onToggle} accent={theme.accent} />
 
@@ -208,10 +162,15 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // Paginé (au-delà de 1000 lignes Supabase coupait en silence → des médias « disparaissaient »),
   // et seule la DERNIÈRE requête compte (changement d'espace perso / organisation en cours).
   const loadSeq = useRef(0)
+  // Squelette SEULEMENT au premier chargement d'un espace : après une action (suppression,
+  // déplacement, import…) la grille reste affichée et garde le défilement (avant : tout
+  // repassait en squelette, la page remontait et chaque vignette se rechargeait).
+  const loadedFor = useRef<string | null>(null)
   const load = useCallback(async () => {
     if (org.loading) return
     const seq = ++loadSeq.current
-    setLoading(true)
+    const scopeKey = currentOrg?.id ?? `u:${user.id}`
+    if (loadedFor.current !== scopeKey) setLoading(true)
     setError(null)
     const make = () => {
       const q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).order('id')
@@ -225,11 +184,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     // Médias en corbeille (deleted_at) exclus de la banque, listés à part (restaurable 7 j).
     setItems(rows.filter(r => !isSentinel(r) && !r.deleted_at))
     setTrash(rows.filter(r => !isSentinel(r) && !!r.deleted_at).sort((a, b) => (b.deleted_at ?? '').localeCompare(a.deleted_at ?? '')))
+    loadedFor.current = scopeKey
     setLoading(false)
   }, [currentOrg?.id, user.id, org.loading])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { setSel(new Set()) }, [tab, folder])
 
   // ── Légendes (caption_bank) ──────────────────────────────────────────────────
   const loadCaptions = useCallback(async () => {
@@ -263,34 +222,39 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // URLs valables 6 h et RE-signées toutes les 5 h (avant : 1 h jamais renouvelée → vignettes
   // et lecture vides si l'app restait ouverte). Lot en échec → nouvel essai. Les chemins que
   // le stockage ne connaît pas sont notés « introuvables » (fichier réellement disparu).
+  // Ordre : miniatures d'abord (légères, la grille s'affiche tout de suite), puis les vidéos
+  // SANS miniature, puis le reste. Un chemin déjà signé il y a moins de 5 h n'est pas re-signé
+  // (avant : tout re-signé — 2 chemins × 1 800 médias — à chaque rechargement de la liste).
   const [missing, setMissing] = useState<Set<string>>(new Set())
   const [signTick, setSignTick] = useState(0)
+  const signedAt = useRef<Record<string, number>>({})
   useEffect(() => { const id = setInterval(() => setSignTick(t => t + 1), 5 * 3600_000); return () => clearInterval(id) }, [])
   useEffect(() => {
+    const stale = (p: string) => !signedAt.current[p] || Date.now() - signedAt.current[p] > 5 * 3600_000
     const thumbPaths = items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
-    const mediaPaths = items.filter(i => i.storage_path).map(i => i.storage_path as string)
-    const paths = [...new Set([...thumbPaths, ...mediaPaths])]
+    const bare = items.filter(i => i.storage_path && !i.thumbnail_url && !i.thumbnail_path).map(i => i.storage_path as string)
+    const rest = items.filter(i => i.storage_path && (i.thumbnail_url || i.thumbnail_path)).map(i => i.storage_path as string)
+    const paths = [...new Set([...thumbPaths, ...bare, ...rest])].filter(stale)
     if (paths.length === 0) return
     let cancelled = false
     ;(async () => {
       const CHUNK = 100
-      const lost: string[] = []
       for (let i = 0; i < paths.length; i += CHUNK) {
         const batch = paths.slice(i, i + CHUNK)
         let res = await supabase.storage.from('content').createSignedUrls(batch, 6 * 3600)
         if (res.error || !res.data) { await new Promise(r => setTimeout(r, 1500)); res = await supabase.storage.from('content').createSignedUrls(batch, 6 * 3600) }
         if (cancelled) return
         const data = res.data
-        if (data) {
-          data.forEach(d => { if (!d.signedUrl && d.path && /not.?found|does not exist/i.test(String(d.error ?? ''))) lost.push(d.path) })
-          setThumbs(prev => {
-            const map = { ...prev }
-            data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl })
-            return map
-          })
-        }
+        if (!data) continue
+        const lost: string[] = [], ok: string[] = []
+        const now = Date.now()
+        data.forEach(d => {
+          if (d.path && d.signedUrl) { ok.push(d.path); signedAt.current[d.path] = now }
+          else if (d.path && /not.?found|does not exist/i.test(String(d.error ?? ''))) lost.push(d.path)
+        })
+        setThumbs(prev => { const map = { ...prev }; data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl }); return map })
+        if (lost.length || ok.some(p => missing.has(p))) setMissing(prev => { const n = new Set(prev); lost.forEach(p => n.add(p)); ok.forEach(p => n.delete(p)); return n })
       }
-      if (!cancelled) setMissing(new Set(lost))
     })()
     return () => { cancelled = true }
   }, [items, signTick])
@@ -350,53 +314,32 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // ── Import RÉEL (upload → bucket content → insert content_bank) ──────────────
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState<string | null>(null)
-  const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
   const { usage, reload: reloadUsage } = useBankUsage(currentOrg?.id ?? null)
-  const IMG = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 
-  async function importFiles(files: FileList | File[]) {
+  const importing = useRef(false)
+  async function importFiles(files: FileList | File[], into?: string) {
     const list = Array.from(files)
     if (list.length === 0) return
+    if (importing.current) { toast('Un import est déjà en cours : attends qu’il se termine.', 'info'); return }
     // Limite d'espace de l'abonnement (le stockage la vérifie aussi côté serveur).
     const u = await reloadUsage()
     const over = quotaIssue(u, list.reduce((s, f) => s + f.size, 0))
     if (over) { toast(over, 'bad', 9000); return }
+    importing.current = true
     let done = 0, ok = 0
     const fails: string[] = []
     for (const file of list) {
       setUploading(`${file.name} (${++done}/${list.length})`)
       try {
-        let ext = (file.name.split('.').pop() ?? '').toLowerCase()
-        if (!ext) ext = file.type.startsWith('image') ? 'jpg' : 'mp4'
-        const id = crypto.randomUUID()
-        const storagePath = `videos/${scopeFolder}/${id}.${ext}`
-        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
-        if (up.error) { fails.push(`${file.name} : ${/row-level security|policy/i.test(up.error.message) ? 'espace plein ou accès refusé' : up.error.message}`); continue }
-        // Miniature + durée générées tout de suite (avant : aucune miniature → vignettes vides).
-        let thumbPath: string | null = null, duration: number | null = null
-        if (!file.type.startsWith('image') && !IMG.includes(ext)) {
-          const th = await videoThumb(file)
-          if (th) {
-            duration = th.duration || null
-            const tp = `videos/${scopeFolder}/${id}_thumb.jpg`
-            const tu = await supabase.storage.from('content').upload(tp, th.blob, { contentType: 'image/jpeg', upsert: false })
-            if (!tu.error) thumbPath = tp
-          }
-        }
-        const dest = (folder !== 'Tous' && folder !== 'Jamais publiées') ? folder : null
-        const ins = await supabase.from('content_bank').insert({
-          user_id: user.id, org_id: currentOrg?.id ?? null,
-          title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: thumbPath,
-          file_url: null, folder: dest, duration, tags: [], notes: null, used_count: 0,
-        })
-        if (ins.error) {   // ligne refusée → on ne laisse pas un fichier orphelin dans le stockage
-          await supabase.storage.from('content').remove([storagePath, ...(thumbPath ? [thumbPath] : [])]).catch(() => {})
-          fails.push(`${file.name} : ${ins.error.message}`); continue
-        }
+        // Fichier + miniature + durée (lib/bankStorage) ; ligne refusée → fichiers retirés.
+        const dest = into ?? ((folder !== 'Tous' && folder !== 'Jamais publiées') ? folder : null)
+        const r = await addToBank({ userId: user.id, orgId: currentOrg?.id ?? null, file, name: file.name, folder: dest })
+        if (r.error) { fails.push(`${file.name} : ${r.error}`); continue }
         ok++
       } catch (e) { fails.push(`${file.name} : ${e instanceof Error ? e.message : 'erreur'}`) }
     }
     setUploading(null)
+    importing.current = false
     if (fails.length) toast(`${ok}/${list.length} importé(s). Échec : ${fails.slice(0, 3).join(' · ')}${fails.length > 3 ? '…' : ''}`, ok ? 'info' : 'bad', 9000)
     else toast(`${ok} fichier(s) importé(s).`, 'ok')
     void reloadUsage()
@@ -643,9 +586,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // ── Lecteur vidéo (double-clic) + menu contextuel (clic droit) ───────────────
   const [player, setPlayer] = useState<{ url: string; title: string; type: MediaType } | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; item: ContentItem } | null>(null)
-  function openPlayer(i: ContentItem) {
-    const url = (i.storage_path && thumbs[i.storage_path]) || i.file_url
+  async function openPlayer(i: ContentItem) {
+    let url = (i.storage_path && thumbs[i.storage_path]) || i.file_url
+    if (!url && i.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(i.storage_path, 6 * 3600); url = data?.signedUrl ?? null }
     if (url) setPlayer({ url, title: i.title, type: inferType(i) })
+    else toast('Fichier introuvable dans le stockage.', 'bad')
   }
 
   // ── Glisser-déposer un média (ou la sélection) dans un dossier ───────────────
@@ -692,6 +637,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     setFolderModal(false); setFolderName(''); setFolder(name); load()
   }
   const [notice, setNotice] = useState<string | null>(null)
+  useEffect(() => {
+    if (!notice || notice.endsWith('…')) return
+    const t = setTimeout(() => setNotice(null), 6000)
+    return () => clearTimeout(t)
+  }, [notice])
   const narrow = useNarrow()
   const moveFolders = useMemo(() => folders.filter(f => f.n !== 'Tous' && !f.special).map(f => f.n), [folders])
 
@@ -727,8 +677,23 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     return a
   }, [typed, folder, ql, sort])
 
+  // Rendu progressif : 120 vignettes, puis la suite en arrivant en bas (1 800 boutons montés
+  // d'un coup faisaient ramer la page et clignoter les vignettes).
+  const PAGE = 120
+  const [limit, setLimit] = useState(PAGE)
+  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort])
+  const moreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = moreRef.current; if (!el) return
+    const io = new IntersectionObserver(es => { if (es[0]?.isIntersecting) setLimit(l => l + PAGE) }, { rootMargin: '800px' })
+    io.observe(el); return () => io.disconnect()
+  }, [limit, shown.length])
+
   // Ancre du dernier clic (index dans `shown`) pour la sélection par intervalle (Maj+clic).
   const lastIdxRef = useRef<number | null>(null)
+  // Nouvelle vue (onglet, dossier, recherche, tri) → sélection et ancre remises à zéro :
+  // aucune action groupée ne peut toucher des médias qui ne sont plus affichés.
+  useEffect(() => { setSel(new Set()); lastIdxRef.current = null }, [tab, folder, ql, sort])
   // Clic simple = bascule 1 vignette. Maj+clic = sélectionne TOUT l'intervalle entre
   // l'ancre (dernière vignette cliquée) et celle-ci (comme sur la plupart des SaaS).
   const toggleAt = (idx: number, id: string, shift: boolean) => {
@@ -847,6 +812,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     if (tab === 'caption') return
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
+      if (e.key === 'Escape' && (showTrash || ctx || folderCtx)) { setShowTrash(false); setCtx(null); setFolderCtx(null); return }
       if (t && (t.closest('input,textarea,select,[contenteditable]') || document.querySelector('[role=dialog]'))) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); setSel(new Set(shown.map(m => m.id))) }
       else if ((e.key === 'Delete' || e.key === 'Backspace') && sel.size) { e.preventDefault(); setConfirmDel([...sel]) }
@@ -854,7 +820,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [tab, shown, sel])
+  }, [tab, shown, sel, showTrash, ctx, folderCtx])
 
   const isCloud = infra === 'cloud'
   const TABS: { k: TabKey; l: string; n: number }[] = [
@@ -871,6 +837,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const neverPublished = items.filter(i => (i.used_count ?? 0) === 0).length
 
   const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+  // Vidéos et images, reconnues par type OU par extension (un .HEIC sous Windows n'a pas de type).
+  const mediaFiles = (fl: FileList) => Array.from(fl).filter(f => f.type.startsWith('video') || f.type.startsWith('image') || /\.(mp4|mov|m4v|webm|avi|mkv|jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(f.name))
 
   return (
     <div style={{ position: 'relative', animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}
@@ -879,7 +847,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       onDrop={e => {
         if (!hasFiles(e)) return
         e.preventDefault(); setDragFiles(false)
-        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video') || f.type.startsWith('image'))
+        const files = mediaFiles(e.dataTransfer.files)
         if (files.length) importFiles(files)
         else toast('Dépose des vidéos ou des images.', 'info')
       }}>
@@ -887,7 +855,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           dedans se plaçait au milieu de la page entière au lieu de l'écran. Fenêtre en haut de
           l'écran ; titre + actions + progression fixes, seule la liste défile. */}
       {showTrash && createPortal(
-        <div onClick={() => setShowTrash(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '8vh 20px 20px', boxSizing: 'border-box' }}>
+        <div role="dialog" aria-modal="true" aria-label="Corbeille" onClick={() => setShowTrash(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '8vh 20px 20px', boxSizing: 'border-box' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px,96vw)', maxHeight: '84vh', display: 'flex', flexDirection: 'column', borderRadius: 20, background: '#101012', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px -24px rgba(0,0,0,0.85)', padding: 20, boxSizing: 'border-box', animation: 'aIn .2s cubic-bezier(0.16,1,0.3,1) both' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 11, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)', color: '#FCA5A5' }}><Icon d="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" size={16} /></span>
@@ -918,17 +886,19 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         </div>,
         document.body,
       )}
-      {dragFiles && (
+      {dragFiles && createPortal(
         <div style={{
-          position: 'absolute', inset: 0, zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          borderRadius: 8, border: `1px dashed rgba(${theme.tone},0.6)`, background: 'rgba(10,10,11,0.85)', pointerEvents: 'none',
+          position: 'fixed', inset: 12, zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 20, border: `2px dashed rgba(${theme.tone},0.6)`, background: 'rgba(10,10,11,0.35)', pointerEvents: 'none',
         }}>
-          <div style={{ textAlign: 'center', color: '#EDEDEF' }}>
+          <div style={{ textAlign: 'center', color: '#EDEDEF', padding: '22px 28px', borderRadius: 18, background: 'rgba(16,16,18,0.94)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 80px -20px rgba(0,0,0,0.9)' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, color: theme.accentText }}><Icon d="M12 3v12|M7 10l5 5 5-5|M4 21h16" size={24} /></div>
             <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.015em' }}>Dépose pour importer</div>
             <div style={{ fontSize: 13, color: '#8B8B94', marginTop: 4 }}>Vidéos et images{folder !== 'Tous' && folder !== 'Jamais publiées' ? ` → dossier « ${folder} »` : ''}</div>
+            <div style={{ fontSize: 12, color: '#71717A', marginTop: 4 }}>ou lâche-les sur un dossier à gauche</div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
       {/* En-tête */}
       <PageHeader title="Banque"
@@ -973,9 +943,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'video' ? 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z' : t.k === 'image' ? 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
 
       {/* Corps : colonne Dossiers + grille */}
-      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '240px minmax(0,1fr)', gap: 14, alignItems: 'start' }}>
-        {/* Dossiers */}
-        <Panel theme={theme}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow || tab === 'caption' ? 'minmax(0,1fr)' : '240px minmax(0,1fr)', gap: 14, alignItems: 'start' }}>
+        {/* Dossiers (médias seulement) */}
+        {tab !== 'caption' && <Panel theme={theme}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '10px 10px 10px 18px', minHeight: 56, boxSizing: 'border-box',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -994,8 +964,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   onClick={() => setFolder(f.n)}
                   onContextMenu={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setFolderCtx({ x: e.clientX, y: e.clientY, name: f.n }) } }}
                   onDragOver={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setDragOver(f.n) } }}
-                  onDragLeave={() => setDragOver(d => d === f.n ? null : d)}
-                  onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDragOver(null); if (id) dropOnFolder(f.n, id) }}
+                  onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(d => d === f.n ? null : d) }}
+                  onDrop={e => {
+                    if (f.n === 'Tous' || f.n === 'Jamais publiées') return
+                    e.preventDefault(); e.stopPropagation(); setDragOver(null); setDragFiles(false)
+                    // Fichiers de l'ordinateur déposés sur un dossier → importés DANS ce dossier.
+                    if (hasFiles(e)) { const files = mediaFiles(e.dataTransfer.files); if (files.length) importFiles(files, f.n); return }
+                    const id = e.dataTransfer.getData('text/plain'); if (id) dropOnFolder(f.n, id)
+                  }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 38, padding: '0 12px', borderRadius: 10,
                     border: 'none', cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
@@ -1003,7 +979,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                     background: dragOver === f.n ? theme.selBg : on ? 'rgba(255,255,255,0.08)' : 'transparent', transition: 'background .12s ease',
                   }}
                   onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
-                  onMouseLeave={e => { if (dragOver !== f.n) e.currentTarget.style.background = on ? 'rgba(255,255,255,0.06)' : 'transparent' }}
+                  onMouseLeave={e => { if (dragOver !== f.n) e.currentTarget.style.background = on ? 'rgba(255,255,255,0.08)' : 'transparent' }}
                 >
                   <span style={{ display: 'flex', color: f.special ? '#4ADE80' : on ? theme.accentText : '#71717A' }}>
                     <Icon d={f.special ? 'M12 2v20|M2 12h20' : 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z'} size={13} />
@@ -1021,7 +997,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               )
             })}
           </div>
-        </Panel>
+        </Panel>}
 
         {/* Grille */}
         <Panel theme={theme}>
@@ -1115,7 +1091,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               display: 'grid', gridTemplateColumns: `repeat(auto-fill,minmax(${narrow ? 110 : 140}px,1fr))`,
               gap: 12, padding: 16, WebkitUserSelect: 'none', userSelect: 'none',
             }}>
-              {shown.map((i, idx) => (
+              {shown.slice(0, limit).map((i, idx) => (
                 <Tile
                   key={i.id} idx={idx} selecting={selecting} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)} broken={isBroken(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={(e) => toggleAt(idx, i.id, e.shiftKey)}
@@ -1124,6 +1100,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   onContextMenu={e => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, item: i }) }}
                 />
               ))}
+              {limit < shown.length && <div ref={moreRef} style={{ gridColumn: '1 / -1', height: 1 }} />}
             </div>
           )}
         </Panel>
@@ -1144,9 +1121,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <span style={{ fontSize: 12.5, fontWeight: 400, color: '#8B8B94' }}>sélectionnée{sel.size > 1 ? 's' : ''}</span>
           </span>
           <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
-          <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
+          <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => { if (tab === 'video') setRelaunch({ kind: 'reels', phoneIds: [], mediaIds: [...sel] }); onNavigate?.('publish') }} />
           {sel.size === 1 && <Btn label="Description" theme={theme} sm icon="M4 7V4h16v3|M9 20h6|M12 4v16" onClick={openDesc} />}
-          <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => { if (onNavigate) openTool(onNavigate, 'studio', { tool: tab === 'image' ? 'imgspoof' : 'remix', ids: [...sel] }) }} />
+          <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => { if (onNavigate) openTool(onNavigate, infra === 'blowsome' ? 'blowTools' : 'studio', { tool: tab === 'image' ? 'imgspoof' : 'remix', ids: [...sel] }) }} />
           <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setMoveOpen(true)} />
           <Btn label="Télécharger" theme={theme} sm icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" onClick={() => downloadMedia([...sel])} />
           <Btn label="Supprimer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />
@@ -1158,8 +1135,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         </div>
       )}
 
-      {notice && (
-        <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', fontSize: 12.5, color: '#EDEDEF' }}>{notice}</div>
+      {/* Message d'action : toujours visible en bas de l'écran (avant : sous la grille, hors
+          de vue), au-dessus des fenêtres ; s'efface seul sauf pendant une progression (« … »). */}
+      {notice && createPortal(
+        <div role="status" aria-live="polite" style={{ position: 'fixed', left: '50%', bottom: 84, transform: 'translateX(-50%)', zIndex: 130, maxWidth: 'min(560px, calc(100vw - 32px))', padding: '10px 16px', borderRadius: 12, background: 'rgba(22,22,24,0.94)', backdropFilter: 'blur(10px)', border: `1px solid ${/échec|impossible|erreur|aucun fichier/i.test(notice) ? 'rgba(248,113,113,0.4)' : 'rgba(255,255,255,0.12)'}`, boxShadow: '0 18px 48px -16px rgba(0,0,0,0.85)', fontSize: 13, color: '#EDEDEF', animation: 'aIn .2s cubic-bezier(0.16,1,0.3,1) both' }}>{notice}</div>,
+        document.body,
       )}
 
       {moveOpen && (
@@ -1198,7 +1178,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {/* Menu contextuel (clic droit sur une vignette) — portal pour échapper au transform de page */}
       {ctx && createPortal(
         <>
-          <div onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
+          <div role="dialog" aria-label="Actions" onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
           <div style={{ position: 'fixed', top: Math.min(ctx.y, window.innerHeight - 230), left: Math.min(ctx.x, window.innerWidth - 190), zIndex: 61, width: 180, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
             {[
               { l: 'Lire', d: 'M5 3l14 9-14 9z', fn: () => openPlayer(ctx.item) },
@@ -1224,7 +1204,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {/* Menu contextuel dossier (clic droit) — portal aussi */}
       {folderCtx && createPortal(
         <>
-          <div onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
+          <div role="dialog" aria-label="Actions du dossier" onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
           <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 110), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
             <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
