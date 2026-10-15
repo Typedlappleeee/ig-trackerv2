@@ -3,7 +3,6 @@
 // abonnement (RPC bank_usage), miniatures générées à l'envoi.
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { putLocal } from './localMedia'
 
 /** Toutes les lignes d'une requête, par pages de 1000. `make` recrée la requête à chaque page. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -119,8 +118,6 @@ export async function addToBank(o: { userId: string; orgId: string | null; file:
     await supabase.storage.from('content').remove([storagePath, ...(thumbPath ? [thumbPath] : [])]).catch(() => {})
     return { id: null, storagePath: null, error: ins.error.message }
   }
-  // Copie locale immédiate : aperçus et générations instantanés, sans retéléchargement.
-  void putLocal(storagePath, o.file)
   return { id: (ins.data as { id?: string } | null)?.id ?? null, storagePath }
 }
 

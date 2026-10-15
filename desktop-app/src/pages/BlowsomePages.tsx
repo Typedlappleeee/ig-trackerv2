@@ -15,6 +15,8 @@ import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
 import { addToBank, pauseRepairs } from '@/lib/bankStorage'
 import { fetchFast } from '@/lib/fastFetch'
+import { saveDirSupported, ensureSaveDirAccess, writeToSaveDir } from '@/lib/saveDir'
+import { SaveDirButton } from '@/components/SaveDirButton'
 import { getLocal, putLocal } from '@/lib/localMedia'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
@@ -644,6 +646,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
 
   async function generate() {
     if (running || sources.length === 0) return
+    // Dossier du PC choisi : accès confirmé maintenant (au clic) pour y écrire chaque vidéo.
+    const toPc = await ensureSaveDirAccess()
     setRunning(true); setLogs([]); setMade(0); setProgress(0)
     const per = Math.max(1, Math.min(12, variants))
     const R = startRun('auto', `${sources.length} vidéo${sources.length > 1 ? 's' : ''} × ${per}`, sources.length * per)
@@ -720,6 +724,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             }, hooks)
             push(`    ✓ variante générée (${Math.round(out.byteLength / 1024)} Ko) → sauvegarde…`)
             await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
+            if (toPc) push(await writeToSaveDir(`${v.title} · auto ${i + 1}.mp4`, out) ? '    💾 aussi enregistrée sur ton PC' : '    ⚠ pas pu l’écrire dans le dossier du PC')
             done++; setMade(done); R.tick(true)
           } catch (ve) {
             // On loggue la VRAIE erreur (message + 1re ligne de stack) et on continue les autres
@@ -841,7 +846,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
           </div>
           <Fld label="Variantes / vidéo"><input type="number" min={1} max={12} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
-          <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
+          <Fld label="Dossier dans la banque"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
+          {saveDirSupported() && <Fld label="Aussi sur mon PC"><SaveDirButton /></Fld>}
         </Grp>
 
         {/* Aperçu : la vidéo + la légende dessus, directement dans la vignette (clic = lecture
