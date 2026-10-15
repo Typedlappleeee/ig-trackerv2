@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs } from '@/lib/data'
-import { fetchAllRows } from '@/lib/bankStorage'
+import { fetchAllRows, addToBank } from '@/lib/bankStorage'
 import { openTool as openToolPage } from '@/lib/openTool'
 import { Icon, FIELD, TEXTAREA, Segmented, toast, useNarrow } from '@/lib/ui'
 import { useConnections } from '@/lib/connections'
@@ -143,20 +143,14 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
   async function importFiles(files: File[]) {
     const list = files.filter(f => imgTool ? f.type.startsWith('image') : f.type.startsWith('video'))
     if (!list.length) { toast(imgTool ? 'Choisis des photos (.jpg, .png…).' : 'Choisis des vidéos (.mp4, .mov…).', 'bad'); return }
-    const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
     const added: string[] = []
     let n = 0
     for (const file of list) {
       setUploading(`Envoi ${++n}/${list.length} · ${file.name}`)
       try {
-        const ext = (file.name.split('.').pop() ?? '').toLowerCase() || (file.type.startsWith('image') ? 'jpg' : 'mp4')
-        const storagePath = `videos/${scopeFolder}/${crypto.randomUUID()}.${ext}`
-        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
-        if (up.error) { toast(`Envoi impossible : ${file.name}`, 'bad'); continue }
-        const { data } = await supabase.from('content_bank').insert({
-          user_id: user.id, org_id: currentOrg?.id ?? null, title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath,
-          thumbnail_path: null, file_url: null, folder: null, duration: null, tags: [], notes: null, used_count: 0,
-        }).select('id').maybeSingle()
+        const r = await addToBank({ userId: user.id, orgId: currentOrg?.id ?? null, file, name: file.name })
+        if (r.error) { toast(`Envoi impossible : ${file.name}`, 'bad'); continue }
+        const data = r.id ? { id: r.id } : null
         if (data?.id) added.push(data.id as string)
       } catch { toast(`Envoi impossible : ${file.name}`, 'bad') }
     }

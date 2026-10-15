@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchAllRows } from '@/lib/bankStorage'
+import { fetchAllRows, addToBank } from '@/lib/bankStorage'
+import { MediaThumb } from '@/components/MediaThumb'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
@@ -22,32 +23,22 @@ const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
 const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 function extOf(m: Media): string { return (m.storage_path ?? m.file_url ?? '').toLowerCase().split('.').pop() ?? '' }
 function isImg(m: Media): boolean { return IMG_EXT.includes(extOf(m)) }
-const HUES = ['139,92,246', '6,182,212', '236,72,153', '16,185,129', '245,158,11', '99,102,241']
 
-// Tuile LAZY : ne monte l'aperçu (vidéo/image) que quand elle est visible à l'écran
-// (IntersectionObserver) et le décharge hors écran. Évite de monter 600 <video> d'un
-// coup → la banque ne rame/bug plus.
-function MediaTile({ m, prev, on, hue, accent, accentBtn, onToggle }: {
-  m: Media; prev: string | null; on: boolean; hue: string; accent: string; accentBtn: string; onToggle: () => void
+// Tuile : components/MediaThumb (miniature, 1re image vidéo quand visible, sinon repli
+// lisible — jamais de carré noir ; les vidéos sans miniature la reçoivent en base).
+function MediaTile({ m, thumb, media, on, accentBtn, onToggle }: {
+  m: Media; thumb: string | null; media: string | null; on: boolean; accent: string; accentBtn: string; onToggle: () => void
 }) {
-  const ref = useRef<HTMLButtonElement>(null)
-  const [vis, setVis] = useState(false)
-  useEffect(() => {
-    const el = ref.current; if (!el) return
-    const io = new IntersectionObserver(es => setVis(es[0]?.isIntersecting ?? false), { rootMargin: '300px' })
-    io.observe(el); return () => io.disconnect()
-  }, [])
-  const isVid = !isImg(m) && !m.thumbnail_url && !m.thumbnail_path
+  const img = isImg(m)
   return (
-    <button ref={ref} onClick={onToggle} title={m.title} style={{
-      position: 'relative', aspectRatio: '9 / 16', borderRadius: 6, padding: 0, cursor: 'pointer', overflow: 'hidden',
-      border: '1px solid ' + (on ? accent : 'rgba(255,255,255,0.08)'),
+    <button onClick={onToggle} title={m.title} style={{
+      position: 'relative', aspectRatio: '9 / 16', borderRadius: 10, padding: 0, cursor: 'pointer', overflow: 'hidden',
+      border: 'none', boxShadow: on ? `0 0 0 2px ${accentBtn}` : '0 0 0 1px rgba(255,255,255,0.08)',
       background: '#161618',
     }}>
-      {vis && prev && (isVid
-        ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
-      <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', background: on ? accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
+      <MediaThumb id={m.id} thumb={thumb} media={media} video={!img} small ext={extOf(m).toUpperCase().slice(0, 4)}
+        repair={!img && m.storage_path && !m.thumbnail_path && !m.thumbnail_url ? { id: m.id, storagePath: m.storage_path } : null} />
+      <span style={{ position: 'absolute', zIndex: 2, top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', background: on ? accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
     </button>
   )
 }
@@ -86,7 +77,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   }, [currentOrg?.id, user.id, kind])
   useEffect(() => { load() }, [load])
 
-  const { thumbFor } = useBankThumbs(media)
+  const { imageFor, mediaFor } = useBankThumbs(media)
 
   const folders = useMemo(() => {
     const s = new Set<string>(); media.forEach(m => { if (m.folder) s.add(m.folder) }); return [...s].sort((a, b) => a.localeCompare(b))
@@ -115,23 +106,13 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
       return true
     })
     if (list.length === 0) return
-    const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
     const newIds: string[] = []
     let done = 0
     for (const file of list) {
       setUploading(`${file.name} (${++done}/${list.length})`)
       try {
-        let ext = (file.name.split('.').pop() ?? '').toLowerCase()
-        if (!ext) ext = file.type.startsWith('image') ? 'jpg' : 'mp4'
-        const id = crypto.randomUUID()
-        const storagePath = `videos/${scopeFolder}/${id}.${ext}`
-        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
-        if (up.error) continue
-        const ins = await supabase.from('content_bank').insert({
-          user_id: user.id, org_id: currentOrg?.id ?? null,
-          title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath,
-          file_url: null, folder: null, duration: null, tags: [], notes: null, used_count: 0,
-        }).select('id').single()
+        const r = await addToBank({ userId: user.id, orgId: currentOrg?.id ?? null, file, name: file.name })
+        const ins = { data: r.id ? { id: r.id } : null }
         if (ins.data?.id) newIds.push(ins.data.id as string)
       } catch { /* ignore */ }
     }
@@ -232,8 +213,8 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
         ) : (
           filteredMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>Aucun contenu dans la banque.<br />Glisse-dépose tes fichiers ici ou clique « Mon PC ».</div> : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 8 }}>
-              {filteredMedia.map((m, i) => (
-                <MediaTile key={m.id} m={m} prev={thumbFor(m)} on={sel.includes(m.id)} hue={HUES[i % 6]}
+              {filteredMedia.map(m => (
+                <MediaTile key={m.id} m={m} thumb={imageFor(m)} media={mediaFor(m)} on={sel.includes(m.id)}
                   accent={theme.accent} accentBtn={theme.accentBtn} onToggle={() => toggle(m.id)} />
               ))}
             </div>

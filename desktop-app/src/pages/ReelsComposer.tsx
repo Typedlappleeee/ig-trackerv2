@@ -424,7 +424,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
         title={tiktok ? 'Publier sur TikTok' : 'Publier un Reel'}
         sub={`${platLabel} · ${nSel} compte${nSel > 1 ? 's' : ''} · ${nVid} vidéo${nVid > 1 ? 's' : ''}`}
       />
-      {relaunch && (
+      {relaunch && relaunch.phoneIds.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 14px', borderRadius: 14, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.25)', fontSize: 13, color: '#A1A1AA' }}>
           <Icon d="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" size={14} />
           <span>Relance de <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{relaunch.phoneIds.length}</b> compte(s) échoué(s) — comptes et vidéos déjà sélectionnés.</span>
