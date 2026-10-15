@@ -3108,6 +3108,11 @@ export const EN: Dict = {
     "Fichier introuvable dans le stockage.": "File not found in storage.",
     "ou lâche-les sur un dossier à gauche": "or drop them on a folder on the left",
     "Actions du dossier": "Folder actions",
+    "Aperçu impossible dans l’app": "Can’t preview in the app",
+    "La vidéo ne se charge pas": "The video won’t load",
+    "Cette vidéo est au format HEVC (iPhone) : ton ordinateur ne sait pas l’afficher ici. Elle reste utilisable pour générer des variantes et publier.": "This video is in HEVC format (iPhone): your computer can’t display it here. You can still use it to generate variants and publish.",
+    "Le fichier est introuvable ou la connexion a coupé. Réessaie, ou télécharge-la pour la vérifier.": "The file is missing or the connection dropped. Try again, or download it to check.",
+    "Réessayer": "Try again",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3621,5 +3626,6 @@ export const EN: Dict = {
     ["{0} · aperçu indisponible", "{0} · preview unavailable"],
     ["{0} · clic pour lire", "{0} · click to play"],
     ["⚠ {0} : lecture impossible dans l’app (format HEVC ?) — la génération fonctionne quand même.", "⚠ {0}: can’t play in the app (HEVC format?) — generation still works."],
+    ["Impossible de charger ces vidéos : {0}", "Couldn’t load these videos: {0}"],
   ],
 }

@@ -44,40 +44,50 @@ function MediaTile({ m, thumb, media, on, accentBtn, onToggle }: {
 }
 
 
+// Dernière liste chargée par espace + type : le sélecteur s'ouvre instantanément la fois
+// suivante (rafraîchie en arrière-plan) au lieu de repasser par le chargement.
+const listCache = new Map<string, { at: number; media: Media[] }>()
+const PAGE = 120
+
 export default function BankPicker({ theme, user, org, kind, multi = true, initialIds = [], title, onClose, onApply }: {
   theme: Theme; user: User; org: OrgState
   kind: PickerKind; multi?: boolean; initialIds?: string[]
   title?: string; onClose: () => void; onApply: (r: PickerResult) => void
 }) {
   const { currentOrg } = org
-  const [media, setMedia] = useState<Media[]>([])
+  const [media, setMedia] = useState<Media[]>(() => listCache.get(`${org.currentOrg?.id ?? 'u:' + user.id}:${kind}`)?.media ?? [])
   const [caps, setCaps] = useState<Cap[]>([])
   const [sel, setSel] = useState<string[]>(initialIds)
   const [q, setQ] = useState('')
   const [folder, setFolder] = useState<string>('Tous')
-  const [loading, setLoading] = useState(true)
+  const cacheKey = `${currentOrg?.id ?? 'u:' + user.id}:${kind}`
+  const [loading, setLoading] = useState(() => kind === 'captions' || !listCache.has(cacheKey))
   const [uploading, setUploading] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const IMG = IMG_EXT
 
   const load = useCallback(async () => {
-    setLoading(true)
+    if (kind === 'captions' || !listCache.has(cacheKey)) setLoading(true)
     const scope = (x: any) => currentOrg ? x.eq('org_id', currentOrg.id) : x.eq('user_id', user.id).is('org_id', null)
-    if (kind === 'captions') {
-      const { data } = await scope(supabase.from('caption_bank').select('id,title,content')).order('created_at', { ascending: false })
-      setCaps((data ?? []) as Cap[])
-    } else {
-      const { data } = await fetchAllRows<any>(() => scope(supabase.from('content_bank').select('*')).is('deleted_at', null).order('created_at', { ascending: false }).order('id'))
-      const all = ((data ?? []) as Media[]).filter(m => !(SENTINELS.includes(m.notes ?? '') && !m.storage_path && !m.file_url))
-      const typed = kind === 'images' ? all.filter(isImg) : all.filter(m => !isImg(m))
-      setMedia(typed.length > 0 ? typed : all)
-    }
-    setLoading(false)
-  }, [currentOrg?.id, user.id, kind])
+    try {
+      if (kind === 'captions') {
+        const { data } = await scope(supabase.from('caption_bank').select('id,title,content')).order('created_at', { ascending: false })
+        setCaps((data ?? []) as Cap[])
+      } else {
+        const { data } = await fetchAllRows<any>(() => scope(supabase.from('content_bank').select('*')).is('deleted_at', null).order('created_at', { ascending: false }).order('id'))
+        const all = ((data ?? []) as Media[]).filter(m => !(SENTINELS.includes(m.notes ?? '') && !m.storage_path && !m.file_url))
+        const typed = kind === 'images' ? all.filter(isImg) : all.filter(m => !isImg(m))
+        const list = typed.length > 0 ? typed : all
+        listCache.set(cacheKey, { at: Date.now(), media: list })
+        setMedia(list)
+      }
+    } catch { /* réseau : on garde la liste affichée */ }
+    finally { setLoading(false) }   // jamais bloqué sur le chargement
+  }, [currentOrg?.id, user.id, kind, cacheKey])
   useEffect(() => { load() }, [load])
 
-  const { imageFor, mediaFor } = useBankThumbs(media)
+  const { imageFor, mediaFor } = useBankThumbs(media, { media: 'bare' })
 
   const folders = useMemo(() => {
     const s = new Set<string>(); media.forEach(m => { if (m.folder) s.add(m.folder) }); return [...s].sort((a, b) => a.localeCompare(b))
@@ -88,6 +98,15 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
       .filter(m => folder === 'Tous' || m.folder === folder)
       .filter(m => !s || (m.title ?? '').toLowerCase().includes(s))
   }, [media, q, folder])
+  // Rendu progressif : 120 vignettes, puis la suite en défilant (1 800 d'un coup figeaient la fenêtre).
+  const [limit, setLimit] = useState(PAGE)
+  useEffect(() => { setLimit(PAGE) }, [q, folder])
+  const moreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = moreRef.current; if (!el) return
+    const io = new IntersectionObserver(es => { if (es[0]?.isIntersecting) setLimit(l => l + PAGE) }, { rootMargin: '400px' })
+    io.observe(el); return () => io.disconnect()
+  }, [limit, filteredMedia.length])
   const filteredCaps = useMemo(() => {
     const s = q.trim().toLowerCase()
     return s ? caps.filter(c => (c.title ?? '').toLowerCase().includes(s) || c.content.toLowerCase().includes(s)) : caps
@@ -213,10 +232,11 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
         ) : (
           filteredMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>Aucun contenu dans la banque.<br />Glisse-dépose tes fichiers ici ou clique « Mon PC ».</div> : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 8 }}>
-              {filteredMedia.map(m => (
+              {filteredMedia.slice(0, limit).map(m => (
                 <MediaTile key={m.id} m={m} thumb={imageFor(m)} media={mediaFor(m)} on={sel.includes(m.id)}
                   accent={theme.accent} accentBtn={theme.accentBtn} onToggle={() => toggle(m.id)} />
               ))}
+              {limit < filteredMedia.length && <div ref={moreRef} style={{ gridColumn: '1 / -1', height: 1 }} />}
             </div>
           )
         )}

@@ -8,6 +8,7 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import { MediaThumb } from '@/components/MediaThumb'
+import { VideoPlayerModal } from '@/components/VideoPlayer'
 import { setRelaunch } from '@/lib/runHistory'
 import type { OrgState } from '@/lib/data'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, addToBank, PLAN_LABEL } from '@/lib/bankStorage'
@@ -1241,11 +1242,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
       {/* Lecteur vidéo / image */}
       {player && (
-        <Modal theme={theme} title={player.title} onClose={() => setPlayer(null)} width={420}>
-          {player.type === 'video'
-            ? <video src={player.url} controls autoPlay style={{ display: 'block', width: '100%', maxHeight: '70vh', borderRadius: 6, background: '#000' }} />
-            : <img src={player.url} alt="" style={{ display: 'block', width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 6 }} />}
-        </Modal>
+        player.type === 'video'
+          ? <VideoPlayerModal theme={theme} url={player.url} title={player.title} onClose={() => setPlayer(null)} />
+          : <Modal theme={theme} title={player.title} onClose={() => setPlayer(null)} width={420}>
+              <img src={player.url} alt="" style={{ display: 'block', width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 12 }} />
+            </Modal>
       )}
 
       {/* Confirmation de suppression */}
