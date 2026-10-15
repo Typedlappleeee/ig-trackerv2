@@ -9,7 +9,7 @@ import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_S
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import { MediaThumb } from '@/components/MediaThumb'
 import { VideoPlayerModal } from '@/components/VideoPlayer'
-import { getLocal } from '@/lib/localMedia'
+import { getLocal, localUsage, clearLocal } from '@/lib/localMedia'
 import { setRelaunch } from '@/lib/runHistory'
 import type { OrgState } from '@/lib/data'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, addToBank, cancelRepairs, PLAN_LABEL } from '@/lib/bankStorage'
@@ -191,6 +191,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }, [currentOrg?.id, user.id, org.loading])
 
   useEffect(() => { load() }, [load])
+  // Place prise sur ce PC par les copies locales (sources d'aperçu) — affichée avec « Vider ».
+  const [localBytes, setLocalBytes] = useState(0)
+  useEffect(() => { void localUsage().then(setLocalBytes) }, [])
   // En quittant la Banque, les miniatures en attente ne se créent plus en arrière-plan.
   useEffect(() => () => cancelRepairs(), [])
 
@@ -918,8 +921,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <Btn label={uploading ? uploading : "Importer"} theme={theme} tone="primary" icon="M12 5v14|M5 12h14" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
         </>} />
 
-      {/* Espace utilisé (limite de l'abonnement) + fichiers vides à nettoyer */}
-      {(usage || broken.length > 0) && (
+      {/* Espace utilisé (limite de l'abonnement) + fichiers vides à nettoyer + copie sur ce PC */}
+      {(usage || broken.length > 0 || localBytes > 0) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
           {usage && (() => {
             const pct = usage.quota ? Math.min(100, Math.round((usage.used / usage.quota) * 100)) : 0
@@ -937,6 +940,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               </div>
             )
           })()}
+          {localBytes > 0 && (
+            <div title="Copies des vidéos sources gardées sur cet ordinateur pour des aperçus instantanés (1 Go max). Tes vidéos restent dans la banque en ligne." style={{ flex: '0 1 auto', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 16, background: '#0F0F11', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <span style={{ fontSize: 12.5, color: '#A1A1AA' }}>Sur ce PC : <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{fmtBytes(localBytes)}</b></span>
+              <Btn theme={theme} sm tone="quiet" label="Vider" onClick={async () => { await clearLocal(); setLocalBytes(0); toast('Copies locales supprimées : l’espace est libéré sur ton PC.', 'ok') }} />
+            </div>
+          )}
           {broken.length > 0 && (
             <div style={{ flex: '1 1 280px', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 16, background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.3)' }}>
               <span style={{ flex: 1, fontSize: 12.5, color: '#FCA5A5' }}>{broken.length} fichier(s) vide(s) : leur fichier n’existe plus.</span>

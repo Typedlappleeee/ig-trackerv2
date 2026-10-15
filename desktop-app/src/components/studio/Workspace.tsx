@@ -8,6 +8,8 @@ import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs } from '@/lib/data'
 import { fetchAllRows, addToBank } from '@/lib/bankStorage'
+import { saveDirSupported, ensureSaveDirAccess, writeToSaveDir } from '@/lib/saveDir'
+import { SaveDirButton } from '@/components/SaveDirButton'
 import { openTool as openToolPage } from '@/lib/openTool'
 import { Icon, FIELD, TEXTAREA, Segmented, toast, useNarrow } from '@/lib/ui'
 import { useConnections } from '@/lib/connections'
@@ -173,6 +175,8 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
 
   async function generate() {
     if (running || blocker) return
+    // Dossier du PC choisi : accès confirmé maintenant (au clic) pour y écrire chaque fichier.
+    const toPc = await ensureSaveDirAccess()
     const list = chosen
     setRunning(true); setLogs([]); setDone(0); setStep(0); setTotal(outCount); setPhase('Préparation…')
     const R = startRun('studio', `${label} · ${list.length} ${imgTool ? 'photo' : 'vidéo'}${list.length > 1 ? 's' : ''}`, outCount)
@@ -180,6 +184,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
     const hooks = { onProgress: (r: number) => setStep(r), onLog: (m: string) => { if (/Video:|Audio:|error|Error|decod|Invalid|unable|hevc|Duration/i.test(m)) push(m.trim()) } }
     const save = async (title: string, data: Uint8Array, ext = 'mp4') => {
       await saveOutputToBank(user.id, currentOrg?.id ?? null, data, title, ext, destFolder || null)
+      if (toPc && !(await writeToSaveDir(`${title}.${ext}`, data))) push(`⚠ ${title} : pas pu l’écrire dans le dossier du PC`)
       const url = URL.createObjectURL(new Blob([data as BlobPart], { type: ext === 'jpg' ? 'image/jpeg' : 'video/mp4' }))
       addResult({ id: crypto.randomUUID(), title, url, ext, tool, at: Date.now() })
       R.tick(true); setDone(d => d + 1)
@@ -398,6 +403,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
                   {folders.map(f => <option key={f} value={f} style={{ background: '#161618' }}>{f}</option>)}
                 </select>
               </FieldRow>
+              {saveDirSupported() && <FieldRow label="Aussi sur mon PC" hint="Facultatif : chaque fichier généré y est aussi enregistré."><SaveDirButton /></FieldRow>}
             </div>
 
             <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '18px -18px 16px' }} />

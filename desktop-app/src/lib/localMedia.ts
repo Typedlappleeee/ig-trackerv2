@@ -1,14 +1,14 @@
-// Copie LOCALE des médias de la banque, sur cet ordinateur. La banque est en ligne (partagée avec
-// l'équipe, les téléphones, les tâches programmées) : sans copie locale, chaque aperçu ou
-// génération retéléchargeait la vidéo (une 4K = 40–80 Mo). Ici :
-// - toute vidéo ajoutée depuis ce PC (import, sorties générées) est gardée tout de suite ;
-// - une vidéo déjà en ligne est gardée après sa 1re lecture ;
-// → aperçus et générations instantanés, même après avoir fermé l'app.
-// IndexedDB (fonctionne aussi en file:// dans l'app PC). Limite 4 Go : les plus anciennes
-// (dernière utilisation) sortent d'abord. Clé = chemin dans le stockage (stable).
+// Copie LOCALE de quelques médias de la banque, sur cet ordinateur. La banque est en ligne
+// (partagée avec l'équipe, les téléphones, les tâches programmées) : sans copie, chaque aperçu
+// retéléchargeait la vidéo source (une 4K = 40–80 Mo).
+// SEULES les vidéos SOURCES sont gardées (choisies dans Auto-contenu, utilisées pour générer) —
+// JAMAIS les imports ni les vidéos générées (elles remplissaient le disque).
+// IndexedDB (fonctionne aussi en file:// dans l'app PC). Limite 1 Go (250 Mo par fichier) :
+// les moins récemment utilisées sortent d'abord. Clé = chemin dans le stockage (stable).
+// « Vider » dans la Banque efface tout (clearLocal).
 
-const DB = 'sf-media', FILES = 'files', META = 'meta'
-const LIMIT = 4 * 1024 * 1024 * 1024
+const DB = 'sf-media-2', OLD_DB = 'sf-media', FILES = 'files', META = 'meta'
+const LIMIT = 1024 * 1024 * 1024, MAX_FILE = 250 * 1024 * 1024
 interface Meta { path: string; size: number; at: number }
 
 let dbp: Promise<IDBDatabase> | null = null
@@ -16,6 +16,8 @@ function db(): Promise<IDBDatabase> {
   if (dbp) return dbp
   dbp = new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') { reject(new Error('indexedDB indisponible')); return }
+    // Ancienne copie (gardait aussi les vidéos générées) : supprimée → espace libéré.
+    try { indexedDB.deleteDatabase(OLD_DB) } catch { /* ignore */ }
     const r = indexedDB.open(DB, 1)
     r.onupgradeneeded = () => {
       const d = r.result
@@ -46,7 +48,7 @@ export async function getLocal(path: string | null | undefined): Promise<Blob | 
 
 /** Garde une copie locale (silencieux en cas d'échec : simple accélérateur). */
 export async function putLocal(path: string | null | undefined, blob: Blob): Promise<void> {
-  if (!path || !blob.size || blob.size > LIMIT / 4) return
+  if (!path || !blob.size || blob.size > MAX_FILE) return
   try {
     const d = await db()
     const tx = d.transaction([FILES, META], 'readwrite')
@@ -66,4 +68,23 @@ async function evict(d: IDBDatabase): Promise<void> {
     if (total <= LIMIT * 0.85) break
     tx.objectStore(FILES).delete(m.path); tx.objectStore(META).delete(m.path); total -= m.size
   }
+}
+
+/** Place occupée par les copies locales (octets). */
+export async function localUsage(): Promise<number> {
+  try {
+    const d = await db()
+    const all = await req(d.transaction(META).objectStore(META).getAll()) as Meta[]
+    return all.reduce((s, m) => s + m.size, 0)
+  } catch { return 0 }
+}
+
+/** Efface toutes les copies locales. */
+export async function clearLocal(): Promise<void> {
+  try {
+    const d = await db()
+    const tx = d.transaction([FILES, META], 'readwrite')
+    tx.objectStore(FILES).clear(); tx.objectStore(META).clear()
+    await new Promise<void>((res, rej) => { tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error) })
+  } catch { /* ignore */ }
 }
