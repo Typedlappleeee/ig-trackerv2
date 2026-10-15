@@ -25,7 +25,8 @@ function extOf(m: Media): string { return (m.storage_path ?? m.file_url ?? '').t
 function isImg(m: Media): boolean { return IMG_EXT.includes(extOf(m)) }
 
 // Tuile : components/MediaThumb (miniature, 1re image vidéo quand visible, sinon repli
-// lisible — jamais de carré noir ; les vidéos sans miniature la reçoivent en base).
+// lisible — jamais de carré noir). Pas de création de miniature ici (seule la Banque en
+// fait) : rien ne télécharge en arrière-plan pendant qu'on choisit / lit une vidéo.
 function MediaTile({ m, thumb, media, on, accentBtn, onToggle }: {
   m: Media; thumb: string | null; media: string | null; on: boolean; accent: string; accentBtn: string; onToggle: () => void
 }) {
@@ -36,8 +37,7 @@ function MediaTile({ m, thumb, media, on, accentBtn, onToggle }: {
       border: 'none', boxShadow: on ? `0 0 0 2px ${accentBtn}` : '0 0 0 1px rgba(255,255,255,0.08)',
       background: '#161618',
     }}>
-      <MediaThumb id={m.id} thumb={thumb} media={media} video={!img} small ext={extOf(m).toUpperCase().slice(0, 4)}
-        repair={!img && m.storage_path && !m.thumbnail_path && !m.thumbnail_url ? { id: m.id, storagePath: m.storage_path } : null} />
+      <MediaThumb id={m.id} thumb={thumb} media={media} video={!img} small ext={extOf(m).toUpperCase().slice(0, 4)} />
       <span style={{ position: 'absolute', zIndex: 2, top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', background: on ? accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
     </button>
   )

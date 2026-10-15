@@ -14,8 +14,6 @@ import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
 import { addToBank } from '@/lib/bankStorage'
-import { MediaThumb } from '@/components/MediaThumb'
-import { VideoPlayerModal } from '@/components/VideoPlayer'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
@@ -531,8 +529,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   // La miniature s'affiche tout de suite ; une vidéo que le navigateur ne décode pas (HEVC)
   // garde un repli lisible au lieu d'un cadre noir.
   const [previews, setPreviews] = useState<Record<string, { thumb: string | null; media: string | null }>>({})
-  // Vérifier une source : lecteur en grand (son, contrôles) avec la légende par-dessus.
-  const [playing, setPlaying] = useState<{ id: string; url: string; title: string; poster: string | null } | null>(null)
+  // Sources que l'ordinateur ne sait pas afficher (HEVC…) : repli au lieu d'un cadre noir.
+  const [unplayable, setUnplayable] = useState<Set<string>>(new Set())
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -788,7 +786,9 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
         </Grp>
 
-        {/* Aperçu : voir la/les vidéo(s) + la caption dessus (clic pour lire) */}
+        {/* Aperçu : la vidéo + la légende dessus, directement dans la vignette (clic = lecture
+            avec le son, instantanée). La miniature s'affiche en attendant la 1re image ; une
+            vidéo que l'ordinateur ne décode pas (HEVC) affiche un repli lisible, pas du noir. */}
         {sources.length > 0 && (
           <Grp title="Aperçu">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -797,14 +797,24 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                 const url = pv?.media ?? null
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
                 const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
+                const ext = ((s.storage_path ?? s.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)
+                const bad = unplayable.has(s.id)
                 return (
-                  <div key={s.id} title={`${s.title} · clic pour lire`} onClick={() => { if (url) setPlaying({ id: s.id, url, title: s.title, poster: pv?.thumb ?? null }) }}
+                  <div key={s.id} title={s.title} onClick={e => {
+                    const v = e.currentTarget.querySelector('video'); if (!v) return
+                    if (v.paused) { e.currentTarget.parentElement?.querySelectorAll('video').forEach(o => { if (o !== v) o.pause() }); v.muted = false; void v.play().catch(() => {}) } else v.pause()
+                  }}
                     style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 6, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${EDGE}`, cursor: url ? 'pointer' : 'default' }}>
-                    <MediaThumb id={s.id} thumb={pv?.thumb ?? null} media={url} video small
-                      ext={((s.storage_path ?? s.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)}
-                      repair={s.storage_path && !s.thumbnail_path && !s.thumbnail_url ? { id: s.id, storagePath: s.storage_path } : null}
-                    />
-                    {url && <span style={{ position: 'absolute', zIndex: 2, right: 5, bottom: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 99, background: 'rgba(10,10,11,0.7)', color: '#fff', pointerEvents: 'none' }}><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8V4z" /></svg></span>}
+                    {bad || !url ? (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, textAlign: 'center', color: MUTED, fontSize: 9.5, fontWeight: 600, background: pv?.thumb ? `center / cover no-repeat url("${pv.thumb}")` : '#0D0D0F' }}>
+                        {!url ? '…' : !pv?.thumb && <>{ext || 'VIDÉO'}<span style={{ fontWeight: 500 }}>aperçu indisponible</span></>}
+                      </div>
+                    ) : (
+                      <video src={url + '#t=0.3'} poster={pv?.thumb ?? undefined} playsInline loop preload="metadata"
+                        onLoadedData={e => { if (!e.currentTarget.videoWidth) setUnplayable(u => new Set(u).add(s.id)) }}
+                        onError={() => setUnplayable(u => new Set(u).add(s.id))}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    )}
                     {capPrev && (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
                         <span style={{ display: 'inline-block', maxWidth: '100%', textAlign: 'center', color: '#fff', fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: capStyle === 'outline' ? 700 : 400, fontSize: 8.5, lineHeight: 1.25, padding: capStyle === 'snapchat' ? '2px 4px' : '0 3px', width: capStyle === 'snapchat' ? '100%' : 'auto', background: capStyle === 'snapchat' ? 'rgba(48,48,48,0.5)' : 'transparent', textShadow: capStyle === 'outline' ? '0 0 2px #000,0 0 2px #000' : 'none', boxSizing: 'border-box' }}>{capPrev}</span>
@@ -815,16 +825,6 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
               })}
               {sources.length > 8 && <div style={{ alignSelf: 'center', fontSize: 11, color: MUTED }}>+{sources.length - 8}</div>}
             </div>
-            {playing && (() => {
-              const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
-              const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
-              return <VideoPlayerModal theme={BLOW_THEME} url={playing.url} title={playing.title} poster={playing.poster} onClose={() => setPlaying(null)}
-                overlay={capPrev ? (
-                  <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center' }}>
-                    <span style={{ display: 'inline-block', maxWidth: '100%', textAlign: 'center', color: '#fff', fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: capStyle === 'outline' ? 700 : 400, fontSize: 17, lineHeight: 1.25, padding: capStyle === 'snapchat' ? '5px 10px' : '0 8px', width: capStyle === 'snapchat' ? '100%' : 'auto', background: capStyle === 'snapchat' ? 'rgba(48,48,48,0.5)' : 'transparent', textShadow: capStyle === 'outline' ? '0 0 3px #000,0 0 3px #000' : 'none', boxSizing: 'border-box' }}>{capPrev}</span>
-                  </div>
-                ) : undefined} />
-            })()}
           </Grp>
         )}
 
