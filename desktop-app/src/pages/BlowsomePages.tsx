@@ -15,13 +15,14 @@ import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
 import { addToBank } from '@/lib/bankStorage'
 import { MediaThumb } from '@/components/MediaThumb'
+import { VideoPlayerModal } from '@/components/VideoPlayer'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
 import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
-import { confirmDialog } from '@/lib/ui'
+import { confirmDialog, toast } from '@/lib/ui'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -530,7 +531,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   // La miniature s'affiche tout de suite ; une vidéo que le navigateur ne décode pas (HEVC)
   // garde un repli lisible au lieu d'un cadre noir.
   const [previews, setPreviews] = useState<Record<string, { thumb: string | null; media: string | null }>>({})
-  const [playing, setPlaying] = useState<string | null>(null)
+  // Vérifier une source : lecteur en grand (son, contrôles) avec la légende par-dessus.
+  const [playing, setPlaying] = useState<{ id: string; url: string; title: string } | null>(null)
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -559,8 +561,12 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   async function applyPicker(r: PickerResult) {
     if (r.kind !== 'videos' || r.ids.length === 0) return
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_path,thumbnail_url')).in('id', r.ids)
-    setSources((data ?? []) as Src[])
+    // select('*') : ne dépend d'aucune colonne optionnelle (une colonne absente faisait échouer
+    // la requête → la vidéo choisie ne « se mettait pas »). Ordre du choix conservé.
+    const { data, error } = await scope(supabase.from('content_bank').select('*')).in('id', r.ids)
+    if (error) { toast(`Impossible de charger ces vidéos : ${error.message}`, 'bad', 8000); return }
+    const rows = (data ?? []) as Src[]
+    setSources(r.ids.map(id => rows.find(x => x.id === id)).filter((x): x is Src => !!x))
   }
 
   // Import « Mon PC » : upload vers le bucket content + content_bank, puis ajout aux sources.
@@ -792,12 +798,13 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
                 const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
                 return (
-                  <div key={s.id} title={`${s.title} · clic pour lire`} onClick={() => { if (url) setPlaying(p => p === s.id ? null : s.id) }}
+                  <div key={s.id} title={`${s.title} · clic pour lire`} onClick={() => { if (url) setPlaying({ id: s.id, url, title: s.title }) }}
                     style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 6, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${EDGE}`, cursor: url ? 'pointer' : 'default' }}>
                     <MediaThumb id={s.id} thumb={pv?.thumb ?? null} media={url} video small
                       ext={((s.storage_path ?? s.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)}
                       repair={s.storage_path && !s.thumbnail_path && !s.thumbnail_url ? { id: s.id, storagePath: s.storage_path } : null}
-                      playing={playing === s.id} playMuted={false} onPlayError={() => { setPlaying(null); push(`⚠ ${s.title} : lecture impossible dans l’app (format HEVC ?) — la génération fonctionne quand même.`) }} />
+                    />
+                    {url && <span style={{ position: 'absolute', zIndex: 2, right: 5, bottom: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 99, background: 'rgba(10,10,11,0.7)', color: '#fff', pointerEvents: 'none' }}><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8V4z" /></svg></span>}
                     {capPrev && (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
                         <span style={{ display: 'inline-block', maxWidth: '100%', textAlign: 'center', color: '#fff', fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: capStyle === 'outline' ? 700 : 400, fontSize: 8.5, lineHeight: 1.25, padding: capStyle === 'snapchat' ? '2px 4px' : '0 3px', width: capStyle === 'snapchat' ? '100%' : 'auto', background: capStyle === 'snapchat' ? 'rgba(48,48,48,0.5)' : 'transparent', textShadow: capStyle === 'outline' ? '0 0 2px #000,0 0 2px #000' : 'none', boxSizing: 'border-box' }}>{capPrev}</span>
@@ -808,6 +815,16 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
               })}
               {sources.length > 8 && <div style={{ alignSelf: 'center', fontSize: 11, color: MUTED }}>+{sources.length - 8}</div>}
             </div>
+            {playing && (() => {
+              const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
+              const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
+              return <VideoPlayerModal theme={BLOW_THEME} url={playing.url} title={playing.title} onClose={() => setPlaying(null)}
+                overlay={capPrev ? (
+                  <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center' }}>
+                    <span style={{ display: 'inline-block', maxWidth: '100%', textAlign: 'center', color: '#fff', fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: capStyle === 'outline' ? 700 : 400, fontSize: 17, lineHeight: 1.25, padding: capStyle === 'snapchat' ? '5px 10px' : '0 8px', width: capStyle === 'snapchat' ? '100%' : 'auto', background: capStyle === 'snapchat' ? 'rgba(48,48,48,0.5)' : 'transparent', textShadow: capStyle === 'outline' ? '0 0 3px #000,0 0 3px #000' : 'none', boxSizing: 'border-box' }}>{capPrev}</span>
+                  </div>
+                ) : undefined} />
+            })()}
           </Grp>
         )}
 

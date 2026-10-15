@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import {
   supabase,
@@ -222,21 +222,32 @@ export interface BankThumbItem {
   storage_path?: string | null
   file_url?: string | null
 }
-export function useBankThumbs(items: BankThumbItem[]) {
+/** URLs signées des miniatures et des médias d'une liste de la banque. Miniatures d'abord
+ *  (la grille s'affiche tout de suite), puis les médias ; un chemin déjà signé n'est pas
+ *  re-signé avant 5 h. `media: 'bare'` : ne signe le média QUE pour ceux sans miniature
+ *  (sélecteurs : 1 800 signatures de moins). */
+export function useBankThumbs(items: BankThumbItem[], opts: { media?: 'all' | 'bare' } = {}) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
+  const signedAt = useRef<Record<string, number>>({})
+  const mode = opts.media ?? 'all'
   useEffect(() => {
+    const stale = (p: string) => !signedAt.current[p] || Date.now() - signedAt.current[p] > 5 * 3600_000
     const thumbPaths = items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
-    const mediaPaths = items.filter(i => i.storage_path).map(i => i.storage_path as string)
-    const paths = [...new Set([...thumbPaths, ...mediaPaths])]
+    const bare = items.filter(i => i.storage_path && !i.thumbnail_url && !i.thumbnail_path).map(i => i.storage_path as string)
+    const rest = mode === 'all' ? items.filter(i => i.storage_path && (i.thumbnail_url || i.thumbnail_path)).map(i => i.storage_path as string) : []
+    const paths = [...new Set([...thumbPaths, ...bare, ...rest])].filter(stale)
     if (paths.length === 0) return
     let cancelled = false
     ;(async () => {
       const CHUNK = 100
       for (let i = 0; i < paths.length; i += CHUNK) {
         const batch = paths.slice(i, i + CHUNK)
-        const { data } = await supabase.storage.from('content').createSignedUrls(batch, 3600)
+        const { data } = await supabase.storage.from('content').createSignedUrls(batch, 6 * 3600)
         if (cancelled) return
-        if (data) setThumbs(prev => {
+        if (!data) continue
+        const now = Date.now()
+        data.forEach(d => { if (d.path && d.signedUrl) signedAt.current[d.path] = now })
+        setThumbs(prev => {
           const map = { ...prev }
           data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl })
           return map
@@ -244,7 +255,7 @@ export function useBankThumbs(items: BankThumbItem[]) {
       }
     })()
     return () => { cancelled = true }
-  }, [items])
+  }, [items, mode])
   const thumbFor = useCallback((i: BankThumbItem): string | null => {
     if (i.thumbnail_url) return i.thumbnail_url
     if (i.thumbnail_path && thumbs[i.thumbnail_path]) return thumbs[i.thumbnail_path]
