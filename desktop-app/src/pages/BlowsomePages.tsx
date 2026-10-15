@@ -648,10 +648,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         let bytes: Uint8Array
         try {
           const loc = localSrc[v.id]
-          let lastPct = -10
-          bytes = loc ? new Uint8Array(await (await fetch(loc)).arrayBuffer()) : await resolveSourceBytes(v, undefined, pct => {
-            if (pct !== null && pct - lastPct >= 10) { lastPct = pct; setLogs(l => [...l.filter(x => !x.startsWith('  📥 téléchargement')), `  📥 téléchargement ${pct} %…`]) }
-          })
+          bytes = loc ? new Uint8Array(await (await fetch(loc)).arrayBuffer()) : await resolveSourceBytes(v)
           push(`  📥 source chargée (${Math.round(bytes.byteLength / 1024)} Ko)`)
         } catch (se) {
           push(`  ❌ source « ${v.title} » illisible : ${se instanceof Error ? (se.message || se.name) : String(se)} → vidéo suivante`)

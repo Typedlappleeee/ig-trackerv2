@@ -10,7 +10,6 @@ import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import { MediaThumb } from '@/components/MediaThumb'
 import { VideoPlayerModal } from '@/components/VideoPlayer'
 import { getLocal, localUsage, clearLocal } from '@/lib/localMedia'
-import { fetchFast } from '@/lib/fastFetch'
 import { setRelaunch } from '@/lib/runHistory'
 import type { OrgState } from '@/lib/data'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, addToBank, PLAN_LABEL } from '@/lib/bankStorage'
@@ -375,19 +374,6 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     while (taken.has(name)) name = `${base}_${n++}.${ext}`
     taken.add(name); return name
   }
-  // Récupère un média : lien déjà signé si dispo (pas d'appel serveur par fichier), puis
-  // téléchargement ACCÉLÉRÉ direct depuis le stockage (lib/fastFetch, 6 morceaux en parallèle) ;
-  // copie déjà sur ce PC → aucun téléchargement. Repli : fetch simple.
-  async function grab(it: ContentItem): Promise<Blob | null> {
-    const local = await getLocal(it.storage_path)
-    if (local) return local
-    const url = mediaFor(it) ?? await urlForItem(it); if (!url) return null
-    try { return await fetchFast(url) } catch {
-      try { const r = await fetch(url); return r.ok ? await r.blob() : null } catch { return null }
-    }
-  }
-  const mo = (n: number) => `${Math.round(n / 1024 / 1024)} Mo`
-
   async function downloadMedia(ids: string[]) {
     if (ids.length === 0) return
     const targets = ids.map(id => items.find(x => x.id === id)).filter((x): x is ContentItem => !!x)
@@ -396,28 +382,24 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     // Un seul média → téléchargement direct.
     if (targets.length === 1) {
       const it = targets[0]
-      setNotice('Téléchargement…')
-      const blob = await grab(it)
-      if (!blob) { setNotice('Échec du téléchargement.'); return }
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = fileNameFor(it, new Set())
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(a.href), 10000)
-      setNotice(null)
+      const url = await urlForItem(it); if (!url) return
+      try {
+        const blob = await (await fetch(url)).blob()
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = fileNameFor(it, new Set())
+        document.body.appendChild(a); a.click(); a.remove()
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000)
+      } catch { setNotice('Échec du téléchargement.') }
       return
     }
 
     // Plusieurs médias → un seul .zip.
     const zipName = `scaleflow-medias-${new Date().toISOString().slice(0, 10)}.zip`
-    // Les 3 vidéos suivantes se téléchargent PENDANT l'écriture de la courante (avant : une par
-    // une, sur une seule connexion, avec un appel serveur par fichier → très lent).
-    const AHEAD = 3
-    const pending = new Map<number, Promise<Blob | null>>()
-    const start = (i: number) => { if (i < targets.length && !pending.has(i)) pending.set(i, grab(targets[i])) }
 
-    // Chrome/Edge : ÉCRITURE STREAMING sur le disque (client-zip → pipeTo) : au plus 4 vidéos
-    // en mémoire à la fois, donc ça marche pour des CENTAINES de vidéos.
+    // Chrome/Edge : ÉCRITURE STREAMING sur le disque (client-zip → pipeTo). Chaque
+    // vidéo est téléchargée puis écrite au fil de l'eau — RIEN n'est gardé en mémoire,
+    // donc ça marche pour des CENTAINES de vidéos (le blob en mémoire plantait avant).
     const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FSHandle> }).showSaveFilePicker
     if (picker) {
       let handle: FSHandle | null = null
@@ -427,40 +409,54 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         try {
           const { downloadZip } = await import('client-zip')
           const taken = new Set<string>()
-          let ok = 0, bytes = 0
+          let done = 0, ok = 0
+          // Fichier entier par un fetch normal (comme avant) ; les 2 suivants sont lancés
+          // PENDANT l'écriture du courant → le ZIP n'attend plus entre deux vidéos.
+          const get = async (it: ContentItem): Promise<Blob | null> => {
+            const url = mediaFor(it) ?? await urlForItem(it); if (!url) return null
+            try { const r = await fetch(url); return r.ok ? await r.blob() : null } catch { return null }
+          }
+          const pending = new Map<number, Promise<Blob | null>>()
+          const start = (i: number) => { if (i < targets.length && !pending.has(i)) pending.set(i, get(targets[i])) }
           async function* gen() {
             for (let i = 0; i < targets.length; i++) {
-              for (let k = i; k <= i + AHEAD; k++) start(k)
+              for (let k = i; k <= i + 2; k++) start(k)
+              setNotice(`ZIP : ${++done}/${targets.length}…`)
               const blob = await pending.get(i)!; pending.delete(i)
-              setNotice(`ZIP : ${i + 1}/${targets.length} · ${mo(bytes)}…`)
               if (!blob) continue
-              ok++; bytes += blob.size
+              ok++
               yield { name: fileNameFor(targets[i], taken), input: blob }
             }
           }
           const zipResp = downloadZip(gen())
           const writable = await handle.createWritable()
           await zipResp.body!.pipeTo(writable as unknown as WritableStream)
-          setNotice(ok > 0 ? `ZIP enregistré — ${ok} fichier(s), ${mo(bytes)}.` : 'Aucun fichier récupéré (réseau/CORS ?).')
+          setNotice(ok > 0 ? `ZIP enregistré — ${ok} fichier(s).` : 'Aucun fichier récupéré (réseau/CORS ?).')
         } catch (e) { setNotice(`Échec du ZIP : ${e instanceof Error ? e.message : String(e)}`) }
         return
       }
     }
 
-    // Repli (Firefox/Safari, pas de File System Access) : ZIP en mémoire (STORE), même
-    // récupération accélérée, 4 fichiers à la fois. Convient aux lots modérés.
+    // Repli (Firefox/Safari, pas de File System Access) : ZIP en mémoire (STORE),
+    // récupération à concurrence limitée. Convient aux lots modérés.
     try {
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
       const taken = new Set<string>()
-      let ok = 0, bytes = 0
-      for (let i = 0; i < targets.length; i++) {
-        for (let k = i; k <= i + AHEAD; k++) start(k)
-        const blob = await pending.get(i)!; pending.delete(i)
-        setNotice(`ZIP : récupération ${i + 1}/${targets.length} · ${mo(bytes)}…`)
-        if (!blob) continue
-        zip.file(fileNameFor(targets[i], taken), blob); ok++; bytes += blob.size
+      const CONC = 12
+      let next = 0, ok = 0, done = 0
+      const worker = async () => {
+        for (;;) {
+          const my = next++; if (my >= targets.length) break
+          const it = targets[my]
+          try {
+            const url = await urlForItem(it)
+            if (url) { const resp = await fetch(url); if (resp.ok) { zip.file(fileNameFor(it, taken), await resp.blob()); ok++ } }
+          } catch { /* ignore */ }
+          setNotice(`ZIP : récupération ${++done}/${targets.length}…`)
+        }
       }
+      await Promise.all(Array.from({ length: Math.min(CONC, targets.length) }, worker))
       if (ok === 0) { setNotice('Aucun fichier récupéré (réseau/CORS ?).'); return }
       setNotice(`ZIP : assemblage de ${ok} fichier(s)…`)
       const out = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, m => setNotice(`ZIP : ${Math.round(m.percent)}%…`))

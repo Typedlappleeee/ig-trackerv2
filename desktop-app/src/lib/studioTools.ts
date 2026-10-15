@@ -4,7 +4,6 @@ import { supabase } from './supabase'
 import { runFfmpeg, fetchInput } from './ffmpeg'
 import { addToBank } from './bankStorage'
 import { getLocal, putLocal } from './localMedia'
-import { fetchFast } from './fastFetch'
 import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
 import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, type RemixIntensity, type RemixToggles } from './studioFilters'
@@ -13,22 +12,18 @@ export { remixParams, captionLines, captionFor, type RemixToggles } from './stud
 export interface SourceRef { id?: string; title: string; storage_path?: string | null; file_url?: string | null }
 
 // Récupère les octets d'une source (URL signée banque OU fichier PC).
-// Copie locale d'abord (lib/localMedia) : une source déjà sur ce PC n'est pas retéléchargée.
-// Sinon téléchargement ACCÉLÉRÉ direct depuis le stockage (lib/fastFetch : 6 morceaux en
-// parallèle, plus rapide qu'une seule connexion) puis la source est gardée sur le PC
-// (jamais les sorties). `onProgress` : 0–100 (ou null si la taille est inconnue).
-export async function resolveSourceBytes(v: SourceRef, file?: File, onProgress?: (pct: number | null) => void): Promise<Uint8Array> {
+// Copie locale d'abord (lib/localMedia) : une source déjà sur ce PC n'est pas retéléchargée ;
+// sinon téléchargement normal (comme avant), puis la source est gardée (jamais les sorties).
+export async function resolveSourceBytes(v: SourceRef, file?: File): Promise<Uint8Array> {
   if (file) return fetchInput(file)
   if (v.storage_path) {
     const local = await getLocal(v.storage_path)
     if (local) return new Uint8Array(await local.arrayBuffer())
     const { data } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600)
     if (data?.signedUrl) {
-      let blob: Blob
-      try { blob = await fetchFast(data.signedUrl, p => onProgress?.(p.total ? Math.round((p.loaded / p.total) * 100) : null)) }
-      catch { blob = new Blob([await fetchInput(data.signedUrl) as BlobPart]) }
-      void putLocal(v.storage_path, blob)
-      return new Uint8Array(await blob.arrayBuffer())
+      const bytes = await fetchInput(data.signedUrl)
+      void putLocal(v.storage_path, new Blob([bytes as BlobPart]))
+      return bytes
     }
   }
   if (v.file_url) return fetchInput(v.file_url)

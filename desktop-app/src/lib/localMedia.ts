@@ -24,8 +24,11 @@ function db(): Promise<IDBDatabase> {
       if (!d.objectStoreNames.contains(FILES)) d.createObjectStore(FILES)
       if (!d.objectStoreNames.contains(META)) d.createObjectStore(META, { keyPath: 'path' })
     }
-    r.onsuccess = () => resolve(r.result)
-    r.onerror = () => reject(r.error)
+    // Jamais bloquant : si le stockage du navigateur ne répond pas, on fait sans copie locale.
+    const t = setTimeout(() => reject(new Error('timeout')), 2000)
+    r.onsuccess = () => { clearTimeout(t); resolve(r.result) }
+    r.onerror = () => { clearTimeout(t); reject(r.error) }
+    r.onblocked = () => { clearTimeout(t); reject(new Error('blocked')) }
   })
   dbp.catch(() => { dbp = null })
   // Demande au navigateur de ne pas effacer ce stockage de lui-même.
@@ -37,6 +40,9 @@ const req = <T>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess 
 /** Copie locale d'un média (null si absente). Met à jour sa date d'utilisation. */
 export async function getLocal(path: string | null | undefined): Promise<Blob | null> {
   if (!path) return null
+  return Promise.race([readLocal(path), new Promise<null>(r => setTimeout(() => r(null), 2500))])
+}
+async function readLocal(path: string): Promise<Blob | null> {
   try {
     const d = await db()
     const blob = await req(d.transaction(FILES).objectStore(FILES).get(path)) as Blob | undefined
