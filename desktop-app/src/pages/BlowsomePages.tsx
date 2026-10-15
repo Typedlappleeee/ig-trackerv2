@@ -13,17 +13,13 @@ import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
-import { addToBank } from '@/lib/bankStorage'
-import { saveDirSupported, ensureSaveDirAccess, writeToSaveDir } from '@/lib/saveDir'
-import { SaveDirButton } from '@/components/SaveDirButton'
-import { getLocal } from '@/lib/localMedia'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
 import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
-import { confirmDialog, toast } from '@/lib/ui'
+import { confirmDialog } from '@/lib/ui'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -61,29 +57,6 @@ function videoDurationFromBytes(bytes: Uint8Array): Promise<number> {
 const numInp: CSSProperties = { ...fieldStyle, width: 62, height: 28, padding: '0 8px', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }
 
 // ── Composants d'options réutilisables (Auto-contenu) ────────────────────────
-// Vidéo d'aperçu : lecture directe tout de suite ; dès que la copie locale (téléchargée en
-// accéléré en arrière-plan) est prête, bascule dessus sans coupure (même position, lecture
-// conservée) → fluide, plus d'attente ni de saccade. `src` n'est plus piloté par React
-// après le montage (bascule impérative).
-function PreviewVideo({ stream, local, poster, onUnsupported, onPlaying }: {
-  stream: string; local: string | null; poster?: string | null; onUnsupported: () => void; onPlaying: () => void
-}) {
-  const ref = useRef<HTMLVideoElement>(null)
-  const [initial] = useState(() => (local ?? stream) + '#t=0.3')
-  useEffect(() => {
-    const v = ref.current; if (!v || !local || v.currentSrc.startsWith('blob:')) return
-    const t = v.currentTime, playing = !v.paused, muted = v.muted
-    v.addEventListener('loadedmetadata', () => { if (t > 0.35) v.currentTime = t; v.muted = muted; if (playing) void v.play().catch(() => {}) }, { once: true })
-    v.src = local + '#t=0.3'
-    v.load()
-  }, [local])
-  return (
-    <video ref={ref} src={initial} poster={poster ?? undefined} playsInline loop preload="metadata"
-      onError={e => { if (e.currentTarget.error?.code === 4) onUnsupported() }} onPlaying={onPlaying}
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-  )
-}
-
 function Grp({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ borderRadius: 8, border: `1px solid ${EDGE}`, background: 'transparent', padding: 16, marginTop: 12 }}>
@@ -516,8 +489,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
 
   // ── Générateur auto : sources banque → N variantes uniques (spoof) + légende IA ──
   const [picker, setPicker] = useState(false)
-  type Src = { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_path?: string | null; thumbnail_url?: string | null }
-  const [sources, setSources] = useState<Src[]>([])
+  const [sources, setSources] = useState<{ id: string; title: string; storage_path: string | null; file_url: string | null }[]>([])
   const [variants, setVariants] = useState(3)
   // Anti-détection : intensité du spoof + localisation GPS (métadonnées mp4).
   const [intensity, setIntensity] = useState<SpoofIntensity>('normal')
@@ -551,38 +523,16 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [speedMax, setSpeedMax] = useState('1.02')
   // Dossier de destination des sorties (banque).
   const [destFolder, setDestFolder] = useState('')
-  // Aperçu : miniature + URL signée de chaque vidéo source (voir la vidéo + la légende dessus).
-  // La miniature s'affiche tout de suite ; une vidéo que le navigateur ne décode pas (HEVC)
-  // garde un repli lisible au lieu d'un cadre noir.
-  const [previews, setPreviews] = useState<Record<string, { thumb: string | null; media: string | null }>>({})
-  // Sources que l'ordinateur ne sait pas afficher (HEVC…) : repli au lieu d'un cadre noir.
-  const [unplayable, setUnplayable] = useState<Set<string>>(new Set())
-  // Copie LOCALE des sources (lib/localMedia, sur ce PC) : si la vidéo y est déjà (gardée lors
-  // d'une génération), l'aperçu la lit directement, sans rien télécharger. Sinon : lecture
-  // directe comme avant. Aucun téléchargement en arrière-plan. id → URL blob.
-  const [localSrc, setLocalSrc] = useState<Record<string, string>>({})
-  const blobUrls = useRef<string[]>([])
-  useEffect(() => () => { blobUrls.current.forEach(u => URL.revokeObjectURL(u)) }, [])
-  const toUrl = (b: Blob) => { const u = URL.createObjectURL(b); blobUrls.current.push(u); return u }
+  // Aperçu : URL signée par vidéo source (pour voir la vidéo + la caption dessus).
+  const [previews, setPreviews] = useState<Record<string, string>>({})
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const list = sources.slice(0, 8)
-      // Copies déjà sur le PC : prêtes AVANT l'affichage de l'aperçu (lecture instantanée).
-      const locals: Record<string, string> = {}
-      await Promise.all(list.map(async x => { if (localSrc[x.id]) return; const b = await getLocal(x.storage_path); if (b && alive) locals[x.id] = toUrl(b) }))
-      const paths = [...new Set(list.flatMap(x => [x.storage_path, x.thumbnail_url ? null : x.thumbnail_path]).filter((p): p is string => !!p))]
-      const signed: Record<string, string> = {}
-      if (paths.length) {
-        const { data } = await supabase.storage.from('content').createSignedUrls(paths, 3600)
-        ;(data ?? []).forEach(d => { if (d.path && d.signedUrl) signed[d.path] = d.signedUrl })
+      const out: Record<string, string> = {}
+      for (const s of sources.slice(0, 8)) {
+        if (s.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(s.storage_path, 3600); if (data?.signedUrl) out[s.id] = data.signedUrl }
+        else if (s.file_url) out[s.id] = s.file_url
       }
-      const out: Record<string, { thumb: string | null; media: string | null }> = {}
-      for (const x of list) out[x.id] = {
-        thumb: x.thumbnail_url ?? (x.thumbnail_path ? signed[x.thumbnail_path] ?? null : null),
-        media: x.storage_path ? signed[x.storage_path] ?? null : x.file_url,
-      }
-      if (alive && Object.keys(locals).length) setLocalSrc(m => ({ ...m, ...locals }))
       if (alive) setPreviews(out)
     })()
     return () => { alive = false }
@@ -596,25 +546,27 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   async function applyPicker(r: PickerResult) {
     if (r.kind !== 'videos' || r.ids.length === 0) return
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    // select('*') : ne dépend d'aucune colonne optionnelle (une colonne absente faisait échouer
-    // la requête → la vidéo choisie ne « se mettait pas »). Ordre du choix conservé.
-    const { data, error } = await scope(supabase.from('content_bank').select('*')).in('id', r.ids)
-    if (error) { toast(`Impossible de charger ces vidéos : ${error.message}`, 'bad', 8000); return }
-    const rows = (data ?? []) as Src[]
-    setSources(r.ids.map(id => rows.find(x => x.id === id)).filter((x): x is Src => !!x))
+    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', r.ids)
+    setSources((data ?? []) as any[])
   }
 
   // Import « Mon PC » : upload vers le bucket content + content_bank, puis ajout aux sources.
   async function importFromPC(files: FileList | File[]) {
     const list = Array.from(files).filter(f => f.type.startsWith('video')); if (list.length === 0) return
-    const added: Src[] = []
+    const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
+    const added: { id: string; title: string; storage_path: string | null; file_url: string | null }[] = []
     let done = 0
     for (const file of list) {
       setUploading(`${file.name} (${++done}/${list.length})`)
       try {
+        const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase()
+        const id = crypto.randomUUID()
+        const storagePath = `videos/${scopeFolder}/${id}.${ext}`
+        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
+        if (up.error) continue
         const title = file.name.replace(/\.[a-z0-9]+$/i, '')
-        const r = await addToBank({ userId: user.id, orgId: currentOrg?.id ?? null, file, name: file.name, folder: destFolder || null })
-        if (r.id && r.storagePath) added.push({ id: r.id, title, storage_path: r.storagePath, file_url: null, thumbnail_path: null, thumbnail_url: null })
+        const ins = await supabase.from('content_bank').insert({ user_id: user.id, org_id: currentOrg?.id ?? null, title, storage_path: storagePath, file_url: null, folder: destFolder || null, tags: [], notes: null, used_count: 0 }).select('id').single()
+        added.push({ id: (ins.data as any)?.id ?? id, title, storage_path: storagePath, file_url: null })
       } catch { /* ignore */ }
     }
     setUploading(null)
@@ -624,8 +576,6 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
 
   async function generate() {
     if (running || sources.length === 0) return
-    // Dossier du PC choisi : accès confirmé maintenant (au clic) pour y écrire chaque vidéo.
-    const toPc = await ensureSaveDirAccess()
     setRunning(true); setLogs([]); setMade(0); setProgress(0)
     const per = Math.max(1, Math.min(12, variants))
     const R = startRun('auto', `${sources.length} vidéo${sources.length > 1 ? 's' : ''} × ${per}`, sources.length * per)
@@ -647,8 +597,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         push(`— ${v.title} —`)
         let bytes: Uint8Array
         try {
-          const loc = localSrc[v.id]
-          bytes = loc ? new Uint8Array(await (await fetch(loc)).arrayBuffer()) : await resolveSourceBytes(v)
+          bytes = await resolveSourceBytes(v)
           push(`  📥 source chargée (${Math.round(bytes.byteLength / 1024)} Ko)`)
         } catch (se) {
           push(`  ❌ source « ${v.title} » illisible : ${se instanceof Error ? (se.message || se.name) : String(se)} → vidéo suivante`)
@@ -702,7 +651,6 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             }, hooks)
             push(`    ✓ variante générée (${Math.round(out.byteLength / 1024)} Ko) → sauvegarde…`)
             await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
-            if (toPc) push(await writeToSaveDir(`${v.title} · auto ${i + 1}.mp4`, out) ? '    💾 aussi enregistrée sur ton PC' : '    ⚠ pas pu l’écrire dans le dossier du PC')
             done++; setMade(done); R.tick(true)
           } catch (ve) {
             // On loggue la VRAIE erreur (message + 1re ligne de stack) et on continue les autres
@@ -824,46 +772,26 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
           </div>
           <Fld label="Variantes / vidéo"><input type="number" min={1} max={12} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
-          <Fld label="Dossier dans la banque"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
-          {saveDirSupported() && <Fld label="Aussi sur mon PC"><SaveDirButton /></Fld>}
+          <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
         </Grp>
 
-        {/* Aperçu : la vidéo + la légende dessus, directement dans la vignette (clic = lecture
-            avec le son, instantanée). La miniature s'affiche en attendant la 1re image ; une
-            vidéo que l'ordinateur ne décode pas (HEVC) affiche un repli lisible, pas du noir. */}
+        {/* Aperçu : voir la/les vidéo(s) + la caption dessus (clic pour lire) */}
         {sources.length > 0 && (
           <Grp title="Aperçu">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {sources.slice(0, 8).map(s => {
-                const pv = previews[s.id]
-                const url = pv?.media ?? null
+                const url = previews[s.id]
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
                 const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
-                const ext = ((s.storage_path ?? s.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)
-                const bad = unplayable.has(s.id)
                 return (
                   <div key={s.id} title={s.title} onClick={e => {
                     const v = e.currentTarget.querySelector('video'); if (!v) return
-                    if (v.paused) {
-                      e.currentTarget.parentElement?.querySelectorAll('video').forEach(o => { if (o !== v) o.pause() })
-                      // Erreur passagère (réseau…) : on recharge et on relance, jamais de clic « mort ».
-                      if (v.error) { setUnplayable(u => { const n = new Set(u); n.delete(s.id); return n }); v.load() }
-                      v.muted = false; void v.play().catch(() => {})
-                    } else v.pause()
+                    if (v.paused) { e.currentTarget.parentElement?.querySelectorAll('video').forEach(o => { if (o !== v) o.pause() }); v.muted = false; v.play() } else v.pause()
                   }}
                     style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 6, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${EDGE}`, cursor: url ? 'pointer' : 'default' }}>
-                    {/* Le lecteur reste TOUJOURS là (un repli ne doit jamais bloquer la lecture) ;
-                        préchargé (« auto ») pour que le clic lise tout de suite, sans attente. */}
-                    {url ? (
-                      <PreviewVideo stream={url} local={localSrc[s.id] ?? null} poster={pv?.thumb}
-                        onUnsupported={() => setUnplayable(u => new Set(u).add(s.id))}
-                        onPlaying={() => setUnplayable(u => { if (!u.has(s.id)) return u; const n = new Set(u); n.delete(s.id); return n })} />
-                    ) : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
-                    {bad && (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, textAlign: 'center', color: '#E4E4E7', fontSize: 9.5, fontWeight: 600, background: 'rgba(13,13,15,0.72)', pointerEvents: 'none' }}>
-                        {ext || 'VIDÉO'}<span style={{ fontWeight: 500 }}>aperçu indisponible</span>
-                      </div>
-                    )}
+                    {url
+                      ? <video src={url + '#t=0.3'} playsInline loop preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
                     {capPrev && (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
                         <span style={{ display: 'inline-block', maxWidth: '100%', textAlign: 'center', color: '#fff', fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: capStyle === 'outline' ? 700 : 400, fontSize: 8.5, lineHeight: 1.25, padding: capStyle === 'snapchat' ? '2px 4px' : '0 3px', width: capStyle === 'snapchat' ? '100%' : 'auto', background: capStyle === 'snapchat' ? 'rgba(48,48,48,0.5)' : 'transparent', textShadow: capStyle === 'outline' ? '0 0 2px #000,0 0 2px #000' : 'none', boxSizing: 'border-box' }}>{capPrev}</span>
