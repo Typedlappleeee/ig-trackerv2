@@ -120,38 +120,3 @@ export async function addToBank(o: { userId: string; orgId: string | null; file:
   }
   return { id: (ins.data as { id?: string } | null)?.id ?? null, storagePath }
 }
-
-// ── Auto-réparation : miniature créée pour un ancien média qui n'en a pas ────────
-// Quand une vignette arrive à décoder la vidéo, on capture une image, on l'enregistre à côté
-// du média et on renseigne thumbnail_path : la fois suivante, la vignette est instantanée.
-// Une à la fois, en silence ; chaque média n'est tenté qu'une fois par session.
-const tried = new Set<string>()
-let chain: Promise<void> = Promise.resolve()
-// Suspendues pendant qu'une vidéo est lue (lecteur ouvert) : la connexion lui est réservée.
-let paused = 0
-const waitResume = async () => { while (paused > 0) await new Promise(r => setTimeout(r, 500)) }
-/** Suspend les créations de miniatures ; renvoie la fonction qui les relance. */
-export function pauseRepairs(): () => void {
-  paused++
-  let done = false
-  return () => { if (!done) { done = true; paused-- } }
-}
-/** Vide la file (on quitte la Banque) : rien ne tourne en arrière-plan sur les autres pages. */
-let gen = 0
-export function cancelRepairs(): void { gen++ }
-export function repairThumb(id: string, storagePath: string, url: string, onDone?: (thumbPath: string) => void): void {
-  if (tried.has(id)) return
-  tried.add(id)
-  const mine = gen
-  chain = chain.then(async () => {
-    await waitResume()
-    if (mine !== gen) { tried.delete(id); return }
-    const th = await frameOf(url)
-    if (!th) return
-    const tp = thumbPathFor(storagePath)
-    const up = await supabase.storage.from('content').upload(tp, th.blob, { contentType: 'image/jpeg', upsert: false })
-    if (up.error && !/exist|duplicate/i.test(up.error.message)) return
-    const { error } = await supabase.from('content_bank').update({ thumbnail_path: tp }).eq('id', id).is('thumbnail_path', null)
-    if (!error) onDone?.(tp)
-  }).catch(() => {})
-}

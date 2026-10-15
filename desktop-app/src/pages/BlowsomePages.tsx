@@ -13,11 +13,10 @@ import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
-import { addToBank, pauseRepairs } from '@/lib/bankStorage'
-import { fetchFast } from '@/lib/fastFetch'
+import { addToBank } from '@/lib/bankStorage'
 import { saveDirSupported, ensureSaveDirAccess, writeToSaveDir } from '@/lib/saveDir'
 import { SaveDirButton } from '@/components/SaveDirButton'
-import { getLocal, putLocal } from '@/lib/localMedia'
+import { getLocal } from '@/lib/localMedia'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
@@ -558,34 +557,13 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [previews, setPreviews] = useState<Record<string, { thumb: string | null; media: string | null }>>({})
   // Sources que l'ordinateur ne sait pas afficher (HEVC…) : repli au lieu d'un cadre noir.
   const [unplayable, setUnplayable] = useState<Set<string>>(new Set())
-  // Sur cette page, aucune création de miniature en arrière-plan : toute la connexion va aux aperçus.
-  useEffect(() => pauseRepairs(), [])
-  // Copie LOCALE des sources (lib/localMedia, sur ce PC) : une vidéo importée d'ici ou déjà
-  // lue une fois s'affiche et se génère instantanément, sans retéléchargement. Sinon elle est
-  // récupérée en accéléré (morceaux parallèles) en arrière-plan, puis gardée sur le PC.
-  // id → URL blob ; progression en %.
+  // Copie LOCALE des sources (lib/localMedia, sur ce PC) : si la vidéo y est déjà (gardée lors
+  // d'une génération), l'aperçu la lit directement, sans rien télécharger. Sinon : lecture
+  // directe comme avant. Aucun téléchargement en arrière-plan. id → URL blob.
   const [localSrc, setLocalSrc] = useState<Record<string, string>>({})
-  const [preProg, setPreProg] = useState<Record<string, number | null>>({})
   const blobUrls = useRef<string[]>([])
   useEffect(() => () => { blobUrls.current.forEach(u => URL.revokeObjectURL(u)) }, [])
   const toUrl = (b: Blob) => { const u = URL.createObjectURL(b); blobUrls.current.push(u); return u }
-  useEffect(() => {
-    const ac = new AbortController()
-    ;(async () => {
-      for (const x of sources.slice(0, 3)) {
-        const media = previews[x.id]?.media
-        if (!media || !x.storage_path || localSrc[x.id] || ac.signal.aborted) continue
-        try {
-          const blob = await fetchFast(media, p => setPreProg(m => ({ ...m, [x.id]: p.total ? Math.round((p.loaded / p.total) * 100) : null })), ac.signal, fetch, 400 * 1024 * 1024)
-          if (ac.signal.aborted) return
-          void putLocal(x.storage_path, blob)
-          setLocalSrc(m => ({ ...m, [x.id]: toUrl(blob) }))
-        } catch { /* trop lourde / réseau : la lecture directe reste */ }
-        finally { setPreProg(m => { const n = { ...m }; delete n[x.id]; return n }) }
-      }
-    })()
-    return () => ac.abort()
-  }, [previews]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -670,7 +648,10 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         let bytes: Uint8Array
         try {
           const loc = localSrc[v.id]
-          bytes = loc ? new Uint8Array(await (await fetch(loc)).arrayBuffer()) : await resolveSourceBytes(v)
+          let lastPct = -10
+          bytes = loc ? new Uint8Array(await (await fetch(loc)).arrayBuffer()) : await resolveSourceBytes(v, undefined, pct => {
+            if (pct !== null && pct - lastPct >= 10) { lastPct = pct; setLogs(l => [...l.filter(x => !x.startsWith('  📥 téléchargement')), `  📥 téléchargement ${pct} %…`]) }
+          })
           push(`  📥 source chargée (${Math.round(bytes.byteLength / 1024)} Ko)`)
         } catch (se) {
           push(`  ❌ source « ${v.title} » illisible : ${se instanceof Error ? (se.message || se.name) : String(se)} → vidéo suivante`)
@@ -881,11 +862,6 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                         onUnsupported={() => setUnplayable(u => new Set(u).add(s.id))}
                         onPlaying={() => setUnplayable(u => { if (!u.has(s.id)) return u; const n = new Set(u); n.delete(s.id); return n })} />
                     ) : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
-                    {s.id in preProg && (
-                      <span title="Préparation de la lecture fluide" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, background: 'rgba(255,255,255,0.15)', pointerEvents: 'none' }}>
-                        <span style={{ display: 'block', height: '100%', width: `${preProg[s.id] ?? 40}%`, background: ACCENT, transition: 'width .3s ease' }} />
-                      </span>
-                    )}
                     {bad && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, textAlign: 'center', color: '#E4E4E7', fontSize: 9.5, fontWeight: 600, background: 'rgba(13,13,15,0.72)', pointerEvents: 'none' }}>
                         {ext || 'VIDÉO'}<span style={{ fontWeight: 500 }}>aperçu indisponible</span>
