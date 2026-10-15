@@ -3113,6 +3113,8 @@ export const EN: Dict = {
     "Cette vidéo est au format HEVC (iPhone) : ton ordinateur ne sait pas l’afficher ici. Elle reste utilisable pour générer des variantes et publier.": "This video is in HEVC format (iPhone): your computer can’t display it here. You can still use it to generate variants and publish.",
     "Le fichier est introuvable ou la connexion a coupé. Réessaie, ou télécharge-la pour la vérifier.": "The file is missing or the connection dropped. Try again, or download it to check.",
     "Réessayer": "Try again",
+    "Chargement": "Loading",
+    "Lire sans attendre": "Play without waiting",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
