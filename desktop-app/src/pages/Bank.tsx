@@ -9,6 +9,7 @@ import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_S
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import { MediaThumb } from '@/components/MediaThumb'
 import { VideoPlayerModal } from '@/components/VideoPlayer'
+import { getLocal } from '@/lib/localMedia'
 import { setRelaunch } from '@/lib/runHistory'
 import type { OrgState } from '@/lib/data'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, addToBank, cancelRepairs, PLAN_LABEL } from '@/lib/bankStorage'
@@ -590,6 +591,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [player, setPlayer] = useState<{ url: string; title: string; type: MediaType; poster?: string | null } | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; item: ContentItem } | null>(null)
   async function openPlayer(i: ContentItem) {
+    // Copie déjà sur ce PC (importée d'ici ou déjà lue) : lecture instantanée, sans téléchargement.
+    const local = await getLocal(i.storage_path)
+    if (local) { const u = URL.createObjectURL(local); setPlayer({ url: u, title: i.title, type: inferType(i), poster: thumbFor(i) }); return }
     let url = (i.storage_path && thumbs[i.storage_path]) || i.file_url
     if (!url && i.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(i.storage_path, 6 * 3600); url = data?.signedUrl ?? null }
     if (url) setPlayer({ url, title: i.title, type: inferType(i), poster: thumbFor(i) })
@@ -1245,7 +1249,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {/* Lecteur vidéo / image */}
       {player && (
         player.type === 'video'
-          ? <VideoPlayerModal theme={theme} url={player.url} title={player.title} poster={player.poster} onClose={() => setPlayer(null)} />
+          ? <VideoPlayerModal theme={theme} url={player.url} title={player.title} poster={player.poster} onClose={() => { if (player.url.startsWith('blob:')) URL.revokeObjectURL(player.url); setPlayer(null) }} />
           : <Modal theme={theme} title={player.title} onClose={() => setPlayer(null)} width={420}>
               <img src={player.url} alt="" style={{ display: 'block', width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 12 }} />
             </Modal>
