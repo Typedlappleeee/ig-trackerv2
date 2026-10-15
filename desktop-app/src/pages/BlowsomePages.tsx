@@ -14,6 +14,7 @@ import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
 import { addToBank, pauseRepairs } from '@/lib/bankStorage'
+import { fetchFast, cachedVideo, rememberVideo } from '@/lib/fastFetch'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
@@ -58,6 +59,29 @@ function videoDurationFromBytes(bytes: Uint8Array): Promise<number> {
 const numInp: CSSProperties = { ...fieldStyle, width: 62, height: 28, padding: '0 8px', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }
 
 // ── Composants d'options réutilisables (Auto-contenu) ────────────────────────
+// Vidéo d'aperçu : lecture directe tout de suite ; dès que la copie locale (téléchargée en
+// accéléré en arrière-plan) est prête, bascule dessus sans coupure (même position, lecture
+// conservée) → fluide, plus d'attente ni de saccade. `src` n'est plus piloté par React
+// après le montage (bascule impérative).
+function PreviewVideo({ stream, local, poster, onUnsupported, onPlaying }: {
+  stream: string; local: string | null; poster?: string | null; onUnsupported: () => void; onPlaying: () => void
+}) {
+  const ref = useRef<HTMLVideoElement>(null)
+  const [initial] = useState(() => (local ?? stream) + '#t=0.3')
+  useEffect(() => {
+    const v = ref.current; if (!v || !local || v.currentSrc.startsWith('blob:')) return
+    const t = v.currentTime, playing = !v.paused, muted = v.muted
+    v.addEventListener('loadedmetadata', () => { if (t > 0.35) v.currentTime = t; v.muted = muted; if (playing) void v.play().catch(() => {}) }, { once: true })
+    v.src = local + '#t=0.3'
+    v.load()
+  }, [local])
+  return (
+    <video ref={ref} src={initial} poster={poster ?? undefined} playsInline loop preload="metadata"
+      onError={e => { if (e.currentTarget.error?.code === 4) onUnsupported() }} onPlaying={onPlaying}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+  )
+}
+
 function Grp({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ borderRadius: 8, border: `1px solid ${EDGE}`, background: 'transparent', padding: 16, marginTop: 12 }}>
@@ -533,6 +557,29 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [unplayable, setUnplayable] = useState<Set<string>>(new Set())
   // Sur cette page, aucune création de miniature en arrière-plan : toute la connexion va aux aperçus.
   useEffect(() => pauseRepairs(), [])
+  // Copie locale des sources (téléchargées en accéléré, en arrière-plan, une à la fois) :
+  // aperçu fluide + génération qui ne retélécharge pas. id → URL blob ; progression en %.
+  const [localSrc, setLocalSrc] = useState<Record<string, string>>({})
+  const [preProg, setPreProg] = useState<Record<string, number | null>>({})
+  useEffect(() => {
+    const ac = new AbortController()
+    ;(async () => {
+      for (const x of sources.slice(0, 3)) {
+        const media = previews[x.id]?.media
+        if (!media || ac.signal.aborted) continue
+        const hit = cachedVideo(media)
+        if (hit) { setLocalSrc(m => m[x.id] === hit ? m : { ...m, [x.id]: hit }); continue }
+        try {
+          const blob = await fetchFast(media, p => setPreProg(m => ({ ...m, [x.id]: p.total ? Math.round((p.loaded / p.total) * 100) : null })), ac.signal, fetch, 400 * 1024 * 1024)
+          if (ac.signal.aborted) return
+          const u = rememberVideo(media, blob)
+          setLocalSrc(m => ({ ...m, [x.id]: u }))
+        } catch { /* trop lourde / réseau : la lecture directe reste */ }
+        finally { setPreProg(m => { const n = { ...m }; delete n[x.id]; return n }) }
+      }
+    })()
+    return () => ac.abort()
+  }, [previews]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -610,7 +657,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         push(`— ${v.title} —`)
         let bytes: Uint8Array
         try {
-          bytes = await resolveSourceBytes(v)
+          const loc = localSrc[v.id]
+          bytes = loc ? new Uint8Array(await (await fetch(loc)).arrayBuffer()) : await resolveSourceBytes(v)
           push(`  📥 source chargée (${Math.round(bytes.byteLength / 1024)} Ko)`)
         } catch (se) {
           push(`  ❌ source « ${v.title} » illisible : ${se instanceof Error ? (se.message || se.name) : String(se)} → vidéo suivante`)
@@ -794,7 +842,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         {sources.length > 0 && (
           <Grp title="Aperçu">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {sources.slice(0, 8).map((s, i) => {
+              {sources.slice(0, 8).map(s => {
                 const pv = previews[s.id]
                 const url = pv?.media ?? null
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
@@ -815,11 +863,15 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                     {/* Le lecteur reste TOUJOURS là (un repli ne doit jamais bloquer la lecture) ;
                         préchargé (« auto ») pour que le clic lise tout de suite, sans attente. */}
                     {url ? (
-                      <video src={url + '#t=0.3'} poster={pv?.thumb ?? undefined} playsInline loop preload={i < 3 ? 'auto' : 'metadata'}
-                        onError={e => { if (e.currentTarget.error?.code === 4) setUnplayable(u => new Set(u).add(s.id)) }}
-                        onPlaying={() => setUnplayable(u => { if (!u.has(s.id)) return u; const n = new Set(u); n.delete(s.id); return n })}
-                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <PreviewVideo stream={url} local={localSrc[s.id] ?? null} poster={pv?.thumb}
+                        onUnsupported={() => setUnplayable(u => new Set(u).add(s.id))}
+                        onPlaying={() => setUnplayable(u => { if (!u.has(s.id)) return u; const n = new Set(u); n.delete(s.id); return n })} />
                     ) : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
+                    {s.id in preProg && (
+                      <span title="Préparation de la lecture fluide" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, background: 'rgba(255,255,255,0.15)', pointerEvents: 'none' }}>
+                        <span style={{ display: 'block', height: '100%', width: `${preProg[s.id] ?? 40}%`, background: ACCENT, transition: 'width .3s ease' }} />
+                      </span>
+                    )}
                     {bad && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, textAlign: 'center', color: '#E4E4E7', fontSize: 9.5, fontWeight: 600, background: 'rgba(13,13,15,0.72)', pointerEvents: 'none' }}>
                         {ext || 'VIDÉO'}<span style={{ fontWeight: 500 }}>aperçu indisponible</span>
