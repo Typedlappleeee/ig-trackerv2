@@ -585,12 +585,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }
 
   // ── Lecteur vidéo (double-clic) + menu contextuel (clic droit) ───────────────
-  const [player, setPlayer] = useState<{ url: string; title: string; type: MediaType } | null>(null)
+  const [player, setPlayer] = useState<{ url: string; title: string; type: MediaType; poster?: string | null } | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; item: ContentItem } | null>(null)
   async function openPlayer(i: ContentItem) {
     let url = (i.storage_path && thumbs[i.storage_path]) || i.file_url
     if (!url && i.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(i.storage_path, 6 * 3600); url = data?.signedUrl ?? null }
-    if (url) setPlayer({ url, title: i.title, type: inferType(i) })
+    if (url) setPlayer({ url, title: i.title, type: inferType(i), poster: thumbFor(i) })
     else toast('Fichier introuvable dans le stockage.', 'bad')
   }
 
@@ -1243,7 +1243,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {/* Lecteur vidéo / image */}
       {player && (
         player.type === 'video'
-          ? <VideoPlayerModal theme={theme} url={player.url} title={player.title} onClose={() => setPlayer(null)} />
+          ? <VideoPlayerModal theme={theme} url={player.url} title={player.title} poster={player.poster} onClose={() => setPlayer(null)} />
           : <Modal theme={theme} title={player.title} onClose={() => setPlayer(null)} width={420}>
               <img src={player.url} alt="" style={{ display: 'block', width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 12 }} />
             </Modal>

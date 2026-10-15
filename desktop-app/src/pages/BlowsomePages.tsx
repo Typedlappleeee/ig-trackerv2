@@ -532,7 +532,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   // garde un repli lisible au lieu d'un cadre noir.
   const [previews, setPreviews] = useState<Record<string, { thumb: string | null; media: string | null }>>({})
   // Vérifier une source : lecteur en grand (son, contrôles) avec la légende par-dessus.
-  const [playing, setPlaying] = useState<{ id: string; url: string; title: string } | null>(null)
+  const [playing, setPlaying] = useState<{ id: string; url: string; title: string; poster: string | null } | null>(null)
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -798,7 +798,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
                 const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
                 return (
-                  <div key={s.id} title={`${s.title} · clic pour lire`} onClick={() => { if (url) setPlaying({ id: s.id, url, title: s.title }) }}
+                  <div key={s.id} title={`${s.title} · clic pour lire`} onClick={() => { if (url) setPlaying({ id: s.id, url, title: s.title, poster: pv?.thumb ?? null }) }}
                     style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 6, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${EDGE}`, cursor: url ? 'pointer' : 'default' }}>
                     <MediaThumb id={s.id} thumb={pv?.thumb ?? null} media={url} video small
                       ext={((s.storage_path ?? s.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)}
@@ -818,7 +818,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             {playing && (() => {
               const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
               const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
-              return <VideoPlayerModal theme={BLOW_THEME} url={playing.url} title={playing.title} onClose={() => setPlaying(null)}
+              return <VideoPlayerModal theme={BLOW_THEME} url={playing.url} title={playing.title} poster={playing.poster} onClose={() => setPlaying(null)}
                 overlay={capPrev ? (
                   <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center' }}>
                     <span style={{ display: 'inline-block', maxWidth: '100%', textAlign: 'center', color: '#fff', fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: capStyle === 'outline' ? 700 : 400, fontSize: 17, lineHeight: 1.25, padding: capStyle === 'snapchat' ? '5px 10px' : '0 8px', width: capStyle === 'snapchat' ? '100%' : 'auto', background: capStyle === 'snapchat' ? 'rgba(48,48,48,0.5)' : 'transparent', textShadow: capStyle === 'outline' ? '0 0 3px #000,0 0 3px #000' : 'none', boxSizing: 'border-box' }}>{capPrev}</span>
