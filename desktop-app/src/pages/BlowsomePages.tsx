@@ -13,7 +13,7 @@ import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
 import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
-import { addToBank } from '@/lib/bankStorage'
+import { addToBank, pauseRepairs } from '@/lib/bankStorage'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
@@ -531,6 +531,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [previews, setPreviews] = useState<Record<string, { thumb: string | null; media: string | null }>>({})
   // Sources que l'ordinateur ne sait pas afficher (HEVC…) : repli au lieu d'un cadre noir.
   const [unplayable, setUnplayable] = useState<Set<string>>(new Set())
+  // Sur cette page, aucune création de miniature en arrière-plan : toute la connexion va aux aperçus.
+  useEffect(() => pauseRepairs(), [])
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -792,7 +794,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         {sources.length > 0 && (
           <Grp title="Aperçu">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {sources.slice(0, 8).map(s => {
+              {sources.slice(0, 8).map((s, i) => {
                 const pv = previews[s.id]
                 const url = pv?.media ?? null
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
@@ -802,18 +804,26 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                 return (
                   <div key={s.id} title={s.title} onClick={e => {
                     const v = e.currentTarget.querySelector('video'); if (!v) return
-                    if (v.paused) { e.currentTarget.parentElement?.querySelectorAll('video').forEach(o => { if (o !== v) o.pause() }); v.muted = false; void v.play().catch(() => {}) } else v.pause()
+                    if (v.paused) {
+                      e.currentTarget.parentElement?.querySelectorAll('video').forEach(o => { if (o !== v) o.pause() })
+                      // Erreur passagère (réseau…) : on recharge et on relance, jamais de clic « mort ».
+                      if (v.error) { setUnplayable(u => { const n = new Set(u); n.delete(s.id); return n }); v.load() }
+                      v.muted = false; void v.play().catch(() => {})
+                    } else v.pause()
                   }}
                     style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 6, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${EDGE}`, cursor: url ? 'pointer' : 'default' }}>
-                    {bad || !url ? (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, textAlign: 'center', color: MUTED, fontSize: 9.5, fontWeight: 600, background: pv?.thumb ? `center / cover no-repeat url("${pv.thumb}")` : '#0D0D0F' }}>
-                        {!url ? '…' : !pv?.thumb && <>{ext || 'VIDÉO'}<span style={{ fontWeight: 500 }}>aperçu indisponible</span></>}
-                      </div>
-                    ) : (
-                      <video src={url + '#t=0.3'} poster={pv?.thumb ?? undefined} playsInline loop preload="metadata"
-                        onLoadedData={e => { if (!e.currentTarget.videoWidth) setUnplayable(u => new Set(u).add(s.id)) }}
-                        onError={() => setUnplayable(u => new Set(u).add(s.id))}
+                    {/* Le lecteur reste TOUJOURS là (un repli ne doit jamais bloquer la lecture) ;
+                        préchargé (« auto ») pour que le clic lise tout de suite, sans attente. */}
+                    {url ? (
+                      <video src={url + '#t=0.3'} poster={pv?.thumb ?? undefined} playsInline loop preload={i < 3 ? 'auto' : 'metadata'}
+                        onError={e => { if (e.currentTarget.error?.code === 4) setUnplayable(u => new Set(u).add(s.id)) }}
+                        onPlaying={() => setUnplayable(u => { if (!u.has(s.id)) return u; const n = new Set(u); n.delete(s.id); return n })}
                         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
+                    {bad && (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, textAlign: 'center', color: '#E4E4E7', fontSize: 9.5, fontWeight: 600, background: 'rgba(13,13,15,0.72)', pointerEvents: 'none' }}>
+                        {ext || 'VIDÉO'}<span style={{ fontWeight: 500 }}>aperçu indisponible</span>
+                      </div>
                     )}
                     {capPrev && (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
