@@ -4,16 +4,14 @@
 // bouton « Télécharger » au lieu d'un écran noir. Pendant la lecture, les créations de
 // miniatures en arrière-plan sont suspendues (toute la connexion pour la vidéo).
 // `overlay` : affiché par-dessus l'image de la vidéo, calé sur son cadre.
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Modal, Icon } from '@/lib/ui'
 import type { Theme } from '@/lib/theme'
-import { pauseRepairs } from '@/lib/bankStorage'
 
 export function VideoPlayerModal({ theme, url, title, onClose, overlay, poster }: {
   theme: Theme; url: string; title: string; onClose: () => void; overlay?: ReactNode; poster?: string | null
 }) {
   const [state, setState] = useState<'loading' | 'ok' | 'nodecode' | 'error'>('loading')
-  useEffect(() => pauseRepairs(), [])
   const bad = state === 'nodecode' || state === 'error'
 
   return (

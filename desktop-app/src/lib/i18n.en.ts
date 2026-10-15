@@ -3129,6 +3129,7 @@ export const EN: Dict = {
     "💾 aussi enregistrée sur ton PC": "💾 also saved on your computer",
     "⚠ pas pu l’écrire dans le dossier du PC": "⚠ couldn’t write it to the computer folder",
     "Dossier dans la banque": "Folder in the bank",
+    "Téléchargement…": "Downloading…",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3644,5 +3645,9 @@ export const EN: Dict = {
     ["⚠ {0} : lecture impossible dans l’app (format HEVC ?) — la génération fonctionne quand même.", "⚠ {0}: can’t play in the app (HEVC format?) — generation still works."],
     ["Impossible de charger ces vidéos : {0}", "Couldn’t load these videos: {0}"],
     ["⚠ {0} : pas pu l’écrire dans le dossier du PC", "⚠ {0}: couldn’t write it to the computer folder"],
+    ["ZIP : {0}/{1} · {2}…", "ZIP: {0}/{1} · {2}…"],
+    ["ZIP enregistré — {0} fichier(s), {1}.", "ZIP saved — {0} file(s), {1}."],
+    ["ZIP : récupération {0}/{1} · {2}…", "ZIP: fetching {0}/{1} · {2}…"],
+    ["📥 téléchargement {0} %…", "📥 downloading {0}%…"],
   ],
 }

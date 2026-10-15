@@ -4,13 +4,10 @@
 //      (en fondu) que lorsqu'une image est réellement peinte ;
 //   3. dessous, en permanence, un repli lisible (format + icône) : vidéo non décodable par
 //      le navigateur (.MOV HEVC d'iPhone), fichier introuvable, chargement en cours.
-// Auto-réparation : une vidéo sans miniature qui se décode reçoit sa miniature en base
-// (lib/bankStorage repairThumb) → instantanée la fois suivante.
 // `playing` : lecture en boucle par-dessus (survol, clic pour lire).
 // Le parent doit être en position relative (la vignette remplit son cadre).
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Icon } from '@/lib/ui'
-import { repairThumb } from '@/lib/bankStorage'
 
 const FILL: CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }
 const HUES = ['139,92,246', '6,182,212', '236,72,153', '16,185,129', '245,158,11', '99,102,241']
@@ -28,7 +25,7 @@ export function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin =
   return inView
 }
 
-export function MediaThumb({ id, thumb, media, video, ext, broken = false, repair, playing = false, playMuted = true, onPlayError, small = false }: {
+export function MediaThumb({ id, thumb, media, video, ext, broken = false, playing = false, playMuted = true, onPlayError, small = false }: {
   /** Identifiant (couleur du repli). */
   id: string
   /** Miniature enregistrée (URL), si elle existe. */
@@ -39,8 +36,6 @@ export function MediaThumb({ id, thumb, media, video, ext, broken = false, repai
   /** Extension affichée sur le repli (MOV, MP4…). */
   ext?: string
   broken?: boolean
-  /** Média SANS miniature en base : on la crée quand la vidéo se décode. */
-  repair?: { id: string; storagePath: string } | null
   playing?: boolean
   /** Lecture sans le son (survol) ; false = avec le son (clic pour lire). */
   playMuted?: boolean
@@ -74,7 +69,7 @@ export function MediaThumb({ id, thumb, media, video, ext, broken = false, repai
       {tryVideo && (
         <video src={`${media}#t=0.1`} muted playsInline preload="metadata"
           onLoadedData={e => {
-            if (e.currentTarget.videoWidth > 0) { setFrame(true); if (repair) repairThumb(repair.id, repair.storagePath, media!) }
+            if (e.currentTarget.videoWidth > 0) setFrame(true)
             else setUndecodable(true)   // piste vidéo illisible (HEVC) : seul le son est décodé
           }}
           onError={() => setUndecodable(true)}
