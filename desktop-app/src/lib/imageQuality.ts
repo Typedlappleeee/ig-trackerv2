@@ -72,7 +72,19 @@ function save() {
   } catch { /* stockage plein ou bloqué : on remesurera */ }
 }
 
-/** Mesure une image (null si elle ne charge pas ou si le canvas est bloqué). */
+/** Lien Instagram expiré (ou qui expire dans l'heure) ? Les miniatures du CDN Instagram portent
+ *  leur date d'expiration (`oe=`, secondes en hexadécimal) ; un lien expiré ne charge plus → image
+ *  noire. Gère aussi l'URL du proxy (`?img=<url Instagram>`). */
+export function igExpired(url: string, now = Date.now()): boolean {
+  let u = url
+  try { const inner = new URL(url).searchParams.get('img'); if (inner) u = inner } catch { /* URL relative */ }
+  const m = u.match(/[?&]oe=([0-9a-fA-F]{6,10})(?:&|$)/)
+  if (!m) return false
+  return parseInt(m[1], 16) * 1000 < now + 3600_000
+}
+
+/** Mesure une image. Ne charge pas → qualité nulle (écartée par isClean, jamais en cache) ;
+ *  canvas bloqué → null (gardée). */
 export async function measureImage(url: string, timeoutMs = 6000): Promise<ImgQuality | null> {
   const k = hash(url), hit = store()[k]
   if (hit) return { sharp: hit[0], luma: hit[1], contrast: hit[2], bars: !!hit[3], w: hit[4], h: hit[5] }
@@ -85,7 +97,7 @@ export async function measureImage(url: string, timeoutMs = 6000): Promise<ImgQu
     img.onerror = () => { clearTimeout(t); res(false) }
     img.src = url
   })
-  if (!ok || !img.naturalWidth) return null
+  if (!ok || !img.naturalWidth) return { sharp: 0, luma: 0, contrast: 0, bars: false, w: 0, h: 0 }
   try {
     const w = Math.min(ANALYZE_W, img.naturalWidth), h = Math.max(2, Math.round(img.naturalHeight * w / img.naturalWidth))
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h

@@ -15,6 +15,7 @@ import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import { Workspace } from '@/components/studio/Workspace'
 import { Results, type StudioResult } from '@/components/studio/Results'
 import type { StudioToolId } from '@/components/studio/Preview'
+import { imgFallback } from '@/lib/curated'
 
 // Outils du Studio (ordre d'affichage) — libellés, icônes et couleurs viennent de lib/tools.ts.
 const IDS: StudioToolId[] = ['remix', 'spoof', 'mixer', 'subs', 'overlay', 'montage', 'imgspoof']
@@ -32,11 +33,11 @@ const AUTO_CSS = `
   @keyframes acIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion: reduce){.sf-ac *{animation:none!important}}
 `
-function Phone({ img, w, text, style, label, filter, pos, rot = 0, delay = 0 }: { img?: string; w: number; text?: string; style?: 'snap' | 'outline'; label: string; filter?: string; pos?: string; rot?: number; delay?: number }) {
+function Phone({ img, w, text, style, label, filter, pos, rot = 0, delay = 0, fb = 9 }: { img?: string; fb?: number; w: number; text?: string; style?: 'snap' | 'outline'; label: string; filter?: string; pos?: string; rot?: number; delay?: number }) {
   return (
     <span style={{ position: 'relative', display: 'block', flexShrink: 0, width: w, aspectRatio: '9 / 16', borderRadius: Math.round(w / 7), overflow: 'hidden', background: '#141416', border: '2px solid rgba(255,255,255,0.16)', boxShadow: '0 30px 60px -24px rgba(0,0,0,.95)', transform: `rotate(${rot}deg)`, animation: `acIn .6s ${delay}s cubic-bezier(.2,.8,.2,1) both` }}>
       <span style={{ position: 'absolute', inset: 0, animation: `acFloat ${5 + delay * 4}s ease-in-out ${-delay * 3}s infinite` }}>
-        {img && <img src={img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: pos ?? 'center 30%', filter, animation: 'acIn .5s ease both' }} />}
+        {img && <img src={img} alt="" onError={imgFallback(fb)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: pos ?? 'center 30%', filter, animation: 'acIn .5s ease both' }} />}
       </span>
       <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.35), transparent 22%, transparent 70%, rgba(0,0,0,.35))' }} />
       {label && <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 99, background: text ? 'rgba(10,10,11,.7)' : '#F4F4F5', color: text ? '#fff' : '#0A0A0B', fontSize: Math.max(9.5, w / 13), fontWeight: 800, backdropFilter: 'blur(6px)', whiteSpace: 'nowrap' }}>{label}</span>}
@@ -83,15 +84,15 @@ function AutoContentHero({ narrow, onOpen }: { narrow: boolean; onOpen: () => vo
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: narrow ? 8 : 16, minWidth: 0 }}>
         {!narrow && (
           <span style={{ position: 'relative', display: 'block', flexShrink: 0 }}>
-            {[2, 1].map(k => <span key={k} style={{ position: 'absolute', inset: 0, transform: `translateX(${k === 2 ? 14 : -14}px) rotate(${k === 2 ? 7 : -7}deg) scale(.94)`, opacity: 0.7 }}><Phone img={imgs?.[k]} w={Math.round(W * 0.9)} label="" /></span>)}
-            <span style={{ position: 'relative', display: 'block' }}><Phone img={imgs?.[0]} w={Math.round(W * 0.9)} label="Tes vidéos" /></span>
+            {[2, 1].map(k => <span key={k} style={{ position: 'absolute', inset: 0, transform: `translateX(${k === 2 ? 14 : -14}px) rotate(${k === 2 ? 7 : -7}deg) scale(.94)`, opacity: 0.7 }}><Phone img={imgs?.[k]} fb={[3, 9, 13][k]} w={Math.round(W * 0.9)} label="" /></span>)}
+            <span style={{ position: 'relative', display: 'block' }}><Phone img={imgs?.[0]} fb={3} w={Math.round(W * 0.9)} label="Tes vidéos" /></span>
           </span>
         )}
         {!narrow && <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 99, background: 'linear-gradient(135deg,#8B5CF6,#EC4899)', color: '#fff', boxShadow: '0 10px 24px -10px rgba(236,72,153,.9)' }}><Icon d="M5 12h14|M13 6l6 6-6 6" size={16} sw={2.6} /></span>}
         <div style={{ display: 'flex', alignItems: 'center', gap: narrow ? 6 : 10 }}>
           {AUTO_TEXTS.map((x, i) => (
             <span key={i} style={{ position: 'relative', display: 'block', zIndex: i === 1 ? 3 : 2, marginTop: i === 1 ? 0 : narrow ? 12 : 20 }}>
-              <Phone img={imgs?.[i]} w={W} text={x.t} style={x.style} label={`Compte ${i + 1}`} rot={(i - 1) * 3} delay={0.1 + i * 0.12} />
+              <Phone img={imgs?.[i]} fb={[3, 9, 13][i]} w={W} text={x.t} style={x.style} label={`Compte ${i + 1}`} rot={(i - 1) * 3} delay={0.1 + i * 0.12} />
             </span>
           ))}
         </div>

@@ -15,6 +15,8 @@ export interface License {
 }
 
 const HARDCODED_SUPER_ADMINS = ['tintin.aunea@gmail.com']
+/** Super admin connu côté client (même liste que le serveur sf_is_super_admin). */
+export const isSuperAdminEmail = (email: string | null | undefined) => !!email && HARDCODED_SUPER_ADMINS.includes(email)
 
 // Sécurité DISPONIBILITÉ : si la BASE est injoignable (500, réseau, cache schéma), on
 // n'enferme PAS tout le monde dehors → on considère l'accès valide (fail-open). Le

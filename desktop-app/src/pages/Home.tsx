@@ -20,6 +20,7 @@ import { visibleTools, type Tool } from '@/lib/tools'
 import { openTool } from '@/lib/openTool'
 import { useTopReels, useFeedPhotos, sharpest, type TopReel } from '@/components/CineHero'
 import { smoothPath } from '@/lib/chart'
+import { imgFallback } from '@/lib/curated'
 
 const C_OK = '#8B7CF6', C_KO = '#E5484D'   // palette validée (daltonisme OK)
 const KEYFRAMES = `
@@ -125,7 +126,7 @@ function ReelFan({ reels, onOpen, small }: { reels: TopReel[]; onOpen: () => voi
               transform: `rotate(${off * (h ? 3 : 6.5)}deg)`, zIndex: 10 - Math.round(Math.abs(off) * 2), boxShadow: '0 24px 50px -18px rgba(0,0,0,.9)',
               transition: 'left .45s cubic-bezier(.2,.8,.2,1), top .45s cubic-bezier(.2,.8,.2,1), transform .45s cubic-bezier(.2,.8,.2,1)', animation: `dbRise .6s ${0.15 + i * 0.07}s both` }}>
             <span style={{ position: 'absolute', inset: 0, animation: `dbFloat ${5 + i}s ease-in-out ${-i * 0.8}s infinite` }}>
-              <img src={r.thumb} alt="" onError={e => { e.currentTarget.style.display = 'none' }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={r.thumb} alt="" onError={imgFallback(i + 3)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             </span>
             <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.25), transparent 25%, transparent 55%, rgba(0,0,0,.85))' }} />
             <span style={{ position: 'absolute', top: 8, left: 8 }}><ScoreChip s={r.score} sm /></span>
@@ -355,7 +356,7 @@ function ReelsCard({ reels, onOpen, cols, delay }: { reels: TopReel[]; onOpen: (
           <button key={r.thumb} type="button" onClick={onOpen} title={`@${r.username}`}
             style={{ position: 'relative', aspectRatio: '9 / 16', padding: 0, border: 'none', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', background: '#141416', animation: `dbRise .5s ${delay + 0.05 + i * 0.05}s both`, transition: 'transform .3s cubic-bezier(.2,.8,.2,1)' }}
             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)' }} onMouseLeave={e => { e.currentTarget.style.transform = 'none' }}>
-            <img src={r.thumb} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={r.thumb} alt="" loading="lazy" onError={imgFallback(i + 6)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.3) 0%, transparent 22%, transparent 55%, rgba(0,0,0,.88) 100%)' }} />
             <span style={{ position: 'absolute', top: 8, right: 8 }}><ScoreChip s={r.score} sm /></span>
             <span style={{ position: 'absolute', left: 10, right: 10, bottom: 10, display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
@@ -434,7 +435,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
       {/* Bandeau : aurore animée + éventail des vraies photos / Reels qui explosent */}
       <section style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 26, border: '1px solid rgba(255,255,255,0.08)', background: '#0B0B0D', marginBottom: 14, animation: 'dbRise .5s cubic-bezier(.2,.8,.2,1) both' }}>
         {/* Couleurs de la meilleure photo, très floutées, en fond à droite */}
-        {hasReels && <img src={reels![0].thumb} alt="" aria-hidden="true" style={{ position: 'absolute', zIndex: -2, right: '-5%', top: '-30%', width: '60%', height: '160%', objectFit: 'cover', filter: 'blur(60px) saturate(1.4)', opacity: 0.45 }} />}
+        {hasReels && <img src={reels![0].thumb} alt="" aria-hidden="true" onError={imgFallback(3)} style={{ position: 'absolute', zIndex: -2, right: '-5%', top: '-30%', width: '60%', height: '160%', objectFit: 'cover', filter: 'blur(60px) saturate(1.4)', opacity: 0.45 }} />}
         <span style={{ position: 'absolute', zIndex: -1, left: '-8%', top: '-60%', width: '55%', height: '220%', borderRadius: 999, background: 'radial-gradient(circle, rgba(139,92,246,0.45), transparent 62%)', filter: 'blur(20px)', animation: 'dbAuroraA 14s ease-in-out infinite' }} />
         <span style={{ position: 'absolute', zIndex: -1, right: '-10%', top: '-80%', width: '55%', height: '240%', borderRadius: 999, background: 'radial-gradient(circle, rgba(236,72,153,0.3), transparent 62%)', filter: 'blur(24px)', animation: 'dbAuroraB 17s ease-in-out infinite' }} />
         <span style={{ position: 'absolute', zIndex: -1, left: '35%', bottom: '-120%', width: '45%', height: '200%', borderRadius: 999, background: 'radial-gradient(circle, rgba(34,211,238,0.14), transparent 62%)', filter: 'blur(24px)', animation: 'dbAuroraA 20s ease-in-out infinite reverse' }} />

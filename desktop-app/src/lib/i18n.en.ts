@@ -3104,6 +3104,8 @@ export const EN: Dict = {
     "chacune avec son propre texte": "each with its own text",
     "Ta vidéo": "Your video",
     "Tes vidéos": "Your videos",
+    "Tu n'es pas membre : accès super admin": "You're not a member: super admin access",
+    "admin": "admin",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

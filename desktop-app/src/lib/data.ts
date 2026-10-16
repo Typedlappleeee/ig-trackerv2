@@ -6,6 +6,7 @@ import {
   type ScheduledPost, type PostRun,
 } from './supabase'
 import type { InfraKey } from './theme'
+import { isSuperAdminEmail } from './license'
 
 // ── Séparation des infrastructures ───────────────────────────────────────────
 // Les deux infras sont distinctes niveau données. Discriminateur : la colonne
@@ -78,15 +79,20 @@ export function useOrg(user: User): OrgState {
       .filter((m: { organizations: Organization | null }) => m.organizations)
       .map((m: OrgMember & { organizations: Organization }) => ({
         org: m.organizations,
-        member: { ...m, organizations: undefined } as OrgMember,
+        member: { ...m, organizations: undefined, guest: !!m.guest || !m.id } as OrgMember,
       }))
+      // Super admin : ses vraies orgas d'abord, puis toutes les autres (A → Z).
+      .sort((a: { org: Organization; member: OrgMember }, b: { org: Organization; member: OrgMember }) =>
+        Number(!!a.member.guest) - Number(!!b.member.guest) || (a.member.guest ? (a.org.name ?? '').localeCompare(b.org.name ?? '') : 0))
     setMyOrgs(list)
     let effective = localStorage.getItem(LS_ORG)
     if (effective && !list.some((x: { org: Organization }) => x.org.id === effective)) {
       localStorage.removeItem(LS_ORG); effective = null
     }
-    if (!effective && list.length > 0) {
-      effective = list[0].org.id; localStorage.setItem(LS_ORG, effective)
+    // Par défaut : la 1re VRAIE orga (jamais une orga où le super admin n'est qu'invité).
+    const firstOwn = list.find((x: { member: OrgMember }) => !x.member.guest)
+    if (!effective && firstOwn) {
+      effective = firstOwn.org.id; localStorage.setItem(LS_ORG, effective)
     }
     setCurrentId(effective ?? null)
     setLoading(false)
@@ -99,11 +105,14 @@ export function useOrg(user: User): OrgState {
     if (id) localStorage.setItem(LS_ORG, id); else localStorage.removeItem(LS_ORG)
     setCurrentId(id)
   }
+  // Super admin : tous les droits (propriétaire) dans CHAQUE organisation — l'interface montre
+  // toute la gestion ; le serveur l'autorise aussi (SQL 20261016b_super_admin_all_orgs).
+  const superAdmin = isSuperAdminEmail(user.email)
   return {
     currentOrg: current?.org ?? null,
     myOrgs,
-    role: current?.member.role ?? null,
-    perms: current?.member.perm_overrides ?? EMPTY_PERMS,
+    role: current ? (superAdmin ? 'owner' : current.member.role) : null,
+    perms: superAdmin ? EMPTY_PERMS : current?.member.perm_overrides ?? EMPTY_PERMS,
     loading,
     switchOrg,
   }
