@@ -4,9 +4,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { compact } from '@/lib/data'
-import { curated as SITE } from '@/lib/curated'
+import { curated as SITE, imgFallback } from '@/lib/curated'
 import { useNarrow } from '@/lib/ui'
-import { measureAll, isClean } from '@/lib/imageQuality'
+import { measureAll, isClean, igExpired } from '@/lib/imageQuality'
 
 const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
 const LIME = '#A78BFA'   // accent ScaleFlow (violet)
@@ -44,7 +44,8 @@ async function loadMedia(kind: Kind): Promise<TopReel[]> {
         ...(kind === 'feed' ? { feed: true, images: (Array.isArray(x.images) ? x.images : []).filter(Boolean).map(proxied) } : {}) }
       ;(users.has(x.username) ? rest : first).push(item); users.add(x.username)
     }
-    const all = [...first, ...rest].slice(0, 48)
+    // Liens Instagram expirés écartés d'office (ils ne chargent plus → images noires).
+    const all = [...first, ...rest].filter(x => !igExpired(x.thumb)).slice(0, 48)
     const qs = await measureAll(all.map(x => x.thumb))
     // Mesure impossible (hors ligne, canvas bloqué) → gardée ; sinon il faut une image propre.
     const out = all.map((x, i) => ({ ...x, sharp: qs[i]?.sharp })).filter((x, i) => !qs[i] || isClean(qs[i]!))
@@ -103,7 +104,7 @@ export function HeroCollage({ height = 440, photos }: { height?: number; photos?
           <div key={c} className="sf-col" style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: c === 1 ? -70 : 40, animation: `${c % 2 ? 'sfColB' : 'sfColA'} ${9 + c * 2}s ease-in-out infinite` }}>
             {col.map(ph => { const url = src(ph.n, slot++); return (
               <span key={ph.n} style={{ position: 'relative', display: 'block', width: Math.round(height * 0.42), aspectRatio: '3 / 4', borderRadius: 20, overflow: 'hidden', background: '#141416', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 30px 60px -30px rgba(0,0,0,.9)' }}>
-                <img src={url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `cineKen ${14 + ph.n % 5}s ease-in-out ${-ph.n}s infinite alternate` }} />
+                <img src={url} alt="" onError={imgFallback(ph.n)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `cineKen ${14 + ph.n % 5}s ease-in-out ${-ph.n}s infinite alternate` }} />
                 <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 55%, rgba(0,0,0,.55))' }} />
                 {ph.chip && (
                   <span style={{ position: 'absolute', left: 10, bottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 800, whiteSpace: 'nowrap',
@@ -225,7 +226,7 @@ export function ViralShowcase({ reels, onOpen }: { reels: TopReel[]; onOpen: () 
             <button key={r.thumb} type="button" onClick={onOpen} style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', padding: 0, cursor: 'pointer', background: '#161618', animation: `cineUp .5s ${0.1 + i * 0.07}s both`, transition: 'transform .3s cubic-bezier(.2,.8,.2,1), border-color .3s ease' }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = 'rgba(167,139,250,.6)'; const im = e.currentTarget.querySelector('img'); if (im) im.style.transform = 'scale(1.06)' }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; const im = e.currentTarget.querySelector('img'); if (im) im.style.transform = 'none' }}>
-              <img src={r.thumb} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .7s cubic-bezier(.2,.8,.2,1)' }} />
+              <img src={r.thumb} alt="" loading="lazy" onError={imgFallback(i + 4)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'transform .7s cubic-bezier(.2,.8,.2,1)' }} />
               <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.5) 0%, transparent 24%, transparent 50%, rgba(0,0,0,.92) 100%)' }} />
               <span style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                 <span style={{ height: 22, padding: '0 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 99, background: i < 3 ? '#F4F4F5' : 'rgba(10,10,11,.55)', color: i < 3 ? '#0A0A0B' : '#fff', fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, fontWeight: 800 }}>{String(i + 1).padStart(2, '0')}</span>
@@ -296,7 +297,7 @@ export function FeatureBanner({ kicker, line1, line2, text, cta, onCta, photos, 
       <span style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, shots.length)}, 1fr)`, gap: 3 }}>
         {shots.map((p, i) => (
           <span key={i} style={{ position: 'relative', overflow: 'hidden' }}>
-            <img src={p} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 25%', animation: `cineKen ${11 + i * 2}s ease-in-out ${-i * 3}s infinite alternate` }} />
+            <img src={p} alt="" loading="lazy" onError={imgFallback(i + 7)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 25%', animation: `cineKen ${11 + i * 2}s ease-in-out ${-i * 3}s infinite alternate` }} />
           </span>
         ))}
       </span>

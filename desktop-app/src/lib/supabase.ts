@@ -35,6 +35,8 @@ export interface OrgMember {
   org_id: string
   user_id: string
   role: OrgRole
+  /** Super admin : orga dont il n'est pas membre (ligne synthétique renvoyée par get_my_orgs). */
+  guest?: boolean
   perm_overrides: PermOverrides
 }
 

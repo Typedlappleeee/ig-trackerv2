@@ -268,7 +268,7 @@ function AppInner({ user }: { user: User }) {
       videoCount={data?.videoCount ?? null}
       canBlowsome={license.blowsome}
       isAdmin={license.isSuperAdmin}
-      orgs={org.myOrgs.map(o => ({ id: o.org.id, name: o.org.name }))}
+      orgs={org.myOrgs.map(o => ({ id: o.org.id, name: o.org.name, guest: !!o.member.guest }))}
       currentOrgId={org.currentOrg?.id ?? null}
       onSwitchOrg={org.switchOrg}
       onSignOut={signOut}

@@ -153,7 +153,7 @@ export default function Shell({
   page: PageKey; setPage: (p: PageKey) => void
   userName: string; orgName: string; role: string; balance: number | null
   phoneCount: number | null; videoCount: number | null; canBlowsome: boolean; isAdmin?: boolean
-  orgs: { id: string; name: string }[]; currentOrgId: string | null; onSwitchOrg: (id: string | null) => void
+  orgs: { id: string; name: string; guest?: boolean }[]; currentOrgId: string | null; onSwitchOrg: (id: string | null) => void
   onSignOut: () => void; children: ReactNode
 }) {
   // Petits écrans : barre latérale repliée et marges réduites.
@@ -365,13 +365,17 @@ export default function Shell({
                 <span style={{ flex: 1 }}>Espace perso</span>
                 {currentOrgId === null && <span style={{ color: T.accentText, display: 'flex' }}><Icon d="M20 6L9 17l-5-5" size={13} sw={2.4} /></span>}
               </button>
+              {/* Liste défilante : le super admin voit TOUTES les organisations. */}
+              <div style={{ maxHeight: 300, overflowY: 'auto' }}>
               {orgs.map(o => (
                 <button key={o.id} onClick={() => { onSwitchOrg(o.id); setUserMenu(false) }} style={{ ...menuItemStyle, paddingTop: 8, paddingBottom: 8 }}>
                   <span style={{ color: currentOrgId === o.id ? T.accentText : '#71717A', display: 'flex' }}><Icon d="M3 21h18|M5 21V7l8-4v18|M19 21V11l-6-4" size={14} /></span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+                  <span data-no-tr style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+                  {o.guest && <span title="Tu n'es pas membre : accès super admin" style={{ flexShrink: 0, padding: '1px 6px', borderRadius: 99, background: 'rgba(167,139,250,0.14)', color: '#C4B5FD', fontSize: 10, fontWeight: 700 }}>admin</span>}
                   {currentOrgId === o.id && <span style={{ color: T.accentText, display: 'flex' }}><Icon d="M20 6L9 17l-5-5" size={13} sw={2.4} /></span>}
                 </button>
               ))}
+              </div>
               <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '5px 0' }} />
               <button onClick={() => { setPage('settings'); setUserMenu(false) }} style={menuItemStyle}>
                 <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V15z" size={14} /></span>

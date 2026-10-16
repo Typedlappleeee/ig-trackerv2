@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { analyzePixels, isClean, MIN_SHARP } from './imageQuality'
+import { analyzePixels, isClean, igExpired, MIN_SHARP } from './imageQuality'
 
 // Image RGBA w×h à partir d'une fonction de luminance (0–255).
 const img = (w: number, h: number, f: (x: number, y: number) => number) => {
@@ -44,5 +44,19 @@ describe('isClean', () => {
     expect(isClean({ ...ok, h: 480 })).toBe(false)
     expect(isClean({ ...ok, bars: true })).toBe(false)
     expect(isClean({ ...ok, contrast: 12 })).toBe(false)
+  })
+})
+
+describe('igExpired', () => {
+  const now = Date.UTC(2026, 9, 16)
+  const hex = (ms: number) => Math.floor(ms / 1000).toString(16).toUpperCase()
+  it('lien Instagram expiré → true, valide → false, sans oe → false', () => {
+    expect(igExpired(`https://scontent.cdninstagram.com/v/x.jpg?stp=1&oe=${hex(now - 86400_000)}&_nc=1`, now)).toBe(true)
+    expect(igExpired(`https://scontent.cdninstagram.com/v/x.jpg?oe=${hex(now + 3 * 86400_000)}`, now)).toBe(false)
+    expect(igExpired('https://scontent.cdninstagram.com/v/x.jpg', now)).toBe(false)
+  })
+  it('lit le lien Instagram à travers le proxy (?img=)', () => {
+    const ig = `https://scontent.cdninstagram.com/v/x.jpg?oe=${hex(now - 1000)}`
+    expect(igExpired(`https://p.supabase.co/functions/v1/x?img=${encodeURIComponent(ig)}`, now)).toBe(true)
   })
 })

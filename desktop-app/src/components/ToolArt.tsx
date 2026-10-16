@@ -6,7 +6,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { TOOLS, type Tool } from '@/lib/tools'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
-import { curated } from '@/lib/curated'
+import { curated, imgFallback } from '@/lib/curated'
 import { useTopReels, sharpest } from '@/components/CineHero'
 
 type Pick = (k: number) => string | null
@@ -21,7 +21,7 @@ const At = ({ children, style }: { children: ReactNode; style: CSSProperties }) 
 function Media({ src, a, b, k = 0, style, filter, still }: { src: string | null; a: string; b: string; k?: number; style?: CSSProperties; filter?: string; still?: boolean }) {
   return (
     <span style={{ position: 'relative', display: 'block', overflow: 'hidden', background: '#17171A', ...style }}>
-      {src && <img src={src} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }}
+      {src && <img src={src} alt="" loading="lazy" onError={imgFallback(k + 3)}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter, animation: still ? undefined : an('sfsKen', 8 + (k % 4), k * 1.7, 'ease-in-out infinite alternate') }} />}
     </span>
   )
@@ -50,14 +50,14 @@ export function AutoContentArt({ side }: { side?: boolean }) {
   const cx = (i: number) => side ? [62, 76.5, 90][i] : 50 + (i - 1) * w * 1.04 // centre, en %
   return <>
     <span style={{ ...FILL, overflow: 'hidden', background: '#120A10' }}>
-      {imgs && <img src={imgs[1]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(18px) saturate(1.25) brightness(.5)', transform: 'scale(1.3)' }} />}
+      {imgs && <img src={imgs[1]} alt="" onError={imgFallback(9)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(18px) saturate(1.25) brightness(.5)', transform: 'scale(1.3)' }} />}
       <span style={{ ...FILL, background: 'radial-gradient(70% 90% at 50% 40%, rgba(240,171,252,.22), transparent 70%), linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.45))' }} />
     </span>
     {AUTO_HOOKS.map((h, i) => (
       <span key={i} style={{ position: 'absolute', zIndex: i === 1 ? 2 : 1, left: `${cx(i) - w / 2}%`, top: `${(side ? [24, 14, 24] : [19, 12, 19])[i]}%`, width: `${w}%`, rotate: `${(i - 1) * (side ? 4 : 6)}deg`,
         animation: an('sfsFloat', 5, i * 1.6), containerType: 'inline-size' }}>
         <span style={{ position: 'relative', display: 'block', aspectRatio: '9 / 16', borderRadius: '13% / 7.3%', overflow: 'hidden', background: '#17171A', border: '2px solid #0A0A0B', boxShadow: '0 0 0 1px rgba(255,255,255,.3), 0 16px 32px -10px rgba(0,0,0,.85)' }}>
-          {imgs && <img src={imgs[i]} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%', animation: 'sfsPop .5s ease both' }} />}
+          {imgs && <img src={imgs[i]} alt="" onError={imgFallback([3, 9, 13][i])} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%', animation: 'sfsPop .5s ease both' }} />}
           <span style={{ position: 'absolute', left: '7%', top: '4.5%', padding: '1px 5px', borderRadius: 99, fontSize: '8.5cqw', fontWeight: 800, whiteSpace: 'nowrap', ...(i === 1 ? { background: '#fff', color: '#0A0A0B' } : { background: 'rgba(10,10,11,.6)', color: '#fff' }) }}>{`Compte ${i + 1}`}</span>
           <span style={{ position: 'absolute', left: 0, right: 0, top: '56%', display: 'flex', justifyContent: 'center', textAlign: 'center', lineHeight: 1.2, color: '#fff', padding: side ? ['0 24% 0 0', '0', '0 0 0 24%'][i] : 0 }}>
             {h.s === 'band' && <span style={{ width: '100%', padding: '3cqw 5cqw', background: 'rgba(20,20,22,.66)', fontSize: '10cqw', fontWeight: 600 }}>{h.t}</span>}

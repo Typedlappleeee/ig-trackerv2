@@ -4,7 +4,7 @@
 //   • Récemment utilisés, puis chaque catégorie : titre, « Tout voir », grille de cartes.
 // Un clic ouvre l'outil précis (onglet / format) via openTool. Catalogue : src/lib/tools.ts.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { CURATED, curated } from '@/lib/curated'
+import { CURATED, curated, imgFallback } from '@/lib/curated'
 import type { User } from '@supabase/supabase-js'
 import type { OrgState } from '@/lib/data'
 import type { Theme, InfraKey } from '@/lib/theme'
@@ -69,7 +69,7 @@ export function ReelsArt({ reels, n = 3, offset = 0 }: { reels: TopReel[]; n?: n
     <span style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${list.length}, 1fr)`, gap: 3, background: '#0A0A0B' }}>
       {list.map((r, i) => (
         <span key={`${r.thumb}-${i}`} style={{ position: 'relative', overflow: 'hidden' }}>
-          <img src={r.thumb} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `sfsKen ${9 + i * 2}s ease-in-out ${-i * 2}s infinite alternate` }} />
+          <img src={r.thumb} alt="" loading="lazy" onError={imgFallback(i + 2)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', animation: `sfsKen ${9 + i * 2}s ease-in-out ${-i * 2}s infinite alternate` }} />
           <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,.45), transparent 30%)' }} />
           <span style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
             {r.score > 0 && <span style={{ height: 21, padding: '0 7px', display: 'inline-flex', alignItems: 'center', borderRadius: 99, background: r.score >= 3 ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'rgba(10,10,11,.6)', color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: r.score >= 3 ? '0 6px 16px -6px rgba(236,72,153,.8)' : 'none' }}>{r.score >= 3 ? '🔥 ' : ''}×{fmtScore(r.score)}</span>}
