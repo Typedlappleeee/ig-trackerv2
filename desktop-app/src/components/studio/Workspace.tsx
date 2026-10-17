@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs } from '@/lib/data'
-import { fetchAllRows } from '@/lib/bankStorage'
+import { fetchAllRows, uploadThumbFor } from '@/lib/bankStorage'
 import { openTool as openToolPage } from '@/lib/openTool'
 import { Icon, FIELD, TEXTAREA, Segmented, toast, useNarrow } from '@/lib/ui'
 import { useConnections } from '@/lib/connections'
@@ -153,9 +153,10 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
         const storagePath = `videos/${scopeFolder}/${crypto.randomUUID()}.${ext}`
         const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
         if (up.error) { toast(`Envoi impossible : ${file.name}`, 'bad'); continue }
+        const th = file.type.startsWith('image') ? { thumbPath: null, duration: null } : await uploadThumbFor(file, storagePath)
         const { data } = await supabase.from('content_bank').insert({
           user_id: user.id, org_id: currentOrg?.id ?? null, title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath,
-          thumbnail_path: null, file_url: null, folder: null, duration: null, tags: [], notes: null, used_count: 0,
+          thumbnail_path: th.thumbPath, file_url: null, folder: null, duration: th.duration, tags: [], notes: null, used_count: 0,
         }).select('id').maybeSingle()
         if (data?.id) added.push(data.id as string)
       } catch { toast(`Envoi impossible : ${file.name}`, 'bad') }

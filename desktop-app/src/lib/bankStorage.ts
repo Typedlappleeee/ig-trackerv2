@@ -71,3 +71,13 @@ export function videoThumb(file: Blob, at = 0.6): Promise<{ blob: Blob; duration
     v.src = url
   })
 }
+
+/** Miniature + durée d'une vidéo qu'on a DÉJÀ sur ce PC (import, vidéo générée), envoyée à côté
+ *  du fichier (…_thumb.jpg). Aucun téléchargement. null si le navigateur ne la décode pas. */
+export async function uploadThumbFor(file: Blob, storagePath: string): Promise<{ thumbPath: string | null; duration: number | null }> {
+  const th = await videoThumb(file)
+  if (!th) return { thumbPath: null, duration: null }
+  const tp = storagePath.replace(/\.[a-z0-9]+$/i, '') + '_thumb.jpg'
+  const up = await supabase.storage.from('content').upload(tp, th.blob, { contentType: 'image/jpeg', upsert: false })
+  return { thumbPath: up.error ? null : tp, duration: th.duration || null }
+}
