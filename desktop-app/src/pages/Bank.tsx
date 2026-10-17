@@ -9,6 +9,7 @@ import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_S
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABEL } from '@/lib/bankStorage'
+import { cachedSigned, signPaths, signedUrl } from '@/lib/signedUrls'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -142,6 +143,7 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
         boxShadow: on ? '0 0 0 2px #A78BFA' : 'none', transform: on ? 'scale(0.97)' : 'none',
         WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none',
         background: '#161618',
+        contentVisibility: 'auto', containIntrinsicSize: 'auto 240px',   // hors écran : pas dessinée
       }}
     >
       {broken || failed ? fallback : thumb
@@ -208,10 +210,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // Paginé (au-delà de 1000 lignes Supabase coupait en silence → des médias « disparaissaient »),
   // et seule la DERNIÈRE requête compte (changement d'espace perso / organisation en cours).
   const loadSeq = useRef(0)
+  // Squelette SEULEMENT au premier chargement d'un espace : après une action (suppression,
+  // déplacement, import, Actualiser) la grille reste affichée, sans saut ni rechargement.
+  const loadedFor = useRef<string | null>(null)
   const load = useCallback(async () => {
     if (org.loading) return
     const seq = ++loadSeq.current
-    setLoading(true)
+    const scopeKey = currentOrg?.id ?? `u:${user.id}`
+    if (loadedFor.current !== scopeKey) setLoading(true)
     setError(null)
     const make = () => {
       const q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).order('id')
@@ -225,6 +231,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     // Médias en corbeille (deleted_at) exclus de la banque, listés à part (restaurable 7 j).
     setItems(rows.filter(r => !isSentinel(r) && !r.deleted_at))
     setTrash(rows.filter(r => !isSentinel(r) && !!r.deleted_at).sort((a, b) => (b.deleted_at ?? '').localeCompare(a.deleted_at ?? '')))
+    loadedFor.current = scopeKey
     setLoading(false)
   }, [currentOrg?.id, user.id, org.loading])
 
@@ -263,37 +270,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // URLs valables 6 h et RE-signées toutes les 5 h (avant : 1 h jamais renouvelée → vignettes
   // et lecture vides si l'app restait ouverte). Lot en échec → nouvel essai. Les chemins que
   // le stockage ne connaît pas sont notés « introuvables » (fichier réellement disparu).
+  // Liens PARTAGÉS et gardés 6 h (lib/signedUrls) : un fichier déjà signé garde son lien → le
+  // navigateur réutilise son cache, rien ne se recharge après une action. Seules les vignettes
+  // AFFICHÉES (onglet et dossier ouverts, au fil du défilement) sont signées — voir plus bas.
   const [missing, setMissing] = useState<Set<string>>(new Set())
   const [signTick, setSignTick] = useState(0)
-  useEffect(() => { const id = setInterval(() => setSignTick(t => t + 1), 5 * 3600_000); return () => clearInterval(id) }, [])
-  useEffect(() => {
-    const thumbPaths = items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
-    const mediaPaths = items.filter(i => i.storage_path).map(i => i.storage_path as string)
-    const paths = [...new Set([...thumbPaths, ...mediaPaths])]
-    if (paths.length === 0) return
-    let cancelled = false
-    ;(async () => {
-      const CHUNK = 100
-      const lost: string[] = []
-      for (let i = 0; i < paths.length; i += CHUNK) {
-        const batch = paths.slice(i, i + CHUNK)
-        let res = await supabase.storage.from('content').createSignedUrls(batch, 6 * 3600)
-        if (res.error || !res.data) { await new Promise(r => setTimeout(r, 1500)); res = await supabase.storage.from('content').createSignedUrls(batch, 6 * 3600) }
-        if (cancelled) return
-        const data = res.data
-        if (data) {
-          data.forEach(d => { if (!d.signedUrl && d.path && /not.?found|does not exist/i.test(String(d.error ?? ''))) lost.push(d.path) })
-          setThumbs(prev => {
-            const map = { ...prev }
-            data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl })
-            return map
-          })
-        }
-      }
-      if (!cancelled) setMissing(new Set(lost))
-    })()
-    return () => { cancelled = true }
-  }, [items, signTick])
+  useEffect(() => { const id = setInterval(() => setSignTick(t => t + 1), 30 * 60_000); return () => clearInterval(id) }, [])
 
   function thumbFor(i: ContentItem): string | null {
     if (i.thumbnail_url) return i.thumbnail_url
@@ -413,7 +395,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // Les VIDÉOS sortent en .mov (les images gardent leur extension réelle).
   async function urlForItem(it: ContentItem): Promise<string | null> {
     if (it.storage_path) {
-      const u = (await supabase.storage.from('content').createSignedUrl(it.storage_path, 3600)).data?.signedUrl
+      const u = await signedUrl(it.storage_path)
       if (u) return u
     }
     return it.file_url ?? null
@@ -643,8 +625,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // ── Lecteur vidéo (double-clic) + menu contextuel (clic droit) ───────────────
   const [player, setPlayer] = useState<{ url: string; title: string; type: MediaType } | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; item: ContentItem } | null>(null)
-  function openPlayer(i: ContentItem) {
-    const url = (i.storage_path && thumbs[i.storage_path]) || i.file_url
+  async function openPlayer(i: ContentItem) {
+    const url = (i.storage_path && (thumbs[i.storage_path] || await signedUrl(i.storage_path))) || i.file_url
     if (url) setPlayer({ url, title: i.title, type: inferType(i) })
   }
 
@@ -726,6 +708,41 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     })
     return a
   }, [typed, folder, ql, sort])
+
+  // Affichage PROGRESSIF : 60 vignettes, puis les suivantes en arrivant en bas (avant : les
+  // 1 600 d'un coup → défilement saccadé). Uniquement l'onglet / le dossier / la recherche en cours.
+  const PAGE = 60
+  const [limit, setLimit] = useState(PAGE)
+  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort])
+  const moreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = moreRef.current; if (!el) return
+    const io = new IntersectionObserver(es => { if (es[0]?.isIntersecting) setLimit(l => l + PAGE) }, { rootMargin: '600px' })
+    io.observe(el); return () => io.disconnect()
+  }, [limit, shown.length])
+  const rendered = useMemo(() => shown.slice(0, limit), [shown, limit])
+
+  // Liens des SEULES vignettes affichées : déjà connus → tout de suite ; sinon signés par lots,
+  // miniatures d'abord, puis la vidéo des tuiles sans miniature (pour leur 1re image).
+  useEffect(() => {
+    const thumbPaths = rendered.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
+    const mediaPaths = rendered.filter(i => i.storage_path && !i.thumbnail_url && !i.thumbnail_path).map(i => i.storage_path as string)
+    const all = [...thumbPaths, ...mediaPaths]
+    if (all.length === 0) return
+    const known: Record<string, string> = {}
+    for (const p of all) { const u = cachedSigned(p); if (u) known[p] = u }
+    setThumbs(prev => { let changed = false; const m = { ...prev }; for (const [p, u] of Object.entries(known)) if (m[p] !== u) { m[p] = u; changed = true } return changed ? m : prev })
+    let cancelled = false
+    ;(async () => {
+      const merge = (fresh: Record<string, string>) => { if (!cancelled && Object.keys(fresh).length) setThumbs(prev => ({ ...prev, ...fresh })) }
+      const r1 = await signPaths(thumbPaths, merge, () => cancelled)
+      const r2 = await signPaths(mediaPaths, merge, () => cancelled)
+      if (cancelled) return
+      const lost = [...r1.lost, ...r2.lost], ok = [...r1.ok, ...r2.ok]
+      if (lost.length || ok.length) setMissing(prev => { if (lost.every(p => prev.has(p)) && ok.every(p => !prev.has(p))) return prev; const n = new Set(prev); lost.forEach(p => n.add(p)); ok.forEach(p => n.delete(p)); return n })
+    })()
+    return () => { cancelled = true }
+  }, [rendered, signTick])
 
   // Ancre du dernier clic (index dans `shown`) pour la sélection par intervalle (Maj+clic).
   const lastIdxRef = useRef<number | null>(null)
@@ -1115,7 +1132,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               display: 'grid', gridTemplateColumns: `repeat(auto-fill,minmax(${narrow ? 110 : 140}px,1fr))`,
               gap: 12, padding: 16, WebkitUserSelect: 'none', userSelect: 'none',
             }}>
-              {shown.map((i, idx) => (
+              {rendered.map((i, idx) => (
                 <Tile
                   key={i.id} idx={idx} selecting={selecting} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)} broken={isBroken(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={(e) => toggleAt(idx, i.id, e.shiftKey)}
@@ -1124,6 +1141,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   onContextMenu={e => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, item: i }) }}
                 />
               ))}
+              {limit < shown.length && <div ref={moreRef} style={{ gridColumn: '1 / -1', height: 1 }} />}
             </div>
           )}
         </Panel>

@@ -6,6 +6,7 @@ import {
   type ScheduledPost, type PostRun,
 } from './supabase'
 import type { InfraKey } from './theme'
+import { cachedSigned, signPaths } from './signedUrls'
 import { isSuperAdminEmail } from './license'
 
 // ── Séparation des infrastructures ───────────────────────────────────────────
@@ -231,26 +232,24 @@ export interface BankThumbItem {
   storage_path?: string | null
   file_url?: string | null
 }
+// Liens PARTAGÉS et gardés (lib/signedUrls) : déjà connus → tout de suite ; seuls les nouveaux
+// sont signés. Miniature d'abord ; la vidéo seulement pour ceux qui n'ont pas de miniature.
+// Passer la liste AFFICHÉE (pas toute la banque) : on ne signe que ce qui se voit.
 export function useBankThumbs(items: BankThumbItem[]) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
   useEffect(() => {
     const thumbPaths = items.filter(i => !i.thumbnail_url && i.thumbnail_path).map(i => i.thumbnail_path as string)
-    const mediaPaths = items.filter(i => i.storage_path).map(i => i.storage_path as string)
+    const mediaPaths = items.filter(i => i.storage_path && !i.thumbnail_url && !i.thumbnail_path).map(i => i.storage_path as string)
     const paths = [...new Set([...thumbPaths, ...mediaPaths])]
     if (paths.length === 0) return
+    const known: Record<string, string> = {}
+    for (const p of paths) { const u = cachedSigned(p); if (u) known[p] = u }
+    if (Object.keys(known).length) setThumbs(prev => ({ ...prev, ...known }))
     let cancelled = false
     ;(async () => {
-      const CHUNK = 100
-      for (let i = 0; i < paths.length; i += CHUNK) {
-        const batch = paths.slice(i, i + CHUNK)
-        const { data } = await supabase.storage.from('content').createSignedUrls(batch, 3600)
-        if (cancelled) return
-        if (data) setThumbs(prev => {
-          const map = { ...prev }
-          data.forEach(d => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl })
-          return map
-        })
-      }
+      const merge = (fresh: Record<string, string>) => { if (!cancelled && Object.keys(fresh).length) setThumbs(prev => ({ ...prev, ...fresh })) }
+      await signPaths(thumbPaths, merge, () => cancelled)
+      await signPaths(mediaPaths, merge, () => cancelled)
     })()
     return () => { cancelled = true }
   }, [items])

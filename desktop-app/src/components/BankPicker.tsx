@@ -86,7 +86,6 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   }, [currentOrg?.id, user.id, kind])
   useEffect(() => { load() }, [load])
 
-  const { thumbFor } = useBankThumbs(media)
 
   const folders = useMemo(() => {
     const s = new Set<string>(); media.forEach(m => { if (m.folder) s.add(m.folder) }); return [...s].sort((a, b) => a.localeCompare(b))
@@ -97,6 +96,17 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
       .filter(m => folder === 'Tous' || m.folder === folder)
       .filter(m => !s || (m.title ?? '').toLowerCase().includes(s))
   }, [media, q, folder])
+  // Affichage progressif (60 puis la suite en défilant) et liens des SEULES vignettes affichées.
+  const [limit, setLimit] = useState(60)
+  useEffect(() => { setLimit(60) }, [q, folder])
+  const renderedMedia = useMemo(() => filteredMedia.slice(0, limit), [filteredMedia, limit])
+  const moreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = moreRef.current; if (!el) return
+    const io = new IntersectionObserver(es => { if (es[0]?.isIntersecting) setLimit(l => l + 60) }, { rootMargin: '300px' })
+    io.observe(el); return () => io.disconnect()
+  }, [limit, filteredMedia.length])
+  const { thumbFor } = useBankThumbs(renderedMedia)
   const filteredCaps = useMemo(() => {
     const s = q.trim().toLowerCase()
     return s ? caps.filter(c => (c.title ?? '').toLowerCase().includes(s) || c.content.toLowerCase().includes(s)) : caps
@@ -232,10 +242,11 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
         ) : (
           filteredMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>Aucun contenu dans la banque.<br />Glisse-dépose tes fichiers ici ou clique « Mon PC ».</div> : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 8 }}>
-              {filteredMedia.map((m, i) => (
+              {renderedMedia.map((m, i) => (
                 <MediaTile key={m.id} m={m} prev={thumbFor(m)} on={sel.includes(m.id)} hue={HUES[i % 6]}
                   accent={theme.accent} accentBtn={theme.accentBtn} onToggle={() => toggle(m.id)} />
               ))}
+              {limit < filteredMedia.length && <div ref={moreRef} style={{ gridColumn: '1 / -1', height: 1 }} />}
             </div>
           )
         )}
