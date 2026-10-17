@@ -20,6 +20,7 @@ import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/li
 import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
 import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
 import { confirmDialog } from '@/lib/ui'
+import { signPaths, cachedSigned } from '@/lib/signedUrls'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -523,17 +524,23 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [speedMax, setSpeedMax] = useState('1.02')
   // Dossier de destination des sorties (banque).
   const [destFolder, setDestFolder] = useState('')
-  // Aperçu : URL signée par vidéo source (pour voir la vidéo + la caption dessus).
+  // Aperçu : lien de chaque vidéo source (+ sa miniature en image d'attente). Liens PARTAGÉS avec
+  // la Banque (lib/signedUrls) : une vidéo déjà ouverte est reprise du cache du navigateur.
   const [previews, setPreviews] = useState<Record<string, string>>({})
+  const [posters, setPosters] = useState<Record<string, string>>({})
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const out: Record<string, string> = {}
-      for (const s of sources.slice(0, 8)) {
-        if (s.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(s.storage_path, 3600); if (data?.signedUrl) out[s.id] = data.signedUrl }
-        else if (s.file_url) out[s.id] = s.file_url
+      const list = sources.slice(0, 8) as { id: string; storage_path: string | null; file_url: string | null; thumbnail_path?: string | null }[]
+      await signPaths(list.flatMap(x => [x.storage_path, x.thumbnail_path]).filter((p): p is string => !!p))
+      if (!alive) return
+      const out: Record<string, string> = {}, post: Record<string, string> = {}
+      for (const x of list) {
+        const u = x.storage_path ? cachedSigned(x.storage_path) : x.file_url
+        if (u) out[x.id] = u
+        const t = cachedSigned(x.thumbnail_path); if (t) post[x.id] = t
       }
-      if (alive) setPreviews(out)
+      setPreviews(out); setPosters(post)
     })()
     return () => { alive = false }
   }, [sources])
@@ -546,7 +553,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   async function applyPicker(r: PickerResult) {
     if (r.kind !== 'videos' || r.ids.length === 0) return
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', r.ids)
+    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_path')).in('id', r.ids)
     setSources((data ?? []) as any[])
   }
 
@@ -779,7 +786,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         {sources.length > 0 && (
           <Grp title="Aperçu">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {sources.slice(0, 8).map(s => {
+              {sources.slice(0, 8).map((s, si) => {
                 const url = previews[s.id]
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
                 const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
@@ -790,7 +797,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                   }}
                     style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 6, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${EDGE}`, cursor: url ? 'pointer' : 'default' }}>
                     {url
-                      ? <video src={url + '#t=0.3'} playsInline loop preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      // Préchargée dès le choix (« auto », 3 premières) : le clic lit tout de suite.
+                      ? <video src={url + '#t=0.3'} poster={posters[s.id]} playsInline loop preload={si < 3 ? 'auto' : 'metadata'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
                     {capPrev && (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
