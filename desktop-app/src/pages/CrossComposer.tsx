@@ -17,6 +17,7 @@ import { startRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
 import BankPicker from '@/components/BankPicker'
+import VideoFrame from '@/components/VideoFrame'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
@@ -227,7 +228,7 @@ export default function CrossComposer({ theme, user, org, onBack }: {
                   return (
                     <button key={v.id} onClick={() => setVideoId(v.id)} title={v.title} style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 8, padding: 0, cursor: 'pointer', overflow: 'hidden', border: '1px solid ' + (on ? theme.selEdge : 'rgba(255,255,255,0.08)'), background: '#161618' }}>
                       {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
-                        ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <VideoFrame src={prev} />
                         : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
                       <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     </button>

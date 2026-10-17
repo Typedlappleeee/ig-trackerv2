@@ -22,6 +22,7 @@ import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
 import { confirmDialog } from '@/lib/ui'
 import { signPaths, cachedSigned } from '@/lib/signedUrls'
 import { uploadThumbFor } from '@/lib/bankStorage'
+import { Video } from '@/components/VideoFrame'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -788,7 +789,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         {sources.length > 0 && (
           <Grp title="Aperçu">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {sources.slice(0, 8).map((s, si) => {
+              {sources.slice(0, 8).map(s => {
                 const url = previews[s.id]
                 const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
                 const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
@@ -799,8 +800,9 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                   }}
                     style={{ position: 'relative', width: 104, aspectRatio: '9 / 16', borderRadius: 6, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${EDGE}`, cursor: url ? 'pointer' : 'default' }}>
                     {url
-                      // Préchargée dès le choix (« auto », 3 premières) : le clic lit tout de suite.
-                      ? <video src={url + '#t=0.3'} poster={posters[s.id]} playsInline loop preload={si < 3 ? 'auto' : 'metadata'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      // Métadonnées seulement : rien ne se télécharge avant le clic (la vidéo cliquée
+                      // a toute la connexion pour elle) ; retirée de l'aperçu → téléchargement coupé.
+                      ? <Video key={url} src={url + '#t=0.3'} poster={posters[s.id]} playsInline loop preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
                     {capPrev && (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
