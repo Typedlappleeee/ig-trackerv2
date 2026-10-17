@@ -9,7 +9,7 @@ import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_S
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABEL } from '@/lib/bankStorage'
-import { cachedSigned, signPaths, signedUrl } from '@/lib/signedUrls'
+import { cachedSigned, signPaths, signedUrl, forgetSigned } from '@/lib/signedUrls'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -103,12 +103,18 @@ function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin = '400px
 
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
-function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx, broken = false }: {
+function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx, broken = false, onStale }: {
   item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: (e: React.MouseEvent) => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
   selecting?: boolean; idx?: number; broken?: boolean
+  /** Le lien n'a pas chargé : on en redemande un neuf (une fois) au lieu de rester sur le repli. */
+  onStale?: () => void
 }) {
   const [failed, setFailed] = useState(false)
   const [ready, setReady] = useState(false)
+  // Nouveau lien → nouvel essai ; 1er échec → lien re-signé ; 2e échec → repli lisible.
+  const retried = useRef(false)
+  useEffect(() => { setFailed(false); setReady(false) }, [thumb, media])
+  const onErr = () => { if (!retried.current && onStale) { retried.current = true; onStale() } else setFailed(true) }
   const ext = ((item.storage_path ?? item.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)
   const fresh = (item.used_count ?? 0) === 0
   const dur = type === 'video' ? fmtDuration(item.duration) : ''
@@ -143,19 +149,18 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
         boxShadow: on ? '0 0 0 2px #A78BFA' : 'none', transform: on ? 'scale(0.97)' : 'none',
         WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none',
         background: '#161618',
-        contentVisibility: 'auto', containIntrinsicSize: 'auto 240px',   // hors écran : pas dessinée
       }}
     >
       {broken || failed ? fallback : thumb
-        ? <img src={thumb} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        ? <img src={thumb} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={onErr} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : type === 'video'
           // Vidéo : aperçu (1re image) monté SEULEMENT si la tuile est visible → limite
           // le nombre de <video> décodés en même temps. Hors écran → placeholder.
           // Le repli (format + icône) reste dessous tant que la 1re image n'est pas peinte :
           // jamais de tuile noire vide pendant le chargement (ou si le navigateur ne décode pas).
-          ? <>{fallback}{media && inView && <video src={`${media}#t=0.1`} muted playsInline preload="metadata" onError={() => setFailed(true)} onLoadedData={e => setReady(e.currentTarget.videoWidth > 0)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: ready ? 1 : 0, transition: 'opacity .25s ease' }} />}</>
+          ? <>{fallback}{media && inView && <video src={`${media}#t=0.1`} muted playsInline preload="metadata" onError={onErr} onLoadedData={e => setReady(e.currentTarget.videoWidth > 0)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: ready ? 1 : 0, transition: 'opacity .25s ease' }} />}</>
           : media && inView
-            ? <img src={media} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            ? <img src={media} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={onErr} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={placeholder} />}
 
       <TileCheck on={on} onToggle={onToggle} accent={theme.accent} />
@@ -276,6 +281,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [missing, setMissing] = useState<Set<string>>(new Set())
   const [signTick, setSignTick] = useState(0)
   useEffect(() => { const id = setInterval(() => setSignTick(t => t + 1), 30 * 60_000); return () => clearInterval(id) }, [])
+
+  // Lien qui n'a pas chargé (expiré, coupure) : oublié puis re-signé → la tuile réessaie.
+  async function refreshLinks(i: ContentItem) {
+    const paths = [i.thumbnail_path, i.storage_path].filter((p): p is string => !!p)
+    paths.forEach(forgetSigned)
+    await signPaths(paths, fresh => setThumbs(prev => ({ ...prev, ...fresh })))
+  }
 
   function thumbFor(i: ContentItem): string | null {
     if (i.thumbnail_url) return i.thumbnail_url
@@ -1139,6 +1151,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   onDragStart={e => e.dataTransfer.setData('text/plain', i.id)}
                   onOpen={() => openPlayer(i)}
                   onContextMenu={e => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, item: i }) }}
+                  onStale={() => void refreshLinks(i)}
                 />
               ))}
               {limit < shown.length && <div ref={moreRef} style={{ gridColumn: '1 / -1', height: 1 }} />}

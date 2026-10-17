@@ -63,6 +63,11 @@ export async function signPaths(paths: string[], onBatch?: (fresh: Record<string
   return { lost, ok }
 }
 
+/** Oublie le lien d'un fichier (il n'a pas chargé) : il sera re-signé. */
+export function forgetSigned(path: string | null | undefined): void {
+  if (path && store()[path]) { delete store()[path]; save() }
+}
+
 /** Lien d'un seul fichier (déjà signé si possible). */
 export async function signedUrl(path: string): Promise<string | null> {
   const c = cachedSigned(path); if (c) return c

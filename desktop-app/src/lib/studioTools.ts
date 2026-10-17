@@ -2,6 +2,7 @@
 // source (banque ou PC) et produit un mp4 prêt à poster, enregistré dans la banque.
 import { supabase } from './supabase'
 import { runFfmpeg, fetchInput } from './ffmpeg'
+import { uploadThumbFor } from './bankStorage'
 import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
 import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, type RemixIntensity, type RemixToggles } from './studioFilters'
@@ -29,9 +30,11 @@ export async function saveOutputToBank(userId: string, orgId: string | null, byt
   const blob = new Blob([bytes as BlobPart], { type: mime })
   const up = await supabase.storage.from('content').upload(storagePath, blob, { contentType: blob.type, upsert: false })
   if (up.error) return null
+  // Miniature tirée des octets qu'on a déjà (pas de téléchargement) : vignette instantanée dans la Banque.
+  const th = mime.startsWith('video') ? await uploadThumbFor(blob, storagePath) : { thumbPath: null, duration: null }
   await supabase.from('content_bank').insert({
-    user_id: userId, org_id: orgId, title, storage_path: storagePath,
-    file_url: null, folder: folder || null, duration: null, tags: [], notes: null, used_count: 0,
+    user_id: userId, org_id: orgId, title, storage_path: storagePath, thumbnail_path: th.thumbPath,
+    file_url: null, folder: folder || null, duration: th.duration, tags: [], notes: null, used_count: 0,
   })
   return storagePath
 }

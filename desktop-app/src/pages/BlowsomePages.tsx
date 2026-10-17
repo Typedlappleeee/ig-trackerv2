@@ -21,6 +21,7 @@ import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsBy
 import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
 import { confirmDialog } from '@/lib/ui'
 import { signPaths, cachedSigned } from '@/lib/signedUrls'
+import { uploadThumbFor } from '@/lib/bankStorage'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -572,7 +573,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
         if (up.error) continue
         const title = file.name.replace(/\.[a-z0-9]+$/i, '')
-        const ins = await supabase.from('content_bank').insert({ user_id: user.id, org_id: currentOrg?.id ?? null, title, storage_path: storagePath, file_url: null, folder: destFolder || null, tags: [], notes: null, used_count: 0 }).select('id').single()
+        const th = await uploadThumbFor(file, storagePath)
+        const ins = await supabase.from('content_bank').insert({ user_id: user.id, org_id: currentOrg?.id ?? null, title, storage_path: storagePath, thumbnail_path: th.thumbPath, duration: th.duration, file_url: null, folder: destFolder || null, tags: [], notes: null, used_count: 0 }).select('id').single()
         added.push({ id: (ins.data as any)?.id ?? id, title, storage_path: storagePath, file_url: null })
       } catch { /* ignore */ }
     }
