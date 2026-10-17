@@ -21,6 +21,7 @@ import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
 import { recordGeelarkSchedule } from '@/lib/scheduling'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
+import VideoFrame from '@/components/VideoFrame'
 
 // Valeur datetime-local (fuseau LOCAL) décalée de `plusMin` minutes par rapport à maintenant.
 function schedLocalValue(plusMin: number): string {
@@ -518,7 +519,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
                     background: '#161618',
                   }}>
                     {prev && (vid && !v.thumbnail_url && !v.thumbnail_path
-                      ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <VideoFrame src={prev} />
                       : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
                     <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, background: on ? theme.accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     {/* Miniature par vidéo = une FRAME de la vidéo. Clic → sélecteur d'image (n'active pas le toggle). */}

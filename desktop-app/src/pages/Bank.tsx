@@ -10,6 +10,7 @@ import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABEL } from '@/lib/bankStorage'
 import { cachedSigned, signPaths, signedUrl, forgetSigned } from '@/lib/signedUrls'
+import VideoFrame, { Video } from '@/components/VideoFrame'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -101,61 +102,27 @@ function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin = '400px
   return inView
 }
 
-// ── Lecture instantanée ──────────────────────────────────────────────────────
-// Les vidéos sont dans le stockage en ligne (Supabase) : il faut en recevoir quelques Mo avant
-// de pouvoir démarrer. On commence donc dès que la souris SURVOLE une vignette (une seule à la
-// fois : survoler la suivante annule la précédente — jamais de téléchargement en masse), et au
-// clic le lecteur REPREND ce même élément vidéo : ce qui est déjà chargé n'est pas refait.
-const warm: { el: HTMLVideoElement | null; url: string } = { el: null, url: '' }
-function warmUp(url: string) {
-  if (warm.url === url) return
-  if (!warm.el) { const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; warm.el = v }
-  warm.url = url; warm.el.src = url; warm.el.load()
-}
-function takeWarm(url: string): HTMLVideoElement | null {
-  if (warm.el && warm.url === url) { const el = warm.el; warm.el = null; warm.url = ''; return el }
-  return null
-}
-function coolDown() { if (warm.el) { warm.el.removeAttribute('src'); warm.el.load() } warm.url = '' }
-
-/** Lecteur : reprend la vidéo préchargée au survol (démarrage immédiat), sinon en crée une. */
-function PlayerVideo({ url, poster }: { url: string; poster?: string | null }) {
-  const box = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const host = box.current; if (!host) return
-    const el = takeWarm(url) ?? Object.assign(document.createElement('video'), { src: url, preload: 'auto' })
-    el.controls = true; el.playsInline = true; el.muted = false
-    if (poster) el.poster = poster
-    el.style.cssText = 'display:block;width:100%;max-height:70vh;border-radius:6px;background:#000'
-    host.appendChild(el)
-    void el.play().catch(() => {})
-    return () => { el.pause(); el.removeAttribute('src'); el.load(); el.remove() }
-  }, [url]) // eslint-disable-line react-hooks/exhaustive-deps
-  return <div ref={box} />
-}
-
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
-function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx, broken = false, onStale, onWarm }: {
+function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx, broken = false, onStale, suspend = false }: {
   item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: (e: React.MouseEvent) => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
   selecting?: boolean; idx?: number; broken?: boolean
   /** Le lien n'a pas chargé : on en redemande un neuf (une fois) au lieu de rester sur le repli. */
   onStale?: () => void
-  /** Survol : commencer à charger la vidéo (lecture instantanée au clic). */
-  onWarm?: () => void
+  /** Lecteur ouvert : les vignettes ne chargent plus rien (toute la connexion pour la vidéo lue). */
+  suspend?: boolean
 }) {
-  const warmT = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [failed, setFailed] = useState(false)
-  const [ready, setReady] = useState(false)
   // Nouveau lien → nouvel essai ; 1er échec → lien re-signé ; 2e échec → repli lisible.
   const retried = useRef(false)
-  useEffect(() => { setFailed(false); setReady(false) }, [thumb, media])
+  useEffect(() => { setFailed(false) }, [thumb, media])
   const onErr = () => { if (!retried.current && onStale) { retried.current = true; onStale() } else setFailed(true) }
   const ext = ((item.storage_path ?? item.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)
   const fresh = (item.used_count ?? 0) === 0
   const dur = type === 'video' ? fmtDuration(item.duration) : ''
   const btnRef = useRef<HTMLButtonElement>(null)
   const inView = useInView(btnRef)
+  const onScreen = useInView(btnRef, '0px')   // vidéos : seulement ce qui est à l'écran
   const placeholder: CSSProperties = {
     position: 'absolute', inset: 0,
     background: '#161618',
@@ -174,9 +141,6 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
       data-tile-idx={idx}
       // Mode sélection (≥ 1 média coché) : un clic n'importe où sur la vignette la coche.
       onClick={selecting ? onToggle : onOpen}
-      onMouseEnter={() => { if (onWarm && !selecting) warmT.current = setTimeout(onWarm, 120) }}
-      onMouseLeave={() => { if (warmT.current) clearTimeout(warmT.current) }}
-      onPointerDown={() => { if (onWarm && !selecting) onWarm() }}
       onContextMenu={onContextMenu}
       draggable={!selecting}
       onDragStart={onDragStart}
@@ -193,11 +157,10 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
       {broken || failed ? fallback : thumb
         ? <img src={thumb} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={onErr} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : type === 'video'
-          // Vidéo : aperçu (1re image) monté SEULEMENT si la tuile est visible → limite
-          // le nombre de <video> décodés en même temps. Hors écran → placeholder.
-          // Le repli (format + icône) reste dessous tant que la 1re image n'est pas peinte :
-          // jamais de tuile noire vide pendant le chargement (ou si le navigateur ne décode pas).
-          ? <>{fallback}{media && inView && <video src={`${media}#t=0.1`} muted playsInline preload="metadata" onError={onErr} onLoadedData={e => setReady(e.currentTarget.videoWidth > 0)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: ready ? 1 : 0, transition: 'opacity .25s ease' }} />}</>
+          // Vidéo sans miniature : sa 1re image, chargée SEULEMENT quand la tuile est à l'écran,
+          // puis le téléchargement est coupé (VideoFrame). Le repli (format + icône) reste
+          // dessous tant que l'image n'est pas prise : jamais de tuile noire vide.
+          ? <>{fallback}{media && <VideoFrame src={media} load={onScreen && !suspend} onError={onErr} />}</>
           : media && inView
             ? <img src={media} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={onErr} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={placeholder} />}
@@ -680,7 +643,6 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     const url = (i.storage_path && (thumbs[i.storage_path] || await signedUrl(i.storage_path))) || i.file_url
     if (url) setPlayer({ url, title: i.title, type: inferType(i), poster: thumbFor(i) })
   }
-  useEffect(() => () => coolDown(), [])
 
   // ── Glisser-déposer un média (ou la sélection) dans un dossier ───────────────
   const [dragOver, setDragOver] = useState<string | null>(null)
@@ -1197,7 +1159,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   onOpen={() => openPlayer(i)}
                   onContextMenu={e => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, item: i }) }}
                   onStale={() => void refreshLinks(i)}
-                  onWarm={tab === 'video' ? () => { const u = mediaFor(i); if (u) warmUp(u) } : undefined}
+                  suspend={!!player}
                 />
               ))}
               {limit < shown.length && <div ref={moreRef} style={{ gridColumn: '1 / -1', height: 1 }} />}
@@ -1340,7 +1302,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {player && (
         <Modal theme={theme} title={player.title} onClose={() => setPlayer(null)} width={420}>
           {player.type === 'video'
-            ? <PlayerVideo url={player.url} poster={player.poster} />
+            // Lecture directe (comme avant) : rien ne se télécharge avant le clic, le lien est déjà
+            // prêt ; à la fermeture le téléchargement est coupé (Video).
+            ? <Video key={player.url} src={player.url} poster={player.poster ?? undefined} controls autoPlay playsInline style={{ display: 'block', width: '100%', maxHeight: '70vh', borderRadius: 6, background: '#000' }} />
             : <img src={player.url} alt="" style={{ display: 'block', width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 6 }} />}
         </Modal>
       )}

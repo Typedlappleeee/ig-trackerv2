@@ -6,6 +6,7 @@ import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { useBankThumbs } from '@/lib/data'
 import { Modal, Btn, FIELD, Skeleton, SkeletonRows } from '@/lib/ui'
+import VideoFrame from './VideoFrame'
 
 // Sélecteur « Banque » commun (fidèle à _openPicker du prototype ZIP) : une modale
 // avec recherche + grille (vidéos/images) ou liste (légendes), sélection multi ou
@@ -44,9 +45,9 @@ function MediaTile({ m, prev, on, hue, accent, accentBtn, onToggle }: {
       border: '1px solid ' + (on ? accent : 'rgba(255,255,255,0.08)'),
       background: '#161618',
     }}>
-      {vis && prev && (isVid
-        ? <video src={prev + '#t=0.1'} muted playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
+      {prev && (isVid
+        ? <VideoFrame src={prev} load={vis} />
+        : vis && <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
       <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', background: on ? accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
     </button>
   )
