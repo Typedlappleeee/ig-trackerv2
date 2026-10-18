@@ -54,6 +54,8 @@ export interface OrgState {
   perms: PermOverrides
   loading: boolean
   switchOrg: (id: string | null) => void
+  /** Recharge la liste des orgas (après une suppression…), sans écran de chargement. */
+  reload: () => Promise<void>
 }
 
 export function useOrg(user: User): OrgState {
@@ -61,8 +63,8 @@ export function useOrg(user: User): OrgState {
   const [currentId, setCurrentId] = useState<string | null>(() => localStorage.getItem(LS_ORG))
   const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     let members: any[] | null = null
     // Voie rapide : RPC SECURITY DEFINER (contourne les RLS récursives).
     try {
@@ -116,6 +118,7 @@ export function useOrg(user: User): OrgState {
     perms: superAdmin ? EMPTY_PERMS : current?.member.perm_overrides ?? EMPTY_PERMS,
     loading,
     switchOrg,
+    reload: () => load(true),
   }
 }
 

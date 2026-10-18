@@ -4,6 +4,9 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, Icon, Panel, PanelHead, PageHead, Empty, Modal, FIELD, MONO, Toggle, Segmented, SkeletonRows, useNarrow, toast } from '@/lib/ui'
+import type { OrgState } from '@/lib/data'
+import { fmtBytes } from '@/lib/bankStorage'
+import { confirmDeleteOrg, confirmEmptyBank, deleteOrgEverything, emptyBank } from '@/lib/orgAdmin'
 
 // ── Panel Admin (superadmin) : création + historique des clés de licence et des
 //    codes de crédits. Porté de electron-app/src/pages/Licences.tsx. ──────────────
@@ -49,7 +52,82 @@ const STATUS_LABEL: Record<Filter, string> = {
   all: 'Toutes', active: 'Active', used: 'Utilisée', expired: 'Expirée', revoked: 'Révoquée',
 }
 
-export default function Admin({ theme, user }: { theme: Theme; user: User }) {
+// ── Organisations (toutes) : vider la banque ou supprimer l'orga avec tout son contenu ──
+interface AdminOrg { id: string; name: string; owner_email: string | null; created_at: string | null; members: number; media: number; bytes: number }
+function OrgsPanel({ theme, org }: { theme: Theme; org: OrgState }) {
+  const [rows, setRows] = useState<AdminOrg[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState<{ id: string; msg: string } | null>(null)
+  const [q, setQ] = useState('')
+  const load = useCallback(async () => {
+    const { data, error } = await supabase.rpc('sf_admin_orgs')
+    if (error) {
+      setErr(error.code === 'PGRST202' || /could not find the function|schema cache/i.test(error.message) ? 'Colle supabase/migrations/20261018_org_delete.sql dans Supabase (SQL Editor → Run).' : error.message)
+      setRows([]); return
+    }
+    setErr(null); setRows((data ?? []) as AdminOrg[])
+  }, [])
+  useEffect(() => { void load() }, [load])
+
+  async function run(o: AdminOrg, kind: 'wipe' | 'delete') {
+    if (busy) return
+    if (!await (kind === 'delete' ? confirmDeleteOrg(o.name) : confirmEmptyBank(o.name))) return
+    const progress = (msg: string) => setBusy({ id: o.id, msg })
+    try {
+      progress('Préparation…')
+      if (kind === 'delete') {
+        await deleteOrgEverything(o, progress)
+        toast(`« ${o.name} » est supprimée, avec tout son contenu.`, 'ok')
+        if (org.currentOrg?.id === o.id) org.switchOrg(null)
+        void org.reload()
+      } else {
+        const r = await emptyBank(o.id, progress)
+        toast(`Banque vidée : ${r.media} média(s) supprimé(s).`, 'ok')
+      }
+    } catch (e) { toast(`Échec : ${e instanceof Error ? e.message : String(e)}`, 'bad', 9000) }
+    finally { setBusy(null); void load() }
+  }
+
+  const ql = q.trim().toLowerCase()
+  const shown = (rows ?? []).filter(o => !ql || o.name.toLowerCase().includes(ql) || (o.owner_email ?? '').toLowerCase().includes(ql))
+  return (
+    <Panel theme={theme}>
+      <PanelHead title="Organisations" sub={rows ? `${rows.length} au total` : undefined} right={
+        <div style={{ ...FIELD, width: 'auto', display: 'flex', alignItems: 'center', gap: 8, color: '#71717A' }}>
+          <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-3.5-3.5" size={13} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher (nom, email)…" style={{ width: 180, maxWidth: '40vw', border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, outline: 'none' }} />
+        </div>} />
+      {err && <div style={{ margin: '12px 16px', padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)', color: '#F87171', fontSize: 13 }}>{err}</div>}
+      {rows === null ? <SkeletonRows rows={3} />
+        : shown.length === 0 ? (err ? null : <div style={{ padding: 24, textAlign: 'center', color: '#8B8B94', fontSize: 13 }}>Aucune organisation.</div>)
+        : (
+          <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 420, overflowY: 'auto' }}>
+            {shown.map(o => (
+              <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 56, boxSizing: 'border-box', padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0, flex: '1 1 220px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span data-no-tr style={{ fontSize: 13.5, fontWeight: 600, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+                    {org.currentOrg?.id === o.id && <Chip text="Ouverte" tone="violet" />}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#8B8B94', fontVariantNumeric: 'tabular-nums' }}>
+                    <span data-no-tr>{o.owner_email ?? '—'}</span>{` · ${o.members} membre(s) · ${o.media} média(s) · ${fmtBytes(o.bytes)}`}
+                  </span>
+                </span>
+                {busy?.id === o.id
+                  ? <span style={{ fontSize: 12, color: '#FBBF24' }}>{busy.msg}</span>
+                  : <span style={{ display: 'flex', gap: 6 }}>
+                      <Btn theme={theme} sm tone="quiet" label="Vider la banque" disabled={!!busy || !o.media} onClick={() => void run(o, 'wipe')} />
+                      <Btn theme={theme} sm tone="danger" label="Supprimer" disabled={!!busy} onClick={() => void run(o, 'delete')} />
+                    </span>}
+              </div>
+            ))}
+          </div>
+        )}
+    </Panel>
+  )
+}
+
+export default function Admin({ theme, user, org }: { theme: Theme; user: User; org: OrgState }) {
   const [keys, setKeys] = useState<LicenseKey[]>([])
   const [codes, setCodes] = useState<CreditCode[]>([])
   const [loading, setLoading] = useState(true)
@@ -150,7 +228,9 @@ export default function Admin({ theme, user }: { theme: Theme; user: User }) {
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHead title="Admin · Licences" sub="Création et historique des clés de licence et des codes de crédits. Réservé au superadmin." actions={<Chip text="Superadmin" tone="violet" />} />
+      <PageHead title="Admin" sub="Licences, codes de crédits et organisations. Réservé au superadmin." actions={<Chip text="Superadmin" tone="violet" />} />
+
+      <div style={{ marginBottom: 16 }}><OrgsPanel theme={theme} org={org} /></div>
 
       {loadErr && <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)', color: '#F87171', fontSize: 13 }}>{`Échec : ${loadErr}`}</div>}
 

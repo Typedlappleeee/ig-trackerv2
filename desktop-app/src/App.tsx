@@ -253,7 +253,7 @@ function AppInner({ user }: { user: User }) {
         : page === 'automation'
         ? <Automation theme={theme} infra={infra} user={user} org={org} />
         : page === 'admin'
-        ? (license.isSuperAdmin ? <Admin theme={theme} user={user} /> : <Home theme={theme} infra={infra} user={user} org={org} data={data} loading={loading} reload={reload} onNavigate={setPage} onOpenTool={openT} isAdmin={license.isSuperAdmin} />)
+        ? (license.isSuperAdmin ? <Admin theme={theme} user={user} org={org} /> : <Home theme={theme} infra={infra} user={user} org={org} data={data} loading={loading} reload={reload} onNavigate={setPage} onOpenTool={openT} isAdmin={license.isSuperAdmin} />)
         : page === 'settings'
         ? <Settings theme={theme} user={user} org={org} onSignOut={signOut} onNavigate={(p) => setPage(p as PageKey)} />
         : <Placeholder theme={theme} spec={SPECS[page] ?? SPECS.settings!} />
