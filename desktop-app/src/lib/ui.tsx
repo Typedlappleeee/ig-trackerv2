@@ -342,11 +342,11 @@ export function confirmDialog(o: { title: string; text?: string; confirmLabel?: 
   })
 }
 // Saisie (remplace window.prompt) : const nom = await promptDialog({ title, placeholder }) → null si annulé.
-export function promptDialog(o: { title: string; text?: string; placeholder?: string; value?: string; confirmLabel?: string }): Promise<string | null> {
+export function promptDialog(o: { title: string; text?: string; placeholder?: string; value?: string; confirmLabel?: string; danger?: boolean }): Promise<string | null> {
   return new Promise(resolve => {
     _confirm?.resolve(false)
     const input = { value: o.value ?? '', placeholder: o.placeholder }
-    _confirm = { title: o.title, text: o.text, confirmLabel: o.confirmLabel, input, resolve: ok => resolve(ok && input.value.trim() ? input.value.trim() : null) }
+    _confirm = { title: o.title, text: o.text, confirmLabel: o.confirmLabel, danger: o.danger, input, resolve: ok => resolve(ok && input.value.trim() ? input.value.trim() : null) }
     _confirmL.forEach(f => f())
   })
 }

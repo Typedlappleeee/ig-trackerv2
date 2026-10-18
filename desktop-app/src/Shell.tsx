@@ -140,7 +140,7 @@ const TITLES: Record<PageKey, string[]> = {
   genjutsu: ['Production', 'Genjutsu IA'],
   explore: ['Explorer'],
   pricing: ['Abonnements'],
-  admin: ['Admin', 'Licences'],
+  admin: ['Admin', 'Orgas & licences'],
   settings: ['Réglages'],
 }
 
@@ -191,7 +191,7 @@ export default function Shell({
   const NAV = [
     ...navFor(infra, phoneCount, videoCount).map(g => g.g === 'Production' && isAdmin ? { ...g, items: [...g.items, GENJUTSU] } : g),
     ...(isAdmin ? [{ g: 'Admin', items: [
-      { k: 'admin' as PageKey, l: 'Admin · Licences', i: 'M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z' },
+      { k: 'admin' as PageKey, l: 'Admin · Orgas & licences', i: 'M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z' },
     ] }] : []),
   ]
 

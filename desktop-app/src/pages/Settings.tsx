@@ -12,6 +12,7 @@ import { fetchBalance, fetchOrgBalance, fmtNumber, type OrgState } from '@/lib/d
 import { takeOpenArg } from '@/lib/openTool'
 import { useBankUsage, fmtBytes, PLAN_LABEL } from '@/lib/bankStorage'
 import { geelarkFetch } from '@/lib/geelark'
+import { confirmDeleteOrg, confirmEmptyBank, deleteOrgEverything, emptyBank } from '@/lib/orgAdmin'
 import { generateCaption } from '@/lib/ai'
 
 type Tab = 'profile' | 'team' | 'billing' | 'integrations'
@@ -241,11 +242,29 @@ function TeamTab({ theme, user, org }: { theme: Theme; user: User; org: OrgState
     const { error } = await supabase.from('organization_members').delete().eq('id', m.id)
     if (error) toast(`Échec : ${error.message}`, 'bad'); else void load()
   }
+  // Zone sensible : suppression de l'orga avec TOUT son contenu, ou vidage de la banque
+  // (lib/orgAdmin — avant, supprimer l'orga faisait retomber ses médias/téléphones chez les membres).
+  const [danger, setDanger] = useState<string | null>(null)
   async function deleteOrg() {
-    if (!currentOrg) return
-    if (!await confirmDialog({ title: `Supprimer « ${currentOrg.name} » ?`, text: 'Irréversible : l’organisation et ses accès membres sont supprimés.', confirmLabel: 'Supprimer définitivement', danger: true })) return
-    const { error } = await supabase.from('organizations').delete().eq('id', currentOrg.id)
-    if (error) toast(`Échec : ${error.message}`, 'bad'); else org.switchOrg(null)
+    if (!currentOrg || danger) return
+    if (!await confirmDeleteOrg(currentOrg.name)) return
+    try {
+      setDanger('Préparation…')
+      await deleteOrgEverything(currentOrg, setDanger)
+      toast(`« ${currentOrg.name} » est supprimée, avec tout son contenu.`, 'ok')
+      org.switchOrg(null); void org.reload()
+    } catch (e) { toast(`Échec : ${e instanceof Error ? e.message : String(e)}`, 'bad', 9000) }
+    finally { setDanger(null) }
+  }
+  async function wipeBank() {
+    if (danger) return
+    if (!await confirmEmptyBank(currentOrg ? currentOrg.name : null)) return
+    try {
+      setDanger('Préparation…')
+      const r = await emptyBank(currentOrg?.id ?? null, setDanger)
+      toast(`Banque vidée : ${r.media} média(s) supprimé(s).`, 'ok')
+    } catch (e) { toast(`Échec : ${e instanceof Error ? e.message : String(e)}`, 'bad', 9000) }
+    finally { setDanger(null) }
   }
 
   if (!currentOrg) return (
@@ -260,6 +279,12 @@ function TeamTab({ theme, user, org }: { theme: Theme; user: User; org: OrgState
             <Btn theme={theme} tone="primary" label={creating ? 'Création…' : 'Créer'} disabled={creating || !orgName.trim()} onClick={() => void createOrg()} />
           </span>
         </div>
+      </Panel>
+      <Panel theme={theme}>
+        <PanelHead title="Zone sensible" sub={danger ?? undefined} />
+        <Row label="Vider ma banque" hint="Toutes tes vidéos et images perso, fichiers compris · irréversible" last>
+          <Btn theme={theme} tone="danger" label="Vider" disabled={!!danger} onClick={() => void wipeBank()} />
+        </Row>
       </Panel>
     </Stack>
   )
@@ -311,12 +336,17 @@ function TeamTab({ theme, user, org }: { theme: Theme; user: User; org: OrgState
         })}
       </Panel>
 
-      {role === 'owner' && (
+      {canManage && (
         <Panel theme={theme}>
-          <PanelHead title="Zone sensible" />
-          <Row label="Supprimer l’organisation" hint="Irréversible" last>
-            <Btn theme={theme} tone="danger" label="Supprimer" onClick={() => void deleteOrg()} />
+          <PanelHead title="Zone sensible" sub={danger ?? undefined} />
+          <Row label="Vider la banque" hint="Toutes les vidéos et images, fichiers compris · irréversible" last={role !== 'owner'}>
+            <Btn theme={theme} tone="danger" label="Vider" disabled={!!danger} onClick={() => void wipeBank()} />
           </Row>
+          {role === 'owner' && (
+            <Row label="Supprimer l’organisation" hint="Avec tout son contenu : banque, légendes, téléphones, programmés, tâches · irréversible" last>
+              <Btn theme={theme} tone="danger" label="Supprimer" disabled={!!danger} onClick={() => void deleteOrg()} />
+            </Row>
+          )}
         </Panel>
       )}
     </Stack>
