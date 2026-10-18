@@ -97,25 +97,37 @@ $$;
 GRANT EXECUTE ON FUNCTION public.member_can_action(uuid, text) TO authenticated;
 
 -- Solde de crédits de l'orga : visible aussi par le super admin.
-CREATE OR REPLACE FUNCTION public.get_org_credit_balance(p_org_id uuid)
-RETURNS numeric LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-  v_owner_id  uuid;
-  v_balance   numeric(12,2);
-  v_is_member boolean;
-BEGIN
-  SELECT public.sf_is_super_admin() OR EXISTS(
-    SELECT 1 FROM public.organization_members WHERE org_id = p_org_id AND user_id = auth.uid()
-    UNION ALL
-    SELECT 1 FROM public.organizations WHERE id = p_org_id AND owner_id = auth.uid()
-  ) INTO v_is_member;
-  IF NOT v_is_member THEN RETURN 0; END IF;
-  SELECT owner_id INTO v_owner_id FROM public.organizations WHERE id = p_org_id;
-  SELECT COALESCE(balance, 0) INTO v_balance
-  FROM public.user_credits WHERE user_id = v_owner_id;
-  RETURN COALESCE(v_balance, 0);
-END;
-$$;
+-- On GARDE le type de retour déjà en place dans la base (integer ou numeric selon les
+-- migrations passées) : Postgres refuse de le changer avec « create or replace ».
+do $do$
+declare v_ret text;
+begin
+  select pg_get_function_result(p.oid) into v_ret
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'get_org_credit_balance'
+      and pg_get_function_identity_arguments(p.oid) = 'p_org_id uuid';
+  execute format($f$
+    CREATE OR REPLACE FUNCTION public.get_org_credit_balance(p_org_id uuid)
+    RETURNS %1$s LANGUAGE plpgsql SECURITY DEFINER AS $fn$
+    DECLARE
+      v_owner_id  uuid;
+      v_balance   %1$s;
+      v_is_member boolean;
+    BEGIN
+      SELECT public.sf_is_super_admin() OR EXISTS(
+        SELECT 1 FROM public.organization_members WHERE org_id = p_org_id AND user_id = auth.uid()
+        UNION ALL
+        SELECT 1 FROM public.organizations WHERE id = p_org_id AND owner_id = auth.uid()
+      ) INTO v_is_member;
+      IF NOT v_is_member THEN RETURN 0; END IF;
+      SELECT owner_id INTO v_owner_id FROM public.organizations WHERE id = p_org_id;
+      SELECT COALESCE(balance, 0) INTO v_balance
+      FROM public.user_credits WHERE user_id = v_owner_id;
+      RETURN COALESCE(v_balance, 0);
+    END;
+    $fn$
+  $f$, coalesce(v_ret, 'integer'));
+end $do$;
 
 -- Licence de l'orga (accès hérité de l'owner) : le super admin passe aussi.
 CREATE OR REPLACE FUNCTION public.org_owner_plan(p_org uuid)
