@@ -11,6 +11,7 @@ import type { OrgState } from '@/lib/data'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABEL } from '@/lib/bankStorage'
 import { cachedSigned, signPaths, signedUrl, forgetSigned } from '@/lib/signedUrls'
 import VideoFrame, { Video } from '@/components/VideoFrame'
+import { readZip } from '@/lib/zipReader'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -350,50 +351,102 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const { usage, reload: reloadUsage } = useBankUsage(currentOrg?.id ?? null)
   const IMG = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 
+  // Un fichier → bucket content + miniature/durée + ligne content_bank. Renvoie l'erreur, ou null.
+  async function uploadOne(file: File, dest: string | null): Promise<string | null> {
+    let ext = (file.name.split('.').pop() ?? '').toLowerCase()
+    if (!ext) ext = file.type.startsWith('image') ? 'jpg' : 'mp4'
+    const id = crypto.randomUUID()
+    const storagePath = `videos/${scopeFolder}/${id}.${ext}`
+    const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
+    if (up.error) return /row-level security|policy/i.test(up.error.message) ? 'espace plein ou accès refusé' : up.error.message
+    // Miniature + durée générées tout de suite (avant : aucune miniature → vignettes vides).
+    let thumbPath: string | null = null, duration: number | null = null
+    if (!file.type.startsWith('image') && !IMG.includes(ext)) {
+      const th = await videoThumb(file)
+      if (th) {
+        duration = th.duration || null
+        const tp = `videos/${scopeFolder}/${id}_thumb.jpg`
+        const tu = await supabase.storage.from('content').upload(tp, th.blob, { contentType: 'image/jpeg', upsert: false })
+        if (!tu.error) thumbPath = tp
+      }
+    }
+    const ins = await supabase.from('content_bank').insert({
+      user_id: user.id, org_id: currentOrg?.id ?? null,
+      title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: thumbPath,
+      file_url: null, folder: dest, duration, tags: [], notes: null, used_count: 0,
+    })
+    if (ins.error) {   // ligne refusée → on ne laisse pas un fichier orphelin dans le stockage
+      await supabase.storage.from('content').remove([storagePath, ...(thumbPath ? [thumbPath] : [])]).catch(() => {})
+      return ins.error.message
+    }
+    return null
+  }
+
+  // Dossier ZIP : ses vidéos/images sont importées directement, rangées dans le dossier de la
+  // banque qui porte le nom de LEUR dossier dans le ZIP (sinon le nom du ZIP). Le ZIP est lu
+  // morceau par morceau (lib/zipReader) : un seul fichier extrait en mémoire à la fois.
+  const ZIP_MEDIA: Record<string, string> = {
+    mp4: 'video/mp4', mov: 'video/quicktime', m4v: 'video/x-m4v', webm: 'video/webm', mkv: 'video/x-matroska', avi: 'video/x-msvideo', '3gp': 'video/3gpp',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', gif: 'image/gif', bmp: 'image/bmp',
+  }
+  const isZip = (f: File) => /\.zip$/i.test(f.name) || /zip/i.test(f.type)
+  type ImportJob = { name: string; size: number; folder: string | null; get: () => Promise<File> }
+
   async function importFiles(files: FileList | File[]) {
     const list = Array.from(files)
     if (list.length === 0) return
-    // Limite d'espace de l'abonnement (le stockage la vérifie aussi côté serveur).
-    const u = await reloadUsage()
-    const over = quotaIssue(u, list.reduce((s, f) => s + f.size, 0))
-    if (over) { toast(over, 'bad', 9000); return }
-    let done = 0, ok = 0
+    const here = (folder !== 'Tous' && folder !== 'Jamais publiées') ? folder : null
+    const jobs: ImportJob[] = []
     const fails: string[] = []
-    for (const file of list) {
-      setUploading(`${file.name} (${++done}/${list.length})`)
+    const zips: string[] = []
+    const zipFolders = new Set<string>()
+    for (const f of list) {
+      if (!isZip(f)) { jobs.push({ name: f.name, size: f.size, folder: here, get: async () => f }); continue }
+      setUploading(`Lecture de « ${f.name} »…`)
       try {
-        let ext = (file.name.split('.').pop() ?? '').toLowerCase()
-        if (!ext) ext = file.type.startsWith('image') ? 'jpg' : 'mp4'
-        const id = crypto.randomUUID()
-        const storagePath = `videos/${scopeFolder}/${id}.${ext}`
-        const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
-        if (up.error) { fails.push(`${file.name} : ${/row-level security|policy/i.test(up.error.message) ? 'espace plein ou accès refusé' : up.error.message}`); continue }
-        // Miniature + durée générées tout de suite (avant : aucune miniature → vignettes vides).
-        let thumbPath: string | null = null, duration: number | null = null
-        if (!file.type.startsWith('image') && !IMG.includes(ext)) {
-          const th = await videoThumb(file)
-          if (th) {
-            duration = th.duration || null
-            const tp = `videos/${scopeFolder}/${id}_thumb.jpg`
-            const tu = await supabase.storage.from('content').upload(tp, th.blob, { contentType: 'image/jpeg', upsert: false })
-            if (!tu.error) thumbPath = tp
-          }
+        const base = f.name.replace(/\.zip$/i, '').trim() || 'ZIP'
+        let found = 0
+        for (const e of await readZip(f)) {
+          const parts = e.path.split('/')
+          if (e.dir || parts.includes('__MACOSX') || e.name.startsWith('.')) continue   // ._x, .DS_Store
+          const type = ZIP_MEDIA[(e.name.split('.').pop() ?? '').toLowerCase()]
+          if (!type) continue
+          if (e.encrypted) { fails.push(`${e.name} : protégé par mot de passe`); continue }
+          let dest = (parts.length > 1 ? parts[parts.length - 2] : base).trim() || base
+          if (dest === 'Tous' || dest === 'Jamais publiées') dest += ' (ZIP)'
+          zipFolders.add(dest)
+          jobs.push({ name: e.name, size: e.size, folder: dest, get: async () => new File([await e.file()], e.name, { type }) })
+          found++
         }
-        const dest = (folder !== 'Tous' && folder !== 'Jamais publiées') ? folder : null
-        const ins = await supabase.from('content_bank').insert({
-          user_id: user.id, org_id: currentOrg?.id ?? null,
-          title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: thumbPath,
-          file_url: null, folder: dest, duration, tags: [], notes: null, used_count: 0,
-        })
-        if (ins.error) {   // ligne refusée → on ne laisse pas un fichier orphelin dans le stockage
-          await supabase.storage.from('content').remove([storagePath, ...(thumbPath ? [thumbPath] : [])]).catch(() => {})
-          fails.push(`${file.name} : ${ins.error.message}`); continue
-        }
-        ok++
-      } catch (e) { fails.push(`${file.name} : ${e instanceof Error ? e.message : 'erreur'}`) }
+        if (found) zips.push(f.name)
+        else fails.push(`${f.name} : aucune vidéo ni image dedans`)
+      } catch (err) { fails.push(`${f.name} : ${err instanceof Error ? err.message : 'ZIP illisible'}`) }
+    }
+    if (!jobs.length) {
+      setUploading(null)
+      if (fails.length) toast(`Rien à importer. ${fails.slice(0, 3).join(' · ')}`, 'bad', 9000)
+      return
+    }
+    // Limite d'espace de l'abonnement (le stockage la vérifie aussi côté serveur) : tailles
+    // réelles, y compris celles lues dans le sommaire des ZIP (rien n'est encore extrait).
+    const u = await reloadUsage()
+    const over = quotaIssue(u, jobs.reduce((s, j) => s + j.size, 0))
+    if (over) { setUploading(null); toast(over, 'bad', 9000); return }
+    let done = 0, ok = 0
+    for (const j of jobs) {
+      setUploading(`${j.name} (${++done}/${jobs.length})`)
+      try {
+        const err = await uploadOne(await j.get(), j.folder)
+        if (err) fails.push(`${j.name} : ${err}`); else ok++
+      } catch (e) { fails.push(`${j.name} : ${e instanceof Error ? e.message : 'erreur'}`) }
     }
     setUploading(null)
-    if (fails.length) toast(`${ok}/${list.length} importé(s). Échec : ${fails.slice(0, 3).join(' · ')}${fails.length > 3 ? '…' : ''}`, ok ? 'info' : 'bad', 9000)
+    const failTxt = `${fails.slice(0, 3).join(' · ')}${fails.length > 3 ? '…' : ''}`
+    if (zips.length) {
+      if (fails.length) toast(`${ok}/${jobs.length} importé(s) depuis ${zips.join(', ')}. Échec : ${failTxt}`, ok ? 'info' : 'bad', 9000)
+      else toast(`${ok} fichier(s) importé(s) depuis ${zips.join(', ')}.`, 'ok')
+      if (ok && zipFolders.size === 1) setFolder([...zipFolders][0])   // on montre le dossier créé
+    } else if (fails.length) toast(`${ok}/${jobs.length} importé(s). Échec : ${failTxt}`, ok ? 'info' : 'bad', 9000)
     else toast(`${ok} fichier(s) importé(s).`, 'ok')
     void reloadUsage()
     load()
@@ -915,9 +968,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       onDrop={e => {
         if (!hasFiles(e)) return
         e.preventDefault(); setDragFiles(false)
-        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video') || f.type.startsWith('image'))
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video') || f.type.startsWith('image') || isZip(f))
         if (files.length) importFiles(files)
-        else toast('Dépose des vidéos ou des images.', 'info')
+        else toast('Dépose des vidéos, des images ou un dossier ZIP.', 'info')
       }}>
       {/* Portail vers <body> : le conteneur de la page est animé (transform), un « fixed » rendu
           dedans se plaçait au milieu de la page entière au lieu de l'écran. Fenêtre en haut de
@@ -962,14 +1015,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <div style={{ textAlign: 'center', color: '#EDEDEF' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, color: theme.accentText }}><Icon d="M12 3v12|M7 10l5 5 5-5|M4 21h16" size={24} /></div>
             <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.015em' }}>Dépose pour importer</div>
-            <div style={{ fontSize: 13, color: '#8B8B94', marginTop: 4 }}>Vidéos et images{folder !== 'Tous' && folder !== 'Jamais publiées' ? ` → dossier « ${folder} »` : ''}</div>
+            <div style={{ fontSize: 13, color: '#8B8B94', marginTop: 4 }}>Vidéos, images ou ZIP{folder !== 'Tous' && folder !== 'Jamais publiées' ? ` → dossier « ${folder} »` : ''}</div>
           </div>
         </div>
       )}
       {/* En-tête */}
       <PageHeader title="Banque"
         kicker={loading || total === 0 ? 'Ton contenu' : <>{`${counts.video} vidéo(s) · ${counts.image} image(s) · ${captions.length} légende(s)`}{neverPublished > 0 && <span style={{ color: '#A78BFA' }}>{` · ${neverPublished} jamais publié(s)`}</span>}</>}
-        sub="Toutes tes vidéos, images et légendes, rangées par dossier. Glisse des fichiers n’importe où sur la page pour les importer."
+        sub="Toutes tes vidéos, images et légendes, rangées par dossier. Glisse des fichiers (ou un dossier ZIP) n’importe où sur la page pour les importer."
 
         actions={<>
           {trash.length > 0 && <Btn label={`Corbeille (${trash.length})`} theme={theme} icon="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" onClick={() => setShowTrash(true)} />}
@@ -1353,7 +1406,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
 
       {/* Input fichier caché (import réel) */}
-      <input ref={fileRef} type="file" accept="video/*,image/*" multiple style={{ display: 'none' }}
+      <input ref={fileRef} type="file" accept="video/*,image/*,.zip,application/zip,application/x-zip-compressed" multiple style={{ display: 'none' }}
         onChange={e => { if (e.target.files) importFiles(e.target.files); e.target.value = '' }} />
 
       {/* Description (légende du média pour le posting) */}
