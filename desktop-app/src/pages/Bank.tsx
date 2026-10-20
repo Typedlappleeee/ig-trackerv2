@@ -15,6 +15,11 @@ import { readZip } from '@/lib/zipReader'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
+type DirHandle = {
+  name: string
+  getFileHandle: (n: string, o?: { create?: boolean }) => Promise<FSHandle>
+  removeEntry: (n: string) => Promise<void>
+}
 
 // ── Type ContentItem (sous-ensemble RÉEL de la table `content_bank`, aligné sur
 //    electron-app/src/lib/supabase.ts). Lecture seule pour cette passe. ──────────
@@ -458,7 +463,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // ── Suppression (média unitaire ou sélection) + nettoyage du storage ─────────
   const [confirmDel, setConfirmDel] = useState<string[] | null>(null)
   const [deleting, setDeleting] = useState(false)
-  // Télécharge les médias sélectionnés. 1 seul → fichier direct ; plusieurs → un ZIP.
+  // Télécharge les médias sélectionnés. 1 seul → fichier direct ; plusieurs → au choix un ZIP ou
+  // des fichiers séparés dans un dossier du PC.
   // Les VIDÉOS sortent en .mov (les images gardent leur extension réelle).
   async function urlForItem(it: ContentItem): Promise<string | null> {
     if (it.storage_path) {
@@ -497,12 +503,125 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       return
     }
 
-    // Plusieurs médias → un seul .zip.
+    // Plusieurs médias → au choix : un ZIP, ou chaque fichier directement dans un dossier du PC.
+    setDlChoice(targets)
+  }
+  const [dlChoice, setDlChoice] = useState<ContentItem[] | null>(null)
+  const canPickDir = typeof (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker === 'function'
+  const lastDlMode = (): 'folder' | 'zip' => { try { return localStorage.getItem('sf-dl-mode') === 'zip' ? 'zip' : 'folder' } catch { return 'folder' } }
+  function chooseDl(mode: 'folder' | 'zip') {
+    const targets = dlChoice; setDlChoice(null)
+    if (!targets) return
+    try { localStorage.setItem('sf-dl-mode', mode) } catch { /* ignore */ }
+    void (mode === 'zip' ? downloadZipOf(targets) : canPickDir ? downloadToFolder(targets) : downloadSeparate(targets))
+  }
+
+  // Dans un dossier choisi (Chrome, Edge, app PC) : chaque fichier est écrit sur le disque au fil
+  // du téléchargement (fetch → pipeTo), rien n'est gardé en mémoire ; 4 à la fois. Un fichier du
+  // même nom déjà présent n'est JAMAIS écrasé (_2, _3…).
+  async function downloadToFolder(targets: ContentItem[]) {
+    const pick = (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<DirHandle> }).showDirectoryPicker
+    let dir: DirHandle
+    try { dir = await pick({ id: 'sf-downloads', mode: 'readwrite', startIn: 'downloads' }) }
+    catch (e) {
+      if (!(e instanceof DOMException && e.name === 'AbortError')) setNotice(`Impossible d’ouvrir ce dossier : ${e instanceof Error ? e.message : String(e)}`)
+      return
+    }
+    const taken = new Set<string>()
+    const exists = async (n: string) => { try { await dir.getFileHandle(n); return true } catch { return false } }
+    // Noms réservés d'abord, un par un (pas de doublon entre téléchargements parallèles).
+    const names: string[] = []
+    for (const it of targets) {
+      let name = fileNameFor(it, taken)
+      if (await exists(name)) {
+        const dot = name.lastIndexOf('.'), base = name.slice(0, dot), ext = name.slice(dot)
+        let n = 2
+        while (taken.has(`${base}_${n}${ext}`) || await exists(`${base}_${n}${ext}`)) n++
+        name = `${base}_${n}${ext}`; taken.add(name)
+      }
+      names.push(name)
+    }
+    let next = 0, done = 0, ok = 0
+    const failed: string[] = []
+    setNotice(`Dossier : ${done}/${targets.length}…`)
+    const worker = async () => {
+      for (;;) {
+        const i = next++; if (i >= targets.length) break
+        const it = targets[i], name = names[i]
+        let created = false
+        try {
+          const url = await urlForItem(it); if (!url) throw new Error('lien introuvable')
+          const resp = await fetch(url)
+          if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
+          const fh = await dir.getFileHandle(name, { create: true }); created = true
+          await resp.body.pipeTo(await fh.createWritable())
+          ok++
+        } catch {
+          failed.push(it.title || name)
+          if (created) await dir.removeEntry(name).catch(() => {})   // jamais de fichier à moitié écrit
+        }
+        setNotice(`Dossier : ${++done}/${targets.length}…`)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(4, targets.length) }, worker))
+    if (!failed.length) setNotice(`${ok} fichier(s) enregistré(s) dans « ${dir.name} ».`)
+    else setNotice(`${ok} fichier(s) enregistré(s) dans « ${dir.name} » · ${failed.length} échec(s) : ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '…' : ''}`)
+  }
+
+  // Firefox / Safari (pas de choix de dossier) : fichiers séparés vers Téléchargements, un par un,
+  // exactement comme le téléchargement d'un seul média (un seul fichier en mémoire à la fois).
+  async function downloadSeparate(targets: ContentItem[]) {
+    const taken = new Set<string>(); let ok = 0
+    for (const [i, it] of targets.entries()) {
+      setNotice(`Téléchargement : ${i + 1}/${targets.length}…`)
+      try {
+        const url = await urlForItem(it); if (!url) continue
+        const resp = await fetch(url); if (!resp.ok) continue
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(await resp.blob())
+        a.download = fileNameFor(it, taken)
+        document.body.appendChild(a); a.click(); a.remove(); ok++
+        setTimeout(() => URL.revokeObjectURL(a.href), 20000)
+        await new Promise(r => setTimeout(r, 300))
+      } catch { /* fichier suivant */ }
+    }
+    setNotice(`${ok} fichier(s) envoyé(s) vers ton dossier Téléchargements.`)
+  }
+
+  // Récupère jusqu'à 4 fichiers EN MÊME TEMPS et les rend dès qu'ils sont prêts (au plus 6 en
+  // attente). Avant, le ZIP les prenait un par un, chacun attendant la fin du précédent → lent.
+  async function* fetchMany(targets: ContentItem[], onDone: (n: number) => void): AsyncGenerator<{ it: ContentItem; blob: Blob }> {
+    const CONC = 4, MAX_HELD = 6
+    const ready: { it: ContentItem; blob: Blob }[] = []
+    let next = 0, active = 0, finished = 0
+    let wake: (() => void) | null = null
+    const start = () => {
+      while (active < CONC && next < targets.length && ready.length + active < MAX_HELD) {
+        const it = targets[next++]; active++
+        void (async () => {
+          try {
+            const url = await urlForItem(it)
+            const resp = url ? await fetch(url) : null
+            if (resp?.ok) ready.push({ it, blob: await resp.blob() })
+          } catch { /* fichier ignoré, compté à la fin */ }
+          active--; onDone(++finished)
+          const w = wake; wake = null; w?.()
+        })()
+      }
+    }
+    start()
+    while (finished < targets.length || ready.length) {
+      if (ready.length) { const x = ready.shift()!; start(); yield x; continue }
+      await new Promise<void>(r => { if (ready.length || finished >= targets.length) r(); else wake = r })
+      start()
+    }
+  }
+
+  async function downloadZipOf(targets: ContentItem[]) {
     const zipName = `scaleflow-medias-${new Date().toISOString().slice(0, 10)}.zip`
 
-    // Chrome/Edge : ÉCRITURE STREAMING sur le disque (client-zip → pipeTo). Chaque
-    // vidéo est téléchargée puis écrite au fil de l'eau — RIEN n'est gardé en mémoire,
-    // donc ça marche pour des CENTAINES de vidéos (le blob en mémoire plantait avant).
+    // Chrome/Edge : ÉCRITURE STREAMING sur le disque (client-zip → pipeTo), 4 vidéos récupérées
+    // en parallèle (fetchMany) ; au plus 6 en attente → ça marche pour des CENTAINES de vidéos.
     const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FSHandle> }).showSaveFilePicker
     if (picker) {
       let handle: FSHandle | null = null
@@ -512,16 +631,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         try {
           const { downloadZip } = await import('client-zip')
           const taken = new Set<string>()
-          let done = 0, ok = 0
+          let ok = 0
           async function* gen() {
-            for (const it of targets) {
-              setNotice(`ZIP : ${++done}/${targets.length}…`)
-              const url = await urlForItem(it); if (!url) continue
-              let resp: Response
-              try { resp = await fetch(url) } catch { continue }
-              if (!resp.ok || !resp.body) continue
+            for await (const { it, blob } of fetchMany(targets, n => setNotice(`ZIP : ${n}/${targets.length}…`))) {
               ok++
-              yield { name: fileNameFor(it, taken), input: resp }
+              yield { name: fileNameFor(it, taken), input: blob }
             }
           }
           const zipResp = downloadZip(gen())
@@ -1348,6 +1462,31 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           </>}>
           <input autoFocus value={renameFolderVal} onChange={e => setRenameFolderVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && renameFolderVal.trim()) { renameFolder(renameFolderOf, renameFolderVal); setRenameFolderOf(null) } }}
             style={FIELD} />
+        </Modal>
+      )}
+
+      {/* Plusieurs médias : ZIP ou fichiers séparés dans un dossier */}
+      {dlChoice && (
+        <Modal theme={theme} title={`Télécharger ${dlChoice.length} médias`} sub="Choisis comment les récupérer." icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" onClose={() => setDlChoice(null)} width={460}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {([
+              { k: 'folder' as const, t: canPickDir ? 'Dans un dossier' : 'Fichiers séparés',
+                d: canPickDir ? 'Chaque vidéo en fichier séparé, enregistrée directement dans le dossier de ton choix.' : 'Chaque vidéo en fichier séparé, dans ton dossier Téléchargements (ton navigateur ne permet pas de choisir le dossier ; il peut demander d’autoriser plusieurs téléchargements).',
+                i: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' },
+              { k: 'zip' as const, t: 'Un fichier ZIP', d: 'Tout dans une seule archive .zip.', i: 'M21 8v13H3V8|M1 3h22v5H1z|M10 12h4' },
+            ]).map(o => {
+              const pref = lastDlMode() === o.k
+              return (
+                <button key={o.k} type="button" onClick={() => chooseDl(o.k)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 12, textAlign: 'left', cursor: 'pointer', background: pref ? 'rgba(167,139,250,0.08)' : '#141416', border: `1px solid ${pref ? 'rgba(167,139,250,0.45)' : 'rgba(255,255,255,0.09)'}`, color: '#EDEDEF' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: 'rgba(255,255,255,0.05)', color: theme.accentText }}><Icon d={o.i} size={17} /></span>
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>{o.t}</span>
+                    <span style={{ fontSize: 12.5, color: '#8B8B94', lineHeight: 1.45 }}>{o.d}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </Modal>
       )}
 
