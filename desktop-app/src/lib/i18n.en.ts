@@ -3154,6 +3154,7 @@ export const EN: Dict = {
     "Aucun fichier récupéré (connexion ?).": "No file retrieved (connection?).",
     "connexion ?": "connection?",
     "🇺🇸 USA (aléatoire)": "🇺🇸 USA (random)",
+    "⚠ moteur vidéo relancé (il avait planté) — nouvel essai…": "⚠ video engine restarted (it had crashed) — retrying…",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3694,5 +3695,6 @@ export const EN: Dict = {
     ["Aucun fichier récupéré ({0}).", "No file retrieved ({0})."],
     ["ZIP enregistré — {0}/{1} fichier(s) · échec : {2}", "ZIP saved — {0}/{1} file(s) · failed: {2}"],
     ["ZIP : récupération {0}/{1} · {2} reçus…", "ZIP: fetching {0}/{1} · {2} received…"],
+    ["moteur vidéo planté ({0})", "video engine crashed ({0})"],
   ],
 }

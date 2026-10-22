@@ -12,7 +12,7 @@ import {
 import LiveDevice from '@/components/LiveDevice'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { useConnections } from '@/lib/connections'
-import { getFFmpeg, isFfmpegReady, probeDuration } from '@/lib/ffmpeg'
+import { getFFmpeg, isFfmpegReady, isEngineCrash, probeDuration } from '@/lib/ffmpeg'
 import { resolveSourceBytes, saveOutputToBank, runAutoVariant, GPS_CITIES, gpsFor, SPOOF_DEVICES, type SpoofIntensity, type CaptionPos, type CaptionStyle } from '@/lib/studioTools'
 import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
@@ -651,14 +651,22 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             } else { vStart = tStart; vEnd = tEnd }
           }
           try {
-            const out = await runAutoVariant(bytes, {
+            const vOpts = {
               seed: Math.random() * 1000,
-              intensity: tendance ? 'strong' : intensity, gps: gpsFor(gpsCity), device,
+              intensity: tendance ? 'strong' as const : intensity, gps: gpsFor(gpsCity), device,
               trimStart: vStart,
               trimEnd: vEnd,
               speed,
               caption: capText ? { text: capText, pos, style: capStyle } : null,
-            }, hooks)
+            }
+            let out: Uint8Array
+            try { out = await runAutoVariant(bytes, vOpts, hooks) }
+            catch (ce) {
+              // Moteur planté : il vient d'être relancé (lib/ffmpeg) → on refait CETTE variante une fois.
+              if (!isEngineCrash(ce)) throw ce
+              push('    ⚠ moteur vidéo relancé (il avait planté) — nouvel essai…')
+              out = await runAutoVariant(bytes, vOpts, hooks)
+            }
             push(`    ✓ variante générée (${Math.round(out.byteLength / 1024)} Ko) → sauvegarde…`)
             await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
             done++; setMade(done); R.tick(true)

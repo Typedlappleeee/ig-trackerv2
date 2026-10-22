@@ -45,6 +45,8 @@ export async function saveOutputToBank(userId: string, orgId: string | null, byt
 const H264 = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart']
 // Garantit des dimensions paires (libx264 yuv420p l'exige).
 const EVEN = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
+// Ramène à 1080 de large au maximum (une vidéo plus petite n'est pas agrandie).
+const CAP_1080 = "scale='min(1080,iw)':-2"
 
 type Hooks = { onProgress?: (r: number) => void; onLog?: (m: string) => void }
 
@@ -118,7 +120,7 @@ export async function runSpoof(input: Uint8Array, seed: number, h?: Hooks, opts?
   if (opts?.gps) { const loc = iso6709(opts.gps.lat, opts.gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
   meta.push(...deviceMetaArgs(opts?.device))
   return runFfmpeg({
-    input, args: ['-vf', spoofFilter(seed, intensity), ...meta, ...H264],
+    input, args: ['-vf', `${CAP_1080},${spoofFilter(seed, intensity)}`, ...meta, ...H264],
     onProgress: h?.onProgress, onLog: h?.onLog,
   })
 }
@@ -163,7 +165,9 @@ export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: 
   if (o.trimStart && o.trimStart > 0) pre.push('-ss', String(o.trimStart))
   if (o.trimEnd != null && o.trimEnd > (o.trimStart ?? 0)) pre.push('-to', String(o.trimEnd))
   // Chaîne vidéo : spoof (+ accélération éventuelle via setpts).
-  let vchain = spoofFilter(o.seed, intensity)
+  // Plafond 1080 de large AVANT le zoom du spoof : une source 4K était agrandie (~4000×7000)
+  // puis encodée en 4K dans le moteur wasm → mémoire saturée. Instagram s'arrête à 1080×1920.
+  let vchain = `${CAP_1080},${spoofFilter(o.seed, intensity)}`
   if (speed) vchain += `,setpts=PTS/${speed.toFixed(4)}`
   // Métadonnées : effacées, puis GPS réécrit si demandé.
   const meta: string[] = ['-map_metadata', '-1']
