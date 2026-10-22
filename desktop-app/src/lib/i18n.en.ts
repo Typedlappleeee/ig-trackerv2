@@ -3153,6 +3153,7 @@ export const EN: Dict = {
     "ZIP annulé.": "ZIP cancelled.",
     "Aucun fichier récupéré (connexion ?).": "No file retrieved (connection?).",
     "connexion ?": "connection?",
+    "🇺🇸 USA (aléatoire)": "🇺🇸 USA (random)",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

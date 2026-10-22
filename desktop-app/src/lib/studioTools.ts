@@ -7,6 +7,8 @@ import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
 import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, type RemixIntensity, type RemixToggles } from './studioFilters'
 export { remixParams, captionLines, captionFor, type RemixToggles } from './studioFilters'
+import { randomFranceGps } from './gps'
+export { GPS_CITIES, gpsFor, randomFranceGps, randomUsGps, type GpsCity } from './gps'
 
 export interface SourceRef { id?: string; title: string; storage_path?: string | null; file_url?: string | null }
 
@@ -68,54 +70,7 @@ export function spoofFilter(seed: number, intensity: SpoofIntensity = 'normal'):
   const z = spoofZoomFactor(seed, intensity).toFixed(3)
   return `scale=iw*${z}:ih*${z},crop=iw/${z}:ih/${z},${EVEN}`
 }
-// Localisations GPS proposées (écrites dans les métadonnées mp4 par le spoof).
-// Source unique partagée par Studio et Auto-contenu.
-export interface GpsCity { k: string; label: string; lat: number; lon: number }
-export const GPS_CITIES: GpsCity[] = [
-  { k: 'none', label: 'Aucune (par défaut)', lat: 0, lon: 0 },
-  { k: 'france', label: '🇫🇷 France (aléatoire)', lat: 46.6, lon: 2.2 },
-  { k: 'paris', label: 'Paris', lat: 48.8566, lon: 2.3522 },
-  { k: 'lyon', label: 'Lyon', lat: 45.7640, lon: 4.8357 },
-  { k: 'marseille', label: 'Marseille', lat: 43.2965, lon: 5.3698 },
-  { k: 'bordeaux', label: 'Bordeaux', lat: 44.8378, lon: -0.5792 },
-  { k: 'lille', label: 'Lille', lat: 50.6292, lon: 3.0573 },
-  { k: 'bruxelles', label: 'Bruxelles', lat: 50.8503, lon: 4.3517 },
-  { k: 'geneve', label: 'Genève', lat: 46.2044, lon: 6.1432 },
-  { k: 'montreal', label: 'Montréal', lat: 45.5017, lon: -73.5673 },
-  { k: 'londres', label: 'Londres', lat: 51.5074, lon: -0.1278 },
-  { k: 'newyork', label: 'New York', lat: 40.7128, lon: -74.0060 },
-  { k: 'losangeles', label: 'Los Angeles', lat: 34.0522, lon: -118.2437 },
-  { k: 'dubai', label: 'Dubaï', lat: 25.2048, lon: 55.2708 },
-]
-// Grandes villes FR pour la localisation « France (aléatoire) » : chaque variante
-// reçoit une position différente (jitter léger pour ne pas répéter la coordonnée exacte).
-const FRANCE_CITIES: { lat: number; lon: number }[] = [
-  { lat: 48.8566, lon: 2.3522 },   // Paris
-  { lat: 45.7640, lon: 4.8357 },   // Lyon
-  { lat: 43.2965, lon: 5.3698 },   // Marseille
-  { lat: 44.8378, lon: -0.5792 },  // Bordeaux
-  { lat: 50.6292, lon: 3.0573 },   // Lille
-  { lat: 43.6047, lon: 1.4442 },   // Toulouse
-  { lat: 43.7102, lon: 7.2620 },   // Nice
-  { lat: 47.2184, lon: -1.5536 },  // Nantes
-  { lat: 48.5734, lon: 7.7521 },   // Strasbourg
-  { lat: 43.6108, lon: 3.8767 },   // Montpellier
-  { lat: 47.3220, lon: 5.0415 },   // Dijon
-  { lat: 48.1173, lon: -1.6778 },  // Rennes
-]
-// Position FR aléatoire (ville + léger décalage ~±0.03° ≈ quelques km).
-export function randomFranceGps(): { lat: number; lon: number } {
-  const c = FRANCE_CITIES[Math.floor(Math.random() * FRANCE_CITIES.length)]
-  const j = () => (Math.random() - 0.5) * 0.06
-  return { lat: +(c.lat + j()).toFixed(4), lon: +(c.lon + j()).toFixed(4) }
-}
-// Résout une clé de ville en coordonnées GPS pour runSpoof (null si « none »).
-// 'france' → une position française aléatoire (différente à chaque appel).
-export function gpsFor(key: string): { lat: number; lon: number } | null {
-  if (key === 'france') return randomFranceGps()
-  const c = GPS_CITIES.find(x => x.k === key)
-  return !c || c.k === 'none' ? null : { lat: c.lat, lon: c.lon }
-}
+// Localisations GPS (liste, villes, tirages aléatoires France / USA) : module pur ./gps.
 
 // Appareils proposés pour le spoof : on réécrit les métadonnées « fabricant/modèle »
 // du mp4 pour faire passer la vidéo pour une capture native (iPhone, etc.), au lieu
