@@ -3696,5 +3696,9 @@ export const EN: Dict = {
     ["ZIP enregistré — {0}/{1} fichier(s) · échec : {2}", "ZIP saved — {0}/{1} file(s) · failed: {2}"],
     ["ZIP : récupération {0}/{1} · {2} reçus…", "ZIP: fetching {0}/{1} · {2} received…"],
     ["moteur vidéo planté ({0})", "video engine crashed ({0})"],
+    ["Dossier « {0} » : {1}/{2} · {3} reçus · {4} (chaque fichier apparaît quand il est terminé)", "Folder “{0}”: {1}/{2} · {3} received · {4} (each file appears when it is finished)"],
+    ["Téléchargement : {0}/{1} · {2} reçus · {3}", "Downloading: {0}/{1} · {2} received · {3}"],
+    ["{0}/{1} fichier(s) envoyé(s) vers ton dossier Téléchargements · échec : {2}", "{0}/{1} file(s) sent to your Downloads folder · failed: {2}"],
+    ["ZIP : {0}/{1} · {2} reçus · {3}", "ZIP: {0}/{1} · {2} received · {3}"],
   ],
 }
