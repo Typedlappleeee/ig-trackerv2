@@ -490,21 +490,62 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     taken.add(name); return name
   }
 
-  // Un téléchargement en cours : bouton « Annuler » + avancement en OCTETS mis à jour en continu
-  // (avant : le compteur ne bougeait qu'à la fin de chaque fichier → « bloqué à 0 »).
+  // Un téléchargement en cours : bouton « Annuler » + avancement en OCTETS et vitesse (Mo/s),
+  // mis à jour en continu (avant : le compteur ne bougeait qu'à la fin de chaque fichier).
   const dlAbort = useRef<AbortController | null>(null)
   const [dlBusy, setDlBusy] = useState(false)
-  function dlSession(render: (received: string) => string) {
+  type DlSession = { signal: AbortSignal; count: (b: ReadableStream<Uint8Array>) => ReadableStream<Uint8Array>; end: () => void }
+  function dlSession(render: (received: string, speed: string) => string): DlSession {
     const ac = new AbortController(); dlAbort.current = ac; setDlBusy(true)
     let bytes = 0
-    const show = () => setNotice(render(fmtBytes(bytes)))
+    const samples: [number, number][] = [[Date.now(), 0]]
+    const show = () => {
+      const now = Date.now(); samples.push([now, bytes])
+      while (samples.length > 2 && now - samples[1][0] >= 3000) samples.shift()
+      const [t0, b0] = samples[0]
+      const rate = now > t0 ? (bytes - b0) / ((now - t0) / 1000) : 0
+      setNotice(render(fmtBytes(bytes), `${fmtBytes(rate)}/s`))
+    }
     show()
     const tick = setInterval(show, 500)
     return {
       signal: ac.signal,
       /** Compte les octets qui passent dans un flux. */
-      count: (body: ReadableStream<Uint8Array>) => body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform(c, ctl) { bytes += c.byteLength; ctl.enqueue(c) } }), { signal: ac.signal }),
+      count: body => body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform(c, ctl) { bytes += c.byteLength; ctl.enqueue(c) } }), { signal: ac.signal }),
       end: () => { clearInterval(tick); if (dlAbort.current === ac) dlAbort.current = null; setDlBusy(false) },
+    }
+  }
+
+  // Récupère les fichiers EN PARALLÈLE (6 à la fois), chacun lu EN ENTIER dès qu'il arrive (jamais
+  // de réponse laissée ouverte sans être lue : en HTTP/2 elle bloquerait la connexion partagée),
+  // et les rend dans l'ordre d'arrivée. Au plus 6 fichiers gardés à la fois (Chrome les met sur
+  // disque s'ils sont gros).
+  async function* fetchAll(targets: ContentItem[], urls: Map<string, string>, s: DlSession, onFail: (it: ContentItem, e: unknown) => void): AsyncGenerator<{ it: ContentItem; blob: Blob }> {
+    const CONC = 6
+    const ready: { it: ContentItem; blob: Blob }[] = []
+    let next = 0, active = 0, finished = 0
+    let wake: (() => void) | null = null
+    const ping = () => { const w = wake; wake = null; w?.() }
+    s.signal.addEventListener('abort', ping)
+    const start = () => {
+      while (!s.signal.aborted && active < CONC && next < targets.length && ready.length + active < CONC) {
+        const it = targets[next++]; active++
+        void (async () => {
+          try {
+            const url = urlOf(urls, it); if (!url) throw new Error('lien introuvable')
+            const resp = await fetch(url, { cache: 'no-store', signal: s.signal })
+            if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
+            ready.push({ it, blob: await new Response(s.count(resp.body)).blob() })
+          } catch (e) { if (!s.signal.aborted) onFail(it, e) }
+          active--; finished++; ping()
+        })()
+      }
+    }
+    start()
+    while (!s.signal.aborted && (finished < targets.length || ready.length)) {
+      if (ready.length) { const x = ready.shift()!; start(); yield x; continue }
+      await new Promise<void>(r => { if (ready.length || finished >= targets.length || s.signal.aborted) r(); else wake = r })
+      start()
     }
   }
 
@@ -544,7 +585,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }
 
   // Dans un dossier choisi (Chrome, Edge, app PC) : chaque fichier est écrit sur le disque au fil
-  // du téléchargement (fetch → pipeTo), rien n'est gardé en mémoire ; 4 à la fois. Un fichier du
+  // du téléchargement (fetch → pipeTo), rien n'est gardé en mémoire ; 6 à la fois. Un fichier du
   // même nom déjà présent n'est JAMAIS écrasé (_2, _3…) ; un fichier inachevé est supprimé.
   async function downloadToFolder(targets: ContentItem[]) {
     const pick = (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<DirHandle> }).showDirectoryPicker
@@ -557,7 +598,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     let next = 0, done = 0, ok = 0
     const failed: string[] = []
     let why: string | null = null
-    const s = dlSession(received => `Dossier « ${dir.name} » : ${done}/${targets.length} · ${received} reçus… (chaque fichier apparaît quand il est terminé)`)
+    const s = dlSession((received, speed) => `Dossier « ${dir.name} » : ${done}/${targets.length} · ${received} reçus · ${speed} (chaque fichier apparaît quand il est terminé)`)
     try {
       const taken = new Set<string>()
       const exists = async (n: string) => { try { await dir.getFileHandle(n); return true } catch { return false } }
@@ -593,125 +634,77 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           done++
         }
       }
-      await Promise.all(Array.from({ length: Math.min(4, targets.length) }, worker))
+      await Promise.all(Array.from({ length: Math.min(6, targets.length) }, worker))
     } finally { s.end() }
     if (s.signal.aborted) setNotice(`Téléchargement annulé — ${ok} fichier(s) déjà enregistré(s) dans « ${dir.name} ».`)
     else if (!failed.length) setNotice(`${ok} fichier(s) enregistré(s) dans « ${dir.name} ».`)
     else setNotice(`${ok} fichier(s) enregistré(s) dans « ${dir.name} » · ${failed.length} échec(s) (${why}) : ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '…' : ''}`)
   }
 
-  // Firefox / Safari (pas de choix de dossier) : fichiers séparés vers Téléchargements, un par un,
-  // exactement comme le téléchargement d'un seul média (un seul fichier en mémoire à la fois).
+  // Navigateur sans choix de dossier (Brave, Firefox, Safari) : fichiers séparés vers
+  // Téléchargements, 6 récupérés EN PARALLÈLE (avant : un par un → très lent) ; chacun part dès
+  // qu'il est prêt.
   async function downloadSeparate(targets: ContentItem[]) {
-    const taken = new Set<string>(); let ok = 0, i = 0
-    const s = dlSession(received => `Téléchargement : ${i}/${targets.length} · ${received} reçus…`)
+    const taken = new Set<string>(); let ok = 0
+    let why: string | null = null, failed = 0
+    const s = dlSession((received, speed) => `Téléchargement : ${ok}/${targets.length} · ${received} reçus · ${speed}`)
     try {
       const urls = await downloadUrls(targets)
-      for (const it of targets) {
-        if (s.signal.aborted) break
-        i++
-        try {
-          const url = urlOf(urls, it); if (!url) continue
-          const resp = await fetch(url, { cache: 'no-store', signal: s.signal })
-          if (!resp.ok || !resp.body) continue
-          const a = document.createElement('a')
-          a.href = URL.createObjectURL(await new Response(s.count(resp.body)).blob())
-          a.download = fileNameFor(it, taken)
-          document.body.appendChild(a); a.click(); a.remove(); ok++
-          setTimeout(() => URL.revokeObjectURL(a.href), 20000)
-          await new Promise(r => setTimeout(r, 300))
-        } catch { /* fichier suivant */ }
+      for await (const { it, blob } of fetchAll(targets, urls, s, (_it, e) => { failed++; why ??= whyFailed(e) })) {
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = fileNameFor(it, taken)
+        document.body.appendChild(a); a.click(); a.remove(); ok++
+        setTimeout(() => URL.revokeObjectURL(a.href), 60_000)
       }
     } finally { s.end() }
-    setNotice(s.signal.aborted ? `Téléchargement annulé — ${ok} fichier(s) déjà envoyé(s).` : `${ok} fichier(s) envoyé(s) vers ton dossier Téléchargements.`)
+    if (s.signal.aborted) setNotice(`Téléchargement annulé — ${ok} fichier(s) déjà envoyé(s).`)
+    else if (failed) setNotice(`${ok}/${targets.length} fichier(s) envoyé(s) vers ton dossier Téléchargements · échec : ${why ?? '?'}`)
+    else setNotice(`${ok} fichier(s) envoyé(s) vers ton dossier Téléchargements.`)
   }
 
   async function downloadZipOf(targets: ContentItem[]) {
     const zipName = `scaleflow-medias-${new Date().toISOString().slice(0, 10)}.zip`
-
-    // Chrome/Edge : ZIP écrit EN FLUX sur le disque (client-zip → pipeTo) — il grossit dès le
-    // début. Les 4 fichiers suivants sont demandés d'avance ; seuls les petits (≤ 40 Mo) sont
-    // préchargés en entier, les gros passent en flux : rien de gros n'est gardé en mémoire.
-    // (La version d'hier gardait jusqu'à 6 vidéos entières en mémoire avant d'écrire → « bloqué ».)
+    // Chrome/Edge : le ZIP est écrit EN FLUX dans le fichier choisi. Partout : 6 vidéos récupérées
+    // en parallèle (fetchAll) et ajoutées au ZIP dans l'ordre d'arrivée.
     const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FSHandle> }).showSaveFilePicker
+    let handle: FSHandle | null = null
     if (picker) {
-      let handle: FSHandle | null = null
       try { handle = await picker({ suggestedName: zipName, types: [{ description: 'Archive ZIP', accept: { 'application/zip': ['.zip'] } }] }) }
       catch (e) { if (e instanceof DOMException && e.name === 'AbortError') return; handle = null }
-      if (handle) {
-        let cur = 0, ok = 0, why: string | null = null
-        const s = dlSession(received => `ZIP : ${cur}/${targets.length} · ${received} reçus…`)
-        try {
-          const { downloadZip } = await import('client-zip')
-          const urls = await downloadUrls(targets)
-          const SMALL = 40 * 1024 * 1024, AHEAD = 4
-          const fetchOne = async (it: ContentItem): Promise<{ it: ContentItem; input: Blob | ReadableStream<Uint8Array> } | null> => {
-            try {
-              const url = urlOf(urls, it); if (!url) throw new Error('lien introuvable')
-              const resp = await fetch(url, { cache: 'no-store', signal: s.signal })
-              if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
-              const len = Number(resp.headers.get('content-length') || 0)
-              const body = s.count(resp.body)
-              return { it, input: len > 0 && len <= SMALL ? await new Response(body).blob() : body }
-            } catch (e) { if (!s.signal.aborted) why ??= whyFailed(e); return null }
-          }
-          const jobs: Promise<{ it: ContentItem; input: Blob | ReadableStream<Uint8Array> } | null>[] = []
-          const launch = (upTo: number) => { while (jobs.length < Math.min(upTo, targets.length)) jobs.push(fetchOne(targets[jobs.length])) }
-          const taken = new Set<string>()
-          async function* gen() {
-            for (let i = 0; i < targets.length; i++) {
-              launch(i + 1 + AHEAD)
-              cur = i + 1
-              const r = await jobs[i]
-              if (s.signal.aborted) return
-              if (r) { ok++; yield { name: fileNameFor(r.it, taken), input: r.input } }
-            }
-          }
-          const writable = await handle.createWritable()
-          await downloadZip(gen()).body!.pipeTo(writable as unknown as WritableStream, { signal: s.signal })
-        } catch (e) { if (!s.signal.aborted) why = whyFailed(e) }
-        finally { s.end() }
-        if (s.signal.aborted) setNotice('ZIP annulé.')
-        else if (ok === 0) setNotice(`Aucun fichier récupéré (${why ?? 'connexion ?'}).`)
-        else if (ok < targets.length) setNotice(`ZIP enregistré — ${ok}/${targets.length} fichier(s) · échec : ${why ?? '?'}`)
-        else setNotice(`ZIP enregistré — ${ok} fichier(s).`)
-        return
-      }
     }
-
-    // Repli (Firefox/Safari, pas de File System Access) : ZIP en mémoire (STORE),
-    // récupération à concurrence limitée. Convient aux lots modérés.
-    let done = 0, ok = 0
-    const s = dlSession(received => `ZIP : récupération ${done}/${targets.length} · ${received} reçus…`)
+    let ok = 0, why: string | null = null
+    const s = dlSession((received, speed) => `ZIP : ${ok}/${targets.length} · ${received} reçus · ${speed}`)
     try {
-      const JSZip = (await import('jszip')).default
-      const zip = new JSZip()
-      const taken = new Set<string>()
+      const { downloadZip } = await import('client-zip')
       const urls = await downloadUrls(targets)
-      let next = 0
-      const worker = async () => {
-        for (;;) {
-          const my = next++; if (my >= targets.length || s.signal.aborted) break
-          const it = targets[my]
-          try {
-            const url = urlOf(urls, it)
-            if (url) { const resp = await fetch(url, { cache: 'no-store', signal: s.signal }); if (resp.ok && resp.body) { zip.file(fileNameFor(it, taken), await new Response(s.count(resp.body)).blob()); ok++ } }
-          } catch { /* ignore */ }
-          done++
+      const taken = new Set<string>()
+      async function* gen() {
+        for await (const { it, blob } of fetchAll(targets, urls, s, (_it, e) => { why ??= whyFailed(e) })) {
+          ok++
+          yield { name: fileNameFor(it, taken), input: blob }
         }
       }
-      await Promise.all(Array.from({ length: Math.min(6, targets.length) }, worker))
-      s.end()
-      if (s.signal.aborted) { setNotice('ZIP annulé.'); return }
-      if (ok === 0) { setNotice('Aucun fichier récupéré (connexion ?).'); return }
-      setNotice(`ZIP : assemblage de ${ok} fichier(s)…`)
-      const out = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, m => setNotice(`ZIP : ${Math.round(m.percent)}%…`))
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(out); a.download = zipName
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(a.href), 20000)
-      setNotice(`ZIP téléchargé — ${ok} fichier(s).`)
-    } catch (e) { s.end(); setNotice(`Échec du ZIP : ${whyFailed(e)}`) }
+      const zip = downloadZip(gen())
+      if (handle) {
+        await zip.body!.pipeTo(await handle.createWritable() as unknown as WritableStream, { signal: s.signal })
+      } else {
+        // Sans choix d'emplacement (Brave, Firefox, Safari) : ZIP assemblé par le navigateur
+        // (gardé sur disque par lui s'il est gros), puis enregistré dans Téléchargements.
+        const out = await zip.blob()
+        if (!s.signal.aborted && ok) {
+          const a = document.createElement('a')
+          a.href = URL.createObjectURL(out); a.download = zipName
+          document.body.appendChild(a); a.click(); a.remove()
+          setTimeout(() => URL.revokeObjectURL(a.href), 60_000)
+        }
+      }
+    } catch (e) { if (!s.signal.aborted) why = whyFailed(e) }
+    finally { s.end() }
+    if (s.signal.aborted) setNotice('ZIP annulé.')
+    else if (ok === 0) setNotice(`Aucun fichier récupéré (${why ?? 'connexion ?'}).`)
+    else if (ok < targets.length) setNotice(`ZIP enregistré — ${ok}/${targets.length} fichier(s) · échec : ${why ?? '?'}`)
+    else setNotice(`ZIP enregistré — ${ok} fichier(s).`)
   }
 
   async function deleteMedia(ids: string[]) {
