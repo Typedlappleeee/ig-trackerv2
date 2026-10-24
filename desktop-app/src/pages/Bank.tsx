@@ -494,17 +494,17 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // mis à jour en continu (avant : le compteur ne bougeait qu'à la fin de chaque fichier).
   const dlAbort = useRef<AbortController | null>(null)
   const [dlBusy, setDlBusy] = useState(false)
-  type DlSession = { signal: AbortSignal; count: (b: ReadableStream<Uint8Array>) => ReadableStream<Uint8Array>; end: () => void }
-  function dlSession(render: (received: string, speed: string) => string): DlSession {
+  type DlSession = { signal: AbortSignal; count: (b: ReadableStream<Uint8Array>) => ReadableStream<Uint8Array>; end: () => void; bytes: () => number; setPar: (n: number) => void }
+  function dlSession(render: (received: string, speed: string, par: number) => string): DlSession {
     const ac = new AbortController(); dlAbort.current = ac; setDlBusy(true)
-    let bytes = 0
+    let bytes = 0, par = 0
     const samples: [number, number][] = [[Date.now(), 0]]
     const show = () => {
       const now = Date.now(); samples.push([now, bytes])
       while (samples.length > 2 && now - samples[1][0] >= 3000) samples.shift()
       const [t0, b0] = samples[0]
       const rate = now > t0 ? (bytes - b0) / ((now - t0) / 1000) : 0
-      setNotice(render(fmtBytes(bytes), `${fmtBytes(rate)}/s`))
+      setNotice(render(fmtBytes(bytes), `${fmtBytes(rate)}/s`, par))
     }
     show()
     const tick = setInterval(show, 500)
@@ -513,40 +513,79 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       /** Compte les octets qui passent dans un flux. */
       count: body => body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform(c, ctl) { bytes += c.byteLength; ctl.enqueue(c) } }), { signal: ac.signal }),
       end: () => { clearInterval(tick); if (dlAbort.current === ac) dlAbort.current = null; setDlBusy(false) },
+      bytes: () => bytes,
+      setPar: n => { par = n },
     }
   }
 
-  // Récupère les fichiers EN PARALLÈLE (6 à la fois), chacun lu EN ENTIER dès qu'il arrive (jamais
-  // de réponse laissée ouverte sans être lue : en HTTP/2 elle bloquerait la connexion partagée),
-  // et les rend dans l'ordre d'arrivée. Au plus 6 fichiers gardés à la fois (Chrome les met sur
-  // disque s'ils sont gros).
+  // Deux routes vers le stockage : l'hôte habituel (passerelle API) et l'hôte DIRECT de Supabase
+  // (…storage.supabase.co, recommandé pour les gros fichiers) → deux connexions au lieu d'une.
+  // Même lien signé, même service. Si l'hôte direct échoue, on bascule sur l'habituel pour la suite.
+  const directOf = (url: string) => /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\//.test(url) ? url.replace(/^https:\/\/([a-z0-9]+)\.supabase\.co\//, 'https://$1.storage.supabase.co/') : null
+  async function fetchMedia(url: string, i: number, s: DlSession, route: { direct: boolean }): Promise<Response> {
+    const direct = directOf(url)
+    if (direct && route.direct && i % 2 === 0) {
+      try {
+        const r = await fetch(direct, { cache: 'no-store', signal: s.signal })
+        if (r.ok && r.body) return r
+        route.direct = false
+      } catch (e) { if (s.signal.aborted) throw e; route.direct = false }
+    }
+    const r = await fetch(url, { cache: 'no-store', signal: s.signal })
+    if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`)
+    return r
+  }
+
+  // Parallélisme qui s'ajuste tout seul : 6 au départ ; toutes les 4 s, +4 (jusqu'à 16) tant que
+  // la vitesse totale progresse d'au moins 15 % ; on s'arrête dès que ça ne gagne plus.
+  function autoLimit(s: DlSession, onGrow: () => void) {
+    let limit = 6, last = 0, lastB = s.bytes(), lastT = Date.now(), growing = true
+    s.setPar(limit)
+    const t = setInterval(() => {
+      const now = Date.now(), b = s.bytes(), rate = (b - lastB) / Math.max(0.001, (now - lastT) / 1000)
+      lastB = b; lastT = now
+      if (!growing || s.signal.aborted) return
+      if (limit < 16 && (last === 0 || rate > last * 1.15)) { last = rate; limit = Math.min(16, limit + 4); s.setPar(limit); onGrow() }
+      else growing = false
+    }, 4000)
+    const stop = () => clearInterval(t)
+    s.signal.addEventListener('abort', stop)
+    return { get: () => limit, stop }
+  }
+
+  // Récupère les fichiers EN PARALLÈLE (parallélisme adaptatif, 2 routes), chacun lu EN ENTIER dès
+  // qu'il arrive (jamais de réponse laissée ouverte sans être lue : en HTTP/2 elle bloquerait la
+  // connexion partagée), et les rend dans l'ordre d'arrivée. Pas plus de fichiers gardés que de
+  // téléchargements en cours (Chrome les met sur disque s'ils sont gros).
   async function* fetchAll(targets: ContentItem[], urls: Map<string, string>, s: DlSession, onFail: (it: ContentItem, e: unknown) => void): AsyncGenerator<{ it: ContentItem; blob: Blob }> {
-    const CONC = 6
     const ready: { it: ContentItem; blob: Blob }[] = []
+    const route = { direct: true }
     let next = 0, active = 0, finished = 0
     let wake: (() => void) | null = null
     const ping = () => { const w = wake; wake = null; w?.() }
     s.signal.addEventListener('abort', ping)
     const start = () => {
-      while (!s.signal.aborted && active < CONC && next < targets.length && ready.length + active < CONC) {
-        const it = targets[next++]; active++
+      while (!s.signal.aborted && active < lim.get() && next < targets.length && ready.length + active < lim.get()) {
+        const i = next++, it = targets[i]; active++
         void (async () => {
           try {
             const url = urlOf(urls, it); if (!url) throw new Error('lien introuvable')
-            const resp = await fetch(url, { cache: 'no-store', signal: s.signal })
-            if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
-            ready.push({ it, blob: await new Response(s.count(resp.body)).blob() })
+            const resp = await fetchMedia(url, i, s, route)
+            ready.push({ it, blob: await new Response(s.count(resp.body!)).blob() })
           } catch (e) { if (!s.signal.aborted) onFail(it, e) }
           active--; finished++; ping()
         })()
       }
     }
-    start()
-    while (!s.signal.aborted && (finished < targets.length || ready.length)) {
-      if (ready.length) { const x = ready.shift()!; start(); yield x; continue }
-      await new Promise<void>(r => { if (ready.length || finished >= targets.length || s.signal.aborted) r(); else wake = r })
+    const lim = autoLimit(s, () => { start(); ping() })
+    try {
       start()
-    }
+      while (!s.signal.aborted && (finished < targets.length || ready.length)) {
+        if (ready.length) { const x = ready.shift()!; start(); yield x; continue }
+        await new Promise<void>(r => { if (ready.length || finished >= targets.length || s.signal.aborted) r(); else wake = r })
+        start()
+      }
+    } finally { lim.stop() }
   }
 
   async function downloadMedia(ids: string[]) {
@@ -585,7 +624,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }
 
   // Dans un dossier choisi (Chrome, Edge, app PC) : chaque fichier est écrit sur le disque au fil
-  // du téléchargement (fetch → pipeTo), rien n'est gardé en mémoire ; 6 à la fois. Un fichier du
+  // du téléchargement (fetch → pipeTo), rien n'est gardé en mémoire ; parallélisme adaptatif. Un fichier du
   // même nom déjà présent n'est JAMAIS écrasé (_2, _3…) ; un fichier inachevé est supprimé.
   async function downloadToFolder(targets: ContentItem[]) {
     const pick = (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<DirHandle> }).showDirectoryPicker
@@ -598,7 +637,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     let next = 0, done = 0, ok = 0
     const failed: string[] = []
     let why: string | null = null
-    const s = dlSession((received, speed) => `Dossier « ${dir.name} » : ${done}/${targets.length} · ${received} reçus · ${speed} (chaque fichier apparaît quand il est terminé)`)
+    const s = dlSession((received, speed, par) => `Dossier « ${dir.name} » : ${done}/${targets.length} · ${received} reçus · ${speed} · ${par} en parallèle (chaque fichier apparaît quand il est terminé)`)
     try {
       const taken = new Set<string>()
       const exists = async (n: string) => { try { await dir.getFileHandle(n); return true } catch { return false } }
@@ -615,26 +654,35 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         names.push(name)
       }
       const urls = await downloadUrls(targets)
-      const worker = async () => {
-        for (;;) {
-          const i = next++; if (i >= targets.length || s.signal.aborted) break
-          const it = targets[i], name = names[i]
-          let created = false
-          try {
-            const url = urlOf(urls, it); if (!url) throw new Error('lien introuvable')
-            const resp = await fetch(url, { cache: 'no-store', signal: s.signal })
-            if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
-            const fh = await dir.getFileHandle(name, { create: true }); created = true
-            await s.count(resp.body).pipeTo(await fh.createWritable(), { signal: s.signal })
-            ok++
-          } catch (e) {
-            if (!s.signal.aborted) { failed.push(it.title || name); why ??= whyFailed(e) }
-            if (created) await dir.removeEntry(name).catch(() => {})   // jamais de fichier à moitié écrit
-          }
-          done++
+      const route = { direct: true }
+      const one = async (i: number) => {
+        const it = targets[i], name = names[i]
+        let created = false
+        try {
+          const url = urlOf(urls, it); if (!url) throw new Error('lien introuvable')
+          const resp = await fetchMedia(url, i, s, route)
+          const fh = await dir.getFileHandle(name, { create: true }); created = true
+          await s.count(resp.body!).pipeTo(await fh.createWritable(), { signal: s.signal })
+          ok++
+        } catch (e) {
+          if (!s.signal.aborted) { failed.push(it.title || name); why ??= whyFailed(e) }
+          if (created) await dir.removeEntry(name).catch(() => {})   // jamais de fichier à moitié écrit
         }
       }
-      await Promise.all(Array.from({ length: Math.min(6, targets.length) }, worker))
+      // Autant de téléchargements à la fois que le parallélisme adaptatif le permet.
+      await new Promise<void>(resolve => {
+        let running = 0, over = false
+        const lim = autoLimit(s, () => pump())
+        const pump = (): void => {
+          while (!s.signal.aborted && running < lim.get() && next < targets.length) {
+            const i = next++; running++
+            void one(i).finally(() => { running--; done++; pump() })
+          }
+          if (!over && running === 0 && (next >= targets.length || s.signal.aborted)) { over = true; lim.stop(); resolve() }
+        }
+        s.signal.addEventListener('abort', () => pump())
+        pump()
+      })
     } finally { s.end() }
     if (s.signal.aborted) setNotice(`Téléchargement annulé — ${ok} fichier(s) déjà enregistré(s) dans « ${dir.name} ».`)
     else if (!failed.length) setNotice(`${ok} fichier(s) enregistré(s) dans « ${dir.name} ».`)
@@ -647,7 +695,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   async function downloadSeparate(targets: ContentItem[]) {
     const taken = new Set<string>(); let ok = 0
     let why: string | null = null, failed = 0
-    const s = dlSession((received, speed) => `Téléchargement : ${ok}/${targets.length} · ${received} reçus · ${speed}`)
+    const s = dlSession((received, speed, par) => `Téléchargement : ${ok}/${targets.length} · ${received} reçus · ${speed} · ${par} en parallèle`)
     try {
       const urls = await downloadUrls(targets)
       for await (const { it, blob } of fetchAll(targets, urls, s, (_it, e) => { failed++; why ??= whyFailed(e) })) {
@@ -674,7 +722,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       catch (e) { if (e instanceof DOMException && e.name === 'AbortError') return; handle = null }
     }
     let ok = 0, why: string | null = null
-    const s = dlSession((received, speed) => `ZIP : ${ok}/${targets.length} · ${received} reçus · ${speed}`)
+    const s = dlSession((received, speed, par) => `ZIP : ${ok}/${targets.length} · ${received} reçus · ${speed} · ${par} en parallèle`)
     try {
       const { downloadZip } = await import('client-zip')
       const urls = await downloadUrls(targets)

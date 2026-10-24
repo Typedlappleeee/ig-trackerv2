@@ -3700,5 +3700,8 @@ export const EN: Dict = {
     ["Téléchargement : {0}/{1} · {2} reçus · {3}", "Downloading: {0}/{1} · {2} received · {3}"],
     ["{0}/{1} fichier(s) envoyé(s) vers ton dossier Téléchargements · échec : {2}", "{0}/{1} file(s) sent to your Downloads folder · failed: {2}"],
     ["ZIP : {0}/{1} · {2} reçus · {3}", "ZIP: {0}/{1} · {2} received · {3}"],
+    ["Dossier « {0} » : {1}/{2} · {3} reçus · {4} · {5} en parallèle (chaque fichier apparaît quand il est terminé)", "Folder “{0}”: {1}/{2} · {3} received · {4} · {5} in parallel (each file appears when it is finished)"],
+    ["Téléchargement : {0}/{1} · {2} reçus · {3} · {4} en parallèle", "Downloading: {0}/{1} · {2} received · {3} · {4} in parallel"],
+    ["ZIP : {0}/{1} · {2} reçus · {3} · {4} en parallèle", "ZIP: {0}/{1} · {2} received · {3} · {4} in parallel"],
   ],
 }
