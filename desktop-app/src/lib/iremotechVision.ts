@@ -389,6 +389,9 @@ async function tapAdvance(
 // `alreadyIn(capture)` : barre des modes MASQUÉE (Instagram rouvre le dernier mode utilisé ;
 // une bulle d'effet la remplace) mais la caméra voulue est reconnue → rien à faire.
 const MODE_WORD = /^(post|publication|publier|story|stories|reels?|live|direct|instants?|templates?|mod[eè]les?)$/i
+// Ordre de la barre (gauche → droite) : POST STORY INSTANTS REEL LIVE → sens du balayage.
+const MODE_ORDER = [/^(post|publication|publier)$/i, /^(story|stories)$/i, /^instants?$/i, /^reels?$/i, /^(live|direct)$/i]
+const modeIndex = (t: string) => MODE_ORDER.findIndex(r => r.test(t))
 async function selectMode(key: string, deviceId: string, patterns: RegExp[], label: string, hooks?: VisionHooks, alreadyIn?: (shot: string) => Promise<boolean>): Promise<boolean> {
   for (let i = 0; i < 6; i++) {
     if (hooks?.shouldStop?.()) return false
@@ -408,7 +411,15 @@ async function selectMode(key: string, deviceId: string, patterns: RegExp[], lab
       return false
     }
     const by = Math.round(bar.reduce((n, o) => n + o.cy, 0) / bar.length)
-    const [xa, xb] = i < 3 ? [0.82, 0.25] : [0.25, 0.82] // puis dans l'autre sens
+    // Le mode voulu est à GAUCHE des mots lus (ex. POST quand LIVE est actif) → balayer vers la
+    // droite pour le faire apparaître ; à DROITE → vers la gauche ; sinon on alterne.
+    const want = modeIndex(label), seen = bar.map(o => modeIndex(o.text)).filter(n => n >= 0)
+    let toRight = i >= 3
+    if (want >= 0 && seen.length) {
+      if (want < Math.min(...seen)) toRight = true
+      else if (want > Math.max(...seen)) toRight = false
+    }
+    const [xa, xb] = toRight ? [0.25, 0.82] : [0.82, 0.25]
     hooks?.log?.(`↔ scroll du bandeau des modes pour trouver ${label}…`)
     await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * xa), y1: by, x2: Math.round(W * xb), y2: by, duration_ms: 350 })
     await sleep(900)
@@ -430,7 +441,13 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   await tapFrac(A.createPlus.x, A.createPlus.y)
   await sleep(2200)
-  // 2. Passer en mode REEL (bandeau du bas POST STORY INSTANTS REEL LIVE) — scroll si besoin.
+  // 2. Mode POST : galerie directe, dernière vidéo pré-sélectionnée, pas de caméra (ni effets).
+  //    Une vidéo publiée en POST devient un Reel. Si POST est introuvable → caméra REEL.
+  if (await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i], 'POST', hooks)) {
+    return postViaPostMode(key, deviceId, W, H, A, opts.caption, hooks)
+  }
+  hooks?.log?.('   POST introuvable → passage par la caméra REEL')
+  // 2bis. Passer en mode REEL (bandeau du bas POST STORY INSTANTS REEL LIVE) — scroll si besoin.
   if (!await selectMode(key, deviceId, [/reels?/i], 'REEL', hooks)) return false
   await sleep(1600)
   // 3. Ouvrir la galerie : la caméra Reel affiche une vignette en BAS-GAUCHE — c'est ELLE
@@ -475,6 +492,69 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   }
   await sleep(4000) // laisse le partage se finaliser
   await dismissPopups(key, deviceId, hooks) // ferme une éventuelle fenêtre post-partage (pas toujours là)
+  hooks?.log?.('🏠 Retour à l’accueil.')
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1200)
+  return true
+}
+
+// Publication par le mode POST : galerie « New post » (la vidéo la plus récente est en 1re case,
+// déjà pré-sélectionnée) → Next (haut-droite) → [popup « shared as reels » → OK] → éditeur →
+// Next → écran de légende → légende → Share. On n'appuie sur Share QUE si l'écran de légende /
+// partage est reconnu (sinon abandon : jamais de post à moitié).
+const CAPTION_MARK = [/^caption[.…]*$/i, /^l[ée]gende[.…]*$/i]
+async function postViaPostMode(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks?: VisionHooks): Promise<boolean> {
+  await sleep(1800) // la galerie se charge
+  // a. Vidéo la plus récente : 1re case de la grille, juste sous « Récents » (x = 1/8 de la largeur :
+  //    dans la 1re case en 3 comme en 4 colonnes). Sans repère, on garde la pré-sélection d'Instagram.
+  const rec = await findWordPoint(key, deviceId, [/^recents?$/i, /^r[ée]cents?$/i], hooks, { minY: 0.25, maxY: 0.85, tries: 2 })
+  if (rec) {
+    const x = Math.round(W / 8), y = Math.round(rec.y + H * 0.03 + W / 8)
+    hooks?.log?.(`🎞️ Dernière vidéo (1re case sous « Récents ») → tap (${x}, ${y})`)
+    await sendAction(key, deviceId, { type: 'tap', x, y })
+    await sleep(1500)
+  } else hooks?.log?.('   « Récents » non lu → vidéo pré-sélectionnée par Instagram (la plus récente)')
+  // b. Avancer jusqu'à l'écran de légende : Next en haut-droite (texte) ou en bas-droite (bouton bleu).
+  let atCaption = false
+  for (let step = 0; step < 6 && !atCaption; step++) {
+    if (hooks?.shouldStop?.()) return false
+    const shot = await snapshot(key, deviceId)
+    if (!shot) { await sleep(800); continue }
+    const words = withJoined([
+      ...await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] }),
+      ...await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] }),
+    ])
+    if (words.some(o => CAPTION_MARK.some(p => p.test(o.text)))) { atCaption = true; break }
+    // Popup « Video posts are now shared as reels » / « … partagées en tant que reels » → OK
+    // (petit « OK » blanc sur bouton BLEU : OCR recadré, sinon le bouton bleu de la popup).
+    if (words.some(o => /^reels?[.!]?$/i.test(o.text)) && words.some(o => /^(shared|partag[ée]e?s?)$/i.test(o.text))) {
+      hooks?.log?.('   popup « vidéos partagées en reels » → OK')
+      if (!await findTapText(key, deviceId, [/^ok[.!]?$/i], hooks, { label: 'OK', tries: 1, cropY: [0.25, 0.85] })) {
+        const blue = await findBlueButton(shot, 0.25, 0.85)
+        if (blue) await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: blue.cy })
+      }
+      await sleep(1500); continue
+    }
+    const top = await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next (haut)', tries: 2, minX: 0.55, cropY: [0, 0.14] })
+    if (!top && !await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (bas)', 2, [0.5, 1])) return false
+    await sleep(step === 0 ? 3000 : 4500) // l'éditeur charge la vidéo
+  }
+  if (!atCaption) { hooks?.log?.('❌ écran de légende non atteint → rien n’est publié (container suivant)'); return false }
+  // c. Légende : tap sur « Write a caption… » → saisie → OK/Done (haut-droite) s'il apparaît.
+  if (caption && caption.trim()) {
+    hooks?.log?.('✏️ Saisie de la légende…')
+    const f = await findWordPoint(key, deviceId, CAPTION_MARK, hooks, { tries: 2 })
+    await sendAction(key, deviceId, { type: 'tap', x: f ? f.x : Math.round(A.captionField.x * W), y: f ? f.y : Math.round(A.captionField.y * H) })
+    await sleep(1400)
+    await sendAction(key, deviceId, { type: 'text', text: caption.trim() })
+    await sleep(900)
+    if (await findTapText(key, deviceId, [/^ok$/i, /^done$/i, /^termin[ée]$/i], hooks, { label: 'OK légende', tries: 2, minX: 0.55, cropY: [0, 0.14] })) await sleep(1400)
+  }
+  // d. Partager (bouton bleu en bas).
+  if (!await tapButton(key, deviceId, [/^share$/i, /^partager$/i], A.shareBtn, W, H, hooks, [0.80, 1], 'Share', 3, [0, 1])) return false
+  hooks?.log?.('📤 Vidéo publiée (POST).')
+  await sleep(4000)
+  await dismissPopups(key, deviceId, hooks)
   hooks?.log?.('🏠 Retour à l’accueil.')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1200)

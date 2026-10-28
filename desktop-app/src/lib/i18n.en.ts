@@ -3169,6 +3169,13 @@ export const EN: Dict = {
     "❌ galerie non ouverte → container suivant": "❌ gallery not opened → next container",
     "🎞️ Sélection de la vidéo la plus récente…": "🎞️ Picking the most recent video…",
     "vidéo non reconnue dans la galerie → 1re case (position connue)": "video not recognized in the gallery → 1st cell (known position)",
+    "POST introuvable → passage par la caméra REEL": "POST not found → using the REEL camera",
+    "« Récents » non lu → vidéo pré-sélectionnée par Instagram (la plus récente)": "“Recents” not read → video preselected by Instagram (the most recent)",
+    "popup « vidéos partagées en reels » → OK": "“videos shared as reels” popup → OK",
+    "Next (haut)": "Next (top)",
+    "Next (bas)": "Next (bottom)",
+    "❌ écran de légende non atteint → rien n’est publié (container suivant)": "❌ caption screen not reached → nothing posted (next container)",
+    "📤 Vidéo publiée (POST).": "📤 Video posted (POST).",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3730,5 +3737,6 @@ export const EN: Dict = {
     ["vignette non repérée → position connue ({0}, {1})", "thumbnail not found → known position ({0}, {1})"],
     ["galerie pas encore ouverte (essai {0}/3)", "gallery not open yet (try {0}/3)"],
     ["🎞️ vidéo la plus récente repérée (case {0}, {1}) → tap", "🎞️ most recent video found (cell {0}, {1}) → tap"],
+    ["🎞️ Dernière vidéo (1re case sous « Récents ») → tap ({0}, {1})", "🎞️ Latest video (1st cell under “Recents”) → tap ({0}, {1})"],
   ],
 }
