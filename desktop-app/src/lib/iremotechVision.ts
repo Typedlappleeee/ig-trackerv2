@@ -3,7 +3,8 @@
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
 import { snapshot, sendAction } from './iremotech'
-import { ocrWords, findBlueButton } from './ocr'
+import { ocrWords, findBlueButton, findInstagramIcon } from './ocr'
+import { isInstagramText, withJoined } from './ocrMatch'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -70,7 +71,7 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
     const chk = await snapshot(key, deviceId)
     if (!chk) break // pas de snapshot : on tente la suite quand même
     const w1 = await ocrWords(chk, undefined, { threshold: null, scale: 2, psms: ['11'] })
-    const homeStill = w1.some(o => /instagram|edits|r[ée]glages|settings|app\s?store/i.test(o.text))
+    const homeStill = w1.some(o => isInstagramText(o.text) || /edits|r[ée]glages|settings|app\s?store/i.test(o.text))
     if (!homeStill) break // accueil disparu → CC ouvert (ou autre écran) → on continue
     await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(800) // reset avant re-essai
   }
@@ -100,7 +101,9 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
 // Réessaie plusieurs fois (l'écran met parfois du temps à charger). true si tapé.
 // Vrai si un texte matchant est présent à l'écran (SANS taper) — pour vérifier qu'on
 // est sur le bon écran avant d'agir.
-async function hasText(key: string, deviceId: string, patterns: RegExp[], hooks?: VisionHooks, opts?: { cropY?: [number, number]; tries?: number }): Promise<boolean> {
+type TextPattern = RegExp | ((t: string) => boolean)
+const matchText = (p: TextPattern, t: string) => typeof p === 'function' ? p(t) : p.test(t)
+async function hasText(key: string, deviceId: string, patterns: TextPattern[], hooks?: VisionHooks, opts?: { cropY?: [number, number]; tries?: number }): Promise<boolean> {
   const tries = opts?.tries ?? 3
   for (let i = 0; i < tries; i++) {
     if (hooks?.shouldStop?.()) return false
@@ -108,7 +111,7 @@ async function hasText(key: string, deviceId: string, patterns: RegExp[], hooks?
     if (shot) {
       const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'], cropY: opts?.cropY })
       const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'], cropY: opts?.cropY })
-      if ([...wa, ...wb].some(o => patterns.some(p => p.test(o.text)))) return true
+      if (withJoined([...wa, ...wb]).some(o => patterns.some(p => matchText(p, o.text)))) return true
     }
     await sleep(700)
   }
@@ -249,6 +252,7 @@ async function tapAppIcon(
   key: string, deviceId: string,
   matcher: (t: string) => boolean, label: string,
   hooks?: VisionHooks,
+  logo?: (shot: string) => Promise<{ cx: number; cy: number } | null>,
 ): Promise<boolean> {
   for (let page = 0; page < 3; page++) {
     if (hooks?.shouldStop?.()) return false
@@ -259,14 +263,29 @@ async function tapAppIcon(
     // Libellé BLANC sur fond coloré : on ISOLE le texte quasi-blanc (invert + seuil) → le blanc
     // devient texte noir net, le fond coloré ET l'ombre du libellé disparaissent. 2 seuils (labels
     // + ou - lumineux) + un repli grayscale. Rapide (3 passes) et fiable.
-    const words: { text: string; cx: number; cy: number }[] = []
+    const words: Awaited<ReturnType<typeof ocrWords>> = []
     for (const th of [95, 140]) {
       words.push(...await ocrWords(shot, undefined, { threshold: th, invert: true, scale: 3, psms: ['11'] }))
     }
     words.push(...await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] }))
+    let hit = withJoined(words).find(o => matcher(o.text))
+    // Fond d'écran CLAIR : le libellé blanc se confond avec le fond → passe « blanc pur »
+    // (seul le texte quasi blanc reste noir après inversion).
+    if (!hit) {
+      words.push(...await ocrWords(shot, undefined, { threshold: 30, invert: true, scale: 3, psms: ['11'] }))
+      hit = withJoined(words).find(o => matcher(o.text))
+    }
     const lus = [...new Set(words.map(w => w.text).filter(Boolean))].slice(0, 28)
     hooks?.log?.(`👁 accueil (${W}×${H}) lu : ${lus.join(', ') || '(rien)'}`)
-    const hit = words.find(o => matcher(o.text))
+    if (!hit && logo) {
+      // Libellé illisible ou icône dans le DOCK (sans libellé) → on la repère à son logo.
+      const at = await logo(shot)
+      if (at) {
+        hooks?.log?.(`📸 logo ${label} repéré (libellé non lu) → tap (${at.cx}, ${at.cy})`)
+        await sendAction(key, deviceId, { type: 'tap', x: at.cx, y: at.cy })
+        return true
+      }
+    }
     if (hit) {
       const ty = Math.max(0, hit.cy - Math.round(H * 0.055)) // viser l'icône, bien au-dessus du libellé
       hooks?.log?.(`📸 icône ${label} repérée → tap (${hit.cx}, ${ty})`)
@@ -281,8 +300,9 @@ async function tapAppIcon(
 }
 
 async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
-  // Matcher tolérant : « Instagram » + lectures OCR approximatives (« lnstagram », « nstagr »).
-  return tapAppIcon(key, deviceId, t => /[il1]nsta/i.test(t) || /nstagr/i.test(t), 'Instagram', hooks)
+  // Libellé lu de façon TOLÉRANTE (« lnstagram », « Instagrarn », « Insta » « gram »…), sinon
+  // repli sur le LOGO (fond clair, icône dans le dock).
+  return tapAppIcon(key, deviceId, isInstagramText, 'Instagram', hooks, findInstagramIcon)
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────
@@ -474,7 +494,7 @@ export async function createInstagramAccountByVision(
   hooks?.log?.('🆕 Création de compte : « Get started »…')
   // On vérifie d'abord qu'on est bien sur l'écran « Join Instagram » (mot « Instagram »
   // OU le bouton), sinon inutile de taper à l'aveugle.
-  const onJoin = await hasText(key, deviceId, [/instagram/i, /^started$/i], hooks, { tries: 5 })
+  const onJoin = await hasText(key, deviceId, [isInstagramText, /^started$/i, /^s.?inscrire$/i, /commencer$/i], hooks, { tries: 5 })
   if (!onJoin) {
     hooks?.log?.('❌ Écran « Join Instagram » non détecté (container déjà connecté ?).')
     return { ok: false, stage: 'get_started' }
@@ -1078,7 +1098,7 @@ export async function closeInstagram(key: string, deviceId: string, hooks?: Visi
   if (shot) {
     const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
     const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
-    const ig = [...wa, ...wb].find(o => /instagram/i.test(o.text) || /^[il]nstagram$/i.test(o.text))
+    const ig = withJoined([...wa, ...wb]).find(o => isInstagramText(o.text))
     if (ig) { swx = ig.cx; hooks?.log?.(`   carte Instagram repérée (x=${swx}) → balayage`) }
     else hooks?.log?.('   nom « Instagram » non lu → carte centrale (la plus récente)')
   }

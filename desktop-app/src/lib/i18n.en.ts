@@ -3162,6 +3162,8 @@ export const EN: Dict = {
     "⚠ Choisis un dossier de la Banque.": "⚠ Choose a Bank folder.",
     "Au lancement, toutes les vidéos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.": "At launch, every video in the folder is used (including new ones): the least-posted go first, with no duplicates.",
     "Au lancement, toutes les photos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.": "At launch, every photo in the folder is used (including new ones): the least-posted go first, with no duplicates.",
+    "⚠ Containers enregistrés sur ce navigateur seulement : colle le SQL": "⚠ Containers saved in this browser only: paste the SQL",
+    "dans Supabase pour les partager en temps réel.": "into Supabase to share them in real time.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3715,5 +3717,7 @@ export const EN: Dict = {
     ["⚠ Le dossier « {0} » ne contient aucune vidéo.", "⚠ The folder “{0}” has no videos."],
     ["📁 « {0} » : {1} photo(s)", "📁 “{0}”: {1} photo(s)"],
     ["📁 « {0} » : {1} vidéo(s)", "📁 “{0}”: {1} video(s)"],
+    ["Hors ligne{0}", "Offline{0}"],
+    ["📸 logo {0} repéré (libellé non lu) → tap ({1}, {2})", "📸 {0} logo found (label not read) → tap ({1}, {2})"],
   ],
 }
