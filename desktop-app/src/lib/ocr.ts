@@ -13,6 +13,7 @@ export interface OcrOpts {
   invert?: boolean     // inverse les tons (texte CLAIR sur fond FONCÉ → lisible par Tesseract)
   cropY?: [number, number]     // recadre verticalement [y0,y1] en fractions (0..1) → OCR focalisé, texte plus gros
   psms?: string[]      // modes de segmentation à fusionner (défaut ['6','11'])
+  whiteText?: boolean  // isole le texte BLANC plus clair que son voisinage (libellés d'icônes, même sur fond clair)
 }
 
 const BASE = import.meta.env.BASE_URL // '/' en web, './' en Electron
@@ -39,7 +40,7 @@ function loadImg(src: string): Promise<HTMLImageElement> {
 // Agrandit + met en niveaux de gris + binarise (chiffres foncés → noir sur blanc).
 // Améliore énormément la lecture de chiffres clairs/peu contrastés (sélecteur Crane).
 // Retourne l'image prétraitée + l'offset vertical (px, espace d'origine) dû au recadrage.
-async function preprocess(image: string, scale: number, threshold: number | null, invert: boolean, cropY?: [number, number]): Promise<{ url: string; offY: number }> {
+async function preprocess(image: string, scale: number, threshold: number | null, invert: boolean, cropY?: [number, number], whiteText = false): Promise<{ url: string; offY: number }> {
   const img = await loadImg(image)
   const oW = img.naturalWidth, oH = img.naturalHeight
   const y0 = cropY ? Math.max(0, Math.round(cropY[0] * oH)) : 0
@@ -51,6 +52,7 @@ async function preprocess(image: string, scale: number, threshold: number | null
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(img, 0, y0, oW, srcH, 0, 0, W, H)
   const d = ctx.getImageData(0, 0, W, H); const p = d.data
+  if (whiteText) { whiteTextMask(p, W, H, scale); ctx.putImageData(d, 0, 0); return { url: cv.toDataURL('image/png'), offY: y0 } }
   for (let i = 0; i < p.length; i += 4) {
     let g = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]
     if (invert) g = 255 - g
@@ -59,6 +61,40 @@ async function preprocess(image: string, scale: number, threshold: number | null
   }
   ctx.putImageData(d, 0, 0)
   return { url: cv.toDataURL('image/png'), offY: y0 }
+}
+
+// Libellés d'icônes iOS : texte BLANC (avec une légère ombre). Un pixel est du texte s'il est
+// quasi blanc ET nettement plus clair que la moyenne de son voisinage (fenêtre ~15 px) → noir sur
+// blanc, que le fond d'écran soit sombre ou CLAIR. Les grands aplats blancs (icônes blanches)
+// restent blancs (pas plus clairs que leur voisinage).
+function whiteTextMask(p: Uint8ClampedArray, W: number, H: number, scale: number): void {
+  const N = W * H
+  const L = new Float32Array(N), ok = new Uint8Array(N)
+  for (let i = 0, j = 0; j < N; i += 4, j++) {
+    const r = p[i], g = p[i + 1], b = p[i + 2]
+    const mn = Math.min(r, g, b), mx = Math.max(r, g, b)
+    L[j] = 0.299 * r + 0.587 * g + 0.114 * b
+    ok[j] = mn > 195 && mx - mn < 45 ? 1 : 0
+  }
+  const S = new Float64Array((W + 1) * (H + 1))           // image intégrale
+  for (let y = 0; y < H; y++) {
+    let row = 0
+    for (let x = 0; x < W; x++) { row += L[y * W + x]; S[(y + 1) * (W + 1) + x + 1] = S[y * (W + 1) + x + 1] + row }
+  }
+  const rad = Math.max(3, Math.round(7 * scale))
+  for (let y = 0; y < H; y++) {
+    const ya = Math.max(0, y - rad), yb = Math.min(H - 1, y + rad)
+    for (let x = 0; x < W; x++) {
+      const j = y * W + x
+      let v = 255
+      if (ok[j]) {
+        const xa = Math.max(0, x - rad), xb = Math.min(W - 1, x + rad)
+        const sum = S[(yb + 1) * (W + 1) + xb + 1] - S[ya * (W + 1) + xb + 1] - S[(yb + 1) * (W + 1) + xa] + S[ya * (W + 1) + xa]
+        if (L[j] - sum / ((xb - xa + 1) * (yb - ya + 1)) > 8) v = 0
+      }
+      p[j * 4] = p[j * 4 + 1] = p[j * 4 + 2] = v
+    }
+  }
 }
 
 // Sérialise les appels OCR : le worker Tesseract est unique, donc deux lectures
@@ -79,7 +115,7 @@ async function ocrWordsInner(image: string, whitelist?: string, opts?: OcrOpts):
   const threshold = opts?.threshold === undefined ? 195 : opts.threshold
   const invert = opts?.invert ?? false
   const psms = opts?.psms ?? ['6', '11']
-  const pre = await preprocess(image, scale, threshold, invert, opts?.cropY)
+  const pre = await preprocess(image, scale, threshold, invert, opts?.cropY, opts?.whiteText)
   const src = pre.url, offY = pre.offY
   const w = await getWorker()
   const merged: OcrWord[] = []
@@ -144,69 +180,6 @@ export async function findBlueButton(image: string, yMin = 0.55, yMax = 1, xMin 
   if (n < 120) return null // pas assez de bleu → pas de bouton
   // Centre de la boîte englobante (plus stable que le centroïde si le bleu est irrégulier).
   return { cx: Math.round((minX + maxX) / 2), cy: y0 + Math.round((minY + maxY) / 2) }
-}
-
-// Détecte l'icône Instagram par son LOGO (couleurs), quand le libellé blanc est illisible
-// (fond d'écran clair) ou ABSENT (icône dans le dock). Le dégradé IG part du JAUNE/orange en
-// BAS-gauche, passe par le rose/magenta et finit BLEU/violet en HAUT ; le glyphe appareil
-// photo est BLANC au centre. On glisse une fenêtre de la taille d'une icône et on ne retient
-// que celle qui réunit les 4 : jaune en bas + magenta + bleu/violet en haut + blanc, sur une
-// surface majoritairement colorée. Un aplat (Musique rouge, Photos, fond uni…) n'a jamais
-// tout à la fois → pas de tap sur une autre appli.
-export async function findInstagramIcon(image: string, yMin = 0.05, yMax = 0.97, xMin = 0, xMax = 1): Promise<{ cx: number; cy: number } | null> {
-  const img = await loadImg(image)
-  const W = img.naturalWidth, H = img.naturalHeight
-  if (!W || !H) return null
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H
-  const ctx = cv.getContext('2d')!; ctx.drawImage(img, 0, 0)
-  const data = ctx.getImageData(0, 0, W, H).data
-  const x0 = Math.max(0, Math.round(xMin * W)), x1 = Math.min(W, Math.round(xMax * W))
-  const y0 = Math.max(0, Math.round(yMin * H)), y1 = Math.min(H, Math.round(yMax * H))
-  const fc = Math.max(4, Math.round(W * 0.02))                 // cellule d'accumulation
-  const cols = Math.ceil(W / fc) + 1, rowsN = Math.ceil(H / fc) + 1
-  const N = cols * rowsN
-  const col = new Int32Array(N), yel = new Int32Array(N), mag = new Int32Array(N), blu = new Int32Array(N), wht = new Int32Array(N), all = new Int32Array(N)
-  const step = 2
-  for (let y = y0; y < y1; y += step) {
-    for (let x = x0; x < x1; x += step) {
-      const i = (y * W + x) * 4
-      const r = data[i], g = data[i + 1], b = data[i + 2]
-      const ci = Math.floor(x / fc) + Math.floor(y / fc) * cols
-      all[ci]++
-      const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
-      if (r > 205 && g > 205 && b > 205) { wht[ci]++; continue }
-      if (mx < 110 || mx - mn < 50) continue
-      col[ci]++
-      if (r > 195 && g > 105 && b < 150 && g < r) yel[ci]++            // jaune / orange
-      else if (r > 150 && b > 90 && g < 115 && r >= b - 40) mag[ci]++   // rose / magenta
-      else if (b > 150 && b > r && b > g) blu[ci]++                     // bleu / violet
-    }
-  }
-  const best: { score: number; cx: number; cy: number }[] = []
-  // Plusieurs tailles d'icône (écran d'accueil ~15 % de la largeur, dock un peu moins).
-  for (const frac of [0.15, 0.13, 0.17]) {
-    const win = Math.max(3, Math.round((W * frac) / fc))
-    const half = Math.floor(win / 2)
-    for (let gy = 0; gy + win <= rowsN; gy++) {
-      for (let gx = 0; gx + win <= cols; gx++) {
-        let n = 0, c = 0, m = 0, w = 0, yBottom = 0, bTop = 0
-        for (let j = 0; j < win; j++) for (let k = 0; k < win; k++) {
-          const idx = (gx + k) + (gy + j) * cols
-          n += all[idx]; c += col[idx]; m += mag[idx]; w += wht[idx]
-          if (j >= half) yBottom += yel[idx]; else bTop += blu[idx]
-        }
-        if (n < 40) continue
-        if (c < n * 0.45 || w < n * 0.02 || w > n * 0.4) continue
-        if (yBottom < n * 0.03 || bTop < n * 0.03 || m < n * 0.04) continue
-        best.push({ score: c + m, cx: Math.round((gx + win / 2) * fc), cy: Math.round((gy + win / 2) * fc) })
-      }
-    }
-  }
-  if (!best.length) return null
-  // Centre = moyenne des meilleures fenêtres (elles se chevauchent sur la même icône).
-  best.sort((a, b) => b.score - a.score)
-  const top = best.filter(o => Math.hypot(o.cx - best[0].cx, o.cy - best[0].cy) < W * 0.08).slice(0, 12)
-  return { cx: Math.round(top.reduce((s, o) => s + o.cx, 0) / top.length), cy: Math.round(top.reduce((s, o) => s + o.cy, 0) / top.length) }
 }
 
 export async function terminateOcr(): Promise<void> {

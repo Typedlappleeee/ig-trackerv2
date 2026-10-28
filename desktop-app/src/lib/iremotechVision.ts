@@ -3,7 +3,7 @@
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
 import { snapshot, sendAction } from './iremotech'
-import { ocrWords, findBlueButton, findInstagramIcon } from './ocr'
+import { ocrWords, findBlueButton } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { findGalleryThumb, findMatchingCell } from './screenMatch'
 
@@ -253,7 +253,6 @@ async function tapAppIcon(
   key: string, deviceId: string,
   matcher: (t: string) => boolean, label: string,
   hooks?: VisionHooks,
-  logo?: (shot: string) => Promise<{ cx: number; cy: number } | null>,
 ): Promise<boolean> {
   for (let page = 0; page < 3; page++) {
     if (hooks?.shouldStop?.()) return false
@@ -270,23 +269,19 @@ async function tapAppIcon(
     }
     words.push(...await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] }))
     let hit = withJoined(words).find(o => matcher(o.text))
-    // Fond d'écran CLAIR : le libellé blanc se confond avec le fond → passe « blanc pur »
-    // (seul le texte quasi blanc reste noir après inversion).
+    // Fond d'écran CLAIR : le libellé blanc se confond avec le fond → passe « texte blanc »
+    // (blanc plus clair que son voisinage, ombre comprise), puis en BANDES agrandies.
     if (!hit) {
-      words.push(...await ocrWords(shot, undefined, { threshold: 30, invert: true, scale: 3, psms: ['11'] }))
+      words.push(...await ocrWords(shot, undefined, { threshold: null, whiteText: true, scale: 3, psms: ['11'] }))
+      hit = withJoined(words).find(o => matcher(o.text))
+    }
+    for (const band of [[0.04, 0.32], [0.28, 0.56], [0.52, 0.8], [0.76, 0.93]] as [number, number][]) {
+      if (hit) break
+      words.push(...await ocrWords(shot, undefined, { threshold: null, whiteText: true, scale: 4, psms: ['11'], cropY: band }))
       hit = withJoined(words).find(o => matcher(o.text))
     }
     const lus = [...new Set(words.map(w => w.text).filter(Boolean))].slice(0, 28)
     hooks?.log?.(`👁 accueil (${W}×${H}) lu : ${lus.join(', ') || '(rien)'}`)
-    if (!hit && logo) {
-      // Libellé illisible ou icône dans le DOCK (sans libellé) → on la repère à son logo.
-      const at = await logo(shot)
-      if (at) {
-        hooks?.log?.(`📸 logo ${label} repéré (libellé non lu) → tap (${at.cx}, ${at.cy})`)
-        await sendAction(key, deviceId, { type: 'tap', x: at.cx, y: at.cy })
-        return true
-      }
-    }
     if (hit) {
       const ty = Math.max(0, hit.cy - Math.round(H * 0.055)) // viser l'icône, bien au-dessus du libellé
       hooks?.log?.(`📸 icône ${label} repérée → tap (${hit.cx}, ${ty})`)
@@ -301,9 +296,9 @@ async function tapAppIcon(
 }
 
 async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
-  // Libellé lu de façon TOLÉRANTE (« lnstagram », « Instagrarn », « Insta » « gram »…), sinon
-  // repli sur le LOGO (fond clair, icône dans le dock).
-  return tapAppIcon(key, deviceId, isInstagramText, 'Instagram', hooks, findInstagramIcon)
+  // UNIQUEMENT par son NOM (libellé sous l'icône), lu de façon tolérante (« lnstagram »,
+  // « Instagrarn », « Insta » « gram »…). Pas de repérage au logo : il tapait parfois ailleurs.
+  return tapAppIcon(key, deviceId, isInstagramText, 'Instagram', hooks)
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────

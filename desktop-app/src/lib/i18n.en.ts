@@ -3730,7 +3730,6 @@ export const EN: Dict = {
     ["📁 « {0} » : {1} photo(s)", "📁 “{0}”: {1} photo(s)"],
     ["📁 « {0} » : {1} vidéo(s)", "📁 “{0}”: {1} video(s)"],
     ["Hors ligne{0}", "Offline{0}"],
-    ["📸 logo {0} repéré (libellé non lu) → tap ({1}, {2})", "📸 {0} logo found (label not read) → tap ({1}, {2})"],
     ["✓ caméra {0} déjà ouverte (barre des modes masquée)", "✓ {0} camera already open (mode bar hidden)"],
     ["❌ mode {0} : barre des modes invisible → aucun balayage (il changerait l'effet de la caméra)", "❌ {0} mode: mode bar not visible → no swipe (it would change the camera effect)"],
     ["vignette repérée → tap ({0}, {1})", "thumbnail found → tap ({0}, {1})"],
