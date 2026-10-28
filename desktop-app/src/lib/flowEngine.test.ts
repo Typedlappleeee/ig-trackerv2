@@ -146,7 +146,7 @@ vi.mock('@/lib/supabase', () => {
   }
 })
 
-import { runFlow, waitFlowRun, getFlowRun, newBlock, BLOCK, isActive, retriesOf, _setFlowTimeScaleForTests, type Flow, type FlowBlock, type BlockType } from './flowEngine'
+import { runFlow, waitFlowRun, getFlowRun, newBlock, BLOCK, isActive, retriesOf, folderMedia, _setFlowTimeScaleForTests, type Flow, type FlowBlock, type BlockType } from './flowEngine'
 // Délais max des blocs ramenés à quelques millisecondes (25 min → 15 ms).
 _setFlowTimeScaleForTests(0.00001)
 
@@ -331,6 +331,14 @@ describe('cas ciblés', () => {
     const { run } = await launch(flowOf(b), 5)
     expect(run.phones.every(p => p.steps[0] === 'ok')).toBe(true)
     expect(run.log.some(l => l.includes('5 média(s)'))).toBe(true)   // v1..v5, pas vX (corbeille)
+  })
+
+  it('folderMedia (iRemoTech) : bon dossier, bon type, sans corbeille ni marqueur', async () => {
+    const v = await folderMedia({ orgId: null, userId: 'u' }, 'A', 'video')
+    expect(v.map(x => x.id).sort()).toEqual(['v1', 'v2', 'v3', 'v4', 'v5'])
+    expect((await folderMedia({ orgId: null, userId: 'u' }, 'A', 'image')).length).toBe(0)
+    expect((await folderMedia({ orgId: null, userId: 'u' }, 'B', 'image')).map(x => x.id)).toEqual(['i1', 'i2', 'i3', 'i4'])
+    expect((await folderMedia({ orgId: null, userId: 'u' }, 'C', 'video')).length).toBe(0)
   })
 
   it('source « toute la banque » : images seulement pour une story', async () => {
