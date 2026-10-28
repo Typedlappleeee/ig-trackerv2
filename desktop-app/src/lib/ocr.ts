@@ -146,12 +146,14 @@ export async function findBlueButton(image: string, yMin = 0.55, yMax = 1, xMin 
   return { cx: Math.round((minX + maxX) / 2), cy: y0 + Math.round((minY + maxY) / 2) }
 }
 
-// Détecte l'icône Instagram par son LOGO (forme + couleur), pas par le libellé (texte blanc peu
-// lisible). On glisse une fenêtre de taille « icône » et on ne retient QUE celle qui réunit les 4
-// marqueurs du logo IG à la fois : dégradé CHAUD dense + VIOLET (bas-gauche) + ORANGE (haut-droite)
-// + l'objectif photo BLANC au centre. Cette combinaison n'existe ni sur le fond d'écran ni sur un
-// aplat rouge/jaune → on n'ouvre plus la mauvaise appli.
-export async function findInstagramIcon(image: string, yMin = 0.05, yMax = 0.96, xMin = 0, xMax = 1): Promise<{ cx: number; cy: number } | null> {
+// Détecte l'icône Instagram par son LOGO (couleurs), quand le libellé blanc est illisible
+// (fond d'écran clair) ou ABSENT (icône dans le dock). Le dégradé IG part du JAUNE/orange en
+// BAS-gauche, passe par le rose/magenta et finit BLEU/violet en HAUT ; le glyphe appareil
+// photo est BLANC au centre. On glisse une fenêtre de la taille d'une icône et on ne retient
+// que celle qui réunit les 4 : jaune en bas + magenta + bleu/violet en haut + blanc, sur une
+// surface majoritairement colorée. Un aplat (Musique rouge, Photos, fond uni…) n'a jamais
+// tout à la fois → pas de tap sur une autre appli.
+export async function findInstagramIcon(image: string, yMin = 0.05, yMax = 0.97, xMin = 0, xMax = 1): Promise<{ cx: number; cy: number } | null> {
   const img = await loadImg(image)
   const W = img.naturalWidth, H = img.naturalHeight
   if (!W || !H) return null
@@ -160,50 +162,51 @@ export async function findInstagramIcon(image: string, yMin = 0.05, yMax = 0.96,
   const data = ctx.getImageData(0, 0, W, H).data
   const x0 = Math.max(0, Math.round(xMin * W)), x1 = Math.min(W, Math.round(xMax * W))
   const y0 = Math.max(0, Math.round(yMin * H)), y1 = Math.min(H, Math.round(yMax * H))
-  const iconPx = Math.max(40, Math.round(W * 0.14))            // taille approx. d'une icône
-  const fc = Math.max(6, Math.round(W * 0.022))                // fine cellule d'accumulation
-  const cols = Math.ceil(W / fc) + 1, gridRows = Math.ceil(H / fc) + 1
-  const warm = new Int32Array(cols * gridRows)               // pixels colorés (hors blanc/noir)
-  const sumB = new Int32Array(warm.length)                    // somme des bleus (pour l'orientation)
-  const white = new Int32Array(warm.length), yell = new Int32Array(warm.length)
+  const fc = Math.max(4, Math.round(W * 0.02))                 // cellule d'accumulation
+  const cols = Math.ceil(W / fc) + 1, rowsN = Math.ceil(H / fc) + 1
+  const N = cols * rowsN
+  const col = new Int32Array(N), yel = new Int32Array(N), mag = new Int32Array(N), blu = new Int32Array(N), wht = new Int32Array(N), all = new Int32Array(N)
   const step = 2
   for (let y = y0; y < y1; y += step) {
     for (let x = x0; x < x1; x += step) {
       const i = (y * W + x) * 4
       const r = data[i], g = data[i + 1], b = data[i + 2]
       const ci = Math.floor(x / fc) + Math.floor(y / fc) * cols
+      all[ci]++
       const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
-      if (mx > 120 && mx - mn > 45) { warm[ci]++; sumB[ci] += b }  // pixel coloré saturé
-      if (r > 215 && g > 140 && g < 205 && b < 130) yell[ci]++      // jaune/orange (haut-droite IG)
-      if (r > 205 && g > 205 && b > 205) white[ci]++                // objectif blanc central
+      if (r > 205 && g > 205 && b > 205) { wht[ci]++; continue }
+      if (mx < 110 || mx - mn < 50) continue
+      col[ci]++
+      if (r > 195 && g > 105 && b < 150 && g < r) yel[ci]++            // jaune / orange
+      else if (r > 150 && b > 90 && g < 115 && r >= b - 40) mag[ci]++   // rose / magenta
+      else if (b > 150 && b > r && b > g) blu[ci]++                     // bleu / violet
     }
   }
-  const win = Math.max(2, Math.round(iconPx / fc))              // fenêtre = 1 icône
-  const half = Math.max(1, Math.floor(win / 2))
-  const winSamples = (win * fc / step) * (win * fc / step)
-  let best: { cx: number; cy: number } | null = null, bestWarm = 0
-  for (let gy = 0; gy + win < gridRows; gy++) {
-    for (let gx = 0; gx + win < cols; gx++) {
-      let sw = 0, swh = 0
-      let blW = 0, blB = 0, trW = 0, trB = 0, trY = 0   // quadrants bas-gauche / haut-droite
-      for (let j = 0; j < win; j++) for (let i = 0; i < win; i++) {
-        const idx = (gx + i) + (gy + j) * cols
-        sw += warm[idx]; swh += white[idx]
-        if (i < half && j >= half) { blW += warm[idx]; blB += sumB[idx] }        // bas-gauche
-        if (i >= half && j < half) { trW += warm[idx]; trB += sumB[idx]; trY += yell[idx] } // haut-droite
-      }
-      if (sw <= bestWarm || sw < winSamples * 0.32 || swh < 2 || blW < 6 || trW < 6) continue
-      const bBL = blB / blW, bTR = trB / trW
-      // Orientation du dégradé IG : coin BAS-GAUCHE bleu/violet (bleu élevé), coin HAUT-DROITE
-      // jaune/orange (bleu faible + jaune présent). Musique (rouge uniforme) et Tinder (flamme
-      // symétrique) n'ont pas cette diagonale bleu→jaune → exclus.
-      if (bBL - bTR > 30 && bBL > 120 && trY >= 4) {
-        bestWarm = sw
-        best = { cx: Math.round((gx + win / 2) * fc), cy: Math.round((gy + win / 2) * fc) }
+  const best: { score: number; cx: number; cy: number }[] = []
+  // Plusieurs tailles d'icône (écran d'accueil ~15 % de la largeur, dock un peu moins).
+  for (const frac of [0.15, 0.13, 0.17]) {
+    const win = Math.max(3, Math.round((W * frac) / fc))
+    const half = Math.floor(win / 2)
+    for (let gy = 0; gy + win <= rowsN; gy++) {
+      for (let gx = 0; gx + win <= cols; gx++) {
+        let n = 0, c = 0, m = 0, w = 0, yBottom = 0, bTop = 0
+        for (let j = 0; j < win; j++) for (let k = 0; k < win; k++) {
+          const idx = (gx + k) + (gy + j) * cols
+          n += all[idx]; c += col[idx]; m += mag[idx]; w += wht[idx]
+          if (j >= half) yBottom += yel[idx]; else bTop += blu[idx]
+        }
+        if (n < 40) continue
+        if (c < n * 0.45 || w < n * 0.02 || w > n * 0.4) continue
+        if (yBottom < n * 0.03 || bTop < n * 0.03 || m < n * 0.04) continue
+        best.push({ score: c + m, cx: Math.round((gx + win / 2) * fc), cy: Math.round((gy + win / 2) * fc) })
       }
     }
   }
-  return best
+  if (!best.length) return null
+  // Centre = moyenne des meilleures fenêtres (elles se chevauchent sur la même icône).
+  best.sort((a, b) => b.score - a.score)
+  const top = best.filter(o => Math.hypot(o.cx - best[0].cx, o.cy - best[0].cy) < W * 0.08).slice(0, 12)
+  return { cx: Math.round(top.reduce((s, o) => s + o.cx, 0) / top.length), cy: Math.round(top.reduce((s, o) => s + o.cy, 0) / top.length) }
 }
 
 export async function terminateOcr(): Promise<void> {

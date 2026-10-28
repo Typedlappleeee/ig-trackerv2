@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-28',
+    date: '2026-10-28',
+    title: { fr: '📱 iRemoTech : téléphones en temps réel + Instagram toujours trouvé', en: '📱 iRemoTech: phones in real time + Instagram always found' },
+    items: {
+      fr: [
+        'Les containers de chaque iPhone sont partagés dans l’agence et se mettent à jour en direct (fini les « 0c » sur un autre PC).',
+        'La liste et l’état des iPhones (point vert / rouge) s’actualisent tout seuls toutes les 15 s.',
+        'Ouverture d’Instagram plus fiable : l’icône est trouvée même sur un fond d’écran clair ou dans le dock, et une autre appli (ex. Instacart) n’est plus ouverte par erreur.',
+      ],
+      en: [
+        'Each iPhone’s containers are shared across the agency and update live (no more “0c” on another PC).',
+        'The iPhone list and status (green / red dot) refresh on their own every 15 s.',
+        'More reliable Instagram opening: the icon is found even on a light wallpaper or in the dock, and another app (e.g. Instacart) is no longer opened by mistake.',
+      ],
+    },
+  },
+  {
     id: '2026-10-14d',
     date: '2026-10-14',
     title: { fr: '🎨 Travail sur l’interface de ScaleFlow', en: '🎨 Work on the ScaleFlow interface' },

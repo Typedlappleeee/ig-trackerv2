@@ -5,19 +5,19 @@
 //   • Story      : pool de photos + lien CTA par container → Story (vision)
 //   • Compte     : création de compte IG (pays UK/USA + numéro/SMS 5sim)
 // La sélection téléphones/containers est PARTAGÉE entre les onglets.
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
-import { useIremotech, listDevices, fetchUsage, uploadMedia, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
+import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
-import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
+import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { folderMedia, loadBankSummary, type BankSummary } from '@/lib/flowEngine'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -73,6 +73,7 @@ function Toggle({ on, onClick, label, sub }: { on: boolean; onClick: () => void;
 export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgState; tab?: IrtTab; onTab?: (t: IrtTab) => void }) {
   const { currentOrg } = org
   const irt = useIremotech(user, org)
+  setContainerScope(currentOrg?.id ?? null, user.id)   // containers partagés de l'espace courant
   // Onglet contrôlé par la nav de l'infra (tab/onTab) ; sinon état interne (mode autonome).
   const [localTab, setLocalTab] = useState<IrtTab>('phones')
   const curTab = onTab ? (tab ?? 'phones') : localTab
@@ -138,25 +139,43 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [logs, setLogs] = useState<string[]>([])
   const [phonesOpen, setPhonesOpen] = useState(true) // sélecteur téléphones déplié
 
-  const load = useCallback(() => {
+  // iPhones + containers. `quiet` = actualisation automatique (pas d'écran de chargement).
+  // Les containers viennent de Supabase (partagés dans l'agence) ; null = SQL pas passé.
+  const [syncOff, setSyncOff] = useState(false)
+  const load = useCallback((quiet = false) => {
     if (!irt.key) return
-    setLoading(true); setErr(null)
-    Promise.all([listDevices(irt.key), fetchUsage(irt.key)])
-      .then(([d, u]) => {
-        setDevices(d); setUsage(u)
+    if (!quiet) { setLoading(true); setErr(null) }
+    Promise.all([listDevices(irt.key), quiet ? Promise.resolve(undefined) : fetchUsage(irt.key)])
+      .then(async ([d, u]) => {
+        setDevices(d); if (u !== undefined) setUsage(u)
+        const remote = await pullContainers(d.map(x => x.public_id)).catch(() => null)
+        setSyncOff(remote === null)
         const c: Record<string, string[]> = {}
         const sl: Record<string, string> = {}
         for (const dev of d) {
-          const list = loadDevContainers(dev.public_id)
+          const list = remote?.[dev.public_id] ?? loadDevContainers(dev.public_id)
           c[dev.public_id] = list
           for (const name of list) { const v = loadStoryLink(dev.public_id, name); if (v) sl[`${dev.public_id}::${name}`] = v }
         }
-        setConts(c); setStoryLinks(sl)
+        setConts(c); setStoryLinks(prev => quiet ? { ...sl, ...prev } : sl)
       })
-      .catch(e => setErr(e instanceof Error ? e.message : 'Connexion iRemoTech échouée'))
-      .finally(() => setLoading(false))
-  }, [irt.key])
+      .catch(e => { if (!quiet) setErr(e instanceof Error ? e.message : 'Connexion iRemoTech échouée') })
+      .finally(() => { if (!quiet) setLoading(false) })
+  }, [irt.key, currentOrg?.id, user.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [load])
+  // TEMPS RÉEL : containers modifiés ailleurs (autre PC, autre membre) → mis à jour aussitôt.
+  useEffect(() => subscribeContainers((dev, list) => setConts(c => ({ ...c, [dev]: list }))), [currentOrg?.id, user.id])
+  // Liste et état des iPhones actualisés toutes les 15 s (page visible), et au retour sur
+  // l'onglet — en pause pendant une automatisation (débit iRemoTech réservé aux actions).
+  const runningRef = useRef(false)
+  runningRef.current = running
+  useEffect(() => {
+    if (!irt.key) return
+    const tick = () => { if (document.visibilityState === 'visible' && !runningRef.current) load(true) }
+    const t = setInterval(tick, 15_000)
+    window.addEventListener('focus', tick)
+    return () => { clearInterval(t); window.removeEventListener('focus', tick) }
+  }, [irt.key, load])
   const bankScope = { orgId: currentOrg?.id ?? null, userId: user.id }
   useEffect(() => {
     if ((curTab === 'posting' && reelSrc.mode === 'folder') || (curTab === 'story' && storySrc.mode === 'folder'))
@@ -233,6 +252,18 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     return v.file_url ?? undefined
   }
 
+  // Container supprimé ailleurs (temps réel) → retiré de la sélection.
+  useEffect(() => setSelConts(sc => {
+    let changed = false
+    const n: typeof sc = {}
+    for (const [dev, set] of Object.entries(sc)) {
+      const list = conts[dev]
+      const ok = list ? new Set([...set].filter(c => list.includes(c))) : set
+      if (ok.size !== set.size) changed = true
+      n[dev] = ok
+    }
+    return changed ? n : sc
+  }), [conts])
   const totalJobs = [...sel].reduce((n, d) => n + (selConts[d]?.size ?? 0), 0)
   const captions = captionPool.split('\n').map(s => s.trim()).filter(Boolean)
   const push = (m: string) => setLogs(l => [...l.slice(-600), m])
@@ -511,15 +542,22 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             {devices.map(d => {
               const on = sel.has(d.public_id)
               const list = conts[d.public_id] ?? []
+              const live = isDeviceOn(d)
               return (
                 <button key={d.public_id} onClick={() => togglePhone(d.public_id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px', borderRadius: 6, cursor: 'pointer', background: on ? SEL_BG : FIELD_BG, color: on ? INK : '#A1A1AA', border: `1px solid ${on ? SEL_EDGE : FIELD_EDGE}`, fontSize: 13, fontWeight: 500 }}>
                   <span style={{ display: 'grid', placeItems: 'center', width: 14, height: 14, borderRadius: 4, background: on ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 9.5, fontWeight: 600, border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.18)' }}>{on ? '✓' : ''}</span>
+                  <span title={live ? 'En ligne' : `Hors ligne${d.status ? ` (${d.status})` : ''}`} style={{ width: 7, height: 7, borderRadius: '50%', background: live ? '#22C55E' : '#EF4444', boxShadow: live ? '0 0 6px rgba(34,197,94,.55)' : 'none', flex: 'none' }} />
                   {d.name ?? d.public_id}<span style={{ fontSize: 11.5, color: DIM, fontVariantNumeric: 'tabular-nums' }}>· {list.length}c</span>
                 </button>
               )
             })}
             {devices.length === 0 && !loading && <span style={{ fontSize: 12.5, color: DIM }}>Aucun iPhone détecté sur ta clé iRemoTech.</span>}
           </div>
+          {syncOff && devices.length > 0 && (
+            <div style={{ marginTop: 9, fontSize: 12, color: '#FBBF24', lineHeight: 1.5 }}>
+              ⚠ Containers enregistrés sur ce navigateur seulement : colle le SQL <code>20261028_irt_containers.sql</code> dans Supabase pour les partager en temps réel.
+            </div>
+          )}
 
           {/* Containers par téléphone sélectionné */}
           {[...sel].map(devId => {

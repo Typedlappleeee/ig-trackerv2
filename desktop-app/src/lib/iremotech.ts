@@ -21,6 +21,12 @@ async function irtProxy(op: string, apiKey: string, payload: Record<string, unkn
 const WS_BASE = 'wss://api.iremotech.com/v1'
 
 export interface IrtDevice { public_id: string; name?: string; model?: string; status?: string; [k: string]: unknown }
+/** iPhone en ligne : « online », « connected », « reachable »… (pas « offline »,
+ *  « disconnected », « unreachable », qui contiennent aussi « on »/« reachable »). */
+export const isDeviceOn = (d: IrtDevice): boolean => {
+  const s = (d.status ?? '').toLowerCase()
+  return !/off|disconn|unreach/.test(s) && (s.includes('on') || s.includes('reachable'))
+}
 export interface IrtBudget { used?: number; budget?: number; remaining?: number }
 export interface IrtUsage {
   active_minutes?: IrtBudget; actions?: IrtBudget; snapshots?: IrtBudget; uploads?: IrtBudget

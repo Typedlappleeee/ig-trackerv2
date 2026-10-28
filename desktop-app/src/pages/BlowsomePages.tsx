@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { themeFor } from '@/lib/theme'
 import {
-  useIremotech, listDevices, fetchUsage, loadSequences, saveSequence, deleteSequence, replaySequence, uploadMedia,
+  useIremotech, listDevices, fetchUsage, isDeviceOn, loadSequences, saveSequence, deleteSequence, replaySequence, uploadMedia,
   type IrtDevice, type IrtUsage, type IrtSequence, type SeqStep,
 } from '@/lib/iremotech'
 import LiveDevice from '@/components/LiveDevice'
@@ -18,7 +18,7 @@ import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
-import { loadDevContainers, saveDevContainers } from '@/lib/irtContainers'
+import { loadDevContainers, saveDevContainers, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { confirmDialog } from '@/lib/ui'
 import { signPaths, cachedSigned } from '@/lib/signedUrls'
 import { uploadThumbFor } from '@/lib/bankStorage'
@@ -142,6 +142,7 @@ const BLOW_THEME = themeFor('blowsome')
 export function BlowParc({ user, org }: { user: User; org: OrgState }) {
   const { currentOrg } = org
   const irt = useIremotech(user, org)
+  setContainerScope(currentOrg?.id ?? null, user.id)   // containers partagés de l'espace courant
   const [devices, setDevices] = useState<IrtDevice[]>([])
   const [usage, setUsage] = useState<IrtUsage | null>(null)
   const [loading, setLoading] = useState(false)
@@ -180,11 +181,30 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
     if (!irt.key) return
     setLoading(true); setErr(null)
     Promise.all([listDevices(irt.key), fetchUsage(irt.key)])
-      .then(([d, u]) => { setDevices(d); setUsage(u) })
+      .then(([d, u]) => { setDevices(d); setUsage(u); void pullContainers(d.map(x => x.public_id)).catch(() => null) })
       .catch(e => setErr(e instanceof Error ? e.message : 'Connexion iRemoTech échouée'))
       .finally(() => setLoading(false))
     loadSeq()
   }, [irt.key, loadSeq])
+  // Liste et état des iPhones actualisés toutes les 15 s (page visible) et au retour sur
+  // l'onglet, sauf pendant une publication.
+  const busyRef = useRef(false)
+  busyRef.current = running || runningMulti
+  useEffect(() => {
+    if (!irt.key) return
+    const key = irt.key
+    const tick = () => { if (document.visibilityState === 'visible' && !busyRef.current) listDevices(key).then(setDevices).catch(() => {}) }
+    const t = setInterval(tick, 15_000)
+    window.addEventListener('focus', tick)
+    return () => { clearInterval(t); window.removeEventListener('focus', tick) }
+  }, [irt.key])
+  // TEMPS RÉEL : containers de l'iPhone ouvert modifiés ailleurs → panneau mis à jour.
+  const publishDevRef = useRef<string | null>(null)
+  publishDevRef.current = publishDev?.public_id ?? null
+  useEffect(() => subscribeContainers((dev, list) => {
+    if (dev !== publishDevRef.current) return
+    setJobs(js => [...js.filter(j => list.includes(j.container)), ...list.filter(c => !js.some(j => j.container === c)).map(c => ({ container: c, on: false, vid: null, caption: '' }))])
+  }), [currentOrg?.id, user.id])
 
   const budget = usage?.actions ?? { remaining: usage?.remaining, budget: usage?.budget }
   const toggleRun = (id: string) => setRunSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -374,7 +394,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
             {/* Grille des appareils */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
               {devices.map(d => {
-                const on = (d.status ?? '').toLowerCase().includes('on') || d.status === 'reachable'
+                const on = isDeviceOn(d)
                 const checked = runSel.has(d.public_id)
                 return (
                   <Card key={d.public_id} style={{ padding: 16 }}>
