@@ -216,8 +216,18 @@ Deno.serve(async (req) => {
         return new Response('forbidden', { status: 403, headers: CORS })
       }
       try {
-        const r = await fetch(imgUrl, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.instagram.com/' } })
-        if (!r.ok) return new Response('', { status: r.status, headers: CORS })
+        const get = (u: string) => fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.instagram.com/' } }).catch(() => null)
+        let r = await get(imgUrl)
+        // Lien Instagram expiré (miniature noire) : le client précise le Reel (&code=) ou le compte
+        // (&user=) → image fraîche copiée une fois pour toutes dans le bucket « viral ».
+        const sp = new URL(req.url).searchParams
+        if ((!r || !r.ok) && (sp.get('code') || sp.get('user'))) {
+          const { healImage } = await import('./viral.ts')
+          const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+          const fresh = await healImage(db, { code: sp.get('code'), user: sp.get('user') }).catch(() => null)
+          if (fresh) r = await get(fresh)
+        }
+        if (!r || !r.ok) return new Response('', { status: r?.status ?? 502, headers: CORS })
         const ct = r.headers.get('content-type') ?? 'image/jpeg'
         return new Response(await r.arrayBuffer(), { headers: { ...CORS, 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' } })
       } catch { return new Response('', { status: 502, headers: CORS }) }
@@ -542,6 +552,18 @@ Deno.serve(async (req) => {
     summary['watchdog'] = `error: ${err instanceof Error ? err.message : String(err)}`
   }
 
+  // ── Étape 0-viral : relevé quotidien à MIDI (Paris) — comptes relevés avant le dernier midi, ≤ 20 s par tick ──
+  // Juste après le watchdog, AVANT le watchguard et le sync des comptes : le déclencheur coupe
+  // l'appel à ~55 s ; placé après le sync des comptes (jusqu'à 60 s, lui aussi à midi), le relevé
+  // de la Veille n'était parfois jamais atteint.
+  if (!filterUserId) {
+    try {
+      const { runViralWatch } = await import('./viral.ts')
+      const r = await runViralWatch(db, Date.now() + 20_000)
+      if (r.accounts > 0) summary['viral_watch'] = `${r.accounts} compte(s) · ${r.reels} reel(s)`
+    } catch { /* tables absentes / fournisseur indisponible : ignoré */ }
+  }
+
   // ── 0-bis. WATCHGUARD : tout téléphone allumé finit éteint ───────────────────
   // Le watchdog ci-dessus n'éteint que les téléphones qui ont un bail. Ici on liste
   // les téléphones RÉELLEMENT allumés chez chaque propriétaire (jeton GeeLark) et on
@@ -652,15 +674,6 @@ Deno.serve(async (req) => {
     const n = await runAccountSync(db, nowIso, Date.now() + 60_000)
     if (n > 0) summary['account_sync'] = `${n} compte(s) synchronisé(s)`
   } catch { /* ignore */ }
-
-  // ── Étape 0-viral : relevé quotidien à MIDI (Paris) — comptes relevés avant le dernier midi, ≤ 20 s par tick ──
-  if (!filterUserId) {
-    try {
-      const { runViralWatch } = await import('./viral.ts')
-      const r = await runViralWatch(db, Date.now() + 20_000)
-      if (r.accounts > 0) summary['viral_watch'] = `${r.accounts} compte(s) · ${r.reels} reel(s)`
-    } catch { /* tables absentes / fournisseur indisponible : ignoré */ }
-  }
 
   // ── Étape 0-genjutsu : file Genjutsu (une génération à la fois par espace), app fermée ──
   if (!filterUserId) {
