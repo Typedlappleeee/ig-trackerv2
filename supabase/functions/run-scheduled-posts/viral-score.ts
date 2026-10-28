@@ -15,6 +15,17 @@ export function isIgCdn(u: string): boolean {
   try { const h = new URL(u).hostname; return /^https:$/.test(new URL(u).protocol) && /(^|\.)(cdninstagram\.com|fbcdn\.net)$/.test(h) } catch { return false }
 }
 
+// ── Copies des images (les liens CDN Instagram expirent en quelques jours) — pur et testé ──
+/** Bucket PUBLIC où la Veille copie miniatures et photos de profil (liens qui n'expirent pas). */
+export const VIRAL_BUCKET = 'viral'
+export const thumbPath = (code: string | null | undefined): string | null => code && /^[A-Za-z0-9_-]{3,60}$/.test(code) ? `thumbs/${code}.jpg` : null
+export function avatarPath(username: string | null | undefined): string | null {
+  const u = (username ?? '').toLowerCase().replace(/^@/, '')
+  return /^[a-z0-9._]{1,30}$/.test(u) ? `avatars/${u}.jpg` : null
+}
+/** Image déjà copiée dans le bucket (lien Supabase public, permanent) ? */
+export const isCachedImage = (u: string | null | undefined): boolean => !!u && /\/storage\/v1\/object\/public\/viral\//.test(u)
+
 // ── Veille v4 : lecture d'un média Instagram (HikerAPI / instagrapi) — pur et testé ──
 export interface ParsedMedia {
   code: string; kind: 'reel' | 'feed'; postedAt: string | null

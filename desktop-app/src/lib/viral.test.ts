@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
-import { scoreReels } from '../../../supabase/functions/run-scheduled-posts/viral-score'
+import { scoreReels, lastParisNoon as serverNoon, thumbPath, avatarPath, isCachedImage } from '../../../supabase/functions/run-scheduled-posts/viral-score'
+import { lastParisNoon } from './parisNoon'
 import { filterReels } from '@/pages/ViralWatch'
 
 
@@ -116,5 +117,25 @@ describe('Veille v5 — profil façon Instagram', async () => {
     const s = profileStats([r('a', 1000, 0.5, 1), r('b', 3000, 1.5, 3), r('c', 90000, 45, 10), r('d', 2000, 1, 60), r('p', 0, 9, 2, 'feed')], now)
     expect(s.avg).toBe(2500); expect(s.best?.code).toBe('c'); expect(s.record).toBe(45); expect(s.viral).toBe(1)
     expect(s.eng).toBe(10); expect(s.perWeek).toBe(0.7)
+  })
+})
+
+
+describe('Veille : relevé de midi et images permanentes', () => {
+  it('midi (Paris) côté app = midi côté serveur, y compris aux changements d’heure', () => {
+    for (let t = Date.UTC(2026, 2, 27); t < Date.UTC(2026, 2, 31); t += 37 * 60_000) expect(lastParisNoon(new Date(t)).getTime()).toBe(serverNoon(new Date(t)).getTime())
+    for (let t = Date.UTC(2026, 9, 23); t < Date.UTC(2026, 9, 28); t += 37 * 60_000) expect(lastParisNoon(new Date(t)).getTime()).toBe(serverNoon(new Date(t)).getTime())
+    // Hiver (UTC+1) : midi Paris = 11:00 UTC ; été (UTC+2) : 10:00 UTC.
+    expect(lastParisNoon(new Date('2026-10-28T12:30:00Z')).toISOString()).toBe('2026-10-28T11:00:00.000Z')
+    expect(lastParisNoon(new Date('2026-10-28T10:30:00Z')).toISOString()).toBe('2026-10-27T11:00:00.000Z')
+    expect(lastParisNoon(new Date('2026-07-01T10:05:00Z')).toISOString()).toBe('2026-07-01T10:00:00.000Z')
+  })
+  it('chemins du bucket sûrs, liens copiés reconnus', () => {
+    expect(thumbPath('DAbc_12-x')).toBe('thumbs/DAbc_12-x.jpg')
+    expect(thumbPath('../etc')).toBeNull()
+    expect(avatarPath('@LacLynn.IG')).toBe('avatars/laclynn.ig.jpg')
+    expect(avatarPath('a/b')).toBeNull()
+    expect(isCachedImage('https://x.supabase.co/storage/v1/object/public/viral/thumbs/a.jpg')).toBe(true)
+    expect(isCachedImage('https://scontent.cdninstagram.com/v/t51/a.jpg?oe=6720')).toBe(false)
   })
 })
