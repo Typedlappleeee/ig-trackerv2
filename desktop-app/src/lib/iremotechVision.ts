@@ -5,6 +5,7 @@
 import { snapshot, sendAction } from './iremotech'
 import { ocrWords, findBlueButton, findInstagramIcon } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
+import { findGalleryThumb, findMatchingCell } from './screenMatch'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -385,18 +386,31 @@ async function tapAdvance(
 
 // Sélectionne un mode dans le bandeau du bas (POST STORY INSTANTS REEL LIVE). Si le
 // mode voulu n'est pas visible, scrolle le bandeau HORIZONTALEMENT jusqu'à le trouver.
-async function selectMode(key: string, deviceId: string, patterns: RegExp[], label: string, hooks?: VisionHooks): Promise<boolean> {
+// `alreadyIn(capture)` : barre des modes MASQUÉE (Instagram rouvre le dernier mode utilisé ;
+// une bulle d'effet la remplace) mais la caméra voulue est reconnue → rien à faire.
+const MODE_WORD = /^(post|publication|publier|story|stories|reels?|live|direct|instants?|templates?|mod[eè]les?)$/i
+async function selectMode(key: string, deviceId: string, patterns: RegExp[], label: string, hooks?: VisionHooks, alreadyIn?: (shot: string) => Promise<boolean>): Promise<boolean> {
   for (let i = 0; i < 6; i++) {
     if (hooks?.shouldStop?.()) return false
     if (await findTapText(key, deviceId, patterns, hooks, { label, minY: 0.72, tries: 2, cropY: [0.78, 1] })) return true
     const shot = await snapshot(key, deviceId)
     const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
-    if (!W || !H) { await sleep(600); continue }
-    // La barre des modes (POST STORY INSTANTS REEL LIVE) est TOUT EN BAS (~91 % de
-    // hauteur). On balaie exactement à ce niveau — plus haut, on scrolle l'aperçu / le
-    // carrousel d'effets (rien ne bouge dans la barre des modes).
+    if (!shot || !W || !H) { await sleep(600); continue }
+    // On ne balaie QUE sur la barre des modes, à la hauteur de ses mots LUS. Ailleurs (aperçu
+    // caméra, carrousel ou bulle d'effet), un balayage horizontal CHANGE D'EFFET (« pretty »…).
+    const wa = await ocrWords(shot, undefined, { threshold: null, scale: 3, psms: ['11'], cropY: [0.78, 1] })
+    const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 3, psms: ['11'], cropY: [0.78, 1] })
+    const bar = [...wa, ...wb].filter(o => MODE_WORD.test(o.text))
+    if (!bar.length) {
+      if (alreadyIn && await alreadyIn(shot)) { hooks?.log?.(`   ✓ caméra ${label} déjà ouverte (barre des modes masquée)`); return true }
+      if (i === 0) { await sleep(1500); continue } // caméra encore en chargement
+      hooks?.log?.(`❌ mode ${label} : barre des modes invisible → aucun balayage (il changerait l'effet de la caméra)`)
+      return false
+    }
+    const by = Math.round(bar.reduce((n, o) => n + o.cy, 0) / bar.length)
+    const [xa, xb] = i < 3 ? [0.82, 0.25] : [0.25, 0.82] // puis dans l'autre sens
     hooks?.log?.(`↔ scroll du bandeau des modes pour trouver ${label}…`)
-    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.91), x2: Math.round(W * 0.25), y2: Math.round(H * 0.91), duration_ms: 350 })
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * xa), y1: by, x2: Math.round(W * xb), y2: by, duration_ms: 350 })
     await sleep(900)
   }
   hooks?.log?.(`❌ mode ${label} introuvable`)
@@ -959,7 +973,7 @@ async function tryComment(key: string, deviceId: string, text: string, W: number
 // (vignette bas-gauche) → 1re vidéo (dernière uploadée) → Done (haut-droite) →
 // icône sticker (droite) → [sticker lien + partage — à venir].
 const STORY_ANCHORS = {
-  galleryThumb: { x: 0.09, y: 0.95 }, // vignette galerie en bas-gauche du story camera
+  galleryThumb: { x: 0.09, y: 0.93 }, // vignette galerie en bas-gauche du story camera (repli si non repérée)
   firstThumb: { x: 0.50, y: 0.40 },   // 1re vidéo de la galerie (dernière uploadée)
   doneBtn: { x: 0.87, y: 0.12 },      // « Done » haut-droite (après sélection vidéo)
   stickerIcon: { x: 0.91, y: 0.16 },  // icône « sticker » (tout à droite, 2e du haut sous Aa)
@@ -985,16 +999,57 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   await tapFrac(REEL_ANCHORS.createPlus.x, REEL_ANCHORS.createPlus.y)
   await sleep(2200)
-  // 2. Mode STORY (bandeau du bas).
-  if (!await selectMode(key, deviceId, [/story|stories/i], 'STORY', hooks)) return false
+  // 2. Mode STORY (bandeau du bas). Barre masquée (Instagram a rouvert la caméra Story, une
+  //    bulle d'effet la remplace) + vignette de galerie en bas-gauche → déjà sur la caméra.
+  //    (Si c'était la caméra Reel, l'écran « Add link » n'apparaîtrait jamais → abandon sans post.)
+  const inStoryCamera = async (s: string) => !!await findGalleryThumb(s)
+  if (!await selectMode(key, deviceId, [/story|stories/i], 'STORY', hooks, inStoryCamera)) return false
   await sleep(1600)
-  // 3. Ouvrir la galerie (vignette bas-gauche du story camera).
-  hooks?.log?.('🖼️ Ouverture de la galerie…')
-  await tapFrac(A.galleryThumb.x, A.galleryThumb.y)
-  await sleep(1800)
-  // 4. Sélectionner la 1re vidéo/photo (dernière uploadée).
-  hooks?.log?.('🎞️ Sélection du dernier média…')
-  await tapFrac(A.firstThumb.x, A.firstThumb.y)
+  // 3. Ouvrir la galerie : la VIGNETTE en bas-gauche = dernier média de la pellicule, donc la
+  //    vidéo qu'on vient d'envoyer. Repérée à l'image (bordure blanche) ; son aperçu sert
+  //    ensuite à retrouver CE média dans la galerie.
+  hooks?.log?.('🖼️ Ouverture de la galerie (vignette en bas à gauche)…')
+  const camShot = await snapshot(key, deviceId)
+  const thumb = camShot ? await findGalleryThumb(camShot) : null
+  const tx = thumb ? thumb.cx : Math.round(A.galleryThumb.x * W), ty = thumb ? thumb.cy : Math.round(A.galleryThumb.y * H)
+  hooks?.log?.(thumb ? `   vignette repérée → tap (${tx}, ${ty})` : `   vignette non repérée → position connue (${tx}, ${ty})`)
+  // Galerie ouverte = la vignette a disparu (ou, sans repère, un titre de galerie est lu).
+  const galleryOpen = async () => {
+    if (!thumb) return hasText(key, deviceId, [/^recents?$/i, /^r[ée]cents?$/i, /^select$/i, /^s[ée]lectionner$/i, /^gallery$/i, /^galerie$/i, /^pellicule$/i], hooks, { cropY: [0, 0.5], tries: 2 })
+    const s = await snapshot(key, deviceId)
+    const t2 = s ? await findGalleryThumb(s) : null
+    return !t2 || Math.abs(t2.cx - thumb.cx) > thumb.size || Math.abs(t2.cy - thumb.cy) > thumb.size
+  }
+  let opened = false
+  for (let attempt = 0; attempt < 3 && !opened; attempt++) {
+    if (hooks?.shouldStop?.()) return false
+    if (attempt < 2) await sendAction(key, deviceId, { type: 'tap', x: tx, y: ty })
+    else {
+      // Dernier recours : balayage VERTICAL vers le haut (ouvre la pellicule, sans toucher aux effets).
+      hooks?.log?.('   ↑ balayage vers le haut pour ouvrir la pellicule…')
+      await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H * 0.6), x2: Math.round(W * 0.5), y2: Math.round(H * 0.2), duration_ms: 400 })
+    }
+    await sleep(1800)
+    opened = await galleryOpen()
+    if (!opened) hooks?.log?.(`   galerie pas encore ouverte (essai ${attempt + 1}/3)`)
+  }
+  if (!opened) { hooks?.log?.('❌ galerie non ouverte → container suivant'); return false }
+  // 4. La vidéo la plus récente : la case de la galerie qui montre le même média que la vignette
+  //    (repli : 1re case, position connue).
+  hooks?.log?.('🎞️ Sélection de la vidéo la plus récente…')
+  let cell: { cx: number; cy: number } | null = null
+  for (let i = 0; i < 2 && thumb && !cell; i++) {
+    if (i) await sleep(1200) // vignettes de la galerie encore en chargement
+    const g = await snapshot(key, deviceId)
+    cell = g ? await findMatchingCell(g, thumb.sig) : null
+  }
+  if (cell) {
+    hooks?.log?.(`🎞️ vidéo la plus récente repérée (case ${cell.cx}, ${cell.cy}) → tap`)
+    await sendAction(key, deviceId, { type: 'tap', x: cell.cx, y: cell.cy })
+  } else {
+    hooks?.log?.('   vidéo non reconnue dans la galerie → 1re case (position connue)')
+    await tapFrac(A.firstThumb.x, A.firstThumb.y)
+  }
   await sleep(3500) // laisse le média se charger (le « Done » apparaît ensuite)
   // 5. Done (haut-droite) — si absent, on saute juste l'étape et on continue (des fois il n'y en a pas).
   if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0, 0.16], 'Done', 6)) hooks?.log?.('   (pas de Done → on continue)')
