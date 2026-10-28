@@ -19,6 +19,7 @@ import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing,
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
+import { folderMedia, loadBankSummary, type BankSummary } from '@/lib/flowEngine'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { themeFor } from '@/lib/theme'
 import { confirmDialog } from '@/lib/ui'
@@ -31,7 +32,7 @@ const GOLD = '#E9C46A', INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#71717A'
 const EDGE = 'rgba(255,255,255,0.07)', FIELD_EDGE = 'rgba(255,255,255,0.09)', FIELD_BG = '#161618'
 const MONO = "'JetBrains Mono',monospace"
 const SEL_BG = 'rgba(255,255,255,0.07)', SEL_EDGE = 'rgba(233,196,106,0.45)'
-type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null }
+type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null; used_count?: number }
 export type IrtTab = 'phones' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
 
 const card: CSSProperties = { background: '#111113', border: `1px solid ${EDGE}`, borderRadius: 8, padding: 16, marginBottom: 12 }
@@ -89,6 +90,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [reelPool, setReelPool] = useState<VidRef[]>([])   // pool vidéos (Posting)
   const [storyPool, setStoryPool] = useState<VidRef[]>([]) // pool photos (Story)
   const [picker, setPicker] = useState<null | 'reel' | 'story'>(null)
+  // Source des médias : choix à la main (pool) ou un DOSSIER de la Banque, lu au lancement
+  // (les vidéos ajoutées depuis sont prises). Retenu par onglet.
+  type Src = { mode: 'pick' | 'folder'; folder: string }
+  const loadSrc = (k: 'reel' | 'story'): Src => {
+    try { const v = JSON.parse(localStorage.getItem(`sf-irt-src-${k}`) ?? 'null'); if (v && (v.mode === 'pick' || v.mode === 'folder')) return { mode: v.mode, folder: String(v.folder ?? '') } } catch { /* ignore */ }
+    return { mode: 'pick', folder: '' }
+  }
+  const [reelSrc, setReelSrc] = useState<Src>(() => loadSrc('reel'))
+  const [storySrc, setStorySrc] = useState<Src>(() => loadSrc('story'))
+  const setSrc = (k: 'reel' | 'story', v: Src) => { (k === 'story' ? setStorySrc : setReelSrc)(v); try { localStorage.setItem(`sf-irt-src-${k}`, JSON.stringify(v)) } catch { /* ignore */ } }
+  const [bankSum, setBankSum] = useState<BankSummary | null>(null)
   const [captionPool, setCaptionPool] = useState('')
   const [storyLink, setStoryLink] = useState('')               // lien CTA par défaut (Story)
   const [storyLinks, setStoryLinks] = useState<Record<string, string>>({}) // lien PAR container : `${dev}::${c}`
@@ -145,6 +157,43 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       .finally(() => setLoading(false))
   }, [irt.key])
   useEffect(() => { load() }, [load])
+  const bankScope = { orgId: currentOrg?.id ?? null, userId: user.id }
+  useEffect(() => {
+    if ((curTab === 'posting' && reelSrc.mode === 'folder') || (curTab === 'story' && storySrc.mode === 'folder'))
+      loadBankSummary(bankScope).then(setBankSum).catch(() => setBankSum(null))
+  }, [curTab, reelSrc.mode, storySrc.mode, currentOrg?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Après une publication réussie : +1 au compteur du média (« Jamais publiées » / tri
+  // « Moins publiées » de la Banque ; le mode dossier prend ainsi des vidéos fraîches).
+  async function bumpUsed(id: string) {
+    try {
+      const { data } = await supabase.from('content_bank').select('used_count').eq('id', id).maybeSingle()
+      await supabase.from('content_bank').update({ used_count: ((data as { used_count: number | null } | null)?.used_count ?? 0) + 1 }).eq('id', id)
+    } catch { /* best-effort */ }
+  }
+  // Choix de la source (à la main / dossier de la Banque) pour Posting et Story.
+  const sourceRow = (k: 'reel' | 'story') => {
+    const src = k === 'story' ? storySrc : reelSrc
+    const img = k === 'story'
+    const folders = (bankSum?.folders ?? []).filter(f => (img ? f.image : f.video) > 0 || f.name === src.folder)
+    return (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+        <div style={{ display: 'inline-flex', padding: 2, borderRadius: 7, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}` }}>
+          {(['pick', 'folder'] as const).map(m => (
+            <button key={m} type="button" onClick={() => setSrc(k, { ...src, mode: m })}
+              style={{ height: 26, padding: '0 10px', borderRadius: 5, border: src.mode === m ? `1px solid ${SEL_EDGE}` : '1px solid transparent', cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: src.mode === m ? SEL_BG : 'transparent', color: src.mode === m ? INK : MUTED }}>
+              {m === 'pick' ? 'À la main' : 'Dossier de la Banque'}
+            </button>
+          ))}
+        </div>
+        {src.mode === 'folder' && (
+          <select value={src.folder} onChange={e => setSrc(k, { mode: 'folder', folder: e.target.value })} style={{ ...inp, height: 30, minWidth: 220, cursor: 'pointer' }}>
+            <option value="" style={{ background: FIELD_BG }}>{bankSum ? 'Choisir un dossier…' : 'Chargement des dossiers…'}</option>
+            {folders.map(f => <option key={f.name} value={f.name} data-no-tr style={{ background: FIELD_BG }}>{`${f.name} · ${img ? f.image : f.video}`}</option>)}
+          </select>
+        )}
+      </div>
+    )
+  }
 
   const budget = usage?.actions ?? { remaining: usage?.remaining, budget: usage?.budget }
 
@@ -192,20 +241,31 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // ── Posting (Reel) / Story — flow unifié ────────────────────────────────────
   async function run(kind: 'reel' | 'story') {
     if (!irt.key || running) return
-    const pool = kind === 'story' ? storyPool : reelPool
+    const src = kind === 'story' ? storySrc : reelSrc
+    let pool: VidRef[] = kind === 'story' ? storyPool : reelPool
     if (totalJobs === 0) { setLogs(['⚠ Sélectionne au moins un container (onglet Téléphones).']); return }
-    if (pool.length === 0) { setLogs([`⚠ Ajoute au moins ${kind === 'story' ? 'une photo' : 'une vidéo'} au pool.`]); return }
+    if (src.mode === 'folder' && !src.folder) { setLogs(['⚠ Choisis un dossier de la Banque.']); return }
+    if (src.mode === 'pick' && pool.length === 0) { setLogs([`⚠ Ajoute au moins ${kind === 'story' ? 'une photo' : 'une vidéo'} au pool.`]); return }
     if (kind === 'story') {
       const missing = [...sel].flatMap(dev => [...(selConts[dev] ?? [])].filter(c => !(storyLinks[linkKey(dev, c)] || storyLink.trim())))
       if (missing.length) { setLogs([`⚠ ${missing.length} container(s) sans lien CTA — mets un lien par container ou un lien par défaut.`]); return }
     }
     setRunning(true); setLogs([])
     const key = irt.key
+    if (src.mode === 'folder') {
+      try { pool = await folderMedia(bankScope, src.folder, kind === 'story' ? 'image' : 'video') }
+      catch (e) { setLogs([`⚠ Banque : ${e instanceof Error ? e.message : String(e)}`]); setRunning(false); return }
+      if (!pool.length) { setLogs([kind === 'story' ? `⚠ Le dossier « ${src.folder} » ne contient aucune photo.` : `⚠ Le dossier « ${src.folder} » ne contient aucune vidéo.`]); setRunning(false); return }
+    }
 
     const shuffle = <T,>(a: T[]) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[b[i], b[j]] = [b[j], b[i]] } return b }
-    let vidQueue = uniqueUse ? shuffle(pool) : []
+    // Dossier : les MOINS publiées d'abord (au hasard entre égales), sans doublon tant que le
+    // dossier n'est pas épuisé. Pool manuel : comme avant (Usage unique ou hasard).
+    const byUse = () => shuffle(pool).sort((x, y) => (y.used_count ?? 0) - (x.used_count ?? 0))   // pop() → la moins publiée
+    const queued = src.mode === 'folder' || uniqueUse
+    let vidQueue = src.mode === 'folder' ? byUse() : uniqueUse ? shuffle(pool) : []
     let capQueue = uniqueUse ? shuffle(captions) : []
-    const pickVid = (): VidRef => { if (uniqueUse) { if (!vidQueue.length) vidQueue = shuffle(pool); return vidQueue.pop()! } return pool[Math.floor(Math.random() * pool.length)] }
+    const pickVid = (): VidRef => { if (queued) { if (!vidQueue.length) vidQueue = src.mode === 'folder' ? byUse() : shuffle(pool); return vidQueue.pop()! } return pool[Math.floor(Math.random() * pool.length)] }
     const pickCap = (): string => { if (!captions.length) return ''; if (uniqueUse) { if (!capQueue.length) capQueue = shuffle(captions); return capQueue.pop()! } return captions[Math.floor(Math.random() * captions.length)] }
 
     const byPhone = [...sel].map(dev => ({
@@ -215,6 +275,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     })).filter(p => p.jobs.length)
 
     push(`▶ ${kind === 'story' ? 'Story' : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
+    if (src.mode === 'folder') push(kind === 'story' ? `📁 « ${src.folder} » : ${pool.length} photo(s)` : `📁 « ${src.folder} » : ${pool.length} vidéo(s)`)
     const R = startRun('farm', `iRemoTech ${kind} · ${byPhone.length} tel × ${totalJobs}`, totalJobs)
     setRunId(R.id)
 
@@ -240,6 +301,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, { log: hooks, shouldStop: () => R.isCancelled() })
           : await postReelByVision(key, p.dev, { caption: job.caption }, { log: hooks, shouldStop: () => R.isCancelled() })
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
+        if (posted) void bumpUsed(job.vid.id)
         R.tick(posted)
       }
     }
@@ -564,12 +626,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         <div style={card}>
           <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>🎬 Posting — Reels</div>
           <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque container coché reçoit une vidéo tirée <b>au hasard</b> du pool et publie un Reel.</p>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+          {sourceRow('reel')}
+          {reelSrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, toutes les vidéos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.</p>}
+          {reelSrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
             <button style={gold} onClick={() => setPicker('reel')}>+ Ajouter des vidéos</button>
             <span style={{ fontSize: 12, color: MUTED }}>{reelPool.length} vidéo(s) dans le pool</span>
             {reelPool.length > 0 && <button style={btn} onClick={() => setReelPool([])}>Vider</button>}
-          </div>
-          {reelPool.length > 0 && (
+          </div>}
+          {reelSrc.mode === 'pick' && reelPool.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
               {reelPool.map(v => (
                 <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, fontSize: 12, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK }}>
@@ -583,7 +647,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={3} placeholder={'Ma légende 1\nMa légende 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 60, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
         </div>
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />
-        <LaunchBar label={`Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || !reelPool.length || running} running={running} onClick={() => run('reel')} />
+        <LaunchBar label={`Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length) || running} running={running} onClick={() => run('reel')} />
         <LogPanel />
       </>)}
 
@@ -593,12 +657,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         <div style={card}>
           <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>📸 Story — photo + lien</div>
           <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque container reçoit une photo tirée au hasard, avec son lien sticker (CTA).</p>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+          {sourceRow('story')}
+          {storySrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, toutes les photos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.</p>}
+          {storySrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
             <button style={gold} onClick={() => setPicker('story')}>+ Ajouter des photos</button>
             <span style={{ fontSize: 12, color: MUTED }}>{storyPool.length} photo(s) dans le pool</span>
             {storyPool.length > 0 && <button style={btn} onClick={() => setStoryPool([])}>Vider</button>}
-          </div>
-          {storyPool.length > 0 && (
+          </div>}
+          {storySrc.mode === 'pick' && storyPool.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
               {storyPool.map(v => (
                 <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, fontSize: 12, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK }}>
@@ -627,7 +693,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={2} placeholder={'Texte 1\nTexte 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 46, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
         </div>
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />
-        <LaunchBar label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || !storyPool.length || running} running={running} onClick={() => run('story')} />
+        <LaunchBar label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || (storySrc.mode === 'folder' ? !storySrc.folder : !storyPool.length) || running} running={running} onClick={() => run('story')} />
         <LogPanel />
       </>)}
 

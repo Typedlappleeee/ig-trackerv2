@@ -177,7 +177,7 @@ function pick<T>(arr: T[], i: number, mode: PoolMode | undefined): T | undefined
 export interface Scope { orgId: string | null; userId: string }
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
 const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
-interface BankRow { id: string; folder: string | null; title: string | null; storage_path: string | null; file_url: string | null; notes: string | null; deleted_at?: string | null }
+interface BankRow { id: string; folder: string | null; title: string | null; storage_path: string | null; file_url: string | null; notes: string | null; deleted_at?: string | null; used_count?: number | null }
 const kindOf = (r: BankRow): 'image' | 'video' => {
   const ext = (r.storage_path ?? r.file_url ?? r.title ?? '').toLowerCase().split('?')[0].split('.').pop() ?? ''
   return IMG_EXT.includes(ext) ? 'image' : 'video'
@@ -186,7 +186,7 @@ const isMedia = (r: BankRow) => !SENTINELS.includes(r.notes ?? '') && !r.deleted
 
 async function bankRows(scope: Scope): Promise<BankRow[]> {
   const make = () => {
-    const q = supabase.from('content_bank').select('id,folder,title,storage_path,file_url,notes,deleted_at').order('created_at', { ascending: false }).order('id')
+    const q = supabase.from('content_bank').select('id,folder,title,storage_path,file_url,notes,deleted_at,used_count').order('created_at', { ascending: false }).order('id')
     return scope.orgId ? q.eq('org_id', scope.orgId) : q.eq('user_id', scope.userId).is('org_id', null)
   }
   const { data, error } = await fetchAllRows<BankRow>(make)
@@ -208,6 +208,16 @@ export async function loadBankSummary(scope: Scope): Promise<BankSummary> {
   }
   out.folders = [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
   return out
+}
+
+// Médias d'un dossier, lus AU LANCEMENT (les ajouts récents sont pris) — pour les outils hors
+// Flow Builder (iRemoTech). Sans lignes repères de dossier ni corbeille.
+export interface FolderMedia { id: string; title: string; storage_path: string | null; file_url: string | null; used_count: number }
+export async function folderMedia(scope: Scope, folder: string, kind: 'video' | 'image'): Promise<FolderMedia[]> {
+  const rows = await bankRows(scope)
+  return rows
+    .filter(r => isMedia(r) && kindOf(r) === kind && r.folder === folder)
+    .map(r => ({ id: r.id, title: r.title ?? 'media', storage_path: r.storage_path, file_url: r.file_url, used_count: r.used_count ?? 0 }))
 }
 
 // Médias (ids) d'un bloc selon sa source, résolus au lancement.
