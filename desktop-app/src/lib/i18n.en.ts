@@ -3164,6 +3164,11 @@ export const EN: Dict = {
     "Au lancement, toutes les photos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.": "At launch, every photo in the folder is used (including new ones): the least-posted go first, with no duplicates.",
     "⚠ Containers enregistrés sur ce navigateur seulement : colle le SQL": "⚠ Containers saved in this browser only: paste the SQL",
     "dans Supabase pour les partager en temps réel.": "into Supabase to share them in real time.",
+    "🖼️ Ouverture de la galerie (vignette en bas à gauche)…": "🖼️ Opening the gallery (bottom-left thumbnail)…",
+    "↑ balayage vers le haut pour ouvrir la pellicule…": "↑ swiping up to open the camera roll…",
+    "❌ galerie non ouverte → container suivant": "❌ gallery not opened → next container",
+    "🎞️ Sélection de la vidéo la plus récente…": "🎞️ Picking the most recent video…",
+    "vidéo non reconnue dans la galerie → 1re case (position connue)": "video not recognized in the gallery → 1st cell (known position)",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3719,5 +3724,11 @@ export const EN: Dict = {
     ["📁 « {0} » : {1} vidéo(s)", "📁 “{0}”: {1} video(s)"],
     ["Hors ligne{0}", "Offline{0}"],
     ["📸 logo {0} repéré (libellé non lu) → tap ({1}, {2})", "📸 {0} logo found (label not read) → tap ({1}, {2})"],
+    ["✓ caméra {0} déjà ouverte (barre des modes masquée)", "✓ {0} camera already open (mode bar hidden)"],
+    ["❌ mode {0} : barre des modes invisible → aucun balayage (il changerait l'effet de la caméra)", "❌ {0} mode: mode bar not visible → no swipe (it would change the camera effect)"],
+    ["vignette repérée → tap ({0}, {1})", "thumbnail found → tap ({0}, {1})"],
+    ["vignette non repérée → position connue ({0}, {1})", "thumbnail not found → known position ({0}, {1})"],
+    ["galerie pas encore ouverte (essai {0}/3)", "gallery not open yet (try {0}/3)"],
+    ["🎞️ vidéo la plus récente repérée (case {0}, {1}) → tap", "🎞️ most recent video found (cell {0}, {1}) → tap"],
   ],
 }
