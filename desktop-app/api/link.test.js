@@ -119,6 +119,7 @@ beforeEach(() => {
       const r = await call(v1, { method: init.method || 'GET', path: route, query: Object.fromEntries(u.searchParams), body: init.body ? JSON.parse(init.body) : undefined, auth: init.headers?.Authorization })
       return new Response(JSON.stringify(r.body), { status: r.status, headers: { 'content-type': 'application/json' } })
     }
+    if (url.startsWith(D.STORE) && globalThis.__slowMs) await new Promise(r => setTimeout(r, globalThis.__slowMs))
     if (url.startsWith(D.STORE)) {
       const p = decodeURIComponent(u.pathname.replace('/storage/v1/object/sign/content/', ''))
       const o = D.objects.get(p)
@@ -230,6 +231,22 @@ describe('Liaison avec le site staff (/api/link)', () => {
     const mine = D.t.content_bank.filter(r => r.org_id === ORG_A && r.folder === 'Reçu du staff')
     expect(mine.map(r => r.title).sort()).toEqual(['staff 1', 'staff 2'])
     expect(mine.every(r => r.user_id === USER && r.storage_path.startsWith(`videos/orgs/${ORG_A}/`))).toBe(true)
+  })
+  it('vitesse : 6 vidéos envoyées EN PARALLÈLE (≈ durée d’une seule, pas la somme)', async () => {
+    for (let i = 0; i < 3; i++) {
+      const path = `videos/orgs/${ORG_A}/${crypto.randomUUID()}.mp4`
+      D.objects.set(path, { bytes: Buffer.from('X' + i), type: 'video/mp4' })
+      D.t.content_bank.push({ id: crypto.randomUUID(), org_id: ORG_A, user_id: USER, title: 'extra ' + i, folder: 'Montage', storage_path: path, thumbnail_path: null, file_url: null, notes: null, created_at: new Date().toISOString(), deleted_at: null })
+    }
+    const ids = D.t.content_bank.filter(r => r.org_id === ORG_A && r.folder === 'Montage').map(r => r.id)
+    expect(ids.length).toBe(6)
+    globalThis.__slowMs = 400                     // chaque téléchargement côté staff prend 400 ms
+    const t0 = Date.now()
+    const r = await L({ op: 'send', ids, folder: 'Rapide' })
+    const ms = Date.now() - t0
+    globalThis.__slowMs = 0
+    expect(r.body.results.filter(x => x.ok).length).toBe(6)
+    expect(ms).toBeLessThan(1000)                 // en série : 6 × 400 = 2,4 s
   })
   it('lecteur (viewer) : voit, mais ne peut ni envoyer ni importer', async () => {
     const viewer = crypto.randomUUID()

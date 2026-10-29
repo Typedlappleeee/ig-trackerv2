@@ -3222,6 +3222,10 @@ export const EN: Dict = {
     "Dossier chez le partenaire": "Folder on the partner’s side",
     "Son site télécharge chaque vidéo (lien valable 24 h) et la range dans ce dossier. Rien n’est retiré de ta banque.": "Their site downloads each video (link valid 24 h) and files it in this folder. Nothing is removed from your bank.",
     "session expirée : reconnecte-toi": "session expired: log in again",
+    "ex. Montages prêts": "e.g. Ready edits",
+    "Non — seulement ma banque": "No — only my bank",
+    "Envoyer direct vers": "Send straight to",
+    "média introuvable": "media not found",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3800,5 +3804,12 @@ export const EN: Dict = {
     ["Envoyer {0} média(s) vers {1}", "Send {0} media to {1}"],
     ["serveur indisponible (HTTP {0})", "server unavailable (HTTP {0})"],
     ["Envoyer vers {0}", "Send to {0}"],
+    ["📤 « {0} » envoyé chez {1} › {2} ({3} s)", "📤 “{0}” sent to {1} › {2} ({3} s)"],
+    ["⚠ envoi chez {0} échoué : {1}", "⚠ sending to {0} failed: {1}"],
+    ["Nouveau dossier chez {0}", "New folder on {0}"],
+    ["{0} › nouveau dossier…", "{0} › new folder…"],
+    ["{0} envoi(s) chez {1} échoué(s) — vois le journal.", "{0} send(s) to {1} failed — see the log."],
+    ["Terminé — {0} montage(s) envoyé(s) chez {1} › {2}.", "Done — {0} edit(s) sent to {1} › {2}."],
+    ["📤 {0} envoyée(s) chez {1} › {2}{3}", "📤 {0} sent to {1} › {2}{3}"],
   ],
 }

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { Btn, Chip, FIELD, MONO, Modal, Panel, PanelHead, Skeleton, toast, confirmDialog } from '@/lib/ui'
-import { API_BASE, DOCS_URL, LINK_SQL, createToken, getPartner, isMissingSql, listTokens, revokeToken, savePartner, testPartner, type ApiToken, type Partner } from '@/lib/scaleflowLink'
+import { API_BASE, DOCS_URL, LINK_SQL, createToken, forgetPartner, getPartner, isMissingSql, listTokens, revokeToken, savePartner, testPartner, type ApiToken, type Partner } from '@/lib/scaleflowLink'
 
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
 async function copy(text: string) {
@@ -46,12 +46,12 @@ export default function LinkApiPanel({ theme, org, canManage }: { theme: Theme; 
   }
   async function saveLink() {
     setBusy('save')
-    try { await savePartner(orgId, pName, pUrl, pKey); toast('Site partenaire enregistré.', 'ok'); await load() } catch (e) { toast(e instanceof Error ? e.message : String(e), 'bad') }
+    try { await savePartner(orgId, pName, pUrl, pKey); forgetPartner(); toast('Site partenaire enregistré.', 'ok'); await load() } catch (e) { toast(e instanceof Error ? e.message : String(e), 'bad') }
     setBusy(null)
   }
   async function removeLink() {
     if (!await confirmDialog({ title: 'Retirer la liaison ?', text: 'Sa banque ne sera plus visible dans ScaleFlow. Rien n’est supprimé chez lui.', confirmLabel: 'Retirer', danger: true })) return
-    try { await savePartner(orgId, '', '', ''); toast('Liaison retirée.', 'ok'); await load() } catch (e) { toast(e instanceof Error ? e.message : String(e), 'bad') }
+    try { await savePartner(orgId, '', '', ''); forgetPartner(); toast('Liaison retirée.', 'ok'); await load() } catch (e) { toast(e instanceof Error ? e.message : String(e), 'bad') }
   }
   async function test() {
     setBusy('test')

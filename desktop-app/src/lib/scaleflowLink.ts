@@ -62,39 +62,58 @@ export const partnerFiles = (orgId: string | null, folder: string | null, cursor
 
 export interface Progress { done: number; total: number; failed: number; lastError?: string }
 
-// Mes médias → dossier du partenaire (3 par appel ; le serveur du partenaire télécharge chaque fichier).
+// Lots envoyés EN PARALLÈLE (et chaque lot traite ses fichiers en parallèle côté serveur) :
+// 10 vidéos partent en même temps → durée ≈ celle d'une seule.
+async function runBatches<T>(items: T[], size: number, parallel: number, op: string, orgId: string | null, extra: Record<string, unknown>,
+  key: string, p: Progress, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<void> {
+  const batches: T[][] = []
+  for (let i = 0; i < items.length; i += size) batches.push(items.slice(i, i + size))
+  let next = 0
+  await Promise.all(Array.from({ length: Math.min(parallel, batches.length) }, async () => {
+    while (next < batches.length && !signal?.aborted) {
+      const batch = batches[next++]
+      try {
+        const r = await linkCall<{ results: { ok: boolean; error?: string }[] }>(orgId, op, { ...extra, [key]: batch })
+        const okN = r.results.filter(x => x.ok).length
+        p.done += okN; p.failed += batch.length - okN
+        const err = r.results.find(x => !x.ok)?.error
+        if (err) p.lastError = err
+      } catch (e) { p.failed += batch.length; p.lastError = e instanceof Error ? e.message : String(e) }
+      onProgress({ ...p })
+    }
+  }))
+}
+
+// Mes médias → dossier du partenaire.
 export async function sendToPartner(orgId: string | null, ids: string[], folder: string, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<Progress> {
   const p: Progress = { done: 0, total: ids.length, failed: 0 }
-  for (let i = 0; i < ids.length; i += 3) {
-    if (signal?.aborted) break
-    const batch = ids.slice(i, i + 3)
-    try {
-      const r = await linkCall<{ results: { ok: boolean; error?: string }[] }>(orgId, 'send', { ids: batch, folder })
-      const okN = r.results.filter(x => x.ok).length
-      p.done += okN; p.failed += batch.length - okN
-      const err = r.results.find(x => !x.ok)?.error
-      if (err) p.lastError = err
-    } catch (e) { p.failed += batch.length; p.lastError = e instanceof Error ? e.message : String(e) }
-    onProgress({ ...p })
-  }
+  await runBatches(ids, 3, 4, 'send', orgId, { folder }, 'ids', p, onProgress, signal)
   return p
 }
 
-// Médias du partenaire → ma banque (2 par appel : chaque fichier est copié dans mon stockage).
+// Médias du partenaire → ma banque (chaque fichier est copié dans mon stockage).
 export async function importFromPartner(orgId: string | null, files: LinkFile[], folder: string, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<Progress> {
   const items = files.filter(f => f.url).map(f => ({ url: f.url, title: f.title, thumbnail_url: f.thumbnail_url }))
   const p: Progress = { done: 0, total: items.length, failed: files.length - items.length }
-  for (let i = 0; i < items.length; i += 2) {
-    if (signal?.aborted) break
-    const batch = items.slice(i, i + 2)
-    try {
-      const r = await linkCall<{ results: { ok: boolean; error?: string }[] }>(orgId, 'import', { items: batch, folder })
-      const okN = r.results.filter(x => x.ok).length
-      p.done += okN; p.failed += batch.length - okN
-      const err = r.results.find(x => !x.ok)?.error
-      if (err) p.lastError = err
-    } catch (e) { p.failed += batch.length; p.lastError = e instanceof Error ? e.message : String(e) }
-    onProgress({ ...p })
-  }
+  await runBatches(items, 3, 3, 'import', orgId, { folder }, 'items', p, onProgress, signal)
   return p
 }
+
+// Un montage tout juste enregistré dans ma banque → directement chez le partenaire.
+export async function sendOneToPartner(orgId: string | null, id: string, folder: string): Promise<{ ok: boolean; error?: string; ms: number }> {
+  const t0 = performance.now()
+  try {
+    const r = await linkCall<{ results: { ok: boolean; error?: string }[] }>(orgId, 'send', { ids: [id], folder })
+    const x = r.results[0]
+    return { ok: !!x?.ok, error: x ? x.error : 'média introuvable', ms: Math.round(performance.now() - t0) }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e), ms: Math.round(performance.now() - t0) } }
+}
+
+// Partenaire de l'espace (mis en cache) + ses dossiers, pour les sélecteurs « Envoyer direct vers ».
+const partnerCache = new Map<string, Promise<Partner | null>>()
+export function cachedPartner(orgId: string | null): Promise<Partner | null> {
+  const k = orgId ?? 'perso'
+  if (!partnerCache.has(k)) partnerCache.set(k, getPartner(orgId).catch(() => null))
+  return partnerCache.get(k)!
+}
+export function forgetPartner(): void { partnerCache.clear() }

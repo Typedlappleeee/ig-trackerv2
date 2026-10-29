@@ -1,39 +1,52 @@
 // Documentation de l'API ScaleFlow Link v1 (servie par GET /api/v1/docs, sans clé).
+// Les backticks et ${ des exemples de code sont échappés (gabarit JS).
 const css = `body{margin:0;background:#0b0b0d;color:#e7e7ea;font:15px/1.65 -apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif}
-main{max-width:860px;margin:0 auto;padding:40px 20px 80px}h1{font-size:28px;margin:0 0 6px;letter-spacing:-.02em}
-h2{font-size:19px;margin:38px 0 10px;padding-bottom:6px;border-bottom:1px solid #26262b}h3{font-size:15.5px;margin:24px 0 6px}
-p,li{color:#c4c4cc}code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:#17171b;border:1px solid #26262b;border-radius:5px;padding:1px 5px;color:#f1f1f3}
-pre{background:#121215;border:1px solid #26262b;border-radius:10px;padding:14px 16px;overflow-x:auto}pre code{background:none;border:0;padding:0}
+main{max-width:900px;margin:0 auto;padding:40px 20px 80px}h1{font-size:30px;margin:0 0 6px;letter-spacing:-.02em}
+h2{font-size:20px;margin:42px 0 10px;padding-bottom:6px;border-bottom:1px solid #26262b}h3{font-size:15.5px;margin:24px 0 6px}
+p,li{color:#c4c4cc}a{color:#c4bbfb}code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:#17171b;border:1px solid #26262b;border-radius:5px;padding:1px 5px;color:#f1f1f3}
+pre{background:#121215;border:1px solid #26262b;border-radius:10px;padding:14px 16px;overflow-x:auto;line-height:1.5}pre code{background:none;border:0;padding:0;font-size:12.5px}
 .m{display:inline-block;min-width:46px;font:600 12px ui-monospace,monospace;padding:2px 7px;border-radius:5px;margin-right:6px;text-align:center}
 .g{background:#12351f;color:#7ee2a0}.p{background:#3a2a0f;color:#f2c46b}.note{border-left:3px solid #c9a227;padding:2px 14px;margin:16px 0;color:#d9d3bf}
-table{border-collapse:collapse;width:100%;display:block;overflow-x:auto}td,th{border:1px solid #26262b;padding:7px 10px;text-align:left;vertical-align:top}th{background:#15151a}`
+table{border-collapse:collapse;width:100%;display:block;overflow-x:auto;margin:10px 0}td,th{border:1px solid #26262b;padding:7px 10px;text-align:left;vertical-align:top}th{background:#15151a}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}.flow span{padding:8px 12px;border-radius:10px;background:#141418;border:1px solid #2a2a31;font-size:13.5px}.flow b{color:#8b8b95;font-weight:400}
+nav{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px;margin:14px 0 0}nav a{text-decoration:none}`
 
 export const DOCS_HTML = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API ScaleFlow Link v1</title><meta name="robots" content="noindex"><style>${css}</style></head><body><main>
 <h1>API ScaleFlow Link <span style="color:#8b8b95;font-weight:400">v1</span></h1>
-<p>Relie la banque de contenus ScaleFlow à un autre site : lister les dossiers, récupérer les vidéos, en envoyer.
-Le même contrat sert dans les deux sens — ScaleFlow le parle, et ton site peut le parler aussi pour que ScaleFlow voie sa banque.</p>
+<p>Relie la banque de contenus ScaleFlow à un autre site (ex. le site du staff) : chacun voit la banque de l'autre — séparément —,
+récupère ses vidéos et lui en envoie, directement dans le dossier voulu.</p>
+<div class="flow"><span>ScaleFlow — montage</span><b>⇄</b><span>API ScaleFlow Link</span><b>⇄</b><span>Site du staff — Drive VA / Posting VA</span></div>
+<nav><a href="#toi">1. Mise en place</a><a href="#auth">2. Authentification</a><a href="#routes">3. Routes ScaleFlow</a><a href="#partenaire">4. Routes à ajouter sur ton site</a><a href="#code">5. Code d'exemple</a><a href="#limites">6. Erreurs &amp; limites</a></nav>
 
-<h2>1. Authentification</h2>
-<p>Crée une clé dans ScaleFlow › <b>Paramètres › API &amp; site partenaire</b> (propriétaire / admin). Elle n'est affichée qu'une fois.
-Envoie-la dans chaque requête :</p>
+<h2 id="toi">1. Mise en place (propriétaire ScaleFlow, 5 min)</h2>
+<ol>
+<li>Supabase → SQL Editor : colle et exécute <code>supabase/migrations/20261029_scaleflow_link.sql</code> (une seule fois).</li>
+<li>ScaleFlow → <b>Réglages › Intégrations › API ScaleFlow</b> → <b>Créer une clé</b> (ex. « Site staff »). Copie-la : elle n'est affichée qu'une fois.</li>
+<li>Envoie à ton dev, par un canal privé : l'adresse <code>https://scaleflow.company/api/v1</code>, la clé, et ce document.</li>
+<li>Ton dev ajoute sur son site les 4 routes de la <a href="#partenaire">section 4</a> et te donne : l'adresse de base (ex. <code>https://site-du-staff.com/api/scaleflow</code>) et SA clé.</li>
+<li>ScaleFlow → <b>Site partenaire</b> : colle son adresse et sa clé → <b>Enregistrer</b> → <b>Tester</b>.</li>
+<li>C'est relié : <b>Banque › « Banque Staff »</b> pour voir et importer ses vidéos ; sélectionne des médias › <b>« Envoyer vers Staff »</b> pour les copier dans le dossier de ton choix chez lui.</li>
+<li><b>Montages envoyés directement</b> : dans le <b>Studio vidéo</b> et l'<b>Auto-contenu</b>, règle <b>« Envoyer direct vers : Staff › dossier »</b>. Chaque montage terminé part chez lui dès qu'il est prêt (une copie reste dans ta banque). Le journal affiche « 📤 envoyé chez Staff › dossier (1,8 s) ».</li>
+</ol>
+<p class="note">Clé perdue ou partagée par erreur : <b>Révoquer</b> dans les Réglages, puis en créer une autre. Un membre « lecteur » de l'organisation voit la banque du partenaire mais ne peut ni envoyer ni importer.</p>
+
+<h2 id="auth">2. Authentification</h2>
+<p>Chaque requête vers ScaleFlow porte la clé :</p>
 <pre><code>Authorization: Bearer sf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code></pre>
 <p class="note">Appels <b>serveur à serveur</b> uniquement : ne mets jamais la clé dans le code d'une page web (pas de CORS).
 Base : <code>https://scaleflow.company/api/v1</code>. Réponses JSON : <code>{"ok": true, …}</code> ou
-<code>{"ok": false, "code": "…", "error": "…"}</code> avec le statut HTTP (401 clé invalide, 404, 409, 413 trop lourd, 422 requête invalide, 507 banque pleine).</p>
+<code>{"ok": false, "code": "…", "error": "…"}</code> avec le statut HTTP.</p>
 
-<h2>2. Routes</h2>
+<h2 id="routes">3. Routes de l'API ScaleFlow</h2>
 <h3><span class="m g">GET</span><code>/me</code></h3>
 <p>Vérifie la clé. <code>{"ok":true,"api":"scaleflow-link","version":1,"space":{"type":"organization","id":"…"}}</code></p>
-
 <h3><span class="m g">GET</span><code>/folders</code></h3>
 <pre><code>{ "ok": true,
   "folders": [ { "name": "Lot octobre", "videos": 42, "images": 3, "updated_at": "2026-10-29T10:12:00Z" } ],
   "unfiled": { "videos": 5, "images": 0 } }</code></pre>
-
 <h3><span class="m p">POST</span><code>/folders</code></h3>
-<p>Corps <code>{"name": "Montage VA"}</code> → crée le dossier (sans effet s'il existe).</p>
-
+<p>Corps <code>{"name": "Montage VA"}</code> → crée le dossier (sans effet s'il existe déjà).</p>
 <h3><span class="m g">GET</span><code>/files?folder=Lot%20octobre&amp;limit=50&amp;cursor=</code></h3>
 <p>Médias d'un dossier, du plus récent au plus ancien (sans <code>folder</code> = médias hors dossier). <code>limit</code> ≤ 200.
 Page suivante : repasse <code>cursor=next_cursor</code>. Les liens <code>url</code> / <code>thumbnail_url</code> sont valables 6 h.</p>
@@ -42,27 +55,130 @@ Page suivante : repasse <code>cursor=next_cursor</code>. Les liens <code>url</co
                "url": "https://…/clip.mp4?token=…", "thumbnail_url": "https://…/thumb.jpg?token=…",
                "duration": 14, "created_at": "2026-10-29T10:12:00Z" } ],
   "next_cursor": "50" }</code></pre>
-
 <h3><span class="m p">POST</span><code>/files</code> — envoyer un média depuis une URL</h3>
 <pre><code>{ "url": "https://ton-stockage/clip.mp4?token=…", "folder": "Montage VA", "title": "clip 12",
   "thumbnail_url": "https://…/thumb.jpg" }</code></pre>
 <p>ScaleFlow télécharge le fichier (https public, 300 Mo max) et le range dans le dossier. Réponse : <code>{"ok":true,"file":{…}}</code>.
-Une URL signée Supabase/S3 valable au moins 1 h convient.</p>
-
+Une URL signée Supabase / S3 valable au moins 1 h convient. Non idempotent : n'envoie pas deux fois la même requête.</p>
 <h3><span class="m p">POST</span><code>/uploads</code> puis <code>PUT</code> puis <span class="m p">POST</span><code>/files</code> — envoi direct d'un fichier</h3>
 <pre><code>POST /uploads   {"filename": "clip.mp4", "content_type": "video/mp4"}
 → {"ok":true,"path":"videos/…/uuid.mp4","upload_url":"https://…","method":"PUT"}
 PUT  upload_url  (corps = le fichier, en-tête Content-Type)
 POST /files     {"path": "videos/…/uuid.mp4", "folder": "Montage VA", "title": "clip 12"}</code></pre>
 
-<h2>3. Pour que ScaleFlow voie TA banque et t'envoie des fichiers</h2>
-<p>Expose sur ton site les mêmes routes (même format de réponse), protégées par une clé que tu choisis
-(<code>Authorization: Bearer &lt;ta-clé&gt;</code>). Dans ScaleFlow, on renseigne l'adresse de base (ex. <code>https://ton-site.com/api/scaleflow</code>) et cette clé.</p>
+<h2 id="partenaire">4. Routes à ajouter sur ton site (pour que ScaleFlow voie ta banque)</h2>
+<p>Expose les mêmes routes, au même format, protégées par une clé que tu choisis (<code>Authorization: Bearer &lt;ta-clé&gt;</code>).
+Dans ScaleFlow, le propriétaire renseigne ton adresse de base et cette clé.</p>
 <table><tr><th>Route chez toi</th><th>Utilisée par ScaleFlow pour</th></tr>
-<tr><td><code>GET /me</code></td><td>Tester la connexion (réponds <code>{"ok":true}</code>)</td></tr>
-<tr><td><code>GET /folders</code></td><td>Afficher tes dossiers dans l'onglet « Banque partenaire »</td></tr>
-<tr><td><code>GET /files?folder=…&amp;cursor=…</code></td><td>Afficher les médias d'un dossier (avec <code>url</code> téléchargeable et si possible <code>thumbnail_url</code>) et les importer dans ScaleFlow</td></tr>
-<tr><td><code>POST /files</code> <code>{url, folder, title, thumbnail_url}</code></td><td>« Envoyer vers le partenaire » : télécharge <code>url</code> (lien ScaleFlow valable 24 h) et range-le dans <code>folder</code> (crée le dossier s'il n'existe pas)</td></tr></table>
+<tr><td><code>GET /me</code></td><td>Tester la connexion — réponds <code>{"ok":true}</code></td></tr>
+<tr><td><code>GET /folders</code></td><td>Afficher tes dossiers dans « Banque Staff »</td></tr>
+<tr><td><code>GET /files?folder=…&amp;cursor=…</code></td><td>Afficher les médias d'un dossier (<code>url</code> téléchargeable, <code>thumbnail_url</code> si possible) et les importer dans ScaleFlow</td></tr>
+<tr><td><code>POST /files</code> <code>{url, folder, title, thumbnail_url}</code></td><td>« Envoyer vers Staff » : télécharge <code>url</code> (lien ScaleFlow valable 24 h) et range-le dans <code>folder</code> (crée le dossier s'il n'existe pas)</td></tr></table>
 <p class="note">ScaleFlow appelle ton site depuis son serveur : https obligatoire, adresse publique, réponse en moins de ~50 s par fichier.
-Pour <code>POST /files</code>, télécharge le fichier puis réponds <code>{"ok":true}</code> (ou <code>{"ok":false,"error":"…"}</code>).</p>
+Les envois partent <b>en parallèle</b> (jusqu'à 12 fichiers en même temps) : ton site doit accepter plusieurs requêtes simultanées.</p>
+<h3>Pour un envoi en ~2 secondes</h3>
+<ul>
+<li>Héberge ton site dans la même région que ton stockage (ex. Supabase + Vercel en Europe) : la copie serveur à serveur d'une vidéo de 30 Mo prend alors 1 à 2 s.</li>
+<li>Transfère en flux (<i>streaming</i>) : envoie le corps de la réponse <code>fetch(url)</code> directement à ton stockage au lieu de tout charger en mémoire.</li>
+<li>Option « instantané » : réponds <code>{"ok":true}</code> tout de suite et termine le téléchargement en arrière-plan (<code>waitUntil</code> de <code>@vercel/functions</code>). ScaleFlow affiche alors « envoyé » en moins d'une seconde ; prévois un journal d'erreurs de ton côté.</li>
+</ul>
+
+<h2 id="code">5. Code d'exemple</h2>
+<h3>Les 4 routes, côté site du staff (Vercel + Supabase)</h3>
+<p>À adapter : nom de ta table, de ton bucket et de tes colonnes. Variables d'environnement : <code>SUPABASE_URL</code>,
+<code>SUPABASE_SERVICE_ROLE_KEY</code>, <code>SCALEFLOW_LINK_KEY</code> (la clé que tu colles dans ScaleFlow).</p>
+<pre><code>// api/scaleflow/[...route].js — fonction Vercel (Node 18+, ESM) sur le site du staff.
+// Adresse à mettre dans ScaleFlow : https://site-du-staff.com/api/scaleflow
+import { createClient } from '@supabase/supabase-js'
+
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+const KEY = process.env.SCALEFLOW_LINK_KEY      // clé que TU inventes et colles dans ScaleFlow
+const TABLE = 'bank', BUCKET = 'videos'          // ← adapte aux noms de ta base
+// Colonnes supposées dans TABLE : id, title, folder, path (chemin dans BUCKET), created_at
+
+export default async function handler(req, res) {
+  if (!KEY || req.headers.authorization !== \`Bearer \${KEY}\`) return res.status(401).json({ ok: false, error: 'clé invalide' })
+  const route = [].concat(req.query.route || []).join('/')
+  try {
+    // 1) Test de connexion
+    if (req.method === 'GET' &amp;&amp; route === 'me') return res.json({ ok: true })
+
+    // 2) Dossiers + nombre de vidéos
+    if (req.method === 'GET' &amp;&amp; route === 'folders') {
+      const { data, error } = await db.from(TABLE).select('folder')
+      if (error) throw error
+      const count = {}
+      let unfiled = 0
+      for (const r of data) r.folder ? (count[r.folder] = (count[r.folder] || 0) + 1) : unfiled++
+      return res.json({ ok: true, folders: Object.entries(count).map(([name, videos]) =&gt; ({ name, videos })), unfiled: { videos: unfiled } })
+    }
+
+    // 3) Médias d'un dossier (sans ?folder= : médias hors dossier), 50 par page
+    if (req.method === 'GET' &amp;&amp; route === 'files') {
+      const off = Number(req.query.cursor || 0), lim = Math.min(Number(req.query.limit || 50), 200)
+      let q = db.from(TABLE).select('id, title, folder, path, created_at').order('created_at', { ascending: false }).range(off, off + lim)
+      q = req.query.folder ? q.eq('folder', req.query.folder) : q.is('folder', null)
+      const { data, error } = await q
+      if (error) throw error
+      const page = data.slice(0, lim)
+      const files = await Promise.all(page.map(async r =&gt; {
+        const { data: s } = await db.storage.from(BUCKET).createSignedUrl(r.path, 6 * 3600)
+        return { id: r.id, title: r.title, folder: r.folder, kind: /\\.(jpe?g|png|webp)$/i.test(r.path) ? 'image' : 'video',
+                 url: s?.signedUrl ?? null, thumbnail_url: null, created_at: r.created_at }
+      }))
+      return res.json({ ok: true, files, next_cursor: data.length &gt; lim ? String(off + lim) : null })
+    }
+
+    // 4) Réception d'un envoi de ScaleFlow : télécharger l'URL et ranger dans le dossier
+    if (req.method === 'POST' &amp;&amp; route === 'files') {
+      const { url, folder, title } = req.body || {}
+      // N'accepter que les liens de stockage Supabase (évite qu'on te fasse télécharger n'importe quoi)
+      if (!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co\\//.test(String(url))) throw new Error('URL refusée')
+      const r = await fetch(url)
+      if (!r.ok) throw new Error(\`téléchargement échoué (\${r.status})\`)
+      const type = r.headers.get('content-type') || 'video/mp4'
+      const ext = type.startsWith('image/') ? 'jpg' : 'mp4'
+      const path = \`scaleflow/\${crypto.randomUUID()}.\${ext}\`
+      const up = await db.storage.from(BUCKET).upload(path, Buffer.from(await r.arrayBuffer()), { contentType: type })
+      if (up.error) throw up.error
+      const ins = await db.from(TABLE).insert({ title: title || 'ScaleFlow', folder: folder || null, path })
+      if (ins.error) throw ins.error
+      return res.json({ ok: true })
+    }
+    return res.status(404).json({ ok: false, error: 'route inconnue' })
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String(e?.message || e) })
+  }
+}</code></pre>
+<h3>Utiliser l'API ScaleFlow depuis ton serveur</h3>
+<pre><code>// Sur le serveur du site staff : utiliser l'API ScaleFlow (clé donnée par le propriétaire ScaleFlow)
+const SF = 'https://scaleflow.company/api/v1'
+const H = { Authorization: \`Bearer \${process.env.SCALEFLOW_KEY}\` }
+
+// Voir sa banque : dossiers, puis les vidéos d'un dossier (liens de téléchargement valables 6 h)
+const { folders } = await (await fetch(\`\${SF}/folders\`, { headers: H })).json()
+const { files, next_cursor } = await (await fetch(\`\${SF}/files?folder=\${encodeURIComponent('Montage')}\`, { headers: H })).json()
+
+// Lui envoyer une vidéo dans SON dossier « Retours VA » (depuis un lien signé de ton stockage)
+const { data: s } = await db.storage.from('videos').createSignedUrl(path, 3600)
+await fetch(\`\${SF}/files\`, {
+  method: 'POST',
+  headers: { ...H, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ url: s.signedUrl, folder: 'Retours VA', title: 'clip 12' }),
+})</code></pre>
+
+<h2 id="limites">6. Erreurs &amp; limites</h2>
+<table><tr><th>Statut</th><th>code</th><th>Quand</th></tr>
+<tr><td>401</td><td><code>unauthorized</code></td><td>Clé absente, fausse ou révoquée</td></tr>
+<tr><td>404</td><td><code>not_found</code></td><td>Route inconnue</td></tr>
+<tr><td>409</td><td><code>not_uploaded</code></td><td><code>POST /files</code> avec un <code>path</code> pas encore envoyé (fais le PUT d'abord)</td></tr>
+<tr><td>413</td><td><code>too_large</code></td><td>Fichier de plus de 300 Mo</td></tr>
+<tr><td>422</td><td><code>invalid_url</code>, <code>invalid_file</code>, <code>invalid_path</code>…</td><td>Requête invalide (URL non https ou interne, type de fichier, chemin)</td></tr>
+<tr><td>502</td><td><code>fetch_failed</code></td><td>Le téléchargement de l'URL fournie a échoué</td></tr>
+<tr><td>507</td><td><code>bank_full</code></td><td>Banque ScaleFlow pleine (limite de l'abonnement)</td></tr></table>
+<ul>
+<li>Types acceptés : vidéos (mp4, mov, m4v, webm, mkv, avi, 3gp) et images (jpg, png, webp, heic, gif).</li>
+<li>Liens de téléchargement : 6 h (lecture via l'API), 24 h (envois vers ton site).</li>
+<li>La clé ne donne accès qu'à la banque de l'espace qui l'a créée (organisation ou compte perso), jamais aux autres.</li>
+</ul>
 </main></body></html>`
