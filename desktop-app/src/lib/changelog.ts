@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-29b',
+    date: '2026-10-29',
+    title: { fr: '🎭 API : Spoof et Remix à distance + appareil enfin écrit dans les vidéos', en: '🎭 API: remote Spoof and Remix + device finally written into videos' },
+    items: {
+      fr: [
+        'API ScaleFlow : /tools/spoof (vidéos et photos) et /tools/remix — mêmes réglages que le Studio, faits par le serveur, résultat rangé dans la banque.',
+        'Spoof : l’appareil choisi (iPhone 15 Pro, Galaxy S23…) est maintenant vraiment écrit dans la vidéo (avant, seul le GPS l’était).',
+      ],
+      en: [
+        'ScaleFlow API: /tools/spoof (videos and photos) and /tools/remix — same settings as the Studio, done by the server, result saved in the bank.',
+        'Spoof: the chosen device (iPhone 15 Pro, Galaxy S23…) is now really written into the video (before, only the GPS was).',
+      ],
+    },
+  },
+  {
     id: '2026-10-29',
     date: '2026-10-29',
     title: { fr: '🔗 API ScaleFlow : relie ta banque à ton autre site', en: '🔗 ScaleFlow API: link your bank to your other site' },

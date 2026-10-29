@@ -23,6 +23,7 @@ const NOT_SENTINEL = 'notes.is.null,notes.not.in.("__sf_folder__","__sf_drive_fo
 const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 const VID_EXT = ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi', '3gp']
 const MIME_EXT = { 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm', 'video/x-m4v': 'm4v', 'video/x-matroska': 'mkv', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/gif': 'gif' }
+export const MIME_OF = { ...Object.fromEntries(Object.entries(MIME_EXT).map(([m, e]) => [e, m])), jpeg: 'image/jpeg' }
 export const MAX_BYTES = 300 * 1024 * 1024        // 300 Mo par fichier (mémoire d'une fonction)
 const URL_TTL = 6 * 3600                            // liens de téléchargement : 6 h
 
@@ -178,6 +179,36 @@ async function insertRow(s, scope, { title, folder, path, thumbPath }) {
     throw new Error(error.message)
   }
   return data
+}
+
+// Range des octets (ex. sortie d'un outil Studio) dans la banque de l'espace : fichier + miniature
+// éventuelle + ligne content_bank. Renvoie le média (liens signés 6 h).
+export async function storeBytes(s, scope, { buf, ext, contentType, title, folder, thumb }) {
+  const id = randomUUID()
+  const path = `${scopeDir(scope)}${id}.${ext}`
+  if (!(await quotaOk(s, path))) throw httpError(507, 'bank_full', 'banque pleine (limite d’espace atteinte)')
+  const up = await s.storage.from('content').upload(path, buf, { contentType: contentType || undefined, upsert: false })
+  if (up.error) throw new Error(up.error.message)
+  let thumbPath = null
+  if (thumb) {
+    const tp = `${scopeDir(scope)}${id}_thumb.jpg`
+    const tu = await s.storage.from('content').upload(tp, thumb, { contentType: 'image/jpeg', upsert: false })
+    if (!tu.error) thumbPath = tp
+  }
+  const row = await insertRow(s, scope, { title: cleanTitle(title), folder: cleanFolder(folder), path, thumbPath })
+  return fileOut(row, await signMany(s, [row.storage_path, row.thumbnail_path]))
+}
+
+// Octets d'un média de MA banque (id dans l'espace), lus dans le stockage (clé service-role).
+export async function bytesOfFile(s, scope, id, maxBytes = MAX_BYTES) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) throw httpError(422, 'invalid_file', 'file_id invalide')
+  const { data: r } = await inScope(s.from('content_bank').select('id, title, folder, storage_path, file_url, deleted_at'), scope).eq('id', String(id)).maybeSingle()
+  if (!r || r.deleted_at || !(r.storage_path || r.file_url)) throw httpError(404, 'file_not_found', 'média introuvable dans ta banque')
+  if (!r.storage_path) { const got = await fetchPublic(r.file_url, { maxBytes }); return { ...got, title: r.title, folder: r.folder, ext: extOf(r.file_url) } }
+  const { data, error } = await s.storage.from('content').download(r.storage_path)
+  if (error || !data) throw httpError(502, 'fetch_failed', 'lecture du média impossible')
+  if (data.size > maxBytes) throw httpError(413, 'too_large', `fichier trop lourd (max ${Math.round(maxBytes / 1048576)} Mo)`)
+  return { buf: Buffer.from(await data.arrayBuffer()), contentType: data.type || '', title: r.title, folder: r.folder, ext: extOf(r.storage_path) }
 }
 
 // Télécharge un média depuis une URL https PUBLIQUE et le range dans la banque.

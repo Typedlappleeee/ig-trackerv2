@@ -18,6 +18,7 @@
  "(ZIP)",
  "(prefers-reduced-motion: reduce)",
  "+faststart",
+ "+faststart+use_metadata_tags",
  ", comment {0}%",
  ", sans hashtags",
  ",setpts=PTS/{0}",
