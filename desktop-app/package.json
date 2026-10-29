@@ -21,6 +21,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^31.3.1",
     "electron-builder": "^24.13.3",
+    "ffmpeg-static": "^5.2.0",
     "typescript": "^5.5.3",
     "vite": "^5.4.1",
     "vitest": "^2.1.9"

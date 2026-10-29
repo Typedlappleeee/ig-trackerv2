@@ -38,6 +38,10 @@
     },
     "api/link.js": {
       "maxDuration": 60
+    },
+    "api/v1-tools.js": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/ffmpeg-static/ffmpeg"
     }
   },
   "rewrites": [
@@ -64,6 +68,14 @@
     {
       "source": "/l/:path*",
       "destination": "/api/l?p=:path*"
+    },
+    {
+      "source": "/api/v1/tools",
+      "destination": "/api/v1-tools"
+    },
+    {
+      "source": "/api/v1/tools/:tool",
+      "destination": "/api/v1-tools?tool=:tool"
     },
     {
       "source": "/api/v1/:path*",

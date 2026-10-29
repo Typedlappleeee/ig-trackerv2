@@ -43,7 +43,9 @@ export async function saveOutputToBank(userId: string, orgId: string | null, byt
 }
 
 // Encodage h264/aac rapide (wasm). '-c:a aac' est ignoré s'il n'y a pas d'audio.
-const H264 = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart']
+// use_metadata_tags : sans lui, le mp4 JETTE les métadonnées « appareil » (make/model/com.apple.*)
+// → le choix « iPhone 15 Pro » du spoof n'était jamais écrit (seul le GPS passait).
+export const H264 = ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart+use_metadata_tags']
 // Garantit des dimensions paires (libx264 yuv420p l'exige).
 const EVEN = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
 // Ramène à 1080 de large au maximum (une vidéo plus petite n'est pas agrandie).

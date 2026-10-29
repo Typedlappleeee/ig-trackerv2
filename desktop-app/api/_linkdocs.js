@@ -17,7 +17,7 @@ export const DOCS_HTML = `<!doctype html><html lang="fr"><head><meta charset="ut
 <p>Relie la banque de contenus ScaleFlow à un autre site (ex. le site du staff) : chacun voit la banque de l'autre — séparément —,
 récupère ses vidéos et lui en envoie, directement dans le dossier voulu.</p>
 <div class="flow"><span>ScaleFlow — montage</span><b>⇄</b><span>API ScaleFlow Link</span><b>⇄</b><span>Site du staff — Drive VA / Posting VA</span></div>
-<nav><a href="#toi">1. Mise en place</a><a href="#auth">2. Authentification</a><a href="#routes">3. Routes ScaleFlow</a><a href="#partenaire">4. Routes à ajouter sur ton site</a><a href="#code">5. Code d'exemple</a><a href="#limites">6. Erreurs &amp; limites</a></nav>
+<nav><a href="#toi">1. Mise en place</a><a href="#auth">2. Authentification</a><a href="#routes">3. Routes ScaleFlow</a><a href="#outils">3b. Outils (spoof, remix)</a><a href="#partenaire">4. Routes à ajouter sur ton site</a><a href="#code">5. Code d'exemple</a><a href="#limites">6. Erreurs &amp; limites</a></nav>
 
 <h2 id="toi">1. Mise en place (propriétaire ScaleFlow, 5 min)</h2>
 <ol>
@@ -65,6 +65,35 @@ Une URL signée Supabase / S3 valable au moins 1 h convient. Non idempotent : n'
 → {"ok":true,"path":"videos/…/uuid.mp4","upload_url":"https://…","method":"PUT"}
 PUT  upload_url  (corps = le fichier, en-tête Content-Type)
 POST /files     {"path": "videos/…/uuid.mp4", "folder": "Montage VA", "title": "clip 12"}</code></pre>
+
+<h3 id="outils"><span class="m p">POST</span><code>/tools/spoof</code> · <code>/tools/remix</code> — outils du Studio, faits par le serveur</h3>
+<p>Les mêmes outils que dans l'app, avec les mêmes réglages, mais exécutés sur le serveur ScaleFlow. Le résultat est rangé dans la banque
+(dossier <code>folder</code>) et renvoyé avec son lien.</p>
+<table><tr><th>Outil</th><th>Pour</th><th>Ce qu'il fait</th></tr>
+<tr><td><code>spoof</code></td><td>vidéo et photo</td><td>Rend le fichier unique : léger zoom/recadrage, métadonnées d'origine effacées (CapCut, titre…), appareil et GPS réécrits (vidéo : métadonnées mp4 ; photo : EXIF).</td></tr>
+<tr><td><code>remix</code></td><td>vidéo</td><td>Vraies variations : recadrage, luminosité/contraste/saturation, teinte, micro-vitesse, micro-coupe ; miroir avec <code>"toggles": {"mirror": true}</code> (aussi <code>color</code>, <code>speed</code>, <code>crop</code>).</td></tr></table>
+<pre><code>POST /api/v1/tools/spoof
+{ "file_id": "4f1c…",              // ou "url": "https://…/clip.mp4"
+  "intensity": "normal",           // subtle | normal | strong
+  "device": "iphone15pro",         // appareil réécrit dans la vidéo (voir GET /tools)
+  "gps": "paris",                  // none | france | usa | paris | … | {"lat": 48.85, "lon": 2.35}
+  "folder": "Spoofées",            // dossier de ScaleFlow où ranger le résultat
+  "title": "clip 12 v1",           // optionnel
+  "seed": 1234 }                   // optionnel : même seed = mêmes réglages
+→ { "ok": true, "tool": "spoof",
+    "file": { "id": "…", "title": "clip 12 v1", "folder": "Spoofées", "kind": "video", "url": "https://…", "thumbnail_url": "https://…" },
+    "settings": { "seed": 1234, "intensity": "normal", "device": "iphone15pro", "gps": "paris" }, "ms": 14200 }</code></pre>
+<p><span class="m g">GET</span><code>/tools</code> renvoie la liste des outils, intensités, appareils (<code>iphone15pro</code>, <code>iphone14</code>, <code>s23</code>, <code>pixel8</code>…) et localisations disponibles.</p>
+<p class="note"><b>1 variante par appel</b> : pour en faire plusieurs, lance les appels <b>en parallèle</b> (chacun tourne sur sa propre machine) — 5 variantes prennent le temps d'une seule.
+Durée : ≈ 10 à 20 s pour un Reel de 30 s en 1080p. Limites : fichier source ≤ 150 Mo, traitement ≤ ~50 s (vidéos jusqu'à ~2 min) ; au-delà : erreur <code>504 timeout</code>.</p>
+<pre><code>// 5 variantes uniques d'une même vidéo = 5 appels EN MÊME TEMPS (≈ durée d'un seul)
+const SF = 'https://scaleflow.company/api/v1'
+const H = { Authorization: \`Bearer \${process.env.SCALEFLOW_KEY}\`, 'Content-Type': 'application/json' }
+const results = await Promise.all([1, 2, 3, 4, 5].map(i =&gt;
+  fetch(\`\${SF}/tools/spoof\`, { method: 'POST', headers: H,
+    body: JSON.stringify({ file_id: videoId, device: 'iphone15pro', gps: 'france', folder: 'Variantes', title: \`clip v\${i}\` }) })
+    .then(r =&gt; r.json())))
+// results[i].file.url → lien de téléchargement de chaque variante (6 h)</code></pre>
 
 <h2 id="partenaire">4. Routes à ajouter sur ton site (pour que ScaleFlow voie ta banque)</h2>
 <p>Expose les mêmes routes, au même format, protégées par une clé que tu choisis (<code>Authorization: Bearer &lt;ta-clé&gt;</code>).
@@ -240,8 +269,9 @@ await fetch(\`\${SF}/files\`, {
 <tr><td>404</td><td><code>not_found</code></td><td>Route inconnue</td></tr>
 <tr><td>409</td><td><code>not_uploaded</code></td><td><code>POST /files</code> avec un <code>path</code> pas encore envoyé (fais le PUT d'abord)</td></tr>
 <tr><td>413</td><td><code>too_large</code></td><td>Fichier de plus de 300 Mo</td></tr>
-<tr><td>422</td><td><code>invalid_url</code>, <code>invalid_file</code>, <code>invalid_path</code>…</td><td>Requête invalide (URL non https ou interne, type de fichier, chemin)</td></tr>
+<tr><td>422</td><td><code>invalid_url</code>, <code>invalid_file</code>, <code>invalid_path</code>, <code>invalid_device</code>, <code>invalid_gps</code>…</td><td>Requête invalide (URL non https ou interne, type de fichier, chemin)</td></tr>
 <tr><td>502</td><td><code>fetch_failed</code></td><td>Le téléchargement de l'URL fournie a échoué</td></tr>
+<tr><td>504</td><td><code>timeout</code></td><td>Outil : vidéo trop longue pour un traitement serveur (~50 s max)</td></tr>
 <tr><td>507</td><td><code>bank_full</code></td><td>Banque ScaleFlow pleine (limite de l'abonnement)</td></tr></table>
 <ul>
 <li>Types acceptés : vidéos (mp4, mov, m4v, webm, mkv, avi, 3gp) et images (jpg, png, webp, heic, gif).</li>
