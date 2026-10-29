@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import ProxyRotationPanel from '@/components/ProxyRotationPanel'
+import LinkApiPanel from '@/components/LinkApiPanel'
 import { LangSwitch } from '@/components/AppUpdate'
 import type { Theme } from '@/lib/theme'
 import { Btn, Chip, Icon, Panel, PanelHead, PageHead, FIELD, MONO, Skeleton, SkeletonRows, useNarrow, toast, confirmDialog } from '@/lib/ui'
@@ -512,6 +513,7 @@ function IntegrationsTab({ theme, user, org, canManage }: { theme: Theme; user: 
       {card('bearer', 'GeeLark', 'Indispensable : pilote tes téléphones et publie.', 'Token OpenAPI GeeLark…', <>GeeLark → OpenAPI → copier le token</>)}
       {card('groq', 'IA (Groq)', 'Légendes IA et sous-titres automatiques. Gratuit.', 'gsk_…', <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{ color: '#C4BBFB', textDecoration: 'none' }}>Créer une clé gratuite →</a>)}
       <ProxyRotationPanel theme={theme} user={user} org={org} />
+      <LinkApiPanel theme={theme} org={org} canManage={canManage} />
       <LinkDomainCard theme={theme} />
     </Stack>
   )

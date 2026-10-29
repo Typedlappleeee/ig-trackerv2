@@ -12,6 +12,8 @@ import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABE
 import { cachedSigned, signPaths, signedUrl, forgetSigned } from '@/lib/signedUrls'
 import VideoFrame, { Video } from '@/components/VideoFrame'
 import { readZip } from '@/lib/zipReader'
+import { getPartner, type Partner } from '@/lib/scaleflowLink'
+import { PartnerBankModal, SendToPartnerModal } from '@/components/PartnerBank'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -215,6 +217,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [capContent, setCapContent] = useState('')
   const [savingCap, setSavingCap] = useState(false)
   const [folder, setFolder] = useState<string>('Tous')
+  // Site partenaire relié (Réglages › Intégrations) : sa banque + envoi de mes médias chez lui.
+  const [partner, setPartner] = useState<Partner | null>(null)
+  const [partnerOpen, setPartnerOpen] = useState(false)
+  const [sendIds, setSendIds] = useState<string[] | null>(null)
+  useEffect(() => { getPartner(currentOrg?.id ?? null).then(setPartner).catch(() => setPartner(null)) }, [currentOrg?.id])
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<SortKey>('recent')
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -1217,6 +1224,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
         actions={<>
           {trash.length > 0 && <Btn label={`Corbeille (${trash.length})`} theme={theme} icon="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" onClick={() => setShowTrash(true)} />}
+          {partner && <Btn label={`Banque ${partner.name}`} theme={theme} icon="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7|M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" onClick={() => setPartnerOpen(true)} />}
           <Btn label="Actualiser" theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={load} />
           <Btn label={uploading ? uploading : "Importer"} theme={theme} tone="primary" icon="M12 5v14|M5 12h14" disabled={!!uploading} onClick={() => fileRef.current?.click()} />
         </>} />
@@ -1432,6 +1440,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => { if (onNavigate) openTool(onNavigate, 'studio', { tool: tab === 'image' ? 'imgspoof' : 'remix', ids: [...sel] }) }} />
           <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setMoveOpen(true)} />
           <Btn label="Télécharger" theme={theme} sm icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" onClick={() => downloadMedia([...sel])} />
+          {partner && <Btn label={`Envoyer vers ${partner.name}`} theme={theme} sm icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => setSendIds([...sel])} />}
           <Btn label="Supprimer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             {sel.size < shown.length && <Btn label={`Tout sélectionner (${shown.length})`} theme={theme} sm tone="ghost" onClick={() => setSel(new Set(shown.map(m => m.id)))} />}
@@ -1448,6 +1457,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         </div>
       )}
 
+      {partner && partnerOpen && (
+        <PartnerBankModal theme={theme} orgId={currentOrg?.id ?? null} partner={partner} myFolders={folders.filter(f => !f.special && f.n !== 'Tous').map(f => f.n)}
+          onImported={load} onClose={() => setPartnerOpen(false)} />
+      )}
+      {partner && sendIds && (
+        <SendToPartnerModal theme={theme} orgId={currentOrg?.id ?? null} partner={partner} ids={sendIds}
+          defaultFolder={folder !== 'Tous' && folder !== 'Jamais publiées' ? folder : 'ScaleFlow'} onClose={() => setSendIds(null)} />
+      )}
       {moveOpen && (
         <Modal theme={theme} title={`Déplacer ${sel.size} média(s)`} sub="Choisis un dossier ou crée-en un." icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
           onClose={() => setMoveOpen(false)}
