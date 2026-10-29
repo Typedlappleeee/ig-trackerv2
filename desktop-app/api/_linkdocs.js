@@ -24,7 +24,7 @@ récupère ses vidéos et lui en envoie, directement dans le dossier voulu.</p>
 <li>Supabase → SQL Editor : colle et exécute <code>supabase/migrations/20261029_scaleflow_link.sql</code> (une seule fois).</li>
 <li>ScaleFlow → <b>Réglages › Intégrations › API ScaleFlow</b> → <b>Créer une clé</b> (ex. « Site staff »). Copie-la : elle n'est affichée qu'une fois.</li>
 <li>Envoie à ton dev, par un canal privé : l'adresse <code>https://scaleflow.company/api/v1</code>, la clé, et ce document.</li>
-<li>Ton dev ajoute sur son site les 4 routes de la <a href="#partenaire">section 4</a> et te donne : l'adresse de base (ex. <code>https://site-du-staff.com/api/scaleflow</code>) et SA clé.</li>
+<li>Ton dev ajoute sur son site les 4 routes de la <a href="#partenaire">section 4</a> — un seul fichier à copier depuis la <a href="#code">section 5</a> (version serveur Vercel, ou version Supabase si son site n'a pas de serveur) — et te donne : l'adresse de base (ex. <code>https://site-du-staff.com/api/scaleflow</code> ou <code>https://&lt;projet&gt;.supabase.co/functions/v1/scaleflow</code>) et SA clé.</li>
 <li>ScaleFlow → <b>Site partenaire</b> : colle son adresse et sa clé → <b>Enregistrer</b> → <b>Tester</b>.</li>
 <li>C'est relié : <b>Banque › « Banque Staff »</b> pour voir et importer ses vidéos ; sélectionne des médias › <b>« Envoyer vers Staff »</b> pour les copier dans le dossier de ton choix chez lui.</li>
 <li><b>Montages envoyés directement</b> : dans le <b>Studio vidéo</b> et l'<b>Auto-contenu</b>, règle <b>« Envoyer direct vers : Staff › dossier »</b>. Chaque montage terminé part chez lui dès qu'il est prêt (une copie reste dans ta banque). Le journal affiche « 📤 envoyé chez Staff › dossier (1,8 s) ».</li>
@@ -150,6 +150,73 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: String(e?.message || e) })
   }
 }</code></pre>
+<h3>Ton site n'a pas de serveur (juste Supabase) ? Version Edge Function, à coller dans Supabase</h3>
+<p>Même chose, sans Vercel ni serveur : une fonction déployée directement depuis le tableau de bord Supabase de ton site
+(sites faits avec Lovable, Bolt, etc.). Les variables <code>SUPABASE_URL</code> et <code>SUPABASE_SERVICE_ROLE_KEY</code> sont fournies automatiquement.</p>
+<pre><code>// Edge Function « scaleflow » — dans le projet Supabase du site staff (aucun serveur nécessaire).
+// 1. Supabase → Edge Functions → Deploy a new function → nom : scaleflow → colle ce code → Deploy.
+// 2. Dans les réglages de la fonction : DÉSACTIVE « Enforce JWT verification »
+//    (ScaleFlow envoie ta clé à toi, pas un jeton de connexion Supabase).
+// 3. Edge Functions → Secrets : ajoute SCALEFLOW_LINK_KEY = une clé longue que tu inventes.
+// 4. Dans ScaleFlow (Site partenaire) : adresse https://&lt;ton-projet&gt;.supabase.co/functions/v1/scaleflow + cette clé.
+import { createClient } from 'npm:@supabase/supabase-js@2'
+
+const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+const KEY = Deno.env.get('SCALEFLOW_LINK_KEY')
+const TABLE = 'bank', BUCKET = 'videos'          // ← adapte aux noms de ta base
+// Colonnes supposées dans TABLE : id, title, folder, path (chemin dans BUCKET), created_at
+const json = (body: unknown, status = 200) =&gt; new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+Deno.serve(async req =&gt; {
+  if (!KEY || req.headers.get('authorization') !== \`Bearer \${KEY}\`) return json({ ok: false, error: 'clé invalide' }, 401)
+  const u = new URL(req.url)
+  const route = u.pathname.replace(/^.*\\/scaleflow\\/?/, '')
+  try {
+    if (req.method === 'GET' &amp;&amp; route === 'me') return json({ ok: true })
+
+    if (req.method === 'GET' &amp;&amp; route === 'folders') {
+      const { data, error } = await db.from(TABLE).select('folder')
+      if (error) throw error
+      const count: Record&lt;string, number&gt; = {}
+      let unfiled = 0
+      for (const r of data) r.folder ? (count[r.folder] = (count[r.folder] || 0) + 1) : unfiled++
+      return json({ ok: true, folders: Object.entries(count).map(([name, videos]) =&gt; ({ name, videos })), unfiled: { videos: unfiled } })
+    }
+
+    if (req.method === 'GET' &amp;&amp; route === 'files') {
+      const off = Number(u.searchParams.get('cursor') || 0), lim = Math.min(Number(u.searchParams.get('limit') || 50), 200)
+      let q = db.from(TABLE).select('id, title, folder, path, created_at').order('created_at', { ascending: false }).range(off, off + lim)
+      const folder = u.searchParams.get('folder')
+      q = folder ? q.eq('folder', folder) : q.is('folder', null)
+      const { data, error } = await q
+      if (error) throw error
+      const page = data.slice(0, lim)
+      const files = await Promise.all(page.map(async r =&gt; {
+        const { data: s } = await db.storage.from(BUCKET).createSignedUrl(r.path, 6 * 3600)
+        return { id: r.id, title: r.title, folder: r.folder, kind: /\\.(jpe?g|png|webp)$/i.test(r.path) ? 'image' : 'video',
+                 url: s?.signedUrl ?? null, thumbnail_url: null, created_at: r.created_at }
+      }))
+      return json({ ok: true, files, next_cursor: data.length &gt; lim ? String(off + lim) : null })
+    }
+
+    if (req.method === 'POST' &amp;&amp; route === 'files') {
+      const { url, folder, title } = await req.json()
+      if (!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co\\//.test(String(url))) throw new Error('URL refusée')
+      const r = await fetch(url)
+      if (!r.ok) throw new Error(\`téléchargement échoué (\${r.status})\`)
+      const type = r.headers.get('content-type') || 'video/mp4'
+      const path = \`scaleflow/\${crypto.randomUUID()}.\${type.startsWith('image/') ? 'jpg' : 'mp4'}\`
+      const up = await db.storage.from(BUCKET).upload(path, new Uint8Array(await r.arrayBuffer()), { contentType: type })
+      if (up.error) throw up.error
+      const ins = await db.from(TABLE).insert({ title: title || 'ScaleFlow', folder: folder || null, path })
+      if (ins.error) throw ins.error
+      return json({ ok: true })
+    }
+    return json({ ok: false, error: 'route inconnue' }, 404)
+  } catch (e) {
+    return json({ ok: false, error: String((e as Error)?.message || e) }, 500)
+  }
+})</code></pre>
 <h3>Utiliser l'API ScaleFlow depuis ton serveur</h3>
 <pre><code>// Sur le serveur du site staff : utiliser l'API ScaleFlow (clé donnée par le propriétaire ScaleFlow)
 const SF = 'https://scaleflow.company/api/v1'
