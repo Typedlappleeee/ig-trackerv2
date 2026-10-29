@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-29',
+    date: '2026-10-29',
+    title: { fr: '🔗 API ScaleFlow : relie ta banque à ton autre site', en: '🔗 ScaleFlow API: link your bank to your other site' },
+    items: {
+      fr: [
+        'Réglages › Intégrations › API ScaleFlow : crée une clé pour que ton autre site (ex. celui du staff) voie ta banque, récupère les vidéos et t’envoie du contenu.',
+        'Site partenaire : sa banque apparaît dans la Banque (bouton à son nom), séparée de la tienne ; importe ses vidéos dans le dossier de ton choix.',
+        'Sélectionne des médias › « Envoyer vers … » : ils sont copiés directement dans le dossier voulu chez lui.',
+      ],
+      en: [
+        'Settings › Integrations › ScaleFlow API: create a key so your other site (e.g. your staff’s) sees your bank, grabs videos and sends you content.',
+        'Partner site: their bank shows in the Bank (button with their name), separate from yours; import their videos into the folder you want.',
+        'Select media › “Send to …”: they are copied straight into the folder you choose on their side.',
+      ],
+    },
+  },
+  {
     id: '2026-10-28',
     date: '2026-10-28',
     title: { fr: '📱 iRemoTech : temps réel, Instagram toujours trouvé, Story fiable', en: '📱 iRemoTech: real time, Instagram always found, reliable Story' },
