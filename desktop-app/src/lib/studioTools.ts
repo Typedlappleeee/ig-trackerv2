@@ -23,7 +23,8 @@ export async function resolveSourceBytes(v: SourceRef, file?: File): Promise<Uin
   throw new Error('Source introuvable')
 }
 
-// Enregistre un mp4 de sortie dans la banque (bucket content + content_bank).
+// Enregistre un mp4 de sortie dans la banque (bucket content + content_bank). Renvoie l'id du
+// média créé (pour l'envoyer ensuite au site partenaire), ou null en cas d'échec.
 export async function saveOutputToBank(userId: string, orgId: string | null, bytes: Uint8Array, title: string, ext = 'mp4', folder: string | null = null): Promise<string | null> {
   const scopeFolder = orgId ? `orgs/${orgId}` : `users/${userId}`
   const id = crypto.randomUUID()
@@ -34,11 +35,11 @@ export async function saveOutputToBank(userId: string, orgId: string | null, byt
   if (up.error) return null
   // Miniature tirée des octets qu'on a déjà (pas de téléchargement) : vignette instantanée dans la Banque.
   const th = mime.startsWith('video') ? await uploadThumbFor(blob, storagePath) : { thumbPath: null, duration: null }
-  await supabase.from('content_bank').insert({
+  const { data } = await supabase.from('content_bank').insert({
     user_id: userId, org_id: orgId, title, storage_path: storagePath, thumbnail_path: th.thumbPath,
     file_url: null, folder: folder || null, duration: th.duration, tags: [], notes: null, used_count: 0,
-  })
-  return storagePath
+  }).select('id').single()
+  return (data as { id?: string } | null)?.id ?? null
 }
 
 // Encodage h264/aac rapide (wasm). '-c:a aac' est ignoré s'il n'y a pas d'audio.

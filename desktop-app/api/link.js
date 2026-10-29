@@ -4,7 +4,7 @@
 //     test                     → GET  <partenaire>/me
 //     folders                  → GET  <partenaire>/folders
 //     files  {folder, cursor}  → GET  <partenaire>/files
-//     send   {ids, folder}     → médias de MA banque → POST <partenaire>/files (liens valables 24 h)
+//     send   {ids, folder}     → médias de MA banque → POST <partenaire>/files (liens 24 h), en parallèle
 //     import {items, folder}   → médias du partenaire → MA banque
 // La clé API du partenaire est lue ici (service-role), jamais renvoyée au navigateur.
 import { db, roleIn, filesByIds, storeFromUrl, assertPublicUrl, cleanFolder, bodyOf, httpError } from './_bank.js'
@@ -75,27 +75,26 @@ export default async function handler(req, res) {
       case 'send': {
         if (!canWrite) return send(res, { ok: false, error: 'accès en lecture seule' })
         const folder = cleanFolder(b.folder)
-        const files = await filesByIds(s, { orgId, userId: user.id }, (b.ids || []).slice(0, 3))
-        const results = []
-        for (const f of files) {
-          if (!f.url) { results.push({ id: f.id, ok: false, error: 'fichier sans lien' }); continue }
+        const files = await filesByIds(s, { orgId, userId: user.id }, (b.ids || []).slice(0, 6))
+        // Tous les fichiers EN MÊME TEMPS : la durée totale ≈ celle du plus long (pas leur somme).
+        const results = await Promise.all(files.map(async f => {
+          if (!f.url) return { id: f.id, ok: false, error: 'fichier sans lien' }
           try {
             await partnerCall(p, '/files', { method: 'POST', body: { url: f.url, folder, title: f.title, thumbnail_url: f.thumbnail_url }, timeout: 55_000 })
-            results.push({ id: f.id, ok: true })
-          } catch (e) { results.push({ id: f.id, ok: false, error: e?.message || String(e) }) }
-        }
+            return { id: f.id, ok: true }
+          } catch (e) { return { id: f.id, ok: false, error: e?.message || String(e) } }
+        }))
         return send(res, { ok: true, results })
       }
       case 'import': {
         if (!canWrite) return send(res, { ok: false, error: 'accès en lecture seule' })
         const folder = cleanFolder(b.folder)
-        const results = []
-        for (const it of (Array.isArray(b.items) ? b.items : []).slice(0, 2)) {
+        const results = await Promise.all((Array.isArray(b.items) ? b.items : []).slice(0, 3).map(async it => {
           try {
             const file = await storeFromUrl(s, { orgId, userId: user.id }, { url: it?.url, folder, title: it?.title, thumbnail_url: it?.thumbnail_url })
-            results.push({ ok: true, id: file.id })
-          } catch (e) { results.push({ ok: false, error: e?.message || String(e) }) }
-        }
+            return { ok: true, id: file.id }
+          } catch (e) { return { ok: false, error: e?.message || String(e) } }
+        }))
         return send(res, { ok: true, results })
       }
       default:

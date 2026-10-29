@@ -1,6 +1,7 @@
 // Espace de travail d'un outil du Studio : sources (glisser-déposer, Banque, PC), aperçu en
 // direct, réglages + lancement (progression globale, annulation), résultats. Les traitements
 // tournent sur l'ordinateur (ffmpeg.wasm) ; chaque sortie est enregistrée dans la Banque.
+import { usePartnerSend, PartnerSendSelect } from '@/components/PartnerSendSelect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -77,6 +78,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
   const [gpsCity, setGpsCity] = useState('none')
   const [device, setDevice] = useState('none')
   const [destFolder, setDestFolder] = useState('')
+  const ps = usePartnerSend(currentOrg?.id ?? null, 'sf-partner-send-studio')   // envoi direct au site partenaire
   const [mMode, setMMode] = useState<'cut' | 'join'>('cut')
   const [trim, setTrim] = useState<{ start: number; end: number | null }>({ start: 0, end: null })
   const [ovImgs, setOvImgs] = useState<{ id: string; title: string; storage_path: string | null; file_url: string | null }[]>([])
@@ -186,7 +188,8 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
     runId.current = R.id
     const hooks = { onProgress: (r: number) => setStep(r), onLog: (m: string) => { if (/Video:|Audio:|error|Error|decod|Invalid|unable|hevc|Duration/i.test(m)) push(m.trim()) } }
     const save = async (title: string, data: Uint8Array, ext = 'mp4') => {
-      await saveOutputToBank(user.id, currentOrg?.id ?? null, data, title, ext, destFolder || null)
+      const savedId = await saveOutputToBank(user.id, currentOrg?.id ?? null, data, title, ext, destFolder || null)
+      ps.queue(savedId, title, push)
       const url = URL.createObjectURL(new Blob([data as BlobPart], { type: ext === 'jpg' ? 'image/jpeg' : 'video/mp4' }))
       addResult({ id: crypto.randomUUID(), title, url, ext, tool, at: Date.now() })
       R.tick(true); setDone(d => d + 1)
@@ -240,8 +243,11 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
           }
         }
       }
+      const sent = await ps.flush()
       R.finish(R.isCancelled() ? 'cancelled' : failed ? 'error' : 'done')
       if (R.isCancelled()) toast('Arrêté.', 'info')
+      else if (sent.failed && ps.partner) toast(`${sent.failed} envoi(s) chez ${ps.partner.name} échoué(s) — vois le journal.`, 'bad', 7000)
+      else if (!failed && sent.ok && ps.partner) toast(`Terminé — ${sent.ok} montage(s) envoyé(s) chez ${ps.partner.name} › ${ps.folder}.`, 'ok')
       else if (!failed) toast('Terminé — tout est dans ta Banque.', 'ok')
     } catch (e) {
       const m = e instanceof Error ? e.message : 'Échec du traitement'
@@ -405,6 +411,11 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
                   {folders.map(f => <option key={f} value={f} style={{ background: '#161618' }}>{f}</option>)}
                 </select>
               </FieldRow>
+              {ps.partner && (
+                <FieldRow label="Envoyer direct vers">
+                  <PartnerSendSelect ps={ps} style={SELECT} optStyle={{ background: '#161618' }} />
+                </FieldRow>
+              )}
             </div>
 
             <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '18px -18px 16px' }} />

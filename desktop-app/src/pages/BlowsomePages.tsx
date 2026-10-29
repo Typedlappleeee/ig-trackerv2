@@ -18,6 +18,7 @@ import { generateCaption } from '@/lib/ai'
 import { startRun } from '@/lib/runStore'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
+import { usePartnerSend, PartnerSendSelect } from '@/components/PartnerSendSelect'
 import { loadDevContainers, saveDevContainers, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { confirmDialog } from '@/lib/ui'
 import { signPaths, cachedSigned } from '@/lib/signedUrls'
@@ -546,6 +547,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [speedMax, setSpeedMax] = useState('1.02')
   // Dossier de destination des sorties (banque).
   const [destFolder, setDestFolder] = useState('')
+  const ps = usePartnerSend(currentOrg?.id ?? null, 'sf-partner-send-auto')   // envoi direct au site partenaire
   // Aperçu : lien de chaque vidéo source (+ sa miniature en image d'attente). Liens PARTAGÉS avec
   // la Banque (lib/signedUrls) : une vidéo déjà ouverte est reprise du cache du navigateur.
   const [previews, setPreviews] = useState<Record<string, string>>({})
@@ -688,7 +690,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
               out = await runAutoVariant(bytes, vOpts, hooks)
             }
             push(`    ✓ variante générée (${Math.round(out.byteLength / 1024)} Ko) → sauvegarde…`)
-            await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
+            const savedId = await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
+            ps.queue(savedId, `${v.title} · auto ${i + 1}`, push)
             done++; setMade(done); R.tick(true)
           } catch (ve) {
             // On loggue la VRAIE erreur (message + 1re ligne de stack) et on continue les autres
@@ -700,7 +703,9 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           }
         }
       }
+      const sent = await ps.flush()
       push(R.isCancelled() ? '⏹ Arrêté.' : `✔ ${done} variantes générées — dans la banque.`)
+      if (ps.partner && (sent.ok || sent.failed)) push(`📤 ${sent.ok} envoyée(s) chez ${ps.partner.name} › ${ps.folder}${sent.failed ? ` · ${sent.failed} échec(s)` : ''}`)
       R.finish()
       load()
     } catch (e) {
@@ -811,6 +816,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           </div>
           <Fld label="Variantes / vidéo"><input type="number" min={1} max={12} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
           <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
+          {ps.partner && <Fld label="Envoyer direct vers"><PartnerSendSelect ps={ps} style={selStyle} optStyle={optStyle} /></Fld>}
         </Grp>
 
         {/* Aperçu : voir la/les vidéo(s) + la caption dessus (clic pour lire) */}
