@@ -12,7 +12,8 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
-import { Icon, Toggle, Segmented, toast, useNarrow, confirmDialog } from '@/lib/ui'
+import { Icon, Toggle, Segmented, toast, useNarrow, confirmDialog, promptDialog } from '@/lib/ui'
+import { hfBridge, listLocal, addLocal, reconnectLocal, checkLocal, removeLocal, type HfLocalAccount } from '@/lib/hfLocal'
 import { IS_WEB } from '@/lib/platform'
 import { SPOOF_DEVICES, GPS_CITIES } from '@/lib/studioTools'
 import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setModelFolder, type BankScope } from '@/lib/bankFolders'
@@ -313,6 +314,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
         onAdd={() => setLogin({ name: freeName(), reconnect: false })}
         onReconnect={name => setLogin({ name, reconnect: true })}
         onRemove={name => void dropAccount(name)} />
+      <LocalAccounts />
       {relayErr && (
         <div style={{ ...card, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderColor: 'rgba(252,165,165,0.25)', color: BAD, fontSize: 13 }}>
           <span style={{ flex: 1 }}>{relayErr}</span>
@@ -869,5 +871,70 @@ function FolderPicker({ scope, model, current, onPick, onClose }: { scope: BankS
         </div>
       </div>
     </div>
+  )
+}
+
+/* ── Higgsfield sur ce PC (appli PC) : sessions locales, connexion avec 2FA dans la vraie page ── */
+function LocalAccounts() {
+  const bridge = hfBridge()
+  const [list, setList] = useState<HfLocalAccount[]>(listLocal)
+  const [busy, setBusy] = useState<string | null>(null)
+  useEffect(() => {
+    if (!bridge) return
+    void (async () => { for (const a of listLocal()) setList(await checkLocal(a.id)) })()
+  }, [bridge])
+  if (!bridge) return <span style={{ marginTop: -6, fontSize: 11.5, color: DIM }}>Connexion locale des comptes Higgsfield (2FA, session gardée sur ton PC) : dans l’appli PC ScaleFlow.</span>
+  const err = (e: unknown) => toast(e instanceof Error ? e.message : String(e), 'bad')
+  async function add() {
+    const name = await promptDialog({ title: 'Connecter un compte Higgsfield', text: 'Une fenêtre Higgsfield va s’ouvrir : connecte-toi (email, mot de passe, code 2FA), puis ferme-la. La session reste sur ce PC.', placeholder: 'Nom du compte (ex. Compte 3)', confirmLabel: 'Ouvrir Higgsfield' })
+    if (name === null) return
+    setBusy('new')
+    try {
+      const r = await addLocal(name)
+      setList(r.list)
+      if (r.status.loggedIn) toast(`Connecté ✓ ${r.status.email ?? ''}`, 'ok')
+      else toast('Pas connecté : la fenêtre a été fermée avant la fin de la connexion.', 'bad')
+    } catch (e) { err(e) } finally { setBusy(null) }
+  }
+  async function open(a: HfLocalAccount, record: boolean) {
+    setBusy(a.id)
+    try {
+      const r = await reconnectLocal(a.id, record)
+      setList(r.list)
+      if (record) toast(r.status.recordFile ? `Calibrage enregistré (${r.status.recorded} appels) : envoie le fichier « ${r.status.recordFile.split(/[\\/]/).pop()} » (dans Téléchargements).` : 'Rien d’enregistré : lance une génération dans la fenêtre avant de la fermer.', r.status.recordFile ? 'ok' : 'bad', 9000)
+      else toast(r.status.loggedIn ? `Connecté ✓ ${r.status.email ?? ''}` : 'Pas connecté.', r.status.loggedIn ? 'ok' : 'bad')
+    } catch (e) { err(e) } finally { setBusy(null) }
+  }
+  async function remove(a: HfLocalAccount) {
+    if (!await confirmDialog({ title: `Retirer « ${a.name} » de ce PC ?`, text: 'Sa session Higgsfield est effacée de ce PC. Le compte Higgsfield lui-même n’est pas touché.', confirmLabel: 'Retirer', danger: true })) return
+    setList(await removeLocal(a.id))
+  }
+  const mini: CSSProperties = { height: 34, padding: '0 9px', background: 'none', border: 'none', borderLeft: `1px solid ${FIELD_EDGE}`, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600 }
+  return (
+    <section style={{ ...card, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8, marginTop: -6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA', marginRight: 4, textTransform: 'uppercase', letterSpacing: '.1em' }}>Sur ce PC</span>
+        {list.map(a => {
+          const dot = a.loggedIn === null ? DIM : a.loggedIn ? OK : WARN
+          return (
+            <div key={a.id} style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 10, border: `1.5px solid ${FIELD_EDGE}`, background: FIELD_BG, overflow: 'hidden', opacity: busy === a.id ? 0.6 : 1 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px' }} title={a.email ?? undefined}>
+                <span style={{ width: 7, height: 7, borderRadius: 99, background: dot, boxShadow: `0 0 8px ${dot}` }} />
+                <span data-no-tr style={{ fontSize: 13, fontWeight: 600, color: INK }}>{a.name}</span>
+                {a.email && <span data-no-tr style={{ fontSize: 11.5, color: MUTED }}>{a.email}</span>}
+              </span>
+              {a.loggedIn === false
+                ? <button type="button" disabled={!!busy} onClick={() => void open(a, false)} style={{ ...mini, color: WARN }}>Se connecter</button>
+                : <button type="button" disabled={!!busy} onClick={() => void open(a, true)} title="Ouvre Higgsfield et enregistre les appels du site pendant que tu fais une génération à la main" style={{ ...mini, color: ACCENT_TXT }}>Calibrer</button>}
+              <button type="button" disabled={!!busy} onClick={() => void remove(a)} title="Retirer de ce PC" style={{ ...mini, color: DIM }}><Icon d="M18 6L6 18|M6 6l12 12" size={11} /></button>
+            </div>
+          )
+        })}
+        <button type="button" disabled={!!busy} onClick={() => void add()} style={{ ...ghostBtn, height: 37, borderStyle: 'dashed', color: ACCENT_TXT }}>{busy === 'new' ? 'Fenêtre Higgsfield ouverte…' : '＋ Connecter un compte'}</button>
+      </div>
+      <span style={{ fontSize: 11.5, color: DIM, lineHeight: 1.5 }}>
+        Chaque compte se connecte une fois dans la vraie page Higgsfield (code 2FA compris) ; la session reste sur ce PC. Génération en local : en cours de calage — clique « Calibrer », fais UNE génération Motion Control à la main dans la fenêtre, ferme-la, puis envoie le fichier « higgsfield-calibrage-… » de Téléchargements.
+      </span>
+    </section>
   )
 }
