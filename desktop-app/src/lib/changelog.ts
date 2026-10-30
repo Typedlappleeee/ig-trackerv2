@@ -19,10 +19,12 @@ export const CHANGELOG: ChangelogEntry[] = [
       fr: [
         'API ScaleFlow : /tools/spoof (vidéos et photos) et /tools/remix — mêmes réglages que le Studio, faits par le serveur, résultat rangé dans la banque.',
         'Spoof : l’appareil choisi (iPhone 15 Pro, Galaxy S23…) est maintenant vraiment écrit dans la vidéo (avant, seul le GPS l’était).',
+        'API : marquer une vidéo « utilisée », la déplacer, la mettre à la corbeille, ou ne lister que les jamais utilisées.',
       ],
       en: [
         'ScaleFlow API: /tools/spoof (videos and photos) and /tools/remix — same settings as the Studio, done by the server, result saved in the bank.',
         'Spoof: the chosen device (iPhone 15 Pro, Galaxy S23…) is now really written into the video (before, only the GPS was).',
+        'API: mark a video as “used”, move it, send it to the trash, or list only never-used ones.',
       ],
     },
   },

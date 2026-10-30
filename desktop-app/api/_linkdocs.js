@@ -48,18 +48,31 @@ Base : <code>https://scaleflow.company/api/v1</code>. Réponses JSON : <code>{"o
 <h3><span class="m p">POST</span><code>/folders</code></h3>
 <p>Corps <code>{"name": "Montage VA"}</code> → crée le dossier (sans effet s'il existe déjà).</p>
 <h3><span class="m g">GET</span><code>/files?folder=Lot%20octobre&amp;limit=50&amp;cursor=</code></h3>
-<p>Médias d'un dossier, du plus récent au plus ancien (sans <code>folder</code> = médias hors dossier). <code>limit</code> ≤ 200.
+<p>Médias d'un dossier, du plus récent au plus ancien (sans <code>folder</code> = médias hors dossier ; <code>&amp;unused=1</code> = seulement les jamais utilisées). <code>limit</code> ≤ 200.
 Page suivante : repasse <code>cursor=next_cursor</code>. Les liens <code>url</code> / <code>thumbnail_url</code> sont valables 6 h.</p>
 <pre><code>{ "ok": true, "folder": "Lot octobre",
   "files": [ { "id": "4f1c…", "title": "clip 12", "folder": "Lot octobre", "kind": "video",
                "url": "https://…/clip.mp4?token=…", "thumbnail_url": "https://…/thumb.jpg?token=…",
-               "duration": 14, "created_at": "2026-10-29T10:12:00Z" } ],
+               "duration": 14, "created_at": "2026-10-29T10:12:00Z", "used_count": 0 } ],
   "next_cursor": "50" }</code></pre>
 <h3><span class="m p">POST</span><code>/files</code> — envoyer un média depuis une URL</h3>
 <pre><code>{ "url": "https://ton-stockage/clip.mp4?token=…", "folder": "Montage VA", "title": "clip 12",
   "thumbnail_url": "https://…/thumb.jpg" }</code></pre>
 <p>ScaleFlow télécharge le fichier (https public, 300 Mo max) et le range dans le dossier. Réponse : <code>{"ok":true,"file":{…}}</code>.
 Une URL signée Supabase / S3 valable au moins 1 h convient. Non idempotent : n'envoie pas deux fois la même requête.</p>
+<h3>Gérer un média : utilisée, déplacer, supprimer</h3>
+<table><tr><th>Route</th><th>Effet</th></tr>
+<tr><td><span class="m p">POST</span><code>/files/&lt;id&gt;/used</code></td><td>Marque la vidéo comme utilisée (+1 à <code>used_count</code>). Elle sort du filtre « Jamais publiées » de ScaleFlow et de <code>?unused=1</code>.</td></tr>
+<tr><td><span class="m g">GET</span><code>/files?folder=…&amp;unused=1</code></td><td>Seulement les vidéos <b>jamais utilisées</b> du dossier (pratique pour ne jamais redonner la même).</td></tr>
+<tr><td><span class="m p">PATCH</span><code>/files/&lt;id&gt;</code> <code>{"folder": "…", "title": "…"}</code></td><td>Déplace et/ou renomme la vidéo.</td></tr>
+<tr><td><span class="m p">DELETE</span><code>/files/&lt;id&gt;</code></td><td>Met la vidéo à la <b>corbeille</b> de ScaleFlow : elle disparaît de l'API tout de suite, le propriétaire peut la restaurer pendant 7 jours, puis elle est effacée.</td></tr></table>
+<p class="note">Chaque média renvoyé contient aussi <code>used_count</code> (0 = jamais utilisée). Une clé ne peut agir que sur les médias de son espace (404 sinon).</p>
+<h3>Flux conseillé pour un CRM (un dossier par modèle)</h3>
+<ol>
+<li>Un dossier ScaleFlow par modèle (même nom des deux côtés, ou crée-le avec <code>POST /folders</code> quand tu ajoutes une modèle).</li>
+<li>Récupère les nouvelles vidéos : <code>GET /files?folder=&lt;modèle&gt;&amp;unused=1</code> (toutes les quelques minutes), télécharge <code>url</code>.</li>
+<li>Après publication par un VA : <code>POST /files/&lt;id&gt;/used</code> ; et si tu ne veux plus la garder chez ScaleFlow : <code>DELETE /files/&lt;id&gt;</code>.</li>
+</ol>
 <h3><span class="m p">POST</span><code>/uploads</code> puis <code>PUT</code> puis <span class="m p">POST</span><code>/files</code> — envoi direct d'un fichier</h3>
 <pre><code>POST /uploads   {"filename": "clip.mp4", "content_type": "video/mp4"}
 → {"ok":true,"path":"videos/…/uuid.mp4","upload_url":"https://…","method":"PUT"}
@@ -266,7 +279,7 @@ await fetch(\`\${SF}/files\`, {
 <h2 id="limites">6. Erreurs &amp; limites</h2>
 <table><tr><th>Statut</th><th>code</th><th>Quand</th></tr>
 <tr><td>401</td><td><code>unauthorized</code></td><td>Clé absente, fausse ou révoquée</td></tr>
-<tr><td>404</td><td><code>not_found</code></td><td>Route inconnue</td></tr>
+<tr><td>404</td><td><code>not_found</code>, <code>file_not_found</code></td><td>Route inconnue, ou média absent de ta banque (déjà supprimé, autre espace)</td></tr>
 <tr><td>409</td><td><code>not_uploaded</code></td><td><code>POST /files</code> avec un <code>path</code> pas encore envoyé (fais le PUT d'abord)</td></tr>
 <tr><td>413</td><td><code>too_large</code></td><td>Fichier de plus de 300 Mo</td></tr>
 <tr><td>422</td><td><code>invalid_url</code>, <code>invalid_file</code>, <code>invalid_path</code>, <code>invalid_device</code>, <code>invalid_gps</code>…</td><td>Requête invalide (URL non https ou interne, type de fichier, chemin)</td></tr>
