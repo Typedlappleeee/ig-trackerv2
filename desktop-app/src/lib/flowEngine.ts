@@ -25,6 +25,7 @@ import {
 } from '@/lib/geelark'
 import { changeUsernameOnPhone, changeProfilePicOnPhone, resetInstagram } from '@/lib/geelarkAdb'
 import { fetchAllRows } from '@/lib/bankStorage'
+import { isWithin } from '@/lib/bankFolders'
 import { startCreditRun, isCreditError, CREDIT_COSTS, type CreditRun } from '@/lib/credits'
 import { startRun, type RunHandle } from '@/lib/runStore'
 import { heartbeatPhone } from '@/lib/phoneWatch'
@@ -216,7 +217,7 @@ export interface FolderMedia { id: string; title: string; storage_path: string |
 export async function folderMedia(scope: Scope, folder: string, kind: 'video' | 'image'): Promise<FolderMedia[]> {
   const rows = await bankRows(scope)
   return rows
-    .filter(r => isMedia(r) && kindOf(r) === kind && r.folder === folder)
+    .filter(r => isMedia(r) && kindOf(r) === kind && isWithin(r.folder, folder))
     .map(r => ({ id: r.id, title: r.title ?? 'media', storage_path: r.storage_path, file_url: r.file_url, used_count: r.used_count ?? 0 }))
 }
 
@@ -227,7 +228,7 @@ async function resolvePool(b: FlowBlock, scope: Scope, cache: { rows?: BankRow[]
   if (!cache.rows) cache.rows = await bankRows(scope)
   const kind = BLOCK[b.type].media
   return cache.rows
-    .filter(r => isMedia(r) && kindOf(r) === kind && (src === 'all' || r.folder === b.params.folder))
+    .filter(r => isMedia(r) && kindOf(r) === kind && (src === 'all' || isWithin(r.folder, String(b.params.folder ?? ''))))
     .map(r => r.id)
 }
 

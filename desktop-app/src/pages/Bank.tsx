@@ -14,6 +14,7 @@ import VideoFrame, { Video } from '@/components/VideoFrame'
 import { readZip } from '@/lib/zipReader'
 import { getPartner, type Partner } from '@/lib/scaleflowLink'
 import { PartnerBankModal, SendToPartnerModal } from '@/components/PartnerBank'
+import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg } from '@/lib/bankFolders'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -342,19 +343,28 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // Items du type actif.
   const typed = useMemo(() => items.filter(i => inferType(i) === tab), [items, tab])
 
-  // Dossiers dérivés des vrais dossiers (+ dossiers vides sentinelles), avec compte.
+  // Dossiers en ARBORESCENCE (chemins « Parent/Enfant », + dossiers vides sentinelles) ;
+  // le compte d'un dossier inclut ses sous-dossiers (ouvrir « Genjutsu » montre tout Genjutsu).
   const folders = useMemo(() => {
-    const names = new Set<string>()
-    typed.forEach(i => { if (i.folder) names.add(i.folder) })
-    folderNames.forEach(n => names.add(n))
-    const list = [...names].sort((a, b) => a.localeCompare(b))
-    const countIn = (f: string) => typed.filter(i => i.folder === f).length
+    const tree = folderTree([...typed.map(i => i.folder), ...folderNames])
+    const countIn = (f: string) => typed.filter(i => isWithin(i.folder, f)).length
     return [
-      { n: 'Tous', c: typed.length, special: false },
-      ...list.map(n => ({ n, c: countIn(n), special: false })),
-      { n: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true },
+      { n: 'Tous', label: 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
+      ...tree.map(t => ({ n: t.path, label: t.name, c: countIn(t.path), special: false, depth: t.depth, hasChildren: t.hasChildren })),
+      { n: 'Jamais publiées', label: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true, depth: 0, hasChildren: false },
     ]
   }, [typed, folderNames])
+  // Dossiers repliés (mémorisés dans ce navigateur) : leurs sous-dossiers sont masqués.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('sf-bank-collapsed') || '[]') as string[]) } catch { return new Set() } })
+  const toggleCollapsed = (p: string) => setCollapsed(c => {
+    const n = new Set(c); if (n.has(p)) n.delete(p); else n.add(p)
+    try { localStorage.setItem('sf-bank-collapsed', JSON.stringify([...n])) } catch { /* ignore */ }
+    return n
+  })
+  const visibleFolders = useMemo(() => folders.filter(f => {
+    for (let par = parentOf(f.n); par; par = parentOf(par)) if (collapsed.has(par)) return false
+    return true
+  }), [folders, collapsed])
 
   // ── Import RÉEL (upload → bucket content → insert content_bank) ──────────────
   const fileRef = useRef<HTMLInputElement>(null)
@@ -864,17 +874,34 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [renameFolderVal, setRenameFolderVal] = useState('')
   const [confirmDelFolder, setConfirmDelFolder] = useState<string | null>(null)
   const scopeQ = (qq: any) => currentOrg ? qq.eq('org_id', currentOrg.id) : qq.eq('user_id', user.id).is('org_id', null)
+  // Valeurs brutes de « folder » (tous types, corbeille et dossiers vides compris) dans un dossier ou ses sous-dossiers.
+  const rawFoldersWithin = (root: string) => {
+    const raws = new Set<string>()
+    for (const i of [...items, ...trash]) if (i.folder && isWithin(i.folder, root)) raws.add(i.folder)
+    for (const n of folderNames) if (isWithin(n, root)) raws.add(n)
+    return [...raws]
+  }
+  // Renommer = changer le nom du dossier ; ses sous-dossiers suivent (« A/B » → « A2/B »).
   async function renameFolder(oldName: string, newName: string) {
-    const n = newName.trim(); if (!n || n === oldName) { setFolderMenu(null); return }
-    await scopeQ(supabase.from('content_bank').update({ folder: n }).eq('folder', oldName))
-    setFolderMenu(null); if (folder === oldName) setFolder(n); load()
+    const leaf = cleanSeg(newName)
+    const newRoot = leaf ? joinPath(parentOf(oldName), leaf) : ''
+    if (!newRoot || newRoot === oldName) { setFolderMenu(null); return }
+    for (const raw of rawFoldersWithin(oldName))
+      await scopeQ(supabase.from('content_bank').update({ folder: renamedPath(raw, oldName, newRoot) }).eq('folder', raw))
+    setFolderMenu(null); if (isWithin(folder, oldName)) setFolder(renamedPath(folder, oldName, newRoot)); load()
   }
   async function deleteFolder(name: string) {
-    // Dégroupe les médias (folder → null). Nécessite le droit d'update sur ces lignes.
-    const { error: upErr } = await scopeQ(supabase.from('content_bank').update({ folder: null }).eq('folder', name).or('notes.is.null,notes.not.in.("__sf_folder__","__sf_drive_folder__")'))
-    // Supprime la/les ligne(s) sentinelle(s) du dossier via la RPC fiable (RLS-proof),
-    // fallback DELETE direct si la RPC n'est pas déployée.
-    const { data: sentinels } = await scopeQ(supabase.from('content_bank').select('id').eq('folder', name).in('notes', ['__sf_folder__', '__sf_drive_folder__']))
+    // Ses médias (et ceux de ses sous-dossiers) remontent dans le dossier parent — ou sans dossier.
+    const parent = parentOf(name)
+    const raws = rawFoldersWithin(name)
+    let upErr: { message: string } | null = null
+    for (const raw of raws) {
+      const { error } = await scopeQ(supabase.from('content_bank').update({ folder: parent }).eq('folder', raw).or('notes.is.null,notes.not.in.("__sf_folder__","__sf_drive_folder__")'))
+      if (error) upErr = error
+    }
+    // Supprime la/les ligne(s) sentinelle(s) du dossier et de ses sous-dossiers via la RPC
+    // fiable (RLS-proof), fallback DELETE direct si la RPC n'est pas déployée.
+    const { data: sentinels } = await scopeQ(supabase.from('content_bank').select('id').in('folder', raws.length ? raws : [name]).in('notes', ['__sf_folder__', '__sf_drive_folder__']))
     const sentIds = ((sentinels ?? []) as { id: string }[]).map(r => r.id)
     if (sentIds.length) {
       const { error } = await supabase.rpc('delete_bank_items', { p_ids: sentIds })
@@ -882,7 +909,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         await scopeQ(supabase.from('content_bank').delete().in('id', sentIds))
       }
     }
-    setFolderMenu(null); if (folder === name) setFolder('Tous')
+    setFolderMenu(null); if (isWithin(folder, name)) setFolder(parent ?? 'Tous')
     if (upErr) setNotice(`Le dossier n'a pas pu être vidé : ${upErr.message} — ces médias appartiennent peut-être à un autre compte.`)
     load()
   }
@@ -929,21 +956,26 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [newFolder, setNewFolder] = useState('')
   const [folderModal, setFolderModal] = useState(false)
   const [folderName, setFolderName] = useState('')
+  const [folderParent, setFolderParent] = useState<string | null>(null)
+  const isRealFolder = (f: string) => f !== 'Tous' && f !== 'Jamais publiées'
+  function openNewFolder(parent: string | null) { setFolderName(''); setFolderParent(parent); setFolderModal(true) }
   async function createFolder() {
-    const name = folderName.trim(); if (!name) return
+    const name = cleanSeg(folderName); if (!name) return
+    const path = joinPath(folderParent, name)
     await supabase.from('content_bank').insert({
       user_id: user.id, org_id: currentOrg?.id ?? null,
-      title: name, folder: name, file_url: null, storage_path: null, thumbnail_path: null,
+      title: name, folder: path, file_url: null, storage_path: null, thumbnail_path: null,
       duration: null, tags: [], notes: '__sf_folder__',
     })
-    setFolderModal(false); setFolderName(''); setFolder(name); load()
+    if (folderParent && collapsed.has(folderParent)) toggleCollapsed(folderParent)
+    setFolderModal(false); setFolderName(''); setFolder(path); load()
   }
   const [notice, setNotice] = useState<string | null>(null)
   const narrow = useNarrow()
-  const moveFolders = useMemo(() => folders.filter(f => f.n !== 'Tous' && !f.special).map(f => f.n), [folders])
+  const moveFolders = useMemo(() => folders.filter(f => f.n !== 'Tous' && !f.special), [folders])
 
   async function doMove(target: string) {
-    const dest = target.trim(); if (!dest || sel.size === 0) return
+    const dest = normPath(target); if (!dest || sel.size === 0) return
     setMoving(true)
     const { error: err } = await supabase.from('content_bank').update({ folder: dest }).in('id', [...sel])
     setMoving(false)
@@ -960,7 +992,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         ? true
         : folder === 'Jamais publiées'
           ? (i.used_count ?? 0) === 0
-          : i.folder === folder
+          : isWithin(i.folder, folder)
       if (!fMatch) return false
       if (!ql) return true
       return i.title.toLowerCase().includes(ql)
@@ -1270,22 +1302,23 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F5', letterSpacing: '-0.02em' }}>Dossiers</span>
             <span style={{ marginLeft: 'auto' }}>
-              <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Nouveau dossier" onClick={() => { setFolderName(''); setFolderModal(true) }} />
+              <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Nouveau dossier" onClick={() => openNewFolder(isRealFolder(folder) ? folder : null)} />
             </span>
           </div>
           <div style={{ padding: 6 }}>
-            {folders.map(f => {
+            {visibleFolders.map(f => {
               const on = folder === f.n
               return (
                 <button
                   key={f.n}
+                  title={f.n}
                   onClick={() => setFolder(f.n)}
                   onContextMenu={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setFolderCtx({ x: e.clientX, y: e.clientY, name: f.n }) } }}
                   onDragOver={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setDragOver(f.n) } }}
                   onDragLeave={() => setDragOver(d => d === f.n ? null : d)}
                   onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDragOver(null); if (id) dropOnFolder(f.n, id) }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 38, padding: '0 12px', borderRadius: 10,
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 36, padding: `0 12px 0 ${6 + f.depth * 16}px`, borderRadius: 10,
                     border: 'none', cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',
                     outline: dragOver === f.n ? `1px dashed ${theme.selEdge}` : 'none', outlineOffset: -3,
                     background: dragOver === f.n ? theme.selBg : on ? 'rgba(255,255,255,0.08)' : 'transparent', transition: 'background .12s ease',
@@ -1293,6 +1326,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
                   onMouseLeave={e => { if (dragOver !== f.n) e.currentTarget.style.background = on ? 'rgba(255,255,255,0.06)' : 'transparent' }}
                 >
+                  {/* chevron : replier / déplier les sous-dossiers */}
+                  <span role={f.hasChildren ? 'button' : undefined} aria-label={f.hasChildren ? (collapsed.has(f.n) ? 'Déplier' : 'Replier') : undefined}
+                    onClick={e => { if (!f.hasChildren) return; e.stopPropagation(); toggleCollapsed(f.n) }}
+                    style={{ width: 14, display: 'flex', justifyContent: 'center', color: '#5A5A63', cursor: f.hasChildren ? 'pointer' : 'inherit', transform: f.hasChildren && !collapsed.has(f.n) ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease', flexShrink: 0 }}>
+                    {f.hasChildren && <Icon d="M9 6l6 6-6 6" size={11} sw={2.2} />}
+                  </span>
                   <span style={{ display: 'flex', color: f.special ? '#4ADE80' : on ? theme.accentText : '#71717A' }}>
                     <Icon d={f.special ? 'M12 2v20|M2 12h20' : 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z'} size={13} />
                   </span>
@@ -1300,7 +1339,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                     flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: on ? 650 : 550,
                     color: on ? '#F4F4F5' : '#A1A1AA',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>{f.n}</span>
+                  }}>{f.label}</span>
                   <span style={{
                     fontSize: 11.5, fontVariantNumeric: 'tabular-nums',
                     color: on ? '#A1A1AA' : '#5A5A63',
@@ -1346,7 +1385,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             })()}
 
             <span style={{ marginLeft: (tab !== 'caption' && shown.length > 0) ? 12 : 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
-              {loading ? <Skeleton w={72} h={10} style={{ display: 'inline-block', verticalAlign: 'middle' }} /> : sel.size ? `${sel.size} sélectionnée${sel.size > 1 ? 's' : ''}` : `${folder} · ${shown.length} affichée${shown.length > 1 ? 's' : ''}`}
+              {loading ? <Skeleton w={72} h={10} style={{ display: 'inline-block', verticalAlign: 'middle' }} /> : sel.size ? `${sel.size} sélectionnée${sel.size > 1 ? 's' : ''}` : `${folder.split('/').join(' › ')} · ${shown.length} affichée${shown.length > 1 ? 's' : ''}`}
             </span>
           </div>
 
@@ -1473,13 +1512,15 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <Btn theme={theme} tone="primary" label={moving ? 'Déplacement…' : 'Déplacer ici'} disabled={moving || !newFolder.trim()} onClick={() => doMove(newFolder)} />
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {moveFolders.map(f => (
-              <button key={f} onClick={() => doMove(f)} disabled={moving} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 36, padding: '0 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#161618', color: '#EDEDEF', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ color: '#8B8B94', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={14} /></span>{f}
-              </button>
-            ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 340, overflowY: 'auto' }}>
+              {moveFolders.map(f => (
+                <button key={f.n} title={f.n} onClick={() => doMove(f.n)} disabled={moving} style={{ display: 'flex', alignItems: 'center', gap: 10, width: `calc(100% - ${f.depth * 18}px)`, marginLeft: f.depth * 18, height: 36, padding: '0 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#161618', color: '#EDEDEF', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'left', flexShrink: 0, boxSizing: 'border-box' }}>
+                  <span style={{ color: '#8B8B94', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={14} /></span>{f.label}
+                </button>
+              ))}
+            </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="Nouveau dossier…" style={{ ...FIELD, flex: 1, minWidth: 0 }} />
+              <input value={newFolder} onChange={e => setNewFolder(e.target.value)} placeholder="Nouveau dossier… (Parent/Sous-dossier possible)" style={{ ...FIELD, flex: 1, minWidth: 0 }} />
             </div>
           </div>
         </Modal>
@@ -1528,8 +1569,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {folderCtx && createPortal(
         <>
           <div onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
-          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 110), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
-            <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 150), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
+            <button onClick={() => { openNewFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginBottom: 4, borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z|M12 10v6|M9 13h6" size={14} /></span>Nouveau sous-dossier
+            </button>
+            <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(leafOf(folderCtx.name)); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" size={14} /></span>Renommer
             </button>
@@ -1546,13 +1591,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         <Modal theme={theme} title="Supprimer ce dossier ?" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClose={() => setConfirmDelFolder(null)}
           footer={<><Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDelFolder(null)} /><Btn theme={theme} tone="danger" label="Supprimer le dossier" onClick={() => { deleteFolder(confirmDelFolder); setConfirmDelFolder(null) }} /></>}>
           <p style={{ margin: 0, fontSize: 13, color: '#A1A1AA', lineHeight: 1.6 }}>
-            Le dossier <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{confirmDelFolder}</b> sera supprimé, mais <b style={{ color: '#4ADE80', fontWeight: 600 }}>tes vidéos ne sont PAS supprimées</b> : elles sont simplement retirées du dossier et restent dans « Tous ». Tu pourras les regrouper dans un nouveau dossier.
+            Le dossier <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{confirmDelFolder.split('/').join(' › ')}</b>{folders.some(f => f.n.startsWith(`${confirmDelFolder}/`)) ? ' et ses sous-dossiers seront supprimés' : ' sera supprimé'}, mais <b style={{ color: '#4ADE80', fontWeight: 600 }}>tes vidéos ne sont PAS supprimées</b> : {parentOf(confirmDelFolder) ? `elles remontent dans « ${parentOf(confirmDelFolder)!.split('/').join(' › ')} ».` : 'elles sont simplement retirées du dossier et restent dans « Tous ». Tu pourras les regrouper dans un nouveau dossier.'}
           </p>
         </Modal>
       )}
 
       {renameFolderOf && (
-        <Modal theme={theme} title="Renommer le dossier" onClose={() => setRenameFolderOf(null)}
+        <Modal theme={theme} title="Renommer le dossier" sub={parentOf(renameFolderOf) ? `Dans « ${parentOf(renameFolderOf)!.split('/').join(' › ')} »` : undefined} onClose={() => setRenameFolderOf(null)}
           footer={<>
             <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setRenameFolderOf(null)} />
             <Btn theme={theme} tone="primary" label="Renommer" disabled={!renameFolderVal.trim()} onClick={() => { renameFolder(renameFolderOf, renameFolderVal); setRenameFolderOf(null) }} />
@@ -1631,13 +1676,23 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
 
       {folderModal && (
-        <Modal theme={theme} title="Nouveau dossier" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClose={() => setFolderModal(false)}
+        <Modal theme={theme} title={folderParent ? 'Nouveau sous-dossier' : 'Nouveau dossier'} icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClose={() => setFolderModal(false)}
           footer={<>
             <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setFolderModal(false)} />
             <Btn theme={theme} tone="primary" label="Créer" disabled={!folderName.trim()} onClick={createFolder} />
           </>}>
-          <input autoFocus value={folderName} onChange={e => setFolderName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && folderName.trim()) createFolder() }} placeholder="Nom du dossier"
-            style={FIELD} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input autoFocus value={folderName} onChange={e => setFolderName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && folderName.trim()) createFolder() }} placeholder="Nom du dossier"
+              style={FIELD} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: '#A1A1AA' }}>
+              <span style={{ flexShrink: 0 }}>Dans</span>
+              <select value={folderParent ?? ''} onChange={e => setFolderParent(e.target.value || null)} style={{ ...FIELD, flex: 1, minWidth: 0, cursor: 'pointer' }}>
+                <option value="" style={{ background: '#161618' }}>— Aucun (dossier principal)</option>
+                {moveFolders.map(f => <option key={f.n} value={f.n} style={{ background: '#161618' }}>{`${'\u00A0\u00A0\u00A0'.repeat(f.depth)}${f.label}`}</option>)}
+              </select>
+            </label>
+            {folderName.trim() && <span style={{ fontSize: 12, color: '#71717A' }}>{`→ ${joinPath(folderParent, folderName).split('/').join(' › ')}`}</span>}
+          </div>
         </Modal>
       )}
 

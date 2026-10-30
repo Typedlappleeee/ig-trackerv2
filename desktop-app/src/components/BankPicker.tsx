@@ -7,6 +7,7 @@ import type { OrgState } from '@/lib/data'
 import { useBankThumbs } from '@/lib/data'
 import { Modal, Btn, FIELD, Skeleton, SkeletonRows } from '@/lib/ui'
 import VideoFrame from './VideoFrame'
+import { folderTree, isWithin } from '@/lib/bankFolders'
 
 // Sélecteur « Banque » commun (fidèle à _openPicker du prototype ZIP) : une modale
 // avec recherche + grille (vidéos/images) ou liste (légendes), sélection multi ou
@@ -88,13 +89,12 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   useEffect(() => { load() }, [load])
 
 
-  const folders = useMemo(() => {
-    const s = new Set<string>(); media.forEach(m => { if (m.folder) s.add(m.folder) }); return [...s].sort((a, b) => a.localeCompare(b))
-  }, [media])
+  // Dossiers en arborescence (un dossier inclut ses sous-dossiers « Parent/Enfant »).
+  const folders = useMemo(() => folderTree(media.map(m => m.folder)).map(n => n.path), [media])
   const filteredMedia = useMemo(() => {
     const s = q.trim().toLowerCase()
     return media
-      .filter(m => folder === 'Tous' || m.folder === folder)
+      .filter(m => folder === 'Tous' || isWithin(m.folder, folder))
       .filter(m => !s || (m.title ?? '').toLowerCase().includes(s))
   }, [media, q, folder])
   // Affichage progressif (60 puis la suite en défilant) et liens des SEULES vignettes affichées.
@@ -199,7 +199,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
                 height: 26, padding: '0 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 500,
                 background: on ? 'rgba(255,255,255,0.08)' : '#161618',
                 border: '1px solid ' + (on ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.09)'), color: on ? '#EDEDEF' : '#A1A1AA',
-              }}>{f === 'Tous' ? 'Tous' : `📁 ${f}`}</button>
+              }}>{f === 'Tous' ? 'Tous' : `📁 ${f.split('/').join(' › ')}`}</button>
             )
           })}
           {multi && filteredMedia.length > 0 && (

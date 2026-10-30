@@ -3,15 +3,16 @@
 // par la RPC sf_genjutsu_access aux seuls comptes Blowsome).
 // Une génération = une vidéo source × une modèle (Element Higgsfield) :
 //   lien → vidéo (ig_video) → import Higgsfield → generate_video (motion control) → suivi
-//   → copie durable (video_garder) → spoof en X versions rangées dans la Banque (/api/v1/tools/spoof).
+//   → copie durable (video_garder) → dossier de la Banque de la modèle : X versions spoofées
+//     (/api/v1/tools/spoof), ou la vidéo telle quelle si le spoof est coupé.
 // La file est un singleton persisté (sf-gj-jobs) : quitter la page ne l'arrête pas, un rechargement
 // reprend le suivi. Une génération déjà envoyée à Higgsfield n'est JAMAIS relancée automatiquement
 // (coût double) : seulement par le bouton « Relancer ».
 import { supabase } from './supabase'
 import { IS_WEB } from './platform'
+import { saveOutputToBank } from './studioTools'
 
 export const GJ_ORIGIN = IS_WEB && typeof window !== 'undefined' && /^https?:/.test(window.location.origin) ? window.location.origin : 'https://scaleflow.company'
-export const GENERATOR_URL = `${GJ_ORIGIN}/genjutsu?seul=genjutsu`
 const RELAY = `${GJ_ORIGIN}/api/hf`
 export const MAX_RUNNING = 8                    // Higgsfield : 8 Genjutsu à la fois par compte
 export const TYPICAL_MS = 240_000               // durée habituelle d'une génération (barre d'avancement estimée)
@@ -130,6 +131,64 @@ export async function listAccounts(): Promise<{ cloud: boolean; accounts: HfAcco
   const j = await relay<{ nuage?: boolean; comptes?: { nom: string; credits: number | null; plan: string | null }[] }>({ a: 'comptes' })
   return { cloud: !!j.nuage, accounts: (j.comptes ?? []).map(c => ({ name: c.nom, credits: c.credits == null ? null : Number(c.credits), plan: c.plan || '' })) }
 }
+// Connexion d'un compte Higgsfield (OAuth PKCE) : Higgsfield n'accepte comme adresse de retour
+// qu'une adresse locale → la page de retour « ne charge pas » et on colle son adresse dans l'app.
+// Le jeton est rangé dans la base de l'équipe par le relais : il ne revient jamais au navigateur.
+interface PendingLogin { verifier: string; state: string; clientId: string; redirect: string; name: string; at: number }
+const LOGIN_KEY = 'sf-gj-login'
+const LOOPBACKS = ['http://127.0.0.1:33418/callback', 'http://localhost:33418/callback', 'http://127.0.0.1/callback', 'http://localhost/callback']
+const b64url = (buf: ArrayBuffer | Uint8Array) => {
+  let s = ''
+  for (const o of new Uint8Array(buf)) s += String.fromCharCode(o)
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+export async function startAccountLogin(name: string): Promise<{ url: string; redirect: string }> {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)))
+  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))
+  const state = b64url(crypto.getRandomValues(new Uint8Array(16)))
+  let d: { url?: string; client_id?: string } | null = null, redirect = ''
+  for (const r of LOOPBACKS) {
+    try { d = await relay({ a: 'depart', retour: r, state, challenge, client_id: null }); redirect = r; break } catch (e) {
+      if (!/redirect/i.test(errMsg(e))) throw e
+    }
+  }
+  if (!d?.url || !d.client_id) throw new Error('Higgsfield refuse la connexion d’une application extérieure pour le moment')
+  const pending = readJson<PendingLogin[]>(LOGIN_KEY, []).filter(x => Date.now() - x.at < 20 * 60_000)
+  pending.push({ verifier, state, clientId: d.client_id, redirect, name, at: Date.now() })
+  writeJson(LOGIN_KEY, pending)
+  return { url: d.url, redirect }
+}
+export async function finishAccountLogin(pasted: string): Promise<string> {
+  let raw = String(pasted || '').trim().replace(/^[^hl1]*/i, '')
+  if (!/^https?:\/\//i.test(raw)) raw = `http://${raw}`        // le navigateur copie parfois sans « http:// »
+  let u: URL
+  try { u = new URL(raw) } catch { throw new Error('ce n’est pas l’adresse de la page de retour') }
+  const err = u.searchParams.get('error')
+  if (err) throw new Error(`Higgsfield a refusé : ${u.searchParams.get('error_description') || err}`)
+  const code = u.searchParams.get('code'), state = u.searchParams.get('state')
+  if (!code) throw new Error('l’adresse collée ne contient pas de code (il faut celle de la page qui ne charge pas)')
+  const pending = readJson<PendingLogin[]>(LOGIN_KEY, [])
+  const p = pending.find(x => x.state === state)
+  if (!p) throw new Error('cette adresse vient d’une autre tentative : relance « Ouvrir Higgsfield » une seule fois, puis colle la nouvelle adresse')
+  const t = await relay<{ access_token?: string; refresh_token?: string; expires_in?: number; error?: string; error_description?: string }>({
+    a: 'jeton', form: { grant_type: 'authorization_code', code, redirect_uri: p.redirect, client_id: p.clientId, code_verifier: p.verifier },
+  })
+  if (!t.access_token) throw new Error(t.error_description || t.error || 'jeton refusé')
+  await relay({
+    a: 'garder', nom: p.name, client_id: p.clientId, credits: null, plan: null,
+    jeton: { access_token: t.access_token, refresh_token: t.refresh_token ?? null, expires_at: Math.floor(Date.now() / 1000) + (Number(t.expires_in) || 3600) },
+  })
+  writeJson(LOGIN_KEY, pending.filter(x => x.state !== state))
+  sessions.delete(p.name)
+  return p.name
+}
+export async function removeAccount(name: string): Promise<void> {
+  await relay({ a: 'retirer', nom: name })
+  sessions.delete(name)
+}
+// Le compte a perdu sa connexion (jeton révoqué) : il faut le reconnecter sous le même nom.
+export const needsReconnect = (e: unknown) => /annulé la connexion|reconnecte|expirée|renouvellement refusé|compte non connecté|HTTP 401/i.test(errMsg(e))
+
 export async function readCredits(account: string): Promise<number | null> {
   const b = await tool<Any>(account, 'balance', {})
   const n = b?.credits ?? b?.balance
@@ -296,6 +355,7 @@ function importVideo(account: string, url: string): Promise<string> {
 
 /* ── file des générations ── */
 export type GjStatus = 'waiting' | 'preparing' | 'running' | 'saving' | 'spoofing' | 'done' | 'failed'
+// count = 0 : pas de spoof, la vidéo est rangée telle quelle dans le dossier.
 export interface SpoofPlan { count: number; device: string; gps: string; folder: string; orgId: string | null }
 export interface GjModelRef { id: string; name: string; mediaId: string; photo: string | null }
 export interface GjJob {
@@ -509,8 +569,25 @@ async function collect(id: string, st?: Any): Promise<void> {
     try { durable = (await relay<{ url?: string }>({ a: 'video_garder', url })).url || url } catch { /* l'adresse Higgsfield reste valable un temps */ }
     patch(id, { resultUrl: durable, doneAt: Date.now() })
     if (j.spoof && j.spoof.count > 0) await spoofJob(id)
+    else if (j.spoof) await saveOriginal(id)
     else patch(id, { status: 'done' })
   } finally { collecting.delete(id) }
+}
+
+// Spoof coupé : la vidéo telle quelle, dans le dossier de la modèle.
+async function saveOriginal(id: string): Promise<void> {
+  const j = byId(id)
+  if (!j?.resultUrl || !j.spoof) return
+  patch(id, { status: 'spoofing', spoofDone: 0, spoofFailed: 0, spoofError: null })
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) throw new Error('Session expirée : reconnecte-toi.')
+    const r = await fetch(j.resultUrl)
+    if (!r.ok) throw new Error(`vidéo indisponible (HTTP ${r.status})`)
+    const bankId = await saveOutputToBank(session.user.id, j.spoof.orgId, new Uint8Array(await r.arrayBuffer()), `Genjutsu ${j.model.name} ${String(j.hfJobId ?? j.id).slice(0, 6)}`, 'mp4', j.spoof.folder)
+    if (!bankId) throw new Error('enregistrement dans la Banque refusé')
+    patch(id, { status: 'done', spoofDone: 1 })
+  } catch (e) { patch(id, { status: 'done', spoofFailed: 1, spoofError: errMsg(e) }) }
 }
 
 // X versions uniques (appareil + GPS + empreinte) rangées dans la Banque.
