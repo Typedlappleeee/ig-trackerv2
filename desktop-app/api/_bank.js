@@ -60,8 +60,10 @@ export async function authToken(s, header) {
   if (!data || data.revoked_at) return null
   // Le créateur de la clé doit toujours faire partie de l'organisation (sinon la clé meurt).
   if (data.space_org && !(await isMember(s, data.space_org, data.owner_id))) return null
-  if (!data.last_used_at || Date.now() - Date.parse(data.last_used_at) > 5 * 60_000) {
-    s.from('sf_api_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', data.id).then(() => {}, () => {})
+  // Attendu (≈ 50 ms) : sur Vercel, une écriture lancée sans attendre peut être coupée à la fin
+  // de la requête → « utilisée jamais » affiché alors que la clé sert.
+  if (!data.last_used_at || Date.now() - Date.parse(data.last_used_at) > 60_000) {
+    await s.from('sf_api_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', data.id).then(() => {}, () => {})
   }
   return { orgId: data.space_org, userId: data.owner_id, tokenId: data.id }
 }
