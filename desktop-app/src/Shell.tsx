@@ -15,12 +15,13 @@ export type PageKey =
   | 'flows' | 'recipes' | 'publish' | 'automation' | 'warmup' | 'flowBuilder'
   | 'studio'
   | 'insights' | 'health'
-  | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto'
+  | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto' | 'blowGenjutsu'
   | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
   | 'scheduled' | 'links' | 'viral' | 'explore' | 'pricing' | 'genjutsu'
   | 'admin'
   | 'settings'
 
+const GENJUTSU_ICON = 'M15 4V2|M15 16v-2|M8 9h2|M20 9h2|M17.8 11.8L19 13|M15 9h.01|M17.8 6.2L19 5|M3 21l9-9|M12.2 6.2L11 5'
 interface NavItem { k: PageKey; l: string; i: string; n?: number; soon?: string }
 interface NavSection { g: string | null; items: NavItem[] }
 
@@ -51,6 +52,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       { g: 'Studio', items: [
         { k: 'bank', l: 'Banque', i: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z', n: videoCount ?? undefined },
         { k: 'blowTools', l: 'Gestionnaire de tools', i: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-2-2 2.1-2.1z' },
+        { k: 'blowGenjutsu', l: 'Genjutsu', i: GENJUTSU_ICON },
       ] },
       { g: 'Parc', items: [
         { k: 'blowParc', l: 'Phone Farm', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined },
@@ -128,6 +130,7 @@ const TITLES: Record<PageKey, string[]> = {
   blowAuto: ['Blowsome', 'Pilote Auto'],
   blowContent: ['Blowsome', 'Auto-contenu'],
   blowTools: ['Blowsome', 'Outils VIP'],
+  blowGenjutsu: ['Blowsome', 'Genjutsu'],
   irtPhones: ['iRemoTech', 'Téléphones'],
   irtPosting: ['iRemoTech', 'Posting'],
   irtStory: ['iRemoTech', 'Story'],
@@ -137,7 +140,7 @@ const TITLES: Record<PageKey, string[]> = {
   scheduled: ['Diffusion', 'Programmé'],
   links: ['Analyse', 'Liens'],
   viral: ['Analyse', 'Veille Reels'],
-  genjutsu: ['Production', 'Genjutsu IA'],
+  genjutsu: ['Production', 'Genjutsu IA (ancien)'],
   explore: ['Explorer'],
   pricing: ['Abonnements'],
   admin: ['Admin', 'Orgas & licences'],
@@ -186,10 +189,14 @@ export default function Shell({
   }, [])
 
   // Compteurs de nav = vrais counts (téléphones, banque) ; null tant que non chargés.
-  // Genjutsu IA (Higgsfield) : réservé aux admins, rangé dans Production.
-  const GENJUTSU: NavItem = { k: 'genjutsu', l: 'Genjutsu IA', i: 'M15 4V2|M15 16v-2|M8 9h2|M20 9h2|M17.8 11.8L19 13|M15 9h.01|M17.8 6.2L19 5|M3 21l9-9|M12.2 6.2L11 5', soon: 'Nouveau' }
+  // Genjutsu (le générateur, intégré) : réservé à l'accès Blowsome (et aux admins), rangé dans
+  // Production. L'ancienne version interne reste visible des admins seulement.
+  const GENJUTSU_VIP: NavItem = { k: 'blowGenjutsu', l: 'Genjutsu ✦', i: GENJUTSU_ICON, soon: 'Nouveau' }
+  const GENJUTSU_OLD: NavItem = { k: 'genjutsu', l: 'Genjutsu IA (ancien)', i: GENJUTSU_ICON }
   const NAV = [
-    ...navFor(infra, phoneCount, videoCount).map(g => g.g === 'Production' && isAdmin ? { ...g, items: [...g.items, GENJUTSU] } : g),
+    ...navFor(infra, phoneCount, videoCount).map(g => g.g === 'Production'
+      ? { ...g, items: [...g.items, ...(canBlowsome || isAdmin ? [GENJUTSU_VIP] : []), ...(isAdmin ? [GENJUTSU_OLD] : [])] }
+      : g),
     ...(isAdmin ? [{ g: 'Admin', items: [
       { k: 'admin' as PageKey, l: 'Admin · Orgas & licences', i: 'M15 7a2 2 0 0 1 2 2m4-2a6 6 0 0 1-7.7 5.7L10 16H8v2H6v2H2v-4l6.3-6.3A6 6 0 1 1 21 7z' },
     ] }] : []),

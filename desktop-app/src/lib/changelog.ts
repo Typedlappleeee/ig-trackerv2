@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-30',
+    date: '2026-10-30',
+    title: { fr: '✦ Genjutsu dans ScaleFlow (accès Blowsome)', en: '✦ Genjutsu inside ScaleFlow (Blowsome access)' },
+    items: {
+      fr: [
+        'Nouvelle page Genjutsu : le générateur (mouvement d’une vidéo transféré sur ta référence, Higgsfield) directement dans l’app — réservée aux comptes avec l’accès Blowsome, sans mot de passe à taper.',
+        'Spoof auto : chaque génération réussie est déclinée en X versions uniques (iPhone 15 · France par défaut) et rangée dans la Banque — un dossier fixe ou un dossier par modèle.',
+      ],
+      en: [
+        'New Genjutsu page: the generator (a video’s motion transferred onto your reference, Higgsfield) right inside the app — for accounts with Blowsome access, no password to type.',
+        'Auto-spoof: every successful generation becomes X unique versions (iPhone 15 · France by default) saved in the Bank — one fixed folder or one folder per model.',
+      ],
+    },
+  },
+  {
     id: '2026-10-29b',
     date: '2026-10-29',
     title: { fr: '🎭 API : Spoof et Remix à distance + appareil enfin écrit dans les vidéos', en: '🎭 API: remote Spoof and Remix + device finally written into videos' },
