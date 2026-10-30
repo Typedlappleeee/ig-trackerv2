@@ -74,6 +74,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     if (error) { toast(error.message, 'bad'); return }
     setNewPass('')
     await loadAccess()
+    void loadAccounts()
   }
 
   // ── comptes Higgsfield de l'équipe ──
@@ -280,6 +281,14 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
         <button type="button" disabled={!newPass.trim()} onClick={() => void savePass()} style={{ ...ghostBtn, height: 32, opacity: newPass.trim() ? 1 : 0.5 }}>Relier</button>
       </div>
     </>) : <span>Genjutsu n’est pas encore activé par l’administrateur.</span>
+    ) : relayErr && /mot de passe/i.test(relayErr) ? (isSuperAdmin ? (<>
+      <span>La clé enregistrée pour le générateur de l’équipe n’est plus la bonne. Colle la clé actuelle (une seule fois, pour tout le monde) :</span>
+      <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+        <input value={newPass} onChange={e => setNewPass(e.target.value)} type="password" autoComplete="off" placeholder="Clé du générateur" style={{ ...field, flex: 1 }}
+          onKeyDown={e => { if (e.key === 'Enter' && newPass.trim()) void savePass() }} />
+        <button type="button" disabled={!newPass.trim()} onClick={() => void savePass()} style={{ ...ghostBtn, height: 32, opacity: newPass.trim() ? 1 : 0.5 }}>Relier</button>
+      </div>
+    </>) : <span>Genjutsu doit être relié à nouveau par l’administrateur.</span>
     ) : relayErr ? (<>
       <span>{relayErr}</span>
       <button type="button" onClick={() => void loadAccounts()} style={ghostBtn}>Réessayer</button>
