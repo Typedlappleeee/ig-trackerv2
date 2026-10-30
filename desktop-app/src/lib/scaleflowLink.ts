@@ -31,6 +31,13 @@ export async function revokeToken(id: string): Promise<void> {
   const { error } = await supabase.rpc('sf_api_token_revoke', { p_id: id })
   if (error) throw new Error(error.message)
 }
+export interface ApiLogRow { at: string; method: string; route: string; status: number; error: string | null; origin: string | null; ip: string | null; attached: boolean }
+export const LOG_SQL = '20261030_api_log.sql'
+export async function listApiLog(orgId: string | null): Promise<ApiLogRow[]> {
+  const { data, error } = await supabase.rpc('sf_api_log_list', { p_org: orgId })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ApiLogRow[]
+}
 export async function getPartner(orgId: string | null): Promise<Partner | null> {
   const { data, error } = await supabase.rpc('sf_link_partner_get', { p_org: orgId })
   if (error) throw new Error(error.message)

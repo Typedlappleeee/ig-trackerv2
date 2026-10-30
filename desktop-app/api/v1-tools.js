@@ -8,7 +8,7 @@
 // Même réglages ffmpeg que l'app (copie dans _studio.js, parité testée dans tools.test.js).
 import { randomInt } from 'node:crypto'
 import piexif from 'piexifjs'
-import { db, authToken, bodyOf, bytesOfFile, cleanFolder, extOf, fetchPublic, storeBytes, MIME_OF } from './_bank.js'
+import { db, authCheck, logCall, bodyOf, bytesOfFile, cleanFolder, extOf, fetchPublic, storeBytes, MIME_OF } from './_bank.js'
 import { runFfmpeg } from './_ffmpeg.js'
 import { GPS_CITIES, INTENSITIES, SPOOF_DEVICES, DEFAULT_TOGGLES, gpsFor, imageSpoofArgs, remixArgs, spoofArgs } from './_studio.js'
 
@@ -79,12 +79,19 @@ export default async function handler(req, res) {
   const url = new URL(req.url, 'http://x')
   const tool = String(url.searchParams.get('tool') || '').replace(/^\/+|\/+$/g, '').toLowerCase()
   const method = String(req.method || 'GET').toUpperCase()
+  let s = null, who = null
+  const reply = async (status, body) => {   // noté dans le journal de l'API avant la réponse
+    if (s) await logCall(s, req, { who, method, route: `tools${tool ? '/' + tool : ''}`, status, error: body.ok ? null : body.error })
+    return send(res, status, body)
+  }
   try {
-    const s = db()
-    const scope = await authToken(s, req.headers.authorization)
-    if (!scope) return send(res, 401, { ok: false, code: 'unauthorized', error: 'clé API manquante, invalide ou révoquée' })
-    if (!tool && method === 'GET') return send(res, 200, { ok: true, ...CATALOG })
-    if (!['spoof', 'remix'].includes(tool) || method !== 'POST') return send(res, 404, { ok: false, code: 'not_found', error: `outil inconnu : ${method} /api/v1/tools/${tool}` })
+    s = db()
+    const auth = await authCheck(s, req.headers.authorization)
+    const scope = auth.scope
+    who = scope ?? auth.attach ?? null
+    if (!scope) return reply(401, { ok: false, code: 'unauthorized', error: `clé API refusée : ${auth.reason}` })
+    if (!tool && method === 'GET') return reply(200, { ok: true, ...CATALOG })
+    if (!['spoof', 'remix'].includes(tool) || method !== 'POST') return reply(404, { ok: false, code: 'not_found', error: `outil inconnu : ${method} /api/v1/tools/${tool}` })
 
     const b = bodyOf(req)
     const intensity = pickIntensity(b.intensity)
@@ -96,9 +103,9 @@ export default async function handler(req, res) {
     let src
     if (b.file_id) src = await bytesOfFile(s, scope, b.file_id, MAX_INPUT)
     else if (b.url) { const got = await fetchPublic(b.url, { maxBytes: MAX_INPUT }); src = { ...got, title: null, folder: null, ext: extOf(new URL(got.finalUrl).pathname) } }
-    else return send(res, 422, { ok: false, code: 'invalid_action', error: 'file_id ou url requis' })
+    else return reply(422, { ok: false, code: 'invalid_action', error: 'file_id ou url requis' })
     const isImage = IMG.includes(src.ext) || String(src.contentType).startsWith('image/')
-    if (isImage && tool !== 'spoof') return send(res, 422, { ok: false, code: 'invalid_file', error: 'le remix est réservé aux vidéos (utilise spoof pour une photo)' })
+    if (isImage && tool !== 'spoof') return reply(422, { ok: false, code: 'invalid_file', error: 'le remix est réservé aux vidéos (utilise spoof pour une photo)' })
     const inExt = src.ext || (isImage ? 'jpg' : 'mp4')
 
     const baseTitle = String(b.title || src.title || (isImage ? 'photo' : 'vidéo'))
@@ -114,9 +121,9 @@ export default async function handler(req, res) {
       const { out, thumb } = await runFfmpeg(src.buf, { inExt, outExt: 'mp4', args, timeoutMs: 48_000, extraOut: true })
       file = await storeBytes(s, scope, { buf: out, ext: 'mp4', contentType: MIME_OF.mp4, title: b.title ? baseTitle : `${baseTitle} · ${tool}`, folder, thumb })
     }
-    return send(res, 200, { ok: true, tool, file, settings: { seed, intensity, device, gps: gpsLabel, ...(gps ? { coords: gps } : {}) }, ms: Date.now() - t0 })
+    return reply(200, { ok: true, tool, file, settings: { seed, intensity, device, gps: gpsLabel, ...(gps ? { coords: gps } : {}) }, ms: Date.now() - t0 })
   } catch (e) {
     const status = Number(e?.status) || 500
-    return send(res, status, { ok: false, code: e?.code || 'server_error', error: status === 500 ? `erreur serveur : ${e?.message || e}` : String(e?.message || e) })
+    return reply(status, { ok: false, code: e?.code || 'server_error', error: status === 500 ? `erreur serveur : ${e?.message || e}` : String(e?.message || e) })
   }
 }

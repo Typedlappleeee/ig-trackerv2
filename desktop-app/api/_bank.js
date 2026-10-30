@@ -53,19 +53,47 @@ export function parseCursor(v) {
 }
 
 // ── Clé API (Authorization: Bearer sf_…) → espace ─────────────────────────────────
-export async function authToken(s, header) {
-  const m = /^Bearer\s+(sf_[0-9a-f]{48})\s*$/i.exec(String(header || ''))
-  if (!m) return null
+// authCheck renvoie l'espace OU la raison précise du refus (pour le journal de l'API) ;
+// une clé mal copiée dont le début correspond à une vraie clé est rattachée à son espace.
+export async function authCheck(s, header) {
+  const raw = String(header || '').trim()
+  if (!raw) return { scope: null, reason: 'clé absente (en-tête Authorization: Bearer sf_…)' }
+  const m = /^Bearer\s+(sf_[0-9a-f]{48})$/i.exec(raw)
+  const pre = (/(sf_[0-9a-f]{6})/i.exec(raw) || [])[1]?.toLowerCase()
+  const byPrefix = async reason => {
+    if (!pre) return { scope: null, reason }
+    const { data } = await s.from('sf_api_tokens').select('id, owner_id, space_org').eq('prefix', pre).is('revoked_at', null).limit(1)
+    const t = data && data[0]
+    return { scope: null, reason: t ? `${reason} — le début (${pre}…) correspond à une de tes clés : elle est mal copiée` : reason, attach: t ? { orgId: t.space_org, userId: t.owner_id, tokenId: t.id } : null }
+  }
+  if (!m) return byPrefix('format de clé invalide (attendu : Bearer sf_ + 48 caractères)')
   const { data } = await s.from('sf_api_tokens').select('id, owner_id, space_org, revoked_at, last_used_at').eq('token_hash', sha256(m[1].toLowerCase())).maybeSingle()
-  if (!data || data.revoked_at) return null
+  if (!data) return byPrefix('clé inconnue')
+  const attach = { orgId: data.space_org, userId: data.owner_id, tokenId: data.id }
+  if (data.revoked_at) return { scope: null, reason: 'clé révoquée', attach }
   // Le créateur de la clé doit toujours faire partie de l'organisation (sinon la clé meurt).
-  if (data.space_org && !(await isMember(s, data.space_org, data.owner_id))) return null
+  if (data.space_org && !(await isMember(s, data.space_org, data.owner_id))) return { scope: null, reason: 'le créateur de la clé ne fait plus partie de l’organisation', attach }
   // Attendu (≈ 50 ms) : sur Vercel, une écriture lancée sans attendre peut être coupée à la fin
   // de la requête → « utilisée jamais » affiché alors que la clé sert.
   if (!data.last_used_at || Date.now() - Date.parse(data.last_used_at) > 60_000) {
     await s.from('sf_api_tokens').update({ last_used_at: new Date().toISOString() }).eq('id', data.id).then(() => {}, () => {})
   }
-  return { orgId: data.space_org, userId: data.owner_id, tokenId: data.id }
+  return { scope: attach }
+}
+export async function authToken(s, header) { return (await authCheck(s, header)).scope }
+
+// Journal de l'API (table sf_api_log, SQL 20261030_api_log.sql) — jamais bloquant.
+export async function logCall(s, req, { who, method, route, status, error }) {
+  const h = req.headers || {}
+  const row = {
+    space_org: who?.orgId ?? null, owner_id: who?.userId ?? null, token_id: who?.tokenId ?? null,
+    method: String(method || '').slice(0, 10), route: String(route || '').slice(0, 120), status,
+    error: error ? String(error).slice(0, 300) : null,
+    origin: h.origin ? String(h.origin).slice(0, 200) : null,
+    ip: String(h['x-forwarded-for'] || h['x-real-ip'] || '').split(',')[0].trim().slice(0, 64) || null,
+    ua: h['user-agent'] ? String(h['user-agent']).slice(0, 200) : null,
+  }
+  try { await s.from('sf_api_log').insert(row).then(() => {}, () => {}) } catch { /* table absente : SQL pas passé */ }
 }
 
 // Rôle d'un utilisateur dans une organisation : 'owner' | 'admin' | 'member' | 'viewer' | null.
