@@ -1,11 +1,12 @@
 // API publique ScaleFlow (« ScaleFlow Link » v1) — /api/v1/<route>
 //   Auth : Authorization: Bearer sf_… (clé créée dans Paramètres › API & site partenaire).
-//   Routes : GET me · GET folders · POST folders · GET files · POST files · POST uploads ·
+//   Routes : GET me · GET folders · POST folders · GET files (?unused=1) · POST files · POST uploads ·
+//            DELETE files/<id> (corbeille) · PATCH files/<id> · POST files/<id>/used ·
 //            GET docs (documentation HTML, sans clé).
 // Les réponses sont { ok: true, … } ou { ok: false, error, code } avec le bon statut HTTP.
 // Appels SERVEUR À SERVEUR uniquement (pas de CORS : la clé ne doit jamais être dans un navigateur).
 // Env Vercel : SUPABASE_URL (ou VITE_SUPABASE_URL) + SUPABASE_SERVICE_ROLE_KEY.
-import { db, authToken, listFolders, listFiles, createFolder, storeFromUrl, createUpload, registerUpload, cleanFolder, bodyOf } from './_bank.js'
+import { db, authToken, listFolders, listFiles, createFolder, storeFromUrl, createUpload, registerUpload, cleanFolder, bodyOf, trashFile, markUsed, updateFile } from './_bank.js'
 import { DOCS_HTML } from './_linkdocs.js'
 
 function send(res, status, body) {
@@ -45,7 +46,8 @@ export default async function handler(req, res) {
     }
     if (route === 'files' && method === 'GET') {
       const folder = url.searchParams.has('folder') ? cleanFolder(url.searchParams.get('folder')) : null
-      return send(res, 200, { ok: true, folder, ...(await listFiles(s, scope, { folder, limit: url.searchParams.get('limit'), cursor: url.searchParams.get('cursor') })) })
+      const unused = /^(1|true|yes)$/i.test(url.searchParams.get('unused') || '')
+      return send(res, 200, { ok: true, folder, ...(await listFiles(s, scope, { folder, limit: url.searchParams.get('limit'), cursor: url.searchParams.get('cursor'), unused })) })
     }
     if (route === 'files' && method === 'POST') {
       const b = bodyOf(req)
@@ -53,6 +55,11 @@ export default async function handler(req, res) {
       if (!b.url) return send(res, 422, { ok: false, code: 'invalid_action', error: 'url (ou path) requis' })
       return send(res, 200, { ok: true, file: await storeFromUrl(s, scope, b) })
     }
+    // files/<id> : DELETE (corbeille), PATCH {folder, title} ; files/<id>/used : POST (+1 utilisation)
+    const m = /^files\/([0-9a-f-]{36})(\/used)?$/i.exec(route)
+    if (m && !m[2] && method === 'DELETE') return send(res, 200, { ok: true, ...(await trashFile(s, scope, m[1])) })
+    if (m && !m[2] && method === 'PATCH') return send(res, 200, { ok: true, file: await updateFile(s, scope, m[1], bodyOf(req)) })
+    if (m && m[2] && method === 'POST') return send(res, 200, { ok: true, ...(await markUsed(s, scope, m[1])) })
     if (route === 'uploads' && method === 'POST') {
       return send(res, 200, { ok: true, ...(await createUpload(s, scope, bodyOf(req))) })
     }

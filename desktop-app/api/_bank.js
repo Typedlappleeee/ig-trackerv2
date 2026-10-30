@@ -121,22 +121,58 @@ function fileOut(r, signed) {
     kind: kindOf(r.storage_path || r.file_url || r.title),
     url: r.storage_path ? signed.get(r.storage_path) ?? null : r.file_url ?? null,
     thumbnail_url: r.thumbnail_path ? signed.get(r.thumbnail_path) ?? null : null,
-    duration: r.duration ?? null, created_at: r.created_at,
+    duration: r.duration ?? null, created_at: r.created_at, used_count: r.used_count ?? 0,
   }
 }
-const FILE_COLS = 'id, title, folder, storage_path, thumbnail_path, file_url, duration, created_at'
+const FILE_COLS = 'id, title, folder, storage_path, thumbnail_path, file_url, duration, created_at, used_count'
 
 // Fichiers d'un dossier (folder null = hors dossier), plus récents d'abord, par pages.
-export async function listFiles(s, scope, { folder, limit, cursor }) {
+export async function listFiles(s, scope, { folder, limit, cursor, unused }) {
   const lim = clampLimit(limit), off = parseCursor(cursor)
   let q = inScope(s.from('content_bank').select(FILE_COLS), scope).is('deleted_at', null).or(NOT_SENTINEL)
   q = folder ? q.eq('folder', folder) : q.is('folder', null)
+  if (unused) q = q.or('used_count.is.null,used_count.eq.0')
   const { data, error } = await q.order('created_at', { ascending: false }).order('id').range(off, off + lim)
   if (error) throw new Error(error.message)
   const rows = (data || []).filter(r => r.storage_path || r.file_url)
   const page = rows.slice(0, lim)
   const signed = await signMany(s, page.flatMap(r => [r.storage_path, r.thumbnail_path]))
   return { files: page.map(r => fileOut(r, signed)), next_cursor: (data || []).length > lim ? String(off + lim) : null }
+}
+
+// Un média de l'espace (non supprimé), ou 404.
+async function ownFile(s, scope, id) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) throw httpError(422, 'invalid_file', 'id de média invalide')
+  const { data } = await inScope(s.from('content_bank').select(FILE_COLS + ', notes, deleted_at'), scope).eq('id', String(id)).maybeSingle()
+  if (!data || data.deleted_at || SENTINELS.includes(data.notes ?? '')) throw httpError(404, 'file_not_found', 'média introuvable dans la banque')
+  return data
+}
+// Corbeille (comme dans l'app) : restaurable 7 jours depuis la Banque, puis effacé.
+export async function trashFile(s, scope, id) {
+  const r = await ownFile(s, scope, id)
+  const { error } = await inScope(s.from('content_bank').update({ deleted_at: new Date().toISOString() }), scope).eq('id', r.id)
+  if (error) throw new Error(error.message)
+  return { id: r.id, trashed: true, restorable_days: 7 }
+}
+// « Utilisée » : +1 au compteur de publications (filtre « Jamais publiées » de la Banque).
+export async function markUsed(s, scope, id) {
+  const r = await ownFile(s, scope, id)
+  const used = (r.used_count ?? 0) + 1
+  const { error } = await inScope(s.from('content_bank').update({ used_count: used }), scope).eq('id', r.id)
+  if (error) throw new Error(error.message)
+  return { id: r.id, used_count: used }
+}
+// Déplacer / renommer.
+export async function updateFile(s, scope, id, { folder, title }) {
+  const r = await ownFile(s, scope, id)
+  const patch = {}
+  if (folder !== undefined) patch.folder = cleanFolder(folder)
+  if (title !== undefined) patch.title = cleanTitle(title)
+  if (!Object.keys(patch).length) throw httpError(422, 'invalid_action', 'rien à modifier (folder ou title)')
+  const { error } = await inScope(s.from('content_bank').update(patch), scope).eq('id', r.id)
+  if (error) throw new Error(error.message)
+  const row = { ...r, ...patch }
+  return fileOut(row, await signMany(s, [row.storage_path, row.thumbnail_path]))
 }
 
 // Médias précis de l'espace (pour les envoyer au partenaire) avec des liens valables 24 h.

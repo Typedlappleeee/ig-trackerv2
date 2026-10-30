@@ -35,7 +35,11 @@ function makeDb() {
       eq(k, v) { f.push(r => r[k] === v); return b },
       is(k, v) { f.push(r => (r[k] ?? null) === v); return b },
       in(k, vs) { f.push(r => vs.includes(r[k])); return b },
-      or(expr) { if (expr.startsWith('notes.is.null')) f.push(r => !r.notes || !['__sf_folder__', '__sf_drive_folder__'].includes(r.notes)); return b },
+      or(expr) {
+        if (expr.startsWith('notes.is.null')) f.push(r => !r.notes || !['__sf_folder__', '__sf_drive_folder__'].includes(r.notes))
+        if (expr.startsWith('used_count.is.null')) f.push(r => !r.used_count)
+        return b
+      },
       order() { return b }, limit(n) { range = [0, n - 1]; return b }, range(a, z) { range = [a, z]; return b },
       single() { single = true; return b }, maybeSingle() { maybe = true; return b },
       then(res, rej) { return Promise.resolve(run()).then(res, rej) },
@@ -175,6 +179,33 @@ describe('API v1 (clé ScaleFlow)', () => {
     // chemin d'un autre espace → refusé
     const other = await call(v1, { method: 'POST', path: 'files', body: { path: `videos/orgs/${ORG_B}/${crypto.randomUUID()}.mp4` }, auth: 'Bearer ' + TOKEN_A })
     expect(other.status).toBe(422)
+  })
+  it('supprimer (corbeille), marquer « utilisée », déplacer, lister les jamais utilisées', async () => {
+    const A = 'Bearer ' + TOKEN_A
+    const [c1, c2] = D.t.content_bank.filter(r => r.org_id === ORG_A && r.folder === 'Montage')
+    // utilisée → n'apparaît plus dans ?unused=1
+    const u = await call(v1, { method: 'POST', path: `files/${c1.id}/used`, auth: A })
+    expect(u.body).toMatchObject({ ok: true, used_count: 1 })
+    const fresh = await call(v1, { path: 'files', query: { folder: 'Montage', unused: '1' }, auth: A })
+    expect(fresh.body.files.map(x => x.title)).toEqual(['clip 2', 'clip 3'])
+    expect((await call(v1, { path: 'files', query: { folder: 'Montage' }, auth: A })).body.files.find(x => x.id === c1.id).used_count).toBe(1)
+    // déplacer + renommer
+    const mv = await call(v1, { method: 'PATCH', path: `files/${c2.id}`, body: { folder: 'Kenza US', title: 'clip deux.mp4' }, auth: A })
+    expect(mv.body.file).toMatchObject({ folder: 'Kenza US', title: 'clip deux' })
+    // corbeille : disparaît de la liste, pas effacé (restaurable)
+    const del = await call(v1, { method: 'DELETE', path: `files/${c1.id}`, auth: A })
+    expect(del.body).toMatchObject({ ok: true, trashed: true, restorable_days: 7 })
+    expect(D.t.content_bank.find(r => r.id === c1.id).deleted_at).toBeTruthy()
+    expect(D.objects.has(c1.storage_path)).toBe(true)
+    expect((await call(v1, { path: 'files', query: { folder: 'Montage' }, auth: A })).body.files.some(x => x.id === c1.id)).toBe(false)
+    expect((await call(v1, { method: 'DELETE', path: `files/${c1.id}`, auth: A })).status).toBe(404)   // déjà à la corbeille
+    // isolation : la clé B ne peut ni supprimer, ni marquer, ni déplacer un média de A
+    const c3 = D.t.content_bank.find(r => r.org_id === ORG_A && r.title === 'clip 3')
+    const B = 'Bearer ' + TOKEN_B
+    expect((await call(v1, { method: 'DELETE', path: `files/${c3.id}`, auth: B })).status).toBe(404)
+    expect((await call(v1, { method: 'POST', path: `files/${c3.id}/used`, auth: B })).status).toBe(404)
+    expect((await call(v1, { method: 'PATCH', path: `files/${c3.id}`, body: { folder: 'x' }, auth: B })).status).toBe(404)
+    expect(D.t.content_bank.find(r => r.id === c3.id)).toMatchObject({ deleted_at: null, folder: 'Montage' })
   })
   it('anti-SSRF : http, IP privée, DNS vers réseau interne, redirection interne, trop lourd', async () => {
     const post = url => call(v1, { method: 'POST', path: 'files', body: { url, folder: 'x' }, auth: 'Bearer ' + TOKEN_A })
