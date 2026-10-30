@@ -75,7 +75,13 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     if (error) { toast(error.message, 'bad'); return }
     setNewPass('')
     await loadAccess()
-    void loadAccounts()
+    // test immédiat : le générateur accepte-t-il cette clé ?
+    try { await listAccounts(); toast('Clé acceptée par le générateur ✓', 'ok'); void loadAccounts() }
+    catch (e) {
+      const m = e instanceof Error ? e.message : String(e)
+      toast(/mot de passe/i.test(m) ? 'Le générateur refuse cette clé : ce n’est pas son mot de passe actuel.' : `Générateur injoignable : ${m}`, 'bad', 8000)
+      void loadAccounts()
+    }
   }
 
   // ── comptes Higgsfield de l'équipe ──
