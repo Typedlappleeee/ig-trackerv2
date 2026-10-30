@@ -3397,6 +3397,13 @@ export const EN: Dict = {
     "Fenêtre Higgsfield ouverte…": "Higgsfield window open…",
     "＋ Connecter un compte": "＋ Connect an account",
     "Chaque compte se connecte une fois dans la vraie page Higgsfield (code 2FA compris) ; la session reste sur ce PC. Génération en local : en cours de calage — clique « Calibrer », fais UNE génération Motion Control à la main dans la fenêtre, ferme-la, puis envoie le fichier « higgsfield-calibrage-… » de Téléchargements.": "Each account signs in once on the real Higgsfield page (2FA included); the session stays on this PC. Local generation: being calibrated — click “Calibrate”, run ONE Motion Control generation by hand in the window, close it, then send the “higgsfield-calibrage-…” file from Downloads.",
+    "mot de passe refusé : la clé du générateur enregistrée n’est pas la bonne": "password refused: the saved generator key is wrong",
+    "Comptes de l’équipe bloqués : la clé du générateur est refusée": "Team accounts blocked: the generator key is refused",
+    "Les comptes Higgsfield de l’équipe passent par le site du générateur (generateur-prompts.vercel.app), qui demande son mot de passe.": "The team’s Higgsfield accounts go through the generator site (generateur-prompts.vercel.app), which requires its password.",
+    "Colle-le ici une seule fois :": "Paste it here once:",
+    "L’administrateur doit le recoller.": "The administrator must paste it again.",
+    "Sans lui, utilise « Sur ce PC » dans l’appli PC.": "Without it, use “On this PC” in the desktop app.",
+    "Il faut d’abord la clé du générateur (voir ci-dessous)": "The generator key is needed first (see below)",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

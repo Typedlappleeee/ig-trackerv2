@@ -50,7 +50,10 @@ async function relay<T = Any>(body: Record<string, unknown>): Promise<T> {
   const txt = await r.text()
   let j: Any
   try { j = JSON.parse(txt) } catch { throw new RelayError(`réponse illisible du relais (HTTP ${r.status})`, r.status) }
-  if (!r.ok) throw new RelayError(j?.error?.message || `HTTP ${r.status}`, r.status)
+  if (!r.ok) {
+    const m = j?.error?.message || `HTTP ${r.status}`
+    throw new RelayError(/mot de passe refusé/i.test(m) ? 'mot de passe refusé : la clé du générateur enregistrée n’est pas la bonne' : m, r.status)
+  }
   return j as T
 }
 

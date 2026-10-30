@@ -82,6 +82,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [accounts, setAccounts] = useState<HfAccount[] | null>(null)
   const [account, setAccountState] = useState<string>(() => readJson(ACC_KEY, ''))
   const [relayErr, setRelayErr] = useState<string | null>(null)
+  const keyRefused = !!relayErr && /mot de passe|clé du générateur|accès enregistré/i.test(relayErr)
   const [credits, setCredits] = useState<Record<string, number | null>>({})
   const [reco, setReco] = useState<Record<string, boolean>>({})        // compte à reconnecter
   const [login, setLogin] = useState<{ name: string; reconnect: boolean } | null>(null)
@@ -309,13 +310,26 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     <Frame>
       <Header />
 
-      <AccountsBar accounts={accounts ?? []} current={account} credits={credits} reco={reco} canRemove={isSuperAdmin}
+      <AccountsBar accounts={accounts ?? []} current={account} credits={credits} reco={reco} canRemove={isSuperAdmin} locked={keyRefused}
         onPick={name => { setAccount(name); void refreshCredits(name) }}
         onAdd={() => setLogin({ name: freeName(), reconnect: false })}
         onReconnect={name => setLogin({ name, reconnect: true })}
         onRemove={name => void dropAccount(name)} />
       <LocalAccounts />
-      {relayErr && (
+      {relayErr && keyRefused && (
+        <div style={{ ...card, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, borderColor: 'rgba(251,191,36,0.3)', fontSize: 13, color: '#D4D4D8' }}>
+          <span style={{ color: WARN, fontWeight: 700 }}>Comptes de l’équipe bloqués : la clé du générateur est refusée</span>
+          <span style={{ fontSize: 12.5, lineHeight: 1.5 }}>Les comptes Higgsfield de l’équipe passent par le site du générateur (generateur-prompts.vercel.app), qui demande son mot de passe. {isSuperAdmin ? 'Colle-le ici une seule fois :' : 'L’administrateur doit le recoller.'} Sans lui, utilise « Sur ce PC » dans l’appli PC.</span>
+          {isSuperAdmin && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={newPass} onChange={e => setNewPass(e.target.value)} type="password" autoComplete="off" placeholder="Mot de passe du générateur" style={{ ...field, flex: 1, maxWidth: 360 }}
+                onKeyDown={e => { if (e.key === 'Enter' && newPass.trim()) void savePass() }} />
+              <button type="button" disabled={!newPass.trim()} onClick={() => void savePass()} style={{ ...ghostBtn, height: 32, opacity: newPass.trim() ? 1 : 0.5 }}>Relier</button>
+            </div>
+          )}
+        </div>
+      )}
+      {relayErr && !keyRefused && (
         <div style={{ ...card, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderColor: 'rgba(252,165,165,0.25)', color: BAD, fontSize: 13 }}>
           <span style={{ flex: 1 }}>{relayErr}</span>
           <button type="button" onClick={() => void loadAccounts()} style={ghostBtn}>Réessayer</button>
@@ -718,8 +732,8 @@ function Gate({ phase, denied, email, checks, failure }: { phase: 'checking' | '
 }
 
 /* ── comptes Higgsfield de l'équipe : choisir, ajouter, reconnecter ── */
-function AccountsBar({ accounts, current, credits, reco, canRemove, onPick, onAdd, onReconnect, onRemove }: {
-  accounts: HfAccount[]; current: string; credits: Record<string, number | null>; reco: Record<string, boolean>; canRemove: boolean
+function AccountsBar({ accounts, current, credits, reco, canRemove, locked, onPick, onAdd, onReconnect, onRemove }: {
+  accounts: HfAccount[]; current: string; credits: Record<string, number | null>; reco: Record<string, boolean>; canRemove: boolean; locked: boolean
   onPick: (name: string) => void; onAdd: () => void; onReconnect: (name: string) => void; onRemove: (name: string) => void
 }) {
   const mini: CSSProperties = { height: 34, padding: '0 9px', background: 'none', border: 'none', borderLeft: `1px solid ${FIELD_EDGE}`, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600 }
@@ -741,8 +755,9 @@ function AccountsBar({ accounts, current, credits, reco, canRemove, onPick, onAd
           </div>
         )
       })}
-      <button type="button" onClick={onAdd} style={{ ...ghostBtn, height: 37, borderStyle: 'dashed', color: ACCENT_TXT }}>＋ Ajouter un compte</button>
-      {!accounts.length && <span style={{ fontSize: 12.5, color: WARN }}>Aucun compte connecté : ajoute un compte Higgsfield pour lancer des Genjutsu.</span>}
+      <button type="button" onClick={onAdd} disabled={locked} title={locked ? 'Il faut d’abord la clé du générateur (voir ci-dessous)' : undefined}
+        style={{ ...ghostBtn, height: 37, borderStyle: 'dashed', color: ACCENT_TXT, opacity: locked ? 0.45 : 1, cursor: locked ? 'not-allowed' : 'pointer' }}>＋ Ajouter un compte</button>
+      {!accounts.length && !locked && <span style={{ fontSize: 12.5, color: WARN }}>Aucun compte connecté : ajoute un compte Higgsfield pour lancer des Genjutsu.</span>}
     </section>
   )
 }
