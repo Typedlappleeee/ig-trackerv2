@@ -130,6 +130,14 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [models, setModels] = useState<HfModel[] | null>(null)
   const [modelsErr, setModelsErr] = useState<string | null>(null)
   const [picked, setPickedState] = useState<string[]>([])
+  // mini-dossiers : les tenues d'une même modèle (« Zoe1 », « Zoe 2 »…) sont rangées sous « Zoe »
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const groups = useMemo(() => {
+    const m = new Map<string, HfModel[]>()
+    for (const x of models ?? []) { const k = x.name.replace(/[\s_.-]*\d+$/, '').trim() || x.name; m.set(k, [...(m.get(k) ?? []), x]) }
+    return [...m.entries()].map(([name, items]) => ({ name, items }))
+  }, [models])
+  const shownGroup = openGroup ? groups.find(g => g.name === openGroup && g.items.length > 1) ?? null : null
   const [creating, setCreating] = useState(false)
   const setPicked = (ids: string[]) => { setPickedState(ids); writeJson(`${PICK_KEY}:${account}`, ids) }
   const loadModels = useCallback(async (quiet = false) => {
@@ -350,7 +358,34 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             {modelsErr && <span style={{ fontSize: 12.5, color: BAD }}>{modelsErr}</span>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
               {models === null && Array.from({ length: 4 }, (_, i) => <div key={i} style={{ aspectRatio: '3 / 4', borderRadius: 10, background: '#18181B', animation: 'pulse 1.4s ease-in-out infinite' }} />)}
-              {models?.map(m => {
+              {shownGroup && (
+                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button type="button" onClick={() => setOpenGroup(null)} style={{ ...ghostBtn, height: 28, padding: '0 10px' }}>← Toutes</button>
+                  <span data-no-tr style={{ fontSize: 13, fontWeight: 700, color: INK }}>{shownGroup.name}</span>
+                  <span style={{ fontSize: 12, color: MUTED }}>{`${shownGroup.items.length} tenues`}</span>
+                  {(() => {
+                    const ids = shownGroup.items.filter(x => x.ready).map(x => x.id), all = ids.every(id => picked.includes(id))
+                    return <button type="button" onClick={() => setPicked(all ? picked.filter(id => !ids.includes(id)) : [...picked, ...ids.filter(id => !picked.includes(id))])} style={{ ...ghostBtn, height: 28, padding: '0 10px', marginLeft: 'auto' }}>{all ? 'Tout retirer' : 'Tout choisir'}</button>
+                  })()}
+                </div>
+              )}
+              {!shownGroup && groups.filter(g => g.items.length > 1).map(g => {
+                const n = g.items.filter(x => picked.includes(x.id)).length
+                return (
+                  <button key={`g:${g.name}`} type="button" onClick={() => setOpenGroup(g.name)} title={`${g.items.length} tenues`}
+                    style={{ position: 'relative', padding: 0, border: `2px solid ${n ? ACCENT : 'transparent'}`, borderRadius: 11, background: '#18181B', cursor: 'pointer', overflow: 'hidden', textAlign: 'left', boxShadow: '4px 4px 0 -1px #222226, 8px 8px 0 -2px #19191C' }}>
+                    <div style={{ aspectRatio: '3 / 4', background: '#0D0D0F' }}>
+                      {g.items[0].photo && <img src={g.items[0].photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+                    </div>
+                    <span style={{ position: 'absolute', top: 5, left: 5, display: 'flex', padding: 3, borderRadius: 6, background: 'rgba(0,0,0,.6)', color: '#fff' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={11} /></span>
+                    <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,.85))', color: '#fff', fontSize: 11.5, fontWeight: 600 }}>
+                      <span data-no-tr>{g.name}</span> <span style={{ opacity: .7, fontWeight: 500 }}>{`· ${g.items.length}`}</span>
+                    </span>
+                    {n > 0 && <span style={{ position: 'absolute', top: 5, right: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 99, background: ACCENT, color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center' }}>{n}</span>}
+                  </button>
+                )
+              })}
+              {(shownGroup ? shownGroup.items : groups.filter(g => g.items.length === 1).map(g => g.items[0])).map(m => {
                 const pos = picked.indexOf(m.id)
                 return (
                   <button key={m.id} type="button" disabled={!m.ready} onClick={() => setPicked(pos >= 0 ? picked.filter(x => x !== m.id) : [...picked, m.id])}

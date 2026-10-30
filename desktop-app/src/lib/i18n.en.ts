@@ -3406,6 +3406,8 @@ export const EN: Dict = {
     "Il faut d’abord la clé du générateur (voir ci-dessous)": "The generator key is needed first (see below)",
     "Clé acceptée par le générateur ✓": "Key accepted by the generator ✓",
     "Le générateur refuse cette clé : ce n’est pas son mot de passe actuel.": "The generator refuses this key: it is not its current password.",
+    "← Toutes": "← All",
+    "Tout choisir": "Pick all",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4022,5 +4024,6 @@ export const EN: Dict = {
     ["Calibrage enregistré ({0} appels) : envoie le fichier « {1} » (dans Téléchargements).", "Calibration saved ({0} calls): send the file “{1}” (in Downloads)."],
     ["Retirer « {0} » de ce PC ?", "Remove “{0}” from this PC?"],
     ["Générateur injoignable : {0}", "Generator unreachable: {0}"],
+    ["{0} tenues", "{0} outfits"],
   ],
 }
