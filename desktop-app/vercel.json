@@ -82,6 +82,38 @@
       "destination": "/api/v1?r=:path*"
     },
     {
+      "source": "/genjutsu",
+      "destination": "https://generateur-prompts.vercel.app/"
+    },
+    {
+      "source": "/genjutsu/:path*",
+      "destination": "https://generateur-prompts.vercel.app/:path*"
+    },
+    {
+      "source": "/api/hf",
+      "destination": "https://generateur-prompts.vercel.app/api/hf"
+    },
+    {
+      "source": "/api/claude",
+      "destination": "https://generateur-prompts.vercel.app/api/claude"
+    },
+    {
+      "source": "/api/collecte",
+      "destination": "https://generateur-prompts.vercel.app/api/collecte"
+    },
+    {
+      "source": "/api/mg",
+      "destination": "https://generateur-prompts.vercel.app/api/mg"
+    },
+    {
+      "source": "/api/transcrire",
+      "destination": "https://generateur-prompts.vercel.app/api/transcrire"
+    },
+    {
+      "source": "/fonts/:path*",
+      "destination": "https://generateur-prompts.vercel.app/fonts/:path*"
+    },
+    {
       "source": "/((?!api/|assets/|ffmpeg/|.*\\.).*)",
       "destination": "/index.html"
     }

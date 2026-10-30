@@ -60,7 +60,7 @@ describe('Parité serveur ↔ app (mêmes réglages ffmpeg)', () => {
 const FF = process.env.FFMPEG_PATH
 const sha = b => createHash('sha256').update(b).digest('hex')
 function makeDb() {
-  const t = { content_bank: [], sf_api_tokens: [], organizations: [], organization_members: [] }
+  const t = { content_bank: [], sf_api_tokens: [], organizations: [], organization_members: [], sf_api_log: [] }
   const objects = new Map()
   function query(table) {
     const f = []
@@ -80,6 +80,7 @@ function makeDb() {
   }
   const client = () => ({
     from: query,
+    auth: { getUser: async jwt => ({ data: { user: (H.db.sessions && H.db.sessions.get(jwt)) || null } }) },
     rpc: async () => ({ data: true, error: null }),
     storage: { from: () => ({
       upload: async (p, buf) => { objects.set(p, Buffer.from(buf)); return { error: null } },
@@ -161,6 +162,17 @@ describe.skipIf(!FF)('Outils via l’API — traitement réel', () => {
     expect(ex.GPS[piexif.GPSIFD.GPSLongitudeRef]).toBe('W')
     expect(r.body.settings.gps).toBe('custom')
   }, 30_000)
+  it('depuis l’app : session utilisateur (JWT) au lieu d’une clé ; lecteur refusé', async () => {
+    const USER = D.t.organizations[0].owner_id
+    H.db.sessions = new Map([['jwt-owner', { id: USER }], ['jwt-viewer', { id: 'v1' }]])
+    D.t.organization_members.push({ org_id: ORG, user_id: 'v1', role: 'viewer' })
+    const ok = await call('spoof', { body: { file_id: VID, org_id: ORG, device: 'iphone15', gps: 'france', folder: 'Genjutsu' }, auth: 'Bearer jwt-owner' })
+    expect(ok.status).toBe(200)
+    expect(ok.body.file.folder).toBe('Genjutsu')
+    expect(ok.body.settings).toMatchObject({ device: 'iphone15', gps: 'france' })
+    expect((await call('spoof', { body: { file_id: VID, org_id: ORG }, auth: 'Bearer jwt-viewer' })).status).toBe(403)
+    expect((await call('spoof', { body: { file_id: VID, org_id: ORG }, auth: 'Bearer jwt-inconnu' })).status).toBe(401)
+  }, 60_000)
   it('erreurs claires', async () => {
     expect((await call('spoof', { body: { file_id: VID }, auth: 'Bearer nope' })).status).toBe(401)
     expect((await call('spoof', { body: { file_id: VID, device: 'nokia3310' }, auth: auth() })).body.code).toBe('invalid_device')

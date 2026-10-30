@@ -8,7 +8,7 @@
 // Même réglages ffmpeg que l'app (copie dans _studio.js, parité testée dans tools.test.js).
 import { randomInt } from 'node:crypto'
 import piexif from 'piexifjs'
-import { db, authCheck, logCall, bodyOf, bytesOfFile, cleanFolder, extOf, fetchPublic, storeBytes, MIME_OF } from './_bank.js'
+import { db, authCheck, logCall, roleIn, bodyOf, bytesOfFile, cleanFolder, extOf, fetchPublic, storeBytes, MIME_OF } from './_bank.js'
 import { runFfmpeg } from './_ffmpeg.js'
 import { GPS_CITIES, INTENSITIES, SPOOF_DEVICES, DEFAULT_TOGGLES, gpsFor, imageSpoofArgs, remixArgs, spoofArgs } from './_studio.js'
 
@@ -87,7 +87,21 @@ export default async function handler(req, res) {
   try {
     s = db()
     const auth = await authCheck(s, req.headers.authorization)
-    const scope = auth.scope
+    let scope = auth.scope
+    // Depuis l'app ScaleFlow (spoof auto des résultats Genjutsu…) : session de l'utilisateur
+    // au lieu d'une clé sf_…, dans l'espace org_id (lecteurs exclus).
+    const raw = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim()
+    if (!scope && raw && !raw.startsWith('sf_')) {
+      const { data } = await s.auth.getUser(raw).catch(() => ({ data: null }))
+      const user = data?.user
+      if (user) {
+        const b0 = bodyOf(req)
+        const orgId = b0.org_id && /^[0-9a-f-]{36}$/i.test(String(b0.org_id)) ? String(b0.org_id) : null
+        const role = orgId ? await roleIn(s, orgId, user.id) : 'owner'
+        if (!role || role === 'viewer') return reply(403, { ok: false, code: 'forbidden', error: 'espace non autorisé (lecture seule)' })
+        scope = { orgId, userId: user.id }
+      }
+    }
     who = scope ?? auth.attach ?? null
     if (!scope) return reply(401, { ok: false, code: 'unauthorized', error: `clé API refusée : ${auth.reason}` })
     if (!tool && method === 'GET') return reply(200, { ok: true, ...CATALOG })

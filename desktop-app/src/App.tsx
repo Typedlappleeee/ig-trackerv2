@@ -52,6 +52,7 @@ const Scheduled = lazy(() => import('@/pages/Scheduled'))
 const Links = lazy(() => import('@/pages/Links'))
 const ViralWatch = lazy(() => import('@/pages/ViralWatch'))
 const Genjutsu = lazy(() => import('@/pages/Genjutsu'))
+const GenjutsuVip = lazy(() => import('@/pages/GenjutsuVip'))
 const Explore = lazy(() => import('@/pages/Explore'))
 const Pricing = lazy(() => import('@/pages/Pricing'))
 // Annonce de lancement des Liens (bandeau en haut de chaque page) — passer à false pour la retirer.
@@ -170,6 +171,11 @@ function AppInner({ user }: { user: User }) {
     if ((infra === 'blowsome' || infra === 'cloud' || infra === 'iremotech') && !license.loading && !license.blowsome && !license.isSuperAdmin) setInfra('geelark')
   }, [infra, license.loading, license.blowsome, license.isSuperAdmin])
 
+  // Accès Blowsome retiré : on efface le mot de passe du générateur Genjutsu posé dans ce navigateur.
+  useEffect(() => {
+    if (!license.loading && !license.blowsome && !license.isSuperAdmin) { try { localStorage.removeItem('motDePasse') } catch { /* ignore */ } }
+  }, [license.loading, license.blowsome, license.isSuperAdmin])
+
   async function signOut() {
     await supabase.auth.signOut()
     localStorage.removeItem('sb-fvmkmkspfksscgqyvysl-auth-token')
@@ -199,6 +205,7 @@ function AppInner({ user }: { user: User }) {
       : page === 'blowAuto' ? <BlowAutoPilot user={user} org={org} />
       : page === 'blowContent' ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'blowTools' ? <Studio theme={theme} infra={infra} user={user} org={org} />
+      : page === 'blowGenjutsu' ? <GenjutsuVip user={user} org={org} isSuperAdmin={license.isSuperAdmin} />
       : page === 'publish' ? <Publish theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'bank' ? <Bank theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'insights' ? <Placeholder theme={theme} spec={SPECS.insights!} />
@@ -240,7 +247,9 @@ function AppInner({ user }: { user: User }) {
         ? <Explore theme={theme} infra={infra} isAdmin={license.isSuperAdmin} onOpen={openT} user={user} org={org} />
         : page === 'viral'
         ? <ViralWatch theme={theme} user={user} org={org} isAdmin={license.isSuperAdmin} onNavigate={(p) => setPage(p as PageKey)} />
-        : page === 'genjutsu' && license.isSuperAdmin   // Genjutsu : admins uniquement
+        : page === 'blowGenjutsu' && (license.blowsome || license.isSuperAdmin)   // Genjutsu (générateur) : accès Blowsome
+        ? <GenjutsuVip user={user} org={org} isSuperAdmin={license.isSuperAdmin} />
+        : page === 'genjutsu' && license.isSuperAdmin   // ancienne version interne : admins uniquement
         ? <Genjutsu theme={theme} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
         : page === 'links'
         ? <Links theme={theme} user={user} org={org} />
