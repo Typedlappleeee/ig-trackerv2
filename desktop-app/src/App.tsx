@@ -171,10 +171,9 @@ function AppInner({ user }: { user: User }) {
     if ((infra === 'blowsome' || infra === 'cloud' || infra === 'iremotech') && !license.loading && !license.blowsome && !license.isSuperAdmin) setInfra('geelark')
   }, [infra, license.loading, license.blowsome, license.isSuperAdmin])
 
-  // Accès Blowsome retiré : on efface le mot de passe du générateur Genjutsu posé dans ce navigateur.
-  useEffect(() => {
-    if (!license.loading && !license.blowsome && !license.isSuperAdmin) { try { localStorage.removeItem('motDePasse') } catch { /* ignore */ } }
-  }, [license.loading, license.blowsome, license.isSuperAdmin])
+  // Le mot de passe du générateur Genjutsu n'est plus gardé dans le navigateur (mémoire seulement) :
+  // on efface celui qu'une ancienne version y avait posé.
+  useEffect(() => { try { localStorage.removeItem('motDePasse') } catch { /* ignore */ } }, [])
 
   async function signOut() {
     await supabase.auth.signOut()

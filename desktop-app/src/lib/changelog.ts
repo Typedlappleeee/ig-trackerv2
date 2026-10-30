@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-30c',
+    date: '2026-10-30',
+    title: { fr: '📁 Sous-dossiers dans la Banque · Genjutsu : un dossier par modèle', en: '📁 Subfolders in the Bank · Genjutsu: one folder per model' },
+    items: {
+      fr: [
+        'Banque : des dossiers dans les dossiers. Clic droit sur un dossier → « Nouveau sous-dossier » (ou « Nouveau dossier » → Dans…), flèche pour replier, et ouvrir un dossier montre aussi ses sous-dossiers. Renommer ou supprimer suit les sous-dossiers.',
+        'Genjutsu : chaque modèle a son dossier de la Banque (par défaut « Genjutsu › Prénom », modifiable) — ses vidéos, spoofées ou telles quelles, y vont directement.',
+        'Genjutsu : vérification de l’accès Blowsome au démarrage, et les comptes Higgsfield s’ajoutent, se choisissent et se reconnectent directement dans l’onglet.',
+      ],
+      en: [
+        'Bank: folders inside folders. Right-click a folder → “New subfolder” (or “New folder” → In…), arrow to collapse, and opening a folder also shows its subfolders. Rename or delete follows the subfolders.',
+        'Genjutsu: each model has its own Bank folder (default “Genjutsu › Name”, editable) — her videos, spoofed or as is, go straight into it.',
+        'Genjutsu: Blowsome access check at startup, and Higgsfield accounts are added, picked and reconnected right in the tab.',
+      ],
+    },
+  },
+  {
     id: '2026-10-30b',
     date: '2026-10-30',
     title: { fr: '✦ Genjutsu, version propre', en: '✦ Genjutsu, clean version' },

@@ -3,16 +3,22 @@
 //   1. la modèle (photo de référence = Element Higgsfield, partagé avec le générateur de l'équipe)
 //   2. les liens des reels à refaire
 //   3. le rendu (480p par défaut, prompt réglé par quelques options) + spoof auto en X versions
-// Moteur et file : src/lib/genjutsuHF.ts (relais /api/hf, mot de passe remis par sf_genjutsu_access).
+// Au démarrage : écran « Vérification de l'accès Blowsome » (accès, comptes, modèles) — aucun mot de
+// passe pour l'utilisateur. Les comptes Higgsfield de l'équipe se connectent depuis la page.
+// Moteur et file : src/lib/genjutsuHF.ts (relais /api/hf, mot de passe remis par sf_genjutsu_access,
+// gardé en mémoire seulement).
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
-import { Icon, Toggle, Segmented, toast, useNarrow } from '@/lib/ui'
+import { Icon, Toggle, Segmented, toast, useNarrow, confirmDialog } from '@/lib/ui'
+import { IS_WEB } from '@/lib/platform'
 import { SPOOF_DEVICES, GPS_CITIES } from '@/lib/studioTools'
+import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setModelFolder, type BankScope } from '@/lib/bankFolders'
 import {
-  GENERATOR_URL, MAX_RUNNING, TYPICAL_MS, setRelayPassword, listAccounts, readCredits, listModels, createModel, readPromptPresets,
+  MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, readPromptPresets,
+  startAccountLogin, finishAccountLogin, removeAccount, needsReconnect,
   buildPrompt, parseLinks, resolveVideo, cachedSource, isInstagram, enqueue, retryJob, removeJob, clearFinished, respoof,
   getJobs, subscribeJobs, isActive, pump, type HfAccount, type HfModel, type PromptOpts, type GjJob, type SpoofPlan,
 } from '@/lib/genjutsuHF'
@@ -29,38 +35,44 @@ const sel: CSSProperties = { ...field, padding: '0 8px', cursor: 'pointer' }
 const opt: CSSProperties = { background: FIELD_BG }
 const ghostBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 11px', borderRadius: 8, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: '#E4E4E7', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }
 
-interface AutoCfg { on: boolean; count: number; device: string; gps: string; perModel: boolean; folder: string }
+interface AutoCfg { on: boolean; count: number; device: string; gps: string }
 const readJson = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : d } catch { return d } }
 const writeJson = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* bloqué */ } }
-const cfgDefaults = (): AutoCfg => ({ on: true, count: 3, device: 'iphone15', gps: 'france', perModel: true, folder: 'Genjutsu' })
+const cfgDefaults = (): AutoCfg => ({ on: true, count: 3, device: 'iphone15', gps: 'france' })
+const crumbs = (path: string) => path.split('/').join(' › ')
 const mmss = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 const reelLabel = (link: string) => link.match(/\/reel\/([\w-]+)/)?.[1] ?? link.replace(/^https?:\/\//, '').slice(0, 42)
 type Access = 'loading' | 'ok' | 'nopass' | 'nosql' | 'denied'
 type SrcState = { state: 'checking' | 'ok' | 'error'; user?: string | null; error?: string }
 type Filter = 'all' | 'active' | 'done' | 'failed'
+type CheckState = 'wait' | 'run' | 'ok' | 'fail'
 
 export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; org: OrgState; isSuperAdmin: boolean }) {
-  void user
   const orgId = org.currentOrg?.id ?? null
   const narrow = useNarrow(1100)
 
   // ── accès : le mot de passe du relais, remis seulement aux comptes Blowsome ──
-  const [access, setAccess] = useState<Access>('loading')
+  // (déjà vérifié pendant cette session → la page s'ouvre directement, sans écran de vérification)
+  const [access, setAccess] = useState<Access>(() => relayReady() ? 'ok' : 'loading')
+  const [gate, setGate] = useState<'on' | 'granted' | 'off'>(() => relayReady() ? 'off' : 'on')
   const [newPass, setNewPass] = useState('')
   const loadAccess = useCallback(async () => {
+    setAccess('loading')
     const { data, error } = await supabase.rpc('sf_genjutsu_access')
     if (error) { setAccess(/function|schema cache/i.test(error.message) ? 'nosql' : 'denied'); return }
     const p = (data as string | null) || null
     if (!p) { setAccess('nopass'); return }
-    try { localStorage.setItem('motDePasse', p) } catch { /* générateur complet : le demandera */ }
     setRelayPassword(p)
     setAccess('ok')
   }, [])
-  useEffect(() => { void loadAccess() }, [loadAccess])
+  useEffect(() => {
+    try { localStorage.removeItem('motDePasse') } catch { /* l'ancienne version le gardait dans le navigateur */ }
+    if (!relayReady()) void loadAccess()
+  }, [loadAccess])
   async function savePass() {
     const { error } = await supabase.rpc('sf_set_secret', { p_name: 'genjutsu_password', p_value: newPass })
     if (error) { toast(error.message, 'bad'); return }
-    setNewPass(''); toast('Mot de passe du générateur enregistré ✓', 'ok')
+    setNewPass('')
     await loadAccess()
   }
 
@@ -68,26 +80,42 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [accounts, setAccounts] = useState<HfAccount[] | null>(null)
   const [account, setAccountState] = useState<string>(() => readJson(ACC_KEY, ''))
   const [relayErr, setRelayErr] = useState<string | null>(null)
-  const [credits, setCredits] = useState<number | null>(null)
+  const [credits, setCredits] = useState<Record<string, number | null>>({})
+  const [reco, setReco] = useState<Record<string, boolean>>({})        // compte à reconnecter
+  const [login, setLogin] = useState<{ name: string; reconnect: boolean } | null>(null)
   const setAccount = (a: string) => { setAccountState(a); writeJson(ACC_KEY, a) }
-  const loadAccounts = useCallback(async () => {
+  const loadAccounts = useCallback(async (select?: string) => {
     setRelayErr(null)
     try {
       const r = await listAccounts()
-      if (!r.cloud) { setRelayErr('Le relais Genjutsu refuse le mot de passe enregistré : demande à l’administrateur de le mettre à jour.'); setAccounts([]); return }
+      if (!r.cloud) { setRelayErr('Le générateur Genjutsu refuse l’accès enregistré : l’administrateur doit le relier à nouveau.'); setAccounts([]); return }
       setAccounts(r.accounts)
-      setAccountState(cur => r.accounts.some(a => a.name === cur) ? cur : (r.accounts[0]?.name ?? ''))
+      setAccountState(cur => {
+        const next = select && r.accounts.some(a => a.name === select) ? select : r.accounts.some(a => a.name === cur) ? cur : (r.accounts[0]?.name ?? '')
+        writeJson(ACC_KEY, next)
+        return next
+      })
     } catch (e) { setRelayErr(e instanceof Error ? e.message : String(e)); setAccounts([]) }
   }, [])
   useEffect(() => { if (access === 'ok') { void loadAccounts(); pump() } }, [access, loadAccounts])
-  const refreshCredits = useCallback(async () => {
-    if (!account) return
-    try { setCredits(await readCredits(account)) } catch { /* solde indisponible */ }
-  }, [account])
+  const refreshCredits = useCallback(async (name: string) => {
+    try {
+      const c = await readCredits(name)
+      setCredits(m => ({ ...m, [name]: c }))
+      setReco(m => ({ ...m, [name]: false }))
+    } catch (e) { if (needsReconnect(e)) setReco(m => ({ ...m, [name]: true })) }
+  }, [])
   useEffect(() => {
-    setCredits(accounts?.find(a => a.name === account)?.credits ?? null)
-    if (access === 'ok' && account) void refreshCredits()
-  }, [access, account, accounts, refreshCredits])
+    if (!accounts?.length) return
+    setCredits(Object.fromEntries(accounts.map(a => [a.name, a.credits])))
+    void (async () => { for (const a of accounts) await refreshCredits(a.name) })()
+  }, [accounts, refreshCredits])
+  async function dropAccount(name: string) {
+    if (!await confirmDialog({ title: `Retirer le compte « ${name} » ?`, text: 'Il disparaît aussi du générateur de l’équipe. Ses modèles restent sur Higgsfield.', confirmLabel: 'Retirer', danger: true })) return
+    try { await removeAccount(name); toast(`Compte « ${name} » retiré`, 'ok'); await loadAccounts() }
+    catch (e) { toast(e instanceof Error ? e.message : String(e), 'bad') }
+  }
+  const freeName = () => { const taken = new Set((accounts ?? []).map(a => a.name)); for (let i = 1; i < 60; i++) if (!taken.has(`Compte ${i}`)) return `Compte ${i}`; return `Compte ${Date.now()}` }
 
   // ── modèles (Elements du compte) ──
   const [models, setModels] = useState<HfModel[] | null>(null)
@@ -102,7 +130,10 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
       const l = await listModels(account)
       setModels(l)
       setPickedState(p => p.filter(id => l.some(m => m.id === id)))
-    } catch (e) { if (!quiet) { setModelsErr(e instanceof Error ? e.message : String(e)); setModels([]) } }
+    } catch (e) {
+      if (needsReconnect(e)) setReco(m => ({ ...m, [account]: true }))
+      if (!quiet) { setModelsErr(e instanceof Error ? e.message : String(e)); setModels([]) }
+    }
   }, [account])
   useEffect(() => {
     if (access !== 'ok' || !account) return
@@ -151,14 +182,25 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const autoPrompt = buildPrompt({ ...popts, outfit: outfitOn ? popts.outfit : '' })
   const prompt = mode === 'auto' ? autoPrompt : mode === 'custom' ? custom : (presets[mode.slice(2)] ?? autoPrompt)
 
+  // ── chaque modèle a SON dossier de la Banque (par défaut « Genjutsu › <nom> ») : ses vidéos y vont ──
+  const scope: BankScope = useMemo(() => ({ orgId, userId: user.id }), [orgId, user.id])
+  const [modelFolders, setModelFolders] = useState<Record<string, string>>({})
+  const [folderPickFor, setFolderPickFor] = useState<HfModel | null>(null)
+  useEffect(() => { if (access === 'ok') void loadModelFolders(scope).then(setModelFolders).catch(() => undefined) }, [access, scope])
+  const folderOf = (m: { id: string; name: string }) => modelFolders[m.id] ?? joinPath('Genjutsu', m.name)
+  async function assignFolder(m: { id: string; name: string }, path: string) {
+    const p = normPath(path)
+    if (!p) return
+    setModelFolders(f => ({ ...f, [m.id]: p }))
+    try { await setModelFolder(scope, m.id, p) } catch (e) { toast(e instanceof Error ? e.message : String(e), 'bad') }
+  }
+
   // ── spoof automatique des résultats ──
   const [cfg, setCfgState] = useState<AutoCfg>(() => ({ ...cfgDefaults(), ...readJson<Partial<AutoCfg>>(CFG_KEY, {}) }))
   const setCfg = (p: Partial<AutoCfg>) => setCfgState(c => { const n = { ...c, ...p }; writeJson(CFG_KEY, n); return n })
-  const folderFor = (model: string) => {
-    const base = cfg.folder.trim() || 'Genjutsu'
-    return cfg.perModel ? `${base} · ${model}` : base
-  }
-  const planFor = (model: string): SpoofPlan => ({ count: cfg.count, device: cfg.device, gps: cfg.gps, folder: folderFor(model), orgId })
+  // spoof coupé → count 0 : la vidéo est rangée telle quelle dans le dossier de la modèle
+  const planFor = (m: { id: string; name: string }, forceSpoof = false): SpoofPlan =>
+    ({ count: cfg.on || forceSpoof ? Math.max(1, cfg.count) : 0, device: cfg.device, gps: cfg.gps, folder: folderOf(m), orgId })
   const deviceLabel = SPOOF_DEVICES.find(d => d.k === cfg.device)?.label ?? cfg.device
   const gpsLabel = GPS_CITIES.find(c => c.k === cfg.gps)?.label ?? cfg.gps
 
@@ -172,11 +214,14 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     enqueue(usable.flatMap(l => chosen.map(m => ({
       account, source: l, prompt: prompt.trim(), res,
       model: { id: m.id, name: m.name, mediaId: m.mediaId!, photo: m.photo },
-      spoof: cfg.on ? planFor(m.name) : null,
+      spoof: planFor(m),
     }))))
+    // le dossier de chaque modèle est créé (et associé) tout de suite : visible dans la Banque
+    for (const m of chosen) if (!modelFolders[m.id]) void assignFolder(m, folderOf(m))
     toast(`${total} Genjutsu ajouté${total > 1 ? 's' : ''} à la file`, 'ok')
     setLinksText(''); setSrc({})
-    setTimeout(() => void refreshCredits(), 30_000)
+    const acc = account
+    setTimeout(() => void refreshCredits(acc), 30_000)
   }
 
   // ── résultats ──
@@ -197,52 +242,72 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   }
   const shown = jobs.filter(j => filter === 'all' ? true : filter === 'active' ? (isActive(j.status) || j.status === 'waiting') : j.status === filter)
 
-  // ── écrans d'accès ──
-  if (access !== 'ok') {
+  // ── vérification de l'accès au démarrage (accès Blowsome → générateur → modèles) ──
+  const [t0] = useState(() => Date.now())
+  const [clock, setClock] = useState(() => Date.now())
+  useEffect(() => {
+    if (gate !== 'on') return
+    const t = setInterval(() => setClock(Date.now()), 120)
+    return () => clearInterval(t)
+  }, [gate])
+  const elapsed = clock - t0
+  const raw: CheckState[] = [
+    access === 'ok' ? 'ok' : access === 'loading' ? 'run' : 'fail',
+    access !== 'ok' ? 'wait' : relayErr ? 'fail' : accounts === null ? 'run' : 'ok',
+    // (modèles lents à lire : la page s'ouvre quand même, elles finissent d'arriver dedans)
+    access !== 'ok' || relayErr || accounts === null ? 'wait' : !accounts.length || models !== null || reco[account] || clock - t0 > 12_000 ? 'ok' : 'run',
+  ]
+  // chaque étape validée s'affiche à son tour (≈ 0,45 s d'écart) : la vérification se lit
+  const shownChecks = raw.map((st, i) => st === 'ok' && elapsed < 450 * (i + 1) ? 'run' : st)
+  const blocked = raw.includes('fail')
+  const allOk = shownChecks.every(x => x === 'ok')
+  useEffect(() => { if (gate === 'on' && allOk) setGate('granted') }, [gate, allOk])
+  useEffect(() => {
+    if (gate !== 'granted') return
+    const t = setTimeout(() => setGate('off'), 900)
+    return () => clearTimeout(t)
+  }, [gate])
+
+  if (gate !== 'off') {
+    const failure = access === 'denied' ? (
+      <span>Genjutsu est réservé aux comptes avec l’accès Blowsome.</span>
+    ) : access === 'nosql' ? (
+      <span>Colle le SQL <code>20261030b_genjutsu_access.sql</code> dans Supabase pour activer Genjutsu.</span>
+    ) : access === 'nopass' ? (isSuperAdmin ? (<>
+      <span>Genjutsu n’est pas encore relié au générateur de l’équipe. Une seule fois, pour tout le monde :</span>
+      <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+        <input value={newPass} onChange={e => setNewPass(e.target.value)} type="password" autoComplete="off" placeholder="Clé du générateur" style={{ ...field, flex: 1 }} />
+        <button type="button" disabled={!newPass.trim()} onClick={() => void savePass()} style={{ ...ghostBtn, height: 32, opacity: newPass.trim() ? 1 : 0.5 }}>Relier</button>
+      </div>
+    </>) : <span>Genjutsu n’est pas encore activé par l’administrateur.</span>
+    ) : relayErr ? (<>
+      <span>{relayErr}</span>
+      <button type="button" onClick={() => void loadAccounts()} style={ghostBtn}>Réessayer</button>
+    </>) : null
     return (
-      <Frame>
-        <Header />
-        <div style={{ ...card, maxWidth: 620, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, color: '#D4D4D8' }}>
-          {access === 'loading' && <span style={{ color: MUTED }}>Connexion à Genjutsu…</span>}
-          {access === 'nosql' && <span style={{ color: WARN }}>⚠ Colle le SQL <code>20261030b_genjutsu_access.sql</code> dans Supabase pour activer Genjutsu.</span>}
-          {access === 'denied' && <span style={{ color: WARN }}>Genjutsu est réservé à l’accès Blowsome.</span>}
-          {access === 'nopass' && isSuperAdmin && (<>
-            <span>Enregistre une fois le mot de passe du générateur : les comptes Blowsome n’auront jamais à le taper.</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input value={newPass} onChange={e => setNewPass(e.target.value)} type="password" autoComplete="off" placeholder="Mot de passe du générateur" style={{ ...field, flex: 1 }} />
-              <button type="button" disabled={!newPass.trim()} onClick={() => void savePass()} style={{ ...ghostBtn, height: 32, opacity: newPass.trim() ? 1 : 0.5 }}>Enregistrer</button>
-            </div>
-          </>)}
-          {access === 'nopass' && !isSuperAdmin && <span style={{ color: MUTED }}>Genjutsu n’est pas encore activé par l’administrateur.</span>}
-        </div>
-      </Frame>
+      <Gate phase={gate === 'granted' ? 'granted' : blocked ? 'blocked' : 'checking'} denied={access === 'denied'} email={user.email ?? null}
+        checks={[
+          { label: 'Accès Blowsome', state: shownChecks[0], note: access === 'denied' ? 'refusé' : access === 'nopass' || access === 'nosql' ? 'à activer' : undefined },
+          { label: 'Générateur Genjutsu', state: shownChecks[1], note: shownChecks[1] === 'fail' ? 'indisponible' : shownChecks[1] === 'ok' && accounts ? `${accounts.length} compte${accounts.length > 1 ? 's' : ''} Higgsfield` : undefined },
+          { label: 'Modèles', state: shownChecks[2], note: shownChecks[2] === 'ok' && models ? `${models.length} prête${models.length > 1 ? 's' : ''}` : undefined },
+        ]}
+        failure={failure} />
     )
   }
 
-  const credit = credits != null ? `${Math.round(credits).toLocaleString('fr-FR')} crédits` : null
   return (
     <Frame>
-      <Header right={<>
-        {accounts && accounts.length > 0 && (
-          <select value={account} onChange={e => setAccount(e.target.value)} style={sel} title="Compte Higgsfield utilisé" data-no-tr>
-            {accounts.map(a => <option key={a.name} value={a.name} style={opt}>{a.name}</option>)}
-          </select>
-        )}
-        {credit && <button type="button" onClick={() => void refreshCredits()} title="Actualiser le solde" style={{ ...ghostBtn, color: ACCENT_TXT }}>{credit}</button>}
-        <a href={GENERATOR_URL} target="_blank" rel="noreferrer" style={{ ...ghostBtn, textDecoration: 'none', color: MUTED }} title="Connexion de comptes Higgsfield, sous-titres, traduction…">
-          Générateur complet <Icon d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6|M15 3h6v6|M10 14L21 3" size={12} />
-        </a>
-      </>} />
+      <Header />
 
+      <AccountsBar accounts={accounts ?? []} current={account} credits={credits} reco={reco} canRemove={isSuperAdmin}
+        onPick={name => { setAccount(name); void refreshCredits(name) }}
+        onAdd={() => setLogin({ name: freeName(), reconnect: false })}
+        onReconnect={name => setLogin({ name, reconnect: true })}
+        onRemove={name => void dropAccount(name)} />
       {relayErr && (
         <div style={{ ...card, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderColor: 'rgba(252,165,165,0.25)', color: BAD, fontSize: 13 }}>
           <span style={{ flex: 1 }}>{relayErr}</span>
           <button type="button" onClick={() => void loadAccounts()} style={ghostBtn}>Réessayer</button>
-        </div>
-      )}
-      {accounts && accounts.length === 0 && !relayErr && (
-        <div style={{ ...card, padding: '10px 14px', fontSize: 13, color: WARN }}>
-          Aucun compte Higgsfield connecté : ajoute-en un dans le <a href={GENERATOR_URL} target="_blank" rel="noreferrer" style={{ color: ACCENT_TXT }}>générateur complet</a> (« ＋ Compte »), puis reviens ici.
         </div>
       )}
 
@@ -275,6 +340,23 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                 </button>
               )}
             </div>
+            {chosen.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: DIM, textTransform: 'uppercase', letterSpacing: '.1em' }}>Dossier de la Banque</span>
+                {chosen.map(m => (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 8px', borderRadius: 9, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
+                    {m.photo ? <img src={m.photo} alt="" style={{ width: 24, height: 24, borderRadius: 99, objectFit: 'cover', flexShrink: 0 }} /> : <span style={{ width: 24, height: 24, borderRadius: 99, background: '#18181B', flexShrink: 0 }} />}
+                    <span data-no-tr style={{ fontSize: 12.5, fontWeight: 700, color: INK, whiteSpace: 'nowrap' }}>{m.name}</span>
+                    <span style={{ color: DIM, fontSize: 12 }}>→</span>
+                    <span data-no-tr title={folderOf(m)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1, fontSize: 12.5, color: '#D4D4D8' }}>
+                      <span style={{ display: 'flex', color: ACCENT_TXT, flexShrink: 0 }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={12} /></span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{crumbs(folderOf(m))}</span>
+                    </span>
+                    <button type="button" onClick={() => setFolderPickFor(m)} style={{ ...ghostBtn, height: 26, padding: '0 9px', fontSize: 12 }}>Changer</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </Step>
 
           <Step n={2} title="Les vidéos" sub="Les reels à refaire : colle leurs liens, un par ligne.">
@@ -334,7 +416,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             </div>
             <div style={{ height: 1, background: EDGE, margin: '2px 0' }} />
             <Row label="Spoof auto"><Toggle on={cfg.on} onChange={v => setCfg({ on: v })} label="Spoof auto" /></Row>
-            {cfg.on && (<>
+            {cfg.on ? (<>
               <Row label="Versions">
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <input type="number" min={1} max={10} value={cfg.count} onChange={e => setCfg({ count: Math.max(1, Math.min(10, Number(e.target.value) || 1)) })} style={{ ...field, width: 56, textAlign: 'center' }} />
@@ -342,18 +424,10 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                   <select value={cfg.gps} onChange={e => setCfg({ gps: e.target.value })} style={sel}>{GPS_CITIES.map(c => <option key={c.k} value={c.k} style={opt}>{c.label}</option>)}</select>
                 </div>
               </Row>
-              <Row label="Dossier">
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input value={cfg.folder} onChange={e => setCfg({ folder: e.target.value })} placeholder="Genjutsu" style={{ ...field, width: 130 }} />
-                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#D4D4D8', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    <input type="checkbox" checked={cfg.perModel} onChange={e => setCfg({ perModel: e.target.checked })} /> un par modèle
-                  </label>
-                </div>
-              </Row>
               <span style={{ fontSize: 12, color: MUTED }} data-no-tr>
-                {`→ ${cfg.count} version${cfg.count > 1 ? 's' : ''} ${deviceLabel} · ${gpsLabel} par résultat, dans « ${folderFor(chosen[0]?.name ?? 'Modèle')} »`}
+                {`→ ${cfg.count} version${cfg.count > 1 ? 's' : ''} ${deviceLabel} · ${gpsLabel} par résultat, dans le dossier de chaque modèle`}
               </span>
-            </>)}
+            </>) : <span style={{ fontSize: 12, color: MUTED }}>→ la vidéo telle quelle, dans le dossier de chaque modèle</span>}
           </Step>
 
           <button type="button" onClick={launch} disabled={!!blocker}
@@ -386,12 +460,16 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-              {shown.map(j => <JobCard key={j.id} job={j} now={now} onRespoof={() => respoof(j.id, planFor(j.model.name))} />)}
+              {shown.map(j => <JobCard key={j.id} job={j} now={now} onRespoof={() => respoof(j.id, planFor(j.model, true))} />)}
             </div>
           )}
         </div>
       </div>
 
+      {login && <AccountLogin initialName={login.name} reconnect={login.reconnect} taken={(accounts ?? []).map(a => a.name)} onClose={() => setLogin(null)}
+        onDone={name => { setLogin(null); setReco(m => ({ ...m, [name]: false })); void loadAccounts(name).then(() => loadModels()) }} />}
+      {folderPickFor && <FolderPicker scope={scope} model={folderPickFor} current={folderOf(folderPickFor)} onClose={() => setFolderPickFor(null)}
+        onPick={path => { void assignFolder(folderPickFor, path); setFolderPickFor(null); toast(`${folderPickFor.name} → « ${crumbs(normPath(path))} »`, 'ok') }} />}
       {creating && account && <NewModel account={account} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); void loadModels(true) }} />}
     </Frame>
   )
@@ -460,9 +538,9 @@ function statusLine(j: GjJob, now: number): { text: string; color: string; progr
       return { text: `Génération · ${mmss(el)}`, color: ACCENT_TXT, progress: Math.min(95, 5 + (el / TYPICAL_MS) * 90) }
     }
     case 'saving': return { text: 'Récupération…', color: ACCENT_TXT, progress: 97 }
-    case 'spoofing': return { text: `Spoof ${j.spoofDone ?? 0}/${j.spoof?.count ?? 0}…`, color: ACCENT_TXT, progress: 98 }
+    case 'spoofing': return { text: j.spoof?.count ? `Spoof ${j.spoofDone ?? 0}/${j.spoof.count}…` : 'Rangement dans la Banque…', color: ACCENT_TXT, progress: 98 }
     case 'done': return j.spoof && (j.spoofDone ?? 0) > 0
-      ? { text: `✓ ${j.spoofDone} version${(j.spoofDone ?? 0) > 1 ? 's' : ''} dans la Banque`, color: OK, progress: null }
+      ? { text: j.spoof.count === 0 ? '✓ Rangée dans la Banque' : `✓ ${j.spoofDone} version${(j.spoofDone ?? 0) > 1 ? 's' : ''} dans la Banque`, color: OK, progress: null }
       : { text: '✓ Terminé', color: OK, progress: null }
     case 'failed': return { text: j.filtered ? 'Refusée par le filtre' : 'Échec', color: BAD, progress: null }
   }
@@ -500,8 +578,9 @@ function JobCard({ job: j, now, onRespoof }: { job: GjJob; now: number; onRespoo
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '7px 8px' }}>
         {done && <span style={{ fontSize: 11.5, fontWeight: 600, color: j.spoofError ? WARN : st.color }} title={j.spoofError ?? j.spoof?.folder}>
-          {j.spoofError ? `${j.spoofDone ?? 0}/${j.spoof?.count ?? 0} versions · ${j.spoofError}` : st.text}
+          {j.spoofError ? (j.spoof?.count ? `${j.spoofDone ?? 0}/${j.spoof.count} versions · ${j.spoofError}` : j.spoofError) : st.text}
         </span>}
+        {done && j.spoof?.folder && <span data-no-tr title={j.spoof.folder} style={{ marginTop: -3, fontSize: 11, color: DIM, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{`📁 ${crumbs(j.spoof.folder)}`}</span>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <a href={j.source} target="_blank" rel="noreferrer" data-no-tr title={j.source}
             style={{ fontSize: 11, color: MUTED, textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
@@ -564,6 +643,220 @@ function NewModel({ account, onClose, onCreated }: { account: string; onClose: (
             style={{ ...ghostBtn, background: '#EDEDEF', color: '#0A0A0B', border: '1px solid #EDEDEF', opacity: busy || !name.trim() || !files.length ? 0.5 : 1 }}>
             {busy ? 'Création…' : 'Créer la modèle'}
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── démarrage : vérification de l'accès Blowsome ── */
+const GATE_CSS = `
+@keyframes gjSpin{to{transform:rotate(360deg)}}
+@keyframes gjIn{from{opacity:0;transform:translateY(10px)}}
+@keyframes gjPulse{0%{box-shadow:0 0 0 0 rgba(134,239,172,.45)}100%{box-shadow:0 0 0 22px rgba(134,239,172,0)}}
+@keyframes gjGlow{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes gjPop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.15);opacity:1}100%{transform:scale(1)}}
+@keyframes gjFade{to{opacity:0;transform:scale(.985)}}
+`
+interface Check { label: string; state: CheckState; note?: string }
+function CheckIcon({ state }: { state: CheckState }) {
+  const box: CSSProperties = { width: 18, height: 18, borderRadius: 99, flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800 }
+  if (state === 'run') return <span style={{ ...box, border: '2px solid rgba(168,85,247,.22)', borderTopColor: ACCENT, animation: 'gjSpin .8s linear infinite' }} />
+  if (state === 'ok') return <span style={{ ...box, background: 'rgba(134,239,172,.16)', color: OK, animation: 'gjPop .35s cubic-bezier(.2,.9,.3,1.3) both' }}>✓</span>
+  if (state === 'fail') return <span style={{ ...box, background: 'rgba(248,113,113,.16)', color: BAD, animation: 'gjPop .35s both' }}>✕</span>
+  return <span style={{ ...box, border: `1.5px solid ${FIELD_EDGE}` }} />
+}
+function Gate({ phase, denied, email, checks, failure }: { phase: 'checking' | 'granted' | 'blocked'; denied: boolean; email: string | null; checks: Check[]; failure: ReactNode }) {
+  const color = phase === 'blocked' ? '#F87171' : phase === 'granted' ? OK : ACCENT
+  const title = phase === 'granted' ? 'Accès Blowsome confirmé' : phase === 'blocked' ? (denied ? 'Accès Blowsome requis' : 'Genjutsu indisponible') : 'Vérification de l’accès Blowsome…'
+  return (
+    <div style={{ position: 'relative', minHeight: 'calc(100vh - 150px)', display: 'grid', placeItems: 'center', borderRadius: 18, overflow: 'hidden', background: '#0B0B0D', border: `1px solid ${EDGE}`, animation: phase === 'granted' ? 'gjFade .35s ease .55s forwards' : undefined }}>
+      <style>{GATE_CSS}</style>
+      <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(620px 400px at 50% 36%, ${phase === 'blocked' ? 'rgba(248,113,113,.10)' : phase === 'granted' ? 'rgba(134,239,172,.10)' : 'rgba(168,85,247,.17)'}, transparent 70%)`, animation: 'gjGlow 3s ease-in-out infinite', transition: 'background .4s' }} />
+      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px)', backgroundSize: '34px 34px', maskImage: 'radial-gradient(circle at 50% 40%, #000, transparent 68%)', WebkitMaskImage: 'radial-gradient(circle at 50% 40%, #000, transparent 68%)' }} />
+      <div style={{ position: 'relative', width: 'min(400px, calc(100% - 32px))', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: '32px 0', animation: 'gjIn .5s cubic-bezier(.16,1,.3,1) both' }}>
+        <div style={{ position: 'relative', width: 108, height: 108 }}>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: `conic-gradient(from 0deg, transparent 0 52%, ${ACCENT} 88%, transparent)`, animation: 'gjSpin 1.1s linear infinite', opacity: phase === 'checking' ? 1 : 0, transition: 'opacity .3s' }} />
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `1.5px solid ${phase === 'checking' ? 'rgba(168,85,247,.22)' : color}`, transition: 'border-color .3s' }} />
+          <div style={{ position: 'absolute', inset: 5, borderRadius: '50%', background: 'radial-gradient(circle at 50% 30%, #1E1529, #0E0E11 72%)', display: 'grid', placeItems: 'center', animation: phase === 'granted' ? 'gjPulse .9s ease-out' : undefined }}>
+            <span key={phase} style={{ fontSize: 36, lineHeight: 1, color, animation: 'gjPop .45s cubic-bezier(.2,.9,.3,1.3) both' }}>{phase === 'granted' ? '✓' : phase === 'blocked' ? '✕' : '✦'}</span>
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: ACCENT_TXT, fontWeight: 600 }}>Blowsome · Genjutsu</div>
+          <div style={{ fontSize: 21, fontWeight: 700, color: '#F4F4F5', marginTop: 8, letterSpacing: '-0.02em' }}>{title}</div>
+          {email && <div data-no-tr style={{ fontSize: 12.5, color: MUTED, marginTop: 5 }}>{email}</div>}
+        </div>
+        <div style={{ width: '100%', borderRadius: 12, background: 'rgba(17,17,19,.85)', border: `1px solid ${EDGE}`, padding: '4px 14px', backdropFilter: 'blur(6px)' }}>
+          {checks.map((c, i) => (
+            <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 0', borderTop: i ? `1px solid ${EDGE}` : 'none', opacity: c.state === 'wait' ? 0.38 : 1, transition: 'opacity .3s' }}>
+              <CheckIcon state={c.state} />
+              <span style={{ fontSize: 13, color: INK, fontWeight: 600 }}>{c.label}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: c.state === 'fail' ? BAD : c.state === 'ok' ? OK : MUTED }}>
+                {c.state === 'ok' ? (c.note ?? 'vérifié') : c.state === 'run' ? 'vérification…' : c.state === 'fail' ? (c.note ?? 'refusé') : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+        {phase === 'blocked' && failure && (
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center', fontSize: 13, lineHeight: 1.5, color: '#D4D4D8', animation: 'gjIn .4s both' }}>{failure}</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── comptes Higgsfield de l'équipe : choisir, ajouter, reconnecter ── */
+function AccountsBar({ accounts, current, credits, reco, canRemove, onPick, onAdd, onReconnect, onRemove }: {
+  accounts: HfAccount[]; current: string; credits: Record<string, number | null>; reco: Record<string, boolean>; canRemove: boolean
+  onPick: (name: string) => void; onAdd: () => void; onReconnect: (name: string) => void; onRemove: (name: string) => void
+}) {
+  const mini: CSSProperties = { height: 34, padding: '0 9px', background: 'none', border: 'none', borderLeft: `1px solid ${FIELD_EDGE}`, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600 }
+  return (
+    <section style={{ ...card, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: '#A1A1AA', marginRight: 4, textTransform: 'uppercase', letterSpacing: '.1em' }}>Compte Higgsfield</span>
+      {accounts.map(a => {
+        const on = a.name === current, needs = !!reco[a.name], cr = credits[a.name]
+        return (
+          <div key={a.name} style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 10, border: `1.5px solid ${on ? ACCENT : FIELD_EDGE}`, background: on ? 'rgba(168,85,247,.10)' : FIELD_BG, overflow: 'hidden', transition: 'border-color .15s, background .15s' }}>
+            <button type="button" onClick={() => onPick(a.name)} title={on ? 'Compte utilisé · clic pour actualiser le solde' : 'Utiliser ce compte'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px', background: 'none', border: 'none', cursor: 'pointer', color: INK }}>
+              <span style={{ width: 7, height: 7, borderRadius: 99, background: needs ? WARN : OK, boxShadow: `0 0 8px ${needs ? WARN : OK}` }} />
+              <span data-no-tr style={{ fontSize: 13, fontWeight: 600 }}>{a.name}</span>
+              <span style={{ fontSize: 11.5, color: on ? ACCENT_TXT : MUTED, fontVariantNumeric: 'tabular-nums' }}>{cr != null ? `${Math.round(cr).toLocaleString('fr-FR')} cr.` : '…'}</span>
+            </button>
+            {needs && <button type="button" onClick={() => onReconnect(a.name)} title="La connexion de ce compte a expiré" style={{ ...mini, color: WARN }}>↻ Reconnecter</button>}
+            {canRemove && <button type="button" onClick={() => onRemove(a.name)} title="Retirer ce compte" style={{ ...mini, color: DIM }}><Icon d="M18 6L6 18|M6 6l12 12" size={11} /></button>}
+          </div>
+        )
+      })}
+      <button type="button" onClick={onAdd} style={{ ...ghostBtn, height: 37, borderStyle: 'dashed', color: ACCENT_TXT }}>＋ Ajouter un compte</button>
+      {!accounts.length && <span style={{ fontSize: 12.5, color: WARN }}>Aucun compte connecté : ajoute un compte Higgsfield pour lancer des Genjutsu.</span>}
+    </section>
+  )
+}
+
+function AccountLogin({ initialName, reconnect, taken, onClose, onDone }: { initialName: string; reconnect: boolean; taken: string[]; onClose: () => void; onDone: (name: string) => void }) {
+  const [name, setName] = useState(initialName)
+  const [link, setLink] = useState<string | null>(null)
+  const [redirect, setRedirect] = useState('')
+  const [pasted, setPasted] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const nameTaken = !reconnect && taken.includes(name.trim())
+  async function open() {
+    if (!name.trim() || nameTaken) return
+    setBusy(true); setErr(null)
+    // onglet ouvert tout de suite (sinon le navigateur le bloque comme une fenêtre surgissante)
+    const w = IS_WEB ? window.open('about:blank', '_blank') : null
+    try {
+      const r = await startAccountLogin(name.trim())
+      setLink(r.url); setRedirect(r.redirect)
+      if (w) { w.opener = null; w.location.href = r.url } else window.open(r.url, '_blank')
+    } catch (e) { w?.close(); setErr(e instanceof Error ? e.message : String(e)) }
+    finally { setBusy(false) }
+  }
+  async function finish(v: string) {
+    if (!v.trim() || busy) return
+    setBusy(true); setErr(null)
+    try { const n = await finishAccountLogin(v); toast(reconnect ? `« ${n} » est reconnecté ✓` : `Compte « ${n} » ajouté ✓`, 'ok'); onDone(n) }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+    finally { setBusy(false) }
+  }
+  const num = (n: number, on: boolean) => <span style={{ width: 20, height: 20, borderRadius: 99, flexShrink: 0, background: on ? 'rgba(168,85,247,.18)' : '#18181B', color: on ? ACCENT_TXT : DIM, fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center' }}>{n}</span>
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget && !busy) onClose() }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.6)', display: 'grid', placeItems: 'center', padding: 16 }}>
+      <div style={{ ...card, width: 'min(480px, 100%)', display: 'flex', flexDirection: 'column', gap: 14, padding: 20 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: INK }}>{reconnect ? `Reconnecter « ${name} »` : 'Ajouter un compte Higgsfield'}</div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Le compte sert à toute l’équipe (il apparaît aussi dans le générateur). Sa connexion reste sur le serveur.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          {num(1, !link)}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 12.5, color: INK, fontWeight: 600 }}>{reconnect ? 'Ouvre Higgsfield et connecte-toi avec ce compte' : 'Donne-lui un nom, puis ouvre Higgsfield'}</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={name} onChange={e => setName(e.target.value)} disabled={reconnect || !!link} placeholder="Nom du compte" style={{ ...field, flex: 1, opacity: reconnect || link ? 0.6 : 1 }} />
+              <button type="button" onClick={() => void open()} disabled={busy || !name.trim() || nameTaken}
+                style={{ ...ghostBtn, height: 32, background: link ? FIELD_BG : '#EDEDEF', color: link ? '#E4E4E7' : '#0A0A0B', border: link ? `1px solid ${FIELD_EDGE}` : '1px solid #EDEDEF', opacity: busy || !name.trim() || nameTaken ? 0.5 : 1 }}>
+                {link ? 'Rouvrir' : 'Ouvrir Higgsfield'} <Icon d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6|M15 3h6v6|M10 14L21 3" size={11} />
+              </button>
+            </div>
+            {nameTaken && <span style={{ fontSize: 12, color: WARN }}>Ce nom est déjà pris par un autre compte.</span>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', opacity: link ? 1 : 0.45, transition: 'opacity .2s' }}>
+          {num(2, !!link)}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 12.5, color: INK, fontWeight: 600 }}>Colle l’adresse de la page de retour</span>
+            <span style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>Sur Higgsfield, connecte-toi et autorise l’accès. Tu arrives sur une page qui ne se charge pas : c’est normal. Copie son adresse et colle-la ici.</span>
+            <input value={pasted} disabled={!link || busy} onChange={e => setPasted(e.target.value)} placeholder={redirect ? `${redirect}?code=…` : 'http://127.0.0.1…/callback?code=…'} data-no-tr
+              onPaste={e => { const v = e.clipboardData.getData('text'); setTimeout(() => void finish(v), 0) }}
+              style={{ ...field, fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5 }} />
+            {link && <a href={link} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: DIM }}>La page Higgsfield ne s’est pas ouverte ? Clique ici.</a>}
+          </div>
+        </div>
+        {err && <span style={{ fontSize: 12.5, color: BAD }}>{err}</span>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button type="button" onClick={onClose} disabled={busy} style={ghostBtn}>Annuler</button>
+          <button type="button" onClick={() => void finish(pasted)} disabled={busy || !link || !pasted.trim()}
+            style={{ ...ghostBtn, background: '#EDEDEF', color: '#0A0A0B', border: '1px solid #EDEDEF', opacity: busy || !link || !pasted.trim() ? 0.5 : 1 }}>
+            {busy && link ? 'Validation…' : 'Valider'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── le dossier de la Banque d'une modèle (sous-dossiers compris) ── */
+function FolderPicker({ scope, model, current, onPick, onClose }: { scope: BankScope; model: { name: string }; current: string; onPick: (path: string) => void; onClose: () => void }) {
+  const [paths, setPaths] = useState<string[] | null>(null)
+  const [parent, setParent] = useState<string>(() => current.includes('/') ? current.slice(0, current.lastIndexOf('/')) : '')
+  const [name, setName] = useState('')
+  useEffect(() => { void listBankFolders(scope).then(setPaths).catch(() => setPaths([])) }, [scope])
+  const tree = useMemo(() => folderTree([...(paths ?? []), current]), [paths, current])
+  const suggestion = joinPath('Genjutsu', model.name)
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.6)', display: 'grid', placeItems: 'center', padding: 16 }}>
+      <div style={{ ...card, width: 'min(460px, 100%)', maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', gap: 12, padding: 20 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: INK }} data-no-tr>{`Dossier de ${model.name}`}</div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Ses vidéos Genjutsu iront directement dans ce dossier de la Banque.</div>
+        </div>
+        <div style={{ flex: 1, minHeight: 120, maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, padding: 6, borderRadius: 10, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
+          {paths === null && <span style={{ fontSize: 12.5, color: MUTED, padding: 6 }}>Chargement des dossiers…</span>}
+          {paths !== null && tree.map(n => {
+            const on = n.path === current
+            return (
+              <button key={n.path} type="button" onClick={() => onPick(n.path)} title={n.path}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: `0 10px 0 ${10 + n.depth * 16}px`, borderRadius: 7, border: 'none', cursor: 'pointer', textAlign: 'left', background: on ? 'rgba(168,85,247,.14)' : 'transparent', color: on ? ACCENT_TXT : '#D4D4D8', fontSize: 13, fontWeight: on ? 700 : 500, flexShrink: 0 }}
+                onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }} onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent' }}>
+                <span style={{ display: 'flex', color: on ? ACCENT_TXT : '#71717A' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={13} /></span>
+                <span data-no-tr style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.name}</span>
+                {on && <span style={{ marginLeft: 'auto', fontSize: 11 }}>✓</span>}
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={{ fontSize: 12.5, color: INK, fontWeight: 600 }}>Ou un nouveau dossier</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select value={parent} onChange={e => setParent(e.target.value)} style={{ ...sel, width: 150, flexShrink: 0 }} title="Dossier parent">
+              <option value="" style={opt}>— Dossier principal</option>
+              {tree.map(n => <option key={n.path} value={n.path} style={opt}>{`${'   '.repeat(n.depth)}${n.name}`}</option>)}
+            </select>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Nom du dossier" style={{ ...field, flex: 1, minWidth: 0 }}
+              onKeyDown={e => { if (e.key === 'Enter' && name.trim()) onPick(joinPath(parent || null, name)) }} />
+            <button type="button" disabled={!name.trim()} onClick={() => onPick(joinPath(parent || null, name))} style={{ ...ghostBtn, height: 32, opacity: name.trim() ? 1 : 0.5 }}>Créer</button>
+          </div>
+          {name.trim() && <span style={{ fontSize: 12, color: DIM }} data-no-tr>{`→ ${crumbs(joinPath(parent || null, name))}`}</span>}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+          {current !== suggestion ? <button type="button" onClick={() => onPick(suggestion)} style={{ ...ghostBtn, color: MUTED }} data-no-tr>{`Par défaut : ${crumbs(suggestion)}`}</button> : <span />}
+          <button type="button" onClick={onClose} style={ghostBtn}>Fermer</button>
         </div>
       </div>
     </div>
