@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-30b',
+    date: '2026-10-30',
+    title: { fr: '✦ Genjutsu, version propre', en: '✦ Genjutsu, clean version' },
+    items: {
+      fr: [
+        'Genjutsu est maintenant une vraie page ScaleFlow en 3 étapes : choisis ta modèle (sa photo de référence), colle les liens des reels, lance — chaque vidéo est refaite avec sa tête.',
+        'Nouvelle modèle en 1 clic (1 à 4 photos), partagée avec le générateur ; options simples pour le prompt (plusieurs filles, garder les textes, autre tenue) ; 480p par défaut.',
+        'Résultats en direct (8 à la fois par compte), raison claire en cas de refus, bouton Relancer, et spoof auto en X versions rangées dans la Banque (un dossier par modèle).',
+      ],
+      en: [
+        'Genjutsu is now a real 3-step ScaleFlow page: pick your model (her reference photo), paste the reel links, launch — every video is remade with her face.',
+        'New model in 1 click (1 to 4 photos), shared with the generator; simple prompt options (several girls, keep texts, different outfit); 480p by default.',
+        'Live results (8 at a time per account), clear reason when rejected, Retry button, and auto-spoof into X versions saved in the Bank (one folder per model).',
+      ],
+    },
+  },
+  {
     id: '2026-10-30',
     date: '2026-10-30',
     title: { fr: '✦ Genjutsu dans ScaleFlow (accès Blowsome)', en: '✦ Genjutsu inside ScaleFlow (Blowsome access)' },
