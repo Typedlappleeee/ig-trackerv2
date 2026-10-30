@@ -1,33 +1,35 @@
-// Genjutsu (accès Blowsome) — moteur côté app. Pilote les comptes Higgsfield de l'équipe par le
-// relais du générateur (/api/hf, servi à la même adresse que ScaleFlow ; son mot de passe est remis
-// par la RPC sf_genjutsu_access aux seuls comptes Blowsome).
+// Genjutsu (accès Blowsome) — moteur côté app. Pilote les comptes Higgsfield de l'espace par le
+// relais de ScaleFlow (/api/higgsfield) : session ScaleFlow + accès Blowsome, aucun mot de passe,
+// les jetons Higgsfield restent côté serveur.
 // Une génération = une vidéo source × une modèle (Element Higgsfield) :
-//   lien → vidéo (ig_video) → import Higgsfield → generate_video (motion control) → suivi
-//   → copie durable (video_garder) → dossier de la Banque de la modèle : X versions spoofées
-//     (/api/v1/tools/spoof), ou la vidéo telle quelle si le spoof est coupé.
+//   lien → vidéo (reel, via la Veille) → import Higgsfield → generate_video (motion control) → suivi
+//   → copie durable (keep) → dossier de la Banque de la modèle : X versions spoofées
+//     (/api/v1/tools/spoof), ou la vidéo telle quelle (save) si le spoof est coupé.
 // La file est un singleton persisté (sf-gj-jobs) : quitter la page ne l'arrête pas, un rechargement
 // reprend le suivi. Une génération déjà envoyée à Higgsfield n'est JAMAIS relancée automatiquement
 // (coût double) : seulement par le bouton « Relancer ».
 import { supabase } from './supabase'
 import { IS_WEB } from './platform'
-import { saveOutputToBank } from './studioTools'
 
 export const GJ_ORIGIN = IS_WEB && typeof window !== 'undefined' && /^https?:/.test(window.location.origin) ? window.location.origin : 'https://scaleflow.company'
-const RELAY = `${GJ_ORIGIN}/api/hf`
+const RELAY = `${GJ_ORIGIN}/api/higgsfield`
 export const MAX_RUNNING = 8                    // Higgsfield : 8 Genjutsu à la fois par compte
 export const TYPICAL_MS = 240_000               // durée habituelle d'une génération (barre d'avancement estimée)
 const RUN_TIMEOUT_MS = 90 * 60_000
 const JOBS_KEY = 'sf-gj-jobs', SRC_KEY = 'sf-gj-src', IMPORT_KEY = 'sf-gj-imports'
 
 /* ── relais ── */
-let password: string | null = null
-export function setRelayPassword(p: string | null): void { password = p; if (p) pump() }
-export const relayReady = () => !!password
+// Espace courant (organisation, ou perso) : les comptes Higgsfield sont ceux de l'espace.
+let space: { orgId: string | null } | null = null
+export function setRelayScope(orgId: string | null): void { space = { orgId }; pump() }
+export const relayReady = () => !!space
 
 class RelayError extends Error {
   status: number
-  constructor(m: string, s: number) { super(m); this.status = s }
+  code: string | null
+  constructor(m: string, s: number, code: string | null = null) { super(m); this.status = s; this.code = code }
 }
+export const relayCode = (e: unknown) => e instanceof RelayError ? e.code : null
 const errMsg = (e: unknown) => e instanceof Error ? e.message : String(e)
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
@@ -35,25 +37,24 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 type Any = any
 
 async function relay<T = Any>(body: Record<string, unknown>): Promise<T> {
-  const long = /^(mcp|televerser|ig_video|video_garder)$/.test(String(body.a))
+  const long = /^(mcp|upload_image|reel|keep|save)$/.test(String(body.op))
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new RelayError('session expirée : reconnecte-toi', 401)
   const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), long ? 58_000 : 15_000)
+  const timer = setTimeout(() => ctl.abort(), long ? 62_000 : 20_000)
   let r: Response
   try {
     r = await fetch(RELAY, {
-      method: 'POST', signal: ctl.signal, body: JSON.stringify(body),
-      headers: { 'content-type': 'application/json', ...(password ? { 'x-mot-de-passe': password } : {}) },
+      method: 'POST', signal: ctl.signal, body: JSON.stringify({ org_id: space?.orgId ?? null, ...body }),
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${session.access_token}` },
     })
   } catch {
-    throw new RelayError(ctl.signal.aborted ? 'le relais Genjutsu n’a pas répondu à temps' : 'relais Genjutsu injoignable', 0)
+    throw new RelayError(ctl.signal.aborted ? 'Genjutsu n’a pas répondu à temps' : 'Genjutsu injoignable (connexion)', 0)
   } finally { clearTimeout(timer) }
   const txt = await r.text()
   let j: Any
-  try { j = JSON.parse(txt) } catch { throw new RelayError(`réponse illisible du relais (HTTP ${r.status})`, r.status) }
-  if (!r.ok) {
-    const m = j?.error?.message || `HTTP ${r.status}`
-    throw new RelayError(/mot de passe refusé/i.test(m) ? 'mot de passe refusé : la clé du générateur enregistrée n’est pas la bonne' : m, r.status)
-  }
+  try { j = JSON.parse(txt) } catch { throw new RelayError(`réponse illisible du serveur Genjutsu (HTTP ${r.status})`, r.status) }
+  if (!r.ok || j?.ok === false) throw new RelayError(j?.error || `HTTP ${r.status}`, r.ok ? 200 : r.status, j?.code ?? null)
   return j as T
 }
 
@@ -66,7 +67,7 @@ async function rpc(account: string, method: string, params: unknown, withId = tr
   const msg: Record<string, unknown> = { jsonrpc: '2.0', method }
   if (params) msg.params = params
   if (withId) msg.id = ++rpcId
-  const j = await relay<{ session?: string | null; rep?: Any }>({ a: 'mcp', compte: account, session: sessions.get(account) ?? null, rpc: msg })
+  const j = await relay<{ session?: string | null; rep?: Any }>({ op: 'mcp', account, session: sessions.get(account) ?? null, rpc: msg })
   if (j.session) sessions.set(account, j.session)
   if (j.rep?.error) throw new Error(j.rep.error.message || JSON.stringify(j.rep.error))
   return j.rep?.result
@@ -131,8 +132,8 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 /* ── comptes, modèles, prompts ── */
 export interface HfAccount { name: string; credits: number | null; plan: string }
 export async function listAccounts(): Promise<{ cloud: boolean; accounts: HfAccount[] }> {
-  const j = await relay<{ nuage?: boolean; comptes?: { nom: string; credits: number | null; plan: string | null }[] }>({ a: 'comptes' })
-  return { cloud: !!j.nuage, accounts: (j.comptes ?? []).map(c => ({ name: c.nom, credits: c.credits == null ? null : Number(c.credits), plan: c.plan || '' })) }
+  const j = await relay<{ accounts?: { name: string; credits: number | null; plan: string | null }[] }>({ op: 'accounts' })
+  return { cloud: true, accounts: (j.accounts ?? []).map(c => ({ name: c.name, credits: c.credits == null ? null : Number(c.credits), plan: c.plan || '' })) }
 }
 // Connexion d'un compte Higgsfield (OAuth PKCE) : Higgsfield n'accepte comme adresse de retour
 // qu'une adresse locale → la page de retour « ne charge pas » et on colle son adresse dans l'app.
@@ -151,7 +152,7 @@ export async function startAccountLogin(name: string): Promise<{ url: string; re
   const state = b64url(crypto.getRandomValues(new Uint8Array(16)))
   let d: { url?: string; client_id?: string } | null = null, redirect = ''
   for (const r of LOOPBACKS) {
-    try { d = await relay({ a: 'depart', retour: r, state, challenge, client_id: null }); redirect = r; break } catch (e) {
+    try { d = await relay({ op: 'login_start', redirect: r, state, challenge }); redirect = r; break } catch (e) {
       if (!/redirect/i.test(errMsg(e))) throw e
     }
   }
@@ -173,20 +174,14 @@ export async function finishAccountLogin(pasted: string): Promise<string> {
   const pending = readJson<PendingLogin[]>(LOGIN_KEY, [])
   const p = pending.find(x => x.state === state)
   if (!p) throw new Error('cette adresse vient d’une autre tentative : relance « Ouvrir Higgsfield » une seule fois, puis colle la nouvelle adresse')
-  const t = await relay<{ access_token?: string; refresh_token?: string; expires_in?: number; error?: string; error_description?: string }>({
-    a: 'jeton', form: { grant_type: 'authorization_code', code, redirect_uri: p.redirect, client_id: p.clientId, code_verifier: p.verifier },
-  })
-  if (!t.access_token) throw new Error(t.error_description || t.error || 'jeton refusé')
-  await relay({
-    a: 'garder', nom: p.name, client_id: p.clientId, credits: null, plan: null,
-    jeton: { access_token: t.access_token, refresh_token: t.refresh_token ?? null, expires_at: Math.floor(Date.now() / 1000) + (Number(t.expires_in) || 3600) },
-  })
+  // le serveur échange le code contre la connexion et la garde (le jeton ne revient pas ici)
+  await relay({ op: 'login_finish', name: p.name, code, redirect: p.redirect, client_id: p.clientId, verifier: p.verifier })
   writeJson(LOGIN_KEY, pending.filter(x => x.state !== state))
   sessions.delete(p.name)
   return p.name
 }
 export async function removeAccount(name: string): Promise<void> {
-  await relay({ a: 'retirer', nom: name })
+  await relay({ op: 'remove', name })
   sessions.delete(name)
 }
 // Le compte a perdu sa connexion (jeton révoqué) : il faut le reconnecter sous le même nom.
@@ -196,7 +191,7 @@ export async function readCredits(account: string): Promise<number | null> {
   const b = await tool<Any>(account, 'balance', {})
   const n = b?.credits ?? b?.balance
   const credits = typeof n === 'number' ? n : null
-  relay({ a: 'noter', nom: account, credits, plan: b?.subscription_plan_type || b?.plan || null }).catch(() => { /* simple mémo */ })
+  relay({ op: 'note', name: account, credits, plan: b?.subscription_plan_type || b?.plan || null }).catch(() => { /* simple mémo */ })
   return credits
 }
 
@@ -246,23 +241,12 @@ export async function createModel(account: string, name: string, photos: Blob[])
   for (const p of photos.slice(0, 4)) {
     const img = await shrinkImage(p)
     const r = await relay<{ media_id?: string; url?: string }>({
-      a: 'televerser', compte: account, nom: 'element.jpg', type: img.type === 'image/png' ? 'image/png' : 'image/jpeg', donnees: await toBase64(img),
+      op: 'upload_image', account, type: img.type === 'image/png' ? 'image/png' : 'image/jpeg', data: await toBase64(img),
     })
     if (!r.media_id || !r.url) throw new Error('Higgsfield n’a pas pris la photo')
     medias.push({ id: r.media_id, url: r.url, type: 'media_input' })
   }
   await tool(account, 'show_reference_elements', { action: 'create', category: 'character', name, medias })
-}
-
-// Prompts enregistrés par l'équipe dans le générateur (mêmes presets partout).
-export async function readPromptPresets(): Promise<Record<string, string>> {
-  try {
-    const j = await relay<{ valeur?: string | null }>({ a: 'reglage_lire', cle: 'genjutsu_prompts' })
-    const o = j.valeur ? JSON.parse(j.valeur) as Record<string, unknown> : {}
-    const out: Record<string, string> = {}
-    for (const [k, v] of Object.entries(o)) if (!k.startsWith('__') && typeof v === 'string' && v.trim()) out[k] = v
-    return out
-  } catch { return {} }
 }
 
 export interface PromptOpts { several: boolean; who: string; keepText: boolean; outfit: string }
@@ -314,16 +298,16 @@ export function resolveVideo(link: string): Promise<SourceVideo> {
   p = (async (): Promise<SourceVideo> => {
     let v: SourceVideo
     if (isInstagram(link)) {
-      let last: unknown = null, got: { url?: string; pseudo?: string | null } | null = null
+      let last: unknown = null, got: { url?: string; user?: string | null } | null = null
       for (let k = 0; k < 3 && !got; k++) {
-        try { got = await relay<{ url?: string; pseudo?: string | null }>({ a: 'ig_video', url: link }) } catch (e) {
+        try { got = await relay<{ url?: string; user?: string | null }>({ op: 'reel', url: link }) } catch (e) {
           last = e
           if (/pas de vidéo|pas un lien|lien invalide|clé HikerAPI/i.test(errMsg(e))) break
           await sleep(2000 * (k + 1))
         }
       }
       if (!got?.url) throw last instanceof Error ? last : new Error('vidéo introuvable')
-      v = { url: got.url, user: got.pseudo ?? null }
+      v = { url: got.url, user: got.user ?? null }
     } else if (isDirectVideo(link)) v = { url: link, user: null }
     else throw new Error('lien non pris en charge (reel Instagram ou fichier .mp4)')
     srcCache[link] = { ...v, at: Date.now() }
@@ -442,7 +426,7 @@ export function respoof(id: string, plan: SpoofPlan): void {
 
 // Lance ce qui attend (8 à la fois par compte) et reprend le suivi de ce qui tourne.
 export function pump(): void {
-  if (!password) return
+  if (!space) return
   const active = new Map<string, number>()
   for (const j of jobs) if (j.status === 'preparing' || j.status === 'running') active.set(j.account, (active.get(j.account) ?? 0) + 1)
   const waiting = jobs.filter(j => j.status === 'waiting').sort((a, b) => a.createdAt - b.createdAt)
@@ -512,7 +496,7 @@ async function pollAccount(account: string): Promise<void> {
   let errors = 0
   try {
     for (;;) {
-      if (!password) break
+      if (!space) break
       const running = jobs.filter(j => j.account === account && j.status === 'running' && j.hfJobId)
       if (!running.length) break
       for (const j of running) if (Date.now() - (j.startedAt ?? j.createdAt) > RUN_TIMEOUT_MS)
@@ -569,7 +553,7 @@ async function collect(id: string, st?: Any): Promise<void> {
       return
     }
     let durable = url
-    try { durable = (await relay<{ url?: string }>({ a: 'video_garder', url })).url || url } catch { /* l'adresse Higgsfield reste valable un temps */ }
+    try { durable = (await relay<{ url?: string }>({ op: 'keep', url })).url || url } catch { /* l'adresse Higgsfield reste valable un temps */ }
     patch(id, { resultUrl: durable, doneAt: Date.now() })
     if (j.spoof && j.spoof.count > 0) await spoofJob(id)
     else if (j.spoof) await saveOriginal(id)
@@ -583,12 +567,8 @@ async function saveOriginal(id: string): Promise<void> {
   if (!j?.resultUrl || !j.spoof) return
   patch(id, { status: 'spoofing', spoofDone: 0, spoofFailed: 0, spoofError: null })
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) throw new Error('Session expirée : reconnecte-toi.')
-    const r = await fetch(j.resultUrl)
-    if (!r.ok) throw new Error(`vidéo indisponible (HTTP ${r.status})`)
-    const bankId = await saveOutputToBank(session.user.id, j.spoof.orgId, new Uint8Array(await r.arrayBuffer()), `Genjutsu ${j.model.name} ${String(j.hfJobId ?? j.id).slice(0, 6)}`, 'mp4', j.spoof.folder)
-    if (!bankId) throw new Error('enregistrement dans la Banque refusé')
+    // rangée côté serveur (pas de souci d'accès croisé depuis le navigateur)
+    await relay({ op: 'save', url: j.resultUrl, folder: j.spoof.folder, title: `Genjutsu ${j.model.name} ${String(j.hfJobId ?? j.id).slice(0, 6)}`, org_id: j.spoof.orgId })
     patch(id, { status: 'done', spoofDone: 1 })
   } catch (e) { patch(id, { status: 'done', spoofFailed: 1, spoofError: errMsg(e) }) }
 }

@@ -3406,6 +3406,13 @@ export const EN: Dict = {
     "Il faut d’abord la clé du générateur (voir ci-dessous)": "The generator key is needed first (see below)",
     "Clé acceptée par le générateur ✓": "Key accepted by the generator ✓",
     "Le générateur refuse cette clé : ce n’est pas son mot de passe actuel.": "The generator refuses this key: it is not its current password.",
+    "Genjutsu n’a pas répondu à temps": "Genjutsu did not answer in time",
+    "Genjutsu injoignable (connexion)": "Genjutsu unreachable (connection)",
+    "Il est retiré pour tout l’espace. Ses modèles restent sur Higgsfield.": "It is removed for the whole space. Its models stay on Higgsfield.",
+    "Comptes Higgsfield": "Higgsfield accounts",
+    "Ajoute d’abord un compte Higgsfield (en haut) : ses modèles apparaîtront ici.": "Add a Higgsfield account first (above): its models will show up here.",
+    "1 à 4 photos : visage net, de face, bien éclairé. Elle est enregistrée sur le compte Higgsfield choisi.": "1 to 4 photos: sharp face, facing the camera, well lit. She is saved on the chosen Higgsfield account.",
+    "Le compte sert à tout l’espace (toute l’équipe). Sa connexion est gardée sur le serveur de ScaleFlow, jamais dans le navigateur.": "The account serves the whole space (the whole team). Its sign-in is kept on the ScaleFlow server, never in the browser.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4022,5 +4029,6 @@ export const EN: Dict = {
     ["Calibrage enregistré ({0} appels) : envoie le fichier « {1} » (dans Téléchargements).", "Calibration saved ({0} calls): send the file “{1}” (in Downloads)."],
     ["Retirer « {0} » de ce PC ?", "Remove “{0}” from this PC?"],
     ["Générateur injoignable : {0}", "Generator unreachable: {0}"],
+    ["réponse illisible du serveur Genjutsu (HTTP {0})", "unreadable Genjutsu server response (HTTP {0})"],
   ],
 }

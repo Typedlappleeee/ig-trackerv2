@@ -1,6 +1,6 @@
 // Genjutsu (accès Blowsome uniquement) : une vidéo source refaite avec la tête d'une modèle
 // (Higgsfield motion control), dans une page ScaleFlow propre :
-//   1. la modèle (photo de référence = Element Higgsfield, partagé avec le générateur de l'équipe)
+//   1. la modèle (photo de référence = Element Higgsfield, enregistré sur le compte Higgsfield)
 //   2. les liens des reels à refaire
 //   3. le rendu (480p par défaut, prompt réglé par quelques options) + spoof auto en X versions
 // Au démarrage : écran « Vérification de l'accès Blowsome » (accès, comptes, modèles) — aucun mot de
@@ -10,7 +10,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { Icon, Toggle, Segmented, toast, useNarrow, confirmDialog, promptDialog } from '@/lib/ui'
 import { hfBridge, listLocal, addLocal, reconnectLocal, checkLocal, removeLocal, type HfLocalAccount } from '@/lib/hfLocal'
@@ -18,7 +17,7 @@ import { IS_WEB } from '@/lib/platform'
 import { SPOOF_DEVICES, GPS_CITIES } from '@/lib/studioTools'
 import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setModelFolder, type BankScope } from '@/lib/bankFolders'
 import {
-  MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, readPromptPresets,
+  MAX_RUNNING, TYPICAL_MS, setRelayScope, relayReady, relayCode, listAccounts, readCredits, listModels, createModel,
   startAccountLogin, finishAccountLogin, removeAccount, needsReconnect,
   buildPrompt, parseLinks, resolveVideo, cachedSource, isInstagram, enqueue, retryJob, removeJob, clearFinished, respoof,
   getJobs, subscribeJobs, isActive, pump, type HfAccount, type HfModel, type PromptOpts, type GjJob, type SpoofPlan,
@@ -43,7 +42,7 @@ const cfgDefaults = (): AutoCfg => ({ on: true, count: 3, device: 'iphone15', gp
 const crumbs = (path: string) => path.split('/').join(' › ')
 const mmss = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 const reelLabel = (link: string) => link.match(/\/reel\/([\w-]+)/)?.[1] ?? link.replace(/^https?:\/\//, '').slice(0, 42)
-type Access = 'loading' | 'ok' | 'nopass' | 'nosql' | 'denied'
+type Access = 'loading' | 'ok' | 'nosql' | 'denied'
 type SrcState = { state: 'checking' | 'ok' | 'error'; user?: string | null; error?: string }
 type Filter = 'all' | 'active' | 'done' | 'failed'
 type CheckState = 'wait' | 'run' | 'ok' | 'fail'
@@ -52,43 +51,16 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const orgId = org.currentOrg?.id ?? null
   const narrow = useNarrow(1100)
 
-  // ── accès : le mot de passe du relais, remis seulement aux comptes Blowsome ──
+  // ── accès : session ScaleFlow + accès Blowsome, vérifiés par le relais (/api/higgsfield) ──
   // (déjà vérifié pendant cette session → la page s'ouvre directement, sans écran de vérification)
   const [access, setAccess] = useState<Access>(() => relayReady() ? 'ok' : 'loading')
   const [gate, setGate] = useState<'on' | 'granted' | 'off'>(() => relayReady() ? 'off' : 'on')
-  const [newPass, setNewPass] = useState('')
-  const loadAccess = useCallback(async () => {
-    setAccess('loading')
-    const { data, error } = await supabase.rpc('sf_genjutsu_access')
-    if (error) { setAccess(/function|schema cache/i.test(error.message) ? 'nosql' : 'denied'); return }
-    const p = (data as string | null) || null
-    if (!p) { setAccess('nopass'); return }
-    setRelayPassword(p)
-    setAccess('ok')
-  }, [])
-  useEffect(() => {
-    try { localStorage.removeItem('motDePasse') } catch { /* l'ancienne version le gardait dans le navigateur */ }
-    if (!relayReady()) void loadAccess()
-  }, [loadAccess])
-  async function savePass() {
-    const { error } = await supabase.rpc('sf_set_secret', { p_name: 'genjutsu_password', p_value: newPass })
-    if (error) { toast(error.message, 'bad'); return }
-    setNewPass('')
-    await loadAccess()
-    // test immédiat : le générateur accepte-t-il cette clé ?
-    try { await listAccounts(); toast('Clé acceptée par le générateur ✓', 'ok'); void loadAccounts() }
-    catch (e) {
-      const m = e instanceof Error ? e.message : String(e)
-      toast(/mot de passe/i.test(m) ? 'Le générateur refuse cette clé : ce n’est pas son mot de passe actuel.' : `Générateur injoignable : ${m}`, 'bad', 8000)
-      void loadAccounts()
-    }
-  }
+  useEffect(() => { try { localStorage.removeItem('motDePasse') } catch { /* ancienne version */ } }, [])
 
   // ── comptes Higgsfield de l'équipe ──
   const [accounts, setAccounts] = useState<HfAccount[] | null>(null)
   const [account, setAccountState] = useState<string>(() => readJson(ACC_KEY, ''))
   const [relayErr, setRelayErr] = useState<string | null>(null)
-  const keyRefused = !!relayErr && /mot de passe|clé du générateur|accès enregistré/i.test(relayErr)
   const [credits, setCredits] = useState<Record<string, number | null>>({})
   const [reco, setReco] = useState<Record<string, boolean>>({})        // compte à reconnecter
   const [login, setLogin] = useState<{ name: string; reconnect: boolean } | null>(null)
@@ -97,16 +69,22 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     setRelayErr(null)
     try {
       const r = await listAccounts()
-      if (!r.cloud) { setRelayErr('Le générateur Genjutsu refuse l’accès enregistré : l’administrateur doit le relier à nouveau.'); setAccounts([]); return }
+      setAccess('ok')
       setAccounts(r.accounts)
       setAccountState(cur => {
         const next = select && r.accounts.some(a => a.name === select) ? select : r.accounts.some(a => a.name === cur) ? cur : (r.accounts[0]?.name ?? '')
         writeJson(ACC_KEY, next)
         return next
       })
-    } catch (e) { setRelayErr(e instanceof Error ? e.message : String(e)); setAccounts([]) }
+    } catch (e) {
+      const code = relayCode(e)
+      if (code === 'blowsome') { setAccess('denied'); return }
+      if (code === 'sql_missing') { setAccess('nosql'); return }
+      setAccess('ok'); setRelayErr(e instanceof Error ? e.message : String(e)); setAccounts([])
+    }
   }, [])
-  useEffect(() => { if (access === 'ok') { void loadAccounts(); pump() } }, [access, loadAccounts])
+  // les comptes Higgsfield sont ceux de l'espace courant (organisation ou perso)
+  useEffect(() => { setRelayScope(orgId); void loadAccounts() }, [orgId, loadAccounts])
   const refreshCredits = useCallback(async (name: string) => {
     try {
       const c = await readCredits(name)
@@ -120,7 +98,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     void (async () => { for (const a of accounts) await refreshCredits(a.name) })()
   }, [accounts, refreshCredits])
   async function dropAccount(name: string) {
-    if (!await confirmDialog({ title: `Retirer le compte « ${name} » ?`, text: 'Il disparaît aussi du générateur de l’équipe. Ses modèles restent sur Higgsfield.', confirmLabel: 'Retirer', danger: true })) return
+    if (!await confirmDialog({ title: `Retirer le compte « ${name} » ?`, text: 'Il est retiré pour tout l’espace. Ses modèles restent sur Higgsfield.', confirmLabel: 'Retirer', danger: true })) return
     try { await removeAccount(name); toast(`Compte « ${name} » retiré`, 'ok'); await loadAccounts() }
     catch (e) { toast(e instanceof Error ? e.message : String(e), 'bad') }
   }
@@ -183,13 +161,11 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [res, setRes] = useState<'480p' | '720p' | '1080p'>('480p')
   const [popts, setPopts] = useState<PromptOpts>({ several: false, who: '', keepText: false, outfit: '' })
   const [outfitOn, setOutfitOn] = useState(false)
-  const [presets, setPresets] = useState<Record<string, string>>({})
   const [mode, setMode] = useState<string>('auto')          // 'auto' | 'custom' | 'p:<preset>'
   const [custom, setCustom] = useState('')
   const [showPrompt, setShowPrompt] = useState(false)
-  useEffect(() => { if (access === 'ok') void readPromptPresets().then(setPresets) }, [access])
   const autoPrompt = buildPrompt({ ...popts, outfit: outfitOn ? popts.outfit : '' })
-  const prompt = mode === 'auto' ? autoPrompt : mode === 'custom' ? custom : (presets[mode.slice(2)] ?? autoPrompt)
+  const prompt = mode === 'custom' ? custom : autoPrompt
 
   // ── chaque modèle a SON dossier de la Banque (par défaut « Genjutsu › <nom> ») : ses vidéos y vont ──
   const scope: BankScope = useMemo(() => ({ orgId, userId: user.id }), [orgId, user.id])
@@ -251,7 +227,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   }
   const shown = jobs.filter(j => filter === 'all' ? true : filter === 'active' ? (isActive(j.status) || j.status === 'waiting') : j.status === filter)
 
-  // ── vérification de l'accès au démarrage (accès Blowsome → générateur → modèles) ──
+  // ── vérification de l'accès au démarrage (accès Blowsome → comptes → modèles) ──
   const [t0] = useState(() => Date.now())
   const [clock, setClock] = useState(() => Date.now())
   useEffect(() => {
@@ -281,22 +257,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     const failure = access === 'denied' ? (
       <span>Genjutsu est réservé aux comptes avec l’accès Blowsome.</span>
     ) : access === 'nosql' ? (
-      <span>Colle le SQL <code>20261030b_genjutsu_access.sql</code> dans Supabase pour activer Genjutsu.</span>
-    ) : access === 'nopass' ? (isSuperAdmin ? (<>
-      <span>Genjutsu n’est pas encore relié au générateur de l’équipe. Une seule fois, pour tout le monde :</span>
-      <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-        <input value={newPass} onChange={e => setNewPass(e.target.value)} type="password" autoComplete="off" placeholder="Clé du générateur" style={{ ...field, flex: 1 }} />
-        <button type="button" disabled={!newPass.trim()} onClick={() => void savePass()} style={{ ...ghostBtn, height: 32, opacity: newPass.trim() ? 1 : 0.5 }}>Relier</button>
-      </div>
-    </>) : <span>Genjutsu n’est pas encore activé par l’administrateur.</span>
-    ) : relayErr && /mot de passe/i.test(relayErr) ? (isSuperAdmin ? (<>
-      <span>La clé enregistrée pour le générateur de l’équipe n’est plus la bonne. Colle la clé actuelle (une seule fois, pour tout le monde) :</span>
-      <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-        <input value={newPass} onChange={e => setNewPass(e.target.value)} type="password" autoComplete="off" placeholder="Clé du générateur" style={{ ...field, flex: 1 }}
-          onKeyDown={e => { if (e.key === 'Enter' && newPass.trim()) void savePass() }} />
-        <button type="button" disabled={!newPass.trim()} onClick={() => void savePass()} style={{ ...ghostBtn, height: 32, opacity: newPass.trim() ? 1 : 0.5 }}>Relier</button>
-      </div>
-    </>) : <span>Genjutsu doit être relié à nouveau par l’administrateur.</span>
+      <span>Colle le SQL <code>20261031_hf_accounts.sql</code> dans Supabase pour activer Genjutsu.</span>
     ) : relayErr ? (<>
       <span>{relayErr}</span>
       <button type="button" onClick={() => void loadAccounts()} style={ghostBtn}>Réessayer</button>
@@ -304,8 +265,8 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     return (
       <Gate phase={gate === 'granted' ? 'granted' : blocked ? 'blocked' : 'checking'} denied={access === 'denied'} email={user.email ?? null}
         checks={[
-          { label: 'Accès Blowsome', state: shownChecks[0], note: access === 'denied' ? 'refusé' : access === 'nopass' || access === 'nosql' ? 'à activer' : undefined },
-          { label: 'Générateur Genjutsu', state: shownChecks[1], note: shownChecks[1] === 'fail' ? 'indisponible' : shownChecks[1] === 'ok' && accounts ? `${accounts.length} compte${accounts.length > 1 ? 's' : ''} Higgsfield` : undefined },
+          { label: 'Accès Blowsome', state: shownChecks[0], note: access === 'denied' ? 'refusé' : access === 'nosql' ? 'à activer' : undefined },
+          { label: 'Comptes Higgsfield', state: shownChecks[1], note: shownChecks[1] === 'fail' ? 'indisponible' : shownChecks[1] === 'ok' && accounts ? `${accounts.length} compte${accounts.length > 1 ? 's' : ''} Higgsfield` : undefined },
           { label: 'Modèles', state: shownChecks[2], note: shownChecks[2] === 'ok' && models ? `${models.length} prête${models.length > 1 ? 's' : ''}` : undefined },
         ]}
         failure={failure} />
@@ -316,26 +277,13 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     <Frame>
       <Header />
 
-      <AccountsBar accounts={accounts ?? []} current={account} credits={credits} reco={reco} canRemove={isSuperAdmin} locked={keyRefused}
+      <AccountsBar accounts={accounts ?? []} current={account} credits={credits} reco={reco} canRemove={isSuperAdmin} locked={false}
         onPick={name => { setAccount(name); void refreshCredits(name) }}
         onAdd={() => setLogin({ name: freeName(), reconnect: false })}
         onReconnect={name => setLogin({ name, reconnect: true })}
         onRemove={name => void dropAccount(name)} />
       <LocalAccounts />
-      {relayErr && keyRefused && (
-        <div style={{ ...card, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, borderColor: 'rgba(251,191,36,0.3)', fontSize: 13, color: '#D4D4D8' }}>
-          <span style={{ color: WARN, fontWeight: 700 }}>Comptes de l’équipe bloqués : la clé du générateur est refusée</span>
-          <span style={{ fontSize: 12.5, lineHeight: 1.5 }}>Les comptes Higgsfield de l’équipe passent par le site du générateur (generateur-prompts.vercel.app), qui demande son mot de passe. {isSuperAdmin ? 'Colle-le ici une seule fois :' : 'L’administrateur doit le recoller.'} Sans lui, utilise « Sur ce PC » dans l’appli PC.</span>
-          {isSuperAdmin && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input value={newPass} onChange={e => setNewPass(e.target.value)} type="password" autoComplete="off" placeholder="Mot de passe du générateur" style={{ ...field, flex: 1, maxWidth: 360 }}
-                onKeyDown={e => { if (e.key === 'Enter' && newPass.trim()) void savePass() }} />
-              <button type="button" disabled={!newPass.trim()} onClick={() => void savePass()} style={{ ...ghostBtn, height: 32, opacity: newPass.trim() ? 1 : 0.5 }}>Relier</button>
-            </div>
-          )}
-        </div>
-      )}
-      {relayErr && !keyRefused && (
+      {relayErr && (
         <div style={{ ...card, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderColor: 'rgba(252,165,165,0.25)', color: BAD, fontSize: 13 }}>
           <span style={{ flex: 1 }}>{relayErr}</span>
           <button type="button" onClick={() => void loadAccounts()} style={ghostBtn}>Réessayer</button>
@@ -349,7 +297,8 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             right={<button type="button" onClick={() => void loadModels()} style={{ ...ghostBtn, height: 26, padding: '0 8px' }} title="Actualiser"><Icon d="M21 12a9 9 0 1 1-3-6.7L21 8|M21 3v5h-5" size={12} /></button>}>
             {modelsErr && <span style={{ fontSize: 12.5, color: BAD }}>{modelsErr}</span>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
-              {models === null && Array.from({ length: 4 }, (_, i) => <div key={i} style={{ aspectRatio: '3 / 4', borderRadius: 10, background: '#18181B', animation: 'pulse 1.4s ease-in-out infinite' }} />)}
+              {!account && <span style={{ gridColumn: '1 / -1', fontSize: 12.5, color: MUTED }}>Ajoute d’abord un compte Higgsfield (en haut) : ses modèles apparaîtront ici.</span>}
+              {account && models === null && Array.from({ length: 4 }, (_, i) => <div key={i} style={{ aspectRatio: '3 / 4', borderRadius: 10, background: '#18181B', animation: 'pulse 1.4s ease-in-out infinite' }} />)}
               {models?.map(m => {
                 const pos = picked.indexOf(m.id)
                 return (
@@ -420,7 +369,6 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             <Row label="Prompt">
               <select value={mode} onChange={e => { const v = e.target.value; if (v === 'custom' && mode !== 'custom') setCustom(prompt); setMode(v) }} style={{ ...sel, maxWidth: 240 }}>
                 <option value="auto" style={opt}>Automatique (options ci-dessous)</option>
-                {Object.keys(presets).map(k => <option key={k} value={`p:${k}`} style={opt}>{k}</option>)}
                 <option value="custom" style={opt}>Personnalisé</option>
               </select>
             </Row>
@@ -658,7 +606,7 @@ function NewModel({ account, onClose, onCreated }: { account: string; onClose: (
       <div style={{ ...card, width: 'min(440px, 100%)', display: 'flex', flexDirection: 'column', gap: 12, padding: 20 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: INK }}>Nouvelle modèle</div>
-          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>1 à 4 photos : visage net, de face, bien éclairé. Elle sera aussi disponible dans le générateur.</div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>1 à 4 photos : visage net, de face, bien éclairé. Elle est enregistrée sur le compte Higgsfield choisi.</div>
         </div>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Prénom de la modèle" autoFocus style={field} />
         <div onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); add(e.dataTransfer.files) }} onClick={() => input.current?.click()}
@@ -761,7 +709,7 @@ function AccountsBar({ accounts, current, credits, reco, canRemove, locked, onPi
           </div>
         )
       })}
-      <button type="button" onClick={onAdd} disabled={locked} title={locked ? 'Il faut d’abord la clé du générateur (voir ci-dessous)' : undefined}
+      <button type="button" onClick={onAdd} disabled={locked} 
         style={{ ...ghostBtn, height: 37, borderStyle: 'dashed', color: ACCENT_TXT, opacity: locked ? 0.45 : 1, cursor: locked ? 'not-allowed' : 'pointer' }}>＋ Ajouter un compte</button>
       {!accounts.length && !locked && <span style={{ fontSize: 12.5, color: WARN }}>Aucun compte connecté : ajoute un compte Higgsfield pour lancer des Genjutsu.</span>}
     </section>
@@ -802,7 +750,7 @@ function AccountLogin({ initialName, reconnect, taken, onClose, onDone }: { init
       <div style={{ ...card, width: 'min(480px, 100%)', display: 'flex', flexDirection: 'column', gap: 14, padding: 20 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: INK }}>{reconnect ? `Reconnecter « ${name} »` : 'Ajouter un compte Higgsfield'}</div>
-          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Le compte sert à toute l’équipe (il apparaît aussi dans le générateur). Sa connexion reste sur le serveur.</div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Le compte sert à tout l’espace (toute l’équipe). Sa connexion est gardée sur le serveur de ScaleFlow, jamais dans le navigateur.</div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           {num(1, !link)}
