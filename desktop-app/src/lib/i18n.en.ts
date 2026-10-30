@@ -3379,6 +3379,8 @@ export const EN: Dict = {
     "Ou un nouveau dossier": "Or a new folder",
     "Dossier parent": "Parent folder",
     "— Dossier principal": "— Top-level folder",
+    "La clé enregistrée pour le générateur de l’équipe n’est plus la bonne. Colle la clé actuelle (une seule fois, pour tout le monde) :": "The key saved for the team’s generator is no longer valid. Paste the current key (once, for everyone):",
+    "Genjutsu doit être relié à nouveau par l’administrateur.": "Genjutsu must be linked again by the administrator.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
