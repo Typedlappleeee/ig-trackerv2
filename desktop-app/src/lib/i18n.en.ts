@@ -3226,6 +3226,14 @@ export const EN: Dict = {
     "Non — seulement ma banque": "No — only my bank",
     "Envoyer direct vers": "Send straight to",
     "média introuvable": "media not found",
+    "Activité de l’API": "API activity",
+    "Les derniers appels reçus par ton API : tu vois si l’autre site t’appelle, et pourquoi un appel est refusé.": "The latest calls received by your API: see whether the other site calls you, and why a call is refused.",
+    "⚠ Colle le SQL": "⚠ Paste the SQL",
+    "dans Supabase → SQL Editor pour activer le journal.": "into Supabase → SQL Editor to turn on the log.",
+    "Aucun appel reçu pour l’instant : l’autre site n’appelle pas encore ton API (ou pas avec une de tes clés).": "No call received yet: the other site isn’t calling your API yet (or not with one of your keys).",
+    "sans clé reconnue": "no recognized key",
+    "depuis une page web :": "from a web page:",
+    "— doit passer par leur serveur": "— must go through their server",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -3811,5 +3819,6 @@ export const EN: Dict = {
     ["{0} envoi(s) chez {1} échoué(s) — vois le journal.", "{0} send(s) to {1} failed — see the log."],
     ["Terminé — {0} montage(s) envoyé(s) chez {1} › {2}.", "Done — {0} edit(s) sent to {1} › {2}."],
     ["📤 {0} envoyée(s) chez {1} › {2}{3}", "📤 {0} sent to {1} › {2}{3}"],
+    ["{0} appel(s) récent(s) · {1} réussi(s)", "{0} recent call(s) · {1} succeeded"],
   ],
 }

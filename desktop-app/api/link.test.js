@@ -19,7 +19,7 @@ import link from './link.js'
 
 // ── Supabase simulé (tables + stockage « content » + auth) ────────────────────────
 function makeDb() {
-  const t = { content_bank: [], sf_api_tokens: [], sf_link_partners: [], organizations: [], organization_members: [] }
+  const t = { content_bank: [], sf_api_tokens: [], sf_link_partners: [], organizations: [], organization_members: [], sf_api_log: [] }
   const objects = new Map()          // chemin → { bytes, type }
   const sessions = new Map()         // jeton de session → user
   let quotaFull = false
@@ -77,9 +77,9 @@ function makeDb() {
 }
 
 // ── Appels HTTP simulés : v1 (ScaleFlow) et le « site staff » (même contrat, autre espace) ──
-function call(handler, { method = 'GET', path = '', query = {}, body, auth }) {
+function call(handler, { method = 'GET', path = '', query = {}, body, auth, headers = {} }) {
   const qs = new URLSearchParams({ ...(path ? { r: path } : {}), ...query })
-  const req = { method, url: `/api/x?${qs}`, headers: { authorization: auth }, body }
+  const req = { method, url: `/api/x?${qs}`, headers: { authorization: auth, ...headers }, body }
   return new Promise(resolve => {
     const res = { statusCode: 200, headers: {}, setHeader(k, v) { this.headers[k.toLowerCase()] = v }, end(s) { resolve({ status: this.statusCode, body: s && this.headers['content-type']?.includes('json') ? JSON.parse(s) : s }) } }
     handler(req, res)
@@ -97,8 +97,8 @@ beforeEach(() => {
   D.t.organizations.push({ id: ORG_A, owner_id: USER }, { id: ORG_B, owner_id: staff })
   TOKEN_A = tok(); TOKEN_B = tok()
   D.t.sf_api_tokens.push(
-    { id: 'ta', owner_id: USER, space_org: ORG_A, token_hash: hash(TOKEN_A), revoked_at: null },
-    { id: 'tb', owner_id: staff, space_org: ORG_B, token_hash: hash(TOKEN_B), revoked_at: null },
+    { id: 'ta', owner_id: USER, space_org: ORG_A, prefix: TOKEN_A.slice(0, 9), token_hash: hash(TOKEN_A), revoked_at: null },
+    { id: 'tb', owner_id: staff, space_org: ORG_B, prefix: TOKEN_B.slice(0, 9), token_hash: hash(TOKEN_B), revoked_at: null },
   )
   // Le « site staff » expose l'API v1 sur https://staff.example.com/api/scaleflow avec la clé B.
   D.t.sf_link_partners.push({ owner_id: USER, space_org: ORG_A, name: 'Staff', base_url: 'https://staff.example.com/api/scaleflow', api_key: TOKEN_B })
@@ -222,6 +222,22 @@ describe('API v1 (clé ScaleFlow)', () => {
     const r = await call(v1, { method: 'POST', path: 'files', body: { url: D.STORE + D.t.content_bank[0].storage_path + '?token=t', folder: 'x' }, auth: 'Bearer ' + TOKEN_B })
     expect(r.status).toBe(507)
     expect(D.t.content_bank.length).toBe(n)
+  })
+  it('journal : appels réussis, clé mal copiée (rattachée à son espace), page web, sans clé', async () => {
+    const LOG = D.t.sf_api_log
+    await call(v1, { path: 'folders', auth: 'Bearer ' + TOKEN_A, headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1', 'user-agent': 'crm/1.0' } })
+    expect(LOG.at(-1)).toMatchObject({ space_org: ORG_A, status: 200, route: 'folders', method: 'GET', ip: '203.0.113.9', ua: 'crm/1.0', error: null })
+    const typo = TOKEN_A.slice(0, -4) + 'ffff'
+    const r = await call(v1, { path: 'files', auth: 'Bearer ' + typo })
+    expect(r.status).toBe(401)
+    expect(r.body.error).toMatch(/mal copiée/)
+    expect(LOG.at(-1)).toMatchObject({ space_org: ORG_A, owner_id: USER, status: 401 })
+    await call(v1, { method: 'OPTIONS', path: 'folders', headers: { origin: 'https://crm.staff.example' } })
+    expect(LOG.at(-1)).toMatchObject({ status: 204, origin: 'https://crm.staff.example', owner_id: null })
+    expect(LOG.at(-1).error).toMatch(/page web/)
+    const none = await call(v1, { path: 'folders' })
+    expect(none.body.error).toMatch(/clé absente/)
+    expect(LOG.at(-1)).toMatchObject({ status: 401, owner_id: null })
   })
   it('documentation HTML sans clé', async () => {
     const d = await call(v1, { path: 'docs' })

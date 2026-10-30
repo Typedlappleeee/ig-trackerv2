@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { Btn, Chip, FIELD, MONO, Modal, Panel, PanelHead, Skeleton, toast, confirmDialog } from '@/lib/ui'
-import { API_BASE, DOCS_URL, LINK_SQL, createToken, forgetPartner, getPartner, isMissingSql, listTokens, revokeToken, savePartner, testPartner, type ApiToken, type Partner } from '@/lib/scaleflowLink'
+import { API_BASE, DOCS_URL, LINK_SQL, LOG_SQL, listApiLog, type ApiLogRow, createToken, forgetPartner, getPartner, isMissingSql, listTokens, revokeToken, savePartner, testPartner, type ApiToken, type Partner } from '@/lib/scaleflowLink'
 
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
 async function copy(text: string) {
@@ -93,6 +93,8 @@ export default function LinkApiPanel({ theme, org, canManage }: { theme: Theme; 
         </div>
       </Panel>
 
+      {canManage && <ApiActivity theme={theme} orgId={orgId} />}
+
       <Panel theme={theme}>
         <PanelHead title="Site partenaire" sub="Sa banque apparaît dans Banque › bouton du partenaire, et tu peux y envoyer tes vidéos." right={partner === undefined ? undefined : <Chip text={partner ? `✓ ${partner.name}` : 'Non relié'} tone={partner ? 'ok' : 'mute'} />} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16 }}>
@@ -125,5 +127,47 @@ export default function LinkApiPanel({ theme, org, canManage }: { theme: Theme; 
         </Modal>
       )}
     </>
+  )
+}
+
+// Journal des appels reçus par TON API (60 derniers, 7 jours) : pour voir si un site t'appelle bien
+// et pourquoi un appel est refusé (clé mal copiée, appel depuis une page web…). Actualisé toutes les 10 s.
+function ApiActivity({ theme, orgId }: { theme: Theme; orgId: string | null }) {
+  const [rows, setRows] = useState<ApiLogRow[] | null>(null)
+  const [missing, setMissing] = useState(false)
+  const load = useCallback(async () => {
+    try { setRows(await listApiLog(orgId)); setMissing(false) }
+    catch (e) { if (isMissingSql(e)) setMissing(true); setRows([]) }
+  }, [orgId])
+  useEffect(() => {
+    void load()
+    const t = setInterval(() => { if (document.visibilityState === 'visible') void load() }, 10_000)
+    return () => clearInterval(t)
+  }, [load])
+  const tone = (r: ApiLogRow) => r.status >= 200 && r.status < 300 ? '#4ADE80' : r.status === 204 ? '#FBBF24' : '#F87171'
+  const when = (s: string) => new Date(s).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const okN = (rows ?? []).filter(r => r.status >= 200 && r.status < 300).length
+  return (
+    <Panel theme={theme}>
+      <PanelHead title="Activité de l’API" sub="Les derniers appels reçus par ton API : tu vois si l’autre site t’appelle, et pourquoi un appel est refusé." right={<Btn theme={theme} sm label="Actualiser" onClick={() => void load()} />} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 16 }}>
+        {missing ? <span style={{ fontSize: 12.5, color: '#FBBF24' }}>⚠ Colle le SQL <span style={{ fontFamily: MONO }}>{LOG_SQL}</span> dans Supabase → SQL Editor pour activer le journal.</span>
+          : rows === null ? <Skeleton h={28} r={6} />
+          : !rows.length ? <span style={{ fontSize: 12.5, color: '#A1A1AA', lineHeight: 1.5 }}>Aucun appel reçu pour l’instant : l’autre site n’appelle pas encore ton API (ou pas avec une de tes clés).</span>
+          : <>
+            <span style={{ fontSize: 12, color: '#8B8B94' }}>{`${rows.length} appel(s) récent(s) · ${okN} réussi(s)`}</span>
+            {rows.map((r, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', padding: '7px 10px', borderRadius: 8, background: '#121214', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12.5 }}>
+                <span style={{ fontFamily: MONO, fontSize: 11.5, color: '#71717A' }}>{when(r.at)}</span>
+                <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: tone(r) }}>{r.status}</span>
+                <span data-no-tr style={{ fontFamily: MONO, fontSize: 12, color: '#EDEDEF' }}>{`${r.method} /${r.route}`}</span>
+                {!r.attached && <Chip text="sans clé reconnue" tone="mute" />}
+                {r.origin && <span style={{ fontSize: 12, color: '#FBBF24' }}>depuis une page web : <span data-no-tr>{r.origin}</span> — doit passer par leur serveur</span>}
+                {r.error && <span data-no-tr style={{ flexBasis: '100%', fontSize: 12, color: '#FCA5A5' }}>{r.error}</span>}
+              </div>
+            ))}
+          </>}
+      </div>
+    </Panel>
   )
 }
