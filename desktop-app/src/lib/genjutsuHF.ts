@@ -218,8 +218,8 @@ export async function listModels(account: string): Promise<HfModel[]> {
 }
 
 async function shrinkImage(b: Blob): Promise<Blob> {
-  // le relais refuse plus de 4,5 Mo et l'image voyage en base64 (+33 %) → ≤ 2,5 Mo
-  if (b.size <= 2.5e6) return b
+  // Toujours ré-encodée en VRAI JPEG (≤ 2048 px, ≤ 2,5 Mo) : une photo d'iPhone (HEIC/PNG/WebP)
+  // annoncée « image/jpeg » faisait refuser le dépôt chez Higgsfield (HTTP 403).
   try {
     const bmp = await createImageBitmap(b)
     let max = 2048, q = 0.9, out: Blob | null = null
@@ -231,8 +231,9 @@ async function shrinkImage(b: Blob): Promise<Blob> {
       out = await new Promise<Blob | null>(r => c.toBlob(r, 'image/jpeg', q))
       max = Math.round(max * 0.8); q = Math.max(0.7, q - 0.05)
     } while (out && out.size > 2.5e6 && max > 700)
-    return out ?? b
-  } catch { return b }
+    if (!out) throw new Error('photo illisible : enregistre-la en JPG puis réessaie')
+    return out
+  } catch (e) { if (e instanceof Error && /photo illisible/.test(e.message)) throw e; throw new Error('photo illisible (format non pris en charge) : enregistre-la en JPG puis réessaie') }
 }
 const toBase64 = (b: Blob) => new Promise<string>((ok, ko) => {
   const f = new FileReader()
@@ -240,13 +241,26 @@ const toBase64 = (b: Blob) => new Promise<string>((ok, ko) => {
   f.onerror = () => ko(new Error('photo illisible'))
   f.readAsDataURL(b)
 })
+// Supprimer une modèle : suppression de l'Element chez Higgsfield si le serveur l'accepte,
+// sinon elle est masquée dans ScaleFlow (sur ce navigateur). Rend 'deleted' | 'hidden'.
+const HIDDEN_KEY = 'sf-gj-hidden'
+export const hiddenModels = (): string[] => readJson<string[]>(HIDDEN_KEY, [])
+export async function deleteModel(account: string, id: string): Promise<'deleted' | 'hidden'> {
+  try {
+    const r = await tool<Any>(account, 'show_reference_elements', { action: 'delete', id })
+    if (!/error|unknown|invalid|not (allowed|supported)/i.test(JSON.stringify(r ?? ''))) return 'deleted'
+  } catch { /* action non prise en charge → masquée */ }
+  writeJson(HIDDEN_KEY, [...new Set([...hiddenModels(), id])])
+  return 'hidden'
+}
+
 // Nouvelle modèle = un Element « character » Higgsfield (1 à 4 photos du visage).
 export async function createModel(account: string, name: string, photos: Blob[]): Promise<void> {
   const medias: { id: string; url: string; type: string }[] = []
   for (const p of photos.slice(0, 4)) {
     const img = await shrinkImage(p)
     const r = await relay<{ media_id?: string; url?: string }>({
-      a: 'televerser', compte: account, nom: 'element.jpg', type: img.type === 'image/png' ? 'image/png' : 'image/jpeg', donnees: await toBase64(img),
+      a: 'televerser', compte: account, nom: 'element.jpg', type: 'image/jpeg', donnees: await toBase64(img),
     })
     if (!r.media_id || !r.url) throw new Error('Higgsfield n’a pas pris la photo')
     medias.push({ id: r.media_id, url: r.url, type: 'media_input' })

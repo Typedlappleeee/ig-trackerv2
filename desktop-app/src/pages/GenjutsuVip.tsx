@@ -18,7 +18,7 @@ import { IS_WEB } from '@/lib/platform'
 import { SPOOF_DEVICES, GPS_CITIES } from '@/lib/studioTools'
 import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setModelFolder, type BankScope } from '@/lib/bankFolders'
 import {
-  MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, readPromptPresets,
+  MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, deleteModel, hiddenModels, readPromptPresets,
   startAccountLogin, finishAccountLogin, removeAccount, needsReconnect,
   buildPrompt, parseLinks, resolveVideo, cachedSource, isInstagram, enqueue, retryJob, removeJob, clearFinished, respoof,
   getJobs, subscribeJobs, isActive, pump, type HfAccount, type HfModel, type PromptOpts, type GjJob, type SpoofPlan,
@@ -144,7 +144,8 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     if (!account) return
     if (!quiet) { setModels(null); setModelsErr(null) }
     try {
-      const l = await listModels(account)
+      const hidden = new Set(hiddenModels())
+      const l = (await listModels(account)).filter(m => !hidden.has(m.id))
       setModels(l)
       setPickedState(p => p.filter(id => l.some(m => m.id === id)))
     } catch (e) {
@@ -397,6 +398,17 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                     <span data-no-tr style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,.85))', color: '#fff', fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</span>
                     {pos >= 0 && <span style={{ position: 'absolute', top: 5, right: 5, width: 20, height: 20, borderRadius: 99, background: ACCENT, color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center' }}>{pos + 1}</span>}
                     {!m.ready && <span style={{ position: 'absolute', top: 5, left: 5, fontSize: 10, color: WARN }}>…</span>}
+                    <span role="button" title="Supprimer cette modèle" className="gj-del"
+                      onClick={async e => {
+                        e.stopPropagation()
+                        if (!await confirmDialog({ title: `Supprimer « ${m.name} » ?`, text: 'Elle disparaît de la liste des modèles. Les vidéos déjà faites restent dans la Banque.', confirmLabel: 'Supprimer', danger: true })) return
+                        const r = await deleteModel(account, m.id)
+                        setModels(l => (l ?? []).filter(x => x.id !== m.id)); setPicked(picked.filter(x => x !== m.id))
+                        toast(r === 'deleted' ? `« ${m.name} » supprimée` : `« ${m.name} » masquée dans ScaleFlow`, 'ok')
+                      }}
+                      style={{ position: 'absolute', top: 5, left: 5, width: 20, height: 20, borderRadius: 99, background: 'rgba(0,0,0,.65)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+                      <Icon d="M18 6L6 18|M6 6l12 12" size={10} />
+                    </span>
                   </button>
                 )
               })}

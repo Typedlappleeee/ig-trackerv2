@@ -3408,6 +3408,10 @@ export const EN: Dict = {
     "Le générateur refuse cette clé : ce n’est pas son mot de passe actuel.": "The generator refuses this key: it is not its current password.",
     "← Toutes": "← All",
     "Tout choisir": "Pick all",
+    "photo illisible : enregistre-la en JPG puis réessaie": "unreadable photo: save it as JPG and try again",
+    "photo illisible (format non pris en charge) : enregistre-la en JPG puis réessaie": "unreadable photo (unsupported format): save it as JPG and try again",
+    "Supprimer cette modèle": "Delete this model",
+    "Elle disparaît de la liste des modèles. Les vidéos déjà faites restent dans la Banque.": "She disappears from the model list. Videos already made stay in the Bank.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4025,5 +4029,7 @@ export const EN: Dict = {
     ["Retirer « {0} » de ce PC ?", "Remove “{0}” from this PC?"],
     ["Générateur injoignable : {0}", "Generator unreachable: {0}"],
     ["{0} tenues", "{0} outfits"],
+    ["« {0} » supprimée", "“{0}” deleted"],
+    ["« {0} » masquée dans ScaleFlow", "“{0}” hidden in ScaleFlow"],
   ],
 }
