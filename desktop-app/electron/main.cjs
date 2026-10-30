@@ -1,8 +1,9 @@
 // Process principal Electron — ouvre l'app sur la page de connexion.
 // webSecurity:false : le runtime du prototype (support.js) charge le contenu .dc.html
 // via fetch ; en file:// il faut lever la restriction CORS locale.
-const { app, BrowserWindow, shell } = require('electron')
+const { app, BrowserWindow, shell, ipcMain } = require('electron')
 const path = require('path')
+const { registerHiggsfield } = require('./higgsfield.cjs')
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -17,6 +18,7 @@ function createWindow() {
     webPreferences: {
       webSecurity: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.cjs'),
     },
   })
   // On démarre sur la page de connexion.
@@ -30,6 +32,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  registerHiggsfield(ipcMain)
   createWindow()
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })

@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-10-30d',
+    date: '2026-10-30',
+    title: { fr: '🔐 Higgsfield sur ce PC (appli PC)', en: '🔐 Higgsfield on this PC (desktop app)' },
+    items: {
+      fr: [
+        'Genjutsu › « Sur ce PC » : connecte chaque compte Higgsfield une fois dans la vraie page Higgsfield (email, mot de passe, code 2FA) ; la session reste sur ton PC, ScaleFlow ne voit aucun identifiant.',
+        '« Calibrer » : enregistre les appels du site pendant une génération faite à la main (sans jetons) pour brancher la génération en local.',
+      ],
+      en: [
+        'Genjutsu › “On this PC”: sign in each Higgsfield account once on the real Higgsfield page (email, password, 2FA code); the session stays on your PC, ScaleFlow never sees any credentials.',
+        '“Calibrate”: records the site’s calls during a generation made by hand (no tokens) to wire local generation.',
+      ],
+    },
+  },
+  {
     id: '2026-10-30c',
     date: '2026-10-30',
     title: { fr: '📁 Sous-dossiers dans la Banque · Genjutsu : un dossier par modèle', en: '📁 Subfolders in the Bank · Genjutsu: one folder per model' },
