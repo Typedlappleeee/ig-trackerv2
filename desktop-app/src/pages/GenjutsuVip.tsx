@@ -132,11 +132,16 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [picked, setPickedState] = useState<string[]>([])
   // mini-dossiers : les tenues d'une même modèle (« Zoe1 », « Zoe 2 »…) sont rangées sous « Zoe »
   const [openGroup, setOpenGroup] = useState<string | null>(null)
+  // rangement à la main (glisser une modèle sur un dossier / une autre modèle) : gardé sur ce navigateur
+  const [manual, setManualState] = useState<Record<string, string>>(() => readJson('sf-gj-groups', {}))
+  const moveTo = (id: string, group: string) => setManualState(g => { const n = { ...g, [id]: group }; writeJson('sf-gj-groups', n); return n })
+  const [dragOver, setDragOver] = useState<string | null>(null)
+  const autoGroup = (name: string) => name.replace(/[\s_.-]*\d+$/, '').trim() || name
   const groups = useMemo(() => {
     const m = new Map<string, HfModel[]>()
-    for (const x of models ?? []) { const k = x.name.replace(/[\s_.-]*\d+$/, '').trim() || x.name; m.set(k, [...(m.get(k) ?? []), x]) }
+    for (const x of models ?? []) { const k = manual[x.id] ?? autoGroup(x.name); m.set(k, [...(m.get(k) ?? []), x]) }
     return [...m.entries()].map(([name, items]) => ({ name, items }))
-  }, [models])
+  }, [models, manual])
   const shownGroup = openGroup ? groups.find(g => g.name === openGroup && g.items.length > 1) ?? null : null
   const [creating, setCreating] = useState(false)
   const setPicked = (ids: string[]) => { setPickedState(ids); writeJson(`${PICK_KEY}:${account}`, ids) }
@@ -361,7 +366,10 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
               {models === null && Array.from({ length: 4 }, (_, i) => <div key={i} style={{ aspectRatio: '3 / 4', borderRadius: 10, background: '#18181B', animation: 'pulse 1.4s ease-in-out infinite' }} />)}
               {shownGroup && (
                 <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button type="button" onClick={() => setOpenGroup(null)} style={{ ...ghostBtn, height: 28, padding: '0 10px' }}>← Toutes</button>
+                  <button type="button" onClick={() => setOpenGroup(null)} title="Dépose une modèle ici pour la sortir du dossier"
+                    onDragOver={e => { e.preventDefault(); setDragOver('__out') }} onDragLeave={() => setDragOver(null)}
+                    onDrop={e => { e.preventDefault(); setDragOver(null); const id = e.dataTransfer.getData('text/gj-model'); if (id) moveTo(id, `__solo:${id}`) }}
+                    style={{ ...ghostBtn, height: 28, padding: '0 10px', outline: dragOver === '__out' ? `1px dashed ${ACCENT}` : 'none' }}>← Toutes</button>
                   <span data-no-tr style={{ fontSize: 13, fontWeight: 700, color: INK }}>{shownGroup.name}</span>
                   <span style={{ fontSize: 12, color: MUTED }}>{`${shownGroup.items.length} tenues`}</span>
                   {(() => {
@@ -374,7 +382,9 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                 const n = g.items.filter(x => picked.includes(x.id)).length
                 return (
                   <button key={`g:${g.name}`} type="button" onClick={() => setOpenGroup(g.name)} title={`${g.items.length} tenues`}
-                    style={{ position: 'relative', padding: 0, border: `2px solid ${n ? ACCENT : 'transparent'}`, borderRadius: 11, background: '#18181B', cursor: 'pointer', overflow: 'hidden', textAlign: 'left', boxShadow: '4px 4px 0 -1px #222226, 8px 8px 0 -2px #19191C' }}>
+                    onDragOver={e => { e.preventDefault(); setDragOver(`g:${g.name}`) }} onDragLeave={() => setDragOver(null)}
+                    onDrop={e => { e.preventDefault(); setDragOver(null); const id = e.dataTransfer.getData('text/gj-model'); if (id) moveTo(id, g.name) }}
+                    style={{ position: 'relative', padding: 0, border: `2px solid ${dragOver === `g:${g.name}` ? '#FFFFFF' : n ? ACCENT : 'transparent'}`, transform: dragOver === `g:${g.name}` ? 'scale(1.04)' : 'none', transition: 'transform .12s', borderRadius: 11, background: '#18181B', cursor: 'pointer', overflow: 'hidden', textAlign: 'left', boxShadow: '4px 4px 0 -1px #222226, 8px 8px 0 -2px #19191C' }}>
                     <div style={{ aspectRatio: '3 / 4', background: '#0D0D0F' }}>
                       {g.items[0].photo && <img src={g.items[0].photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
                     </div>
@@ -390,6 +400,14 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                 const pos = picked.indexOf(m.id)
                 return (
                   <button key={m.id} type="button" disabled={!m.ready} onClick={() => setPicked(pos >= 0 ? picked.filter(x => x !== m.id) : [...picked, m.id])}
+                    draggable onDragStart={e => { e.dataTransfer.setData('text/gj-model', m.id); e.dataTransfer.effectAllowed = 'move' }}
+                    onDragOver={e => { if (!shownGroup) { e.preventDefault(); setDragOver(m.id) } }} onDragLeave={() => setDragOver(null)}
+                    onDrop={e => {
+                      e.preventDefault(); setDragOver(null)
+                      const id = e.dataTransfer.getData('text/gj-model'); if (!id || id === m.id || shownGroup) return
+                      const name = autoGroup(m.name)
+                      moveTo(m.id, name); moveTo(id, name)
+                    }}
                     title={m.ready ? m.name : 'En préparation chez Higgsfield…'}
                     style={{ position: 'relative', padding: 0, border: `2px solid ${pos >= 0 ? ACCENT : 'transparent'}`, borderRadius: 11, background: '#18181B', cursor: m.ready ? 'pointer' : 'wait', overflow: 'hidden', textAlign: 'left', opacity: m.ready ? 1 : 0.55 }}>
                     <div style={{ aspectRatio: '3 / 4', background: '#0D0D0F' }}>

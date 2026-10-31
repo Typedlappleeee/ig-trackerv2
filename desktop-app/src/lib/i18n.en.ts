@@ -3412,6 +3412,7 @@ export const EN: Dict = {
     "photo illisible (format non pris en charge) : enregistre-la en JPG puis réessaie": "unreadable photo (unsupported format): save it as JPG and try again",
     "Supprimer cette modèle": "Delete this model",
     "Elle disparaît de la liste des modèles. Les vidéos déjà faites restent dans la Banque.": "She disappears from the model list. Videos already made stay in the Bank.",
+    "Dépose une modèle ici pour la sortir du dossier": "Drop a model here to take it out of the folder",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

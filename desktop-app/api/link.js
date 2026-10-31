@@ -30,6 +30,7 @@ async function partnerCall(p, path, { method = 'GET', body, timeout = 25_000 } =
   }
   let j = null
   try { j = await resp.json() } catch { /* pas du JSON */ }
+  if (resp.ok && !j) throw httpError(502, 'partner_not_api', `site partenaire : l’adresse enregistrée (${base}${path}) renvoie une page web, pas son API. Vérifie l’adresse de l’API dans Réglages › Intégrations (elle se termine en général par /api/scaleflow).`)
   if (!resp.ok || !j || j.ok === false) throw httpError(502, 'partner_error', `site partenaire : ${j?.error || `HTTP ${resp.status}`}`)
   return j
 }
