@@ -3422,6 +3422,7 @@ export const EN: Dict = {
     "Plus remplis": "Fullest",
     "Voir en grand": "View large",
     "✓ Choisie": "✓ Picked",
+    "Higgsfield est saturé en ce moment (erreur 502 de leur côté). Réessaie avec « Relancer » dans quelques minutes.": "Higgsfield is overloaded right now (502 error on their side). Try again with “Retry” in a few minutes.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

@@ -485,19 +485,32 @@ export function pump(): void {
 }
 
 let noRatio = false
+const TRANSIENT = /HTTP (429|5\d\d)|Bad gateway|rate.?limit|too many|busy|overload|temporar|try again|unavailable|n’a pas répondu à temps/i
+// Une étape sans coût (import, lecture) qui tombe sur une saturation de Higgsfield : réessayée
+// jusqu'à 4 fois (5 s, 10 s, 20 s).
+async function patient<T>(fn: () => Promise<T>): Promise<T> {
+  for (let k = 0; ; k++) {
+    try { return await fn() } catch (e) { if (k >= 3 || !TRANSIENT.test(errMsg(e))) throw e; await sleep(5000 * 2 ** k) }
+  }
+}
+// Message lisible quand Higgsfield est saturé (erreur 5xx de leur côté).
+const friendly = (e: unknown) => /HTTP 5\d\d|Bad gateway|overlo/i.test(errMsg(e))
+  ? 'Higgsfield est saturé en ce moment (erreur 502 de leur côté). Réessaie avec « Relancer » dans quelques minutes.'
+  : errMsg(e)
+
 async function generate(account: string, params: Record<string, unknown>): Promise<Any> {
   let last: unknown = null
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0; k < 4; k++) {
     try {
       const r = await tool<Any>(account, 'generate_video', { params, context: 'Transférer le mouvement d’une vidéo sur la personne de l’image de référence.' })
       const txt = JSON.stringify(r ?? {})
       // saturation passagère sans rien de créé → nouvel essai
-      if (!UUID.test(txt) && /rate.?limit|too many|busy|overload|temporar|try again|unavailable|timeout/i.test(txt) && k < 2) { await sleep(2500 * (k + 1)); continue }
+      if (!UUID.test(txt) && /rate.?limit|too many|busy|overload|temporar|try again|unavailable|timeout/i.test(txt) && k < 3) { await sleep(5000 * 2 ** k); continue }
       return r
     } catch (e) {
       last = e
-      if (k >= 2 || !/HTTP (429|5\d\d)|rate.?limit|too many|busy|overload|temporar|try again|unavailable/i.test(errMsg(e))) throw e
-      await sleep(2500 * (k + 1))
+      if (k >= 3 || !TRANSIENT.test(errMsg(e))) throw e
+      await sleep(5000 * 2 ** k)
     }
   }
   throw last
@@ -510,7 +523,7 @@ async function launch(id: string): Promise<void> {
   try {
     const src = await resolveVideo(j0.source)
     patch(id, { sourceUrl: src.url, sourceUser: src.user })
-    const vid = await importVideo(j0.account, src.url)
+    const vid = await patient(() => importVideo(j0.account, src.url))
     const params: Record<string, unknown> = {
       model: 'hf_mult_motion_control', resolution: j0.res, use_unlim: false, ...(noRatio ? {} : { aspect_ratio: '9:16' }),
       medias: [{ value: vid, role: 'video_references' }, { value: j0.model.mediaId, role: 'image_references' }],
@@ -528,7 +541,7 @@ async function launch(id: string): Promise<void> {
     if (!hfJobId) { patch(id, { status: 'failed', error: reasonIn(r) || 'Higgsfield n’a lancé aucune génération.' }); return }
     patch(id, { status: 'running', hfJobId: String(hfJobId) })
   } catch (e) {
-    patch(id, { status: 'failed', error: errMsg(e) })
+    patch(id, { status: 'failed', error: friendly(e) })
   } finally { pump() }
 }
 
