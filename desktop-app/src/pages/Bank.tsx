@@ -343,17 +343,23 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // Items du type actif.
   const typed = useMemo(() => items.filter(i => inferType(i) === tab), [items, tab])
 
+  // Tri des dossiers (nom, plus remplis, plus récents) — mémorisé dans ce navigateur.
+  const [folderSort, setFolderSortState] = useState<'name' | 'count' | 'recent'>(() => { try { return (localStorage.getItem('sf-bank-fsort') as 'name' | 'count' | 'recent') || 'name' } catch { return 'name' } })
+  const setFolderSort = (v: 'name' | 'count' | 'recent') => { setFolderSortState(v); try { localStorage.setItem('sf-bank-fsort', v) } catch { /* ignore */ } }
   // Dossiers en ARBORESCENCE (chemins « Parent/Enfant », + dossiers vides sentinelles) ;
   // le compte d'un dossier inclut ses sous-dossiers (ouvrir « Genjutsu » montre tout Genjutsu).
   const folders = useMemo(() => {
-    const tree = folderTree([...typed.map(i => i.folder), ...folderNames])
     const countIn = (f: string) => typed.filter(i => isWithin(i.folder, f)).length
+    const lastIn = (f: string) => typed.reduce((m, i) => isWithin(i.folder, f) && i.created_at > m ? i.created_at : m, '')
+    const cmp = folderSort === 'count' ? (a: string, b: string) => countIn(b) - countIn(a)
+      : folderSort === 'recent' ? (a: string, b: string) => lastIn(b).localeCompare(lastIn(a)) : undefined
+    const tree = folderTree([...typed.map(i => i.folder), ...folderNames], cmp)
     return [
       { n: 'Tous', label: 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
       ...tree.map(t => ({ n: t.path, label: t.name, c: countIn(t.path), special: false, depth: t.depth, hasChildren: t.hasChildren })),
       { n: 'Jamais publiées', label: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true, depth: 0, hasChildren: false },
     ]
-  }, [typed, folderNames])
+  }, [typed, folderNames, folderSort])
   // Dossiers repliés (mémorisés dans ce navigateur) : leurs sous-dossiers sont masqués.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('sf-bank-collapsed') || '[]') as string[]) } catch { return new Set() } })
   const toggleCollapsed = (p: string) => setCollapsed(c => {
@@ -890,6 +896,18 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       await scopeQ(supabase.from('content_bank').update({ folder: renamedPath(raw, oldName, newRoot) }).eq('folder', raw))
     setFolderMenu(null); if (isWithin(folder, oldName)) setFolder(renamedPath(folder, oldName, newRoot)); load()
   }
+  // Glisser un dossier sur un autre : il devient son sous-dossier (sur « Tous » : dossier principal).
+  async function moveFolderInto(src: string, target: string | null) {
+    if (target && isWithin(target, src)) { toast('Impossible : un dossier ne peut pas aller dans son propre sous-dossier.', 'bad'); return }
+    const newRoot = joinPath(target, leafOf(src))
+    if (newRoot === src) return
+    if (folders.some(f => f.n === newRoot)) { toast(`« ${newRoot.split('/').join(' › ')} » existe déjà.`, 'bad'); return }
+    for (const raw of rawFoldersWithin(src))
+      await scopeQ(supabase.from('content_bank').update({ folder: renamedPath(raw, src, newRoot) }).eq('folder', raw))
+    if (isWithin(folder, src)) setFolder(renamedPath(folder, src, newRoot))
+    if (target && collapsed.has(target)) toggleCollapsed(target)
+    toast(`Dossier déplacé dans « ${target ? target.split('/').join(' › ') : 'Dossiers'} »`, 'ok'); load()
+  }
   async function deleteFolder(name: string) {
     // Ses médias (et ceux de ses sous-dossiers) remontent dans le dossier parent — ou sans dossier.
     const parent = parentOf(name)
@@ -1301,6 +1319,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             borderBottom: '1px solid rgba(255,255,255,0.06)',
           }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: '#F4F4F5', letterSpacing: '-0.02em' }}>Dossiers</span>
+            <select value={folderSort} onChange={e => setFolderSort(e.target.value as 'name' | 'count' | 'recent')} title="Trier les dossiers"
+              style={{ height: 26, padding: '0 4px', borderRadius: 6, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#A1A1AA', fontSize: 11.5, cursor: 'pointer' }}>
+              <option value="name" style={{ background: '#161618' }}>A → Z</option>
+              <option value="count" style={{ background: '#161618' }}>Plus remplis</option>
+              <option value="recent" style={{ background: '#161618' }}>Récents</option>
+            </select>
             <span style={{ marginLeft: 'auto' }}>
               <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Nouveau dossier" onClick={() => openNewFolder(isRealFolder(folder) ? folder : null)} />
             </span>
@@ -1314,9 +1338,16 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   title={f.n}
                   onClick={() => setFolder(f.n)}
                   onContextMenu={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setFolderCtx({ x: e.clientX, y: e.clientY, name: f.n }) } }}
-                  onDragOver={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setDragOver(f.n) } }}
+                  draggable={f.n !== 'Tous' && !f.special}
+                  onDragStart={e => { if (f.n !== 'Tous' && !f.special) { e.dataTransfer.setData('text/sf-folder', f.n); e.dataTransfer.effectAllowed = 'move' } }}
+                  onDragOver={e => { if (f.n !== 'Jamais publiées' && (f.n !== 'Tous' || e.dataTransfer.types.includes('text/sf-folder'))) { e.preventDefault(); setDragOver(f.n) } }}
                   onDragLeave={() => setDragOver(d => d === f.n ? null : d)}
-                  onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDragOver(null); if (id) dropOnFolder(f.n, id) }}
+                  onDrop={e => {
+                    e.preventDefault(); setDragOver(null)
+                    const dir = e.dataTransfer.getData('text/sf-folder')
+                    if (dir) { void moveFolderInto(dir, f.n === 'Tous' ? null : f.n); return }
+                    const id = e.dataTransfer.getData('text/plain'); if (id) dropOnFolder(f.n, id)
+                  }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 36, padding: `0 12px 0 ${6 + f.depth * 16}px`, borderRadius: 10,
                     border: 'none', cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box',

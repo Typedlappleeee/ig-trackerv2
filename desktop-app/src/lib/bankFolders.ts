@@ -26,7 +26,7 @@ export const renamedPath = (path: string, oldRoot: string, newRoot: string) => {
 
 export interface FolderNode { path: string; name: string; depth: number; hasChildren: boolean }
 // Tous les chemins (et leurs parents implicites) en ordre d'arborescence, frères triés par nom.
-export function folderTree(paths: Iterable<string | null | undefined>): FolderNode[] {
+export function folderTree(paths: Iterable<string | null | undefined>, cmp?: (a: string, b: string) => number): FolderNode[] {
   const all = new Set<string>()
   for (const raw of paths) {
     if (!raw) continue
@@ -41,7 +41,8 @@ export function folderTree(paths: Iterable<string | null | undefined>): FolderNo
   }
   const out: FolderNode[] = []
   const walk = (par: string | null, depth: number) => {
-    const l = (kids.get(par) ?? []).sort((a, b) => leafOf(a).localeCompare(leafOf(b), 'fr', { sensitivity: 'base', numeric: true }))
+    const byName = (a: string, b: string) => leafOf(a).localeCompare(leafOf(b), 'fr', { sensitivity: 'base', numeric: true })
+    const l = (kids.get(par) ?? []).sort((a, b) => (cmp ? cmp(a, b) : 0) || byName(a, b))
     for (const p of l) {
       out.push({ path: p, name: leafOf(p), depth, hasChildren: kids.has(p) })
       walk(p, depth + 1)

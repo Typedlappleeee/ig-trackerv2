@@ -3417,6 +3417,9 @@ export const EN: Dict = {
     "Colle des liens de reels (un par ligne) ou importe des vidéos depuis ton PC.": "Paste reel links (one per line) or import videos from your PC.",
     "envoi…": "uploading…",
     "Glisse ou choisis des vidéos depuis ton PC": "Drop or choose videos from your PC",
+    "Impossible : un dossier ne peut pas aller dans son propre sous-dossier.": "Not possible: a folder cannot go into its own subfolder.",
+    "Trier les dossiers": "Sort folders",
+    "Plus remplis": "Fullest",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4037,5 +4040,7 @@ export const EN: Dict = {
     ["« {0} » supprimée", "“{0}” deleted"],
     ["« {0} » masquée dans ScaleFlow", "“{0}” hidden in ScaleFlow"],
     ["envoi refusé (HTTP {0})", "upload refused (HTTP {0})"],
+    ["« {0} » existe déjà.", "“{0}” already exists."],
+    ["Dossier déplacé dans « {0} »", "Folder moved into “{0}”"],
   ],
 }

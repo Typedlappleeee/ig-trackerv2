@@ -399,7 +399,13 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                 return (
                   <button key={`g:${g.name}`} type="button" onClick={() => setOpenGroup(g.name)} title={`${g.items.length} tenues`}
                     onDragOver={e => { e.preventDefault(); setDragOver(`g:${g.name}`) }} onDragLeave={() => setDragOver(null)}
-                    onDrop={e => { e.preventDefault(); setDragOver(null); const id = e.dataTransfer.getData('text/gj-model'); if (id) moveTo(id, g.name) }}
+                    draggable onDragStart={e => { e.dataTransfer.setData('text/gj-group', g.name); e.dataTransfer.effectAllowed = 'move' }}
+                    onDrop={e => {
+                      e.preventDefault(); setDragOver(null)
+                      const from = e.dataTransfer.getData('text/gj-group')
+                      if (from && from !== g.name) { for (const x of groups.find(z => z.name === from)?.items ?? []) moveTo(x.id, g.name); return }
+                      const id = e.dataTransfer.getData('text/gj-model'); if (id) moveTo(id, g.name)
+                    }}
                     style={{ position: 'relative', padding: 0, border: `2px solid ${dragOver === `g:${g.name}` ? '#FFFFFF' : n ? ACCENT : 'transparent'}`, transform: dragOver === `g:${g.name}` ? 'scale(1.04)' : 'none', transition: 'transform .12s', borderRadius: 11, background: '#18181B', cursor: 'pointer', overflow: 'hidden', textAlign: 'left', boxShadow: '4px 4px 0 -1px #222226, 8px 8px 0 -2px #19191C' }}>
                     <div style={{ aspectRatio: '3 / 4', background: '#0D0D0F' }}>
                       {g.items[0].photo && <img src={g.items[0].photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
