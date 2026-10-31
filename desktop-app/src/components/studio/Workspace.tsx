@@ -219,8 +219,8 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
                 setPhase(`${v.title} · variante ${k + 1}/${copies}`); setStep(0)
                 const seed = Math.random() * 1000 + 1
                 if (imgTool) await save(`${v.title} · v${k + 1}`, await runImageSpoof(bytes, { seed, ...sOpts }), 'jpg')
-                else if (tool === 'remix') await save(`${v.title} · remix ${k + 1}`, await runRemix(bytes, seed, hooks, { ...sOpts, toggles }))
-                else await save(`${v.title} · spoof ${k + 1}`, await runSpoof(bytes, seed, hooks, sOpts))
+                else if (tool === 'remix') await save(`${v.title} · v${k + 1}`, await runRemix(bytes, seed, hooks, { ...sOpts, toggles }))
+                else await save(`${v.title} · v${k + 1}`, await runSpoof(bytes, seed, hooks, sOpts))
               }
             } else if (tool === 'montage') {
               setPhase(`${v.title} · découpe…`)

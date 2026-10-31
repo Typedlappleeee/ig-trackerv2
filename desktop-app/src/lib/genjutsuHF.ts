@@ -395,6 +395,7 @@ export interface GjJob {
   sourceUrl?: string | null
   sourceUser?: string | null
   label?: string | null           // nom du fichier importé depuis le PC
+  videoNo?: number | null         // numéro de la vidéo pour sa modèle (« Zoe 012 »)
   prompt: string
   res: string
   status: GjStatus
@@ -604,6 +605,33 @@ async function collect(id: string, st?: Any): Promise<void> {
   } finally { collecting.delete(id) }
 }
 
+// Nom des vidéos : « <Modèle> <numéro> » (numéro suivant pour cette modèle dans la Banque de l'espace),
+// puis « · v1, v2… » pour les variantes — une architecture par vidéo : modèle › numéro › variante.
+const lastNo = new Map<string, number>()
+const escRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+export const videoTitle = (model: string, no: number) => `${model} ${String(no).padStart(3, '0')}`
+async function nextVideoNo(model: string, orgId: string | null, userId: string): Promise<number> {
+  const key = `${orgId ?? 'u:' + userId}|${model}`
+  if (!lastNo.has(key)) {
+    let q = supabase.from('content_bank').select('title').ilike('title', `${model} %`).limit(5000)
+    q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId).is('org_id', null)
+    const { data } = await q
+    const re = new RegExp(`^${escRe(model)} (\\d+)`, 'i')
+    let max = 0
+    for (const r of (data ?? []) as { title: string | null }[]) { const m = re.exec(r.title ?? ''); if (m) max = Math.max(max, Number(m[1])) }
+    lastNo.set(key, max)
+  }
+  const n = (lastNo.get(key) ?? 0) + 1
+  lastNo.set(key, n)
+  return n
+}
+async function titleOf(id: string, userId: string): Promise<string> {
+  const j = byId(id)!
+  let no = j.videoNo
+  if (!no) { no = await nextVideoNo(j.model.name, j.spoof?.orgId ?? null, userId); patch(id, { videoNo: no }) }
+  return videoTitle(j.model.name, no)
+}
+
 // Spoof coupé : la vidéo telle quelle, dans le dossier de la modèle.
 async function saveOriginal(id: string): Promise<void> {
   const j = byId(id)
@@ -614,7 +642,7 @@ async function saveOriginal(id: string): Promise<void> {
     if (!session) throw new Error('Session expirée : reconnecte-toi.')
     const r = await fetch(j.resultUrl)
     if (!r.ok) throw new Error(`vidéo indisponible (HTTP ${r.status})`)
-    const bankId = await saveOutputToBank(session.user.id, j.spoof.orgId, new Uint8Array(await r.arrayBuffer()), `Genjutsu ${j.model.name} ${String(j.hfJobId ?? j.id).slice(0, 6)}`, 'mp4', j.spoof.folder)
+    const bankId = await saveOutputToBank(session.user.id, j.spoof.orgId, new Uint8Array(await r.arrayBuffer()), await titleOf(id, session.user.id), 'mp4', j.spoof.folder)
     if (!bankId) throw new Error('enregistrement dans la Banque refusé')
     patch(id, { status: 'done', spoofDone: 1 })
   } catch (e) { patch(id, { status: 'done', spoofFailed: 1, spoofError: errMsg(e) }) }
@@ -628,14 +656,14 @@ async function spoofJob(id: string): Promise<void> {
   patch(id, { status: 'spoofing', spoofDone: 0, spoofFailed: 0, spoofError: null })
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) { patch(id, { status: 'done', spoofError: 'Session expirée : reconnecte-toi puis « Spoofer ».' }); return }
-  const base = `Genjutsu ${j.model.name} ${String(j.hfJobId ?? j.id).slice(0, 6)}`
+  const base = await titleOf(id, session.user.id)
   let done = 0, failed = 0, lastErr: string | null = null
   await Promise.all(Array.from({ length: n }, async (_, i) => {
     try {
       const r = await fetch(`${GJ_ORIGIN}/api/v1/tools/spoof`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ url: j.resultUrl, org_id: plan.orgId, device: plan.device, gps: plan.gps, intensity: 'normal', folder: plan.folder, title: `${base} v${i + 1}` }),
+        body: JSON.stringify({ url: j.resultUrl, org_id: plan.orgId, device: plan.device, gps: plan.gps, intensity: 'normal', folder: plan.folder, title: `${base} · v${i + 1}` }),
       })
       const b = await r.json().catch(() => null) as { ok?: boolean; error?: string } | null
       if (b?.ok) done++
