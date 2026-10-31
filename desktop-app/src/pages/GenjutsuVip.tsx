@@ -18,7 +18,7 @@ import { IS_WEB } from '@/lib/platform'
 import { SPOOF_DEVICES, GPS_CITIES } from '@/lib/studioTools'
 import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setModelFolder, type BankScope } from '@/lib/bankFolders'
 import {
-  MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, deleteModel, hiddenModels, readPromptPresets,
+  MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, deleteModel, uploadLocalVideo, hiddenModels, readPromptPresets,
   startAccountLogin, finishAccountLogin, removeAccount, needsReconnect,
   buildPrompt, parseLinks, resolveVideo, cachedSource, isInstagram, enqueue, retryJob, removeJob, clearFinished, respoof,
   getJobs, subscribeJobs, isActive, pump, type HfAccount, type HfModel, type PromptOpts, type GjJob, type SpoofPlan,
@@ -191,6 +191,20 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
         .finally(() => { checking.current.delete(l); setSrc(s => ({ ...s })) })
     }
   }, [access, links, src])
+  // vidéos importées depuis le PC
+  const [files, setFiles] = useState<{ id: string; name: string; url?: string; error?: string }[]>([])
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [dropping, setDropping] = useState(false)
+  function addFiles(list: FileList | null) {
+    const picked = [...(list ?? [])].filter(f => /^video\//.test(f.type) || /\.(mp4|mov|webm|m4v)$/i.test(f.name))
+    for (const f of picked) {
+      const id = crypto.randomUUID()
+      setFiles(l => [...l, { id, name: f.name }])
+      uploadLocalVideo(f)
+        .then(url => setFiles(l => l.map(x => x.id === id ? { ...x, url } : x)))
+        .catch(e => setFiles(l => l.map(x => x.id === id ? { ...x, error: e instanceof Error ? e.message : String(e) } : x)))
+    }
+  }
   const removeLink = (l: string) => setLinksText(t => t.split('\n').filter(line => !parseLinks(line).includes(l)).join('\n'))
 
   // ── rendu : résolution + prompt ──
@@ -229,20 +243,22 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
 
   // ── lancement ──
   const chosen = (models ?? []).filter(m => picked.includes(m.id) && m.ready && m.mediaId)
-  const usable = links.filter(l => src[l]?.state !== 'error')
+  const fileSources = files.filter(f => f.url).map(f => ({ source: f.url!, label: f.name }))
+  const usable = [...links.filter(l => src[l]?.state !== 'error'), ...fileSources.map(f => f.source)]
+  const labelOf = (source: string) => fileSources.find(f => f.source === source)?.label ?? null
   const total = usable.length * chosen.length
   const blocker = !account ? 'Aucun compte Higgsfield' : !chosen.length ? 'Choisis au moins une modèle' : !usable.length ? 'Colle au moins un lien de reel' : !prompt.trim() ? 'Le prompt est vide' : null
   function launch() {
     if (blocker) return
     enqueue(usable.flatMap(l => chosen.map(m => ({
-      account, source: l, prompt: prompt.trim(), res,
+      account, source: l, label: labelOf(l), prompt: prompt.trim(), res,
       model: { id: m.id, name: m.name, mediaId: m.mediaId!, photo: m.photo },
       spoof: planFor(m),
     }))))
     // le dossier de chaque modèle est créé (et associé) tout de suite : visible dans la Banque
     for (const m of chosen) if (!modelFolders[m.id]) void assignFolder(m, folderOf(m))
     toast(`${total} Genjutsu ajouté${total > 1 ? 's' : ''} à la file`, 'ok')
-    setLinksText(''); setSrc({})
+    setLinksText(''); setSrc({}); setFiles([])
     const acc = account
     setTimeout(() => void refreshCredits(acc), 30_000)
   }
@@ -455,29 +471,28 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             )}
           </Step>
 
-          <Step n={2} title="Les vidéos" sub="Les reels à refaire : colle leurs liens, un par ligne.">
-            <textarea value={linksText} onChange={e => setLinksText(e.target.value)} rows={4} spellCheck={false}
+          <Step n={2} title="Les vidéos" sub="Colle des liens de reels (un par ligne) ou importe des vidéos depuis ton PC.">
+            <textarea value={linksText} onChange={e => setLinksText(e.target.value)} rows={3} spellCheck={false}
               placeholder={'https://www.instagram.com/reel/…\nhttps://www.instagram.com/reel/…'}
-              style={{ ...field, height: 'auto', minHeight: 92, padding: '9px 10px', lineHeight: 1.5, resize: 'vertical', fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }} />
-            {links.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              style={{ ...field, height: 'auto', minHeight: 76, padding: '9px 10px', lineHeight: 1.5, resize: 'vertical', fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }} />
+            {(links.length > 0 || files.length > 0) && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 8 }}>
                 {links.map(l => {
-                  const s = src[l]
-                  const color = s?.state === 'ok' ? OK : s?.state === 'error' ? BAD : MUTED
-                  return (
-                    <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 8, background: '#0D0D0F', border: `1px solid ${EDGE}`, fontSize: 12 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: 99, background: color, flexShrink: 0, animation: s?.state === 'checking' ? 'pulse 1.2s ease-in-out infinite' : undefined }} />
-                      <a href={l} target="_blank" rel="noreferrer" data-no-tr style={{ color: INK, textDecoration: 'none', fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>{isInstagram(l) ? reelLabel(l) : l}</a>
-                      {s?.user && <span data-no-tr style={{ color: MUTED }}>@{s.user}</span>}
-                      <span style={{ marginLeft: 'auto', color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }} title={s?.error}>
-                        {s?.state === 'ok' ? 'prête' : s?.state === 'error' ? s.error : 'vérification…'}
-                      </span>
-                      <button type="button" onClick={() => removeLink(l)} title="Retirer" style={{ background: 'none', border: 'none', color: DIM, cursor: 'pointer', padding: 0, display: 'flex' }}><Icon d="M18 6L6 18|M6 6l12 12" size={12} /></button>
-                    </div>
-                  )
+                  const st = src[l], url = st?.state === 'ok' ? cachedSource(l)?.url : null
+                  return <SourceCard key={l} url={url ?? null} label={st?.user ? `@${st.user}` : reelLabel(l)} href={l}
+                    state={st?.state === 'ok' ? 'ok' : st?.state === 'error' ? 'error' : 'busy'} error={st?.error} onRemove={() => removeLink(l)} />
                 })}
+                {files.map(f => <SourceCard key={f.id} url={f.url ?? null} label={f.name} state={f.error ? 'error' : f.url ? 'ok' : 'busy'} error={f.error}
+                  busyText="envoi…" onRemove={() => setFiles(l => l.filter(x => x.id !== f.id))} />)}
               </div>
             )}
+            <div onClick={() => fileInput.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDropping(true) }} onDragLeave={() => setDropping(false)}
+              onDrop={e => { e.preventDefault(); setDropping(false); addFiles(e.dataTransfer.files) }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 10px', borderRadius: 10, border: `1.5px dashed ${dropping ? ACCENT : FIELD_EDGE}`, background: dropping ? 'rgba(168,85,247,.08)' : 'transparent', color: MUTED, fontSize: 12.5, cursor: 'pointer' }}>
+              <Icon d="M12 16V4|M7 9l5-5 5 5|M4 20h16" size={13} /> Glisse ou choisis des vidéos depuis ton PC
+            </div>
+            <input ref={fileInput} type="file" accept="video/*" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
           </Step>
 
           <Step n={3} title="Le rendu">
@@ -680,7 +695,7 @@ function JobCard({ job: j, now, onRespoof }: { job: GjJob; now: number; onRespoo
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <a href={j.source} target="_blank" rel="noreferrer" data-no-tr title={j.source}
             style={{ fontSize: 11, color: MUTED, textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
-            {j.sourceUser ? `@${j.sourceUser}` : reelLabel(j.source)}
+            {j.sourceUser ? `@${j.sourceUser}` : j.label ?? reelLabel(j.source)}
           </a>
           {done && <IconBtn title="Ouvrir la vidéo" href={j.resultUrl!} d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6|M15 3h6v6|M10 14L21 3" />}
           {canRespoof && <IconBtn title="Spoofer (versions dans la Banque)" onClick={onRespoof} d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />}
@@ -1022,5 +1037,23 @@ function LocalAccounts() {
         Chaque compte se connecte une fois dans la vraie page Higgsfield (code 2FA compris) ; la session reste sur ce PC. Génération en local : en cours de calage — clique « Calibrer », fais UNE génération Motion Control à la main dans la fenêtre, ferme-la, puis envoie le fichier « higgsfield-calibrage-… » de Téléchargements.
       </span>
     </section>
+  )
+}
+
+/* ── aperçu d'une vidéo source (lien ou fichier du PC) ── */
+function SourceCard({ url, label, href, state, error, busyText = 'vérification…', onRemove }: { url: string | null; label: string; href?: string; state: 'ok' | 'busy' | 'error'; error?: string; busyText?: string; onRemove: () => void }) {
+  return (
+    <div style={{ position: 'relative', aspectRatio: '9 / 16', borderRadius: 10, overflow: 'hidden', background: '#0D0D0F', border: `1px solid ${state === 'error' ? 'rgba(252,165,165,.35)' : EDGE}` }}>
+      {url && <video src={`${url}#t=0.5`} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+      {state !== 'ok' && (
+        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 8, textAlign: 'center', fontSize: 11, lineHeight: 1.35, color: state === 'error' ? BAD : MUTED }}>
+          {state === 'error' ? (error ?? 'erreur') : <span style={{ animation: 'pulse 1.2s ease-in-out infinite' }}>{busyText}</span>}
+        </div>
+      )}
+      <button type="button" onClick={onRemove} title="Retirer" style={{ position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 99, border: 'none', background: 'rgba(0,0,0,.65)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer', padding: 0 }}><Icon d="M18 6L6 18|M6 6l12 12" size={10} /></button>
+      {href
+        ? <a href={href} target="_blank" rel="noreferrer" data-no-tr style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,.85))', color: '#fff', fontSize: 10.5, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</a>
+        : <span data-no-tr style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,.85))', color: '#fff', fontSize: 10.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}
+    </div>
   )
 }

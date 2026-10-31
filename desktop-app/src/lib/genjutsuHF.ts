@@ -349,6 +349,18 @@ export function resolveVideo(link: string): Promise<SourceVideo> {
   return p
 }
 
+// Vidéo du PC : déposée dans le stockage du relais (adresse signée, le navigateur envoie le fichier
+// lui-même, sans limite de taille Vercel), puis utilisée comme une vidéo source.
+export async function uploadLocalVideo(file: File): Promise<string> {
+  const type = /^video\//.test(file.type) ? file.type : 'video/mp4'
+  const d = await relay<{ depot?: string; url?: string }>({ a: 'video_depot', type })
+  if (!d.depot || !d.url) throw new Error('dépôt de la vidéo refusé')
+  const put = await fetch(d.depot, { method: 'PUT', headers: { 'content-type': type, 'x-upsert': 'false' }, body: file })
+  if (!put.ok) throw new Error(`envoi refusé (HTTP ${put.status})`)
+  srcCache[d.url] = { url: d.url, user: null, at: Date.now() }
+  return d.url
+}
+
 // La même vidéo n'est importée qu'une fois par compte.
 const imports: Record<string, string> = readJson(IMPORT_KEY, {})
 const importing = new Map<string, Promise<string>>()     // même vidéo × plusieurs modèles : un seul import
@@ -382,6 +394,7 @@ export interface GjJob {
   source: string
   sourceUrl?: string | null
   sourceUser?: string | null
+  label?: string | null           // nom du fichier importé depuis le PC
   prompt: string
   res: string
   status: GjStatus
@@ -425,7 +438,7 @@ const byId = (id: string) => jobs.find(j => j.id === id)
 export const getJobs = () => jobs
 export function subscribeJobs(f: () => void): () => void { subs.add(f); return () => { subs.delete(f) } }
 
-export interface NewJob { account: string; model: GjModelRef; source: string; prompt: string; res: string; spoof: SpoofPlan | null }
+export interface NewJob { account: string; model: GjModelRef; source: string; label?: string | null; prompt: string; res: string; spoof: SpoofPlan | null }
 export function enqueue(items: NewJob[]): void {
   const now = Date.now()
   const fresh: GjJob[] = items.map((it, i) => {

@@ -3413,6 +3413,10 @@ export const EN: Dict = {
     "Supprimer cette modèle": "Delete this model",
     "Elle disparaît de la liste des modèles. Les vidéos déjà faites restent dans la Banque.": "She disappears from the model list. Videos already made stay in the Bank.",
     "Dépose une modèle ici pour la sortir du dossier": "Drop a model here to take it out of the folder",
+    "dépôt de la vidéo refusé": "video upload refused",
+    "Colle des liens de reels (un par ligne) ou importe des vidéos depuis ton PC.": "Paste reel links (one per line) or import videos from your PC.",
+    "envoi…": "uploading…",
+    "Glisse ou choisis des vidéos depuis ton PC": "Drop or choose videos from your PC",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4032,5 +4036,6 @@ export const EN: Dict = {
     ["{0} tenues", "{0} outfits"],
     ["« {0} » supprimée", "“{0}” deleted"],
     ["« {0} » masquée dans ScaleFlow", "“{0}” hidden in ScaleFlow"],
+    ["envoi refusé (HTTP {0})", "upload refused (HTTP {0})"],
   ],
 }
