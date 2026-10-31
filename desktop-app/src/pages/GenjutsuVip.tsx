@@ -132,6 +132,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [picked, setPickedState] = useState<string[]>([])
   // mini-dossiers : les tenues d'une même modèle (« Zoe1 », « Zoe 2 »…) sont rangées sous « Zoe »
   const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const [preview, setPreview] = useState<HfModel | null>(null)
   // rangement à la main (glisser une modèle sur un dossier / une autre modèle) : gardé sur ce navigateur
   const [manual, setManualState] = useState<Record<string, string>>(() => readJson('sf-gj-groups', {}))
   const moveTo = (id: string, group: string) => setManualState(g => { const n = { ...g, [id]: group }; writeJson('sf-gj-groups', n); return n })
@@ -438,6 +439,10 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                     <span data-no-tr style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,.85))', color: '#fff', fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</span>
                     {pos >= 0 && <span style={{ position: 'absolute', top: 5, right: 5, width: 20, height: 20, borderRadius: 99, background: ACCENT, color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center' }}>{pos + 1}</span>}
                     {!m.ready && <span style={{ position: 'absolute', top: 5, left: 5, fontSize: 10, color: WARN }}>…</span>}
+                    <span role="button" title="Voir en grand" onClick={e => { e.stopPropagation(); setPreview(m) }}
+                      style={{ position: 'absolute', top: 5, right: pos >= 0 ? 29 : 5, width: 20, height: 20, borderRadius: 99, background: 'rgba(0,0,0,.65)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'zoom-in' }}>
+                      <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-4.35-4.35|M11 8v6|M8 11h6" size={10} />
+                    </span>
                     <span role="button" title="Supprimer cette modèle" className="gj-del"
                       onClick={async e => {
                         e.stopPropagation()
@@ -587,6 +592,29 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
         onDone={name => { setLogin(null); setReco(m => ({ ...m, [name]: false })); void loadAccounts(name).then(() => loadModels()) }} />}
       {folderPickFor && <FolderPicker scope={scope} model={folderPickFor} current={folderOf(folderPickFor)} onClose={() => setFolderPickFor(null)}
         onPick={path => { void assignFolder(folderPickFor, path); setFolderPickFor(null); toast(`${folderPickFor.name} → « ${crumbs(normPath(path))} »`, 'ok') }} />}
+      {preview && (() => {
+        const list = shownGroup ? shownGroup.items : (models ?? [])
+        const i = list.findIndex(x => x.id === preview.id), on = picked.includes(preview.id)
+        const go = (d: number) => { const n = list[(i + d + list.length) % list.length]; if (n) setPreview(n) }
+        return (
+          <div onClick={() => setPreview(null)} tabIndex={-1} ref={el => el?.focus()}
+            onKeyDown={e => { if (e.key === 'Escape') setPreview(null); if (e.key === 'ArrowRight') go(1); if (e.key === 'ArrowLeft') go(-1) }}
+            style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 20, outline: 'none' }}>
+            {list.length > 1 && <button type="button" onClick={e => { e.stopPropagation(); go(-1) }} style={{ ...ghostBtn, height: 40, width: 40, justifyContent: 'center', fontSize: 18 }}>‹</button>}
+            <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, maxHeight: '100%' }}>
+              {preview.photo && <img src={preview.photo} alt="" style={{ maxHeight: 'calc(100vh - 140px)', maxWidth: 'min(560px, 80vw)', borderRadius: 14, objectFit: 'contain', boxShadow: '0 20px 60px rgba(0,0,0,.6)' }} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span data-no-tr style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{preview.name}</span>
+                {list.length > 1 && <span style={{ fontSize: 12, color: MUTED }}>{`${i + 1} / ${list.length}`}</span>}
+                <button type="button" disabled={!preview.ready} onClick={() => setPicked(on ? picked.filter(x => x !== preview.id) : [...picked, preview.id])}
+                  style={{ ...ghostBtn, height: 32, background: on ? ACCENT : '#EDEDEF', color: on ? '#fff' : '#0A0A0B', border: 'none' }}>{on ? '✓ Choisie' : 'Choisir'}</button>
+                <button type="button" onClick={() => setPreview(null)} style={{ ...ghostBtn, height: 32 }}>Fermer</button>
+              </div>
+            </div>
+            {list.length > 1 && <button type="button" onClick={e => { e.stopPropagation(); go(1) }} style={{ ...ghostBtn, height: 40, width: 40, justifyContent: 'center', fontSize: 18 }}>›</button>}
+          </div>
+        )
+      })()}
       {creating && account && <NewModel account={account} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); void loadModels(true) }} />}
     </Frame>
   )

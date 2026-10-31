@@ -3420,6 +3420,8 @@ export const EN: Dict = {
     "Impossible : un dossier ne peut pas aller dans son propre sous-dossier.": "Not possible: a folder cannot go into its own subfolder.",
     "Trier les dossiers": "Sort folders",
     "Plus remplis": "Fullest",
+    "Voir en grand": "View large",
+    "✓ Choisie": "✓ Picked",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
