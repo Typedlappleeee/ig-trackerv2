@@ -173,7 +173,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
 
   // ── Ce qui bloque le lancement (affiché en clair sous le bouton) ──
   const lines = captionLines(capText)
-  const perOut = tool === 'remix' || tool === 'spoof' || imgTool ? copies : 1
+  const perOut = tool === 'remix' || tool === 'spoof' || imgTool || (tool === 'subs' && subsUnique) ? copies : 1
   const outCount = tool === 'montage' && mMode === 'join' ? (chosen.length >= 2 ? 1 : 0) : perOut === 1 ? chosen.length : chosen.reduce((n, v) => n + copiesOf(v.id), 0)
   const blocker: { msg: string; action?: { l: string; go: () => void } } | null =
     !chosen.length ? { msg: imgTool ? 'Ajoute au moins une photo.' : 'Ajoute au moins une vidéo.' }
@@ -238,7 +238,13 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
               await save(`${v.title} · texte`, await runCaption(bytes, captionFor(lines, i, capMode), { x: cap.x, y: cap.y }, hooks, capStyle))
             } else if (tool === 'subs') {
               setPhase(`${v.title} · transcription et sous-titres…`)
-              await save(`${v.title} · sous-titres`, await runSubtitles(bytes, conns.groq, { onProgress: setStep, onLog: push }, subsUnique ? { ...sOpts, intensity: 'subtle' } : false))
+              // rendue unique : N variantes (transcription faite une seule fois)
+              const nV = subsUnique ? copiesOf(v.id) : 1, memo = {}
+              for (let k = 0; k < nV; k++) {
+                if (R.isCancelled()) break
+                if (nV > 1) setPhase(`${v.title} · sous-titres ${k + 1}/${nV}`)
+                await save(nV > 1 ? `${v.title} · v${k + 1}` : `${v.title} · sous-titres`, await runSubtitles(bytes, conns.groq, { onProgress: setStep, onLog: push }, subsUnique ? { ...sOpts, intensity: 'subtle' } : false, memo))
+              }
             }
           } catch (e) {
             failed++; R.tick(false)
@@ -299,6 +305,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
           <span style={{ flex: 1, fontSize: 12.5, color: conns.groq ? '#BBF7D0' : '#FDE68A', lineHeight: 1.45 }}>{conns.groq ? 'Transcription prête (Groq Whisper), langue détectée automatiquement.' : 'Il faut une clé Groq pour transcrire l’audio.'}</span>
         </div>
         <SwitchRow label="Rendre la vidéo unique" hint="Métadonnées effacées, GPS et appareil réécrits, micro-recadrage" on={subsUnique} onChange={setSubsUnique} />
+        {subsUnique && <FieldRow inline label="Variantes par vidéo" hint="Toutes uniques · réglable aussi sous chaque vidéo"><Stepper value={copies} onChange={setCopies} /></FieldRow>}
         {subsUnique && spoofExtras}
       </>
       case 'overlay': return <>

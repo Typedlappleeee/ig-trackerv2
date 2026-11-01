@@ -348,7 +348,10 @@ function groupWords(words: Segment[], maxWords = SUB_MAX_WORDS): Segment[] {
 // spoof=false → sous-titres seuls. Sinon (défaut), la sortie est AUSSI spoofée :
 // métadonnées effacées + localisation GPS + fabricant/modèle + micro-zoom unique →
 // chaque vidéo qui sort du sous-titre est une copie unique (anti-empreinte / anti-repost).
-export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks, spoof: SpoofOpts | false = {}): Promise<Uint8Array> {
+// memo : transcription gardée entre plusieurs variantes de la même vidéo (Groq appelé une seule fois).
+export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks, spoof: SpoofOpts | false = {}, memo?: { words?: Segment[] }): Promise<Uint8Array> {
+  let words = memo?.words
+  if (!words) {
   h?.onLog?.('🎧 Extraction audio…')
   const audio = await runFfmpeg({ input, args: ['-vn', '-ar', '16000', '-ac', '1', '-c:a', 'libmp3lame', '-q:a', '5'], outName: 'a.mp3' })
   // Pas (ou quasi pas) d'octets audio → la vidéo n'a pas de piste son (ou elle est muette).
@@ -356,9 +359,11 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
     throw new Error('Cette vidéo n’a pas de piste audio (ou le son est muet) — rien à transcrire.')
   }
   h?.onLog?.(`📝 Transcription au mot (Groq Whisper)… (${(audio.length / 1048576).toFixed(1)} Mo audio)`)
-  const words = await transcribeWordsGroq(groqKey, new Blob([audio as BlobPart], { type: 'audio/mpeg' }))
+  words = await transcribeWordsGroq(groqKey, new Blob([audio as BlobPart], { type: 'audio/mpeg' }))
   if (words.length === 0) {
     throw new Error('Aucune parole détectée dans l’audio (musique/bruit seul, ou voix inaudible). Essaie une vidéo avec de la voix claire.')
+  }
+  if (memo) memo.words = words
   }
   const blocks = groupWords(words)
   h?.onLog?.(`🖊 ${blocks.length} groupes (2–4 mots) — incrustation…`)
