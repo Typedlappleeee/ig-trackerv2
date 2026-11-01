@@ -4054,5 +4054,6 @@ export const EN: Dict = {
     ["Dossier déplacé dans « {0} »", "Folder moved into “{0}”"],
     ["{0} · sous-titres {1}/{2}", "{0} · subtitles {1}/{2}"],
     ["✂️ Micro-coupe : {0} s au début, {1} s à la fin", "✂️ Micro-trim: {0} s at the start, {1} s at the end"],
+    ["🎨 Couleurs : lum. {0} · contraste {1} · saturation {2} · teinte {3}° · sous-titres à {4} %", "🎨 Colors: bright. {0} · contrast {1} · saturation {2} · hue {3}° · subtitles at {4} %"],
   ],
 }

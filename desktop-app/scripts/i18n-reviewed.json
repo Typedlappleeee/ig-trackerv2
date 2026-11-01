@@ -22,6 +22,7 @@
  ", comment {0}%",
  ", sans hashtags",
  ",setpts=PTS/{0}",
+ ",{0},eq=brightness={1}:contrast={2}:saturation={3}:gamma={4},hue=h={5}",
  "./index.html?auth=login",
  ".fb-card, button, input, textarea, select, .fb-menu",
  ".jpg ×3",

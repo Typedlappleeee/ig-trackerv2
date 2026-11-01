@@ -377,7 +377,13 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
   const intensity: SpoofIntensity = spOpts.intensity ?? 'subtle'
   // Zoom spoof appliqué à la base AVANT l'incrustation → les sous-titres restent nets
   // et jamais rognés (ils sont dessinés par-dessus la vidéo déjà zoomée, en 1080 de large).
-  const spoofChain = doSpoof ? ',' + spoofFilter(seed, intensity) : ''
+  // Chaque variante change AUSSI visuellement : couleurs (luminosité/contraste/saturation/gamma),
+  // légère teinte, et position des sous-titres décalée — en plus du zoom et de la micro-coupe.
+  const r = (k: number) => { const x = Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x) }
+  const sv = (k: number, a: number) => Math.round((r(k) * 2 - 1) * a * 1000) / 1000
+  const look = doSpoof ? { b: sv(31, 0.035), c: 1 + sv(32, 0.06), s: 1 + sv(33, 0.1), g: 1 + sv(34, 0.05), h: Math.round(sv(35, 4) * 10) / 10 } : null
+  const subY = doSpoof ? SUB_Y_FRAC + sv(36, 0.05) : SUB_Y_FRAC
+  const spoofChain = doSpoof ? `,${spoofFilter(seed, intensity)},eq=brightness=${look!.b}:contrast=${look!.c}:saturation=${look!.s}:gamma=${look!.g},hue=h=${look!.h}` : ''
   if (doSpoof) {
     // On AFFICHE précisément ce qui est spoofé (preuve visible).
     const devLabel = SPOOF_DEVICES.find(x => x.k === device)?.label ?? 'aucun'
@@ -387,6 +393,7 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
     if (gps) h?.onLog?.(`   📍 Localisation GPS réécrite : ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)} (France)`)
     h?.onLog?.(`   📱 Appareil simulé : ${devLabel}`)
     h?.onLog?.(`   🔍 Recadrage/zoom unique : +${zPct}%`)
+    if (look) h?.onLog?.(`   🎨 Couleurs : lum. ${look.b} · contraste ${look.c} · saturation ${look.s} · teinte ${look.h}° · sous-titres à ${Math.round(subY * 100)} %`)
     { const t = spoofTrim(seed); h?.onLog?.(`   ✂️ Micro-coupe : ${t.start.toFixed(2)} s au début, ${t.end.toFixed(2)} s à la fin`) }
   }
   // Un PNG (1080px) par groupe, overlay activé entre ses timecodes. Chaîne d'overlays.
@@ -405,7 +412,7 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
     extra.push({ name: `s${i}.png`, data: await textToPng(shown, 1080, true) })
     const out = i === blocks.length - 1 ? '[vv]' : `[v${i}]`
     // Centre vertical à SUB_Y_FRAC de la hauteur (le PNG est centré sur ce point).
-    const y = `(H*${SUB_Y_FRAC.toFixed(3)})-(h/2)`
+    const y = `(H*${subY.toFixed(3)})-(h/2)`
     chain += `${cursor}[${i + 1}:v]overlay=(W-w)/2:${y}:enable='between(t,${b.start.toFixed(2)},${end.toFixed(2)})'${out};`
     cursor = `[v${i}]`
   }
