@@ -133,6 +133,8 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   // mini-dossiers : les tenues d'une même modèle (« Zoe1 », « Zoe 2 »…) sont rangées sous « Zoe »
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const [preview, setPreview] = useState<HfModel | null>(null)
+  // dossier en « aléatoire » : chaque vidéo prend une tenue au hasard dans le dossier
+  const [randomGroups, setRandomGroups] = useState<string[]>([])
   // rangement à la main (glisser une modèle sur un dossier / une autre modèle) : gardé sur ce navigateur
   const [manual, setManualState] = useState<Record<string, string>>(() => readJson('sf-gj-groups', {}))
   const moveTo = (id: string, group: string) => setManualState(g => { const n = { ...g, [id]: group }; writeJson('sf-gj-groups', n); return n })
@@ -212,12 +214,13 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [res, setRes] = useState<'480p' | '720p' | '1080p'>('480p')
   const [popts, setPopts] = useState<PromptOpts>({ several: false, who: '', keepText: false, outfit: '' })
   const [outfitOn, setOutfitOn] = useState(false)
+  const [modelOutfit, setModelOutfit] = useState(false)
   const [presets, setPresets] = useState<Record<string, string>>({})
   const [mode, setMode] = useState<string>('auto')          // 'auto' | 'custom' | 'p:<preset>'
   const [custom, setCustom] = useState('')
   const [showPrompt, setShowPrompt] = useState(false)
   useEffect(() => { if (access === 'ok') void readPromptPresets().then(setPresets) }, [access])
-  const autoPrompt = buildPrompt({ ...popts, outfit: outfitOn ? popts.outfit : '' })
+  const autoPrompt = buildPrompt({ ...popts, outfit: outfitOn && !modelOutfit ? popts.outfit : '', modelOutfit })
   const prompt = mode === 'auto' ? autoPrompt : mode === 'custom' ? custom : (presets[mode.slice(2)] ?? autoPrompt)
 
   // ── chaque modèle a SON dossier de la Banque (par défaut « Genjutsu › <nom> ») : ses vidéos y vont ──
@@ -250,21 +253,25 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
 
   // ── lancement ──
   const chosen = (models ?? []).filter(m => picked.includes(m.id) && m.ready && m.mediaId)
+  const randomPools = randomGroups.map(g => ({ name: g, items: (groups.find(x => x.name === g)?.items ?? []).filter(m => m.ready && m.mediaId) })).filter(p => p.items.length)
   const fileSources = files.filter(f => f.url).map(f => ({ source: f.url!, label: f.name }))
   const usable = [...links.filter(l => src[l]?.state !== 'error'), ...fileSources.map(f => f.source)]
   const labelOf = (source: string) => fileSources.find(f => f.source === source)?.label ?? null
-  const total = usable.length * chosen.length
-  const blocker = !account ? 'Aucun compte Higgsfield' : !chosen.length ? 'Choisis au moins une modèle' : !usable.length ? 'Colle au moins un lien de reel' : !prompt.trim() ? 'Le prompt est vide' : null
+  const total = usable.length * (chosen.length + randomPools.length)
+  const blocker = !account ? 'Aucun compte Higgsfield' : !chosen.length && !randomPools.length ? 'Choisis au moins une modèle' : !usable.length ? 'Colle au moins un lien de reel' : !prompt.trim() ? 'Le prompt est vide' : null
   function launch() {
     if (blocker) return
-    enqueue(usable.flatMap(l => chosen.map(m => ({
+    const job = (l: string, m: HfModel) => ({
       account, source: l, label: labelOf(l), prompt: prompt.trim(), res,
       model: { id: m.id, name: m.name, mediaId: m.mediaId!, photo: m.photo },
       spoof: planFor(m),
-    }))))
+    })
+    // aléatoire : tenues mélangées puis réparties (pas deux fois la même tant qu'il en reste)
+    const shuffled = randomPools.map(p => [...p.items].sort(() => Math.random() - 0.5))
+    enqueue(usable.flatMap((l, i) => [...chosen.map(m => job(l, m)), ...shuffled.map(items => job(l, items[i % items.length]))]))
     // le dossier de chaque modèle est créé (et associé) tout de suite : visible dans la Banque
     const seen = new Set<string>()
-    for (const m of chosen) { const g = groupRef(m).id; if (!modelFolders[g] && !seen.has(g)) { seen.add(g); void assignFolder(m, folderOf(m)) } }
+    for (const m of [...chosen, ...randomPools.map(p => p.items[0])]) { const g = groupRef(m).id; if (!modelFolders[g] && !seen.has(g)) { seen.add(g); void assignFolder(m, folderOf(m)) } }
     toast(`${total} Genjutsu ajouté${total > 1 ? 's' : ''} à la file`, 'ok')
     setLinksText(''); setSrc({}); setFiles([])
     const acc = account
@@ -414,7 +421,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                       if (from && from !== g.name) { for (const x of groups.find(z => z.name === from)?.items ?? []) moveTo(x.id, g.name); return }
                       const id = e.dataTransfer.getData('text/gj-model'); if (id) moveTo(id, g.name)
                     }}
-                    style={{ position: 'relative', padding: 0, border: `2px solid ${dragOver === `g:${g.name}` ? '#FFFFFF' : n ? ACCENT : 'transparent'}`, transform: dragOver === `g:${g.name}` ? 'scale(1.04)' : 'none', transition: 'transform .12s', borderRadius: 11, background: '#18181B', cursor: 'pointer', overflow: 'hidden', textAlign: 'left', boxShadow: '4px 4px 0 -1px #222226, 8px 8px 0 -2px #19191C' }}>
+                    style={{ position: 'relative', padding: 0, border: `2px solid ${dragOver === `g:${g.name}` ? '#FFFFFF' : n || randomGroups.includes(g.name) ? ACCENT : 'transparent'}`, transform: dragOver === `g:${g.name}` ? 'scale(1.04)' : 'none', transition: 'transform .12s', borderRadius: 11, background: '#18181B', cursor: 'pointer', overflow: 'hidden', textAlign: 'left', boxShadow: '4px 4px 0 -1px #222226, 8px 8px 0 -2px #19191C' }}>
                     <div style={{ aspectRatio: '3 / 4', background: '#0D0D0F' }}>
                       {g.items[0].photo && <img src={g.items[0].photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
                     </div>
@@ -422,6 +429,9 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                     <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '14px 6px 5px', background: 'linear-gradient(transparent, rgba(0,0,0,.85))', color: '#fff', fontSize: 11.5, fontWeight: 600 }}>
                       <span data-no-tr>{g.name}</span> <span style={{ opacity: .7, fontWeight: 500 }}>{`· ${g.items.length}`}</span>
                     </span>
+                    <span role="button" title={randomGroups.includes(g.name) ? 'Aléatoire activé : chaque vidéo prend une tenue au hasard' : 'Aléatoire : chaque vidéo prend une tenue au hasard dans ce dossier'}
+                      onClick={e => { e.stopPropagation(); setRandomGroups(r => r.includes(g.name) ? r.filter(x => x !== g.name) : [...r, g.name]) }}
+                      style={{ position: 'absolute', right: 5, bottom: 26, padding: '2px 6px', borderRadius: 99, background: randomGroups.includes(g.name) ? ACCENT : 'rgba(0,0,0,.65)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>🎲</span>
                     {n > 0 && <span style={{ position: 'absolute', top: 5, right: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 99, background: ACCENT, color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center' }}>{n}</span>}
                   </button>
                 )
@@ -470,10 +480,10 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                 </button>
               )}
             </div>
-            {chosen.length > 0 && (
+            {(chosen.length > 0 || randomPools.length > 0) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: DIM, textTransform: 'uppercase', letterSpacing: '.1em' }}>Dossier de la Banque</span>
-                {[...new Map(chosen.map(m => [groupRef(m).id, m])).values()].map(m => (
+                {[...new Map([...chosen, ...randomPools.map(p => p.items[0])].map(m => [groupRef(m).id, m])).values()].map(m => (
                   <div key={groupRef(m).id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 8px', borderRadius: 9, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
                     {m.photo ? <img src={m.photo} alt="" style={{ width: 24, height: 24, borderRadius: 99, objectFit: 'cover', flexShrink: 0 }} /> : <span style={{ width: 24, height: 24, borderRadius: 99, background: '#18181B', flexShrink: 0 }} />}
                     <span data-no-tr style={{ fontSize: 12.5, fontWeight: 700, color: INK, whiteSpace: 'nowrap' }}>{groupRef(m).name}</span>
@@ -529,7 +539,8 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                   <input value={popts.who} onChange={e => setPopts(p => ({ ...p, who: e.target.value }))} placeholder="on the left, in the red dress" style={{ ...field, width: '100%' }} />
                 </Opt>
                 <Opt on={popts.keepText} onChange={v => setPopts(p => ({ ...p, keepText: v }))} label="Garder les textes écrits de la vidéo" hint="Sinon, les textes à l’écran sont retirés." />
-                <Opt on={outfitOn} onChange={setOutfitOn} label="Autre tenue que la vidéo" hint="Décris la tenue voulue (en anglais de préférence).">
+                <Opt on={modelOutfit} onChange={v => { setModelOutfit(v); if (v) setOutfitOn(false) }} label="Prendre la tenue de la modèle" hint="Elle garde la tenue de sa photo, pas celle de la vidéo." />
+                <Opt on={outfitOn} onChange={v => { setOutfitOn(v); if (v) setModelOutfit(false) }} label="Autre tenue que la vidéo" hint="Décris la tenue voulue (en anglais de préférence).">
                   <input value={popts.outfit} onChange={e => setPopts(p => ({ ...p, outfit: e.target.value }))} placeholder="a black satin mini dress" style={{ ...field, width: '100%' }} />
                 </Opt>
               </div>
@@ -566,7 +577,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             {blocker ?? `Lancer ${total} Genjutsu`}
           </button>
           {!blocker && <span style={{ marginTop: -6, textAlign: 'center', fontSize: 12, color: MUTED }}>
-            {`${usable.length} vidéo${usable.length > 1 ? 's' : ''} × ${chosen.length} modèle${chosen.length > 1 ? 's' : ''} · ${res} · ${MAX_RUNNING} à la fois sur le compte`}
+            {`${usable.length} vidéo${usable.length > 1 ? 's' : ''} × ${chosen.length + randomPools.length} modèle${chosen.length + randomPools.length > 1 ? 's' : ''} · ${res} · ${MAX_RUNNING} à la fois sur le compte`}
           </span>}
         </div>
 

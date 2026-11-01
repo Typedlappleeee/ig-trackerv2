@@ -279,14 +279,14 @@ export async function readPromptPresets(): Promise<Record<string, string>> {
   } catch { return {} }
 }
 
-export interface PromptOpts { several: boolean; who: string; keepText: boolean; outfit: string }
+export interface PromptOpts { several: boolean; who: string; keepText: boolean; outfit: string; modelOutfit?: boolean }
 export function buildPrompt(o: PromptOpts): string {
   const who = o.several && o.who.trim() ? `the woman ${o.who.trim()}` : 'the woman'
   return [
     'Same video as @Video 1: keep the exact same motion, camera movement, framing and timing.',
     `Replace ${who} with @Image 1, preserving her face and her exact hairstyle from @Image 1, no tattoos on any part of her body.${o.several ? ' Keep every other person exactly as in @Video 1.' : ''}`,
     o.keepText ? 'Keep the on-screen texts of @Video 1 exactly as they are.' : 'Remove the caption texts moving on screen.',
-    o.outfit.trim() ? `She wears ${o.outfit.trim()}.` : 'Keep the same outfit as @Video 1.',
+    o.modelOutfit ? 'She wears exactly the same outfit as in @Image 1 (not the outfit of @Video 1).' : o.outfit.trim() ? `She wears ${o.outfit.trim()}.` : 'Keep the same outfit as @Video 1.',
   ].join('\n')
 }
 

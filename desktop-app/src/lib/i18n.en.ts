@@ -3423,6 +3423,10 @@ export const EN: Dict = {
     "Voir en grand": "View large",
     "✓ Choisie": "✓ Picked",
     "Higgsfield est saturé en ce moment (erreur 502 de leur côté). Réessaie avec « Relancer » dans quelques minutes.": "Higgsfield is overloaded right now (502 error on their side). Try again with “Retry” in a few minutes.",
+    "Aléatoire activé : chaque vidéo prend une tenue au hasard": "Random on: each video takes a random outfit",
+    "Aléatoire : chaque vidéo prend une tenue au hasard dans ce dossier": "Random: each video takes a random outfit from this folder",
+    "Prendre la tenue de la modèle": "Use the model’s outfit",
+    "Elle garde la tenue de sa photo, pas celle de la vidéo.": "She keeps the outfit from her photo, not the video’s.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
