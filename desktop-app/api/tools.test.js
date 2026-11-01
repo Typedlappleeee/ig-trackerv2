@@ -29,6 +29,9 @@ describe('Parité serveur ↔ app (mêmes réglages ffmpeg)', () => {
     for (const s of seeds) for (const i of ['subtle', 'normal', 'strong']) {
       expect(srv.spoofZoomFactor(s, i)).toBe(appTools.spoofZoomFactor(s, i))
       expect(srv.spoofFilter(s, i)).toBe(appTools.spoofFilter(s, i))
+      expect(srv.spoofTrim(s)).toEqual(appFilters.spoofTrim(s))
+      expect(srv.spoofTrimArgs(s, 12.5)).toEqual(appFilters.spoofTrimArgs(s, 12.5))
+      const t = srv.spoofTrim(s); expect(t.start).toBeGreaterThanOrEqual(0.1); expect(t.end).toBeLessThanOrEqual(0.8)
     }
   })
   it('Remix : paramètres et filtres identiques', () => {
@@ -181,5 +184,20 @@ describe.skipIf(!FF)('Outils via l’API — traitement réel', () => {
     expect((await call('spoof', { body: {}, auth: auth() })).status).toBe(422)
     expect((await call('spoof', { body: { file_id: crypto.randomUUID() }, auth: auth() })).status).toBe(404)
     expect((await call('blur', { body: { file_id: VID }, auth: auth() })).status).toBe(404)
+  })
+})
+
+describe('Spoof : micro-coupe début/fin', () => {
+  it('lit la durée d’un mp4 (mvhd) et garde toujours au moins 1 s', () => {
+    const b = new Uint8Array(64); const dv = new DataView(b.buffer)
+    b.set([0x6d, 0x76, 0x68, 0x64], 8)            // 'mvhd' en 8, version 0 en 12
+    dv.setUint32(12 + 12, 1000); dv.setUint32(12 + 16, 12500)   // timescale 1000, durée 12,5 s
+    expect(srv.mp4Duration(b)).toBe(12.5)
+    expect(appFilters.mp4Duration(b)).toBe(12.5)
+    expect(srv.mp4Duration(new Uint8Array(40))).toBe(null)
+    const a = srv.spoofTrimArgs(7, 12.5)
+    expect(a[0]).toBe('-ss'); expect(a[2]).toBe('-t')
+    expect(Number(a[3])).toBeGreaterThan(10.9); expect(Number(a[3])).toBeLessThan(12.31)
+    expect(srv.spoofTrimArgs(7, 1.2)).toEqual([])
   })
 })

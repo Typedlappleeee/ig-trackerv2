@@ -73,6 +73,9 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
 
   // ── Réglages ──
   const [copies, setCopies] = useState(3)
+  // variantes par vidéo : réglage commun, ou un nombre propre à une vidéo (petit compteur sous la vignette)
+  const [perVideo, setPerVideo] = useState<Record<string, number>>({})
+  const copiesOf = (id: string) => perVideo[id] ?? copies
   const [intensity, setIntensity] = useState<RemixIntensity>('normal')
   const [toggles, setToggles] = useState<RemixToggles>({ color: true, speed: true, crop: true, mirror: false })
   const [gpsCity, setGpsCity] = useState('none')
@@ -171,7 +174,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
   // ── Ce qui bloque le lancement (affiché en clair sous le bouton) ──
   const lines = captionLines(capText)
   const perOut = tool === 'remix' || tool === 'spoof' || imgTool ? copies : 1
-  const outCount = tool === 'montage' && mMode === 'join' ? (chosen.length >= 2 ? 1 : 0) : chosen.length * perOut
+  const outCount = tool === 'montage' && mMode === 'join' ? (chosen.length >= 2 ? 1 : 0) : perOut === 1 ? chosen.length : chosen.reduce((n, v) => n + copiesOf(v.id), 0)
   const blocker: { msg: string; action?: { l: string; go: () => void } } | null =
     !chosen.length ? { msg: imgTool ? 'Ajoute au moins une photo.' : 'Ajoute au moins une vidéo.' }
     : tool === 'montage' && mMode === 'join' && chosen.length < 2 ? { msg: 'Choisis au moins 2 vidéos à assembler.' }
@@ -214,9 +217,10 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
             const bytes = await resolveSourceBytes(v)
             const sOpts = { intensity, gps: gpsFor(gpsCity), device: device === 'none' ? null : device }
             if (tool === 'remix' || tool === 'spoof' || imgTool) {
-              for (let k = 0; k < copies; k++) {
+              const nV = copiesOf(v.id)
+              for (let k = 0; k < nV; k++) {
                 if (R.isCancelled()) break
-                setPhase(`${v.title} · variante ${k + 1}/${copies}`); setStep(0)
+                setPhase(`${v.title} · variante ${k + 1}/${nV}`); setStep(0)
                 const seed = Math.random() * 1000 + 1
                 if (imgTool) await save(`${v.title} · v${k + 1}`, await runImageSpoof(bytes, { seed, ...sOpts }), 'jpg')
                 else if (tool === 'remix') await save(`${v.title} · v${k + 1}`, await runRemix(bytes, seed, hooks, { ...sOpts, toggles }))
@@ -378,6 +382,17 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
                         <MediaTile thumb={thumbFor(v)} video={!imgTool && !v.thumbnail_url && !v.thumbnail_path ? mediaUrl(v) : null} aspect={imgTool ? '4 / 5' : '9 / 16'} title={v.title} sub={fmtDur(durations[v.id])}
                           selected={preview?.id === v.id} onClick={() => setPreviewId(v.id)} onRemove={() => setSrc(s => s.filter(id => id !== v.id))}
                           badge={join ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 99, background: '#F4F4F5', color: '#0A0A0B', fontSize: 11.5, fontWeight: 800 }}>{i + 1}</span> : undefined} />
+                        {perOut !== 1 && (() => {
+                          const n = copiesOf(v.id), set = (x: number) => setPerVideo(p => ({ ...p, [v.id]: Math.max(1, Math.min(24, x)) }))
+                          const b: React.CSSProperties = { width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#161618', color: '#E4E4E7', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }
+                          return (
+                            <div title="Variantes pour cette vidéo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 5 }}>
+                              <button type="button" style={b} onClick={() => set(n - 1)}>−</button>
+                              <span style={{ minWidth: 26, textAlign: 'center', fontSize: 12, fontWeight: 700, color: perVideo[v.id] != null ? '#F4F4F5' : '#71717A' }}>{`×${n}`}</span>
+                              <button type="button" style={b} onClick={() => set(n + 1)}>+</button>
+                            </div>
+                          )
+                        })()}
                       </div>
                     ))}
                   </div>

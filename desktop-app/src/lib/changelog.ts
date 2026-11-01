@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-01',
+    date: '2026-11-01',
+    title: { fr: '✂️ Spoof : micro-coupe début/fin · variantes par vidéo', en: '✂️ Spoof: start/end micro-trim · variants per video' },
+    items: {
+      fr: [
+        'Le spoof coupe maintenant au hasard 0,1 à 0,8 s au début ET à la fin de chaque version (Studio, Genjutsu et API) : chaque copie a sa propre durée.',
+        'Studio (spoof, remix, photos) : un compteur « − ×3 + » sous chaque vidéo pour choisir son nombre de variantes ; sinon le réglage commun s’applique.',
+      ],
+      en: [
+        'Spoof now randomly trims 0.1 to 0.8 s at the start AND end of each version (Studio, Genjutsu and API): every copy has its own length.',
+        'Studio (spoof, remix, photos): a “− ×3 +” counter under each video to set its own number of variants; otherwise the common setting applies.',
+      ],
+    },
+  },
+  {
     id: '2026-10-30d',
     date: '2026-10-30',
     title: { fr: '🔐 Higgsfield sur ce PC (appli PC)', en: '🔐 Higgsfield on this PC (desktop app)' },

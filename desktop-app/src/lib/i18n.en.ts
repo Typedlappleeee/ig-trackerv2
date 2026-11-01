@@ -3428,6 +3428,7 @@ export const EN: Dict = {
     "Prendre la tenue de la modèle": "Use the model’s outfit",
     "Elle garde la tenue de sa photo, pas celle de la vidéo.": "She keeps the outfit from her photo, not the video’s.",
     "Higgsfield est saturé en ce moment (erreur 502 de leur côté). Vérifie ton historique Higgsfield (la vidéo est peut-être partie) avant « Relancer ».": "Higgsfield is overloaded right now (502 on their side). Check your Higgsfield history (the video may have started) before “Retry”.",
+    "Variantes pour cette vidéo": "Variants for this video",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

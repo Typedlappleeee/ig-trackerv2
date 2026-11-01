@@ -5,7 +5,7 @@ import { runFfmpeg, fetchInput } from './ffmpeg'
 import { uploadThumbFor } from './bankStorage'
 import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
-import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, type RemixIntensity, type RemixToggles } from './studioFilters'
+import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, spoofTrimArgs, mp4Duration, type RemixIntensity, type RemixToggles } from './studioFilters'
 export { remixParams, captionLines, captionFor, type RemixToggles } from './studioFilters'
 import { randomFranceGps } from './gps'
 export { GPS_CITIES, gpsFor, randomFranceGps, randomUsGps, type GpsCity } from './gps'
@@ -123,7 +123,7 @@ export async function runSpoof(input: Uint8Array, seed: number, h?: Hooks, opts?
   if (opts?.gps) { const loc = iso6709(opts.gps.lat, opts.gps.lon); meta.push('-metadata', `location=${loc}`, '-metadata', `location-eng=${loc}`) }
   meta.push(...deviceMetaArgs(opts?.device))
   return runFfmpeg({
-    input, args: ['-vf', `${CAP_1080},${spoofFilter(seed, intensity)}`, ...meta, ...H264],
+    input, args: [...spoofTrimArgs(seed, mp4Duration(input)), '-vf', `${CAP_1080},${spoofFilter(seed, intensity)}`, ...meta, ...H264],
     onProgress: h?.onProgress, onLog: h?.onLog,
   })
 }

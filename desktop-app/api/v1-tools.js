@@ -10,7 +10,7 @@ import { randomInt } from 'node:crypto'
 import piexif from 'piexifjs'
 import { db, authCheck, logCall, roleIn, bodyOf, bytesOfFile, cleanFolder, extOf, fetchPublic, storeBytes, MIME_OF } from './_bank.js'
 import { runFfmpeg } from './_ffmpeg.js'
-import { GPS_CITIES, INTENSITIES, SPOOF_DEVICES, DEFAULT_TOGGLES, gpsFor, imageSpoofArgs, remixArgs, spoofArgs } from './_studio.js'
+import { GPS_CITIES, INTENSITIES, SPOOF_DEVICES, DEFAULT_TOGGLES, gpsFor, imageSpoofArgs, remixArgs, spoofArgs, mp4Duration } from './_studio.js'
 
 const MAX_INPUT = 150 * 1024 * 1024                       // 150 Mo en entrée (temps de traitement serveur)
 const IMG = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
@@ -131,7 +131,7 @@ export default async function handler(req, res) {
     } else {
       const args = tool === 'remix'
         ? remixArgs({ seed, intensity, gps, device, toggles: { ...DEFAULT_TOGGLES, ...(b.toggles && typeof b.toggles === 'object' ? b.toggles : {}) } })
-        : spoofArgs({ seed, intensity, gps, device })
+        : spoofArgs({ seed, intensity, gps, device, duration: mp4Duration(src.buf) })
       const { out, thumb } = await runFfmpeg(src.buf, { inExt, outExt: 'mp4', args, timeoutMs: 48_000, extraOut: true })
       file = await storeBytes(s, scope, { buf: out, ext: 'mp4', contentType: MIME_OF.mp4, title: b.title ? baseTitle : `${baseTitle} · ${tool}`, folder, thumb })
     }

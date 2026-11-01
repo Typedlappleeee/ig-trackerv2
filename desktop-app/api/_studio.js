@@ -142,8 +142,8 @@ export function gpsFor(key) {
 }
 
 // ── Commandes ffmpeg complètes (mêmes que l'app) ───────────────────────────────
-export function spoofArgs({ seed, intensity = 'normal', gps = null, device = null }) {
-  return ['-vf', `${CAP_1080},${spoofFilter(seed, intensity)}`, ...metaArgs(gps, device), ...H264]
+export function spoofArgs({ seed, intensity = 'normal', gps = null, device = null, duration = null }) {
+  return [...spoofTrimArgs(seed, duration), '-vf', `${CAP_1080},${spoofFilter(seed, intensity)}`, ...metaArgs(gps, device), ...H264]
 }
 export function remixArgs({ seed, intensity = 'normal', gps = null, device = null, toggles = DEFAULT_TOGGLES }) {
   const p = remixParams(seed, intensity, toggles)
@@ -156,4 +156,27 @@ export function imageSpoofArgs({ seed, intensity = 'normal' }) {
   const z = spoofZoomFactor(seed, intensity).toFixed(4)
   const q = 2 + Math.round(((Math.sin(seed * 13.7) + 1) / 2) * 2)     // qscale 2–4 (≈ qualité 0,90–0,96)
   return ['-vf', `crop=iw/${z}:ih/${z},scale=iw*${z}:ih*${z}`, '-map_metadata', '-1', '-q:v', String(q), '-frames:v', '1']
+}
+
+// Copie de studioFilters.ts : micro-coupe du spoof (0,1–0,8 s au début et à la fin).
+export function spoofTrim(seed) {
+  const r2 = v => Math.round(v * 100) / 100
+  return { start: r2(0.1 + rnd(seed, 21) * 0.7), end: r2(0.1 + rnd(seed, 22) * 0.7) }
+}
+export function mp4Duration(buf) {
+  for (let i = 4; i + 32 < buf.length && i < 64 * 1024 * 1024; i++) {
+    if (buf[i] !== 0x6d || buf[i + 1] !== 0x76 || buf[i + 2] !== 0x68 || buf[i + 3] !== 0x64) continue
+    const dv = new DataView(buf.buffer, buf.byteOffset + i + 4)
+    const v = dv.getUint8(0)
+    const scale = v === 1 ? dv.getUint32(20) : dv.getUint32(12)
+    const dur = v === 1 ? dv.getUint32(24) * 2 ** 32 + dv.getUint32(28) : dv.getUint32(16)
+    return scale > 0 && dur > 0 ? dur / scale : null
+  }
+  return null
+}
+export function spoofTrimArgs(seed, duration) {
+  const { start, end } = spoofTrim(seed)
+  if (!duration) return ['-ss', String(start)]
+  const keep = Math.round((duration - start - end) * 100) / 100
+  return keep >= 1 ? ['-ss', String(start), '-t', String(keep)] : []
 }
