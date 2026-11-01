@@ -495,7 +495,7 @@ async function patient<T>(fn: () => Promise<T>): Promise<T> {
 }
 // Message lisible quand Higgsfield est saturé (erreur 5xx de leur côté).
 const friendly = (e: unknown) => /HTTP 5\d\d|Bad gateway|overlo/i.test(errMsg(e))
-  ? 'Higgsfield est saturé en ce moment (erreur 502 de leur côté). Réessaie avec « Relancer » dans quelques minutes.'
+  ? 'Higgsfield est saturé en ce moment (erreur 502 de leur côté). Vérifie ton historique Higgsfield (la vidéo est peut-être partie) avant « Relancer ».'
   : errMsg(e)
 
 async function generate(account: string, params: Record<string, unknown>): Promise<Any> {
@@ -509,7 +509,10 @@ async function generate(account: string, params: Record<string, unknown>): Promi
       return r
     } catch (e) {
       last = e
-      if (k >= 3 || !TRANSIENT.test(errMsg(e))) throw e
+      // Seul un refus explicite (429 / limite) garantit que rien n'a été créé. Une erreur 5xx ou
+      // une coupure peut arriver APRÈS que Higgsfield a lancé (et facturé) la génération :
+      // on ne renvoie jamais dans ce cas (double coût) → « Relancer » à la main après vérification.
+      if (k >= 3 || !/HTTP 429|rate.?limit|too many/i.test(errMsg(e))) throw e
       await sleep(5000 * 2 ** k)
     }
   }
