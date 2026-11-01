@@ -5,7 +5,7 @@ import { runFfmpeg, fetchInput } from './ffmpeg'
 import { uploadThumbFor } from './bankStorage'
 import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
-import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, spoofTrimArgs, mp4Duration, type RemixIntensity, type RemixToggles } from './studioFilters'
+import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, spoofTrimArgs, spoofTrim, mp4Duration, type RemixIntensity, type RemixToggles } from './studioFilters'
 export { remixParams, captionLines, captionFor, type RemixToggles } from './studioFilters'
 import { randomFranceGps } from './gps'
 export { GPS_CITIES, gpsFor, randomFranceGps, randomUsGps, type GpsCity } from './gps'
@@ -387,6 +387,7 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
     if (gps) h?.onLog?.(`   📍 Localisation GPS réécrite : ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)} (France)`)
     h?.onLog?.(`   📱 Appareil simulé : ${devLabel}`)
     h?.onLog?.(`   🔍 Recadrage/zoom unique : +${zPct}%`)
+    { const t = spoofTrim(seed); h?.onLog?.(`   ✂️ Micro-coupe : ${t.start.toFixed(2)} s au début, ${t.end.toFixed(2)} s à la fin`) }
   }
   // Un PNG (1080px) par groupe, overlay activé entre ses timecodes. Chaîne d'overlays.
   // IMPORTANT : on met d'abord la vidéo à 1080 de large (= largeur du PNG). Sinon, sur une
@@ -416,7 +417,8 @@ export async function runSubtitles(input: Uint8Array, groqKey: string, h?: Hooks
   if (doSpoof) meta.push(...deviceMetaArgs(device))
   const output = await runFfmpeg({
     input, inputName: 'in.mp4', extra,
-    args: [...inputs, '-filter_complex', chain, '-map', '[v]', '-map', '0:a?', ...meta, ...H264],
+    // micro-coupe 0,1–0,8 s début/fin (option de SORTIE : appliquée après l'incrustation → texte et voix restent calés)
+    args: [...inputs, '-filter_complex', chain, '-map', '[v]', '-map', '0:a?', ...(doSpoof ? spoofTrimArgs(seed, mp4Duration(input)) : []), ...meta, ...H264],
     onProgress: h?.onProgress, onLog: h?.onLog,
   })
   if (doSpoof) {

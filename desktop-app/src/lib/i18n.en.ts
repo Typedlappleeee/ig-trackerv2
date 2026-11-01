@@ -4053,5 +4053,6 @@ export const EN: Dict = {
     ["« {0} » existe déjà.", "“{0}” already exists."],
     ["Dossier déplacé dans « {0} »", "Folder moved into “{0}”"],
     ["{0} · sous-titres {1}/{2}", "{0} · subtitles {1}/{2}"],
+    ["✂️ Micro-coupe : {0} s au début, {1} s à la fin", "✂️ Micro-trim: {0} s at the start, {1} s at the end"],
   ],
 }
