@@ -225,8 +225,14 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [modelFolders, setModelFolders] = useState<Record<string, string>>({})
   const [folderPickFor, setFolderPickFor] = useState<HfModel | null>(null)
   useEffect(() => { if (access === 'ok') void loadModelFolders(scope).then(setModelFolders).catch(() => undefined) }, [access, scope])
-  const folderOf = (m: { id: string; name: string }) => modelFolders[m.id] ?? joinPath('Genjutsu', m.name)
-  async function assignFolder(m: { id: string; name: string }, path: string) {
+  // UN dossier de la Banque par DOSSIER de modèles (Zoe › toutes ses tenues → « Genjutsu › Zoe »)
+  const groupRef = (m: { id: string; name: string }) => {
+    const g0 = manual[m.id] ?? autoGroup(m.name), g = g0.startsWith('__solo:') ? m.name : g0
+    return { id: `grp:${g}`, name: g }
+  }
+  const folderOf = (m: { id: string; name: string }) => { const g = groupRef(m); return modelFolders[g.id] ?? joinPath('Genjutsu', g.name) }
+  async function assignFolder(m0: { id: string; name: string }, path: string) {
+    const m = groupRef(m0)
     const p = normPath(path)
     if (!p) return
     setModelFolders(f => ({ ...f, [m.id]: p }))
@@ -257,7 +263,8 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
       spoof: planFor(m),
     }))))
     // le dossier de chaque modèle est créé (et associé) tout de suite : visible dans la Banque
-    for (const m of chosen) if (!modelFolders[m.id]) void assignFolder(m, folderOf(m))
+    const seen = new Set<string>()
+    for (const m of chosen) { const g = groupRef(m).id; if (!modelFolders[g] && !seen.has(g)) { seen.add(g); void assignFolder(m, folderOf(m)) } }
     toast(`${total} Genjutsu ajouté${total > 1 ? 's' : ''} à la file`, 'ok')
     setLinksText(''); setSrc({}); setFiles([])
     const acc = account
@@ -466,10 +473,11 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             {chosen.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: DIM, textTransform: 'uppercase', letterSpacing: '.1em' }}>Dossier de la Banque</span>
-                {chosen.map(m => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 8px', borderRadius: 9, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
+                {[...new Map(chosen.map(m => [groupRef(m).id, m])).values()].map(m => (
+                  <div key={groupRef(m).id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 8px', borderRadius: 9, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
                     {m.photo ? <img src={m.photo} alt="" style={{ width: 24, height: 24, borderRadius: 99, objectFit: 'cover', flexShrink: 0 }} /> : <span style={{ width: 24, height: 24, borderRadius: 99, background: '#18181B', flexShrink: 0 }} />}
-                    <span data-no-tr style={{ fontSize: 12.5, fontWeight: 700, color: INK, whiteSpace: 'nowrap' }}>{m.name}</span>
+                    <span data-no-tr style={{ fontSize: 12.5, fontWeight: 700, color: INK, whiteSpace: 'nowrap' }}>{groupRef(m).name}</span>
+                    {(() => { const n = chosen.filter(x => groupRef(x).id === groupRef(m).id).length; return n > 1 ? <span style={{ fontSize: 11.5, color: MUTED }}>{`${n} tenues`}</span> : null })()}
                     <span style={{ color: DIM, fontSize: 12 }}>→</span>
                     <span data-no-tr title={folderOf(m)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1, fontSize: 12.5, color: '#D4D4D8' }}>
                       <span style={{ display: 'flex', color: ACCENT_TXT, flexShrink: 0 }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={12} /></span>
@@ -590,8 +598,8 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
 
       {login && <AccountLogin initialName={login.name} reconnect={login.reconnect} taken={(accounts ?? []).map(a => a.name)} onClose={() => setLogin(null)}
         onDone={name => { setLogin(null); setReco(m => ({ ...m, [name]: false })); void loadAccounts(name).then(() => loadModels()) }} />}
-      {folderPickFor && <FolderPicker scope={scope} model={folderPickFor} current={folderOf(folderPickFor)} onClose={() => setFolderPickFor(null)}
-        onPick={path => { void assignFolder(folderPickFor, path); setFolderPickFor(null); toast(`${folderPickFor.name} → « ${crumbs(normPath(path))} »`, 'ok') }} />}
+      {folderPickFor && <FolderPicker scope={scope} model={groupRef(folderPickFor)} current={folderOf(folderPickFor)} onClose={() => setFolderPickFor(null)}
+        onPick={path => { void assignFolder(folderPickFor, path); setFolderPickFor(null); toast(`${groupRef(folderPickFor).name} → « ${crumbs(normPath(path))} »`, 'ok') }} />}
       {preview && (() => {
         const list = shownGroup ? shownGroup.items : (models ?? [])
         const i = list.findIndex(x => x.id === preview.id), on = picked.includes(preview.id)
