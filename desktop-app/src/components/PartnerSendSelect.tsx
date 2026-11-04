@@ -29,10 +29,15 @@ export function usePartnerSend(orgId: string | null, storeKey: string): PartnerS
     })
     return () => { alive = false }
   }, [orgId])
-  const setFolder = (f: string) => { setFolderState(f); try { localStorage.setItem(storeKey, f) } catch { /* ignore */ } }
+  // Dossiers du partenaire déjà choisis ici : gardés dans la liste même si son site ne montre pas ses dossiers vides
+  const [known, setKnown] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('sf-partner-known') || '[]') as string[] } catch { return [] } })
+  const setFolder = (f: string) => {
+    setFolderState(f); try { localStorage.setItem(storeKey, f) } catch { /* ignore */ }
+    if (f && !known.includes(f)) { const n = [...known, f].slice(-50); setKnown(n); try { localStorage.setItem('sf-partner-known', JSON.stringify(n)) } catch { /* ignore */ } }
+  }
   const target = partner ? folder : ''
   return {
-    partner, folder: target, setFolder, theirs,
+    partner, folder: target, setFolder, theirs: [...new Set([...theirs, ...known])].sort((a, b) => a.localeCompare(b)),
     queue(id, title, log) {
       if (!id || !partner || !target) return
       const name = partner.name, dest = target

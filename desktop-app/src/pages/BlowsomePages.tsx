@@ -24,6 +24,7 @@ import { confirmDialog } from '@/lib/ui'
 import { signPaths, cachedSigned } from '@/lib/signedUrls'
 import { uploadThumbFor } from '@/lib/bankStorage'
 import { Video } from '@/components/VideoFrame'
+import { folderTree, listBankFolders } from '@/lib/bankFolders'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -506,8 +507,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { count: c } = await scope(supabase.from('content_bank').select('id', { count: 'exact', head: true }))
     setCount(c ?? 0)
-    const { data: fd } = await scope(supabase.from('content_bank').select('folder'))
-    setFolders([...new Set(((fd ?? []) as { folder: string | null }[]).map(r => r.folder).filter((f): f is string => !!f))].sort())
+    // TOUS les dossiers (vides compris, au-delà de 1000 médias), en ordre d'arborescence
+    setFolders(folderTree(await listBankFolders({ orgId: currentOrg?.id ?? null, userId: user.id })).map(n => n.path))
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
 

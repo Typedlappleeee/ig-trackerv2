@@ -2,6 +2,7 @@
 // direct, réglages + lancement (progression globale, annulation), résultats. Les traitements
 // tournent sur l'ordinateur (ffmpeg.wasm) ; chaque sortie est enregistrée dans la Banque.
 import { isHeic, heicToJpeg } from '@/lib/heic'
+import { folderTree, listBankFolders } from '@/lib/bankFolders'
 import { usePartnerSend, PartnerSendSelect } from '@/components/PartnerSendSelect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
@@ -270,7 +271,10 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
     void load()
   }
 
-  const folders = [...new Set(items.map(v => v.folder).filter((f): f is string => !!f))].sort()
+  // TOUS les dossiers de la Banque (vides compris), pas seulement ceux des médias chargés
+  const [allFolders, setAllFolders] = useState<string[]>([])
+  useEffect(() => { void listBankFolders({ orgId: currentOrg?.id ?? null, userId: user.id }).then(setAllFolders).catch(() => undefined) }, [currentOrg?.id, user.id])
+  const folders = folderTree([...items.map(v => v.folder), ...allFolders]).map(n => n.path)
   const preview = chosen.find(v => v.id === previewId) ?? chosen[0] ?? null
   const ovUrl = mediaUrl(ovImgs[0] ?? null)
   const join = tool === 'montage' && mMode === 'join'

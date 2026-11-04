@@ -59,8 +59,15 @@ const scoped = (q: any, s: BankScope) => s.orgId ? q.eq('org_id', s.orgId) : q.e
 
 // Chemins des dossiers existants (médias + dossiers vides).
 export async function listBankFolders(s: BankScope): Promise<string[]> {
-  const { data } = await scoped(supabase.from('content_bank').select('folder').not('folder', 'is', null).is('deleted_at', null).limit(10000), s)
-  return [...new Set(((data ?? []) as { folder: string | null }[]).map(r => r.folder ? normPath(r.folder) : '').filter(Boolean))]
+  // par pages de 1000 (Supabase coupe à 1000 lignes par requête) : TOUS les dossiers, vides compris
+  const out = new Set<string>()
+  for (let from = 0; from < 100_000; from += 1000) {
+    const { data } = await scoped(supabase.from('content_bank').select('folder').not('folder', 'is', null).is('deleted_at', null).order('id').range(from, from + 999), s)
+    const rows = (data ?? []) as { folder: string | null }[]
+    for (const r of rows) if (r.folder) out.add(normPath(r.folder))
+    if (rows.length < 1000) break
+  }
+  return [...out]
 }
 
 // Crée le dossier (ligne sentinelle) s'il n'existe pas encore.
