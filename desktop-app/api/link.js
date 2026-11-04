@@ -4,7 +4,9 @@
 //     test                     → GET  <partenaire>/me
 //     folders                  → GET  <partenaire>/folders
 //     files  {folder, cursor}  → GET  <partenaire>/files
-//     send   {ids, folder}     → médias de MA banque → POST <partenaire>/files (liens 24 h), en parallèle
+//     send   {ids, folder}     → médias de MA banque → POST <partenaire>/files (liens 24 h), en parallèle ;
+//                                 scaleflow_id = id du média chez ScaleFlow (le partenaire peut le supprimer
+//                                 ici via DELETE /api/v1/files/<scaleflow_id> une fois téléchargé)
 //     import {items, folder}   → médias du partenaire → MA banque
 // La clé API du partenaire est lue ici (service-role), jamais renvoyée au navigateur.
 import { db, roleIn, filesByIds, storeFromUrl, assertPublicUrl, cleanFolder, bodyOf, httpError } from './_bank.js'
@@ -81,7 +83,7 @@ export default async function handler(req, res) {
         const results = await Promise.all(files.map(async f => {
           if (!f.url) return { id: f.id, ok: false, error: 'fichier sans lien' }
           try {
-            await partnerCall(p, '/files', { method: 'POST', body: { url: f.url, folder, title: f.title, thumbnail_url: f.thumbnail_url }, timeout: 55_000 })
+            await partnerCall(p, '/files', { method: 'POST', body: { url: f.url, folder, title: f.title, thumbnail_url: f.thumbnail_url, scaleflow_id: f.id }, timeout: 55_000 })
             return { id: f.id, ok: true }
           } catch (e) { return { id: f.id, ok: false, error: e?.message || String(e) } }
         }))

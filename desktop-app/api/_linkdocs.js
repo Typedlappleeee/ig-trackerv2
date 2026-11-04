@@ -71,7 +71,7 @@ Une URL signée Supabase / S3 valable au moins 1 h convient. Non idempotent : n'
 <ol>
 <li>Un dossier ScaleFlow par modèle (même nom des deux côtés, ou crée-le avec <code>POST /folders</code> quand tu ajoutes une modèle).</li>
 <li>Récupère les nouvelles vidéos : <code>GET /files?folder=&lt;modèle&gt;&amp;unused=1</code> (toutes les quelques minutes), télécharge <code>url</code>.</li>
-<li>Après publication par un VA : <code>POST /files/&lt;id&gt;/used</code> ; et si tu ne veux plus la garder chez ScaleFlow : <code>DELETE /files/&lt;id&gt;</code>.</li>
+<li>Après publication par un VA : <code>POST /files/&lt;id&gt;/used</code> ; et pour la retirer aussi de ScaleFlow une fois téléchargée : <code>DELETE /files/&lt;id&gt;</code>. Les vidéos envoyées par ScaleFlow arrivent avec leur <code>scaleflow_id</code> : garde-le pour pouvoir les supprimer chez ScaleFlow.</li>
 </ol>
 <h3><span class="m p">POST</span><code>/uploads</code> puis <code>PUT</code> puis <span class="m p">POST</span><code>/files</code> — envoi direct d'un fichier</h3>
 <pre><code>POST /uploads   {"filename": "clip.mp4", "content_type": "video/mp4"}
