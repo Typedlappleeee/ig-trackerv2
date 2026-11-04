@@ -3430,6 +3430,7 @@ export const EN: Dict = {
     "Higgsfield est saturé en ce moment (erreur 502 de leur côté). Vérifie ton historique Higgsfield (la vidéo est peut-être partie) avant « Relancer ».": "Higgsfield is overloaded right now (502 on their side). Check your Higgsfield history (the video may have started) before “Retry”.",
     "Variantes pour cette vidéo": "Variants for this video",
     "Toutes uniques · réglable aussi sous chaque vidéo": "All unique · also adjustable under each video",
+    "photo HEIC illisible (conversion en JPG impossible)": "unreadable HEIC photo (JPG conversion failed)",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

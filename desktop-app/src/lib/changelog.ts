@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-04',
+    date: '2026-11-04',
+    title: { fr: '📸 Photos HEIC converties en JPG automatiquement', en: '📸 HEIC photos converted to JPG automatically' },
+    items: {
+      fr: ['Les photos iPhone (.heic / .heif) importées dans la Banque, le Studio ou un sélecteur sont converties en JPG toutes seules — plus besoin de passer par un site de conversion.'],
+      en: ['iPhone photos (.heic / .heif) imported into the Bank, the Studio or a picker are converted to JPG automatically — no conversion website needed.'],
+    },
+  },
+  {
     id: '2026-11-01',
     date: '2026-11-01',
     title: { fr: '✂️ Spoof : micro-coupe début/fin · variantes par vidéo', en: '✂️ Spoof: start/end micro-trim · variants per video' },

@@ -8,6 +8,7 @@ import { useBankThumbs } from '@/lib/data'
 import { Modal, Btn, FIELD, Skeleton, SkeletonRows } from '@/lib/ui'
 import VideoFrame from './VideoFrame'
 import { folderTree, isWithin } from '@/lib/bankFolders'
+import { heicToJpeg } from '@/lib/heic'
 
 // Sélecteur « Banque » commun (fidèle à _openPicker du prototype ZIP) : une modale
 // avec recherche + grille (vidéos/images) ou liste (légendes), sélection multi ou
@@ -119,7 +120,9 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
 
   // Import depuis le PC (multi-fichiers + glisser-déposer) → bucket content → banque.
   async function importFiles(files: FileList | File[]) {
-    const list = Array.from(files).filter(f => {
+    // HEIC (iPhone) → JPEG avant l'envoi
+    const conv = await Promise.all(Array.from(files).map(f => heicToJpeg(f).catch(() => f)))
+    const list = conv.filter(f => {
       const ext = (f.name.split('.').pop() ?? '').toLowerCase()
       if (kind === 'images') return IMG.includes(ext) || f.type.startsWith('image')
       if (kind === 'videos') return !IMG.includes(ext)

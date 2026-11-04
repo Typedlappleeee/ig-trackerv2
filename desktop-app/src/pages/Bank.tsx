@@ -14,6 +14,7 @@ import VideoFrame, { Video } from '@/components/VideoFrame'
 import { readZip } from '@/lib/zipReader'
 import { getPartner, type Partner } from '@/lib/scaleflowLink'
 import { PartnerBankModal, SendToPartnerModal } from '@/components/PartnerBank'
+import { isHeic, heicToJpeg } from '@/lib/heic'
 import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg } from '@/lib/bankFolders'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -380,7 +381,10 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const IMG = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 
   // Un fichier → bucket content + miniature/durée + ligne content_bank. Renvoie l'erreur, ou null.
-  async function uploadOne(file: File, dest: string | null): Promise<string | null> {
+  async function uploadOne(file0: File, dest: string | null): Promise<string | null> {
+    // HEIC (iPhone) → JPEG automatiquement
+    let file = file0
+    if (isHeic(file0)) { try { file = await heicToJpeg(file0) } catch { return 'photo HEIC illisible (conversion en JPG impossible)' } }
     let ext = (file.name.split('.').pop() ?? '').toLowerCase()
     if (!ext) ext = file.type.startsWith('image') ? 'jpg' : 'mp4'
     const id = crypto.randomUUID()

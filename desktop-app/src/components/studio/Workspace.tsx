@@ -1,6 +1,7 @@
 // Espace de travail d'un outil du Studio : sources (glisser-déposer, Banque, PC), aperçu en
 // direct, réglages + lancement (progression globale, annulation), résultats. Les traitements
 // tournent sur l'ordinateur (ffmpeg.wasm) ; chaque sortie est enregistrée dans la Banque.
+import { isHeic, heicToJpeg } from '@/lib/heic'
 import { usePartnerSend, PartnerSendSelect } from '@/components/PartnerSendSelect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
@@ -146,14 +147,15 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
 
   // Import « Mon PC » / glisser-déposer : envoi dans la Banque PUIS sélection automatique.
   async function importFiles(files: File[]) {
-    const list = files.filter(f => imgTool ? f.type.startsWith('image') : f.type.startsWith('video'))
+    const list = files.filter(f => imgTool ? f.type.startsWith('image') || isHeic(f) : f.type.startsWith('video'))
     if (!list.length) { toast(imgTool ? 'Choisis des photos (.jpg, .png…).' : 'Choisis des vidéos (.mp4, .mov…).', 'bad'); return }
     const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
     const added: string[] = []
     let n = 0
-    for (const file of list) {
-      setUploading(`Envoi ${++n}/${list.length} · ${file.name}`)
+    for (const file0 of list) {
+      setUploading(`Envoi ${++n}/${list.length} · ${file0.name}`)
       try {
+        const file = await heicToJpeg(file0)   // HEIC (iPhone) → JPEG
         const ext = (file.name.split('.').pop() ?? '').toLowerCase() || (file.type.startsWith('image') ? 'jpg' : 'mp4')
         const storagePath = `videos/${scopeFolder}/${crypto.randomUUID()}.${ext}`
         const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
@@ -164,7 +166,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
           thumbnail_path: th.thumbPath, file_url: null, folder: null, duration: th.duration, tags: [], notes: null, used_count: 0,
         }).select('id').maybeSingle()
         if (data?.id) added.push(data.id as string)
-      } catch { toast(`Envoi impossible : ${file.name}`, 'bad') }
+      } catch { toast(`Envoi impossible : ${file0.name}`, 'bad') }
     }
     setUploading(null)
     await load()
