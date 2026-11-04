@@ -8,7 +8,7 @@ import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
-import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, PLAN_LABEL } from '@/lib/bankStorage'
+import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, isDarkImage, PLAN_LABEL } from '@/lib/bankStorage'
 import { cachedSigned, signPaths, signedUrl, forgetSigned } from '@/lib/signedUrls'
 import VideoFrame, { Video } from '@/components/VideoFrame'
 import { readZip } from '@/lib/zipReader'
@@ -1080,6 +1080,40 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     })()
     return () => { cancelled = true }
   }, [rendered, signTick])
+
+  // Miniatures NOIRES (ou absentes) des vidéos affichées : refaites en arrière-plan à partir d'une
+  // image claire de la vidéo (videoThumb essaie plusieurs instants), puis enregistrées. Une seule
+  // vérification par média (mémorisée dans ce navigateur).
+  const thumbChecked = useRef<Set<string>>(new Set((() => { try { return JSON.parse(localStorage.getItem('sf-thumb-ok') || '[]') as string[] } catch { return [] } })()))
+  const thumbBusy = useRef(false)
+  useEffect(() => {
+    if (thumbBusy.current) return
+    const todo = rendered.filter(i => inferType(i) === 'video' && i.storage_path && !i.thumbnail_url && !thumbChecked.current.has(i.id)
+      && thumbs[i.storage_path] && (!i.thumbnail_path || thumbs[i.thumbnail_path]))
+    if (!todo.length) return
+    thumbBusy.current = true
+    ;(async () => {
+      for (const i of todo.slice(0, 12)) {
+        thumbChecked.current.add(i.id)
+        try {
+          const cur = i.thumbnail_path ? thumbs[i.thumbnail_path] : null
+          if (cur && !(await isDarkImage(cur))) continue
+          const th = await videoThumb(thumbs[i.storage_path as string])
+          if (!th) continue
+          const tp = (i.storage_path as string).replace(/\.[a-z0-9]+$/i, '') + `_thumb_${Date.now()}.jpg`
+          const up = await supabase.storage.from('content').upload(tp, th.blob, { contentType: 'image/jpeg', upsert: true })
+          if (up.error) continue
+          await supabase.from('content_bank').update({ thumbnail_path: tp }).eq('id', i.id)
+          const url = URL.createObjectURL(th.blob)
+          setThumbs(prev => ({ ...prev, [tp]: url }))
+          setItems(prev => prev.map(x => x.id === i.id ? { ...x, thumbnail_path: tp } : x))
+        } catch { /* on réessaiera une autre fois */ thumbChecked.current.delete(i.id) }
+      }
+      try { localStorage.setItem('sf-thumb-ok', JSON.stringify([...thumbChecked.current].slice(-5000))) } catch { /* plein */ }
+      thumbBusy.current = false
+      setSignTick(t => t)        // relance l'examen s'il en reste
+    })()
+  }, [rendered, thumbs])
 
   // Ancre du dernier clic (index dans `shown`) pour la sélection par intervalle (Maj+clic).
   const lastIdxRef = useRef<number | null>(null)

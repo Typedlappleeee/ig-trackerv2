@@ -50,25 +50,66 @@ export function useBankUsage(orgId: string | null): { usage: BankUsage | null; r
 }
 
 // ── Miniature + durée d'une vidéo, générées dans le navigateur à l'envoi ─────────
-export function videoThumb(file: Blob, at = 0.6): Promise<{ blob: Blob; duration: number } | null> {
+// Une miniature ne doit JAMAIS être noire : on essaie plusieurs instants (0,6 s, 1,5 s, 20 %, 40 %,
+// 60 %, 80 %) et on garde la première image assez claire — sinon la plus claire trouvée.
+export function videoThumb(file: Blob | string, at = 0.6): Promise<{ blob: Blob; duration: number } | null> {
   return new Promise(resolve => {
-    const url = URL.createObjectURL(file)
+    const url = typeof file === 'string' ? file : URL.createObjectURL(file)
     const v = document.createElement('video')
     let done = false
-    const finish = (r: { blob: Blob; duration: number } | null) => { if (done) return; done = true; URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); resolve(r) }
-    const timer = setTimeout(() => finish(null), 12_000)
-    v.muted = true; v.playsInline = true; v.preload = 'metadata'
+    const finish = (r: { blob: Blob; duration: number } | null) => {
+      if (done) return; done = true
+      if (typeof file !== 'string') URL.revokeObjectURL(url)
+      v.removeAttribute('src'); v.load(); resolve(r)
+    }
+    const timer = setTimeout(() => finish(best ? { blob: best.blob, duration: Math.round(v.duration || 0) } : null), 20_000)
+    let times: number[] = [], k = 0
+    let best: { blob: Blob; lum: number } | null = null
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'
     v.onerror = () => { clearTimeout(timer); finish(null) }   // ex. HEVC non décodable : pas de miniature, pas grave
-    v.onloadedmetadata = () => { try { v.currentTime = Math.min(at, Math.max(0, (v.duration || 1) / 2)) } catch { finish(null) } }
+    v.onloadedmetadata = () => {
+      const d = v.duration || 1
+      times = [Math.min(at, d / 2), Math.min(1.5, d * 0.3), d * 0.2, d * 0.4, d * 0.6, d * 0.8].filter((t, i, a) => t < d && a.indexOf(t) === i)
+      try { v.currentTime = times[0] } catch { finish(null) }
+    }
     v.onseeked = () => {
-      try {
-        const w = 360, h = Math.round(w * (v.videoHeight / Math.max(1, v.videoWidth))) || 640
-        const c = document.createElement('canvas'); c.width = w; c.height = h
-        c.getContext('2d')!.drawImage(v, 0, 0, w, h)
-        c.toBlob(b => { clearTimeout(timer); finish(b ? { blob: b, duration: Math.round(v.duration || 0) } : null) }, 'image/jpeg', 0.8)
-      } catch { clearTimeout(timer); finish(null) }
+      // laisse le décodeur peindre l'image avant de la lire (sinon image noire sur certains navigateurs)
+      setTimeout(() => {
+        try {
+          const w = 360, h = Math.round(w * (v.videoHeight / Math.max(1, v.videoWidth))) || 640
+          const c = document.createElement('canvas'); c.width = w; c.height = h
+          const ctx = c.getContext('2d')!; ctx.drawImage(v, 0, 0, w, h)
+          const px = ctx.getImageData(0, 0, w, h).data
+          let sum = 0, n = 0
+          for (let i = 0; i < px.length; i += 4 * 37) { sum += px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114; n++ }
+          const lum = sum / Math.max(1, n)
+          c.toBlob(b => {
+            if (b && (!best || lum > best.lum)) best = { blob: b, lum }
+            if (lum >= 22 || ++k >= times.length) { clearTimeout(timer); finish(best ? { blob: best.blob, duration: Math.round(v.duration || 0) } : null); return }
+            try { v.currentTime = times[k] } catch { finish(null) }
+          }, 'image/jpeg', 0.8)
+        } catch { clearTimeout(timer); finish(best ? { blob: best.blob, duration: Math.round(v.duration || 0) } : null) }
+      }, 120)
     }
     v.src = url
+  })
+}
+
+// Miniature déjà en ligne trop sombre (quasi noire) ? Lue en petit, luminosité moyenne.
+export function isDarkImage(src: string, threshold = 12): Promise<boolean> {
+  return new Promise(resolve => {
+    const img = new Image(); img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = 24; c.height = 40
+        const ctx = c.getContext('2d')!; ctx.drawImage(img, 0, 0, 24, 40)
+        const px = ctx.getImageData(0, 0, 24, 40).data
+        let sum = 0; for (let i = 0; i < px.length; i += 4) sum += px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114
+        resolve(sum / (px.length / 4) < threshold)
+      } catch { resolve(false) }
+    }
+    img.onerror = () => resolve(false)
+    img.src = src
   })
 }
 
