@@ -3433,6 +3433,7 @@ export const EN: Dict = {
     "photo HEIC illisible (conversion en JPG impossible)": "unreadable HEIC photo (JPG conversion failed)",
     "Précédent (←)": "Previous (←)",
     "Suivant (→)": "Next (→)",
+    "Conversion des photos HEIC en JPG…": "Converting HEIC photos to JPG…",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4060,5 +4061,8 @@ export const EN: Dict = {
     ["🎨 Couleurs : lum. {0} · contraste {1} · saturation {2} · teinte {3}° · sous-titres à {4} %", "🎨 Colors: bright. {0} · contrast {1} · saturation {2} · hue {3}° · subtitles at {4} %"],
     ["Conversion de {0} photo(s) HEIC en JPG…", "Converting {0} HEIC photo(s) to JPG…"],
     ["{0} photo(s) HEIC converties en JPG ✓", "{0} HEIC photo(s) converted to JPG ✓"],
+    ["HEIC illisible ({0} / {1})", "unreadable HEIC ({0} / {1})"],
+    ["lecture impossible (HTTP {0})", "read failed (HTTP {0})"],
+    ["{0} photo(s) HEIC non converties — {1}", "{0} HEIC photo(s) not converted — {1}"],
   ],
 }

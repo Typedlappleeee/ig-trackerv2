@@ -14,7 +14,7 @@ import VideoFrame, { Video } from '@/components/VideoFrame'
 import { readZip } from '@/lib/zipReader'
 import { getPartner, type Partner } from '@/lib/scaleflowLink'
 import { PartnerBankModal, SendToPartnerModal } from '@/components/PartnerBank'
-import { isHeic, heicToJpeg } from '@/lib/heic'
+import { isHeic, heicToJpeg, sniffHeic } from '@/lib/heic'
 import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg } from '@/lib/bankFolders'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -1115,36 +1115,47 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     })()
   }, [rendered, thumbs])
 
-  // Photos HEIC déjà dans la Banque : converties en JPG sur place (une fois, en arrière-plan).
-  // Le média garde son id, son titre, son dossier et ses compteurs ; l'ancien fichier HEIC est supprimé.
+  // Photos HEIC déjà dans la Banque : converties en JPG sur place (en arrière-plan). Repérées par
+  // l'extension ET par le contenu (un HEIC renommé .jpg est aussi converti). Le média garde son id,
+  // son titre, son dossier et ses compteurs ; l'ancien fichier est remplacé.
   const heicBusy = useRef(false), heicTried = useRef(new Set<string>())
   useEffect(() => {
     if (heicBusy.current || loading) return
-    const todo = items.filter(i => i.storage_path && /\.(heic|heif)$/i.test(i.storage_path) && !heicTried.current.has(i.id))
-    todo.forEach(i => heicTried.current.add(i.id))        // une seule tentative par photo et par visite
+    let okSet: Set<string>
+    try { okSet = new Set(JSON.parse(localStorage.getItem('sf-heic-ok') || '[]') as string[]) } catch { okSet = new Set() }
+    const todo = items.filter(i => i.storage_path && !heicTried.current.has(i.id) && !okSet.has(i.id)
+      && (/\.(heic|heif)$/i.test(i.storage_path) || inferType(i) === 'image'))
     if (!todo.length) return
+    todo.forEach(i => heicTried.current.add(i.id))        // une tentative par photo et par visite
     heicBusy.current = true
     ;(async () => {
-      let ok = 0
-      toast(`Conversion de ${todo.length} photo(s) HEIC en JPG…`, 'info')
+      let ok = 0, announced = false
+      const fails: string[] = []
       for (const i of todo) {
+        const old = i.storage_path as string
         try {
-          const old = i.storage_path as string
           const url = await signedUrl(old)
           if (!url) continue
-          const r = await fetch(url); if (!r.ok) continue
-          const jpg = await heicToJpeg(new File([await r.blob()], old.split('/').pop() || 'photo.heic', { type: 'image/heic' }))
-          const np = old.replace(/\.(heic|heif)$/i, '.jpg')
+          if (!/\.(heic|heif)$/i.test(old)) {                 // .jpg/.png… : on regarde les premiers octets
+            const h = await fetch(url, { headers: { Range: 'bytes=0-15' } })
+            if (!h.ok || !sniffHeic(new Uint8Array(await h.arrayBuffer()))) { okSet.add(i.id); continue }
+          }
+          if (!announced) { announced = true; toast('Conversion des photos HEIC en JPG…', 'info') }
+          const r = await fetch(url); if (!r.ok) throw new Error(`lecture impossible (HTTP ${r.status})`)
+          const jpg = await heicToJpeg(new File([await r.blob()], 'photo.heic', { type: 'image/heic' }))
+          const np = old.replace(/\.[a-z0-9]+$/i, '') + (/\.(heic|heif)$/i.test(old) ? '.jpg' : '_conv.jpg')
           const up = await supabase.storage.from('content').upload(np, jpg, { contentType: 'image/jpeg', upsert: true })
-          if (up.error) continue
+          if (up.error) throw new Error(up.error.message)
           const { error } = await supabase.from('content_bank').update({ storage_path: np }).eq('id', i.id)
-          if (error) continue
+          if (error) throw new Error(error.message)
           await supabase.storage.from('content').remove([old])
           setItems(prev => prev.map(x => x.id === i.id ? { ...x, storage_path: np } : x))
-          ok++
-        } catch { /* photo illisible : laissée telle quelle */ }
+          okSet.add(i.id); ok++
+        } catch (e) { fails.push(`${i.title} : ${e instanceof Error ? e.message : String(e)}`) }
       }
+      try { localStorage.setItem('sf-heic-ok', JSON.stringify([...okSet].slice(-20000))) } catch { /* plein */ }
       if (ok) toast(`${ok} photo(s) HEIC converties en JPG ✓`, 'ok')
+      if (fails.length) { toast(`${fails.length} photo(s) HEIC non converties — ${fails[0]}`, 'bad', 12000); console.warn('HEIC non converties', fails) }
       heicBusy.current = false
     })()
   }, [items, loading])
