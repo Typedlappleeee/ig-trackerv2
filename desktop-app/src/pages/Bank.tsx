@@ -1115,6 +1115,40 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     })()
   }, [rendered, thumbs])
 
+  // Photos HEIC déjà dans la Banque : converties en JPG sur place (une fois, en arrière-plan).
+  // Le média garde son id, son titre, son dossier et ses compteurs ; l'ancien fichier HEIC est supprimé.
+  const heicBusy = useRef(false), heicTried = useRef(new Set<string>())
+  useEffect(() => {
+    if (heicBusy.current || loading) return
+    const todo = items.filter(i => i.storage_path && /\.(heic|heif)$/i.test(i.storage_path) && !heicTried.current.has(i.id))
+    todo.forEach(i => heicTried.current.add(i.id))        // une seule tentative par photo et par visite
+    if (!todo.length) return
+    heicBusy.current = true
+    ;(async () => {
+      let ok = 0
+      toast(`Conversion de ${todo.length} photo(s) HEIC en JPG…`, 'info')
+      for (const i of todo) {
+        try {
+          const old = i.storage_path as string
+          const url = await signedUrl(old)
+          if (!url) continue
+          const r = await fetch(url); if (!r.ok) continue
+          const jpg = await heicToJpeg(new File([await r.blob()], old.split('/').pop() || 'photo.heic', { type: 'image/heic' }))
+          const np = old.replace(/\.(heic|heif)$/i, '.jpg')
+          const up = await supabase.storage.from('content').upload(np, jpg, { contentType: 'image/jpeg', upsert: true })
+          if (up.error) continue
+          const { error } = await supabase.from('content_bank').update({ storage_path: np }).eq('id', i.id)
+          if (error) continue
+          await supabase.storage.from('content').remove([old])
+          setItems(prev => prev.map(x => x.id === i.id ? { ...x, storage_path: np } : x))
+          ok++
+        } catch { /* photo illisible : laissée telle quelle */ }
+      }
+      if (ok) toast(`${ok} photo(s) HEIC converties en JPG ✓`, 'ok')
+      heicBusy.current = false
+    })()
+  }, [items, loading])
+
   // Ancre du dernier clic (index dans `shown`) pour la sélection par intervalle (Maj+clic).
   const lastIdxRef = useRef<number | null>(null)
   // Clic simple = bascule 1 vignette. Maj+clic = sélectionne TOUT l'intervalle entre
