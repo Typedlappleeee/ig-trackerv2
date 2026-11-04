@@ -207,6 +207,21 @@ describe('API v1 (clé ScaleFlow)', () => {
     expect((await call(v1, { method: 'PATCH', path: `files/${c3.id}`, body: { folder: 'x' }, auth: B })).status).toBe(404)
     expect(D.t.content_bank.find(r => r.id === c3.id)).toMatchObject({ deleted_at: null, folder: 'Montage' })
   })
+  it('supprimer par titre (vidéos envoyées avant le scaleflow_id)', async () => {
+    const A = 'Bearer ' + TOKEN_A
+    const c2 = D.t.content_bank.find(r => r.org_id === ORG_A && r.title === 'clip 2')
+    const del = await call(v1, { method: 'DELETE', path: 'files', query: { title: 'clip 2', folder: 'Montage' }, auth: A })
+    expect(del.body).toMatchObject({ ok: true, trashed: true })
+    expect(D.t.content_bank.find(r => r.id === c2.id).deleted_at).toBeTruthy()
+    expect((await call(v1, { method: 'DELETE', path: 'files', query: { title: 'inconnu' }, auth: A })).status).toBe(404)
+    // deux vidéos du même titre → rien n'est touché, la liste est rendue
+    D.t.content_bank.push({ ...D.t.content_bank.find(r => r.org_id === ORG_A && r.title === 'clip 3'), id: crypto.randomUUID(), folder: 'Autre' })
+    const amb = await call(v1, { method: 'DELETE', path: 'files', query: { title: 'clip 3' }, auth: A })
+    expect(amb.status).toBe(409); expect(amb.body.candidates).toHaveLength(2)
+    expect(D.t.content_bank.filter(r => r.title === 'clip 3').every(r => !r.deleted_at)).toBe(true)
+    // la clé B ne trouve rien dans la banque de A
+    expect((await call(v1, { method: 'DELETE', path: 'files', query: { title: 'clip 1' }, auth: 'Bearer ' + TOKEN_B })).status).toBe(404)
+  })
   it('anti-SSRF : http, IP privée, DNS vers réseau interne, redirection interne, trop lourd', async () => {
     const post = url => call(v1, { method: 'POST', path: 'files', body: { url, folder: 'x' }, auth: 'Bearer ' + TOKEN_A })
     expect((await post('http://example.com/a.mp4')).body.error).toMatch(/https requis/)

@@ -65,6 +65,7 @@ Une URL signée Supabase / S3 valable au moins 1 h convient. Non idempotent : n'
 <tr><td><span class="m p">POST</span><code>/files/&lt;id&gt;/used</code></td><td>Marque la vidéo comme utilisée (+1 à <code>used_count</code>). Elle sort du filtre « Jamais publiées » de ScaleFlow et de <code>?unused=1</code>.</td></tr>
 <tr><td><span class="m g">GET</span><code>/files?folder=…&amp;unused=1</code></td><td>Seulement les vidéos <b>jamais utilisées</b> du dossier (pratique pour ne jamais redonner la même).</td></tr>
 <tr><td><span class="m p">PATCH</span><code>/files/&lt;id&gt;</code> <code>{"folder": "…", "title": "…"}</code></td><td>Déplace et/ou renomme la vidéo.</td></tr>
+<tr><td><span class="m p">DELETE</span><code>/files?title=…&amp;folder=…</code></td><td>Pour les vidéos reçues <b>avant</b> le <code>scaleflow_id</code> : supprime (corbeille) la vidéo qui porte ce titre (dans ce dossier si <code>folder</code> est donné). S'il y en a plusieurs : <b>409</b> avec la liste <code>candidates</code>, rien n'est touché.</td></tr>
 <tr><td><span class="m p">DELETE</span><code>/files/&lt;id&gt;</code></td><td>Met la vidéo à la <b>corbeille</b> de ScaleFlow : elle disparaît de l'API tout de suite, le propriétaire peut la restaurer pendant 7 jours, puis elle est effacée.</td></tr></table>
 <p class="note">Chaque média renvoyé contient aussi <code>used_count</code> (0 = jamais utilisée). Une clé ne peut agir que sur les médias de son espace (404 sinon).</p>
 <h3>Flux conseillé pour un CRM (un dossier par modèle)</h3>

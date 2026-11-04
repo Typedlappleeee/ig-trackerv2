@@ -182,6 +182,24 @@ export async function trashFile(s, scope, id) {
   if (error) throw new Error(error.message)
   return { id: r.id, trashed: true, restorable_days: 7 }
 }
+// Vidéos envoyées AVANT le scaleflow_id : retrouvée par son titre (et son dossier, si donné).
+// Supprimée seulement s'il y en a exactement UNE ; plusieurs → 409 avec la liste (rien n'est touché).
+export async function trashByTitle(s, scope, { title, folder }) {
+  const t = cleanTitle(title, '')
+  if (!t) throw httpError(422, 'invalid_action', 'title requis')
+  let q = inScope(s.from('content_bank').select('id, title, folder'), scope).is('deleted_at', null).eq('title', t).or(NOT_SENTINEL)
+  if (folder !== undefined && folder !== null && String(folder).trim()) q = q.eq('folder', cleanFolder(folder))
+  const { data, error } = await q.limit(20)
+  if (error) throw new Error(error.message)
+  const rows = data || []
+  if (!rows.length) throw httpError(404, 'file_not_found', 'aucune vidéo avec ce titre dans ta banque')
+  if (rows.length > 1) {
+    const e = httpError(409, 'ambiguous', `${rows.length} vidéos portent ce titre : précise le dossier (folder) ou supprime par id`)
+    e.candidates = rows.map(r => ({ id: r.id, folder: r.folder }))
+    throw e
+  }
+  return trashFile(s, scope, rows[0].id)
+}
 // « Utilisée » : +1 au compteur de publications (filtre « Jamais publiées » de la Banque).
 export async function markUsed(s, scope, id) {
   const r = await ownFile(s, scope, id)

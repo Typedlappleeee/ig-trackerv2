@@ -6,7 +6,7 @@
 // Les réponses sont { ok: true, … } ou { ok: false, error, code } avec le bon statut HTTP.
 // Appels SERVEUR À SERVEUR uniquement (pas de CORS : la clé ne doit jamais être dans un navigateur).
 // Env Vercel : SUPABASE_URL (ou VITE_SUPABASE_URL) + SUPABASE_SERVICE_ROLE_KEY.
-import { db, authCheck, logCall, listFolders, listFiles, createFolder, storeFromUrl, createUpload, registerUpload, cleanFolder, bodyOf, trashFile, markUsed, updateFile } from './_bank.js'
+import { db, authCheck, logCall, listFolders, listFiles, createFolder, storeFromUrl, createUpload, registerUpload, cleanFolder, bodyOf, trashFile, trashByTitle, markUsed, updateFile } from './_bank.js'
 import { DOCS_HTML } from './_linkdocs.js'
 
 function send(res, status, body) {
@@ -68,6 +68,10 @@ export default async function handler(req, res) {
       if (!b.url) return reply(422, { ok: false, code: 'invalid_action', error: 'url (ou path) requis' })
       return reply(200, { ok: true, file: await storeFromUrl(s, scope, b) })
     }
+    // DELETE files?title=…&folder=… : vidéo envoyée avant le scaleflow_id, retrouvée par son titre
+    if (route === 'files' && method === 'DELETE') {
+      return reply(200, { ok: true, ...(await trashByTitle(s, scope, { title: url.searchParams.get('title'), folder: url.searchParams.get('folder') })) })
+    }
     // files/<id> : DELETE (corbeille), PATCH {folder, title} ; files/<id>/used : POST (+1 utilisation)
     const m = /^files\/([0-9a-f-]{36})(\/used)?$/i.exec(route)
     if (m && !m[2] && method === 'DELETE') return reply(200, { ok: true, ...(await trashFile(s, scope, m[1])) })
@@ -79,6 +83,6 @@ export default async function handler(req, res) {
     return reply(404, { ok: false, code: 'not_found', error: `route inconnue : ${method} /api/v1/${route}` })
   } catch (e) {
     const status = Number(e?.status) || 500
-    return reply(status, { ok: false, code: e?.code || 'server_error', error: status === 500 ? `erreur serveur : ${e?.message || e}` : String(e?.message || e) })
+    return reply(status, { ok: false, code: e?.code || 'server_error', error: status === 500 ? `erreur serveur : ${e?.message || e}` : String(e?.message || e), ...(e?.candidates ? { candidates: e.candidates } : {}) })
   }
 }
