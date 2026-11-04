@@ -3434,6 +3434,9 @@ export const EN: Dict = {
     "Précédent (←)": "Previous (←)",
     "Suivant (→)": "Next (→)",
     "Conversion des photos HEIC en JPG…": "Converting HEIC photos to JPG…",
+    "Une copie va dans le dossier choisi, l’original reste où il est.": "A copy goes into the chosen folder, the original stays where it is.",
+    "Duplication…": "Duplicating…",
+    "Dupliquer ici": "Duplicate here",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4064,5 +4067,7 @@ export const EN: Dict = {
     ["HEIC illisible ({0} / {1})", "unreadable HEIC ({0} / {1})"],
     ["lecture impossible (HTTP {0})", "read failed (HTTP {0})"],
     ["{0} photo(s) HEIC non converties — {1}", "{0} HEIC photo(s) not converted — {1}"],
+    ["{0} média(s) dupliqué(s) dans « {1} ».", "{0} media duplicated into “{1}”."],
+    ["Dupliquer {0} média(s)", "Duplicate {0} media"],
   ],
 }

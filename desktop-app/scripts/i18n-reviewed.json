@@ -625,6 +625,7 @@
  "video/*",
  "videos/{0}/linkpic-{1}.{2}",
  "videos/{0}/{1}.{2}",
+ "videos/{0}/{1}{2}",
  "warmup",
  "zoe",
  "{0} bio(s)",

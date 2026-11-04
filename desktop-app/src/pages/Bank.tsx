@@ -1009,8 +1009,42 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const narrow = useNarrow()
   const moveFolders = useMemo(() => folders.filter(f => f.n !== 'Tous' && !f.special), [folders])
 
+  // « Dupliquer » : copie (fichier + miniature + nouvelle ligne) dans le dossier ; l'original reste.
+  const [moveMode, setMoveMode] = useState<'move' | 'copy'>('move')
+  async function doCopy(dest: string) {
+    setMoving(true)
+    let ok = 0
+    for (const it of items.filter(x => sel.has(x.id))) {
+      try {
+        let path: string | null = null, thumb: string | null = it.thumbnail_path ?? null
+        if (it.storage_path) {
+          const ext = (it.storage_path.match(/\.[a-z0-9]+$/i)?.[0]) ?? ''
+          path = `videos/${scopeFolder}/${crypto.randomUUID()}${ext}`
+          const c = await supabase.storage.from('content').copy(it.storage_path, path)
+          if (c.error) throw new Error(c.error.message)
+          if (it.thumbnail_path) {
+            const tp = path.replace(/\.[a-z0-9]+$/i, '') + '_thumb.jpg'
+            const t = await supabase.storage.from('content').copy(it.thumbnail_path, tp)
+            thumb = t.error ? null : tp
+          }
+        }
+        const { error } = await supabase.from('content_bank').insert({
+          user_id: user.id, org_id: currentOrg?.id ?? null, title: it.title, storage_path: path, thumbnail_path: thumb,
+          file_url: path ? null : it.file_url, folder: dest, duration: it.duration ?? null, tags: it.tags ?? [], notes: null, used_count: 0,
+          ...((it as { description?: string | null }).description ? { description: (it as { description?: string | null }).description } : {}),
+        })
+        if (error) throw new Error(error.message)
+        ok++
+      } catch (e) { toast(`${it.title} : ${e instanceof Error ? e.message : String(e)}`, 'bad') }
+    }
+    setMoving(false)
+    setMoveOpen(false); setNewFolder(''); setSel(new Set())
+    if (ok) toast(`${ok} média(s) dupliqué(s) dans « ${dest} ».`, 'ok')
+    load()
+  }
   async function doMove(target: string) {
     const dest = normPath(target); if (!dest || sel.size === 0) return
+    if (moveMode === 'copy') return doCopy(dest)
     setMoving(true)
     const { error: err } = await supabase.from('content_bank').update({ folder: dest }).in('id', [...sel])
     setMoving(false)
@@ -1604,7 +1638,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
           {sel.size === 1 && <Btn label="Description" theme={theme} sm icon="M4 7V4h16v3|M9 20h6|M12 4v16" onClick={openDesc} />}
           <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => { if (onNavigate) openTool(onNavigate, 'studio', { tool: tab === 'image' ? 'imgspoof' : 'remix', ids: [...sel] }) }} />
-          <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => setMoveOpen(true)} />
+          <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => { setMoveMode('move'); setMoveOpen(true) }} />
+          <Btn label="Dupliquer" theme={theme} sm icon="M8 8h12v12H8z|M4 16V4h12" onClick={() => { setMoveMode('copy'); setMoveOpen(true) }} />
           <Btn label="Télécharger" theme={theme} sm icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" onClick={() => downloadMedia([...sel])} />
           {partner && <Btn label={`Envoyer vers ${partner.name}`} theme={theme} sm icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => setSendIds([...sel])} />}
           <Btn label="Supprimer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />
@@ -1632,13 +1667,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           defaultFolder={folder !== 'Tous' && folder !== 'Jamais publiées' ? folder : 'ScaleFlow'} onClose={() => setSendIds(null)} />
       )}
       {moveOpen && (
-        <Modal theme={theme} title={`Déplacer ${sel.size} média(s)`} sub="Choisis un dossier ou crée-en un." icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
+        <Modal theme={theme} title={moveMode === 'copy' ? `Dupliquer ${sel.size} média(s)` : `Déplacer ${sel.size} média(s)`} sub={moveMode === 'copy' ? 'Une copie va dans le dossier choisi, l’original reste où il est.' : 'Choisis un dossier ou crée-en un.'} icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
           onClose={() => setMoveOpen(false)}
           footer={<>
             <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setMoveOpen(false)} />
-            <Btn theme={theme} tone="primary" label={moving ? 'Déplacement…' : 'Déplacer ici'} disabled={moving || !newFolder.trim()} onClick={() => doMove(newFolder)} />
+            <Btn theme={theme} tone="primary" label={moving ? (moveMode === 'copy' ? 'Duplication…' : 'Déplacement…') : (moveMode === 'copy' ? 'Dupliquer ici' : 'Déplacer ici')} disabled={moving || !newFolder.trim()} onClick={() => doMove(newFolder)} />
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Segmented<'move' | 'copy'> value={moveMode} onChange={setMoveMode} options={[{ v: 'move', l: 'Déplacer' }, { v: 'copy', l: 'Dupliquer' }]} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 340, overflowY: 'auto' }}>
               {moveFolders.map(f => (
                 <button key={f.n} title={f.n} onClick={() => doMove(f.n)} disabled={moving} style={{ display: 'flex', alignItems: 'center', gap: 10, width: `calc(100% - ${f.depth * 18}px)`, marginLeft: f.depth * 18, height: 36, padding: '0 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#161618', color: '#EDEDEF', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'left', flexShrink: 0, boxSizing: 'border-box' }}>
@@ -1675,7 +1711,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               { l: 'Lire', d: 'M5 3l14 9-14 9z', fn: () => openPlayer(ctx.item) },
               { l: 'Renommer', d: 'M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z', fn: () => openRename(ctx.item) },
               { l: 'Description', d: 'M4 7V4h16v3|M9 20h6|M12 4v16', fn: () => { setDescItem(ctx.item); setDescVal((ctx.item as any).description ?? '') } },
-              { l: 'Déplacer', d: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z', fn: () => { setSel(new Set([ctx.item.id])); setMoveOpen(true) } },
+              { l: 'Déplacer', d: 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z', fn: () => { setSel(new Set([ctx.item.id])); setMoveMode('move'); setMoveOpen(true) } },
+              { l: 'Dupliquer', d: 'M8 8h12v12H8z|M4 16V4h12', fn: () => { setSel(new Set([ctx.item.id])); setMoveMode('copy'); setMoveOpen(true) } },
               { l: 'Télécharger', d: 'M12 3v12|M7 10l5 5 5-5|M4 21h16', fn: () => downloadMedia([ctx.item.id]) },
             ].map(o => (
               <button key={o.l} onClick={() => { o.fn(); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
