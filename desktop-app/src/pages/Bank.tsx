@@ -937,12 +937,25 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }
 
   // ── Lecteur vidéo (double-clic) + menu contextuel (clic droit) ───────────────
-  const [player, setPlayer] = useState<{ url: string; title: string; type: MediaType; poster?: string | null } | null>(null)
+  const [player, setPlayer] = useState<{ id?: string; url: string; title: string; type: MediaType; poster?: string | null } | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; item: ContentItem } | null>(null)
   async function openPlayer(i: ContentItem) {
     const url = (i.storage_path && (thumbs[i.storage_path] || await signedUrl(i.storage_path))) || i.file_url
-    if (url) setPlayer({ url, title: i.title, type: inferType(i), poster: thumbFor(i) })
+    if (url) setPlayer({ id: i.id, url, title: i.title, type: inferType(i), poster: thumbFor(i) })
   }
+  // Flèches ‹ › (et clavier ← →) : média précédent / suivant dans la liste affichée
+  function stepPlayer(d: number) {
+    if (!player?.id || shown.length < 2) return
+    const k = shown.findIndex(x => x.id === player.id)
+    const next = shown[(k + d + shown.length) % shown.length]
+    if (next) void openPlayer(next)
+  }
+
+  useEffect(() => {
+    if (!player) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'ArrowRight') stepPlayer(1); else if (e.key === 'ArrowLeft') stepPlayer(-1) }
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey)
+  })
 
   // ── Glisser-déposer un média (ou la sélection) dans un dossier ───────────────
   const [dragOver, setDragOver] = useState<string | null>(null)
@@ -1675,6 +1688,17 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             // prêt ; à la fermeture le téléchargement est coupé (Video).
             ? <Video key={player.url} src={player.url} poster={player.poster ?? undefined} controls autoPlay playsInline style={{ display: 'block', width: '100%', maxHeight: '70vh', borderRadius: 6, background: '#000' }} />
             : <img src={player.url} alt="" style={{ display: 'block', width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 6 }} />}
+          {shown.length > 1 && player.id && (() => {
+            const k = shown.findIndex(x => x.id === player.id)
+            const arrow: CSSProperties = { width: 44, height: 44, borderRadius: 99, border: '1px solid rgba(255,255,255,0.12)', background: '#161618', color: '#F4F4F5', fontSize: 22, lineHeight: 1, cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0 }
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 12 }}>
+                <button type="button" title="Précédent (←)" onClick={() => stepPlayer(-1)} style={arrow}>‹</button>
+                <span style={{ fontSize: 12.5, color: '#8B8B94', fontVariantNumeric: 'tabular-nums', minWidth: 60, textAlign: 'center' }}>{`${k + 1} / ${shown.length}`}</span>
+                <button type="button" title="Suivant (→)" onClick={() => stepPlayer(1)} style={arrow}>›</button>
+              </div>
+            )
+          })()}
         </Modal>
       )}
 

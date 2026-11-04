@@ -3431,6 +3431,8 @@ export const EN: Dict = {
     "Variantes pour cette vidéo": "Variants for this video",
     "Toutes uniques · réglable aussi sous chaque vidéo": "All unique · also adjustable under each video",
     "photo HEIC illisible (conversion en JPG impossible)": "unreadable HEIC photo (JPG conversion failed)",
+    "Précédent (←)": "Previous (←)",
+    "Suivant (→)": "Next (→)",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
