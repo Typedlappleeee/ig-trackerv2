@@ -25,6 +25,7 @@ import { signPaths, cachedSigned } from '@/lib/signedUrls'
 import { uploadThumbFor } from '@/lib/bankStorage'
 import { Video } from '@/components/VideoFrame'
 import { folderTree, listBankFolders } from '@/lib/bankFolders'
+import { niceBase } from '@/lib/niceTitle'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -628,6 +629,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
       for (const v of sources) {
         if (R.isCancelled()) { push('⏹ Annulé.'); break }
         push(`— ${v.title} —`)
+        // Nom propre des variantes (jamais « hf_… ») : « <titre> · v1, v2… »
+        const vt = await niceBase({ orgId: currentOrg?.id ?? null, userId: user.id }, v.title, destFolder || (v as { folder?: string | null }).folder)
         let bytes: Uint8Array
         try {
           bytes = await resolveSourceBytes(v)
@@ -691,8 +694,8 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
               out = await runAutoVariant(bytes, vOpts, hooks)
             }
             push(`    ✓ variante générée (${Math.round(out.byteLength / 1024)} Ko) → sauvegarde…`)
-            const savedId = await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${v.title} · auto ${i + 1}`, 'mp4', destFolder || null)
-            ps.queue(savedId, `${v.title} · auto ${i + 1}`, push)
+            const savedId = await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${vt} · v${i + 1}`, 'mp4', destFolder || null)
+            ps.queue(savedId, `${vt} · v${i + 1}`, push)
             done++; setMade(done); R.tick(true)
           } catch (ve) {
             // On loggue la VRAIE erreur (message + 1re ligne de stack) et on continue les autres

@@ -15,6 +15,7 @@ import { readZip } from '@/lib/zipReader'
 import { getPartner, type Partner } from '@/lib/scaleflowLink'
 import { PartnerBankModal, SendToPartnerModal } from '@/components/PartnerBank'
 import { isHeic, heicToJpeg, sniffHeic } from '@/lib/heic'
+import { niceBase, isUglyTitle, allocTitle, prefixFor } from '@/lib/niceTitle'
 import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg } from '@/lib/bankFolders'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -404,7 +405,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     }
     const ins = await supabase.from('content_bank').insert({
       user_id: user.id, org_id: currentOrg?.id ?? null,
-      title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: thumbPath,
+      title: await niceBase({ orgId: currentOrg?.id ?? null, userId: user.id }, file.name.replace(/\.[a-z0-9]+$/i, ''), dest), storage_path: storagePath, thumbnail_path: thumbPath,
       file_url: null, folder: dest, duration, tags: [], notes: null, used_count: 0,
     })
     if (ins.error) {   // ligne refusée → on ne laisse pas un fichier orphelin dans le stockage
@@ -1191,6 +1192,34 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       if (ok) toast(`${ok} photo(s) HEIC converties en JPG ✓`, 'ok')
       if (fails.length) { toast(`${fails.length} photo(s) HEIC non converties — ${fails[0]}`, 'bad', 12000); console.warn('HEIC non converties', fails) }
       heicBusy.current = false
+    })()
+  }, [items, loading])
+
+  // Noms techniques (« hf_… », identifiants) → « <Dossier> 012 » (et « · v1 » gardé pour une variante).
+  // Une fois, en arrière-plan, sur toute la Banque de l'espace.
+  const renameBusy = useRef(false), renameTried = useRef(new Set<string>())
+  useEffect(() => {
+    if (renameBusy.current || loading) return
+    const todo = items.filter(i => !renameTried.current.has(i.id) && isUglyTitle(i.title))
+    if (!todo.length) return
+    todo.forEach(i => renameTried.current.add(i.id))
+    renameBusy.current = true
+    ;(async () => {
+      const scopeArg = { orgId: currentOrg?.id ?? null, userId: user.id }
+      // les variantes d'un même nom technique gardent le même nouveau numéro
+      const baseMap = new Map<string, string>()
+      let n = 0
+      for (const i of todo) {
+        const [oldBase, ...rest] = i.title.split(' · ')
+        const key = `${i.folder ?? ''}|${oldBase}`
+        let nb = baseMap.get(key)
+        if (!nb) { nb = await allocTitle(scopeArg, prefixFor(i.folder)); baseMap.set(key, nb) }
+        const title = [nb, ...rest].join(' · ')
+        const { error } = await supabase.from('content_bank').update({ title }).eq('id', i.id)
+        if (!error) { n++; setItems(prev => prev.map(x => x.id === i.id ? { ...x, title } : x)) }
+      }
+      if (n) toast(`${n} média(s) renommé(s) (noms « hf_… » remplacés)`, 'ok')
+      renameBusy.current = false
     })()
   }, [items, loading])
 

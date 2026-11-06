@@ -3,6 +3,7 @@
 // tournent sur l'ordinateur (ffmpeg.wasm) ; chaque sortie est enregistrée dans la Banque.
 import { isHeic, heicToJpeg } from '@/lib/heic'
 import { folderTree, listBankFolders } from '@/lib/bankFolders'
+import { niceBase } from '@/lib/niceTitle'
 import { usePartnerSend, PartnerSendSelect } from '@/components/PartnerSendSelect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
@@ -163,7 +164,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
         if (up.error) { toast(`Envoi impossible : ${file.name}`, 'bad'); continue }
         const th = file.type.startsWith('image') ? { thumbPath: null, duration: null } : await uploadThumbFor(file, storagePath)
         const { data } = await supabase.from('content_bank').insert({
-          user_id: user.id, org_id: currentOrg?.id ?? null, title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath,
+          user_id: user.id, org_id: currentOrg?.id ?? null, title: await niceBase({ orgId: currentOrg?.id ?? null, userId: user.id }, file.name.replace(/\.[a-z0-9]+$/i, ''), null), storage_path: storagePath,
           thumbnail_path: th.thumbPath, file_url: null, folder: null, duration: th.duration, tags: [], notes: null, used_count: 0,
         }).select('id').maybeSingle()
         if (data?.id) added.push(data.id as string)
@@ -215,38 +216,40 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
         for (let i = 0; i < list.length; i++) {
           if (R.isCancelled()) break
           const v = list[i]
+          // nom propre des sorties (jamais « hf_… »)
+          const vt = await niceBase({ orgId: currentOrg?.id ?? null, userId: user.id }, v.title, destFolder || v.folder)
           try {
-            setPhase(`${v.title} · lecture…`); setStep(0)
+            setPhase(`${vt} · lecture…`); setStep(0)
             const bytes = await resolveSourceBytes(v)
             const sOpts = { intensity, gps: gpsFor(gpsCity), device: device === 'none' ? null : device }
             if (tool === 'remix' || tool === 'spoof' || imgTool) {
               const nV = copiesOf(v.id)
               for (let k = 0; k < nV; k++) {
                 if (R.isCancelled()) break
-                setPhase(`${v.title} · variante ${k + 1}/${nV}`); setStep(0)
+                setPhase(`${vt} · variante ${k + 1}/${nV}`); setStep(0)
                 const seed = Math.random() * 1000 + 1
-                if (imgTool) await save(`${v.title} · v${k + 1}`, await runImageSpoof(bytes, { seed, ...sOpts }), 'jpg')
-                else if (tool === 'remix') await save(`${v.title} · v${k + 1}`, await runRemix(bytes, seed, hooks, { ...sOpts, toggles }))
-                else await save(`${v.title} · v${k + 1}`, await runSpoof(bytes, seed, hooks, sOpts))
+                if (imgTool) await save(`${vt} · v${k + 1}`, await runImageSpoof(bytes, { seed, ...sOpts }), 'jpg')
+                else if (tool === 'remix') await save(`${vt} · v${k + 1}`, await runRemix(bytes, seed, hooks, { ...sOpts, toggles }))
+                else await save(`${vt} · v${k + 1}`, await runSpoof(bytes, seed, hooks, sOpts))
               }
             } else if (tool === 'montage') {
-              setPhase(`${v.title} · découpe…`)
-              await save(`${v.title} · coupe`, await runMontage(bytes, trim.start, trim.end, hooks))
+              setPhase(`${vt} · découpe…`)
+              await save(`${vt} · coupe`, await runMontage(bytes, trim.start, trim.end, hooks))
             } else if (tool === 'overlay') {
               const o = ovMode === 'random' ? ovs[Math.floor(Math.random() * ovs.length)] : ovs[i % ovs.length]
-              setPhase(`${v.title} · incrustation…`)
-              await save(`${v.title} · incrustation`, await runOverlay(bytes, o.data, o.ext, { x: ov.x, y: ov.y, sizePct: ov.size, from: ovWhen === 'range' ? ovFrom : 0, to: ovWhen === 'range' ? ovTo : null }, hooks))
+              setPhase(`${vt} · incrustation…`)
+              await save(`${vt} · incrustation`, await runOverlay(bytes, o.data, o.ext, { x: ov.x, y: ov.y, sizePct: ov.size, from: ovWhen === 'range' ? ovFrom : 0, to: ovWhen === 'range' ? ovTo : null }, hooks))
             } else if (tool === 'mixer') {
-              setPhase(`${v.title} · légende…`)
-              await save(`${v.title} · texte`, await runCaption(bytes, captionFor(lines, i, capMode), { x: cap.x, y: cap.y }, hooks, capStyle))
+              setPhase(`${vt} · légende…`)
+              await save(`${vt} · texte`, await runCaption(bytes, captionFor(lines, i, capMode), { x: cap.x, y: cap.y }, hooks, capStyle))
             } else if (tool === 'subs') {
-              setPhase(`${v.title} · transcription et sous-titres…`)
+              setPhase(`${vt} · transcription et sous-titres…`)
               // rendue unique : N variantes (transcription faite une seule fois)
               const nV = subsUnique ? copiesOf(v.id) : 1, memo = {}
               for (let k = 0; k < nV; k++) {
                 if (R.isCancelled()) break
-                if (nV > 1) setPhase(`${v.title} · sous-titres ${k + 1}/${nV}`)
-                await save(nV > 1 ? `${v.title} · v${k + 1}` : `${v.title} · sous-titres`, await runSubtitles(bytes, conns.groq, { onProgress: setStep, onLog: push }, subsUnique ? { ...sOpts, intensity: 'subtle' } : false, memo))
+                if (nV > 1) setPhase(`${vt} · sous-titres ${k + 1}/${nV}`)
+                await save(`${vt} · v${k + 1}`, await runSubtitles(bytes, conns.groq, { onProgress: setStep, onLog: push }, subsUnique ? { ...sOpts, intensity: 'subtle' } : false, memo))
               }
             }
           } catch (e) {

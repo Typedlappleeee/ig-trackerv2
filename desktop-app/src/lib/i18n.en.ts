@@ -4069,5 +4069,6 @@ export const EN: Dict = {
     ["{0} photo(s) HEIC non converties — {1}", "{0} HEIC photo(s) not converted — {1}"],
     ["{0} média(s) dupliqué(s) dans « {1} ».", "{0} media duplicated into “{1}”."],
     ["Dupliquer {0} média(s)", "Duplicate {0} media"],
+    ["{0} média(s) renommé(s) (noms « hf_… » remplacés)", "{0} media renamed (“hf_…” names replaced)"],
   ],
 }

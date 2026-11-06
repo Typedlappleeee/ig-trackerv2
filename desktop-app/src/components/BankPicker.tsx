@@ -9,6 +9,7 @@ import { Modal, Btn, FIELD, Skeleton, SkeletonRows } from '@/lib/ui'
 import VideoFrame from './VideoFrame'
 import { folderTree, isWithin } from '@/lib/bankFolders'
 import { heicToJpeg } from '@/lib/heic'
+import { niceBase } from '@/lib/niceTitle'
 
 // Sélecteur « Banque » commun (fidèle à _openPicker du prototype ZIP) : une modale
 // avec recherche + grille (vidéos/images) ou liste (légendes), sélection multi ou
@@ -144,7 +145,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
         const th = IMG.includes(ext) || file.type.startsWith('image') ? { thumbPath: null, duration: null } : await uploadThumbFor(file, storagePath)
         const ins = await supabase.from('content_bank').insert({
           user_id: user.id, org_id: currentOrg?.id ?? null,
-          title: file.name.replace(/\.[a-z0-9]+$/i, ''), storage_path: storagePath, thumbnail_path: th.thumbPath,
+          title: await niceBase({ orgId: currentOrg?.id ?? null, userId: user.id }, file.name.replace(/\.[a-z0-9]+$/i, ''), null), storage_path: storagePath, thumbnail_path: th.thumbPath,
           file_url: null, folder: null, duration: th.duration, tags: [], notes: null, used_count: 0,
         }).select('id').single()
         if (ins.data?.id) newIds.push(ins.data.id as string)
