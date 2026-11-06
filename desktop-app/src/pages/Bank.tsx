@@ -16,6 +16,7 @@ import { getPartner, type Partner } from '@/lib/scaleflowLink'
 import { PartnerBankModal, SendToPartnerModal } from '@/components/PartnerBank'
 import { isHeic, heicToJpeg, sniffHeic } from '@/lib/heic'
 import { niceBase, isUglyTitle, allocTitle, prefixFor } from '@/lib/niceTitle'
+import PoolManager, { POOL_PREFIX } from '@/components/PoolManager'
 import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg } from '@/lib/bankFolders'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -76,7 +77,7 @@ function hueFor(id: string): string {
   return HUES[h % HUES.length]
 }
 
-type TabKey = 'video' | 'image' | 'caption'
+type TabKey = 'video' | 'image' | 'caption' | 'pool'
 interface Caption { id: string; title: string | null; content: string; used_count: number | null; created_at: string }
 type SortKey = 'recent' | 'name' | 'used'
 
@@ -262,12 +263,15 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   useEffect(() => { setSel(new Set()) }, [tab, folder])
 
   // ── Légendes (caption_bank) ──────────────────────────────────────────────────
+  const [poolCount, setPoolCount] = useState(0)
   const loadCaptions = useCallback(async () => {
     const q = currentOrg
       ? supabase.from('caption_bank').select('id,title,content,used_count,created_at').eq('org_id', currentOrg.id)
       : supabase.from('caption_bank').select('id,title,content,used_count,created_at').eq('user_id', user.id).is('org_id', null)
     const { data } = await q.order('created_at', { ascending: false })
-    setCaptions((data ?? []) as Caption[])
+    const all = (data ?? []) as Caption[]
+    setCaptions(all.filter(c => !(c.title ?? '').startsWith(POOL_PREFIX)))   // les pools ont leur onglet
+    setPoolCount(all.length - all.filter(c => !(c.title ?? '').startsWith(POOL_PREFIX)).length)
   }, [currentOrg?.id, user.id])
   useEffect(() => { loadCaptions() }, [loadCaptions])
 
@@ -1357,6 +1361,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     { k: 'video', l: 'Vidéos', n: counts.video },
     { k: 'image', l: 'Images', n: counts.image },
     { k: 'caption', l: 'Légendes', n: captions.length },
+    { k: 'pool', l: 'Pools', n: poolCount },
   ]
   const SORTS: { k: SortKey; l: string }[] = [
     { k: 'recent', l: 'Récentes' },
@@ -1467,10 +1472,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
 
       <UnderlineTabs<TabKey> value={tab} onChange={k => { setTab(k); setFolder('Tous') }}
-        items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'video' ? 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z' : t.k === 'image' ? 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
+        items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'video' ? 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z' : t.k === 'image' ? 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' : t.k === 'pool' ? 'M4 6h16|M4 12h16|M4 18h10' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
+
+      {tab === 'pool' && <PoolManager orgId={currentOrg?.id ?? null} userId={user.id} onChanged={loadCaptions} />}
 
       {/* Corps : colonne Dossiers + grille */}
-      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '240px minmax(0,1fr)', gap: 14, alignItems: 'start' }}>
+      <div style={{ display: tab === 'pool' ? 'none' : 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '240px minmax(0,1fr)', gap: 14, alignItems: 'start' }}>
         {/* Dossiers */}
         <Panel theme={theme}>
           <div style={{
@@ -1634,7 +1641,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             }}>
               {rendered.map((i, idx) => (
                 <Tile
-                  key={i.id} idx={idx} selecting={selecting} item={i} type={tab} thumb={thumbFor(i)} media={mediaFor(i)} broken={isBroken(i)}
+                  key={i.id} idx={idx} selecting={selecting} item={i} type={tab === 'image' ? 'image' : 'video'} thumb={thumbFor(i)} media={mediaFor(i)} broken={isBroken(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={(e) => toggleAt(idx, i.id, e.shiftKey)}
                   onDragStart={e => e.dataTransfer.setData('text/plain', i.id)}
                   onOpen={() => openPlayer(i)}
