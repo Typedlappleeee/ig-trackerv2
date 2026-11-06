@@ -3441,6 +3441,12 @@ export const EN: Dict = {
     "photo de la modèle introuvable": "model photo not found",
     "photo de la modèle illisible": "model photo unreadable",
     "Higgsfield n’a pas pris la photo de la modèle": "Higgsfield did not accept the model photo",
+    "Écris au moins une légende (une par ligne) avant d’enregistrer.": "Write at least one caption (one per line) before saving.",
+    "Enregistrer ce pool de légendes": "Save this caption pool",
+    "Nom du pool (ex. Kenza FR)": "Pool name (e.g. Kenza FR)",
+    "Pools de légendes enregistrés": "Saved caption pools",
+    "📚 Aucun pool enregistré": "📚 No saved pool",
+    "💾 Enregistrer le pool": "💾 Save the pool",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4074,5 +4080,10 @@ export const EN: Dict = {
     ["{0} média(s) dupliqué(s) dans « {1} ».", "{0} media duplicated into “{1}”."],
     ["Dupliquer {0} média(s)", "Duplicate {0} media"],
     ["{0} média(s) renommé(s) (noms « hf_… » remplacés)", "{0} media renamed (“hf_…” names replaced)"],
+    ["{0} légende(s). Il sera disponible pour toute l’équipe.", "{0} caption(s). It will be available to the whole team."],
+    ["Pool « {0} » mis à jour ✓", "Pool “{0}” updated ✓"],
+    ["Pool « {0} » enregistré ✓", "Pool “{0}” saved ✓"],
+    ["Supprimer le pool « {0} » ?", "Delete the pool “{0}”?"],
+    ["📚 Mes pools ({0})…", "📚 My pools ({0})…"],
   ],
 }

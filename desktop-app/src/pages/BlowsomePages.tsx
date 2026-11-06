@@ -26,6 +26,7 @@ import { uploadThumbFor } from '@/lib/bankStorage'
 import { Video } from '@/components/VideoFrame'
 import { folderTree, listBankFolders } from '@/lib/bankFolders'
 import { niceBase } from '@/lib/niceTitle'
+import CaptionPools from '@/components/CaptionPools'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -864,6 +865,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                 <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', ...BTN_GHOST, fontSize: 12, fontWeight: 500 }}>📁 Choisir dans la banque</button>
                 {capPool.trim() && <button onClick={() => setCapPool('')} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid transparent', background: 'transparent', color: '#A1A1AA', fontSize: 12, fontWeight: 500 }}>Vider</button>}
               </div>
+              <CaptionPools value={capPool} onChange={setCapPool} orgId={currentOrg?.id ?? null} userId={user.id} selStyle={selStyle} btnStyle={BTN_GHOST} />
               <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne (distribuées entre les variantes)…\nEx : Sérieux là ?'} style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 6, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }} />
               <Fld label="Format"><Seg value={capStyle} onChange={setCapStyle} options={[{ v: 'snapchat', label: 'Snapchat' }, { v: 'outline', label: 'Contour' }]} /></Fld>
               <Fld label="Distribution"><Seg value={capMode} onChange={setCapMode} options={[{ v: 'seq', label: 'Séquentiel' }, { v: 'random', label: 'Aléatoire' }]} /></Fld>

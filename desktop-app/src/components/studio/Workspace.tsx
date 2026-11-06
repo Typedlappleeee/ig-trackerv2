@@ -4,6 +4,7 @@
 import { isHeic, heicToJpeg } from '@/lib/heic'
 import { folderTree, listBankFolders } from '@/lib/bankFolders'
 import { niceBase } from '@/lib/niceTitle'
+import CaptionPools from '@/components/CaptionPools'
 import { usePartnerSend, PartnerSendSelect } from '@/components/PartnerSendSelect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
@@ -352,6 +353,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
       </>
       case 'mixer': return <>
         <FieldRow label="Légende(s)" hint={lines.length > 1 ? `${lines.length} légendes → une par vidéo` : 'Une par ligne pour une légende différente par vidéo'}>
+          <CaptionPools value={capText} onChange={setCapText} orgId={currentOrg?.id ?? null} userId={user.id} selStyle={{ ...SELECT, width: 'auto', height: 30 }} btnStyle={{ background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#E4E4E7' }} />
           <textarea value={capText} onChange={e => setCapText(e.target.value)} rows={4} placeholder={'POV : tu restes jusqu’à la fin 👀\nAttends la fin…'} style={{ ...TEXTAREA, minHeight: 92 }} />
         </FieldRow>
         {lines.length > 1 && <FieldRow inline label="Répartition"><Segmented value={capMode} onChange={setCapMode} options={[{ v: 'seq', l: 'Dans l’ordre' }, { v: 'random', l: 'Au hasard' }]} /></FieldRow>}
