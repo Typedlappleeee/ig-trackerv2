@@ -40,7 +40,7 @@ const INTENSITY = [
   { v: 'strong' as const, l: 'Forte', d: 'Plus de différence' },
 ]
 
-function Stepper({ value, onChange, min = 1, max = 24 }: { value: number; onChange: (n: number) => void; min?: number; max?: number }) {
+function Stepper({ value, onChange, min = 1, max = 100 }: { value: number; onChange: (n: number) => void; min?: number; max?: number }) {
   const b = (d: number, icon: string) => (
     <button type="button" onClick={() => onChange(Math.min(max, Math.max(min, value + d)))} disabled={d < 0 ? value <= min : value >= max}
       style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: '#E4E4E7', cursor: 'pointer', opacity: (d < 0 ? value <= min : value >= max) ? 0.3 : 1 }}><Icon d={icon} size={14} sw={2.2} /></button>
