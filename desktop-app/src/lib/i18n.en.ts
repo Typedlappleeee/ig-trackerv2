@@ -3438,6 +3438,9 @@ export const EN: Dict = {
     "Duplication…": "Duplicating…",
     "Dupliquer ici": "Duplicate here",
     "Jusqu’à 100, toutes différentes": "Up to 100, all different",
+    "photo de la modèle introuvable": "model photo not found",
+    "photo de la modèle illisible": "model photo unreadable",
+    "Higgsfield n’a pas pris la photo de la modèle": "Higgsfield did not accept the model photo",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

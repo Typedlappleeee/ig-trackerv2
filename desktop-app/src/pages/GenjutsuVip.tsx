@@ -147,25 +147,27 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   }, [models, manual])
   const shownGroup = openGroup ? groups.find(g => g.name === openGroup && g.items.length > 1) ?? null : null
   const [creating, setCreating] = useState(false)
-  const setPicked = (ids: string[]) => { setPickedState(ids); writeJson(`${PICK_KEY}:${account}`, ids) }
+  // Modèles PARTAGÉES : toujours celles du premier compte (références communes à tous les comptes)
+  const refAccount = accounts?.[0]?.name ?? account
+  const setPicked = (ids: string[]) => { setPickedState(ids); writeJson(`${PICK_KEY}:${refAccount}`, ids) }
   const loadModels = useCallback(async (quiet = false) => {
-    if (!account) return
+    if (!refAccount) return
     if (!quiet) { setModels(null); setModelsErr(null) }
     try {
       const hidden = new Set(hiddenModels())
-      const l = (await listModels(account)).filter(m => !hidden.has(m.id))
+      const l = (await listModels(refAccount)).filter(m => !hidden.has(m.id))
       setModels(l)
       setPickedState(p => p.filter(id => l.some(m => m.id === id)))
     } catch (e) {
-      if (needsReconnect(e)) setReco(m => ({ ...m, [account]: true }))
+      if (needsReconnect(e)) setReco(m => ({ ...m, [refAccount]: true }))
       if (!quiet) { setModelsErr(e instanceof Error ? e.message : String(e)); setModels([]) }
     }
-  }, [account])
+  }, [refAccount])
   useEffect(() => {
-    if (access !== 'ok' || !account) return
-    setPickedState(readJson<string[]>(`${PICK_KEY}:${account}`, []))
+    if (access !== 'ok' || !refAccount) return
+    setPickedState(readJson<string[]>(`${PICK_KEY}:${refAccount}`, []))
     void loadModels()
-  }, [access, account, loadModels])
+  }, [access, refAccount, loadModels])
   // une modèle tout juste créée met quelques secondes à être prête
   useEffect(() => {
     if (!models?.some(m => !m.ready)) return
@@ -263,7 +265,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     if (blocker) return
     const job = (l: string, m: HfModel) => ({
       account, source: l, label: labelOf(l), prompt: prompt.trim(), res,
-      model: { id: m.id, name: m.name, mediaId: m.mediaId!, photo: m.photo },
+      model: { id: m.id, name: m.name, mediaId: m.mediaId!, photo: m.photo, account: refAccount },
       spoof: planFor(m),
     })
     // aléatoire : tenues mélangées puis réparties (pas deux fois la même tant qu'il en reste)
@@ -464,7 +466,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                       onClick={async e => {
                         e.stopPropagation()
                         if (!await confirmDialog({ title: `Supprimer « ${m.name} » ?`, text: 'Elle disparaît de la liste des modèles. Les vidéos déjà faites restent dans la Banque.', confirmLabel: 'Supprimer', danger: true })) return
-                        const r = await deleteModel(account, m.id)
+                        const r = await deleteModel(refAccount, m.id)
                         setModels(l => (l ?? []).filter(x => x.id !== m.id)); setPicked(picked.filter(x => x !== m.id))
                         toast(r === 'deleted' ? `« ${m.name} » supprimée` : `« ${m.name} » masquée dans ScaleFlow`, 'ok')
                       }}
@@ -634,7 +636,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
           </div>
         )
       })()}
-      {creating && account && <NewModel account={account} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); void loadModels(true) }} />}
+      {creating && refAccount && <NewModel account={refAccount} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); void loadModels(true) }} />}
     </Frame>
   )
 }

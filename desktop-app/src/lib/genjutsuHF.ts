@@ -361,6 +361,32 @@ export async function uploadLocalVideo(file: File): Promise<string> {
   return d.url
 }
 
+// Références PARTAGÉES : les modèles viennent du premier compte. Pour lancer sur un autre compte,
+// sa photo y est déposée une fois (puis réutilisée) — chaque compte n'a pas à avoir ses modèles.
+const REF_KEY = 'sf-gj-refs'
+const refs: Record<string, string> = readJson(REF_KEY, {})
+const refInflight = new Map<string, Promise<string>>()
+function refFor(account: string, model: GjModelRef): Promise<string> {
+  if (!model.account || model.account === account) return Promise.resolve(model.mediaId)
+  const key = `${account}|${model.id}`
+  if (refs[key]) return Promise.resolve(refs[key])
+  let p = refInflight.get(key)
+  if (!p) {
+    p = (async () => {
+      if (!model.photo) throw new Error('photo de la modèle introuvable')
+      const img = await relay<{ type?: string; donnees?: string }>({ a: 'image_proxy', url: model.photo })
+      if (!img.donnees) throw new Error('photo de la modèle illisible')
+      const up = await relay<{ media_id?: string }>({ a: 'televerser', compte: account, nom: 'reference.jpg', type: /png/.test(img.type ?? '') ? 'image/png' : 'image/jpeg', donnees: img.donnees })
+      if (!up.media_id) throw new Error('Higgsfield n’a pas pris la photo de la modèle')
+      refs[key] = up.media_id
+      writeJson(REF_KEY, Object.fromEntries(Object.entries(refs).slice(-500)))
+      return up.media_id
+    })().finally(() => refInflight.delete(key))
+    refInflight.set(key, p)
+  }
+  return p
+}
+
 // La même vidéo n'est importée qu'une fois par compte.
 const imports: Record<string, string> = readJson(IMPORT_KEY, {})
 const importing = new Map<string, Promise<string>>()     // même vidéo × plusieurs modèles : un seul import
@@ -386,7 +412,7 @@ function importVideo(account: string, url: string): Promise<string> {
 export type GjStatus = 'waiting' | 'preparing' | 'running' | 'saving' | 'spoofing' | 'done' | 'failed'
 // count = 0 : pas de spoof, la vidéo est rangée telle quelle dans le dossier.
 export interface SpoofPlan { count: number; device: string; gps: string; folder: string; orgId: string | null }
-export interface GjModelRef { id: string; name: string; mediaId: string; photo: string | null }
+export interface GjModelRef { id: string; name: string; mediaId: string; photo: string | null; account?: string | null }   // account = compte d'où vient la référence
 export interface GjJob {
   id: string
   account: string
@@ -527,9 +553,10 @@ async function launch(id: string): Promise<void> {
     const src = await resolveVideo(j0.source)
     patch(id, { sourceUrl: src.url, sourceUser: src.user })
     const vid = await patient(() => importVideo(j0.account, src.url))
+    const imgId = await patient(() => refFor(j0.account, j0.model))
     const params: Record<string, unknown> = {
       model: 'hf_mult_motion_control', resolution: j0.res, use_unlim: false, ...(noRatio ? {} : { aspect_ratio: '9:16' }),
-      medias: [{ value: vid, role: 'video_references' }, { value: j0.model.mediaId, role: 'image_references' }],
+      medias: [{ value: vid, role: 'video_references' }, { value: imgId, role: 'image_references' }],
       ...(j0.prompt.trim() ? { prompt: j0.prompt.trim() } : {}),
     }
     patch(id, { sent: true })
@@ -540,7 +567,7 @@ async function launch(id: string): Promise<void> {
       r = await generate(j0.account, params)
     }
     const ids = [...new Set((JSON.stringify(r ?? {}).match(/"(?:job_id|id)":"([0-9a-f-]{36})"/gi) ?? []).map(x => x.match(UUID)![0]))]
-    const hfJobId = r?.job_id || r?.jobs?.[0]?.job_id || ids.find(x => x !== vid && x !== j0.model.mediaId)
+    const hfJobId = r?.job_id || r?.jobs?.[0]?.job_id || ids.find(x => x !== vid && x !== imgId)
     if (!hfJobId) { patch(id, { status: 'failed', error: reasonIn(r) || 'Higgsfield n’a lancé aucune génération.' }); return }
     patch(id, { status: 'running', hfJobId: String(hfJobId) })
   } catch (e) {
