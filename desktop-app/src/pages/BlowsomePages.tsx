@@ -611,7 +611,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   async function generate() {
     if (running || sources.length === 0) return
     setRunning(true); setLogs([]); setMade(0); setProgress(0)
-    const per = Math.max(1, Math.min(12, variants))
+    const per = Math.max(1, Math.min(100, variants))
     const R = startRun('auto', `${sources.length} vidéo${sources.length > 1 ? 's' : ''} × ${per}`, sources.length * per)
     // Pool de légendes (une par ligne, vides ignorées).
     const pool = capPool.split('\n').map(s => s.trim()).filter(Boolean)
@@ -818,7 +818,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             {uploading && <span style={{ fontSize: 12, color: '#FBBF24' }}>Envoi : {uploading}</span>}
             <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
           </div>
-          <Fld label="Variantes / vidéo"><input type="number" min={1} max={12} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
+          <Fld label="Variantes / vidéo"><input type="number" min={1} max={100} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
           <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
           {ps.partner && <Fld label="Envoyer direct vers"><PartnerSendSelect ps={ps} style={selStyle} optStyle={optStyle} /></Fld>}
         </Grp>

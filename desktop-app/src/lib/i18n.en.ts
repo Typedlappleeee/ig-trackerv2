@@ -3437,6 +3437,7 @@ export const EN: Dict = {
     "Une copie va dans le dossier choisi, l’original reste où il est.": "A copy goes into the chosen folder, the original stays where it is.",
     "Duplication…": "Duplicating…",
     "Dupliquer ici": "Duplicate here",
+    "Jusqu’à 100, toutes différentes": "Up to 100, all different",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

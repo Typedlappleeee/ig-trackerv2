@@ -292,7 +292,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
   const settings = (() => {
     switch (tool) {
       case 'remix': return <>
-        <FieldRow inline label="Variantes par vidéo" hint="Jusqu’à 24, toutes différentes"><Stepper value={copies} onChange={setCopies} /></FieldRow>
+        <FieldRow inline label="Variantes par vidéo" hint="Jusqu’à 100, toutes différentes"><Stepper value={copies} onChange={setCopies} /></FieldRow>
         <FieldRow label="Intensité"><ChoiceCards value={intensity} onChange={setIntensity} options={INTENSITY} /></FieldRow>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <SwitchRow label="Couleurs" hint="Luminosité, contraste, saturation, teinte" on={toggles.color} onChange={v => setToggles(t => ({ ...t, color: v }))} />
@@ -399,7 +399,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
                           selected={preview?.id === v.id} onClick={() => setPreviewId(v.id)} onRemove={() => setSrc(s => s.filter(id => id !== v.id))}
                           badge={join ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 99, background: '#F4F4F5', color: '#0A0A0B', fontSize: 11.5, fontWeight: 800 }}>{i + 1}</span> : undefined} />
                         {perOut !== 1 && (() => {
-                          const n = copiesOf(v.id), set = (x: number) => setPerVideo(p => ({ ...p, [v.id]: Math.max(1, Math.min(24, x)) }))
+                          const n = copiesOf(v.id), set = (x: number) => setPerVideo(p => ({ ...p, [v.id]: Math.max(1, Math.min(100, x)) }))
                           const b: React.CSSProperties = { width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#161618', color: '#E4E4E7', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }
                           return (
                             <div title="Variantes pour cette vidéo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 5 }}>
