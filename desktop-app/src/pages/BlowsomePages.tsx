@@ -653,6 +653,21 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     // Pool selon la voix : pools relus au lancement (dernière version enregistrée).
     const useVoice = burnCap && voiceAuto && !!(poolMale || poolFemale)
     const vPools = useVoice ? await loadCaptionPools(currentOrg?.id ?? null, user.id).catch(() => savedPools) : []
+    // Pioche dans un pool sans répéter : aléatoire = paquet mélangé (re-mélangé quand il est vide),
+    // séquentiel = on continue la liste d'une vidéo à l'autre. Une pioche par pool, sur tout le lancement.
+    const decks = new Map<string, { deck: string[]; at: number }>()
+    const draw = (l: string[]): string | null => {
+      if (!l.length) return null
+      const k = l.join('\n')
+      let d = decks.get(k)
+      if (!d) { d = { deck: [], at: 0 }; decks.set(k, d) }
+      if (capMode === 'seq') return l[d.at++ % l.length]
+      if (!d.deck.length) {
+        d.deck = [...l]
+        for (let j = d.deck.length - 1; j > 0; j--) { const r = Math.floor(Math.random() * (j + 1)); [d.deck[j], d.deck[r]] = [d.deck[r], d.deck[j]] }
+      }
+      return d.deck.pop() ?? null
+    }
     const sMin = Math.max(0.5, Number(speedMin) || 0.98)
     const sMax = Math.min(2, Number(speedMax) || 1.02)
     const tStart = Number(trimStart) || 0
@@ -711,7 +726,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           // Choix de la légende : pool (seq/aléatoire) sinon IA.
           let capText: string | null = null
           if (burnCap) {
-            if (vPool.length) capText = capMode === 'random' ? vPool[Math.floor(Math.random() * vPool.length)] : vPool[i % vPool.length]
+            if (vPool.length) capText = draw(vPool)
             else if (aiCap) capText = aiCap
           }
           const pos: CaptionPos = capManual ? { x: capX, y: capY } : capPos
