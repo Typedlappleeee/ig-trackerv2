@@ -535,8 +535,13 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [poolMale, setPoolMale] = useState('')       // id du pool (caption_bank)
   const [poolFemale, setPoolFemale] = useState('')
   const [savedPools, setSavedPools] = useState<Pool[]>([])
-  const [voices, setVoices] = useState<Record<string, VoiceResult>>({})   // détecté, par vidéo source
-  const [voiceSet, setVoiceSet] = useState<Record<string, Voice>>({})     // corrigé à la main
+  // Détecté / attribué à la main, par vidéo de la Banque — gardés sur ce PC (une vidéo attribuée le reste).
+  const readLS = <T,>(k: string): T => { try { return JSON.parse(localStorage.getItem(k) || '{}') as T } catch { return {} as T } }
+  const [voices, setVoices] = useState<Record<string, VoiceResult>>(() => readLS('sf-voice-det'))
+  const [voiceSet, setVoiceSet] = useState<Record<string, Voice>>(() => readLS('sf-voice-set'))
+  useEffect(() => { try { localStorage.setItem('sf-voice-set', JSON.stringify(voiceSet)) } catch { /* plein */ } }, [voiceSet])
+  useEffect(() => { try { const k = Object.keys(voices); localStorage.setItem('sf-voice-det', JSON.stringify(Object.fromEntries(k.slice(-2000).map(i => [i, voices[i]])))) } catch { /* plein */ } }, [voices])
+  const setVoiceFor = (ids: string[], v: Voice | 'auto') => setVoiceSet(m => { const n = { ...m }; for (const id of ids) { if (v === 'auto') delete n[id]; else n[id] = v }; return n })
   const [detecting, setDetecting] = useState(false)
   useEffect(() => { if (voiceAuto) void loadCaptionPools(currentOrg?.id ?? null, user.id).then(setSavedPools) }, [voiceAuto, currentOrg?.id, user.id])
   // Voix retenue pour une vidéo : correction manuelle, sinon détection.
@@ -917,7 +922,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                       : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
                     {burnCap && voiceAuto && (
                       <button type="button" title={`${vr ? voiceLabel(vr) : 'pas encore détectée'}${voiceSet[s.id] ? ' · corrigée à la main' : ''} — clic : changer`}
-                        onClick={e => { e.stopPropagation(); const cur = voiceSet[s.id]; setVoiceSet(m => { const n = { ...m }; if (!cur) n[s.id] = vw === 'homme' ? 'femme' : 'homme'; else if (cur === 'homme') n[s.id] = 'femme'; else delete n[s.id]; return n }) }}
+                        onClick={e => { e.stopPropagation(); const cur = voiceSet[s.id]; setVoiceFor([s.id], !cur ? 'homme' : cur === 'homme' ? 'femme' : 'auto') }}
                         style={{ position: 'absolute', top: 4, left: 4, zIndex: 2, height: 18, padding: '0 6px', borderRadius: 9, border: voiceSet[s.id] ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 9.5, fontWeight: 600, cursor: 'pointer' }}>
                         {vw === 'homme' ? '♂ Homme' : vw === 'femme' ? '♀ Femme' : vr ? '🔇 Sans voix' : '🎙 ?'}{vr?.by === 'écran' && !voiceSet[s.id] ? ' 👁' : ''}{vw && vr && !vr.sure && !voiceSet[s.id] ? ' ?' : ''}
                       </button>
@@ -956,7 +961,31 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                       </select>
                     </Fld>
                   ))}
-                  <span style={{ fontSize: 11.5, color: MUTED }}>Chaque vidéo reçoit toujours une légende. Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée) ; si la voix n’est pas nette, c’est la personne qu’on voit le plus à l’écran qui décide (👁). Le badge sur chaque vidéo (aperçu) se corrige d’un clic.</span>
+                  <span style={{ fontSize: 11.5, color: MUTED }}>Chaque vidéo reçoit toujours une légende. Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée) ; si la voix n’est pas nette, c’est la personne qu’on voit le plus à l’écran qui décide (👁). Tu peux aussi choisir Homme ou Femme pour chaque vidéo ci-dessous : ton choix passe avant la détection et reste gardé.</span>
+                  {sources.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 10, borderRadius: 8, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: INK, flex: 1 }}>Version par vidéo</span>
+                        <span style={{ fontSize: 11.5, color: MUTED }}>Tout :</span>
+                        {(['auto', 'homme', 'femme'] as const).map(k => (
+                          <button key={k} type="button" onClick={() => setVoiceFor(sources.map(x => x.id), k)} style={{ height: 24, padding: '0 8px', borderRadius: 5, cursor: 'pointer', ...BTN_GHOST, fontSize: 11.5 }}>{k === 'auto' ? 'Auto' : k === 'homme' ? '♂ Homme' : '♀ Femme'}</button>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 280, overflowY: 'auto' }}>
+                        {sources.map(x => {
+                          const r = voices[x.id], set = voiceSet[x.id]
+                          const det = r ? (r.voice === 'homme' ? '♂' : r.voice === 'femme' ? '♀' : '🔇') + (r.by === 'écran' ? ' 👁' : !r.sure && r.voice !== 'incertain' ? ' ?' : '') : '…'
+                          return (
+                            <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span data-no-tr title={x.title} style={{ flex: 1, minWidth: 0, fontSize: 12, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.title}</span>
+                              <Seg value={set ?? 'auto'} onChange={v => setVoiceFor([x.id], v)}
+                                options={[{ v: 'auto', label: `Auto ${det}` }, { v: 'homme', label: '♂ Homme' }, { v: 'femme', label: '♀ Femme' }]} />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <div><button type="button" disabled={detecting || !sources.length} onClick={() => void detectAllVoices()} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: detecting ? 'wait' : 'pointer', ...BTN_GHOST, fontSize: 12, fontWeight: 500 }}>{detecting ? '🎙 Détection…' : '🎙 Détecter les voix maintenant'}</button></div>
                 </div>
               )}

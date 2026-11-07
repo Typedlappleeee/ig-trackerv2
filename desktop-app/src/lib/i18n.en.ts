@@ -3486,8 +3486,11 @@ export const EN: Dict = {
     "Chaque vidéo reçoit toujours une légende. Sans voix du tout : le pool du dessous (ou l’autre pool). Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée). Le badge sur chaque vidéo (aperçu) se corrige d’un clic.": "Every video always gets a caption. No voice at all: the pool below (or the other pool). With the Groq key, only real speech is measured (music ignored). The badge on each video (preview) can be changed with one click.",
     "un homme": "a man",
     "une femme": "a woman",
-    "Chaque vidéo reçoit toujours une légende. Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée) ; si la voix n’est pas nette, c’est la personne qu’on voit le plus à l’écran qui décide (👁). Le badge sur chaque vidéo (aperçu) se corrige d’un clic.": "Every video always gets a caption. With the Groq key, only real speech is measured (music ignored); if the voice is unclear, the person seen most on screen decides (👁). The badge on each video (preview) can be changed with one click.",
+    "Chaque vidéo reçoit toujours une légende. Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée) ; si la voix n’est pas nette, c’est la personne qu’on voit le plus à l’écran qui décide (👁). Tu peux aussi choisir Homme ou Femme pour chaque vidéo ci-dessous : ton choix passe avant la détection et reste gardé.": "Every video always gets a caption. With the Groq key, only real speech is measured (music ignored); if the voice is unclear, the person seen most on screen decides (👁). You can also pick Male or Female for each video below: your choice overrides detection and is remembered.",
     "Groq indisponible": "Groq unavailable",
+    "Version par vidéo": "Version per video",
+    "Tout :": "All:",
+    "Auto": "Auto",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
