@@ -3484,6 +3484,10 @@ export const EN: Dict = {
     "de secours": "fallback",
     "🔇 Sans voix": "🔇 No voice",
     "Chaque vidéo reçoit toujours une légende. Sans voix du tout : le pool du dessous (ou l’autre pool). Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée). Le badge sur chaque vidéo (aperçu) se corrige d’un clic.": "Every video always gets a caption. No voice at all: the pool below (or the other pool). With the Groq key, only real speech is measured (music ignored). The badge on each video (preview) can be changed with one click.",
+    "un homme": "a man",
+    "une femme": "a woman",
+    "Chaque vidéo reçoit toujours une légende. Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée) ; si la voix n’est pas nette, c’est la personne qu’on voit le plus à l’écran qui décide (👁). Le badge sur chaque vidéo (aperçu) se corrige d’un clic.": "Every video always gets a caption. With the Groq key, only real speech is measured (music ignored); if the voice is unclear, the person seen most on screen decides (👁). The badge on each video (preview) can be changed with one click.",
+    "Groq indisponible": "Groq unavailable",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4139,5 +4143,7 @@ export const EN: Dict = {
     ["📚 pool {0} ({1} légende(s))", "📚 {0} pool ({1} caption(s))"],
     ["{0}{1} — clic : changer", "{0}{1} — click: change"],
     ["(Whisper indisponible : {0} → mesure locale)", "(Whisper unavailable: {0} → local measurement)"],
+    ["{0} à l’écran (voix pas assez nette)", "{0} on screen (voice not clear enough)"],
+    ["(vision indisponible : {0})", "(vision unavailable: {0})"],
   ],
 }

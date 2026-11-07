@@ -6,11 +6,12 @@
 // Avec une clé Groq, Whisper repère d'abord OÙ sont les vraies paroles (mots minutés) : la hauteur
 // n'est mesurée que sur les premiers mots prononcés — la musique et les bruits sont ignorés.
 // Sans clé : tout se fait sur le PC (détection de voix par le volume et la périodicité).
-import { runFfmpeg } from './ffmpeg'
+import { runFfmpeg, probeDuration } from './ffmpeg'
+import { groqChat } from './ai'
 import { transcribeWordsGroq } from './subtitles'
 
 export type Voice = 'homme' | 'femme' | 'incertain'
-export interface VoiceResult { voice: Voice; hz: number | null; frames: number; sure: boolean; words?: string }
+export interface VoiceResult { voice: Voice; hz: number | null; frames: number; sure: boolean; words?: string; by?: 'voix' | 'écran' }
 export interface Span { start: number; end: number }
 
 export const SR = 16000
@@ -127,5 +128,46 @@ export async function detectVoice(video: Uint8Array, groqKey?: string | null, lo
 }
 
 export const voiceLabel = (r: VoiceResult) =>
-  r.voice === 'incertain' ? 'aucune voix entendue'
+  r.by === 'écran' ? `${r.voice === 'homme' ? 'un homme' : 'une femme'} à l’écran (voix pas assez nette)`
+  : r.voice === 'incertain' ? 'aucune voix entendue'
     : `${r.voice === 'homme' ? 'voix d’homme' : 'voix de femme'} (${r.hz} Hz${r.sure ? '' : ', à vérifier'})${r.words ? ` — « ${r.words} »` : ''}`
+
+/* ── Repli VISUEL : qui apparaît le plus à l'écran (homme / femme) ──
+   Utilisé quand la voix n'est pas nette (« à vérifier » ou aucune voix). 6 images de la vidéo,
+   assemblées en une planche, envoyées au modèle vision de Groq (clé de l'espace). */
+const VISION_MODELS = ['meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct']   // le 2e si le 1er est retiré
+export function parseOnScreen(t: string | null): 'homme' | 'femme' | null {
+  if (!t) return null
+  const m = t.match(/"main"\s*:\s*"([^"]+)"/i)?.[1] ?? t
+  const n = m.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  if (/\b(femme|woman|female|fille)\b/.test(n)) return 'femme'
+  if (/\b(homme|man|male|garcon)\b/.test(n)) return 'homme'
+  return null
+}
+export async function detectOnScreen(video: Uint8Array, groqKey: string): Promise<'homme' | 'femme' | null> {
+  const dur = await probeDuration(video).catch(() => 0)
+  const fps = (6 / Math.max(1, dur || 10)).toFixed(4)
+  const jpg = await runFfmpeg({ input: video, inputName: 'look.mp4', args: ['-vf', `fps=${fps},scale=240:-2,tile=3x2`, '-frames:v', '1', '-q:v', '5'], outName: 'look.jpg' })
+  let bin = ''
+  for (let i = 0; i < jpg.length; i += 0x8000) bin += String.fromCharCode(...jpg.subarray(i, i + 0x8000))
+  const messages = [{ role: 'user', content: [
+    { type: 'text', text: 'These 6 images are frames from the same short video. Which person appears the most on screen: a man or a woman? Answer ONLY with JSON: {"main":"homme"} or {"main":"femme"} (or {"main":"aucun"} if nobody is visible).' },
+    { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${btoa(bin)}` } },
+  ] }]
+  let err: unknown = null
+  for (const m of VISION_MODELS) {
+    try { return parseOnScreen(await groqChat(groqKey, m, messages, 30)) } catch (e) { err = e }
+  }
+  throw err
+}
+
+// Voix d'abord ; si elle n'est pas nette (ou absente) et qu'une clé Groq est là → qui est à l'écran.
+export async function detectSpeaker(video: Uint8Array, groqKey?: string | null, log?: (m: string) => void): Promise<VoiceResult> {
+  const r = await detectVoice(video, groqKey, log)
+  if (r.sure || !groqKey) return r
+  try {
+    const who = await detectOnScreen(video, groqKey)
+    if (who) return { ...r, voice: who, sure: true, by: 'écran' }
+  } catch (e) { log?.(`    (vision indisponible : ${e instanceof Error ? e.message.slice(0, 120) : String(e)})`) }
+  return r
+}

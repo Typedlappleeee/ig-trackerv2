@@ -34,3 +34,28 @@ export async function generateCaption(groqKey: string, topic?: string): Promise<
   } catch { return null }
 }
 
+
+// Appel chat Groq brut (texte de la réponse, ou null). Electron → direct ; WEB → relais /api/groq.
+// `messages` peut contenir des images (content: [{type:'text'},{type:'image_url'}]) pour les modèles vision.
+export async function groqChat(groqKey: string, model: string, messages: unknown[], maxTokens = 200, temperature = 0): Promise<string | null> {
+  if (!groqKey) return null
+  if (IS_WEB) {
+    const res = await fetch('/api/groq', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: groqKey, model, messages, temperature, maxTokens }),
+    })
+    const j = await res.json() as { ok: boolean; error?: string; data?: any }   // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!j.ok) throw new Error(j.error || 'Groq indisponible')
+    const t = j.data?.choices?.[0]?.message?.content
+    return typeof t === 'string' ? t : null
+  }
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${groqKey}` },
+    body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens }),
+  })
+  if (!res.ok) throw new Error(`Groq HTTP ${res.status}`)
+  const j = await res.json()
+  const t = j?.choices?.[0]?.message?.content
+  return typeof t === 'string' ? t : null
+}

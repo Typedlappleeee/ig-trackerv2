@@ -27,7 +27,7 @@ import { Video } from '@/components/VideoFrame'
 import { folderTree, listBankFolders } from '@/lib/bankFolders'
 import { niceBase } from '@/lib/niceTitle'
 import CaptionPools, { loadCaptionPools, poolLines, type Pool } from '@/components/CaptionPools'
-import { detectVoice, voiceLabel, type Voice, type VoiceResult } from '@/lib/voiceGender'
+import { detectSpeaker, voiceLabel, type Voice, type VoiceResult } from '@/lib/voiceGender'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -556,7 +556,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
       if (!isFfmpegReady()) { push('⏳ Chargement du moteur (~30 Mo, une fois)…'); await getFFmpeg() }
       for (const v of sources) {
         try {
-          const r = await detectVoice(await resolveSourceBytes(v), conns.groq, push)
+          const r = await detectSpeaker(await resolveSourceBytes(v), conns.groq, push)
           setVoices(m => ({ ...m, [v.id]: r }))
           push(`🎙 ${v.title} : ${voiceLabel(r)}`)
         } catch (e) { push(`🎙 ${v.title} : son illisible (${e instanceof Error ? e.message.split('\n')[0] : String(e)})`) }
@@ -698,7 +698,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           let who: Voice | null = voiceSet[v.id] ?? null
           if (who) push(`  🎙 voix choisie à la main : ${who}`)
           else {
-            const r = voices[v.id] ?? await detectVoice(bytes, conns.groq, push).catch(() => ({ voice: 'incertain' as const, hz: null, frames: 0, sure: false }))
+            const r = voices[v.id] ?? await detectSpeaker(bytes, conns.groq, push).catch(() => ({ voice: 'incertain' as const, hz: null, frames: 0, sure: false }))
             setVoices(m => ({ ...m, [v.id]: r }))
             who = r.voice
             push(`  🎙 ${voiceLabel(r)}`)
@@ -919,7 +919,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                       <button type="button" title={`${vr ? voiceLabel(vr) : 'pas encore détectée'}${voiceSet[s.id] ? ' · corrigée à la main' : ''} — clic : changer`}
                         onClick={e => { e.stopPropagation(); const cur = voiceSet[s.id]; setVoiceSet(m => { const n = { ...m }; if (!cur) n[s.id] = vw === 'homme' ? 'femme' : 'homme'; else if (cur === 'homme') n[s.id] = 'femme'; else delete n[s.id]; return n }) }}
                         style={{ position: 'absolute', top: 4, left: 4, zIndex: 2, height: 18, padding: '0 6px', borderRadius: 9, border: voiceSet[s.id] ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 9.5, fontWeight: 600, cursor: 'pointer' }}>
-                        {vw === 'homme' ? '♂ Homme' : vw === 'femme' ? '♀ Femme' : vr ? '🔇 Sans voix' : '🎙 ?'}{vw && vr && !vr.sure && !voiceSet[s.id] ? ' ?' : ''}
+                        {vw === 'homme' ? '♂ Homme' : vw === 'femme' ? '♀ Femme' : vr ? '🔇 Sans voix' : '🎙 ?'}{vr?.by === 'écran' && !voiceSet[s.id] ? ' 👁' : ''}{vw && vr && !vr.sure && !voiceSet[s.id] ? ' ?' : ''}
                       </button>
                     )}
                     {capPrev && (
@@ -956,7 +956,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                       </select>
                     </Fld>
                   ))}
-                  <span style={{ fontSize: 11.5, color: MUTED }}>Chaque vidéo reçoit toujours une légende. Sans voix du tout : le pool du dessous (ou l’autre pool). Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée). Le badge sur chaque vidéo (aperçu) se corrige d’un clic.</span>
+                  <span style={{ fontSize: 11.5, color: MUTED }}>Chaque vidéo reçoit toujours une légende. Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée) ; si la voix n’est pas nette, c’est la personne qu’on voit le plus à l’écran qui décide (👁). Le badge sur chaque vidéo (aperçu) se corrige d’un clic.</span>
                   <div><button type="button" disabled={detecting || !sources.length} onClick={() => void detectAllVoices()} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: detecting ? 'wait' : 'pointer', ...BTN_GHOST, fontSize: 12, fontWeight: 500 }}>{detecting ? '🎙 Détection…' : '🎙 Détecter les voix maintenant'}</button></div>
                 </div>
               )}

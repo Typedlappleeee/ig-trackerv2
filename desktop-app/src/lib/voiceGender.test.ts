@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./ffmpeg', () => ({ runFfmpeg: vi.fn() }))
 vi.mock('./subtitles', () => ({ transcribeWordsGroq: vi.fn() }))
-import { analyzeVoice, firstSpeech, pcmToWav, SR } from './voiceGender'
+vi.mock('./ai', () => ({ groqChat: vi.fn() }))
+import { analyzeVoice, firstSpeech, pcmToWav, parseOnScreen, SR } from './voiceGender'
 
 // voix synthétique : silence puis son voisé (fondamentale + harmoniques, légère modulation)
 function voice(f0: number, silence = 1, dur = 2, noise = 0.002): Float32Array {
@@ -54,4 +55,8 @@ describe('voix du premier qui parle', () => {
     expect(r.text).toBe('mais pourquoi'); expect(r.spans).toHaveLength(2)
   })
   it('WAV valide', () => { const w = pcmToWav(new Uint8Array(100)); expect(String.fromCharCode(...w.slice(0, 4))).toBe('RIFF'); expect(w.length).toBe(144) })
+  it('réponse vision lue', () => {
+    expect(parseOnScreen('{"main":"femme"}')).toBe('femme'); expect(parseOnScreen('```json\n{"main": "homme"}\n```')).toBe('homme')
+    expect(parseOnScreen('A woman')).toBe('femme'); expect(parseOnScreen('{"main":"aucun"}')).toBeNull(); expect(parseOnScreen(null)).toBeNull()
+  })
 })
