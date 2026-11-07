@@ -7,7 +7,14 @@ import { supabase } from '@/lib/supabase'
 import { toast, promptDialog, confirmDialog } from '@/lib/ui'
 
 const PREFIX = 'Pool · '
-interface Pool { id: string; name: string; content: string }
+export interface Pool { id: string; name: string; content: string }
+// Les pools enregistrés de l'espace (organisation, ou perso).
+export async function loadCaptionPools(orgId: string | null, userId: string): Promise<Pool[]> {
+  const q = supabase.from('caption_bank').select('id,title,content').like('title', `${PREFIX}%`)
+  const { data } = await (orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId).is('org_id', null)).order('title')
+  return ((data ?? []) as { id: string; title: string; content: string }[]).map(r => ({ id: r.id, name: r.title.slice(PREFIX.length), content: r.content }))
+}
+export const poolLines = (content: string) => content.split('\n').map(s => s.trim()).filter(Boolean)
 
 export default function CaptionPools({ value, onChange, orgId, userId, selStyle, btnStyle }: {
   value: string; onChange: (v: string) => void; orgId: string | null; userId: string; selStyle?: CSSProperties; btnStyle?: CSSProperties

@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-07',
+    date: '2026-11-07',
+    title: { fr: '🎙 Auto-contenu : le pool de légendes choisi selon la voix', en: '🎙 Auto-content: caption pool picked from the voice' },
+    items: {
+      fr: ['Nouvelle option « Pool selon la voix » : ScaleFlow détecte si c’est un homme ou une femme qui parle en premier dans chaque vidéo et prend le pool de légendes qui va avec. Le badge ♂/♀ de l’aperçu se corrige d’un clic.'],
+      en: ['New “Pool by voice” option: ScaleFlow detects whether a man or a woman speaks first in each video and uses the matching caption pool. The ♂/♀ badge in the preview can be changed with one click.'],
+    },
+  },
+  {
     id: '2026-11-04',
     date: '2026-11-04',
     title: { fr: '📸 Photos HEIC converties en JPG automatiquement', en: '📸 HEIC photos converted to JPG automatically' },

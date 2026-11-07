@@ -26,7 +26,8 @@ import { uploadThumbFor } from '@/lib/bankStorage'
 import { Video } from '@/components/VideoFrame'
 import { folderTree, listBankFolders } from '@/lib/bankFolders'
 import { niceBase } from '@/lib/niceTitle'
-import CaptionPools from '@/components/CaptionPools'
+import CaptionPools, { loadCaptionPools, poolLines, type Pool } from '@/components/CaptionPools'
+import { detectVoice, voiceLabel, type Voice, type VoiceResult } from '@/lib/voiceGender'
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -529,6 +530,37 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [capMode, setCapMode] = useState<'seq' | 'random'>('random')
   const [capStyle, setCapStyle] = useState<CaptionStyle>('snapchat')
   const [withCap, setWithCap] = useState(false)  // compléter le pool par une légende IA
+  // Pool selon la voix : qui parle en premier (homme / femme) → pool enregistré correspondant.
+  const [voiceAuto, setVoiceAuto] = useState(false)
+  const [poolMale, setPoolMale] = useState('')       // id du pool (caption_bank)
+  const [poolFemale, setPoolFemale] = useState('')
+  const [savedPools, setSavedPools] = useState<Pool[]>([])
+  const [voices, setVoices] = useState<Record<string, VoiceResult>>({})   // détecté, par vidéo source
+  const [voiceSet, setVoiceSet] = useState<Record<string, Voice>>({})     // corrigé à la main
+  const [detecting, setDetecting] = useState(false)
+  useEffect(() => { if (voiceAuto) void loadCaptionPools(currentOrg?.id ?? null, user.id).then(setSavedPools) }, [voiceAuto, currentOrg?.id, user.id])
+  // Voix retenue pour une vidéo : correction manuelle, sinon détection.
+  const voiceOf = (id: string): Voice | null => voiceSet[id] ?? voices[id]?.voice ?? null
+  const poolForVoice = (v: Voice | null, list: Pool[], fallback: string[]) => {
+    const id = v === 'homme' ? poolMale : v === 'femme' ? poolFemale : ''
+    const l = poolLines(list.find(p => p.id === id)?.content ?? '')
+    return l.length ? l : fallback
+  }
+  // Détecte (sans générer) qui parle en premier dans chaque vidéo source.
+  async function detectAllVoices() {
+    if (detecting || !sources.length) return
+    setDetecting(true)
+    try {
+      if (!isFfmpegReady()) { push('⏳ Chargement du moteur (~30 Mo, une fois)…'); await getFFmpeg() }
+      for (const v of sources) {
+        try {
+          const r = await detectVoice(await resolveSourceBytes(v))
+          setVoices(m => ({ ...m, [v.id]: r }))
+          push(`🎙 ${v.title} : ${voiceLabel(r)}`)
+        } catch (e) { push(`🎙 ${v.title} : son illisible (${e instanceof Error ? e.message.split('\n')[0] : String(e)})`) }
+      }
+    } finally { setDetecting(false) }
+  }
   const [capManual, setCapManual] = useState(false)
   const [capPos, setCapPos] = useState<'top' | 'center' | 'bottom'>('bottom')
   const [capX, setCapX] = useState(50)
@@ -616,6 +648,9 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     const R = startRun('auto', `${sources.length} vidéo${sources.length > 1 ? 's' : ''} × ${per}`, sources.length * per)
     // Pool de légendes (une par ligne, vides ignorées).
     const pool = capPool.split('\n').map(s => s.trim()).filter(Boolean)
+    // Pool selon la voix : pools relus au lancement (dernière version enregistrée).
+    const useVoice = burnCap && voiceAuto && !!(poolMale || poolFemale)
+    const vPools = useVoice ? await loadCaptionPools(currentOrg?.id ?? null, user.id).catch(() => savedPools) : []
     const sMin = Math.max(0.5, Number(speedMin) || 0.98)
     const sMax = Math.min(2, Number(speedMax) || 1.02)
     const tStart = Number(trimStart) || 0
@@ -640,6 +675,20 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           push(`  ❌ source « ${v.title} » illisible : ${se instanceof Error ? (se.message || se.name) : String(se)} → vidéo suivante`)
           R.tick(false); continue
         }
+        // Qui parle en premier → pool homme / femme (incertain : pool par défaut).
+        let vPool = pool
+        if (useVoice) {
+          let who: Voice | null = voiceSet[v.id] ?? null
+          if (who) push(`  🎙 voix choisie à la main : ${who}`)
+          else {
+            const r = voices[v.id] ?? await detectVoice(bytes).catch(() => ({ voice: 'incertain' as const, hz: null, frames: 0 }))
+            setVoices(m => ({ ...m, [v.id]: r }))
+            who = r.voice
+            push(`  🎙 ${voiceLabel(r)}`)
+          }
+          vPool = poolForVoice(who, vPools, pool)
+          push(vPool === pool ? `  📚 pool par défaut (${pool.length} légende(s))` : `  📚 pool ${who === 'homme' ? 'homme' : 'femme'} (${vPool.length} légende(s))`)
+        }
         // Durée réelle (pour la coupe de fin aléatoire) — lue une fois par vidéo.
         // Fallback ffmpeg si le <video> du navigateur échoue (HEVC/.mov) → sinon la
         // coupe de fin serait silencieusement annulée.
@@ -660,7 +709,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           // Choix de la légende : pool (seq/aléatoire) sinon IA.
           let capText: string | null = null
           if (burnCap) {
-            if (pool.length) capText = capMode === 'random' ? pool[Math.floor(Math.random() * pool.length)] : pool[i % pool.length]
+            if (vPool.length) capText = capMode === 'random' ? vPool[Math.floor(Math.random() * vPool.length)] : vPool[i % vPool.length]
             else if (aiCap) capText = aiCap
           }
           const pos: CaptionPos = capManual ? { x: capX, y: capY } : capPos
@@ -731,13 +780,14 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     capManual: boolean; capPos: 'top' | 'center' | 'bottom'; capX: number; capY: number
     useTrim: boolean; trimRandom: boolean; trimRandMin: string; trimRandMax: string; trimEndMin: string; trimEndMax: string; trimStart: string; trimEnd: string
     useSpeed: boolean; speedMin: string; speedMax: string; destFolder: string
+    voiceAuto?: boolean; poolMale?: string; poolFemale?: string
   }
   const AUTO_COMPOSER = 'auto-contenu'
   const autoOrgId = currentOrg?.id ?? null
   const [presets, setPresets] = useState<ComposerPreset<AutoCfg>[]>([])
   const [presetSel, setPresetSel] = useState('')
 
-  const autoCfg = (): AutoCfg => ({ variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder })
+  const autoCfg = (): AutoCfg => ({ variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder, voiceAuto, poolMale, poolFemale })
   const applyAutoCfg = (c: Partial<AutoCfg>) => {
     if (typeof c.variants === 'number') setVariants(c.variants)
     if (c.intensity) setIntensity(c.intensity)
@@ -765,6 +815,9 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     if (typeof c.speedMin === 'string') setSpeedMin(c.speedMin)
     if (typeof c.speedMax === 'string') setSpeedMax(c.speedMax)
     if (typeof c.destFolder === 'string') setDestFolder(c.destFolder)
+    if (typeof c.voiceAuto === 'boolean') setVoiceAuto(c.voiceAuto)
+    if (typeof c.poolMale === 'string') setPoolMale(c.poolMale)
+    if (typeof c.poolFemale === 'string') setPoolFemale(c.poolFemale)
   }
 
   // Charge la LISTE des presets nommés (aucune restauration automatique de réglages).
@@ -830,7 +883,9 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {sources.slice(0, 8).map(s => {
                 const url = previews[s.id]
-                const capPrev = burnCap ? (capPool.split('\n').map(x => x.trim()).filter(Boolean)[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
+                const vw = voiceAuto ? voiceOf(s.id) : null
+                const capPrev = burnCap ? ((voiceAuto ? poolForVoice(vw, savedPools, poolLines(capPool)) : poolLines(capPool))[0] || (withCap ? 'Légende IA…' : 'Ta légende')) : null
+                const vr = voices[s.id]
                 const vy = capManual ? `${capY}%` : capPos === 'top' ? '8%' : capPos === 'center' ? '50%' : '90%'
                 return (
                   <div key={s.id} title={s.title} onClick={e => {
@@ -843,6 +898,13 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                       // a toute la connexion pour elle) ; retirée de l'aperçu → téléchargement coupé.
                       ? <Video key={url} src={url + '#t=0.3'} poster={posters[s.id]} playsInline loop preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, fontSize: 10 }}>…</div>}
+                    {burnCap && voiceAuto && (
+                      <button type="button" title={`${vr ? voiceLabel(vr) : 'pas encore détectée'}${voiceSet[s.id] ? ' · corrigée à la main' : ''} — clic : changer`}
+                        onClick={e => { e.stopPropagation(); const cur = voiceSet[s.id]; setVoiceSet(m => { const n = { ...m }; if (!cur) n[s.id] = vw === 'homme' ? 'femme' : 'homme'; else if (cur === 'homme') n[s.id] = 'femme'; else delete n[s.id]; return n }) }}
+                        style={{ position: 'absolute', top: 4, left: 4, zIndex: 2, height: 18, padding: '0 6px', borderRadius: 9, border: voiceSet[s.id] ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 9.5, fontWeight: 600, cursor: 'pointer' }}>
+                        {vw === 'homme' ? '♂ Homme' : vw === 'femme' ? '♀ Femme' : vr ? '? Incertain' : '🎙 ?'}
+                      </button>
+                    )}
                     {capPrev && (
                       <div style={{ position: 'absolute', left: 0, right: 0, top: vy, transform: 'translateY(-50%)', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
                         <span style={{ display: 'inline-block', maxWidth: '100%', textAlign: 'center', color: '#fff', fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: capStyle === 'outline' ? 700 : 400, fontSize: 8.5, lineHeight: 1.25, padding: capStyle === 'snapchat' ? '2px 4px' : '0 3px', width: capStyle === 'snapchat' ? '100%' : 'auto', background: capStyle === 'snapchat' ? 'rgba(48,48,48,0.5)' : 'transparent', textShadow: capStyle === 'outline' ? '0 0 2px #000,0 0 2px #000' : 'none', boxSizing: 'border-box' }}>{capPrev}</span>
@@ -866,6 +928,21 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                 {capPool.trim() && <button onClick={() => setCapPool('')} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid transparent', background: 'transparent', color: '#A1A1AA', fontSize: 12, fontWeight: 500 }}>Vider</button>}
               </div>
               <CaptionPools value={capPool} onChange={setCapPool} orgId={currentOrg?.id ?? null} userId={user.id} selStyle={selStyle} btnStyle={BTN_GHOST} />
+              <Sw on={voiceAuto} onChange={setVoiceAuto} label="Pool selon la voix (homme / femme)" sub="Détecte qui parle en premier dans chaque vidéo et prend le pool qui va avec" />
+              {voiceAuto && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginLeft: 49 }}>
+                  {([['Voix d’homme', poolMale, setPoolMale], ['Voix de femme', poolFemale, setPoolFemale]] as const).map(([lab, val, set]) => (
+                    <Fld key={lab} label={lab}>
+                      <select value={val} onChange={e => set(e.target.value)} style={{ height: 28, fontSize: 12, ...selStyle }}>
+                        <option value="">{savedPools.length ? 'Choisir un pool…' : 'Aucun pool (Banque › Pools)'}</option>
+                        {savedPools.map(p => <option key={p.id} value={p.id} data-no-tr>{`${p.name} · ${poolLines(p.content).length}`}</option>)}
+                      </select>
+                    </Fld>
+                  ))}
+                  <span style={{ fontSize: 11.5, color: MUTED }}>Voix incertaine ou sans voix : le pool du dessous est utilisé. Le badge sur chaque vidéo (aperçu) se corrige d’un clic.</span>
+                  <div><button type="button" disabled={detecting || !sources.length} onClick={() => void detectAllVoices()} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: detecting ? 'wait' : 'pointer', ...BTN_GHOST, fontSize: 12, fontWeight: 500 }}>{detecting ? '🎙 Détection…' : '🎙 Détecter les voix maintenant'}</button></div>
+                </div>
+              )}
               <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne (distribuées entre les variantes)…\nEx : Sérieux là ?'} style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 6, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }} />
               <Fld label="Format"><Seg value={capStyle} onChange={setCapStyle} options={[{ v: 'snapchat', label: 'Snapchat' }, { v: 'outline', label: 'Contour' }]} /></Fld>
               <Fld label="Distribution"><Seg value={capMode} onChange={setCapMode} options={[{ v: 'seq', label: 'Séquentiel' }, { v: 'random', label: 'Aléatoire' }]} /></Fld>
