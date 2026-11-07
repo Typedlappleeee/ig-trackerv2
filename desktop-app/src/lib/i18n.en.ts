@@ -3476,6 +3476,14 @@ export const EN: Dict = {
     "Voix incertaine ou sans voix : le pool du dessous est utilisé. Le badge sur chaque vidéo (aperçu) se corrige d’un clic.": "Unsure or no voice: the pool below is used. The badge on each video (preview) can be changed with one click.",
     "🎙 Détection…": "🎙 Detecting…",
     "🎙 Détecter les voix maintenant": "🎙 Detect voices now",
+    "(Whisper : aucune parole repérée → mesure sur toute la piste)": "(Whisper: no speech found → measuring the whole track)",
+    "aucune voix entendue": "no voice heard",
+    "voix d’homme": "male voice",
+    "voix de femme": "female voice",
+    ", à vérifier": ", to check",
+    "de secours": "fallback",
+    "🔇 Sans voix": "🔇 No voice",
+    "Chaque vidéo reçoit toujours une légende. Sans voix du tout : le pool du dessous (ou l’autre pool). Avec la clé Groq, seules les vraies paroles sont mesurées (musique ignorée). Le badge sur chaque vidéo (aperçu) se corrige d’un clic.": "Every video always gets a caption. No voice at all: the pool below (or the other pool). With the Groq key, only real speech is measured (music ignored). The badge on each video (preview) can be changed with one click.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4130,5 +4138,6 @@ export const EN: Dict = {
     ["📚 pool par défaut ({0} légende(s))", "📚 default pool ({0} caption(s))"],
     ["📚 pool {0} ({1} légende(s))", "📚 {0} pool ({1} caption(s))"],
     ["{0}{1} — clic : changer", "{0}{1} — click: change"],
+    ["(Whisper indisponible : {0} → mesure locale)", "(Whisper unavailable: {0} → local measurement)"],
   ],
 }
