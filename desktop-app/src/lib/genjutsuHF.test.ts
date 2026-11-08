@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
-import { parseLinks, buildPrompt, isDirectVideo } from './genjutsuHF'
+import { parseLinks, buildPrompt, isDirectVideo, buildWanPrompt, buildDuoPrompt, pickWanId, estimateCredits } from './genjutsuHF'
 
 describe('Genjutsu — liens collés', () => {
   it('garde les reels Instagram (normalisés, sans doublon) et les fichiers vidéo', () => {
@@ -34,4 +34,29 @@ describe('Genjutsu — prompt automatique', () => {
     expect(p).not.toContain('Remove the caption texts')
     expect(p).toContain('She wears a white dress.')
   })
+})
+
+describe('WAN 3.0 + duo', () => {
+  it('prompt universel : garde la tenue de la vidéo, image_1 = corps entier', () => {
+    const p = buildWanPrompt({ duo: false, keepText: false, outfit: '' })
+    expect(p.startsWith('Video edit of <<<video_1>>>.')).toBe(true)
+    expect(p).toContain('<<<image_1>>> defines the character\'s full body')
+    expect(p).toContain('she wears exactly the same outfit as the original woman in <<<video_1>>>')
+    expect(p).toContain('Clean frame: remove all captions')
+    expect(p).toContain('Audio: keep the original audio track.')
+    expect(p).not.toContain('<<<image_2>>>')
+  })
+  it('prompt duo : gauche = image_1, droite = image_2', () => {
+    const p = buildWanPrompt({ duo: true, keepText: true, outfit: 'a red bikini' })
+    expect(p).toContain('<<<image_2>>> defines the full body of the woman on the right')
+    expect(p).toContain('both women wear a red bikini')
+    expect(p).toContain('keep the captions and on-screen texts')
+    expect(buildDuoPrompt({ keepText: false, outfit: '' })).toContain('woman on the right with @Image 2')
+  })
+  it('identifiant du modèle WAN lu dans le schéma', () => {
+    expect(pickWanId('{"enum":["kling3_0","wan2_6","wan3_0","seedance"]}')).toBe('wan3_0')
+    expect(pickWanId('models: wan-3.0, veo3')).toBe('wan-3.0')
+    expect(pickWanId('rien')).toBe('wan3_0')
+  })
+  it('estimation : rien avant la 1re mesure', () => { expect(estimateCredits('wan', '480p')).toBeNull() })
 })

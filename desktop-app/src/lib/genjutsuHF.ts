@@ -290,6 +290,125 @@ export function buildPrompt(o: PromptOpts): string {
   ].join('\n')
 }
 
+// Duo (Genjutsu) : 2 filles, @Image 1 = celle de gauche, @Image 2 = celle de droite.
+export function buildDuoPrompt(o: Omit<PromptOpts, 'several' | 'who'>): string {
+  return [
+    'Same video as @Video 1: keep the exact same motion, camera movement, framing and timing.',
+    'Replace the woman on the left (at the start of the video) with @Image 1 and the woman on the right with @Image 2, preserving each face and exact hairstyle from her own image. Never swap or blend the two women, even when they move around each other. No tattoos on any part of their bodies. Keep every other person exactly as in @Video 1.',
+    o.keepText ? 'Keep the on-screen texts of @Video 1 exactly as they are.' : 'Remove the caption texts moving on screen.',
+    o.modelOutfit ? 'Each woman wears exactly the same outfit as in her own image (not the outfits of @Video 1).' : o.outfit.trim() ? `Both women wear ${o.outfit.trim()}.` : 'Keep the same outfits as @Video 1.',
+  ].join('\n')
+}
+
+/* ── WAN 3.0 (Higgsfield) : même principe — photo de la modèle + vidéo de référence (15 s max) ── */
+export type GjEngine = 'genjutsu' | 'wan'
+export const ENGINE_LABEL: Record<GjEngine, string> = { genjutsu: 'Genjutsu', wan: 'WAN 3.0' }
+export const WAN_MAX_S = 15
+export interface WanPromptOpts { duo: boolean; keepText: boolean; outfit: string; modelOutfit?: boolean }
+const WAN_COMMON = (both: boolean) => [
+  `Realism: the result must look like real smartphone footage, indistinguishable from the original video. Natural skin texture with visible pores, fine lines and subtle imperfections, no beauty filter, no airbrushed or plastic look. Realistic eyes with natural reflections and moisture, individual hair strands reacting naturally to movement and light.`,
+  both
+    ? 'Skin: bare, unmarked skin on all visible areas of both characters (face, neck, chest, arms, hands, back, legs). No tattoos. Remove any tattoo present in <<<video_1>>> and do not transfer any from <<<image_1>>> or <<<image_2>>>.'
+    : 'Skin: bare, unmarked skin on all her visible areas (face, neck, chest, arms, hands, back, legs). No tattoos. Remove any tattoo present in <<<video_1>>> and do not transfer any from <<<image_1>>>.',
+  both
+    ? 'Integration: match the original video\'s lighting direction, shadows, color grading, white balance, sharpness, motion blur, grain and compression on both characters. Consistent skin tone across each character\'s face and body, natural contact with the environment and with each other. No morphing, no flickering, no identity drift.'
+    : 'Integration: match the original video\'s lighting direction, shadows, color grading, white balance, sharpness, motion blur, grain and compression. Consistent skin tone across face and body, natural contact with the environment. No morphing, no flickering, no identity drift.',
+]
+export function buildWanPrompt(o: WanPromptOpts): string {
+  const outfit = o.outfit.trim()
+  const clean = o.keepText
+    ? 'On-screen text: keep the captions and on-screen texts of <<<video_1>>> exactly as they are; remove only watermarks and logos.'
+    : 'Clean frame: remove all captions, subtitles, on-screen text, watermarks, logos and stickers, and restore the underlying background.'
+  if (!o.duo) return [
+    'Video edit of <<<video_1>>>.',
+    `Reference roles (strict):\n- <<<image_1>>> defines the character's full body: face, hair, body shape, body proportions, height, build, curves and skin tone. Her entire body must match <<<image_1>>>, not the original woman's body.\n- <<<video_1>>> defines ${o.modelOutfit || outfit ? 'everything else' : 'the outfit and everything else'}: ${o.modelOutfit || outfit ? '' : 'clothing, accessories, '}pose, movements, background, other people, camera motion, framing, lighting and timing.`,
+    'Subject replacement: this is a full-body character replacement, not a face swap. Modify only the adult female character; all other people in the video remain completely unchanged. Replace the original woman entirely with the character from <<<image_1>>>, with exact identity and body consistency in every frame and from every angle.',
+    o.modelOutfit ? 'Outfit: she wears exactly the same outfit as in <<<image_1>>> (same garments, colors, cut, fabric and details), not the outfit of the original woman in <<<video_1>>>.'
+      : outfit ? `Outfit: she wears ${outfit}, fitted naturally to her body from <<<image_1>>>. Do not copy the original woman's clothing from <<<video_1>>> nor any clothing from <<<image_1>>>.`
+      : 'Outfit: she wears exactly the same outfit as the original woman in <<<video_1>>> (same garments, colors, cut, fabric and details), refitted naturally to her new body from <<<image_1>>>. Do not copy any clothing from <<<image_1>>>.',
+    'Motion: her new body performs exactly the same pose, movements, gestures and timing as the original woman in <<<video_1>>>. Retain the original head movements, facial expressions, eye blinks, micro-expressions and lip sync.',
+    'Viewing angle: follow the original orientation of her head and body in every frame. When she is seen from behind, show her hair and her body from behind, matching <<<image_1>>>. Never turn her toward the camera, never reveal or invent a face when it is not visible in <<<video_1>>>. In profile or three-quarter views, show only the parts of the face visible in the original.',
+    'Preservation: keep everything else identical to <<<video_1>>>: background, other people, camera motion, framing, lighting and timing.',
+    ...WAN_COMMON(false), clean, 'Audio: keep the original audio track.',
+  ].join('\n\n')
+  return [
+    'Video edit of <<<video_1>>>.',
+    `Reference roles (strict):\n- <<<image_1>>> defines the full body of the woman on the left: face, hair, body shape, body proportions, height, build, curves and skin tone.\n- <<<image_2>>> defines the full body of the woman on the right: face, hair, body shape, body proportions, height, build, curves and skin tone.\n- <<<video_1>>> defines ${o.modelOutfit || outfit ? 'everything else' : 'the outfits and everything else'}: ${o.modelOutfit || outfit ? '' : 'clothing, accessories, '}poses, movements, interactions, background, other people, camera motion, framing, lighting and timing.`,
+    'Subject replacement: this is a full-body replacement of two adult women, not a face swap. Modify only these two characters; anyone else in the video remains completely unchanged.\n- Woman on the left (at the start of the video): replace her entirely with the character from <<<image_1>>>.\n- Woman on the right (at the start of the video): replace her entirely with the character from <<<image_2>>>.\nEach identity and body stays locked to its own reference in every frame and from every angle, even if the two women change positions later in the video. Never swap, mix or blend the two characters, even when they cross, overlap or move around each other.',
+    o.modelOutfit ? 'Outfits: each woman wears exactly the same outfit as in her own reference image, not the outfits of <<<video_1>>>.'
+      : outfit ? `Outfits: both women wear ${outfit}, fitted naturally to each new body. Do not copy the original clothing from <<<video_1>>> nor any clothing from <<<image_1>>> or <<<image_2>>>.`
+      : 'Outfits: each woman wears exactly the same outfit as the original woman she replaces in <<<video_1>>> (same garments, colors, cut, fabric and details), refitted naturally to her new body. Do not copy any clothing from <<<image_1>>> or <<<image_2>>>.',
+    'Motion: each new body performs exactly the same pose, movements, gestures, interactions and timing as the original woman she replaces. Retain each character\'s original head movements, facial expressions, eye blinks, micro-expressions and lip sync.',
+    'Viewing angle: follow the original orientation of each head and body in every frame. When a character is seen from behind, show her hair and her body from behind, matching her own reference. Never turn a character toward the camera, never reveal or invent a face when it is not visible in <<<video_1>>>. In profile or three-quarter views, show only the parts of the face visible in the original.',
+    'Preservation: keep everything else identical to <<<video_1>>>: background, other people, camera motion, framing, lighting and timing.',
+    ...WAN_COMMON(true), clean, 'Audio: keep the original audio track.',
+  ].join('\n\n')
+}
+
+// Identifiant du modèle WAN 3.0 chez Higgsfield : lu dans la description de generate_video
+// (tools/list) — repli « wan3_0 » (celui de l'adresse higgsfield.ai/ai/video?model=wan3_0).
+export function pickWanId(schemaText: string): string {
+  const ids = [...new Set(schemaText.match(/\bwan[_-]?3(?:[._-]\d+)?[a-z0-9_-]*/gi) ?? [])]
+  return ids.find(x => /^wan3_0$/i.test(x)) ?? ids.find(x => !/[-_](t2v|text)/i.test(x)) ?? 'wan3_0'
+}
+const wanIds = new Map<string, Promise<string>>()
+function wanModelId(account: string): Promise<string> {
+  let p = wanIds.get(account)
+  if (!p) {
+    p = (async () => {
+      try { await openSession(account); return pickWanId(JSON.stringify(await rpc(account, 'tools/list', {}) ?? {})) } catch { return 'wan3_0' }
+    })()
+    wanIds.set(account, p)
+  }
+  return p
+}
+
+// Durée (s) d'une vidéo par son adresse (métadonnées seulement).
+export function videoSeconds(url: string): Promise<number> {
+  return new Promise(ok => {
+    const v = document.createElement('video')
+    const done = (d: number) => { v.removeAttribute('src'); v.load(); ok(d) }
+    const t = setTimeout(() => done(0), 20_000)
+    v.preload = 'metadata'; v.muted = true
+    v.onloadedmetadata = () => { clearTimeout(t); done(Number.isFinite(v.duration) ? v.duration : 0) }
+    v.onerror = () => { clearTimeout(t); done(0) }
+    v.src = url
+  })
+}
+
+/* ── crédits : coût réel de chaque génération (solde avant / après), et estimation apprise ── */
+const COST_KEY = 'sf-gj-cost'
+type CostStats = Record<string, { n: number; total: number; secs: number }>   // clé « moteur|résolution »
+const costKey = (engine: GjEngine, res: string, duo = false) => `${engine}|${res}${duo ? '|duo' : ''}`
+function learnCost(engine: GjEngine, res: string, duo: boolean, credits: number, secs: number): void {
+  const st = readJson<CostStats>(COST_KEY, {}), k = costKey(engine, res, duo)
+  const c = st[k] ?? { n: 0, total: 0, secs: 0 }
+  // les 20 dernières comptent (prix qui changent)
+  const keep = Math.min(c.n, 19) / Math.max(1, c.n)
+  st[k] = { n: Math.min(c.n, 19) + 1, total: c.total * keep + credits, secs: c.secs * keep + (secs || 0) }
+  writeJson(COST_KEY, st)
+}
+// Crédits estimés pour UNE génération (null = pas encore de mesure). `secs` : durée de la vidéo si connue.
+export function estimateCredits(engine: GjEngine, res: string, duo = false, secs?: number): number | null {
+  const st = readJson<CostStats>(COST_KEY, {})
+  const one = (e: GjEngine) => {
+    const c = st[costKey(e, res, duo)] ?? st[costKey(e, res)]
+    if (!c || !c.n) return null
+    if (secs && c.secs > 0) return (c.total / c.secs) * secs
+    return c.total / c.n
+  }
+  const v = one(engine) ?? (engine === 'wan' ? (() => { const g = one('genjutsu'); return g == null ? null : g * 0.65 })() : null)
+  return v == null ? null : Math.round(v * 10) / 10
+}
+// Les créations d'un même compte passent une par une (solde lu avant/après = coût exact).
+const createLocks = new Map<string, Promise<unknown>>()
+function oneAtATime<T>(account: string, fn: () => Promise<T>): Promise<T> {
+  const prev = createLocks.get(account) ?? Promise.resolve()
+  const next = prev.catch(() => undefined).then(fn)
+  createLocks.set(account, next.catch(() => undefined))
+  return next
+}
+
 /* ── vidéos sources ── */
 export interface SourceVideo { url: string; user: string | null }
 const readJson = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : d } catch { return d } }
@@ -424,6 +543,10 @@ export interface GjJob {
   videoNo?: number | null         // numéro de la vidéo pour sa modèle (« Zoe 012 »)
   prompt: string
   res: string
+  engine?: GjEngine               // absent = Genjutsu (anciennes générations)
+  model2?: GjModelRef | null      // duo : la 2e fille (à droite)
+  credits?: number | null         // crédits réellement utilisés (solde avant / après)
+  seconds?: number | null         // durée de la vidéo source
   status: GjStatus
   sent?: boolean                 // generate_video envoyé (même sans réponse) → jamais relancé tout seul
   hfJobId?: string | null
@@ -465,7 +588,7 @@ const byId = (id: string) => jobs.find(j => j.id === id)
 export const getJobs = () => jobs
 export function subscribeJobs(f: () => void): () => void { subs.add(f); return () => { subs.delete(f) } }
 
-export interface NewJob { account: string; model: GjModelRef; source: string; label?: string | null; prompt: string; res: string; spoof: SpoofPlan | null }
+export interface NewJob { account: string; model: GjModelRef; model2?: GjModelRef | null; engine?: GjEngine; source: string; label?: string | null; prompt: string; res: string; spoof: SpoofPlan | null }
 export function enqueue(items: NewJob[]): void {
   const now = Date.now()
   const fresh: GjJob[] = items.map((it, i) => {
@@ -478,7 +601,7 @@ export function enqueue(items: NewJob[]): void {
 export function retryJob(id: string): void {
   const j = byId(id)
   if (!j) return
-  enqueue([{ account: j.account, model: j.model, source: j.source, prompt: j.prompt, res: j.res, spoof: j.spoof ?? null }])
+  enqueue([{ account: j.account, model: j.model, model2: j.model2 ?? null, engine: j.engine, source: j.source, label: j.label, prompt: j.prompt, res: j.res, spoof: j.spoof ?? null }])
   commit(jobs.filter(x => x.id !== id))
 }
 export function removeJob(id: string): void {
@@ -524,11 +647,11 @@ const friendly = (e: unknown) => /HTTP 5\d\d|Bad gateway|overlo/i.test(errMsg(e)
   ? 'Higgsfield est saturé en ce moment (erreur 502 de leur côté). Vérifie ton historique Higgsfield (la vidéo est peut-être partie) avant « Relancer ».'
   : errMsg(e)
 
-async function generate(account: string, params: Record<string, unknown>): Promise<Any> {
+async function generate(account: string, params: Record<string, unknown>, context = 'Transférer le mouvement d’une vidéo sur la personne de l’image de référence.'): Promise<Any> {
   let last: unknown = null
   for (let k = 0; k < 4; k++) {
     try {
-      const r = await tool<Any>(account, 'generate_video', { params, context: 'Transférer le mouvement d’une vidéo sur la personne de l’image de référence.' })
+      const r = await tool<Any>(account, 'generate_video', { params, context })
       const txt = JSON.stringify(r ?? {})
       // saturation passagère sans rien de créé → nouvel essai
       if (!UUID.test(txt) && /rate.?limit|too many|busy|overload|temporar|try again|unavailable|timeout/i.test(txt) && k < 3) { await sleep(5000 * 2 ** k); continue }
@@ -552,22 +675,42 @@ async function launch(id: string): Promise<void> {
   try {
     const src = await resolveVideo(j0.source)
     patch(id, { sourceUrl: src.url, sourceUser: src.user })
+    const wan = j0.engine === 'wan'
+    // WAN 3.0 : vidéo de référence de 15 s maximum, rendu de la même durée
+    let secs = j0.seconds ?? 0
+    if (!secs) { secs = await videoSeconds(src.url); if (secs) patch(id, { seconds: Math.round(secs * 10) / 10 }) }
+    if (wan && secs > WAN_MAX_S + 0.5) { patch(id, { status: 'failed', error: `Vidéo de ${Math.round(secs)} s : WAN 3.0 prend 15 s maximum. Coupe-la (Studio › Montage) puis relance.` }); return }
     const vid = await patient(() => importVideo(j0.account, src.url))
     const imgId = await patient(() => refFor(j0.account, j0.model))
-    const params: Record<string, unknown> = {
-      model: 'hf_mult_motion_control', resolution: j0.res, use_unlim: false, ...(noRatio ? {} : { aspect_ratio: '9:16' }),
-      medias: [{ value: vid, role: 'video_references' }, { value: imgId, role: 'image_references' }],
-      ...(j0.prompt.trim() ? { prompt: j0.prompt.trim() } : {}),
-    }
-    patch(id, { sent: true })
-    let r: Any
-    try { r = await generate(j0.account, params) } catch (e) {
-      if (noRatio || !/aspect|ratio/i.test(errMsg(e))) throw e
-      noRatio = true; delete params.aspect_ratio            // ce modèle refuse le format : rendu au format de la vidéo
-      r = await generate(j0.account, params)
-    }
+    const img2 = j0.model2 ? await patient(() => refFor(j0.account, j0.model2!)) : null
+    const medias = [{ value: vid, role: 'video_references' }, { value: imgId, role: 'image_references' }, ...(img2 ? [{ value: img2, role: 'image_references' }] : [])]
+    const params: Record<string, unknown> = wan
+      ? { model: await wanModelId(j0.account), resolution: j0.res, use_unlim: false, aspect_ratio: '9:16', ...(secs ? { duration: Math.max(1, Math.min(WAN_MAX_S, Math.round(secs))) } : {}), medias, ...(j0.prompt.trim() ? { prompt: j0.prompt.trim() } : {}) }
+      : { model: 'hf_mult_motion_control', resolution: j0.res, use_unlim: false, ...(noRatio ? {} : { aspect_ratio: '9:16' }), medias, ...(j0.prompt.trim() ? { prompt: j0.prompt.trim() } : {}) }
+    const ctx = wan ? 'Éditer la vidéo de référence : remplacer la personne par celle de l’image de référence (WAN 3.0), même durée que la vidéo.' : undefined
+    // création + coût réel (solde avant / après) — une création à la fois par compte
+    const r: Any = await oneAtATime(j0.account, async () => {
+      const before = await readCredits(j0.account).catch(() => null)
+      patch(id, { sent: true })
+      let out: Any
+      try { out = await generate(j0.account, params, ctx) } catch (e) {
+        const m = errMsg(e)
+        // refus de validation (rien n'est créé) : on retire le paramètre refusé et on renvoie une fois
+        if (!wan && !noRatio && /aspect|ratio/i.test(m)) { noRatio = true; delete params.aspect_ratio }   // ce modèle refuse le format : rendu au format de la vidéo
+        else if (wan && params.duration != null && /duration/i.test(m) && /invalid|not allowed|must|unsupported|enum|value/i.test(m)) delete params.duration
+        else throw e
+        out = await generate(j0.account, params, ctx)
+      }
+      if (before != null) {
+        await sleep(1500)
+        const after = await readCredits(j0.account).catch(() => null)
+        const used = after != null ? Math.round((before - after) * 10) / 10 : null
+        if (used != null && used > 0) { patch(id, { credits: used }); learnCost(wan ? 'wan' : 'genjutsu', j0.res, !!j0.model2, used, secs) }
+      }
+      return out
+    })
     const ids = [...new Set((JSON.stringify(r ?? {}).match(/"(?:job_id|id)":"([0-9a-f-]{36})"/gi) ?? []).map(x => x.match(UUID)![0]))]
-    const hfJobId = r?.job_id || r?.jobs?.[0]?.job_id || ids.find(x => x !== vid && x !== imgId)
+    const hfJobId = r?.job_id || r?.jobs?.[0]?.job_id || ids.find(x => x !== vid && x !== imgId && x !== img2)
     if (!hfJobId) { patch(id, { status: 'failed', error: reasonIn(r) || 'Higgsfield n’a lancé aucune génération.' }); return }
     patch(id, { status: 'running', hfJobId: String(hfJobId) })
   } catch (e) {

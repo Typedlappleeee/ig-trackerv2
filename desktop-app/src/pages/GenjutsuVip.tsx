@@ -20,7 +20,7 @@ import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setM
 import {
   MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, deleteModel, uploadLocalVideo, hiddenModels, readPromptPresets,
   startAccountLogin, finishAccountLogin, removeAccount, needsReconnect,
-  buildPrompt, parseLinks, resolveVideo, cachedSource, isInstagram, enqueue, retryJob, removeJob, clearFinished, respoof,
+  buildPrompt, buildDuoPrompt, buildWanPrompt, ENGINE_LABEL, WAN_MAX_S, estimateCredits, type GjEngine, parseLinks, resolveVideo, cachedSource, isInstagram, enqueue, retryJob, removeJob, clearFinished, respoof,
   getJobs, subscribeJobs, isActive, pump, type HfAccount, type HfModel, type PromptOpts, type GjJob, type SpoofPlan,
 } from '@/lib/genjutsuHF'
 
@@ -214,6 +214,10 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
 
   // ── rendu : résolution + prompt ──
   const [res, setRes] = useState<'480p' | '720p' | '1080p'>('480p')
+  // moteur : Genjutsu (motion control) ou WAN 3.0 (≈ 35 % moins cher, vidéo de 15 s max)
+  const [engine, setEngineState] = useState<GjEngine>(() => readJson<GjEngine>('sf-gj-engine', 'genjutsu'))
+  const setEngine = (e: GjEngine) => { setEngineState(e); writeJson('sf-gj-engine', e); if (e === 'wan' && res === '1080p') setRes('480p') }
+  const [duo, setDuo] = useState(false)          // 2 filles : modèle 1 = à gauche, modèle 2 = à droite
   const [popts, setPopts] = useState<PromptOpts>({ several: false, who: '', keepText: false, outfit: '' })
   const [outfitOn, setOutfitOn] = useState(false)
   const [modelOutfit, setModelOutfit] = useState(false)
@@ -222,7 +226,11 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [custom, setCustom] = useState('')
   const [showPrompt, setShowPrompt] = useState(false)
   useEffect(() => { if (access === 'ok') void readPromptPresets().then(setPresets) }, [access])
-  const autoPrompt = buildPrompt({ ...popts, outfit: outfitOn && !modelOutfit ? popts.outfit : '', modelOutfit })
+  const outfitTxt = outfitOn && !modelOutfit ? popts.outfit : ''
+  const autoPrompt = engine === 'wan'
+    ? buildWanPrompt({ duo, keepText: popts.keepText, outfit: outfitTxt, modelOutfit })
+    : duo ? buildDuoPrompt({ keepText: popts.keepText, outfit: outfitTxt, modelOutfit })
+    : buildPrompt({ ...popts, outfit: outfitTxt, modelOutfit })
   const prompt = mode === 'auto' ? autoPrompt : mode === 'custom' ? custom : (presets[mode.slice(2)] ?? autoPrompt)
 
   // ── chaque modèle a SON dossier de la Banque (par défaut « Genjutsu › <nom> ») : ses vidéos y vont ──
@@ -259,22 +267,36 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const fileSources = files.filter(f => f.url).map(f => ({ source: f.url!, label: f.name }))
   const usable = [...links.filter(l => src[l]?.state !== 'error'), ...fileSources.map(f => f.source)]
   const labelOf = (source: string) => fileSources.find(f => f.source === source)?.label ?? null
-  const total = usable.length * (chosen.length + randomPools.length)
-  const blocker = !account ? 'Aucun compte Higgsfield' : !chosen.length && !randomPools.length ? 'Choisis au moins une modèle' : !usable.length ? 'Colle au moins un lien de reel' : !prompt.trim() ? 'Le prompt est vide' : null
+  const total = duo ? usable.length : usable.length * (chosen.length + randomPools.length)
+  const blocker = !account ? 'Aucun compte Higgsfield'
+    : duo ? (chosen.length !== 2 ? 'Duo : choisis exactement 2 modèles (1 = gauche, 2 = droite)' : !usable.length ? 'Colle au moins un lien de reel' : !prompt.trim() ? 'Le prompt est vide' : null)
+    : !chosen.length && !randomPools.length ? 'Choisis au moins une modèle' : !usable.length ? 'Colle au moins un lien de reel' : !prompt.trim() ? 'Le prompt est vide' : null
+  // crédits estimés (appris sur les dernières générations du même moteur / résolution)
+  const est = estimateCredits(engine, res, duo)
+  const fmtCr = (n: number) => (Math.round(n * 10) / 10).toLocaleString('fr-FR')
   function launch() {
     if (blocker) return
+    const ref = (m: HfModel) => ({ id: m.id, name: m.name, mediaId: m.mediaId!, photo: m.photo, account: refAccount })
     const job = (l: string, m: HfModel) => ({
-      account, source: l, label: labelOf(l), prompt: prompt.trim(), res,
-      model: { id: m.id, name: m.name, mediaId: m.mediaId!, photo: m.photo, account: refAccount },
-      spoof: planFor(m),
+      account, source: l, label: labelOf(l), prompt: prompt.trim(), res, engine,
+      model: ref(m), spoof: planFor(m),
     })
+    if (duo) {
+      enqueue(usable.map(l => ({ ...job(l, chosen[0]), model2: ref(chosen[1]) })))
+      if (!modelFolders[groupRef(chosen[0]).id]) void assignFolder(chosen[0], folderOf(chosen[0]))
+      toast(`${total} ${ENGINE_LABEL[engine]} duo ajouté${total > 1 ? 's' : ''} à la file`, 'ok')
+      setLinksText(''); setSrc({}); setFiles([])
+      const acc0 = account
+      setTimeout(() => void refreshCredits(acc0), 30_000)
+      return
+    }
     // aléatoire : tenues mélangées puis réparties (pas deux fois la même tant qu'il en reste)
     const shuffled = randomPools.map(p => [...p.items].sort(() => Math.random() - 0.5))
     enqueue(usable.flatMap((l, i) => [...chosen.map(m => job(l, m)), ...shuffled.map(items => job(l, items[i % items.length]))]))
     // le dossier de chaque modèle est créé (et associé) tout de suite : visible dans la Banque
     const seen = new Set<string>()
     for (const m of [...chosen, ...randomPools.map(p => p.items[0])]) { const g = groupRef(m).id; if (!modelFolders[g] && !seen.has(g)) { seen.add(g); void assignFolder(m, folderOf(m)) } }
-    toast(`${total} Genjutsu ajouté${total > 1 ? 's' : ''} à la file`, 'ok')
+    toast(`${total} ${ENGINE_LABEL[engine]} ajouté${total > 1 ? 's' : ''} à la file`, 'ok')
     setLinksText(''); setSrc({}); setFiles([])
     const acc = account
     setTimeout(() => void refreshCredits(acc), 30_000)
@@ -395,6 +417,20 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
           <Step n={1} title="La modèle" sub="Sa photo de référence remplace la fille de la vidéo. Plusieurs modèles = une version par modèle."
             right={<button type="button" onClick={() => void loadModels()} style={{ ...ghostBtn, height: 26, padding: '0 8px' }} title="Actualiser"><Icon d="M21 12a9 9 0 1 1-3-6.7L21 8|M21 3v5h-5" size={12} /></button>}>
             {modelsErr && <span style={{ fontSize: 12.5, color: BAD }}>{modelsErr}</span>}
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: '#0D0D0F', border: `1px solid ${duo ? 'rgba(168,85,247,.45)' : EDGE}` }}>
+              <Opt on={duo} onChange={v => { setDuo(v); if (v) setRandomGroups([]) }} label="Duo : 2 filles à l’écran" hint="Choisis 2 modèles : 1 = la fille de gauche, 2 = celle de droite (au début de la vidéo)." />
+              {duo && chosen.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                  {chosen.slice(0, 2).map((m, i) => (
+                    <span key={m.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: INK }}>
+                      {m.photo && <img src={m.photo} alt="" style={{ width: 22, height: 22, borderRadius: 99, objectFit: 'cover' }} />}
+                      {i === 0 ? 'Gauche :' : 'Droite :'} <span data-no-tr>{m.name}</span>
+                    </span>
+                  ))}
+                  {chosen.length > 2 && <span style={{ fontSize: 12, color: WARN }}>{`${chosen.length} choisies : garde-en 2`}</span>}
+                </div>
+              )}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
               {models === null && Array.from({ length: 4 }, (_, i) => <div key={i} style={{ aspectRatio: '3 / 4', borderRadius: 10, background: '#18181B', animation: 'pulse 1.4s ease-in-out infinite' }} />)}
               {shownGroup && (
@@ -527,7 +563,9 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
           </Step>
 
           <Step n={3} title="Le rendu">
-            <Row label="Résolution"><Segmented sm value={res} onChange={setRes} options={[{ v: '480p', l: '480p' }, { v: '720p', l: '720p' }, { v: '1080p', l: '1080p' }]} /></Row>
+            <Row label="Moteur"><Segmented sm value={engine} onChange={setEngine} options={[{ v: 'genjutsu', l: 'Genjutsu' }, { v: 'wan', l: 'WAN 3.0' }]} /></Row>
+            {engine === 'wan' && <span style={{ marginTop: -4, fontSize: 12, color: MUTED }}>{`≈ 35 % moins cher que Genjutsu · vidéo de référence de ${WAN_MAX_S} s maximum · même durée que la vidéo · 9:16. Mets une photo de la modèle qui montre ses formes.`}</span>}
+            <Row label="Résolution"><Segmented sm value={res} onChange={setRes} options={engine === 'wan' ? [{ v: '480p', l: '480p' }, { v: '720p', l: '720p' }] : [{ v: '480p', l: '480p' }, { v: '720p', l: '720p' }, { v: '1080p', l: '1080p' }]} /></Row>
             <Row label="Prompt">
               <select value={mode} onChange={e => { const v = e.target.value; if (v === 'custom' && mode !== 'custom') setCustom(prompt); setMode(v) }} style={{ ...sel, maxWidth: 240 }}>
                 <option value="auto" style={opt}>Automatique (options ci-dessous)</option>
@@ -537,9 +575,9 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             </Row>
             {mode === 'auto' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '10px 12px', borderRadius: 10, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
-                <Opt on={popts.several} onChange={v => setPopts(p => ({ ...p, several: v }))} label="Plusieurs filles dans la vidéo" hint="Précise laquelle remplacer.">
+                {!duo && engine === 'genjutsu' && <Opt on={popts.several} onChange={v => setPopts(p => ({ ...p, several: v }))} label="Plusieurs filles dans la vidéo" hint="Précise laquelle remplacer.">
                   <input value={popts.who} onChange={e => setPopts(p => ({ ...p, who: e.target.value }))} placeholder="on the left, in the red dress" style={{ ...field, width: '100%' }} />
-                </Opt>
+                </Opt>}
                 <Opt on={popts.keepText} onChange={v => setPopts(p => ({ ...p, keepText: v }))} label="Garder les textes écrits de la vidéo" hint="Sinon, les textes à l’écran sont retirés." />
                 <Opt on={modelOutfit} onChange={v => { setModelOutfit(v); if (v) setOutfitOn(false) }} label="Prendre la tenue de la modèle" hint="Elle garde la tenue de sa photo, pas celle de la vidéo." />
                 <Opt on={outfitOn} onChange={v => { setOutfitOn(v); if (v) setModelOutfit(false) }} label="Autre tenue que la vidéo" hint="Décris la tenue voulue (en anglais de préférence).">
@@ -576,10 +614,14 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
           <button type="button" onClick={launch} disabled={!!blocker}
             style={{ height: 46, borderRadius: 12, border: 'none', cursor: blocker ? 'not-allowed' : 'pointer', fontSize: 14.5, fontWeight: 700, letterSpacing: '-0.01em',
               background: blocker ? '#1C1C1F' : `linear-gradient(135deg, ${ACCENT}, #7C3AED)`, color: blocker ? DIM : '#fff', boxShadow: blocker ? 'none' : '0 8px 24px -10px rgba(168,85,247,.7)' }}>
-            {blocker ?? `Lancer ${total} Genjutsu`}
+            {blocker ?? (est != null ? `Lancer ${total} ${ENGINE_LABEL[engine]}${duo ? ' duo' : ''} · ≈ ${fmtCr(est * total)} crédits` : `Lancer ${total} ${ENGINE_LABEL[engine]}${duo ? ' duo' : ''}`)}
           </button>
           {!blocker && <span style={{ marginTop: -6, textAlign: 'center', fontSize: 12, color: MUTED }}>
-            {`${usable.length} vidéo${usable.length > 1 ? 's' : ''} × ${chosen.length + randomPools.length} modèle${chosen.length + randomPools.length > 1 ? 's' : ''} · ${res} · ${MAX_RUNNING} à la fois sur le compte`}
+            {`${usable.length} vidéo${usable.length > 1 ? 's' : ''} × ${duo ? '1 duo' : `${chosen.length + randomPools.length} modèle${chosen.length + randomPools.length > 1 ? 's' : ''}`} · ${res} · ${MAX_RUNNING} à la fois sur le compte`}
+            <br />
+            {est != null
+              ? `≈ ${fmtCr(est)} crédits par vidéo (moyenne de tes dernières générations ${ENGINE_LABEL[engine]} ${res})${account && credits[account] != null ? ` · solde ${fmtCr(credits[account]!)}` : ''}`
+              : `Crédits : le coût exact s’affiche sur chaque vidéo dès la 1re génération ${ENGINE_LABEL[engine]} ${res}`}
           </span>}
         </div>
 
@@ -727,8 +769,9 @@ function JobCard({ job: j, now, onRespoof }: { job: GjJob; now: number; onRespoo
           style={{ position: 'relative', width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: done ? 'none' : 'blur(5px) brightness(.45)', mixBlendMode: done ? 'normal' : 'luminosity' }} />}
         <div style={{ position: 'absolute', top: 6, left: 6, right: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
           {j.model.photo && <img src={j.model.photo} alt="" style={{ width: 22, height: 22, borderRadius: 99, objectFit: 'cover', border: '1.5px solid rgba(255,255,255,.7)' }} />}
-          <span data-no-tr style={{ fontSize: 11.5, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.model.name}</span>
-          <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,.75)', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>{j.res}</span>
+          {j.model2?.photo && <img src={j.model2.photo} alt="" style={{ width: 22, height: 22, marginLeft: -12, borderRadius: 99, objectFit: 'cover', border: '1.5px solid rgba(255,255,255,.7)' }} />}
+          <span data-no-tr style={{ fontSize: 11.5, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.model2 ? `${j.model.name} + ${j.model2.name}` : j.model.name}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,.75)', textShadow: '0 1px 4px rgba(0,0,0,.8)', whiteSpace: 'nowrap' }}>{`${j.engine === 'wan' ? 'WAN · ' : ''}${j.model2 ? 'duo · ' : ''}${j.res}`}</span>
         </div>
         {!done && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 8, padding: 12, textAlign: 'center' }}>
@@ -746,6 +789,7 @@ function JobCard({ job: j, now, onRespoof }: { job: GjJob; now: number; onRespoo
         {done && <span style={{ fontSize: 11.5, fontWeight: 600, color: j.spoofError ? WARN : st.color }} title={j.spoofError ?? j.spoof?.folder}>
           {j.spoofError ? (j.spoof?.count ? `${j.spoofDone ?? 0}/${j.spoof.count} versions · ${j.spoofError}` : j.spoofError) : st.text}
         </span>}
+        {j.credits != null && <span style={{ fontSize: 11, color: WARN }} title="Crédits Higgsfield utilisés (solde avant / après le lancement)">{`− ${j.credits.toLocaleString('fr-FR')} crédits`}</span>}
         {done && j.spoof?.folder && <span data-no-tr title={j.spoof.folder} style={{ marginTop: -3, fontSize: 11, color: DIM, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{`📁 ${crumbs(j.spoof.folder)}`}</span>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <a href={j.source} target="_blank" rel="noreferrer" data-no-tr title={j.source}

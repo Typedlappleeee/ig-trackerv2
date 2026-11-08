@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-08',
+    date: '2026-11-08',
+    title: { fr: '✨ Genjutsu : moteur WAN 3.0, mode duo et crédits affichés', en: '✨ Genjutsu: WAN 3.0 engine, duo mode and credits shown' },
+    items: {
+      fr: [
+        'Nouveau moteur WAN 3.0 (≈ 35 % moins cher) à côté de Genjutsu : photo de la modèle + vidéo de référence de 15 s max, rendu de la même durée, 9:16.',
+        'Mode duo : 2 filles à l’écran — modèle 1 à gauche, modèle 2 à droite.',
+        'Crédits : coût estimé sur le bouton Lancer, et crédits réellement utilisés affichés sur chaque vidéo.',
+      ],
+      en: [
+        'New WAN 3.0 engine (≈ 35% cheaper) next to Genjutsu: model photo + reference video up to 15s, same-length render, 9:16.',
+        'Duo mode: 2 girls on screen — model 1 on the left, model 2 on the right.',
+        'Credits: estimated cost on the Launch button, and the credits actually used shown on each video.',
+      ],
+    },
+  },
+  {
     id: '2026-11-07',
     date: '2026-11-07',
     title: { fr: '🎙 Auto-contenu : le pool de légendes choisi selon la voix', en: '🎙 Auto-content: caption pool picked from the voice' },
