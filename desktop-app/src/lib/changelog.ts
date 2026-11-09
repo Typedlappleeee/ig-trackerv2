@@ -20,11 +20,13 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Nouveau moteur WAN 3.0 (≈ 35 % moins cher) à côté de Genjutsu : photo de la modèle + vidéo de référence de 15 s max, rendu de la même durée, 9:16.',
         'Mode duo : 2 filles à l’écran — modèle 1 à gauche, modèle 2 à droite.',
         'Crédits : coût estimé sur le bouton Lancer, et crédits réellement utilisés affichés sur chaque vidéo.',
+        'WAN 3.0 est maintenant le moteur par défaut, et le spoof est réglé par défaut sur 🇩🇪 Allemagne (aléatoire) — nouvelle localisation aussi disponible dans le Studio et Auto-contenu.',
       ],
       en: [
         'New WAN 3.0 engine (≈ 35% cheaper) next to Genjutsu: model photo + reference video up to 15s, same-length render, 9:16.',
         'Duo mode: 2 girls on screen — model 1 on the left, model 2 on the right.',
         'Credits: estimated cost on the Launch button, and the credits actually used shown on each video.',
+        'WAN 3.0 is now the default engine, and spoofing defaults to 🇩🇪 Germany (random) — the new location is also available in the Studio and Auto-content.',
       ],
     },
   },

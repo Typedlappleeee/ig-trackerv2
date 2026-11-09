@@ -17,6 +17,13 @@ describe('Localisation GPS aléatoire', () => {
       expect(p.lon).toBeGreaterThan(-5.5); expect(p.lon).toBeLessThan(9.6)
     }
   })
+  it('Allemagne (aléatoire) reste en Allemagne', () => {
+    for (let i = 0; i < 200; i++) {
+      const p = gpsFor('germany')!
+      expect(p.lat).toBeGreaterThan(47.2); expect(p.lat).toBeLessThan(55.1)
+      expect(p.lon).toBeGreaterThan(5.8); expect(p.lon).toBeLessThan(15.1)
+    }
+  })
   it('liste : USA juste après France ; ville fixe et « aucune » inchangées', () => {
     expect(GPS_CITIES.map(c => c.k).slice(0, 3)).toEqual(['none', 'france', 'usa'])
     expect(gpsFor('paris')).toEqual({ lat: 48.8566, lon: 2.3522 })

@@ -28,7 +28,7 @@ const ACCENT = '#A855F7', ACCENT_TXT = '#D8B4FE'
 const INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#5A5A63'
 const EDGE = 'rgba(255,255,255,0.07)', FIELD_EDGE = 'rgba(255,255,255,0.09)', FIELD_BG = '#161618'
 const OK = '#86EFAC', BAD = '#FCA5A5', WARN = '#FBBF24'
-const CFG_KEY = 'sf-gj-auto2', ACC_KEY = 'sf-gj-account', PICK_KEY = 'sf-gj-picked'
+const CFG_KEY = 'sf-gj-auto3', ACC_KEY = 'sf-gj-account', PICK_KEY = 'sf-gj-picked'
 
 const card: CSSProperties = { background: '#111113', border: `1px solid ${EDGE}`, borderRadius: 12, padding: 16 }
 const field: CSSProperties = { height: 32, padding: '0 10px', borderRadius: 8, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 13, outline: 'none', boxSizing: 'border-box' }
@@ -39,7 +39,7 @@ const ghostBtn: CSSProperties = { display: 'inline-flex', alignItems: 'center', 
 interface AutoCfg { on: boolean; count: number; device: string; gps: string }
 const readJson = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : d } catch { return d } }
 const writeJson = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* bloqué */ } }
-const cfgDefaults = (): AutoCfg => ({ on: false, count: 3, device: 'iphone15', gps: 'france' })
+const cfgDefaults = (): AutoCfg => ({ on: false, count: 3, device: 'iphone15', gps: 'germany' })
 const crumbs = (path: string) => path.split('/').join(' › ')
 const mmss = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 const reelLabel = (link: string) => link.match(/\/reel\/([\w-]+)/)?.[1] ?? link.replace(/^https?:\/\//, '').slice(0, 42)
@@ -215,8 +215,8 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   // ── rendu : résolution + prompt ──
   const [res, setRes] = useState<'480p' | '720p' | '1080p'>('480p')
   // moteur : Genjutsu (motion control) ou WAN 3.0 (≈ 35 % moins cher, vidéo de 15 s max)
-  const [engine, setEngineState] = useState<GjEngine>(() => readJson<GjEngine>('sf-gj-engine', 'genjutsu'))
-  const setEngine = (e: GjEngine) => { setEngineState(e); writeJson('sf-gj-engine', e); if (e === 'wan' && res === '1080p') setRes('480p') }
+  const [engine, setEngineState] = useState<GjEngine>(() => readJson<GjEngine>('sf-gj-engine2', 'wan'))
+  const setEngine = (e: GjEngine) => { setEngineState(e); writeJson('sf-gj-engine2', e); if (e === 'wan' && res === '1080p') setRes('480p') }
   const [duo, setDuo] = useState(false)          // 2 filles : modèle 1 = à gauche, modèle 2 = à droite
   const [popts, setPopts] = useState<PromptOpts>({ several: false, who: '', keepText: false, outfit: '' })
   const [outfitOn, setOutfitOn] = useState(false)

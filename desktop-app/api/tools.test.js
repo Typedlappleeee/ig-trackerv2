@@ -50,7 +50,7 @@ describe('Parité serveur ↔ app (mêmes réglages ffmpeg)', () => {
     expect(srv.SPOOF_DEVICES).toEqual(appTools.SPOOF_DEVICES)
     for (const d of appTools.SPOOF_DEVICES) expect(srv.deviceMetaArgs(d.k)).toEqual(appTools.deviceMetaArgs(d.k))
     expect(srv.GPS_CITIES).toEqual(appGps.GPS_CITIES)
-    for (const c of appGps.GPS_CITIES.filter(c => !['france', 'usa'].includes(c.k))) expect(srv.gpsFor(c.k)).toEqual(appGps.gpsFor(c.k))
+    for (const c of appGps.GPS_CITIES.filter(c => !['france', 'usa', 'germany'].includes(c.k))) expect(srv.gpsFor(c.k)).toEqual(appGps.gpsFor(c.k))
     for (let n = 0; n < 50; n++) {
       const f = srv.gpsFor('france'), u = srv.gpsFor('usa')
       expect(f.lat).toBeGreaterThan(41); expect(f.lat).toBeLessThan(51.5)

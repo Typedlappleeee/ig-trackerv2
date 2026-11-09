@@ -104,6 +104,7 @@ export const GPS_CITIES = [
   { k: 'none', label: 'Aucune (par défaut)', lat: 0, lon: 0 },
   { k: 'france', label: '🇫🇷 France (aléatoire)', lat: 46.6, lon: 2.2 },
   { k: 'usa', label: '🇺🇸 USA (aléatoire)', lat: 39.8, lon: -98.6 },
+  { k: 'germany', label: '🇩🇪 Allemagne (aléatoire)', lat: 51.2, lon: 10.4 },
   { k: 'paris', label: 'Paris', lat: 48.8566, lon: 2.3522 },
   { k: 'lyon', label: 'Lyon', lat: 45.7640, lon: 4.8357 },
   { k: 'marseille', label: 'Marseille', lat: 43.2965, lon: 5.3698 },
@@ -129,6 +130,9 @@ const US_CITIES = [
   { lat: 47.6062, lon: -122.3321 }, { lat: 39.7392, lon: -104.9903 }, { lat: 42.3601, lon: -71.0589 }, { lat: 36.1699, lon: -115.1398 },
   { lat: 37.7749, lon: -122.4194 }, { lat: 36.1627, lon: -86.7816 }, { lat: 28.5384, lon: -81.3789 }, { lat: 38.9072, lon: -77.0369 },
 ]
+const GERMANY_CITIES = [
+  { lat: 52.5200, lon: 13.4050 },   { lat: 48.1351, lon: 11.5820 },   { lat: 53.5511, lon: 9.9937 },   { lat: 50.9375, lon: 6.9603 },   { lat: 50.1109, lon: 8.6821 },   { lat: 48.7758, lon: 9.1829 },   { lat: 51.2277, lon: 6.7735 },   { lat: 51.3397, lon: 12.3731 },   { lat: 51.5136, lon: 7.4653 },   { lat: 51.4556, lon: 7.0116 },   { lat: 53.0793, lon: 8.8017 },   { lat: 51.0504, lon: 13.7373 },   { lat: 52.3759, lon: 9.7320 },   { lat: 49.4521, lon: 11.0767 },
+]
 function randomCityGps(list) {
   const c = list[Math.floor(Math.random() * list.length)]
   const j = () => (Math.random() - 0.5) * 0.06
@@ -137,6 +141,7 @@ function randomCityGps(list) {
 export function gpsFor(key) {
   if (key === 'france') return randomCityGps(FRANCE_CITIES)
   if (key === 'usa') return randomCityGps(US_CITIES)
+  if (key === 'germany') return randomCityGps(GERMANY_CITIES)
   const c = GPS_CITIES.find(x => x.k === key)
   return !c || c.k === 'none' ? null : { lat: c.lat, lon: c.lon }
 }

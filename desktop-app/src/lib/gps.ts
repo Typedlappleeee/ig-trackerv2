@@ -6,6 +6,7 @@ export const GPS_CITIES: GpsCity[] = [
   { k: 'none', label: 'Aucune (par défaut)', lat: 0, lon: 0 },
   { k: 'france', label: '🇫🇷 France (aléatoire)', lat: 46.6, lon: 2.2 },
   { k: 'usa', label: '🇺🇸 USA (aléatoire)', lat: 39.8, lon: -98.6 },
+  { k: 'germany', label: '🇩🇪 Allemagne (aléatoire)', lat: 51.2, lon: 10.4 },
   { k: 'paris', label: 'Paris', lat: 48.8566, lon: 2.3522 },
   { k: 'lyon', label: 'Lyon', lat: 45.7640, lon: 4.8357 },
   { k: 'marseille', label: 'Marseille', lat: 43.2965, lon: 5.3698 },
@@ -59,6 +60,23 @@ const US_CITIES: LatLon[] = [
   { lat: 28.5384, lon: -81.3789 },   // Orlando
   { lat: 38.9072, lon: -77.0369 },   // Washington
 ]
+// Grandes villes allemandes pour « Allemagne (aléatoire) ».
+const GERMANY_CITIES: LatLon[] = [
+  { lat: 52.5200, lon: 13.4050 },   // Berlin
+  { lat: 48.1351, lon: 11.5820 },   // Munich
+  { lat: 53.5511, lon: 9.9937 },    // Hambourg
+  { lat: 50.9375, lon: 6.9603 },    // Cologne
+  { lat: 50.1109, lon: 8.6821 },    // Francfort
+  { lat: 48.7758, lon: 9.1829 },    // Stuttgart
+  { lat: 51.2277, lon: 6.7735 },    // Düsseldorf
+  { lat: 51.3397, lon: 12.3731 },   // Leipzig
+  { lat: 51.5136, lon: 7.4653 },    // Dortmund
+  { lat: 51.4556, lon: 7.0116 },    // Essen
+  { lat: 53.0793, lon: 8.8017 },    // Brême
+  { lat: 51.0504, lon: 13.7373 },   // Dresde
+  { lat: 52.3759, lon: 9.7320 },    // Hanovre
+  { lat: 49.4521, lon: 11.0767 },   // Nuremberg
+]
 // Une ville au hasard + léger décalage ~±0.03° (≈ quelques km).
 function randomCityGps(list: LatLon[]): LatLon {
   const c = list[Math.floor(Math.random() * list.length)]
@@ -67,12 +85,14 @@ function randomCityGps(list: LatLon[]): LatLon {
 }
 export const randomFranceGps = (): LatLon => randomCityGps(FRANCE_CITIES)
 export const randomUsGps = (): LatLon => randomCityGps(US_CITIES)
+export const randomGermanyGps = (): LatLon => randomCityGps(GERMANY_CITIES)
 
 // Résout une clé de ville en coordonnées GPS pour runSpoof (null si « none »).
-// 'france' / 'usa' → une position aléatoire du pays (différente à chaque appel).
+// 'france' / 'usa' / 'germany' → une position aléatoire du pays (différente à chaque appel).
 export function gpsFor(key: string): LatLon | null {
   if (key === 'france') return randomFranceGps()
   if (key === 'usa') return randomUsGps()
+  if (key === 'germany') return randomGermanyGps()
   const c = GPS_CITIES.find(x => x.k === key)
   return !c || c.k === 'none' ? null : { lat: c.lat, lon: c.lon }
 }

@@ -3502,6 +3502,7 @@ export const EN: Dict = {
     "WAN ·": "WAN ·",
     "duo ·": "duo ·",
     "Crédits Higgsfield utilisés (solde avant / après le lancement)": "Higgsfield credits used (balance before / after launch)",
+    "🇩🇪 Allemagne (aléatoire)": "🇩🇪 Germany (random)",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],

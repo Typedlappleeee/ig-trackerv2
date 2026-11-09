@@ -90,7 +90,7 @@ POST /files     {"path": "videos/…/uuid.mp4", "folder": "Montage VA", "title":
 { "file_id": "4f1c…",              // ou "url": "https://…/clip.mp4"
   "intensity": "normal",           // subtle | normal | strong
   "device": "iphone15pro",         // appareil réécrit dans la vidéo (voir GET /tools)
-  "gps": "paris",                  // none | france | usa | paris | … | {"lat": 48.85, "lon": 2.35}
+  "gps": "paris",                  // none | france | usa | germany | paris | … | {"lat": 48.85, "lon": 2.35}
   "folder": "Spoofées",            // dossier de ScaleFlow où ranger le résultat
   "title": "clip 12 v1",           // optionnel
   "seed": 1234 }                   // optionnel : même seed = mêmes réglages
