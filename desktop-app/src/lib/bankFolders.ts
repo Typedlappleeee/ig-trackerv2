@@ -112,6 +112,18 @@ export function childFolders(paths: Iterable<string | null | undefined>, parent:
   return [...out].sort((a, b) => leafOf(a).localeCompare(leafOf(b), 'fr', { sensitivity: 'base', numeric: true }))
 }
 
+/* ── Pays (Auto-contenu) : dossier de sortie « PAYS/Modèle » créé tout seul ── */
+export const MARKETS = ['US', 'DE', 'FR'] as const
+export type Market = typeof MARKETS[number]
+/** Dossier de destination d'une variante pour un pays : « US/<dossier de la source> » (dernier
+ *  niveau du dossier source = la modèle, ex. « Genjutsu/Kenza » → « US/Kenza »). Source à la
+ *  racine ou déjà dans un dossier pays → « US » / « US/Kenza ». */
+export function marketDest(market: string, srcFolder: string | null | undefined): string {
+  const s = segs(srcFolder ?? '').filter(x => !(MARKETS as readonly string[]).includes(x.toUpperCase()))
+  const model = s.length ? s[s.length - 1] : ''
+  return model && !model.startsWith('_') ? `${market}/${model}` : market
+}
+
 /* ── Genjutsu : le dossier de la Banque associé à chaque modèle ── */
 const modelTag = (modelId: string) => `gj:${modelId}`
 export async function loadModelFolders(s: BankScope): Promise<Record<string, string>> {

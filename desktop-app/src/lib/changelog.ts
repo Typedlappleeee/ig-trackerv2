@@ -22,6 +22,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Sélecteur de la Banque plus simple : seulement les sous-dossiers du dossier ouvert, un fil « Banque › US › Kenza », et le dernier dossier ouvert est retenu.',
         'Auto-contenu : nouvelle option « Remplacer le son » — le son d’origine est coupé et remplacé par un son de ta banque (sons choisis ou dossier de sons, aléatoire ou dans l’ordre, volume réglable), un son différent par variante.',
         'Sécurité posting : un sélecteur de vidéos ne propose plus jamais d’images ni de sons (avant, une banque sans vidéo affichait tout).',
+        'Auto-contenu : nouveau choix « Pays » (🇺🇸 US / 🇩🇪 DE / 🇫🇷 FR) — GPS du pays, variantes rangées toutes seules dans « US/Kenza », « DE/Kenza »… (aucun dossier à créer), et les légendes / sons utilisés la dernière fois pour ce pays reviennent automatiquement.',
       ],
       en: [
         'Library: a single “Media” list (videos, images and sounds together) with an All / Videos / Images / Sounds filter and a type badge on each tile. You can now import sounds (mp3, m4a, wav…).',
@@ -29,6 +30,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Simpler Library picker: only the subfolders of the open folder, a “Library › US › Kenza” trail, and the last opened folder is remembered.',
         'Auto-content: new “Replace the sound” option — the original sound is muted and replaced by a sound from your library (chosen sounds or a sounds folder, random or in order, adjustable volume), a different sound per variant.',
         'Posting safety: a video picker never offers images or sounds anymore (before, a library with no videos showed everything).',
+        'Auto-content: new “Country” choice (🇺🇸 US / 🇩🇪 DE / 🇫🇷 FR) — country GPS, variants saved automatically to “US/Kenza”, “DE/Kenza”… (no folder to create), and the captions / sounds last used for that country come back automatically.',
       ],
     },
   },

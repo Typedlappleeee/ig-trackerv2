@@ -30,7 +30,7 @@ import CaptionPools, { loadCaptionPools, poolLines, type Pool } from '@/componen
 import { detectSpeaker, voiceLabel, type Voice, type VoiceResult } from '@/lib/voiceGender'
 import { isAudioRow, extOfPath } from '@/lib/mediaKind'
 import { fetchAllRows } from '@/lib/bankStorage'
-import { isWithin, loadFavFolders } from '@/lib/bankFolders'
+import { isWithin, loadFavFolders, marketDest, MARKETS, type Market } from '@/lib/bankFolders'
 
 // Options d'une liste de dossiers : favoris ★ d'abord, puis tous les dossiers (chemin « A › B »).
 function FolderOptions({ folders, favs }: { folders: string[]; favs: string[] }) {
@@ -621,6 +621,31 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   }, [soundIds.join(','), currentOrg?.id, user.id])
   // Dossier de destination des sorties (banque).
   const [destFolder, setDestFolder] = useState('')
+  // Pays : choisir US / DE / FR règle tout d'un coup — GPS du pays, sortie rangée toute seule dans
+  // « PAYS/<modèle de la source> » (aucun dossier à créer), et les légendes / sons utilisés la
+  // dernière fois pour ce pays (mémorisés sur ce PC).
+  const [market, setMarketState] = useState<Market | ''>('')
+  const MARKET_GPS: Record<Market, string> = { US: 'usa', DE: 'germany', FR: 'france' }
+  const marketKey = (m: string) => `sf-auto-market-${currentOrg?.id ?? user.id}-${m}`
+  type MarketMem = { capPool?: string; poolMale?: string; poolFemale?: string; soundSource?: 'pick' | 'folder'; soundIds?: string[]; soundFolder?: string }
+  const rememberMarket = () => { if (market) try { localStorage.setItem(marketKey(market), JSON.stringify({ capPool, poolMale, poolFemale, soundSource, soundIds, soundFolder } satisfies MarketMem)) } catch { /* plein */ } }
+  const setMarket = (m: Market | '') => {
+    rememberMarket()
+    setMarketState(m)
+    if (!m) return
+    setGpsCity(MARKET_GPS[m])
+    let mem: MarketMem = {}
+    try { mem = JSON.parse(localStorage.getItem(marketKey(m)) || '{}') as MarketMem } catch { /* ignore */ }
+    if (typeof mem.capPool === 'string') setCapPool(mem.capPool)
+    if (typeof mem.poolMale === 'string') setPoolMale(mem.poolMale)
+    if (typeof mem.poolFemale === 'string') setPoolFemale(mem.poolFemale)
+    if (mem.soundSource) setSoundSource(mem.soundSource)
+    if (Array.isArray(mem.soundIds)) setSoundIds(mem.soundIds)
+    if (typeof mem.soundFolder === 'string') setSoundFolder(mem.soundFolder)
+    else { const f = folders.find(x => /^sons?\//i.test(x) && x.split('/').pop()?.toUpperCase() === m); if (f) { setSoundSource('folder'); setSoundFolder(f) } }
+  }
+  // Destination réelle d'une source : pays → PAYS/modèle ; sinon le dossier choisi.
+  const destFor = (v: { folder?: string | null }) => market ? marketDest(market, v.folder) : (destFolder || null)
   const ps = usePartnerSend(currentOrg?.id ?? null, 'sf-partner-send-auto')   // envoi direct au site partenaire
   // Aperçu : lien de chaque vidéo source (+ sa miniature en image d'attente). Liens PARTAGÉS avec
   // la Banque (lib/signedUrls) : une vidéo déjà ouverte est reprise du cache du navigateur.
@@ -651,7 +676,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   async function applyPicker(r: PickerResult) {
     if (r.kind !== 'videos' || r.ids.length === 0) return
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_path')).in('id', r.ids)
+    const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,thumbnail_path,folder')).in('id', r.ids)
     setSources((data ?? []) as any[])
   }
 
@@ -682,6 +707,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
 
   async function generate() {
     if (running || sources.length === 0) return
+    rememberMarket()
     setRunning(true); setLogs([]); setMade(0); setProgress(0)
     const per = Math.max(1, Math.min(100, variants))
     const R = startRun('auto', `${sources.length} vidéo${sources.length > 1 ? 's' : ''} × ${per}`, sources.length * per)
@@ -750,7 +776,9 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         if (R.isCancelled()) { push('⏹ Annulé.'); break }
         push(`— ${v.title} —`)
         // Nom propre des variantes (jamais « hf_… ») : « <titre> · v1, v2… »
-        const vt = await niceBase({ orgId: currentOrg?.id ?? null, userId: user.id }, v.title, destFolder || (v as { folder?: string | null }).folder)
+        const vDest = destFor(v as { folder?: string | null })
+        if (market) push(`  📁 → ${vDest}`)
+        const vt = await niceBase({ orgId: currentOrg?.id ?? null, userId: user.id }, v.title, vDest || (v as { folder?: string | null }).folder)
         let bytes: Uint8Array
         try {
           bytes = await resolveSourceBytes(v)
@@ -843,7 +871,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
               out = await runAutoVariant(bytes, vOpts, hooks)
             }
             push(`    ✓ variante générée (${Math.round(out.byteLength / 1024)} Ko) → sauvegarde…`)
-            const savedId = await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${vt} · v${i + 1}`, 'mp4', destFolder || null)
+            const savedId = await saveOutputToBank(user.id, currentOrg?.id ?? null, out, `${vt} · v${i + 1}`, 'mp4', vDest)
             ps.queue(savedId, `${vt} · v${i + 1}`, push)
             done++; setMade(done); R.tick(true)
           } catch (ve) {
@@ -880,6 +908,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     useTrim: boolean; trimRandom: boolean; trimRandMin: string; trimRandMax: string; trimEndMin: string; trimEndMax: string; trimStart: string; trimEnd: string
     useSpeed: boolean; speedMin: string; speedMax: string; destFolder: string
     voiceAuto?: boolean; poolMale?: string; poolFemale?: string
+    market?: Market | ''
     useSound?: boolean; soundSource?: 'pick' | 'folder'; soundIds?: string[]; soundFolder?: string; soundMode?: 'seq' | 'random'; soundVol?: string
   }
   const AUTO_COMPOSER = 'auto-contenu'
@@ -887,7 +916,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [presets, setPresets] = useState<ComposerPreset<AutoCfg>[]>([])
   const [presetSel, setPresetSel] = useState('')
 
-  const autoCfg = (): AutoCfg => ({ variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder, voiceAuto, poolMale, poolFemale, useSound, soundSource, soundIds, soundFolder, soundMode, soundVol })
+  const autoCfg = (): AutoCfg => ({ variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder, voiceAuto, poolMale, poolFemale, useSound, soundSource, soundIds, soundFolder, soundMode, soundVol, market })
   const applyAutoCfg = (c: Partial<AutoCfg>) => {
     if (typeof c.variants === 'number') setVariants(c.variants)
     if (c.intensity) setIntensity(c.intensity)
@@ -924,6 +953,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     if (typeof c.soundFolder === 'string') setSoundFolder(c.soundFolder)
     if (c.soundMode) setSoundMode(c.soundMode)
     if (typeof c.soundVol === 'string') setSoundVol(c.soundVol)
+    if (typeof c.market === 'string') setMarketState(c.market)
   }
 
   // Charge la LISTE des presets nommés (aucune restauration automatique de réglages).
@@ -979,7 +1009,15 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
           </div>
           <Fld label="Variantes / vidéo"><input type="number" min={1} max={100} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
-          <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option><FolderOptions folders={folders} favs={favFolders} /></select></Fld>
+          <Fld label="Pays">
+            <Seg value={market || 'none'} onChange={v => setMarket(v === 'none' ? '' : v as Market)} options={[{ v: 'none', label: 'Aucun' }, ...MARKETS.map(m => ({ v: m, label: m === 'US' ? '🇺🇸 US' : m === 'DE' ? '🇩🇪 DE' : '🇫🇷 FR' }))]} />
+          </Fld>
+          {market ? (
+            <Fld label="Rangé dans">
+              <span data-no-tr style={{ fontSize: 12.5, color: INK }}>{[...new Set(sources.map(v => destFor(v as { folder?: string | null })))].slice(0, 4).join(' · ') || `${market}/<modèle>`}</span>
+              <span style={{ fontSize: 11.5, color: MUTED }}>créé tout seul · GPS du pays · légendes et sons de la dernière fois pour ce pays</span>
+            </Fld>
+          ) : <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option><FolderOptions folders={folders} favs={favFolders} /></select></Fld>}
           {ps.partner && <Fld label="Envoyer direct vers"><PartnerSendSelect ps={ps} style={selStyle} optStyle={optStyle} /></Fld>}
         </Grp>
 

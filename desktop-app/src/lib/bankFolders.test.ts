@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
-import { folderTree, isWithin, renamedPath, joinPath, parentOf, leafOf, normPath, cleanSeg, childFolders } from './bankFolders'
+import { folderTree, isWithin, renamedPath, joinPath, parentOf, leafOf, normPath, cleanSeg, childFolders, marketDest } from './bankFolders'
 
 describe('Banque — sous-dossiers', () => {
   it('arborescence : parents implicites, frères triés, profondeur', () => {
@@ -36,5 +36,13 @@ describe('Banque — sous-dossiers', () => {
     expect(childFolders(p, 'US/Kenza')).toEqual(['US/Kenza/Prêt'])
     expect(childFolders(p, 'Sources')).toEqual([])
     expect(childFolders(['USA/X'], 'US')).toEqual([])
+  })
+  it('pays : dossier de sortie PAYS/modèle', () => {
+    expect(marketDest('US', 'Genjutsu/Kenza')).toBe('US/Kenza')
+    expect(marketDest('DE', 'Kenza')).toBe('DE/Kenza')
+    expect(marketDest('DE', 'US/Kenza')).toBe('DE/Kenza')
+    expect(marketDest('FR', null)).toBe('FR')
+    expect(marketDest('US', 'US')).toBe('US')
+    expect(marketDest('US', '_Sources')).toBe('US')
   })
 })
