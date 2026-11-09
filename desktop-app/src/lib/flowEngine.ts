@@ -29,6 +29,7 @@ import { isWithin } from '@/lib/bankFolders'
 import { startCreditRun, isCreditError, CREDIT_COSTS, type CreditRun } from '@/lib/credits'
 import { startRun, type RunHandle } from '@/lib/runStore'
 import { heartbeatPhone } from '@/lib/phoneWatch'
+import { kindOfExt, extOfPath } from './mediaKind'
 
 // ── Modèle ───────────────────────────────────────────────────────────────────
 export type BlockType = 'login' | 'username' | 'avatar' | 'bio' | 'warmup' | 'post' | 'story' | 'pause'
@@ -177,12 +178,9 @@ function pick<T>(arr: T[], i: number, mode: PoolMode | undefined): T | undefined
 // dossiers vides et ne sont pas des médias.
 export interface Scope { orgId: string | null; userId: string }
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
-const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 interface BankRow { id: string; folder: string | null; title: string | null; storage_path: string | null; file_url: string | null; notes: string | null; deleted_at?: string | null; used_count?: number | null }
-const kindOf = (r: BankRow): 'image' | 'video' => {
-  const ext = (r.storage_path ?? r.file_url ?? r.title ?? '').toLowerCase().split('?')[0].split('.').pop() ?? ''
-  return IMG_EXT.includes(ext) ? 'image' : 'video'
-}
+// Son (.mp3…) = 'audio' : jamais proposé à un bloc Reels / photo / story.
+const kindOf = (r: BankRow) => kindOfExt(extOfPath(r.storage_path ?? r.file_url ?? r.title ?? ''))
 const isMedia = (r: BankRow) => !SENTINELS.includes(r.notes ?? '') && !r.deleted_at && !!(r.storage_path || r.file_url)
 
 async function bankRows(scope: Scope): Promise<BankRow[]> {
@@ -204,6 +202,7 @@ export async function loadBankSummary(scope: Scope): Promise<BankSummary> {
     if (r.folder && !map.has(r.folder)) map.set(r.folder, { name: r.folder, video: 0, image: 0 })
     if (!isMedia(r)) continue
     const k = kindOf(r)
+    if (k === 'audio') continue   // les sons ne comptent ni comme vidéo ni comme image
     out[k]++
     if (r.folder) map.get(r.folder)![k]++
   }

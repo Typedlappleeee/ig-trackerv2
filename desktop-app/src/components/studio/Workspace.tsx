@@ -28,11 +28,11 @@ import {
 import type { RemixIntensity } from '@/lib/studioFilters'
 import { getFFmpeg, isFfmpegReady } from '@/lib/ffmpeg'
 import { startRun, cancelRun } from '@/lib/runStore'
+import { mediaKindOf } from '@/lib/mediaKind'
 
 export interface BankItem { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null; folder: string | null; deleted_at?: string | null }
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
-const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
-export const isVid = (v: { storage_path: string | null; file_url: string | null }) => !IMG_EXT.includes((v.storage_path ?? v.file_url ?? '').toLowerCase().split('.').pop() ?? '')
+export const isVid = (v: { storage_path: string | null; file_url: string | null }) => mediaKindOf(v) === 'video'
 const fmtDur = (s?: number) => s && s > 0 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : undefined
 const POS9: [number, number][] = [[18, 14], [50, 14], [82, 14], [18, 50], [50, 50], [82, 50], [18, 84], [50, 84], [82, 84]]
 const INTENSITY = [

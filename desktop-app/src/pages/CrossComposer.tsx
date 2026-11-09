@@ -18,15 +18,12 @@ import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
 import BankPicker from '@/components/BankPicker'
 import VideoFrame from '@/components/VideoFrame'
+import { mediaKindOf } from '@/lib/mediaKind'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; geelark_id: string | null }
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
-const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
-function isVid(v: Video): boolean {
-  const ext = (v.storage_path ?? v.file_url ?? '').toLowerCase().split('.').pop() ?? ''
-  return !IMG_EXT.includes(ext)
-}
+function isVid(v: Video): boolean { return mediaKindOf(v) === 'video' }
 function dotKind(s: string): string { return s === 'warming' ? 'warmup' : s }
 type Phase = 'pending' | 'running' | 'done' | 'failed'
 interface RunItem { id: string; name: string; phase: Phase; detail?: string }

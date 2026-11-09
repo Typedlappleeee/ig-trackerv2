@@ -22,6 +22,7 @@ import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
 import { recordGeelarkSchedule } from '@/lib/scheduling'
 import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/lib/composerPrefs'
 import VideoFrame from '@/components/VideoFrame'
+import { mediaKindOf } from '@/lib/mediaKind'
 
 // Valeur datetime-local (fuseau LOCAL) décalée de `plusMin` minutes par rapport à maintenant.
 function schedLocalValue(plusMin: number): string {
@@ -35,11 +36,8 @@ interface Phone { id: string; ig_username: string | null; pp_url?: string | null
 interface Video { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; duration: number | null; notes: string | null }
 
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
-const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
-function isVideo(v: Video): boolean {
-  const ext = (v.storage_path ?? v.file_url ?? '').toLowerCase().split('.').pop() ?? ''
-  return !IMG_EXT.includes(ext)
-}
+// Vidéo seulement : ni image ni son (lib/mediaKind).
+function isVideo(v: Video): boolean { return mediaKindOf(v) === 'video' }
 function dotKind(s: string): string { return s === 'warming' ? 'warmup' : s }
 function fmtDur(s: number | null): string {
   if (!s || s <= 0) return ''

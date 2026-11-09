@@ -64,3 +64,14 @@ describe('Studio · Légendes réparties', () => {
     expect(captionFor([], 3)).toBe('')
   })
 })
+
+import { soundOutDuration } from './studioFilters'
+describe('Auto-contenu · son remplacé : durée de sortie', () => {
+  it('bornée par la vidéo (son bouclé), repères de sortie après la vitesse', () => {
+    expect(soundOutDuration(6, 0.5, null, 1.02)).toBeCloseTo(5.382, 3)
+    expect(soundOutDuration(6, 0.3, 4, 1)).toBeCloseTo(3.7, 3)
+    expect(soundOutDuration(10, null, null, null)).toBe(10)
+    expect(soundOutDuration(null, 0, null, 1)).toBeNull()
+    expect(soundOutDuration(1, 0.9, null, 1)).toBeNull()
+  })
+})

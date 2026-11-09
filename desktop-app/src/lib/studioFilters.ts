@@ -99,6 +99,16 @@ export function mp4Duration(buf: Uint8Array): number | null {
   }
   return null
 }
+/** Durée (s) de la sortie quand on remplace le son : bornée par la vidéo, jamais par le son
+ *  (bouclé). Mêmes repères que -ss/-to (temps de SORTIE, après la vitesse). null = inconnue. */
+export function soundOutDuration(srcDur: number | null, trimStart?: number | null, trimEnd?: number | null, speed?: number | null): number | null {
+  const start = trimStart && trimStart > 0 ? trimStart : 0
+  if (trimEnd != null && trimEnd > start) return +(trimEnd - start).toFixed(3)
+  if (!srcDur || srcDur <= 0) return null
+  const out = srcDur / (speed && speed > 0 ? speed : 1) - start
+  return out > 0.2 ? +out.toFixed(3) : null
+}
+
 // Arguments ffmpeg de la micro-coupe (on garde toujours au moins 1 s).
 export function spoofTrimArgs(seed: number, duration: number | null): string[] {
   const { start, end } = spoofTrim(seed)

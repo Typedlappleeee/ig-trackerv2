@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
-import { folderTree, isWithin, renamedPath, joinPath, parentOf, leafOf, normPath, cleanSeg } from './bankFolders'
+import { folderTree, isWithin, renamedPath, joinPath, parentOf, leafOf, normPath, cleanSeg, childFolders } from './bankFolders'
 
 describe('Banque — sous-dossiers', () => {
   it('arborescence : parents implicites, frères triés, profondeur', () => {
@@ -28,5 +28,13 @@ describe('Banque — sous-dossiers', () => {
     expect(renamedPath('Genjutsu', 'Genjutsu', 'IA')).toBe('IA')
     expect(renamedPath('Genjutsu/Zoe/S2', 'Genjutsu', 'IA')).toBe('IA/Zoe/S2')
     expect(renamedPath('Genjutsu/Zoe', 'Genjutsu/Zoe', 'Genjutsu/Zoé')).toBe('Genjutsu/Zoé')
+  })
+  it('sous-dossiers directs (navigation du sélecteur)', () => {
+    const p = ['US/Kenza/Prêt', 'US/Zoé', 'DE/Kenza', null, 'Sources']
+    expect(childFolders(p, null)).toEqual(['DE', 'Sources', 'US'])
+    expect(childFolders(p, 'US')).toEqual(['US/Kenza', 'US/Zoé'])
+    expect(childFolders(p, 'US/Kenza')).toEqual(['US/Kenza/Prêt'])
+    expect(childFolders(p, 'Sources')).toEqual([])
+    expect(childFolders(['USA/X'], 'US')).toEqual([])
   })
 })

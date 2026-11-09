@@ -17,7 +17,8 @@ import { PartnerBankModal, SendToPartnerModal } from '@/components/PartnerBank'
 import { isHeic, heicToJpeg, sniffHeic } from '@/lib/heic'
 import { niceBase, isUglyTitle, allocTitle, prefixFor } from '@/lib/niceTitle'
 import PoolManager, { POOL_PREFIX } from '@/components/PoolManager'
-import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg } from '@/lib/bankFolders'
+import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg, setFolderFav } from '@/lib/bankFolders'
+import { mediaKindOf, kindOfFile, extOfPath, isFav, withFav, AUDIO_MIME, AUDIO_EXT, type MediaKind } from '@/lib/mediaKind'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
 type FSHandle = { createWritable: () => Promise<WritableStream> }
@@ -53,13 +54,27 @@ function isSentinel(i: ContentItem): boolean {
   return SENTINELS.includes(i.notes ?? '') && !i.storage_path && !i.file_url
 }
 
-// ── Type de média inféré de l'extension (même logique que electron Bank.tsx) ────
-type MediaType = 'video' | 'image'
-function inferType(i: ContentItem): MediaType {
-  const src = (i.storage_path ?? i.file_url ?? '').toLowerCase().split('?')[0]
-  const ext = src.split('.').pop() ?? ''
-  if (['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif'].includes(ext)) return 'image'
-  return 'video'
+// ── Type de média inféré de l'extension (source unique : lib/mediaKind) ────────
+type MediaType = MediaKind
+const inferType = (i: ContentItem): MediaType => mediaKindOf(i)
+// Filtre de type dans la banque unique (une seule liste, on distingue par le filtre + le badge).
+type KindFilter = 'all' | MediaKind
+// Entrées spéciales de la colonne Dossiers (pas de vrais dossiers).
+const SPECIAL_F = new Set(['Tous', 'Jamais publiées', '★ Favoris'])
+const KIND_LABEL: Record<MediaKind, string> = { video: 'VIDÉO', image: 'IMAGE', audio: 'SON' }
+
+// Durée d'un son importé (lue par le navigateur, sans rien envoyer). null si illisible.
+function audioDuration(file: Blob): Promise<number | null> {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file)
+    const a = new Audio()
+    const done = (d: number | null) => { URL.revokeObjectURL(url); resolve(d) }
+    const t = setTimeout(() => done(null), 8000)
+    a.preload = 'metadata'
+    a.onloadedmetadata = () => { clearTimeout(t); done(isFinite(a.duration) ? Math.round(a.duration) : null) }
+    a.onerror = () => { clearTimeout(t); done(null) }
+    a.src = url
+  })
 }
 
 function fmtDuration(s: number | null): string {
@@ -77,7 +92,7 @@ function hueFor(id: string): string {
   return HUES[h % HUES.length]
 }
 
-type TabKey = 'video' | 'image' | 'caption' | 'pool'
+type TabKey = 'media' | 'caption' | 'pool'
 interface Caption { id: string; title: string | null; content: string; used_count: number | null; created_at: string }
 type SortKey = 'recent' | 'name' | 'used'
 
@@ -116,8 +131,12 @@ function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin = '400px
 
 // ── Vignette 9/16 (vidéo) ou 4/5 (image). Vraie miniature si dispo, sinon un
 //    placeholder à rayures diagonales CSS teinté (aucune image inventée). ────────
-function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx, broken = false, onStale, suspend = false }: {
+function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragStart, onContextMenu, selecting = false, idx, broken = false, onStale, suspend = false, onFav, showKind = false }: {
   item: ContentItem; type: MediaType; thumb: string | null; media: string | null; on: boolean; theme: Theme; onToggle: (e: React.MouseEvent) => void; onOpen?: () => void; onDragStart?: (e: React.DragEvent) => void; onContextMenu?: (e: React.MouseEvent) => void
+  /** Étoile favori (partagée par l'équipe). */
+  onFav?: () => void
+  /** Badge VIDÉO / IMAGE / SON (vue « Tout »). */
+  showKind?: boolean
   selecting?: boolean; idx?: number; broken?: boolean
   /** Le lien n'a pas chargé : on en redemande un neuf (une fois) au lieu de rester sur le repli. */
   onStale?: () => void
@@ -131,7 +150,7 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
   const onErr = () => { if (!retried.current && onStale) { retried.current = true; onStale() } else setFailed(true) }
   const ext = ((item.storage_path ?? item.file_url ?? '').split('?')[0].split('.').pop() ?? '').toUpperCase().slice(0, 4)
   const fresh = (item.used_count ?? 0) === 0
-  const dur = type === 'video' ? fmtDuration(item.duration) : ''
+  const dur = type !== 'image' ? fmtDuration(item.duration) : ''
   const btnRef = useRef<HTMLButtonElement>(null)
   const inView = useInView(btnRef)
   const onScreen = useInView(btnRef, '0px')   // vidéos : seulement ce qui est à l'écran
@@ -143,8 +162,8 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
   // (ex. .MOV HEVC d'iPhone), ou fichier introuvable dans le stockage.
   const fallback = (
     <span style={{ ...placeholder, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, background: broken ? 'repeating-linear-gradient(135deg,#1A1215,#1A1215 8px,#16101299 8px,#16101299 16px)' : `linear-gradient(160deg, rgba(${hueFor(item.id)},0.28), #161618)`, color: broken ? '#F87171' : 'rgba(255,255,255,0.7)' }}>
-      <Icon d={broken ? 'M12 9v4|M12 17h.01|M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z' : type === 'video' ? 'M6 4l14 8-14 8V4z' : 'M3 3h18v18H3z|M21 15l-5-5L5 21'} size={18} />
-      <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.04em' }}>{broken ? 'Fichier introuvable' : ext || (type === 'video' ? 'VIDÉO' : 'IMAGE')}</span>
+      <Icon d={broken ? 'M12 9v4|M12 17h.01|M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z' : type === 'video' ? 'M6 4l14 8-14 8V4z' : type === 'audio' ? 'M9 18V5l12-2v13|M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z|M21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z' : 'M3 3h18v18H3z|M21 15l-5-5L5 21'} size={type === 'audio' ? 26 : 18} />
+      <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.04em' }}>{broken ? 'Fichier introuvable' : ext || KIND_LABEL[type]}</span>
     </span>
   )
   return (
@@ -158,7 +177,7 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
       onDragStart={onDragStart}
       title={selecting ? 'Clic pour cocher / décocher · glisse pour en cocher plusieurs' : 'Clic pour lire · reste appuyé pour sélectionner · clic droit pour les actions'}
       style={{
-        position: 'relative', aspectRatio: type === 'image' ? '4 / 5' : '9 / 16', borderRadius: 14, padding: 0,
+        position: 'relative', aspectRatio: type === 'image' ? '4 / 5' : type === 'audio' ? '1 / 1' : '9 / 16', borderRadius: 14, padding: 0,
         cursor: 'pointer', overflow: 'hidden', transition: 'border-color .15s ease, transform .15s ease, box-shadow .15s ease',
         border: `1px solid ${on ? '#A78BFA' : 'rgba(255,255,255,0.07)'}`,
         boxShadow: on ? '0 0 0 2px #A78BFA' : 'none', transform: on ? 'scale(0.97)' : 'none',
@@ -166,7 +185,7 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
         background: '#161618',
       }}
     >
-      {broken || failed ? fallback : thumb
+      {broken || failed || type === 'audio' ? fallback : thumb
         ? <img src={thumb} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={onErr} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : type === 'video'
           // Vidéo sans miniature : sa 1re image, chargée SEULEMENT quand la tuile est à l'écran,
@@ -178,6 +197,14 @@ function Tile({ item, type, thumb, media, on, theme, onToggle, onOpen, onDragSta
             : <span style={placeholder} />}
 
       <TileCheck on={on} onToggle={onToggle} accent={theme.accent} />
+      {onFav && (
+        <span data-tile-check="" role="button" aria-label={isFav(item) ? 'Retirer des favoris' : 'Ajouter aux favoris'} title={isFav(item) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+          onClick={e => { e.stopPropagation(); onFav() }}
+          style={{ position: 'absolute', top: 30, right: 4, zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, cursor: 'pointer', background: 'rgba(10,10,11,0.6)', color: isFav(item) ? '#FBBF24' : 'rgba(255,255,255,0.55)', fontSize: 13 }}>{isFav(item) ? '★' : '☆'}</span>
+      )}
+      {showKind && (
+        <span style={{ position: 'absolute', bottom: 34, left: 8, zIndex: 2, height: 18, padding: '0 6px', display: 'inline-flex', alignItems: 'center', borderRadius: 5, background: 'rgba(10,10,11,0.72)', color: type === 'audio' ? '#6EE7B7' : type === 'image' ? '#93C5FD' : '#E9D5FF', fontSize: 9.5, fontWeight: 700, letterSpacing: '.05em' }}>{KIND_LABEL[type]}</span>
+      )}
 
       {fresh && (
         <span style={{
@@ -210,11 +237,21 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [trash, setTrash] = useState<ContentItem[]>([])
   const [showTrash, setShowTrash] = useState(false)
   const [folderNames, setFolderNames] = useState<string[]>([]) // dossiers vides (sentinelles)
+  const [favFolders, setFavFolders] = useState<Set<string>>(new Set()) // dossiers épinglés ★ (partagés)
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [tab, setTab] = useState<TabKey>(() => (takeOpenArg<{ tab?: TabKey }>('bank')?.tab) ?? 'video')
+  // Ouverture depuis un autre outil : { tab: 'video' | 'image' | 'audio' } (ancien format) → banque
+  // unique avec le filtre de type correspondant.
+  const openArg = useRef(takeOpenArg<{ tab?: string }>('bank'))
+  const [tab, setTab] = useState<TabKey>(() => { const t = openArg.current?.tab; return t === 'caption' || t === 'pool' ? t : 'media' })
+  const [kindF, setKindFState] = useState<KindFilter>(() => {
+    const t = openArg.current?.tab
+    if (t === 'video' || t === 'image' || t === 'audio') return t
+    try { const v = localStorage.getItem('sf-bank-kind'); return v === 'video' || v === 'image' || v === 'audio' ? v : 'all' } catch { return 'all' }
+  })
+  const setKindF = (k: KindFilter) => { setKindFState(k); try { localStorage.setItem('sf-bank-kind', k) } catch { /* ignore */ } }
   const [captions, setCaptions] = useState<Caption[]>([])
   const [capOpen, setCapOpen] = useState(false)
   const [capTitle, setCapTitle] = useState('')
@@ -252,6 +289,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     if (err) { setError('Erreur lors du chargement de la banque.'); setLoading(false); return }
     const rows = data
     setFolderNames(rows.filter(isSentinel).map(r => r.folder ?? r.title).filter((f): f is string => Boolean(f)))
+    setFavFolders(new Set(rows.filter(r => isSentinel(r) && isFav(r) && r.folder).map(r => normPath(r.folder as string))))
     // Médias en corbeille (deleted_at) exclus de la banque, listés à part (restaurable 7 j).
     setItems(rows.filter(r => !isSentinel(r) && !r.deleted_at))
     setTrash(rows.filter(r => !isSentinel(r) && !!r.deleted_at).sort((a, b) => (b.deleted_at ?? '').localeCompare(a.deleted_at ?? '')))
@@ -260,7 +298,15 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }, [currentOrg?.id, user.id, org.loading])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { setSel(new Set()) }, [tab, folder])
+  useEffect(() => { setSel(new Set()) }, [tab, folder, kindF])
+
+  // Favori (étoile) : tag « fav » sur le média, enregistré tout de suite (optimiste).
+  async function toggleFav(i: ContentItem) {
+    const tags = withFav(i.tags, !isFav(i))
+    setItems(list => list.map(x => x.id === i.id ? { ...x, tags } : x))
+    const { error: e } = await supabase.from('content_bank').update({ tags }).eq('id', i.id)
+    if (e) { setItems(list => list.map(x => x.id === i.id ? { ...x, tags: i.tags } : x)); toast(`Favori non enregistré : ${e.message}`, 'bad') }
+  }
 
   // ── Légendes (caption_bank) ──────────────────────────────────────────────────
   const [poolCount, setPoolCount] = useState(0)
@@ -341,13 +387,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
   // Compteurs par type (réels).
   const counts = useMemo(() => {
-    let v = 0, im = 0
-    items.forEach(i => { inferType(i) === 'image' ? im++ : v++ })
-    return { video: v, image: im }
+    const c = { video: 0, image: 0, audio: 0 }
+    items.forEach(i => { c[inferType(i)]++ })
+    return c
   }, [items])
 
-  // Items du type actif.
-  const typed = useMemo(() => items.filter(i => inferType(i) === tab), [items, tab])
+  // Items du filtre de type actif (banque unique : vidéos, images et sons ensemble).
+  const typed = useMemo(() => tab !== 'media' ? [] : kindF === 'all' ? items : items.filter(i => inferType(i) === kindF), [items, tab, kindF])
 
   // Tri des dossiers (nom, plus remplis, plus récents) — mémorisé dans ce navigateur.
   const [folderSort, setFolderSortState] = useState<'name' | 'count' | 'recent'>(() => { try { return (localStorage.getItem('sf-bank-fsort') as 'name' | 'count' | 'recent') || 'name' } catch { return 'name' } })
@@ -364,6 +410,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       { n: 'Tous', label: 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
       ...tree.map(t => ({ n: t.path, label: t.name, c: countIn(t.path), special: false, depth: t.depth, hasChildren: t.hasChildren })),
       { n: 'Jamais publiées', label: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true, depth: 0, hasChildren: false },
+      { n: '★ Favoris', label: 'Favoris', c: typed.filter(isFav).length, special: true, depth: 0, hasChildren: false },
     ]
   }, [typed, folderNames, folderSort])
   // Dossiers repliés (mémorisés dans ce navigateur) : leurs sous-dossiers sont masqués.
@@ -383,22 +430,23 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [uploading, setUploading] = useState<string | null>(null)
   const scopeFolder = currentOrg ? `orgs/${currentOrg.id}` : `users/${user.id}`
   const { usage, reload: reloadUsage } = useBankUsage(currentOrg?.id ?? null)
-  const IMG = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 
   // Un fichier → bucket content + miniature/durée + ligne content_bank. Renvoie l'erreur, ou null.
   async function uploadOne(file0: File, dest: string | null): Promise<string | null> {
     // HEIC (iPhone) → JPEG automatiquement
     let file = file0
     if (isHeic(file0)) { try { file = await heicToJpeg(file0) } catch { return 'photo HEIC illisible (conversion en JPG impossible)' } }
-    let ext = (file.name.split('.').pop() ?? '').toLowerCase()
-    if (!ext) ext = file.type.startsWith('image') ? 'jpg' : 'mp4'
+    const fk = kindOfFile(file) ?? 'video'
+    let ext = extOfPath(file.name)
+    if (!ext) ext = fk === 'image' ? 'jpg' : fk === 'audio' ? 'mp3' : 'mp4'
     const id = crypto.randomUUID()
     const storagePath = `videos/${scopeFolder}/${id}.${ext}`
-    const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || undefined, upsert: false })
+    const up = await supabase.storage.from('content').upload(storagePath, file, { contentType: file.type || AUDIO_MIME[ext] || undefined, upsert: false })
     if (up.error) return /row-level security|policy/i.test(up.error.message) ? 'espace plein ou accès refusé' : up.error.message
     // Miniature + durée générées tout de suite (avant : aucune miniature → vignettes vides).
     let thumbPath: string | null = null, duration: number | null = null
-    if (!file.type.startsWith('image') && !IMG.includes(ext)) {
+    if (fk === 'audio') duration = await audioDuration(file)
+    if (fk === 'video') {
       const th = await videoThumb(file)
       if (th) {
         duration = th.duration || null
@@ -425,6 +473,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const ZIP_MEDIA: Record<string, string> = {
     mp4: 'video/mp4', mov: 'video/quicktime', m4v: 'video/x-m4v', webm: 'video/webm', mkv: 'video/x-matroska', avi: 'video/x-msvideo', '3gp': 'video/3gpp',
     jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', gif: 'image/gif', bmp: 'image/bmp',
+    ...AUDIO_MIME,
   }
   const isZip = (f: File) => /\.zip$/i.test(f.name) || /zip/i.test(f.type)
   type ImportJob = { name: string; size: number; folder: string | null; get: () => Promise<File> }
@@ -432,7 +481,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   async function importFiles(files: FileList | File[]) {
     const list = Array.from(files)
     if (list.length === 0) return
-    const here = (folder !== 'Tous' && folder !== 'Jamais publiées') ? folder : null
+    const here = !SPECIAL_F.has(folder) ? folder : null
     const jobs: ImportJob[] = []
     const fails: string[] = []
     const zips: string[] = []
@@ -450,13 +499,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           if (!type) continue
           if (e.encrypted) { fails.push(`${e.name} : protégé par mot de passe`); continue }
           let dest = (parts.length > 1 ? parts[parts.length - 2] : base).trim() || base
-          if (dest === 'Tous' || dest === 'Jamais publiées') dest += ' (ZIP)'
+          if (SPECIAL_F.has(dest)) dest += ' (ZIP)'
           zipFolders.add(dest)
           jobs.push({ name: e.name, size: e.size, folder: dest, get: async () => new File([await e.file()], e.name, { type }) })
           found++
         }
         if (found) zips.push(f.name)
-        else fails.push(`${f.name} : aucune vidéo ni image dedans`)
+        else fails.push(`${f.name} : aucune vidéo, image ni son dedans`)
       } catch (err) { fails.push(`${f.name} : ${err instanceof Error ? err.message : 'ZIP illisible'}`) }
     }
     if (!jobs.length) {
@@ -513,9 +562,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const whyFailed = (e: unknown) => e instanceof TypeError ? 'connexion interrompue' : e instanceof Error ? e.message : String(e)
   // Nom de fichier : vidéos → .mov, images → extension réelle. `taken` évite les doublons.
   function fileNameFor(it: ContentItem, taken: Set<string>): string {
-    const isImg = inferType(it) === 'image'
-    const realExt = ((it.storage_path ?? it.file_url ?? '').split('?')[0].split('.').pop() || (isImg ? 'jpg' : 'mp4')).toLowerCase()
-    const ext = isImg ? realExt : 'mov'
+    const k = inferType(it)
+    const realExt = extOfPath(it.storage_path ?? it.file_url ?? '') || (k === 'image' ? 'jpg' : k === 'audio' ? 'mp3' : 'mp4')
+    const ext = k === 'video' ? 'mov' : realExt
     const base = (it.title || 'media').replace(/[^\w.-]+/g, '_')
     let name = `${base}.${ext}`; let n = 2
     while (taken.has(name)) name = `${base}_${n++}.${ext}`
@@ -965,7 +1014,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // ── Glisser-déposer un média (ou la sélection) dans un dossier ───────────────
   const [dragOver, setDragOver] = useState<string | null>(null)
   async function dropOnFolder(target: string, draggedId: string) {
-    const dest = (target === 'Tous' || target === 'Jamais publiées') ? null : target
+    const dest = SPECIAL_F.has(target) ? null : target
     if (dest === null) return
     const ids = sel.has(draggedId) ? [...sel] : [draggedId]
     const { error: err } = await supabase.from('content_bank').update({ folder: dest }).in('id', ids)
@@ -997,7 +1046,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [folderModal, setFolderModal] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [folderParent, setFolderParent] = useState<string | null>(null)
-  const isRealFolder = (f: string) => f !== 'Tous' && f !== 'Jamais publiées'
+  const isRealFolder = (f: string) => !SPECIAL_F.has(f)
   function openNewFolder(parent: string | null) { setFolderName(''); setFolderParent(parent); setFolderModal(true) }
   async function createFolder() {
     const name = cleanSeg(folderName); if (!name) return
@@ -1064,6 +1113,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     let a = typed.filter(i => {
       const fMatch = folder === 'Tous'
         ? true
+        : folder === '★ Favoris'
+          ? isFav(i)
         : folder === 'Jamais publiées'
           ? (i.used_count ?? 0) === 0
           : isWithin(i.folder, folder)
@@ -1084,7 +1135,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // 1 600 d'un coup → défilement saccadé). Uniquement l'onglet / le dossier / la recherche en cours.
   const PAGE = 60
   const [limit, setLimit] = useState(PAGE)
-  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort])
+  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort, kindF])
   const moreRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = moreRef.current; if (!el) return
@@ -1356,10 +1407,26 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     return () => window.removeEventListener('keydown', onKey)
   }, [tab, shown, sel])
 
+  // Types présents dans la sélection (Remixer : un seul type, jamais de son).
+  const selKinds = useMemo(() => new Set(items.filter(i => sel.has(i.id)).map(inferType)), [items, sel])
+  async function setFavMany(ids: string[], on: boolean) {
+    const targets = items.filter(i => ids.includes(i.id) && isFav(i) !== on)
+    setItems(list => list.map(x => ids.includes(x.id) ? { ...x, tags: withFav(x.tags, on) } : x))
+    let failed = 0
+    for (const t of targets) { const { error: e } = await supabase.from('content_bank').update({ tags: withFav(t.tags, on) }).eq('id', t.id); if (e) failed++ }
+    if (failed) { toast(`${failed} favori(s) non enregistré(s).`, 'bad'); load() }
+    else toast(on ? `${targets.length} média(s) ajouté(s) aux favoris.` : `${targets.length} média(s) retiré(s) des favoris.`, 'ok')
+  }
+  const KIND_FILTERS: { v: KindFilter; l: string }[] = [
+    { v: 'all', l: `Tout · ${items.length}` },
+    { v: 'video', l: `Vidéos · ${counts.video}` },
+    { v: 'image', l: `Images · ${counts.image}` },
+    { v: 'audio', l: `Sons · ${counts.audio}` },
+  ]
+
   const isCloud = infra === 'cloud'
   const TABS: { k: TabKey; l: string; n: number }[] = [
-    { k: 'video', l: 'Vidéos', n: counts.video },
-    { k: 'image', l: 'Images', n: counts.image },
+    { k: 'media', l: 'Médias', n: items.length },
     { k: 'caption', l: 'Légendes', n: captions.length },
     { k: 'pool', l: 'Pools', n: poolCount },
   ]
@@ -1380,9 +1447,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       onDrop={e => {
         if (!hasFiles(e)) return
         e.preventDefault(); setDragFiles(false)
-        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video') || f.type.startsWith('image') || isZip(f))
+        const files = Array.from(e.dataTransfer.files).filter(f => kindOfFile(f) !== null || isZip(f))
         if (files.length) importFiles(files)
-        else toast('Dépose des vidéos, des images ou un dossier ZIP.', 'info')
+        else toast('Dépose des vidéos, des images, des sons ou un dossier ZIP.', 'info')
       }}>
       {/* Portail vers <body> : le conteneur de la page est animé (transform), un « fixed » rendu
           dedans se plaçait au milieu de la page entière au lieu de l'écran. Fenêtre en haut de
@@ -1427,14 +1494,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <div style={{ textAlign: 'center', color: '#EDEDEF' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, color: theme.accentText }}><Icon d="M12 3v12|M7 10l5 5 5-5|M4 21h16" size={24} /></div>
             <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.015em' }}>Dépose pour importer</div>
-            <div style={{ fontSize: 13, color: '#8B8B94', marginTop: 4 }}>Vidéos, images ou ZIP{folder !== 'Tous' && folder !== 'Jamais publiées' ? ` → dossier « ${folder} »` : ''}</div>
+            <div style={{ fontSize: 13, color: '#8B8B94', marginTop: 4 }}>Vidéos, images, sons ou ZIP{!SPECIAL_F.has(folder) ? ` → dossier « ${folder} »` : ''}</div>
           </div>
         </div>
       )}
       {/* En-tête */}
       <PageHeader title="Banque"
-        kicker={loading || total === 0 ? 'Ton contenu' : <>{`${counts.video} vidéo(s) · ${counts.image} image(s) · ${captions.length} légende(s)`}{neverPublished > 0 && <span style={{ color: '#A78BFA' }}>{` · ${neverPublished} jamais publié(s)`}</span>}</>}
-        sub="Toutes tes vidéos, images et légendes, rangées par dossier. Glisse des fichiers (ou un dossier ZIP) n’importe où sur la page pour les importer."
+        kicker={loading || total === 0 ? 'Ton contenu' : <>{`${counts.video} vidéo(s) · ${counts.image} image(s) · ${counts.audio} son(s) · ${captions.length} légende(s)`}{neverPublished > 0 && <span style={{ color: '#A78BFA' }}>{` · ${neverPublished} jamais publié(s)`}</span>}</>}
+        sub="Toutes tes vidéos, images, sons et légendes, rangés par dossier. Glisse des fichiers (ou un dossier ZIP) n’importe où sur la page pour les importer."
 
         actions={<>
           {trash.length > 0 && <Btn label={`Corbeille (${trash.length})`} theme={theme} icon="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" onClick={() => setShowTrash(true)} />}
@@ -1472,7 +1539,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
 
       <UnderlineTabs<TabKey> value={tab} onChange={k => { setTab(k); setFolder('Tous') }}
-        items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'video' ? 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z' : t.k === 'image' ? 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' : t.k === 'pool' ? 'M4 6h16|M4 12h16|M4 18h10' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
+        items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'media' ? 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' : t.k === 'pool' ? 'M4 6h16|M4 12h16|M4 18h10' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
 
       {tab === 'pool' && <PoolManager orgId={currentOrg?.id ?? null} userId={user.id} onChanged={loadCaptions} />}
 
@@ -1503,10 +1570,10 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   key={f.n}
                   title={f.n}
                   onClick={() => setFolder(f.n)}
-                  onContextMenu={e => { if (f.n !== 'Tous' && f.n !== 'Jamais publiées') { e.preventDefault(); setFolderCtx({ x: e.clientX, y: e.clientY, name: f.n }) } }}
+                  onContextMenu={e => { if (!SPECIAL_F.has(f.n)) { e.preventDefault(); setFolderCtx({ x: e.clientX, y: e.clientY, name: f.n }) } }}
                   draggable={f.n !== 'Tous' && !f.special}
                   onDragStart={e => { if (f.n !== 'Tous' && !f.special) { e.dataTransfer.setData('text/sf-folder', f.n); e.dataTransfer.effectAllowed = 'move' } }}
-                  onDragOver={e => { if (f.n !== 'Jamais publiées' && (f.n !== 'Tous' || e.dataTransfer.types.includes('text/sf-folder'))) { e.preventDefault(); setDragOver(f.n) } }}
+                  onDragOver={e => { if (!f.special && (f.n !== 'Tous' || e.dataTransfer.types.includes('text/sf-folder'))) { e.preventDefault(); setDragOver(f.n) } }}
                   onDragLeave={() => setDragOver(d => d === f.n ? null : d)}
                   onDrop={e => {
                     e.preventDefault(); setDragOver(null)
@@ -1529,14 +1596,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                     style={{ width: 14, display: 'flex', justifyContent: 'center', color: '#5A5A63', cursor: f.hasChildren ? 'pointer' : 'inherit', transform: f.hasChildren && !collapsed.has(f.n) ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease', flexShrink: 0 }}>
                     {f.hasChildren && <Icon d="M9 6l6 6-6 6" size={11} sw={2.2} />}
                   </span>
-                  <span style={{ display: 'flex', color: f.special ? '#4ADE80' : on ? theme.accentText : '#71717A' }}>
-                    <Icon d={f.special ? 'M12 2v20|M2 12h20' : 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z'} size={13} />
+                  <span style={{ display: 'flex', color: f.n === '★ Favoris' ? '#FBBF24' : f.special ? '#4ADE80' : on ? theme.accentText : '#71717A' }}>
+                    <Icon d={f.n === '★ Favoris' ? 'M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z' : f.special ? 'M12 2v20|M2 12h20' : 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z'} size={13} />
                   </span>
                   <span style={{
                     flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: on ? 650 : 550,
                     color: on ? '#F4F4F5' : '#A1A1AA',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>{f.label}</span>
+                  }}>{f.label}{favFolders.has(f.n) && <span style={{ color: '#FBBF24', marginLeft: 5 }}>★</span>}</span>
                   <span style={{
                     fontSize: 11.5, fontVariantNumeric: 'tabular-nums',
                     color: on ? '#A1A1AA' : '#5A5A63',
@@ -1569,6 +1636,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               />
             </span>
 
+            {tab === 'media' && <Segmented<KindFilter> value={kindF} onChange={k => setKindF(k)} options={KIND_FILTERS} />}
             <Segmented<SortKey> value={sort} onChange={setSort} options={SORTS.map(s => ({ v: s.k, l: s.l }))} />
 
             {tab !== 'caption' && shown.length > 0 && (() => {
@@ -1641,7 +1709,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             }}>
               {rendered.map((i, idx) => (
                 <Tile
-                  key={i.id} idx={idx} selecting={selecting} item={i} type={tab === 'image' ? 'image' : 'video'} thumb={thumbFor(i)} media={mediaFor(i)} broken={isBroken(i)}
+                  key={i.id} idx={idx} selecting={selecting} item={i} type={inferType(i)} showKind={kindF === 'all'} onFav={() => void toggleFav(i)} thumb={thumbFor(i)} media={mediaFor(i)} broken={isBroken(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={(e) => toggleAt(idx, i.id, e.shiftKey)}
                   onDragStart={e => e.dataTransfer.setData('text/plain', i.id)}
                   onOpen={() => openPlayer(i)}
@@ -1673,7 +1741,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
           <Btn label={isCloud ? 'Publier' : 'Mass Posting'} theme={theme} sm tone="primary" icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => onNavigate?.('publish')} />
           {sel.size === 1 && <Btn label="Description" theme={theme} sm icon="M4 7V4h16v3|M9 20h6|M12 4v16" onClick={openDesc} />}
-          <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => { if (onNavigate) openTool(onNavigate, 'studio', { tool: tab === 'image' ? 'imgspoof' : 'remix', ids: [...sel] }) }} />
+          {selKinds.size === 1 && !selKinds.has('audio') && <Btn label="Remixer" theme={theme} sm icon="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" onClick={() => { if (onNavigate) openTool(onNavigate, 'studio', { tool: selKinds.has('image') ? 'imgspoof' : 'remix', ids: [...sel] }) }} />}
+          {(() => { const allFav = [...sel].every(id => { const it = items.find(x => x.id === id); return it ? isFav(it) : true }); return <Btn label={allFav ? '☆ Retirer des favoris' : '★ Favoris'} theme={theme} sm onClick={() => void setFavMany([...sel], !allFav)} /> })()}
           <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => { setMoveMode('move'); setMoveOpen(true) }} />
           <Btn label="Dupliquer" theme={theme} sm icon="M8 8h12v12H8z|M4 16V4h12" onClick={() => { setMoveMode('copy'); setMoveOpen(true) }} />
           <Btn label="Télécharger" theme={theme} sm icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" onClick={() => downloadMedia([...sel])} />
@@ -1700,7 +1769,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
       {partner && sendIds && (
         <SendToPartnerModal theme={theme} orgId={currentOrg?.id ?? null} partner={partner} ids={sendIds}
-          defaultFolder={folder !== 'Tous' && folder !== 'Jamais publiées' ? folder : 'ScaleFlow'} onClose={() => setSendIds(null)} />
+          defaultFolder={!SPECIAL_F.has(folder) ? folder : 'ScaleFlow'} onClose={() => setSendIds(null)} />
       )}
       {moveOpen && (
         <Modal theme={theme} title={moveMode === 'copy' ? `Dupliquer ${sel.size} média(s)` : `Déplacer ${sel.size} média(s)`} sub={moveMode === 'copy' ? 'Une copie va dans le dossier choisi, l’original reste où il est.' : 'Choisis un dossier ou crée-en un.'} icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
@@ -1769,7 +1838,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {folderCtx && createPortal(
         <>
           <div onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
-          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 150), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
+          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 190), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
             <button onClick={() => { openNewFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginBottom: 4, borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z|M12 10v6|M9 13h6" size={14} /></span>Nouveau sous-dossier
@@ -1777,6 +1846,10 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(leafOf(folderCtx.name)); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" size={14} /></span>Renommer
+            </button>
+            <button onClick={() => { const n = folderCtx.name, on = !favFolders.has(n); setFolderCtx(null); setFavFolders(f => { const x = new Set(f); if (on) x.add(n); else x.delete(n); return x }); void setFolderFav({ orgId: currentOrg?.id ?? null, userId: user.id }, n, on).then(() => toast(on ? `« ${leafOf(n)} » épinglé : il apparaît en premier dans les sélecteurs.` : `« ${leafOf(n)} » n’est plus épinglé.`, 'ok')).catch(() => load()) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ color: '#FBBF24', display: 'flex', width: 14, justifyContent: 'center' }}>{favFolders.has(folderCtx.name) ? '☆' : '★'}</span>{favFolders.has(folderCtx.name) ? 'Retirer des favoris' : 'Épingler en favori'}
             </button>
             <button onClick={() => { setConfirmDelFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginTop: 4, borderRadius: 5, border: 'none', boxShadow: '0 -1px 0 rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -1835,7 +1908,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {/* Lecteur vidéo / image */}
       {player && (
         <Modal theme={theme} title={player.title} onClose={() => setPlayer(null)} width={420}>
-          {player.type === 'video'
+          {player.type === 'audio'
+            ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '24px 8px' }}>
+                <span style={{ display: 'flex', color: '#6EE7B7' }}><Icon d="M9 18V5l12-2v13|M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z|M21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" size={40} /></span>
+                <audio key={player.url} src={player.url} controls autoPlay style={{ width: '100%' }} />
+              </div>
+            : player.type === 'video'
             // Lecture directe (comme avant) : rien ne se télécharge avant le clic, le lien est déjà
             // prêt ; à la fermeture le téléchargement est coupé (Video).
             ? <Video key={player.url} src={player.url} poster={player.poster ?? undefined} controls autoPlay playsInline style={{ display: 'block', width: '100%', maxHeight: '70vh', borderRadius: 6, background: '#000' }} />
@@ -1908,7 +1986,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
 
       {/* Input fichier caché (import réel) */}
-      <input ref={fileRef} type="file" accept="video/*,image/*,.zip,application/zip,application/x-zip-compressed" multiple style={{ display: 'none' }}
+      <input ref={fileRef} type="file" accept={`video/*,image/*,audio/*,${AUDIO_EXT.map(e => '.' + e).join(',')},.zip,application/zip,application/x-zip-compressed`} multiple style={{ display: 'none' }}
         onChange={e => { if (e.target.files) importFiles(e.target.files); e.target.value = '' }} />
 
       {/* Description (légende du média pour le posting) */}

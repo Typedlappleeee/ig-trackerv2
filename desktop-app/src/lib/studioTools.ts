@@ -5,7 +5,7 @@ import { runFfmpeg, fetchInput } from './ffmpeg'
 import { uploadThumbFor } from './bankStorage'
 import { transcribeWordsGroq, type Segment } from './subtitles'
 import piexif from 'piexifjs'
-import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, spoofTrimArgs, spoofTrim, mp4Duration, type RemixIntensity, type RemixToggles } from './studioFilters'
+import { remixParams, remixFilter, remixAudioFilter, overlayFilter, concatFilter, spoofTrimArgs, spoofTrim, mp4Duration, soundOutDuration, type RemixIntensity, type RemixToggles } from './studioFilters'
 export { remixParams, captionLines, captionFor, type RemixToggles } from './studioFilters'
 import { randomFranceGps } from './gps'
 export { GPS_CITIES, gpsFor, randomFranceGps, randomUsGps, type GpsCity } from './gps'
@@ -159,6 +159,8 @@ export interface AutoVariantOpts {
   trimEnd?: number | null              // s (null = fin)
   speed?: number | null                // ex. 0.99 (null/1 = inchangé)
   caption?: { text: string; pos: CaptionPos; style: CaptionStyle } | null
+  /** Remplace le son d'origine (coupé) par ce son de la Banque, bouclé si plus court que la vidéo. */
+  sound?: { data: Uint8Array; ext: string; volume?: number } | null
 }
 export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: Hooks): Promise<Uint8Array> {
   const intensity = o.intensity ?? 'normal'
@@ -178,8 +180,40 @@ export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: 
   meta.push(...deviceMetaArgs(o.device))
   // Audio : atempo pour rester synchro quand on change la vitesse.
   const aFilter: string[] = speed ? ['-af', `atempo=${speed.toFixed(4)}`] : []
+  const hasCap = !!(o.caption && o.caption.text.trim())
 
-  if (!o.caption || !o.caption.text.trim()) {
+  // ── Son remplacé : le son d'origine est COUPÉ (non mappé), le son de la Banque est bouclé
+  // (-stream_loop) et la sortie s'arrête avec la vidéo (-t calculé, -shortest en filet).
+  if (o.sound && o.sound.data.byteLength > 0) {
+    const sndName = `snd.${(o.sound.ext || 'mp3').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'mp3'}`
+    const extra: { name: string; data: Uint8Array }[] = []
+    const ins: string[] = []
+    let fc: string
+    if (hasCap) {
+      const png = await textToPng(o.caption!.text, 1080, false, o.caption!.style)
+      extra.push({ name: 'cap.png', data: png })
+      ins.push('-i', 'cap.png')
+      const { x, y } = capXY(o.caption!.pos, o.caption!.style)
+      fc = `[0:v]${vchain},scale=1080:-2[vb];[vb][1:v]overlay=${x}:${y},${EVEN}[v]`
+    } else fc = `[0:v]${vchain},${EVEN}[v]`
+    extra.push({ name: sndName, data: o.sound.data })
+    ins.push('-stream_loop', '-1', '-i', sndName)
+    const sIdx = hasCap ? 2 : 1
+    const vol = o.sound.volume && Math.abs(o.sound.volume - 1) > 1e-3 ? o.sound.volume : null
+    if (vol) fc += `;[${sIdx}:a:0]volume=${vol.toFixed(2)}[a]`
+    const t = soundOutDuration(mp4Duration(input), o.trimStart, o.trimEnd, speed)
+    // -to remplacé par -t (même fin) : -t est prioritaire et borne aussi le son bouclé.
+    const cut: string[] = []
+    if (o.trimStart && o.trimStart > 0) cut.push('-ss', String(o.trimStart))
+    if (t) cut.push('-t', String(t)); else if (o.trimEnd != null && o.trimEnd > (o.trimStart ?? 0)) cut.push('-to', String(o.trimEnd))
+    return runFfmpeg({
+      input, inputName: 'in.mp4', extra,
+      args: [...ins, '-filter_complex', fc, '-map', '[v]', '-map', vol ? '[a]' : `${sIdx}:a:0`, ...cut, '-shortest', ...meta, ...H264],
+      onProgress: h?.onProgress, onLog: h?.onLog,
+    })
+  }
+
+  if (!hasCap) {
     return runFfmpeg({
       input, inputName: 'in.mp4',
       args: [...pre, '-vf', `${vchain},${EVEN}`, ...meta, ...aFilter, ...H264],
@@ -187,12 +221,8 @@ export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: 
     })
   }
   // Légende incrustée → filter_complex (2e entrée = PNG texte).
-  const png = await textToPng(o.caption.text, 1080, false, o.caption.style)
-  const pos = o.caption.pos
-  let x = '(W-w)/2', y: string
-  if (typeof pos === 'object') { x = `(W*${(pos.x / 100).toFixed(4)})-(w/2)`; y = `(H*${(pos.y / 100).toFixed(4)})-(h/2)` }
-  else y = pos === 'top' ? 'H*0.08' : pos === 'center' ? '(H-h)/2' : 'H-h-H*0.12'
-  if (o.caption.style === 'snapchat') x = '0'   // bande pleine largeur → collée aux bords
+  const png = await textToPng(o.caption!.text, 1080, false, o.caption!.style)
+  const { x, y } = capXY(o.caption!.pos, o.caption!.style)
   // On met la vidéo à 1080 de large (= largeur du PNG) AVANT l'overlay, sinon la
   // légende est décalée/surdimensionnée sur les vidéos qui ne font pas 1080 px.
   const fc = `[0:v]${vchain},scale=1080:-2[vb];[vb][1:v]overlay=${x}:${y},${EVEN}[v]`
@@ -204,6 +234,15 @@ export async function runAutoVariant(input: Uint8Array, o: AutoVariantOpts, h?: 
     args: ['-i', 'cap.png', '-filter_complex', fc, '-map', '[v]', '-map', '0:a?', ...pre, ...aFilter, ...meta, ...H264],
     onProgress: h?.onProgress, onLog: h?.onLog,
   })
+}
+
+// Placement de la légende de l'Auto-contenu (centre du PNG en %, ou preset haut/centre/bas).
+function capXY(pos: CaptionPos, style: CaptionStyle): { x: string; y: string } {
+  let x = '(W-w)/2', y: string
+  if (typeof pos === 'object') { x = `(W*${(pos.x / 100).toFixed(4)})-(w/2)`; y = `(H*${(pos.y / 100).toFixed(4)})-(h/2)` }
+  else y = pos === 'top' ? 'H*0.08' : pos === 'center' ? '(H-h)/2' : 'H-h-H*0.12'
+  if (style === 'snapchat') x = '0'   // bande pleine largeur → collée aux bords
+  return { x, y }
 }
 
 // ── Spoof IMAGE : micro zoom/recadrage + ré-encodage JPEG → sortie .jpg ────────

@@ -82,6 +82,36 @@ export async function ensureBankFolder(s: BankScope, path: string, tags: string[
   })
 }
 
+/* ── Dossiers favoris : tag « fav » sur la ligne sentinelle du dossier (partagé par l'équipe) ── */
+export async function loadFavFolders(s: BankScope): Promise<string[]> {
+  const { data } = await scoped(supabase.from('content_bank').select('folder').eq('notes', FOLDER_SENTINEL).contains('tags', ['fav']).not('folder', 'is', null), s)
+  return [...new Set(((data ?? []) as { folder: string }[]).map(r => normPath(r.folder)))]
+}
+export async function setFolderFav(s: BankScope, path: string, on: boolean): Promise<void> {
+  const p = normPath(path)
+  if (!p) return
+  await ensureBankFolder(s, p)
+  const { data } = await scoped(supabase.from('content_bank').select('id, tags').eq('notes', FOLDER_SENTINEL).eq('folder', p), s)
+  for (const r of (data ?? []) as { id: string; tags: string[] | null }[]) {
+    const t = (r.tags ?? []).filter(x => x !== 'fav')
+    await supabase.from('content_bank').update({ tags: on ? [...t, 'fav'] : t }).eq('id', r.id)
+  }
+}
+
+/** Sous-dossiers DIRECTS de `parent` (null = racine) parmi des chemins (parents implicites compris). */
+export function childFolders(paths: Iterable<string | null | undefined>, parent: string | null): string[] {
+  const out = new Set<string>()
+  const depth = parent ? segs(parent).length : 0
+  for (const raw of paths) {
+    if (!raw) continue
+    const s = segs(raw)
+    if (s.length <= depth) continue
+    const p = s.slice(0, depth + 1).join('/')
+    if (parent === null || isWithin(p, parent)) out.add(p)
+  }
+  return [...out].sort((a, b) => leafOf(a).localeCompare(leafOf(b), 'fr', { sensitivity: 'base', numeric: true }))
+}
+
 /* ── Genjutsu : le dossier de la Banque associé à chaque modèle ── */
 const modelTag = (modelId: string) => `gj:${modelId}`
 export async function loadModelFolders(s: BankScope): Promise<Record<string, string>> {

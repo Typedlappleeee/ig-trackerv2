@@ -28,6 +28,20 @@ import { folderTree, listBankFolders } from '@/lib/bankFolders'
 import { niceBase } from '@/lib/niceTitle'
 import CaptionPools, { loadCaptionPools, poolLines, type Pool } from '@/components/CaptionPools'
 import { detectSpeaker, voiceLabel, type Voice, type VoiceResult } from '@/lib/voiceGender'
+import { isAudioRow, extOfPath } from '@/lib/mediaKind'
+import { fetchAllRows } from '@/lib/bankStorage'
+import { isWithin, loadFavFolders } from '@/lib/bankFolders'
+
+// Options d'une liste de dossiers : favoris ★ d'abord, puis tous les dossiers (chemin « A › B »).
+function FolderOptions({ folders, favs }: { folders: string[]; favs: string[] }) {
+  const f = favs.filter(x => folders.includes(x))
+  return <>
+    {f.length > 0 && <optgroup label="★ Favoris" style={optStyle}>{f.map(x => <option key={`fav-${x}`} value={x} style={optStyle}>{`★ ${x.split('/').join(' › ')}`}</option>)}</optgroup>}
+    <optgroup label="Tous les dossiers" style={optStyle}>{folders.map(x => <option key={x} value={x} style={optStyle}>{x.split('/').join(' › ')}</option>)}</optgroup>
+  </>
+}
+
+interface SoundRow { id: string; title: string; storage_path: string | null; file_url: string | null; folder: string | null }
 
 // ── Style Blowsome « SaaS épuré » : surfaces plates neutres, accent mauve (or en appoint) ──
 const ACCENT = '#A855F7'
@@ -506,12 +520,14 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const conns = useConnections(user, org)
   const [count, setCount] = useState<number | null>(null)
   const [folders, setFolders] = useState<string[]>([])
+  const [favFolders, setFavFolders] = useState<string[]>([])   // dossiers épinglés ★ (en tête des listes)
   const load = useCallback(async () => {
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { count: c } = await scope(supabase.from('content_bank').select('id', { count: 'exact', head: true }))
     setCount(c ?? 0)
     // TOUS les dossiers (vides compris, au-delà de 1000 médias), en ordre d'arborescence
     setFolders(folderTree(await listBankFolders({ orgId: currentOrg?.id ?? null, userId: user.id })).map(n => n.path))
+    setFavFolders(await loadFavFolders({ orgId: currentOrg?.id ?? null, userId: user.id }).catch(() => []))
   }, [currentOrg?.id, user.id])
   useEffect(() => { load() }, [load])
 
@@ -587,6 +603,22 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   const [useSpeed, setUseSpeed] = useState(false)
   const [speedMin, setSpeedMin] = useState('0.98')
   const [speedMax, setSpeedMax] = useState('1.02')
+  // Son : coupe le son d'origine et le remplace par un son de la Banque (pool choisi à la main
+  // ou dossier de sons — les sons ajoutés plus tard au dossier sont pris au lancement).
+  const [useSound, setUseSound] = useState(false)
+  const [soundSource, setSoundSource] = useState<'pick' | 'folder'>('pick')
+  const [soundIds, setSoundIds] = useState<string[]>([])
+  const [soundFolder, setSoundFolder] = useState('')
+  const [soundMode, setSoundMode] = useState<'seq' | 'random'>('random')
+  const [soundVol, setSoundVol] = useState('1')
+  const [soundPicker, setSoundPicker] = useState(false)
+  const [soundRows, setSoundRows] = useState<SoundRow[]>([])
+  useEffect(() => {   // titres des sons choisis (affichage)
+    if (!soundIds.length) { setSoundRows([]); return }
+    const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    scope(supabase.from('content_bank').select('id,title,storage_path,file_url,folder')).in('id', soundIds).is('deleted_at', null)
+      .then(({ data }: any) => setSoundRows(((data ?? []) as SoundRow[]).filter(isAudioRow)))
+  }, [soundIds.join(','), currentOrg?.id, user.id])
   // Dossier de destination des sorties (banque).
   const [destFolder, setDestFolder] = useState('')
   const ps = usePartnerSend(currentOrg?.id ?? null, 'sf-partner-send-auto')   // envoi direct au site partenaire
@@ -677,6 +709,36 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     const sMax = Math.min(2, Number(speedMax) || 1.02)
     const tStart = Number(trimStart) || 0
     const tEnd = trimEnd.trim() ? Number(trimEnd) : null
+    // Sons de remplacement : liste relue au lancement, octets chargés une fois par son.
+    let sounds: SoundRow[] = []
+    if (useSound) {
+      const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      if (soundSource === 'folder') {
+        const { data } = await fetchAllRows<SoundRow>(() => scope(supabase.from('content_bank').select('id,title,storage_path,file_url,folder')).is('deleted_at', null).order('created_at', { ascending: false }).order('id'))
+        sounds = data.filter(r => isAudioRow(r) && !!soundFolder && isWithin(r.folder, soundFolder))
+      } else if (soundIds.length) {
+        const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url,folder')).in('id', soundIds).is('deleted_at', null)
+        const rows = ((data ?? []) as SoundRow[]).filter(isAudioRow)
+        sounds = soundIds.map(id => rows.find(r => r.id === id)).filter((r): r is SoundRow => !!r)
+      }
+      if (!sounds.length) {
+        push(soundSource === 'folder' ? `❌ Aucun son dans le dossier « ${soundFolder || '—'} » → rien n’est généré. Ajoute des sons à ce dossier ou désactive « Remplacer le son ».` : '❌ Aucun son choisi → choisis des sons dans la banque ou désactive « Remplacer le son ».')
+        R.finish('error'); setRunning(false); return
+      }
+      push(`🎵 ${sounds.length} son(s) de remplacement (${soundMode === 'seq' ? 'dans l’ordre' : 'aléatoire'})`)
+    }
+    const soundBytes = new Map<string, Uint8Array>()
+    let soundAt = 0, soundDeck: SoundRow[] = []
+    const drawSound = (): SoundRow | null => {
+      if (!sounds.length) return null
+      if (soundMode === 'seq') return sounds[soundAt++ % sounds.length]
+      if (!soundDeck.length) {
+        soundDeck = [...sounds]
+        for (let j = soundDeck.length - 1; j > 0; j--) { const r = Math.floor(Math.random() * (j + 1)); [soundDeck[j], soundDeck[r]] = [soundDeck[r], soundDeck[j]] }
+      }
+      return soundDeck.pop() ?? null
+    }
+    const vol = Math.max(0, Math.min(3, Number(soundVol.replace(',', '.')) || 1))
     try {
       if (!isFfmpegReady()) { push('⏳ Chargement du moteur (~30 Mo, une fois)…'); await getFFmpeg(); push('✅ Moteur prêt.') }
       // Plages de coupe aléatoire (début / fin), tirées par vidéo.
@@ -748,6 +810,20 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
               vEnd = end > vStart + 0.3 ? +end.toFixed(2) : null
             } else { vStart = tStart; vEnd = tEnd }
           }
+          // Son de remplacement de CETTE variante (le son d'origine est coupé).
+          let sound: { data: Uint8Array; ext: string; volume: number } | null = null
+          const snd = drawSound()
+          if (snd) {
+            try {
+              let b = soundBytes.get(snd.id)
+              if (!b) { b = await resolveSourceBytes(snd); soundBytes.set(snd.id, b) }
+              sound = { data: b, ext: extOfPath(snd.storage_path ?? snd.file_url ?? '') || 'mp3', volume: vol }
+              push(`    🎵 son : ${snd.title}`)
+            } catch (se) {
+              push(`  ❌ son « ${snd.title} » illisible : ${se instanceof Error ? se.message : String(se)} → variante ${i + 1} ignorée`)
+              R.tick(false); continue
+            }
+          }
           try {
             const vOpts = {
               seed: Math.random() * 1000,
@@ -756,6 +832,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
               trimEnd: vEnd,
               speed,
               caption: capText ? { text: capText, pos, style: capStyle } : null,
+              sound,
             }
             let out: Uint8Array
             try { out = await runAutoVariant(bytes, vOpts, hooks) }
@@ -803,13 +880,14 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     useTrim: boolean; trimRandom: boolean; trimRandMin: string; trimRandMax: string; trimEndMin: string; trimEndMax: string; trimStart: string; trimEnd: string
     useSpeed: boolean; speedMin: string; speedMax: string; destFolder: string
     voiceAuto?: boolean; poolMale?: string; poolFemale?: string
+    useSound?: boolean; soundSource?: 'pick' | 'folder'; soundIds?: string[]; soundFolder?: string; soundMode?: 'seq' | 'random'; soundVol?: string
   }
   const AUTO_COMPOSER = 'auto-contenu'
   const autoOrgId = currentOrg?.id ?? null
   const [presets, setPresets] = useState<ComposerPreset<AutoCfg>[]>([])
   const [presetSel, setPresetSel] = useState('')
 
-  const autoCfg = (): AutoCfg => ({ variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder, voiceAuto, poolMale, poolFemale })
+  const autoCfg = (): AutoCfg => ({ variants, intensity, tendance, gpsCity, device, burnCap, capPool, capMode, capStyle, withCap, capManual, capPos, capX, capY, useTrim, trimRandom, trimRandMin, trimRandMax, trimEndMin, trimEndMax, trimStart, trimEnd, useSpeed, speedMin, speedMax, destFolder, voiceAuto, poolMale, poolFemale, useSound, soundSource, soundIds, soundFolder, soundMode, soundVol })
   const applyAutoCfg = (c: Partial<AutoCfg>) => {
     if (typeof c.variants === 'number') setVariants(c.variants)
     if (c.intensity) setIntensity(c.intensity)
@@ -840,6 +918,12 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
     if (typeof c.voiceAuto === 'boolean') setVoiceAuto(c.voiceAuto)
     if (typeof c.poolMale === 'string') setPoolMale(c.poolMale)
     if (typeof c.poolFemale === 'string') setPoolFemale(c.poolFemale)
+    if (typeof c.useSound === 'boolean') setUseSound(c.useSound)
+    if (c.soundSource) setSoundSource(c.soundSource)
+    if (Array.isArray(c.soundIds)) setSoundIds(c.soundIds)
+    if (typeof c.soundFolder === 'string') setSoundFolder(c.soundFolder)
+    if (c.soundMode) setSoundMode(c.soundMode)
+    if (typeof c.soundVol === 'string') setSoundVol(c.soundVol)
   }
 
   // Charge la LISTE des presets nommés (aucune restauration automatique de réglages).
@@ -895,7 +979,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
           </div>
           <Fld label="Variantes / vidéo"><input type="number" min={1} max={100} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
-          <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option>{folders.map(f => <option key={f} value={f} style={optStyle}>{f}</option>)}</select></Fld>
+          <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option><FolderOptions folders={folders} favs={favFolders} /></select></Fld>
           {ps.partner && <Fld label="Envoyer direct vers"><PartnerSendSelect ps={ps} style={selStyle} optStyle={optStyle} /></Fld>}
         </Grp>
 
@@ -1006,6 +1090,31 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         </Grp>
 
         {/* Anti-détection & montage */}
+        <Grp title="Son">
+          <Sw on={useSound} onChange={setUseSound} label="🎵 Remplacer le son" sub="Coupe le son d’origine et met un son de ta banque à la place (bouclé si plus court, coupé à la fin de la vidéo). Un son différent par variante." />
+          {useSound && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginLeft: 49 }}>
+              <Seg value={soundSource} onChange={setSoundSource} options={[{ v: 'pick', label: 'Sons choisis' }, { v: 'folder', label: 'Dossier de sons' }]} />
+              {soundSource === 'pick' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <BlowBtn ghost label={soundIds.length ? `${soundIds.length} son(s) choisi(s)` : 'Choisir des sons dans la banque'} onClick={() => setSoundPicker(true)} />
+                  {soundRows.slice(0, 6).map(r => (
+                    <span key={r.id} data-no-tr style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 8px', borderRadius: 6, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#A7F3D0', fontSize: 11.5, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      ♪ {r.title}
+                      <button onClick={() => setSoundIds(ids => ids.filter(x => x !== r.id))} aria-label="Retirer" style={{ background: 'none', border: 'none', color: '#A7F3D0', cursor: 'pointer', padding: 0, fontSize: 13 }}>×</button>
+                    </span>
+                  ))}
+                  {soundRows.length > 6 && <span style={{ fontSize: 11.5, color: MUTED }}>{`+ ${soundRows.length - 6}`}</span>}
+                </div>
+              ) : (
+                <Fld label="Dossier"><select value={soundFolder} onChange={e => setSoundFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>— Choisir —</option><FolderOptions folders={folders} favs={favFolders} /></select></Fld>
+              )}
+              <Fld label="Distribution"><Seg value={soundMode} onChange={setSoundMode} options={[{ v: 'random', label: 'Aléatoire' }, { v: 'seq', label: 'Dans l’ordre' }]} /></Fld>
+              <Fld label="Volume"><input type="number" min={0.1} max={3} step={0.1} value={soundVol} onChange={e => setSoundVol(e.target.value)} style={numInp} /><span style={{ fontSize: 12, color: MUTED }}>× (1 = inchangé)</span></Fld>
+            </div>
+          )}
+        </Grp>
+
         <Grp title="Anti-détection & montage">
           <Sw on={tendance} onChange={setTendance} label="🔥 Mode Tendance" sub="Micro-vitesse marquée (0,94–1,06×) + spoof renforcé → variantes « tendance » & uniques" />
           {!tendance && <Fld label="Anti-détection"><Seg value={intensity} onChange={setIntensity} options={[{ v: 'subtle', label: 'Subtile' }, { v: 'normal', label: 'Normale' }, { v: 'strong', label: 'Forte' }]} /></Fld>}
@@ -1050,6 +1159,11 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
       {picker && (
         <BankPicker theme={BLOW_THEME} user={user} org={org} kind="videos" multi title="Choisir des vidéos à décliner"
           onClose={() => setPicker(false)} onApply={applyPicker} />
+      )}
+
+      {soundPicker && (
+        <BankPicker theme={BLOW_THEME} user={user} org={org} kind="audios" multi initialIds={soundIds} title="Choisir les sons de remplacement"
+          onClose={() => setSoundPicker(false)} onApply={r => { if (r.kind === 'audios') setSoundIds(r.ids) }} />
       )}
 
       {showCapPicker && (

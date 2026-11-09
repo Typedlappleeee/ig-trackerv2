@@ -17,16 +17,15 @@ import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
 import { loadProxyRotation, resolveRotationUrls } from '@/lib/proxyRotation'
 import { registerPhoneWatch, unregisterPhoneWatch } from '@/lib/phoneWatch'
+import { mediaKindOf } from '@/lib/mediaKind'
 
 interface Phone { id: string; ig_username: string | null; phone_name: string; status: string; group_name: string | null; geelark_id: string | null }
 interface Media { id: string; title: string; storage_path: string | null; file_url: string | null; thumbnail_url: string | null; thumbnail_path: string | null; notes: string | null }
 
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
-const IMG_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'bmp', 'gif']
 function isImage(v: Media): boolean {
   if (SENTINELS.includes(v.notes ?? '') && !v.storage_path && !v.file_url) return false
-  const ext = (v.storage_path ?? v.file_url ?? '').toLowerCase().split('.').pop() ?? ''
-  return IMG_EXT.includes(ext)
+  return mediaKindOf(v) === 'image'
 }
 function dotKind(s: string): string { return s === 'warming' ? 'warmup' : s }
 function linkKey(p: Phone): string { return `sf-story-link-${p.geelark_id ?? p.id}` }
