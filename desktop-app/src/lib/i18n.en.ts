@@ -3535,8 +3535,6 @@ export const EN: Dict = {
     "× (1 = inchangé)": "× (1 = unchanged)",
     "Choisir les sons de remplacement": "Choose the replacement sounds",
     "Pause": "Pause",
-    "Rangé dans": "Saved to",
-    "créé tout seul · GPS du pays · légendes et sons de la dernière fois pour ce pays": "created automatically · country GPS · captions and sounds from last time for this country",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4225,7 +4223,5 @@ export const EN: Dict = {
     ["❌ son « {0} » illisible : {1} → variante {2} ignorée", "❌ sound \"{0}\" unreadable: {1} → variant {2} skipped"],
     ["{0} son(s) choisi(s)", "{0} sound(s) chosen"],
     ["Utiliser {0} son{1}", "Use {0} sound{1}"],
-    ["{0}/<modèle>", "{0}/<model>"],
-    ["  📁 → {0}", "  📁 → {0}"],
   ],
 }
