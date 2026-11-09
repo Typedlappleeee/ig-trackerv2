@@ -55,6 +55,7 @@ describe('Parité serveur ↔ app (mêmes réglages ffmpeg)', () => {
       const f = srv.gpsFor('france'), u = srv.gpsFor('usa')
       expect(f.lat).toBeGreaterThan(41); expect(f.lat).toBeLessThan(51.5)
       expect(u.lon).toBeGreaterThan(-125); expect(u.lon).toBeLessThan(-66)
+      const g = srv.gpsFor('germany'); expect(appGps.inPoly(g.lon, g.lat, appGps.GERMANY_POLY)).toBe(true)
     }
   })
 })

@@ -60,23 +60,6 @@ const US_CITIES: LatLon[] = [
   { lat: 28.5384, lon: -81.3789 },   // Orlando
   { lat: 38.9072, lon: -77.0369 },   // Washington
 ]
-// Grandes villes allemandes pour « Allemagne (aléatoire) ».
-const GERMANY_CITIES: LatLon[] = [
-  { lat: 52.5200, lon: 13.4050 },   // Berlin
-  { lat: 48.1351, lon: 11.5820 },   // Munich
-  { lat: 53.5511, lon: 9.9937 },    // Hambourg
-  { lat: 50.9375, lon: 6.9603 },    // Cologne
-  { lat: 50.1109, lon: 8.6821 },    // Francfort
-  { lat: 48.7758, lon: 9.1829 },    // Stuttgart
-  { lat: 51.2277, lon: 6.7735 },    // Düsseldorf
-  { lat: 51.3397, lon: 12.3731 },   // Leipzig
-  { lat: 51.5136, lon: 7.4653 },    // Dortmund
-  { lat: 51.4556, lon: 7.0116 },    // Essen
-  { lat: 53.0793, lon: 8.8017 },    // Brême
-  { lat: 51.0504, lon: 13.7373 },   // Dresde
-  { lat: 52.3759, lon: 9.7320 },    // Hanovre
-  { lat: 49.4521, lon: 11.0767 },   // Nuremberg
-]
 // Une ville au hasard + léger décalage ~±0.03° (≈ quelques km).
 function randomCityGps(list: LatLon[]): LatLon {
   const c = list[Math.floor(Math.random() * list.length)]
@@ -85,7 +68,24 @@ function randomCityGps(list: LatLon[]): LatLon {
 }
 export const randomFranceGps = (): LatLon => randomCityGps(FRANCE_CITIES)
 export const randomUsGps = (): LatLon => randomCityGps(US_CITIES)
-export const randomGermanyGps = (): LatLon => randomCityGps(GERMANY_CITIES)
+// Contour simplifié de l'Allemagne [lon, lat] : « Allemagne (aléatoire) » = un point au hasard
+// n'importe où dans le pays (tirage dans le rectangle, gardé s'il tombe à l'intérieur du contour).
+export const GERMANY_POLY: [number, number][] = [[8.6,54.9],[9.4,54.8],[10.1,54.4],[11.1,54.4],[10.9,53.95],[11.5,54.0],[12.1,54.2],[13.1,54.4],[13.4,54.6],[14.2,53.95],[14.4,53.3],[14.1,52.8],[14.6,52.6],[14.7,52.1],[14.6,51.6],[15.0,51.1],[14.3,50.9],[13.5,50.6],[12.5,50.3],[12.1,50.3],[12.5,49.8],[13.0,49.3],[13.8,48.8],[13.45,48.57],[12.9,47.7],[12.2,47.6],[11.0,47.4],[10.2,47.3],[9.6,47.5],[8.6,47.6],[7.6,47.6],[7.6,48.1],[8.2,48.97],[7.0,49.1],[6.4,49.5],[6.1,50.1],[6.1,50.6],[6.0,50.8],[6.1,51.2],[5.9,51.8],[6.8,51.95],[7.0,52.4],[7.1,52.9],[7.2,53.3],[7.0,53.6],[8.0,53.7],[8.5,53.55],[8.9,53.9],[8.9,54.3],[8.6,54.5]]
+export function inPoly(lon: number, lat: number, poly: [number, number][]): boolean {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j]
+    if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+export function randomGermanyGps(): LatLon {
+  for (let k = 0; k < 1000; k++) {
+    const lon = 5.9 + Math.random() * 9.1, lat = 47.3 + Math.random() * 7.6
+    if (inPoly(lon, lat, GERMANY_POLY)) return { lat: +lat.toFixed(4), lon: +lon.toFixed(4) }
+  }
+  return { lat: 51.1657, lon: 10.4515 }
+}
 
 // Résout une clé de ville en coordonnées GPS pour runSpoof (null si « none »).
 // 'france' / 'usa' / 'germany' → une position aléatoire du pays (différente à chaque appel).
