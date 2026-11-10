@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-10b',
+    date: '2026-11-10',
+    title: { fr: 'Reels Facebook sur tes Pages, sans téléphone', en: 'Facebook Reels on your Pages, no phone needed' },
+    items: {
+      fr: [
+        'Publication › Reels Facebook : connecte tes Pages Facebook, choisis des vidéos de la Banque et publie sur toutes les Pages en même temps, par l’API officielle de Meta.',
+        'Une vidéo différente par Page ou toutes les vidéos sur chaque Page ; légendes distribuées ; suivi en direct et crédits remboursés en cas d’échec.',
+      ],
+      en: [
+        'Publishing › Facebook Reels: connect your Facebook Pages, pick videos from the Library and publish to every Page at once through Meta’s official API.',
+        'A different video per Page or every video on each Page; captions handed out in turn; live tracking and credits refunded on failure.',
+      ],
+    },
+  },
+  {
     id: '2026-11-10',
     date: '2026-11-10',
     title: { fr: 'Interface plus nette', en: 'A cleaner interface' },

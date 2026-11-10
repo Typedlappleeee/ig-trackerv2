@@ -13,6 +13,7 @@ import { peekRelaunch } from '@/lib/runHistory'
 const ReelsComposer = lazy(() => import('./ReelsComposer'))
 const StoryComposer = lazy(() => import('./StoryComposer'))
 const CrossComposer = lazy(() => import('./CrossComposer'))
+const FbComposer = lazy(() => import('@/pages/FbComposer'))
 const PhotoComposer = lazy(() => import('./PhotoComposer'))
 // Chargement d'un composer : squelette (titre + panneau) au lieu d'un spinner.
 const Wait = () => (
@@ -33,6 +34,7 @@ const FORMATS: Format[] = [
   { id: 'story', plat: 'instagram', t: 'Story', d: 'Une image et un sticker lien propre à chaque compte.', cost: '1 crédit / compte', ready: true, icon: 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1' },
   { id: 'photo', plat: 'instagram', t: 'Photo', d: 'Une photo (ou carrousel) + description dans le feed, sur tes comptes.', cost: '2 crédits / compte', ready: true, icon: 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' },
   { id: 'tiktok', plat: 'tiktok', t: 'Vidéo TikTok', d: 'Une vidéo sur des dizaines de comptes TikTok, en parallèle.', cost: '2 crédits / compte', ready: true, icon: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5' },
+  { id: 'fbpages', plat: 'other', t: 'Reels Facebook', d: 'Sur tes Pages Facebook, par l’API officielle : sans téléphone, toutes en même temps.', cost: '2 crédits / Page', ready: true, icon: 'M4 4h16v16H4z|M13 20v-7h2.5l.5-3H13V8.5c0-.9.3-1.5 1.6-1.5H16V4.2A19 19 0 0 0 14 4c-2.2 0-3.6 1.3-3.6 3.8V10H8v3h2.4v7' },
   { id: 'cross', plat: 'other', t: 'Cross-posting', d: 'Facebook, Shorts, X, Threads, Reddit et Pinterest en une fois.', cost: '2 crédits / compte / réseau', ready: true, icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M2 12h20|M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z' },
 ]
 const PLATS: { k: Plat; label: string; sub: string; color: string; icon: string }[] = [
@@ -63,6 +65,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
   if (mode === 'tiktok') return <>{tabs('tiktok')}<Suspense fallback={<Wait />}><ReelsComposer key="tiktok" platform="tiktok" theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
   if (mode === 'story') return <>{tabs('story')}<Suspense fallback={<Wait />}><StoryComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
   if (mode === 'photo' && isAdmin) return <>{tabs('photo')}<Suspense fallback={<Wait />}><PhotoComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
+  if (mode === 'fbpages') return <>{tabs('fbpages')}<Suspense fallback={<Wait />}><FbComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
   if (mode === 'cross' && isAdmin) return <>{tabs('cross')}<Suspense fallback={<Wait />}><CrossComposer theme={theme} user={user} org={org} onBack={() => setMode(null)} /></Suspense></>
 
   return (

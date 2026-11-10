@@ -23,7 +23,9 @@ function admin() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-function page(title, body) {
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+function page(rawTitle, rawBody) {
+  const title = esc(rawTitle), body = esc(rawBody)   // jamais de HTML venu de l'adresse
   return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>${title}</title><body style="margin:0;font-family:system-ui,sans-serif;background:#0B0B0F;color:#E4E4E7;display:grid;place-items:center;height:100vh">
   <div style="text-align:center;max-width:420px;padding:24px">

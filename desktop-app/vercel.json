@@ -42,6 +42,9 @@
     "api/v1-tools.js": {
       "maxDuration": 60,
       "includeFiles": "node_modules/ffmpeg-static/ffmpeg"
+    },
+    "api/fb.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
