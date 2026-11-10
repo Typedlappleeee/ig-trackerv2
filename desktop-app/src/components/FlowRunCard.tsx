@@ -68,10 +68,10 @@ export default function RunCard({ theme, run }: { theme: Theme; run: FlowRun }) 
             </div>
           )
         })}
-        {list.length > LIMIT && <div style={{ padding: '10px 16px', fontSize: 12, color: '#71717A', borderTop: '1px solid rgba(255,255,255,0.05)' }}>… et {list.length - LIMIT} autre(s) — filtre « En cours » ou « Échecs » pour les voir.</div>}
+        {list.length > LIMIT && <div style={{ padding: '10px 16px', fontSize: 12, color: '#7C7C86', borderTop: '1px solid rgba(255,255,255,0.05)' }}>… et {list.length - LIMIT} autre(s) — filtre « En cours » ou « Échecs » pour les voir.</div>}
       </div>
       {run.log.length > 0 && (
-        <div style={{ margin: '4px 16px 16px', padding: '8px 12px', borderRadius: 6, background: '#0C0C0E', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 90, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.6, color: '#71717A', whiteSpace: 'pre-wrap' }}>
+        <div style={{ margin: '4px 16px 16px', padding: '8px 12px', borderRadius: 6, background: '#0C0C0E', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 90, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.6, color: '#7C7C86', whiteSpace: 'pre-wrap' }}>
           {run.log.join('\n')}
         </div>
       )}

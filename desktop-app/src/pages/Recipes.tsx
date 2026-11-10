@@ -133,12 +133,12 @@ export default function Recipes({ theme, infra, user, org }: {
                   {chips.map((sp, k) => (
                     <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 7px', borderRadius: 5, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 500, color: '#A1A1AA', boxSizing: 'border-box' }}>{sp}</span>
-                      {k < chips.length - 1 && <span style={{ color: '#5A5A63', fontSize: 11 }}>→</span>}
+                      {k < chips.length - 1 && <span style={{ color: '#7C7C86', fontSize: 11 }}>→</span>}
                     </span>
                   ))}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>
                     {(t.run_count ?? 0)} fois · {relDay(t.last_run_at)}
                   </span>
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>

@@ -90,7 +90,7 @@ export default function PoolManager({ orgId, userId, onChanged }: { orgId: strin
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 9, border: 'none', cursor: 'pointer', textAlign: 'left', background: on ? 'rgba(255,255,255,0.08)' : 'transparent', color: on ? '#F4F4F5' : '#A1A1AA' }}>
               <span style={{ fontSize: 15 }}>📚</span>
               <span data-no-tr style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
-              <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{p.lines.length}</span>
+              <span style={{ fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{p.lines.length}</span>
             </button>
           )
         })}
@@ -128,10 +128,10 @@ export default function PoolManager({ orgId, userId, onChanged }: { orgId: strin
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 520, overflowY: 'auto' }}>
             {shown.map(({ t, i }) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 8, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
-                <span style={{ width: 34, textAlign: 'right', fontSize: 11, color: '#5A5A63', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ width: 34, textAlign: 'right', fontSize: 11, color: '#7C7C86', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{i + 1}</span>
                 <input value={t} data-no-tr onChange={e => { const l = [...draft]; l[i] = e.target.value; set(l) }}
                   style={{ flex: 1, minWidth: 0, height: 30, padding: '0 8px', border: 'none', background: 'transparent', color: INK, fontSize: 13, outline: 'none' }} />
-                <button type="button" title="Retirer" onClick={() => set(draft.filter((_, k) => k !== i))} style={{ background: 'none', border: 'none', color: '#5A5A63', cursor: 'pointer', padding: 4, display: 'flex' }}><Icon d="M18 6L6 18|M6 6l12 12" size={12} /></button>
+                <button type="button" title="Retirer" onClick={() => set(draft.filter((_, k) => k !== i))} style={{ background: 'none', border: 'none', color: '#7C7C86', cursor: 'pointer', padding: 4, display: 'flex' }}><Icon d="M18 6L6 18|M6 6l12 12" size={12} /></button>
               </div>
             ))}
             {draft.length === 0 && <span style={{ fontSize: 12.5, color: MUTED, padding: 6 }}>Pool vide : colle des textes au-dessus.</span>}

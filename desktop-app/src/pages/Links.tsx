@@ -169,7 +169,7 @@ function Dashboard({ theme, stats, links, groups, period, BASE }: { theme: Theme
     <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, borderLeft: first || narrow ? 'none' : '1px solid rgba(255,255,255,0.06)', borderTop: narrow && !first ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
       <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{label}</span>
       <span style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-0.035em', color: '#EDEDEF', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
-      <span style={{ fontSize: 11.5, color: '#71717A' }}>{per}</span>
+      <span style={{ fontSize: 11.5, color: '#7C7C86' }}>{per}</span>
       <Spark values={series} w={220} h={34} />
     </div>
   )
@@ -189,7 +189,7 @@ function Dashboard({ theme, stats, links, groups, period, BASE }: { theme: Theme
                 <text x={21} y={23} textAnchor="middle" fontSize={7} fontWeight={600} fill="#EDEDEF">{fmtNumber(totalG)}</text>
               </svg>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0, flex: 1 }}>
-                {stats.byGroup.length === 0 ? <span style={{ fontSize: 12, color: '#71717A' }}>Aucune visite.</span> : stats.byGroup.slice(0, 5).map(([g, n], i) => (
+                {stats.byGroup.length === 0 ? <span style={{ fontSize: 12, color: '#7C7C86' }}>Aucune visite.</span> : stats.byGroup.slice(0, 5).map(([g, n], i) => (
                   <span key={String(g)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
                     <span style={{ width: 7, height: 7, borderRadius: 99, background: COLORS[i], flexShrink: 0 }} />
                     <span data-no-tr style={{ flex: 1, minWidth: 0, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{gName(g)}</span>
@@ -213,10 +213,10 @@ function Dashboard({ theme, stats, links, groups, period, BASE }: { theme: Theme
             <div style={{ maxHeight: 340, overflowY: 'auto' }}>
               {top.map(({ l, s }, i) => (
                 <div key={l.id} style={{ display: 'grid', gridTemplateColumns: '18px minmax(0,1fr) 70px 46px', alignItems: 'center', gap: 10, padding: '9px 16px', borderTop: i ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                  <span style={{ fontSize: 11.5, color: '#71717A' }}>{i + 1}</span>
+                  <span style={{ fontSize: 11.5, color: '#7C7C86' }}>{i + 1}</span>
                   <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span data-no-tr style={{ fontSize: 12.5, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.label || l.code}</span>
-                    <span data-no-tr style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{BASE.replace(/^https?:\/\//, '')}{l.code}</span>
+                    <span data-no-tr style={{ fontFamily: MONO, fontSize: 11, color: '#7C7C86', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{BASE.replace(/^https?:\/\//, '')}{l.code}</span>
                   </span>
                   <Spark values={s!.trend} w={70} h={22} />
                   <span style={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{fmtNumber(s!.visits)}</span>
@@ -234,7 +234,7 @@ function Dashboard({ theme, stats, links, groups, period, BASE }: { theme: Theme
             <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span style={{ fontSize: 12, color: '#8B8B94' }}>Visiteurs actifs</span>
               <span style={{ fontSize: 32, fontWeight: 600, color: '#EDEDEF', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>{stats.liveNow}</span>
-              <span style={{ fontSize: 11.5, color: '#71717A' }}>5 dernières minutes</span>
+              <span style={{ fontSize: 11.5, color: '#7C7C86' }}>5 dernières minutes</span>
             </span>
             <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 12, color: '#8B8B94' }}>Événements · 30 dernières minutes</span>
@@ -366,7 +366,7 @@ function LinksTab({ theme, links, groups, phones, stats, BASE, copy, owner, relo
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un lien…" style={{ ...FIELD, maxWidth: 320 }} />
-        <span style={{ fontSize: 12, color: '#71717A' }}>{fmtNumber(shown.length)} lien(s)</span>
+        <span style={{ fontSize: 12, color: '#7C7C86' }}>{fmtNumber(shown.length)} lien(s)</span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <Btn theme={theme} sm tone="ghost" label="Utiliser dans les stories" onClick={useInStories} />
           <Btn theme={theme} sm tone="ghost" icon="M12 5v14|M5 12h14" label="Créer un groupe" onClick={newGroup} />
@@ -390,7 +390,7 @@ function LinksTab({ theme, links, groups, phones, stats, BASE, copy, owner, relo
               <span style={{ display: 'flex', color: '#8B8B94', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease' }}><Icon d="M9 18l6-6-6-6" size={14} /></span>
               <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                 <span data-no-tr style={{ fontSize: 14, fontWeight: 600, color: '#EDEDEF' }}>{sec.name}</span>
-                <span style={{ fontSize: 12, color: '#71717A' }}>{list.length} lien(s) · +{fmtNumber(today)} aujourd’hui</span>
+                <span style={{ fontSize: 12, color: '#7C7C86' }}>{list.length} lien(s) · +{fmtNumber(today)} aujourd’hui</span>
               </span>
               <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
                 <span style={{ fontSize: 12, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }}>{fmtNumber(week)} · 7 j</span>
@@ -404,7 +404,7 @@ function LinksTab({ theme, links, groups, phones, stats, BASE, copy, owner, relo
             {open && list.length > 0 && (
               <div style={{ overflowX: 'auto' }}>
                 <div style={{ minWidth: 780 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 12, padding: '0 16px', height: 32, alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 11, fontWeight: 500, color: '#71717A' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 12, padding: '0 16px', height: 32, alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 11, fontWeight: 500, color: '#7C7C86' }}>
                     <span>Lien</span><span>Notes</span><span>Tendance</span><span style={{ textAlign: 'right' }}>Aujourd’hui</span><span style={{ textAlign: 'right' }}>Taux de clic</span><span />
                   </div>
                   {list.map(l => {
@@ -417,9 +417,9 @@ function LinksTab({ theme, links, groups, phones, stats, BASE, copy, owner, relo
                             <span data-no-tr style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.label || l.code}</span>
                             <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                               <span data-no-tr style={{ fontFamily: MONO, fontSize: 11, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{BASE.replace(/^https?:\/\//, '')}{l.code}</span>
-                              <button type="button" onClick={() => copy(BASE + l.code)} title="Copier" style={{ display: 'flex', padding: 2, border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer' }}><Icon d={ICON_COPY} size={12} /></button>
+                              <button type="button" onClick={() => copy(BASE + l.code)} title="Copier" style={{ display: 'flex', padding: 2, border: 'none', background: 'transparent', color: '#7C7C86', cursor: 'pointer' }}><Icon d={ICON_COPY} size={12} /></button>
                             </span>
-                            {l.kind === 'direct' && l.destination && <span data-no-tr style={{ fontFamily: MONO, fontSize: 11, color: '#5A5A63', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {l.destination.replace(/^https?:\/\//, '')}</span>}
+                            {l.kind === 'direct' && l.destination && <span data-no-tr style={{ fontFamily: MONO, fontSize: 11, color: '#7C7C86', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {l.destination.replace(/^https?:\/\//, '')}</span>}
                           </span>
                         </span>
                         <input defaultValue={l.notes} placeholder="Ajouter une note…" onBlur={e => saveNotes(l, e.target.value.trim())} style={{ ...FIELD, height: 28, fontSize: 12 }} />
@@ -529,7 +529,7 @@ function AutoCreate({ theme, pages, groups, phones, links, owner, BASE, onClose,
           </div>
           <div style={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, maxHeight: 360, overflow: 'auto' }}>
             <div style={{ minWidth: 640 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: ROW, gap: 10, padding: '0 12px', height: 32, alignItems: 'center', fontSize: 11, fontWeight: 500, color: '#71717A', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: ROW, gap: 10, padding: '0 12px', height: 32, alignItems: 'center', fontSize: 11, fontWeight: 500, color: '#7C7C86', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <input type="checkbox" checked={sel.size === phones.length && phones.length > 0} onChange={e => setSel(e.target.checked ? new Set(phones.map(p => p.id)) : new Set())} />
                 <span>Compte</span><span>Lien OF</span><span>Lien MYM</span>
               </div>
@@ -549,7 +549,7 @@ function AutoCreate({ theme, pages, groups, phones, links, owner, BASE, onClose,
               })}
             </div>
           </div>
-          <div style={{ fontSize: 12, color: '#71717A' }}>Adresses créées : <span data-no-tr style={{ fontFamily: MONO }}>{BASE.replace(/^https?:\/\//, '')}&lt;compte&gt;</span> (page), <span data-no-tr style={{ fontFamily: MONO }}>…1</span> (OF direct), <span data-no-tr style={{ fontFamily: MONO }}>…2</span> (MYM direct).</div>
+          <div style={{ fontSize: 12, color: '#7C7C86' }}>Adresses créées : <span data-no-tr style={{ fontFamily: MONO }}>{BASE.replace(/^https?:\/\//, '')}&lt;compte&gt;</span> (page), <span data-no-tr style={{ fontFamily: MONO }}>…1</span> (OF direct), <span data-no-tr style={{ fontFamily: MONO }}>…2</span> (MYM direct).</div>
         </div>
       )}
     </Modal>
@@ -669,7 +669,7 @@ function PageEditor({ theme, value: edit, setEdit, BASE, scopeFolder, onSave }: 
             <L t="Nom affiché"><input value={edit.title} placeholder="Zoé" onChange={e => set({ title: e.target.value })} style={FIELD} /></L>
             <L t="Adresse">
               <input value={edit.slug} placeholder="zoe" onChange={e => set({ slug: slugify(e.target.value) })} style={FIELD} />
-              <span data-no-tr style={{ fontFamily: MONO, fontSize: 11, color: '#71717A' }}>{BASE}{slugify(edit.slug || edit.title) || '…'}</span>
+              <span data-no-tr style={{ fontFamily: MONO, fontSize: 11, color: '#7C7C86' }}>{BASE}{slugify(edit.slug || edit.title) || '…'}</span>
             </L>
             <L t="Bio"><textarea value={edit.bio} rows={2} placeholder="Viens discuter ici ⇩" onChange={e => set({ bio: e.target.value })} style={TEXTAREA} /></L>
             <Row><Toggle on={D.verified} onChange={v => setD({ verified: v })} /><span style={{ fontSize: 13, color: '#EDEDEF' }}>Badge vérifié</span></Row>
@@ -737,7 +737,7 @@ function PageEditor({ theme, value: edit, setEdit, BASE, scopeFolder, onSave }: 
           <div style={{ width: 300, height: 600, borderRadius: 32, overflow: 'hidden', border: '6px solid #1C1C1F', boxShadow: '0 24px 60px -24px rgba(0,0,0,0.8)', background: '#000' }}>
             <iframe title="Aperçu" srcDoc={srcDoc} sandbox="" style={{ width: 375, height: 750, border: 'none', transform: 'scale(0.8)', transformOrigin: '0 0', display: 'block' }} />
           </div>
-          <span style={{ fontSize: 11.5, color: '#71717A' }}>Aperçu réel de la page publique</span>
+          <span style={{ fontSize: 11.5, color: '#7C7C86' }}>Aperçu réel de la page publique</span>
         </div>
       </div>
     </Modal>

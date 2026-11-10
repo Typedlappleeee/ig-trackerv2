@@ -197,7 +197,7 @@ export default function LaunchSpotlight({ onClose, onNavigate }: { onClose: () =
               {i < SLIDES.length - 1
                 ? <button type="button" onClick={next} style={{ height: 40, padding: '0 14px', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, background: 'transparent', color: '#EDEDEF', fontSize: 13.5, fontWeight: 550, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>Suivant <Icon d="M9 18l6-6-6-6" size={13} /></button>
                 : <button type="button" onClick={close} style={{ height: 40, padding: '0 14px', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, background: 'transparent', color: '#EDEDEF', fontSize: 13.5, fontWeight: 550, cursor: 'pointer' }}>Terminer</button>}
-              <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{i + 1} / {SLIDES.length}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{i + 1} / {SLIDES.length}</span>
             </div>
           </div>
         </div>

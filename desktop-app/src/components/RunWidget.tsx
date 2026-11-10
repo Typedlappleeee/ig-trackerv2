@@ -30,12 +30,12 @@ function Row({ r, theme }: { r: RunState; theme: Theme }) {
         </span>
         {r.status === 'running'
           ? <button onClick={() => cancelRun(r.id)} style={{ height: 24, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#F87171', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', flexShrink: 0 }}>Annuler</button>
-          : <button onClick={() => dismissRun(r.id)} aria-label="Fermer" style={{ width: 20, height: 20, borderRadius: 6, border: 'none', background: 'transparent', color: '#71717A', fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>✕</button>}
+          : <button onClick={() => dismissRun(r.id)} aria-label="Fermer" style={{ width: 20, height: 20, borderRadius: 6, border: 'none', background: 'transparent', color: '#7C7C86', fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>✕</button>}
       </div>
       <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, transition: 'width .25s ease' }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>
         <span>{r.done}/{r.total}{r.failed > 0 ? ` · ${r.failed} échec${r.failed > 1 ? 's' : ''}` : ''}</span>
         <span style={{ color: done ? color : '#71717A', fontWeight: 500 }}>{r.status === 'running' ? (r.detail ?? `${pct}%`) : r.status === 'cancelled' ? 'Annulé' : r.status === 'error' ? 'Erreur' : 'Terminé'}</span>
       </div>

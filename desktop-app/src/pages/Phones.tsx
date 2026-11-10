@@ -94,7 +94,7 @@ function Check({ on, mid, accent, onClick }: { on: boolean; mid?: boolean; accen
 }
 
 const TH: CSSProperties = {
-  fontSize: 11, fontWeight: 500, color: '#71717A',
+  fontSize: 11, fontWeight: 500, color: '#7C7C86',
 }
 
 function ctaKey(p: { geelark_id: string | null; id: string }): string { return `sf-story-link-${p.geelark_id ?? p.id}` }
@@ -309,9 +309,9 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
 
       {/* Chiffres (cliquables : filtrent la liste) */}
       <StatBar items={[
-        { l: 'Total', v: loading ? el : fmtNumber(total), sub: <span style={{ color: '#71717A' }}>{filter === 'all' ? 'affichés' : 'voir tout'}</span>, onClick: () => setFilter('all') },
-        { l: 'En ligne', v: loading ? el : fmtNumber(online), c: '#4ADE80', sub: <span style={{ color: '#71717A' }}>allumés maintenant</span>, onClick: () => setFilter('on') },
-        { l: 'Hors ligne', v: loading ? el : fmtNumber(offline), c: '#A1A1AA', sub: <span style={{ color: '#71717A' }}>éteints</span>, onClick: () => setFilter('off') },
+        { l: 'Total', v: loading ? el : fmtNumber(total), sub: <span style={{ color: '#7C7C86' }}>{filter === 'all' ? 'affichés' : 'voir tout'}</span>, onClick: () => setFilter('all') },
+        { l: 'En ligne', v: loading ? el : fmtNumber(online), c: '#4ADE80', sub: <span style={{ color: '#7C7C86' }}>allumés maintenant</span>, onClick: () => setFilter('on') },
+        { l: 'Hors ligne', v: loading ? el : fmtNumber(offline), c: '#A1A1AA', sub: <span style={{ color: '#7C7C86' }}>éteints</span>, onClick: () => setFilter('off') },
         { l: 'À risque', v: loading ? el : fmtNumber(atRisk), c: atRisk > 0 ? '#F87171' : '#F4F4F5', sub: loading ? undefined : <span style={{ color: atRisk > 0 ? '#F87171' : '#4ADE80' }}>{atRisk > 0 ? 'santé sous 70 · à vérifier' : 'tout va bien'}</span>, onClick: () => setFilter('risk') },
       ]} />
 
@@ -355,7 +355,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
             {!isCloud && poweredIds.length > 0 && (
               <Btn theme={theme} sm tone="danger" icon={POWER_ICON} label={`Tout éteindre (${poweredIds.length})`} onClick={stopAll} />
             )}
-            <span style={{ fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 12, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>
               {loading ? <Skeleton w={40} h={10} style={{ display: 'inline-block' }} /> : `${shown.length} / ${total}`}
             </span>
           </span>
@@ -432,7 +432,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
                       <span style={{ fontSize: 14, fontWeight: 650, color: '#F4F4F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.phone_name || 'Appareil'}
                       </span>
-                      <span style={{ fontSize: 11.5, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 11.5, color: '#7C7C86', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.ig_username ? `@${p.ig_username}` : 'sans compte lié'}
                       </span>
                     </span>
@@ -440,7 +440,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
 
                   {/* Groupe */}
                   <span style={{ fontSize: 12, color: '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.group_name ?? <span style={{ color: '#5A5A63' }}>—</span>}
+                    {p.group_name ?? <span style={{ color: '#7C7C86' }}>—</span>}
                   </span>
 
                   {/* Statut */}
@@ -605,7 +605,7 @@ function PhoneSettings({ theme, phone, groups, onClose, onSaved }: {
         <div>
           <label style={lbl}>Lien CTA (sticker story)</label>
           <input value={cta} onChange={e => setCta(e.target.value)} placeholder="https://mon-lien.com" style={inp} />
-          <p style={{ margin: '6px 0 0', fontSize: 12, color: '#71717A', lineHeight: 1.5 }}>Le lien utilisé pour le sticker de cet appareil quand tu postes une story. Pré-rempli automatiquement dans l'onglet Story.</p>
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: '#7C7C86', lineHeight: 1.5 }}>Le lien utilisé pour le sticker de cet appareil quand tu postes une story. Pré-rempli automatiquement dans l'onglet Story.</p>
         </div>
         {err && <p style={{ margin: 0, fontSize: 12, color: '#F87171' }}>{err}</p>}
       </div>

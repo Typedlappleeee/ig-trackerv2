@@ -60,7 +60,7 @@ export default function LinkApiPanel({ theme, org, canManage }: { theme: Theme; 
   }
 
   const row = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } as const
-  const muted = { fontSize: 12, color: '#71717A', lineHeight: 1.5 } as const
+  const muted = { fontSize: 12, color: '#7C7C86', lineHeight: 1.5 } as const
 
   return (
     <>
@@ -158,7 +158,7 @@ function ApiActivity({ theme, orgId }: { theme: Theme; orgId: string | null }) {
             <span style={{ fontSize: 12, color: '#8B8B94' }}>{`${rows.length} appel(s) récent(s) · ${okN} réussi(s)`}</span>
             {rows.map((r, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', padding: '7px 10px', borderRadius: 8, background: '#121214', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12.5 }}>
-                <span style={{ fontFamily: MONO, fontSize: 11.5, color: '#71717A' }}>{when(r.at)}</span>
+                <span style={{ fontFamily: MONO, fontSize: 11.5, color: '#7C7C86' }}>{when(r.at)}</span>
                 <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: tone(r) }}>{r.status}</span>
                 <span data-no-tr style={{ fontFamily: MONO, fontSize: 12, color: '#EDEDEF' }}>{`${r.method} /${r.route}`}</span>
                 {!r.attached && <Chip text="sans clé reconnue" tone="mute" />}

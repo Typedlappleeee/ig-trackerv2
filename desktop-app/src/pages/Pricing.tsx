@@ -67,7 +67,7 @@ function PlanCard({ p, current, narrow }: { p: Plan; current: boolean; narrow: b
       <div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
           <span style={{ fontSize: narrow ? 46 : 56, fontWeight: 900, letterSpacing: '-0.055em', lineHeight: 0.9, color: '#F4F4F5', fontVariantNumeric: 'tabular-nums' }}>{p.price}$</span>
-          <span style={{ fontSize: 13.5, color: '#71717A' }}>/ mois</span>
+          <span style={{ fontSize: 13.5, color: '#7C7C86' }}>/ mois</span>
         </div>
         <div style={{ marginTop: 10, fontSize: 13.5, color: '#A1A1AA', lineHeight: 1.45 }}>{p.tag}</div>
       </div>
@@ -75,7 +75,7 @@ function PlanCard({ p, current, narrow }: { p: Plan; current: boolean; narrow: b
       <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.04em', color: '#F4F4F5', fontVariantNumeric: 'tabular-nums' }}>{p.credits.toLocaleString('fr-FR')}</span>
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#71717A' }}>crédits / mois</span>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#7C7C86' }}>crédits / mois</span>
         </div>
         <div style={{ marginTop: 10, height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
           <div style={{ width: `${(p.credits / MAX_CREDITS) * 100}%`, height: '100%', borderRadius: 99, background: p.best ? GRAD : V, animation: 'aIn .8s cubic-bezier(0.16,1,0.3,1) both' }} />
@@ -134,7 +134,7 @@ export default function Pricing({ org }: { theme: Theme; org: OrgState }) {
       {/* Ce que valent les crédits */}
       <section style={{ marginBottom: narrow ? 36 : 56 }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-          <h2 style={H2}>Ce que coûte <span style={{ color: '#52525B' }}>chaque action</span></h2>
+          <h2 style={H2}>Ce que coûte <span style={{ color: '#7C7C86' }}>chaque action</span></h2>
           <span style={{ fontSize: 13, color: '#8B8B94' }}>Même tarif en direct, en masse ou programmé.</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 10 }}>
@@ -142,7 +142,7 @@ export default function Pricing({ org }: { theme: Theme; org: OrgState }) {
             <div key={l} style={{ padding: '18px 18px 16px', borderRadius: 16, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#8B8B94' }}>{l}</div>
               <div style={{ marginTop: 10, fontSize: 40, fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 0.9, color: v === '0' ? V : '#F4F4F5' }}>{v === '0' ? 'Gratuit' : v}</div>
-              <div style={{ marginTop: 8, fontSize: 12.5, color: '#71717A' }}>{s}</div>
+              <div style={{ marginTop: 8, fontSize: 12.5, color: '#7C7C86' }}>{s}</div>
             </div>
           ))}
         </div>
@@ -150,7 +150,7 @@ export default function Pricing({ org }: { theme: Theme; org: OrgState }) {
 
       {/* Comparatif */}
       <section style={{ marginBottom: narrow ? 36 : 56 }}>
-        <h2 style={{ ...H2, marginBottom: 16 }}>Comparer <span style={{ color: '#52525B' }}>les offres</span></h2>
+        <h2 style={{ ...H2, marginBottom: 16 }}>Comparer <span style={{ color: '#7C7C86' }}>les offres</span></h2>
         <div style={{ borderRadius: 20, background: '#111113', border: '1px solid rgba(255,255,255,0.07)', overflowX: 'auto' }}>
           <table style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse', fontSize: 13.5 }}>
             <thead><tr>{['', ...PLANS.map(p => p.name)].map((h, i) => (
@@ -173,7 +173,7 @@ export default function Pricing({ org }: { theme: Theme; org: OrgState }) {
       {/* FAQ */}
       <section style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'minmax(0, 1fr) minmax(0, 1.6fr)', gap: narrow ? 16 : 32, marginBottom: narrow ? 28 : 44 }}>
         <div>
-          <h2 style={H2}>Questions <span style={{ color: '#52525B' }}>fréquentes</span></h2>
+          <h2 style={H2}>Questions <span style={{ color: '#7C7C86' }}>fréquentes</span></h2>
           <p style={{ margin: '12px 0 0', fontSize: 13.5, lineHeight: 1.55, color: '#8B8B94' }}>Une autre question ? Écris à l’équipe sur Telegram.</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

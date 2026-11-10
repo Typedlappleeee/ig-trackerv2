@@ -45,7 +45,7 @@ export default function ProxyRotationPanel({ theme, user, org }: { theme: Theme;
                 <input value={u} onChange={e => setUrl(i, e.target.value)} placeholder="https://…/changeip?u=…" style={{ ...inp, flex: '1 1 200px' }} />
                 <input value={cfg.names?.[i] ?? ''} onChange={e => setName(i, e.target.value)} placeholder="Nom (optionnel)" style={{ ...inp, flex: '0 0 140px' }} />
                 <Btn theme={theme} tone="ghost" label={t === 'run' ? '…' : 'Tester'} onClick={() => test(i)} />
-                <button type="button" onClick={() => removeRow(i)} title="Retirer" style={{ width: 32, height: 32, flexShrink: 0, boxSizing: 'border-box', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: 'transparent', color: '#71717A', fontSize: 12, cursor: 'pointer' }}>✕</button>
+                <button type="button" onClick={() => removeRow(i)} title="Retirer" style={{ width: 32, height: 32, flexShrink: 0, boxSizing: 'border-box', borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: 'transparent', color: '#7C7C86', fontSize: 12, cursor: 'pointer' }}>✕</button>
               </div>
               {t && t !== 'run' && <span style={{ fontSize: 12, color: t.ok ? '#4ADE80' : '#F87171', paddingLeft: 2 }}>{t.msg}</span>}
             </div>
@@ -57,7 +57,7 @@ export default function ProxyRotationPanel({ theme, user, org }: { theme: Theme;
           {saveErr && <span role="alert" style={{ fontSize: 12, color: '#F87171', maxWidth: 360, textAlign: 'right' }}>{saveErr}</span>}
           <Btn theme={theme} tone="primary" label={saving ? 'Enregistrement…' : 'Enregistrer'} disabled={saving} onClick={doSave} />
         </div>
-        <p style={{ margin: '8px 0 0', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: '#71717A', lineHeight: 1.55 }}>
+        <p style={{ margin: '8px 0 0', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: '#7C7C86', lineHeight: 1.55 }}>
           Ex. Prox'Easy : <code style={{ fontFamily: MONO, fontSize: 11.5, color: '#A1A1AA' }}>https://dongle.proxeasy.tech/android/changeip?u=…</code>. Un proxy ⇒ posting en série (1 IP à la fois). Plusieurs proxys ⇒ tu peux poster en parallèle.
         </p>
       </div>

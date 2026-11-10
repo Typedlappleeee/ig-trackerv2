@@ -73,7 +73,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
       {(() => {
         const head = (label: string, color: string, icon: string, count: number, sub: string) => (
           <SectionHead title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}><span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 9, background: `${color}1F`, border: `1px solid ${color}55`, color }}><Icon d={icon} size={14} /></span>{label}</span>} count={count}
-            right={narrow ? undefined : <span style={{ fontSize: 12.5, color: '#71717A', maxWidth: 420, textAlign: 'right' }}>{sub}</span>} />
+            right={narrow ? undefined : <span style={{ fontSize: 12.5, color: '#7C7C86', maxWidth: 420, textAlign: 'right' }}>{sub}</span>} />
         )
         const grid = (cards: React.ReactNode) => <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${narrow ? 200 : 260}px, 100%), 1fr))`, gap: narrow ? '22px 12px' : '28px 18px' }}>{cards}</div>
         let n = 0

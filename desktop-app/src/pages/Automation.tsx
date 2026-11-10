@@ -189,7 +189,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
                   }}>{when}</span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: done || failed ? '#A1A1AA' : '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
-                    <span style={{ fontSize: 11.5, color: '#71717A' }}>{typeLabel(r.type)}{running ? ' · en cours' : ''}</span>
+                    <span style={{ fontSize: 11.5, color: '#7C7C86' }}>{typeLabel(r.type)}{running ? ' · en cours' : ''}</span>
                   </span>
                   <Chip
                     text={done ? 'publié' : failed ? 'échec' : running ? 'en cours' : 'programmé'}
@@ -206,7 +206,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
             <div style={{ padding: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 6 }}>
                 {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
-                  <span key={i} style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, color: '#71717A' }}>{d}</span>
+                  <span key={i} style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, color: '#7C7C86' }}>{d}</span>
                 ))}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
@@ -271,7 +271,7 @@ export default function Automation({ theme, infra, user, org, embedded }: {
                         background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
                         fontSize: 11.5, fontWeight: 500, color: '#A1A1AA',
                       }}>
-                        <span style={{ fontSize: 11, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{k + 1}</span>{sp}
+                        <span style={{ fontSize: 11, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{k + 1}</span>{sp}
                       </span>
                     ))}
                     <span style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontSize: 12, flexWrap: 'wrap' }}>

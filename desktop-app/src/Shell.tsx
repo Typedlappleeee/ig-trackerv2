@@ -246,11 +246,11 @@ export default function Shell({
             {navOpen && (
               <>
                 <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: '#71717A' }}>Infrastructure</span>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: '#7C7C86' }}>Infrastructure</span>
                   <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inf.name}</span>
                 </span>
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
-                  <span style={{ display: 'flex', color: '#71717A' }}><Icon d="M7 15l5 5 5-5|M7 9l5-5 5 5" size={13} /></span>
+                  <span style={{ display: 'flex', color: '#7C7C86' }}><Icon d="M7 15l5 5 5-5|M7 9l5-5 5 5" size={13} /></span>
                 </span>
               </>
             )}
@@ -281,7 +281,7 @@ export default function Shell({
                         {o.beta && <span style={{ padding: '1px 6px', borderRadius: 4, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.18)', color: '#67E8F9', fontSize: 11, fontWeight: 500, lineHeight: 1.3 }}>BETA</span>}
                       </span>
                       <span style={{ fontSize: 11.5, color: '#8B8B94' }}>{o.desc}</span>
-                      <span style={{ display: 'flex', gap: 10, marginTop: 2, fontFamily: MONO, fontSize: 11, color: '#5A5A63' }}>
+                      <span style={{ display: 'flex', gap: 10, marginTop: 2, fontFamily: MONO, fontSize: 11, color: '#7C7C86' }}>
                         <span>boot {o.boot}</span><span>{o.quota}</span>
                       </span>
                     </span>
@@ -298,7 +298,7 @@ export default function Shell({
           <div style={{ flexShrink: 0, padding: '6px 10px' }}>
             <button onClick={() => { setPaletteOpen(true); setPaletteQ('') }} style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 30, padding: '0 8px 0 10px',
-              border: '1px solid rgba(255,255,255,0.07)', borderRadius: 7, background: '#111113', color: '#71717A',
+              border: '1px solid rgba(255,255,255,0.07)', borderRadius: 7, background: '#111113', color: '#7C7C86',
               fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box', transition: 'all 0.16s ease',
             }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.color = '#A1A1AA' }}
@@ -306,8 +306,8 @@ export default function Shell({
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.35-4.35" /></svg>
               <span style={{ flex: 1 }}>Rechercher…</span>
               <span style={{ display: 'flex', gap: 2 }}>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 16, height: 16, padding: '0 3px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', fontFamily: MONO, fontSize: 11, color: '#71717A' }}>⌘</span>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 16, height: 16, padding: '0 3px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', fontFamily: MONO, fontSize: 11, color: '#71717A' }}>K</span>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 16, height: 16, padding: '0 3px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', fontFamily: MONO, fontSize: 11, color: '#7C7C86' }}>⌘</span>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 16, height: 16, padding: '0 3px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', fontFamily: MONO, fontSize: 11, color: '#7C7C86' }}>K</span>
               </span>
             </button>
           </div>
@@ -318,7 +318,7 @@ export default function Shell({
           {NAV.map((sec, si) => (
             <div key={si} style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
               {sec.g && navOpen ? (
-                <div style={{ padding: '14px 10px 4px', fontSize: 11.5, fontWeight: 500, color: '#5A5A63' }}>{sec.g}</div>
+                <div style={{ padding: '14px 10px 4px', fontSize: 11.5, fontWeight: 500, color: '#7C7C86' }}>{sec.g}</div>
               ) : sec.g ? <div style={{ height: 11 }} /> : null}
               {sec.items.map(it => {
                 const on = page === it.k
@@ -335,7 +335,7 @@ export default function Shell({
                     <span style={{ display: 'flex', flexShrink: 0, color: on ? T.accentText : '#71717A' }}><Icon d={it.i} size={15} /></span>
                     {navOpen && <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.l}</span>}
                     {navOpen && it.soon && <span style={{ padding: '1px 6px', borderRadius: 5, fontSize: 11, fontWeight: 500, color: '#A1A1AA', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>{it.soon}</span>}
-                    {navOpen && it.n != null && <span style={{ fontSize: 11.5, fontVariantNumeric: 'tabular-nums', color: '#5A5A63' }}>{fmtNumber(it.n)}</span>}
+                    {navOpen && it.n != null && <span style={{ fontSize: 11.5, fontVariantNumeric: 'tabular-nums', color: '#7C7C86' }}>{fmtNumber(it.n)}</span>}
                   </button>
                 )
               })}
@@ -350,7 +350,7 @@ export default function Shell({
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
                   <span style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{balance === null ? <Skeleton w={36} h={11} style={{ display: 'inline-block' }} /> : fmtNumber(balance)}</span>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: '#71717A' }}>crédits</span>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: '#7C7C86' }}>crédits</span>
                 </span>
                 <span style={{ height: 2, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
                   <span style={{ display: 'block', height: '100%', width: `${balance === null ? 0 : Math.min(100, Math.round((balance / 5000) * 100))}%`, borderRadius: 99, background: T.accent }} />
@@ -385,7 +385,7 @@ export default function Shell({
               </div>
               <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '5px 0' }} />
               <button onClick={() => { setPage('settings'); setUserMenu(false) }} style={menuItemStyle}>
-                <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V15z" size={14} /></span>
+                <span style={{ color: '#7C7C86', display: 'flex' }}><Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z|M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V15z" size={14} /></span>
                 Réglages
               </button>
               <button onClick={onSignOut} style={{ ...menuItemStyle, color: '#F87171' }}>
@@ -404,7 +404,7 @@ export default function Shell({
             {navOpen && (
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 500, color: '#71717A', overflow: 'hidden' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 500, color: '#7C7C86', overflow: 'hidden' }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{orgName}</span>
                   {role && <><span style={{ flexShrink: 0, opacity: 0.5 }}>·</span><span style={{ flexShrink: 0, color: T.accentText }}>{role}</span></>}
                 </span>
@@ -412,7 +412,7 @@ export default function Shell({
             )}
             <button onClick={() => setNavOpen(o => !o)} aria-label="Replier" style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, border: 'none', borderRadius: 6,
-              background: 'transparent', color: '#71717A', cursor: 'pointer', flexShrink: 0, transition: 'all 0.16s ease',
+              background: 'transparent', color: '#7C7C86', cursor: 'pointer', flexShrink: 0, transition: 'all 0.16s ease',
             }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#EDEDEF' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#71717A' }}>
@@ -430,7 +430,7 @@ export default function Shell({
             {(narrow ? path.slice(-1) : path).map((l, i, arr) => (
               <Fragment key={i}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: i === arr.length - 1 ? '#EDEDEF' : '#71717A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</span>
-                {i < arr.length - 1 && <span style={{ color: '#5A5A63', fontSize: 13 }}>/</span>}
+                {i < arr.length - 1 && <span style={{ color: '#7C7C86', fontSize: 13 }}>/</span>}
               </Fragment>
             ))}
           </div>
@@ -461,7 +461,7 @@ export default function Shell({
                 <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 260, zIndex: 50, borderRadius: 8, overflow: 'hidden', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)', animation: 'aIn 0.18s cubic-bezier(0.16,1,0.3,1) both' }}>
                   <div style={{ padding: '11px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>Notifications</div>
                   {bellRuns.length === 0
-                    ? <div style={{ padding: '22px 13px', textAlign: 'center', color: '#71717A', fontSize: 12 }}>Tu es à jour — rien de nouveau.</div>
+                    ? <div style={{ padding: '22px 13px', textAlign: 'center', color: '#7C7C86', fontSize: 12 }}>Tu es à jour — rien de nouveau.</div>
                     : bellRuns.map(r => (
                       <div key={r.id} style={{ padding: '10px 13px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 3 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#EDEDEF' }}>
@@ -512,17 +512,17 @@ export default function Shell({
                 <input autoFocus value={paletteQ} onChange={e => setPaletteQ(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && list[0]) { list[0].run(); setPaletteOpen(false) } }}
                   placeholder="Aller à une page ou ouvrir un outil…" style={{ flex: 1, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 14, outline: 'none' }} />
-                <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A' }}>ESC</span>
+                <span style={{ fontFamily: MONO, fontSize: 11, color: '#7C7C86' }}>ESC</span>
               </div>
               <div style={{ maxHeight: 340, overflowY: 'auto', padding: 6 }}>
-                {list.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12 }}>Aucun résultat.</div>
+                {list.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#7C7C86', fontSize: 12 }}>Aucun résultat.</div>
                   : list.map(it => (
                     <button key={it.id} onClick={() => { it.run(); setPaletteOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '9px 11px', border: 'none', borderRadius: 6, cursor: 'pointer', background: it.on ? 'rgba(255,255,255,0.07)' : 'transparent', color: it.on ? '#EDEDEF' : '#A1A1AA', fontSize: 13, fontWeight: 500, textAlign: 'left' }}
                       onMouseEnter={e => { if (!it.on) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
                       onMouseLeave={e => { if (!it.on) e.currentTarget.style.background = 'transparent' }}>
                       <span style={{ display: 'flex', color: it.on ? T.accentText : '#71717A' }}><Icon d={it.i} size={15} /></span>
                       <span style={{ flex: 1 }}>{it.l}</span>
-                      {it.sub && <span style={{ fontSize: 11, color: '#52525B' }}>{it.sub}</span>}
+                      {it.sub && <span style={{ fontSize: 11, color: '#7C7C86' }}>{it.sub}</span>}
                     </button>
                   ))}
               </div>

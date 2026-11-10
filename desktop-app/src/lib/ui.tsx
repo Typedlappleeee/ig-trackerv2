@@ -256,7 +256,7 @@ export function ConnectBanner({ theme, onConnect }: { theme: Theme; onConnect: (
       </span>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>Connecte tes comptes pour des stats officielles</span>
-        <span style={{ fontSize: 11.5, color: '#71717A' }}>Vues, abonnés et engagement natifs via l'API Meta — remplit ces écrans automatiquement.</span>
+        <span style={{ fontSize: 11.5, color: '#7C7C86' }}>Vues, abonnés et engagement natifs via l'API Meta — remplit ces écrans automatiquement.</span>
       </span>
       <Btn theme={theme} tone="primary" sm icon="M12 5v14|M5 12h14" label="Connecter" onClick={onConnect} />
     </div>

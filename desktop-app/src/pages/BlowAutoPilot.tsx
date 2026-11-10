@@ -28,7 +28,7 @@ const BLOW_THEME = themeFor('blowsome')
 
 // Style « SaaS épuré » : surfaces plates neutres ; l'or iRemoTech reste un accent discret
 // (sélection, cases cochées, interrupteurs, petites pastilles).
-const GOLD = '#E9C46A', INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#71717A'
+const GOLD = '#E9C46A', INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#7C7C86'
 const EDGE = 'rgba(255,255,255,0.07)', FIELD_EDGE = 'rgba(255,255,255,0.09)', FIELD_BG = '#161618'
 const MONO = "'JetBrains Mono',monospace"
 const SEL_BG = 'rgba(255,255,255,0.07)', SEL_EDGE = 'rgba(233,196,106,0.45)'
@@ -46,11 +46,11 @@ const logBox: CSSProperties = { padding: 10, borderRadius: 6, background: '#0D0D
 
 function H({ title, sub, right }: { title: string; sub?: string; right?: ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 22, flexWrap: 'wrap' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: GOLD, fontSize: 11, fontWeight: 500, marginBottom: 10 }}>✦ iRemoTech · Studio</div>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', color: INK }}>{title}</h1>
-        {sub && <p style={{ margin: '6px 0 0', fontSize: 13, color: '#A1A1AA', lineHeight: 1.55, maxWidth: 720 }}>{sub}</p>}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: GOLD, fontSize: 11.5, fontWeight: 600, marginBottom: 10 }}>iRemoTech · Studio</div>
+        <h1 style={{ margin: 0, fontSize: 'clamp(28px, 3.2vw, 38px)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, color: '#F4F4F5' }}>{title}</h1>
+        {sub && <p style={{ margin: '8px 0 0', fontSize: 14.5, color: '#8B8B94', lineHeight: 1.5, maxWidth: 720 }}>{sub}</p>}
       </div>
       {right}
     </div>

@@ -53,7 +53,7 @@ export default function ReelPreview({ theme, videos, accounts, captions, resolve
             ? <video key={src} src={src} poster={poster} autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             : poster ? <img src={poster} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : null
         ) : (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', fontSize: 12.5, color: '#71717A' }}>Aucune vidéo choisie</div>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', fontSize: 12.5, color: '#7C7C86' }}>Aucune vidéo choisie</div>
         )}
 
         {/* Habillage Reels Instagram */}
@@ -90,7 +90,7 @@ export default function ReelPreview({ theme, videos, accounts, captions, resolve
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
         <Btn theme={theme} sm tone="ghost" icon={ICONS.shuffle} label="Autre aperçu" disabled={videos.length <= 1 && accounts.length <= 1 && caps.length <= 1} onClick={() => setSeed([Math.random(), Math.random(), Math.random()])} />
-        <span style={{ fontSize: 11.5, color: '#71717A' }}>Vidéo, compte et légende tirés au hasard</span>
+        <span style={{ fontSize: 11.5, color: '#7C7C86' }}>Vidéo, compte et légende tirés au hasard</span>
       </div>
     </div>
   )

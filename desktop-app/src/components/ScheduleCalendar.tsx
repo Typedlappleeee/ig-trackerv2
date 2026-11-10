@@ -84,7 +84,7 @@ export default function ScheduleCalendar({ theme, posts, onMove, onOpen }: {
         <span style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: p.status === 'failed' ? '#F87171' : t.color }} />
         <span style={{ fontVariantNumeric: 'tabular-nums', color: '#A1A1AA', flexShrink: 0 }}>{time}</span>
         <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.label}</span>
-        {!compact && <span style={{ marginLeft: 'auto', color: '#71717A', flexShrink: 0 }}>{n}</span>}
+        {!compact && <span style={{ marginLeft: 'auto', color: '#7C7C86', flexShrink: 0 }}>{n}</span>}
       </button>
     )
   }
@@ -102,15 +102,15 @@ export default function ScheduleCalendar({ theme, posts, onMove, onOpen }: {
           outline: overDay === i ? `1px solid ${theme.accent}` : 'none', transition: 'background .12s ease',
         }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-          {view === 'week' && <span style={{ fontSize: 11.5, color: '#71717A', textTransform: 'capitalize' }}>{d.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>}
+          {view === 'week' && <span style={{ fontSize: 11.5, color: '#7C7C86', textTransform: 'capitalize' }}>{d.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>}
           <span style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 22, height: 22, borderRadius: 99, fontSize: 12, fontWeight: 600,
             background: isToday ? 'linear-gradient(135deg,#8B5CF6,#EC4899)' : 'transparent', color: isToday ? '#fff' : out ? '#5A5A63' : '#A1A1AA', fontVariantNumeric: 'tabular-nums', boxShadow: isToday ? '0 4px 12px -4px rgba(236,72,153,.7)' : 'none',
           }}>{d.getDate()}</span>
-          {list.length > 0 && view === 'week' && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#71717A' }}>{list.length}</span>}
+          {list.length > 0 && view === 'week' && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#7C7C86' }}>{list.length}</span>}
         </div>
         {list.slice(0, max).map(p => pill(p, view === 'month'))}
-        {list.length > max && <span style={{ fontSize: 11, color: '#71717A', paddingLeft: 4 }}>+{list.length - max}</span>}
+        {list.length > max && <span style={{ fontSize: 11, color: '#7C7C86', paddingLeft: 4 }}>+{list.length - max}</span>}
       </div>
     )
   }
@@ -128,13 +128,13 @@ export default function ScheduleCalendar({ theme, posts, onMove, onOpen }: {
       </div>
       {view === 'month' && !narrow && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,minmax(0,1fr))', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          {weekDays(new Date()).map((d, i) => <span key={i} style={{ padding: '6px 8px', fontSize: 11.5, color: '#71717A', textTransform: 'capitalize' }}>{d.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>)}
+          {weekDays(new Date()).map((d, i) => <span key={i} style={{ padding: '6px 8px', fontSize: 11.5, color: '#7C7C86', textTransform: 'capitalize' }}>{d.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>)}
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'repeat(7,minmax(0,1fr))', gap: 1, background: 'rgba(255,255,255,0.06)' }}>
         {(narrow && view === 'month' ? days.filter(d => d.getMonth() === anchor.getMonth()) : days).map((d, i) => cell(d, i, view === 'week' && !narrow))}
       </div>
-      <div style={{ padding: '8px 12px', fontSize: 11.5, color: '#71717A', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ padding: '8px 12px', fontSize: 11.5, color: '#7C7C86', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         Glisse un post « En attente (serveur) » sur un autre jour pour le décaler (même heure).
       </div>
     </div>

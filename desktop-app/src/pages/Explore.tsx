@@ -101,7 +101,7 @@ export function ToolCard({ t, fav, onFav, onOpen, i, pick, art }: { t: Tool; fav
             <span style={{ display: 'flex', color: h ? '#F4F4F5' : 'transparent', transform: h ? 'translateX(0)' : 'translateX(-4px)', transition: 'all .18s ease', flexShrink: 0 }}><Icon d={ARROW} size={13} sw={2} /></span>
           </span>
           <span style={{ fontSize: 12.5, lineHeight: 1.45, color: '#8B8B94', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.desc}</span>
-          {t.cost && <span style={{ marginTop: 2, fontSize: 11.5, fontWeight: 600, color: '#5A5A63' }}>{t.cost}</span>}
+          {t.cost && <span style={{ marginTop: 2, fontSize: 11.5, fontWeight: 600, color: '#7C7C86' }}>{t.cost}</span>}
         </span>
       </div>
     </div>
@@ -154,7 +154,7 @@ export function SectionHead({ title, count, right }: { title: ReactNode; count?:
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '0 2px 14px' }}>
       <h2 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 19, fontWeight: 750, letterSpacing: '-0.025em', color: '#F4F4F5' }}>
-        {title}{count !== undefined && <span style={{ fontSize: 14, fontWeight: 600, color: '#5A5A63' }}>{count}</span>}
+        {title}{count !== undefined && <span style={{ fontSize: 14, fontWeight: 600, color: '#7C7C86' }}>{count}</span>}
       </h2>
       {right}
     </div>
@@ -231,12 +231,12 @@ export default function Explore({ infra, isAdmin, onOpen, user, org }: { theme: 
       {/* En-tête */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 22 }}>
         <div style={{ minWidth: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#71717A' }}>{all.length} outils</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#7C7C86' }}>{all.length} outils</span>
           <h1 style={{ margin: '4px 0 0', fontSize: narrow ? 30 : 38, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, color: '#F4F4F5' }}>Explorer</h1>
           <p style={{ margin: '8px 0 0', fontSize: 14.5, lineHeight: 1.5, color: '#8B8B94' }}>Publier, créer, gérer tes comptes, analyser : choisis un outil et lance-toi.</p>
         </div>
         <span style={{ position: 'relative', width: narrow ? '100%' : 'min(420px, 100%)' }}>
-          <span style={{ position: 'absolute', left: 15, top: 14, color: '#71717A', display: 'flex' }}><Icon d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z|M21 21l-4.3-4.3" size={17} /></span>
+          <span style={{ position: 'absolute', left: 15, top: 14, color: '#7C7C86', display: 'flex' }}><Icon d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z|M21 21l-4.3-4.3" size={17} /></span>
           <input ref={searchRef} value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') { setQ(''); e.currentTarget.blur() } }} placeholder="Rechercher un outil…" aria-label="Rechercher un outil"
             style={{ width: '100%', boxSizing: 'border-box', height: 46, padding: '0 44px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.09)', background: '#111113', color: '#F4F4F5', fontSize: 14.5, outline: 'none' }} />
           {q

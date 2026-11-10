@@ -103,7 +103,7 @@ function KeyPanel({ theme, orgId, nudge, onChange }: { theme: Theme; orgId: stri
           <span style={{ color: '#8B8B94' }}>{st === null ? '…' : noSql ? '· colle d’abord le SQL 20261015_genjutsu.sql dans Supabase' : ok ? `· configurée (••••${st.hint ?? ''})${orgId ? ' pour toute l’équipe' : ''}` : '· pas encore configurée — Genjutsu utilise TA clé (facturée par Higgsfield)'}</span>
         </span>
         {st?.canEdit ? <Btn theme={theme} sm tone={ok ? 'quiet' : 'primary'} label={ok ? 'Changer la clé' : 'Ajouter ma clé'} onClick={() => setOpen(o => !o)} />
-          : st && <span style={{ fontSize: 12, color: '#71717A' }}>Seuls l’owner et les admins peuvent la changer.</span>}
+          : st && <span style={{ fontSize: 12, color: '#7C7C86' }}>Seuls l’owner et les admins peuvent la changer.</span>}
       </div>
       {open && st?.canEdit && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
@@ -291,7 +291,7 @@ export default function Genjutsu({ theme, user, org, onNavigate }: { theme: Them
           <span style={{ width: 7, height: 7, borderRadius: 99, background: V, boxShadow: '0 0 0 4px rgba(167,139,250,.18)' }} />Genjutsu IA · Higgsfield
         </span>
         <h1 style={{ margin: '10px 0 0', fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 0.92, textTransform: 'uppercase', fontSize: 'clamp(32px, 4vw, 56px)', color: '#F4F4F5' }}>
-          Recrée des Reels <span style={{ color: '#52525B' }}>avec ton modèle</span>
+          Recrée des Reels <span style={{ color: '#7C7C86' }}>avec ton modèle</span>
         </h1>
         <p style={{ margin: '12px 0 0', fontSize: 14, lineHeight: 1.55, color: '#8B8B94', maxWidth: 680 }}>Les mouvements, le cadrage et le rythme du Reel sont gardés ; le personnage et le décor sont reconstruits à partir des images de ton modèle. Les vidéos arrivent dans ta Banque (dossier IA).</p>
       </div>
@@ -324,7 +324,7 @@ export default function Genjutsu({ theme, user, org, onNavigate }: { theme: Them
                   <span style={{ display: 'flex', justifyContent: 'flex-end' }}><Btn theme={theme} sm tone="primary" label="Ajouter à la file" icon="M12 5v14|M5 12h14" disabled={!links.trim()} onClick={addLinks} /></span>
                 </div>
               )}
-              {srcKind === 'viral' && (reels.length === 0 ? <div style={{ fontSize: 13, color: '#71717A', padding: '8px 2px' }}>Aucun Reel dans la Veille pour l’instant.</div> : (
+              {srcKind === 'viral' && (reels.length === 0 ? <div style={{ fontSize: 13, color: '#7C7C86', padding: '8px 2px' }}>Aucun Reel dans la Veille pour l’instant.</div> : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 8, maxHeight: 360, overflowY: 'auto' }}>
                   {reels.map(r => {
                     const on = queue.some(q => q.reel_code === r.code)
@@ -352,7 +352,7 @@ export default function Genjutsu({ theme, user, org, onNavigate }: { theme: Them
                 <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#A1A1AA' }}>File · {queue.length} Reel(s)</span>
-                    <button type="button" onClick={() => setQueue([])} style={{ border: 'none', background: 'transparent', color: '#71717A', fontSize: 12, cursor: 'pointer' }}>Tout retirer</button>
+                    <button type="button" onClick={() => setQueue([])} style={{ border: 'none', background: 'transparent', color: '#7C7C86', fontSize: 12, cursor: 'pointer' }}>Tout retirer</button>
                   </div>
                   <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
                     {queue.map((q, i) => {
@@ -408,7 +408,7 @@ export default function Genjutsu({ theme, user, org, onNavigate }: { theme: Them
                 background: GRAD, boxShadow: ready ? '0 4px 0 #6D28D9, 0 16px 34px -14px rgba(236,72,153,.7)' : 'none' }}>
               {sending ? 'Envoi…' : queue.length > 1 ? `Recréer les ${queue.length} Reels →` : 'Recréer le Reel →'}
             </button>
-            <span style={{ fontSize: 12, lineHeight: 1.5, color: '#71717A' }}>Un Reel à la fois, dans l’ordre. Tu peux fermer l’app : la file continue. Génération facturée par Higgsfield sur ta clé. Utilise des photos de modèles qui ont donné leur accord.</span>
+            <span style={{ fontSize: 12, lineHeight: 1.5, color: '#7C7C86' }}>Un Reel à la fois, dans l’ordre. Tu peux fermer l’app : la file continue. Génération facturée par Higgsfield sur ta clé. Utilise des photos de modèles qui ont donné leur accord.</span>
           </div>
         </div>
       )}
@@ -437,7 +437,7 @@ export default function Genjutsu({ theme, user, org, onNavigate }: { theme: Them
       )}
 
       {tab === 'history' && (
-        jobs.length === 0 ? <div style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13.5, color: '#71717A', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 20 }}>Tes Reels recréés apparaîtront ici.</div> : (
+        jobs.length === 0 ? <div style={{ padding: '48px 16px', textAlign: 'center', fontSize: 13.5, color: '#7C7C86', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 20 }}>Tes Reels recréés apparaîtront ici.</div> : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px,100%), 1fr))', gap: 10 }}>
             {jobs.map(j => {
               const [label, color] = STATUS[j.status] ?? [j.status, '#A1A1AA']
@@ -453,7 +453,7 @@ export default function Genjutsu({ theme, user, org, onNavigate }: { theme: Them
                     <span data-no-tr style={{ fontSize: 13.5, fontWeight: 750, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.title ?? 'Genjutsu'}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color }}>{label}</span>
                     {j.error && <span data-no-tr style={{ fontSize: 11.5, color: j.status === 'failed' ? '#F87171' : '#A1A1AA', lineHeight: 1.4 }}>{j.error}</span>}
-                    <span style={{ fontSize: 11.5, color: '#71717A' }}>{new Date(j.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    <span style={{ fontSize: 11.5, color: '#7C7C86' }}>{new Date(j.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                     <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 'auto' }}>
                       {done && j.video_url && <Btn theme={theme} sm label="Télécharger" onClick={() => window.open(j.video_url!, '_blank', 'noopener')} />}
                       {done && j.bank_id && <Btn theme={theme} sm tone="primary" label="Publier" onClick={() => openTool(onNavigate, 'publish', { mode: 'reels' })} />}
@@ -485,7 +485,7 @@ export default function Genjutsu({ theme, user, org, onNavigate }: { theme: Them
                 <button type="button" onClick={() => setPicker({ kind: 'images', for: 'model' })} style={{ aspectRatio: '4 / 5', borderRadius: 12, border: '1px dashed rgba(255,255,255,0.16)', background: 'transparent', color: '#A1A1AA', fontSize: 12, cursor: 'pointer' }}>+ Images</button>
               )}
             </div>
-            <span style={{ fontSize: 12, color: '#71717A' }}>1 à 8 photos : visage net, plusieurs angles, la tenue et le décor voulus.</span>
+            <span style={{ fontSize: 12, color: '#7C7C86' }}>1 à 8 photos : visage net, plusieurs angles, la tenue et le décor voulus.</span>
             <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setEditing(null)} />
               <Btn theme={theme} tone="primary" label="Enregistrer le modèle" onClick={() => void saveModel()} />

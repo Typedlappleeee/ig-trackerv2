@@ -348,7 +348,7 @@ function VoiceNote() {
       <button type="button" className="sfl-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Écouter le message vocal'}><Ico d={playing ? P.pause : P.play} s={16} /></button>
       <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
         <span className="sfl-wave" aria-hidden="true">{Array.from({ length: 40 }, (_, i) => { const seed = Math.abs(Math.sin(i * 2.7) * Math.cos(i * 0.9)); return <i key={i} className={i / 40 <= pct && pct > 0 ? 'p' : ''} style={{ height: (22 + seed * 70) + '%' }} /> })}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: '#71717A', whiteSpace: 'nowrap', minWidth: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: '#7C7C86', whiteSpace: 'nowrap', minWidth: 0 }}>
           <span style={{ color: '#EDEDEF', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>Message vocal d’un client</span>
           <span className="sfl-mono sfl-num" style={{ fontSize: 11.5 }}>{time}</span>
           <span style={{ marginLeft: 'auto' }}>Telegram</span>
@@ -456,7 +456,7 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
           </div>
         </div>
         <div id="sfl-menu" className={'sfl-menu' + (menu ? ' sfl-open' : '')}>
-          {NAV.map(([href, label]) => <a key={href} href={href} className="sfl-mlink" tabIndex={menu ? 0 : -1}>{label}<Ico d={P.arrow} s={15} style={{ color: '#71717A' }} /></a>)}
+          {NAV.map(([href, label]) => <a key={href} href={href} className="sfl-mlink" tabIndex={menu ? 0 : -1}>{label}<Ico d={P.arrow} s={15} style={{ color: '#7C7C86' }} /></a>)}
           <div className="sfl-menu-cta">
             <a href={WIN_URL} className="sfl-btn sfl-btn-s" tabIndex={menu ? 0 : -1}><Ico d={P.download} s={15} />Télécharger</a>
             <button type="button" className="sfl-btn sfl-btn-p" tabIndex={menu ? 0 : -1} onClick={() => { setMenu(false); onStudio() }}>Commencer</button>

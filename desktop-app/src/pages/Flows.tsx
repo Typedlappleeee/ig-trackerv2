@@ -97,12 +97,12 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
           {f.beta && <Chip text="Beta" tone="warn" />}
         </span>
         <span style={{ fontSize: 12, lineHeight: 1.55, color: '#8B8B94' }}>{f.d}</span>
-        {!big && <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 11.5, fontWeight: 500, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{f.p}<span style={{ opacity: 0.4 }}>·</span>{f.n} étapes</span>}
+        {!big && <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 11.5, fontWeight: 500, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{f.p}<span style={{ opacity: 0.4 }}>·</span>{f.n} étapes</span>}
       </span>
       <span style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
         {big && <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, marginRight: 4 }}>
           <span style={{ fontSize: 12, fontWeight: 500, color: '#A1A1AA' }}>{f.p}</span>
-          <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{f.n} étapes</span>
+          <span style={{ fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{f.n} étapes</span>
         </span>}
         <Star k={f.k} big={big} />
         <IconBtn d="M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" title="Programmer" onClick={(e) => { e.stopPropagation(); openFlow(f, 'sched') }} disabled={!f.ok} />
@@ -118,8 +118,8 @@ export default function Flows({ theme, infra, user, org, onNavigate }: {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         {label === 'Recommandés' && <span style={{ color: '#FBBF24', display: 'flex', alignSelf: 'center' }}><Icon d="M13 2 3 14h9l-1 8 10-12h-9z" size={12} /></span>}
         <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>{label}</span>
-        {hint && <span style={{ fontSize: 12, color: '#71717A' }}>{hint}</span>}
-        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
+        {hint && <span style={{ fontSize: 12, color: '#7C7C86' }}>{hint}</span>}
+        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{items.length}</span>
       </div>
       {label === 'Recommandés'
         ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{items.map(f => card(f, true))}</div>

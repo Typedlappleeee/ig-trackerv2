@@ -20,7 +20,7 @@ import { loadPresets, savePreset, deletePreset, type ComposerPreset } from '@/li
 import { selectContainerByVision, postReelByVision, airplaneReset, warmupEditsByVision, recalibrateTouch } from '@/lib/iremotechVision'
 import { usePartnerSend, PartnerSendSelect } from '@/components/PartnerSendSelect'
 import { loadDevContainers, saveDevContainers, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
-import { confirmDialog } from '@/lib/ui'
+import { confirmDialog, SkeletonRows } from '@/lib/ui'
 import { signPaths, cachedSigned } from '@/lib/signedUrls'
 import { uploadThumbFor } from '@/lib/bankStorage'
 import { Video } from '@/components/VideoFrame'
@@ -125,11 +125,11 @@ const tileHoverOn = (e: { currentTarget: HTMLElement }) => { e.currentTarget.sty
 const tileHoverOff = (e: { currentTarget: HTMLElement }) => { e.currentTarget.style.borderColor = EDGE; e.currentTarget.style.background = '#111113' }
 function Head({ title, sub, right }: { title: string; sub?: string; right?: ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 22, flexWrap: 'wrap' }}>
       <div style={{ minWidth: 0 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: ACCENT_TXT, fontSize: 11, fontWeight: 500, marginBottom: 10 }}>✦ Blowsome VIP</span>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', color: INK }}>{title}</h1>
-        {sub && <p style={{ margin: '6px 0 0', fontSize: 13, lineHeight: 1.55, color: '#A1A1AA', maxWidth: 560 }}>{sub}</p>}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: ACCENT_TXT, fontSize: 11.5, fontWeight: 600, marginBottom: 10 }}>Blowsome VIP</span>
+        <h1 style={{ margin: 0, fontSize: 'clamp(28px, 3.2vw, 38px)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, color: '#F4F4F5' }}>{title}</h1>
+        {sub && <p style={{ margin: '8px 0 0', fontSize: 14.5, lineHeight: 1.5, color: '#8B8B94', maxWidth: 680 }}>{sub}</p>}
       </div>
       {right && <div style={{ marginLeft: 'auto' }}>{right}</div>}
     </div>
@@ -355,7 +355,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
       <Head title="Phone Farm" sub="Tes vrais iPhones pilotés à distance. Clique un appareil pour le contrôler en direct, enregistre une séquence, puis publie sur tout le parc."
         right={budget?.budget != null ? <span style={{ fontFamily: MONO, fontSize: 12, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }}>{budget.remaining ?? '—'} / {budget.budget ?? '—'} actions</span> : undefined} />
 
-      {irt.loading ? <Card style={{ padding: 32, textAlign: 'center', color: MUTED, fontSize: 13 }}>Chargement…</Card>
+      {irt.loading ? <Card><SkeletonRows rows={4} avatar /></Card>
         : !irt.key ? <ConnectIrt title="iRemoTech pas encore branché" />
         : err ? <Card style={{ padding: 32, textAlign: 'center', color: '#F87171', fontSize: 13 }}>{err}</Card>
         : loading ? <Card style={{ padding: 32, textAlign: 'center', color: MUTED, fontSize: 13 }}>Connexion à iRemoTech…</Card>
@@ -965,7 +965,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         </select>
         <BlowBtn label="Enregistrer" onClick={doSavePreset} />
         {presetSel && <BlowBtn label="Supprimer" ghost onClick={doDeletePreset} />}
-        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#71717A' }}>Tes réglages sont mémorisés automatiquement</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#7C7C86' }}>Tes réglages sont mémorisés automatiquement</span>
       </div>
 
       <Card style={{ padding: 16, marginBottom: 12 }}>
@@ -1030,7 +1030,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
           {burnCap && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginLeft: 49 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', ...BTN_GHOST, fontSize: 12, fontWeight: 500 }}>📁 Choisir dans la banque</button>
+                <button onClick={() => setShowCapPicker(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', ...BTN_GHOST, fontSize: 12, fontWeight: 500 }}>Choisir dans la banque</button>
                 {capPool.trim() && <button onClick={() => setCapPool('')} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid transparent', background: 'transparent', color: '#A1A1AA', fontSize: 12, fontWeight: 500 }}>Vider</button>}
               </div>
               <CaptionPools value={capPool} onChange={setCapPool} orgId={currentOrg?.id ?? null} userId={user.id} selStyle={selStyle} btnStyle={BTN_GHOST} />
@@ -1070,7 +1070,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
                       </div>
                     </div>
                   )}
-                  <div><button type="button" disabled={detecting || !sources.length} onClick={() => void detectAllVoices()} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: detecting ? 'wait' : 'pointer', ...BTN_GHOST, fontSize: 12, fontWeight: 500 }}>{detecting ? '🎙 Détection…' : '🎙 Détecter les voix maintenant'}</button></div>
+                  <div><button type="button" disabled={detecting || !sources.length} onClick={() => void detectAllVoices()} style={{ height: 28, padding: '0 10px', borderRadius: 6, cursor: detecting ? 'wait' : 'pointer', ...BTN_GHOST, fontSize: 12, fontWeight: 500 }}>{detecting ? 'Détection…' : 'Détecter les voix maintenant'}</button></div>
                 </div>
               )}
               <textarea value={capPool} onChange={e => setCapPool(e.target.value)} rows={3} placeholder={'Une légende par ligne (distribuées entre les variantes)…\nEx : Sérieux là ?'} style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 6, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }} />
@@ -1116,7 +1116,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
         </Grp>
 
         <Grp title="Anti-détection & montage">
-          <Sw on={tendance} onChange={setTendance} label="🔥 Mode Tendance" sub="Micro-vitesse marquée (0,94–1,06×) + spoof renforcé → variantes « tendance » & uniques" />
+          <Sw on={tendance} onChange={setTendance} label="Mode Tendance" sub="Micro-vitesse marquée (0,94–1,06×) + spoof renforcé → variantes « tendance » & uniques" />
           {!tendance && <Fld label="Anti-détection"><Seg value={intensity} onChange={setIntensity} options={[{ v: 'subtle', label: 'Subtile' }, { v: 'normal', label: 'Normale' }, { v: 'strong', label: 'Forte' }]} /></Fld>}
           <Fld label="Localisation GPS"><select value={gpsCity} onChange={e => setGpsCity(e.target.value)} style={selStyle}>{GPS_CITIES.map(c => <option key={c.k} value={c.k} style={optStyle}>{c.label}</option>)}</select></Fld>
           <Fld label="Appareil (spoof)"><select value={device} onChange={e => setDevice(e.target.value)} style={selStyle}>{SPOOF_DEVICES.map(d => <option key={d.k} value={d.k} style={optStyle}>{d.label}</option>)}</select></Fld>
@@ -1211,7 +1211,7 @@ function CaptionBankPicker({ user, org, onSelect, onClose }: {
             style={{ ...fieldStyle, width: '100%' }} />
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {loading ? <p style={{ fontSize: 12.5, color: MUTED }}>Chargement…</p>
+          {loading ? <SkeletonRows rows={4} />
             : filtered.length === 0 ? <p style={{ fontSize: 12.5, color: MUTED }}>Aucune caption dans la banque.</p>
             : filtered.map(it => {
               const on = selected.has(it.id)

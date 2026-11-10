@@ -34,7 +34,7 @@ export function BigCard({ preview, pick, icon, title, tag, desc, foot, onOpen, i
         </span>
         <span style={{ fontSize: 13, lineHeight: 1.55, color: '#9A9AA3' }}>{desc}</span>
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 6 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: '#71717A' }}>{foot}</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: '#7C7C86' }}>{foot}</span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', borderRadius: 9, fontSize: 12.5, fontWeight: 800, color: h ? '#fff' : '#A1A1AA', background: h ? '#8B5CF6' : 'rgba(255,255,255,0.05)', transition: 'all .2s ease' }}>
             Ouvrir<Icon d="M5 12h14|M13 6l6 6-6 6" size={13} />
           </span>

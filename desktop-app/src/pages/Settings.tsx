@@ -94,7 +94,7 @@ export default function Settings({ theme, user, org, onSignOut }: {
                 <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, flexShrink: 0, borderRadius: 8, background: on ? theme.accent : '#18181B', color: on ? '#fff' : '#A1A1AA', border: '1px solid rgba(255,255,255,0.08)' }}><Icon d={x.i} size={15} /></span>
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: on ? '#EDEDEF' : '#D4D4D8' }}>{x.l}</span>
-                  {!narrow && <span style={{ fontSize: 11.5, color: '#71717A' }}>{x.d}</span>}
+                  {!narrow && <span style={{ fontSize: 11.5, color: '#7C7C86' }}>{x.d}</span>}
                 </span>
               </button>
             )
@@ -321,7 +321,7 @@ function TeamTab({ theme, user, org }: { theme: Theme; user: User; org: OrgState
             <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderTop: i ? '1px solid rgba(255,255,255,0.05)' : 'none', flexWrap: 'wrap' }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 99, flexShrink: 0, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: '#D4D4D8', fontSize: 11.5, fontWeight: 600 }}>{initialsFrom(m.display_name, m.email)}</span>
               <span style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span data-no-tr style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{m.display_name?.trim() || m.email || m.user_id.slice(0, 8)}{me && <span style={{ color: '#71717A', fontWeight: 400 }}> · toi</span>}</span>
+                <span data-no-tr style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{m.display_name?.trim() || m.email || m.user_id.slice(0, 8)}{me && <span style={{ color: '#7C7C86', fontWeight: 400 }}> · toi</span>}</span>
                 <span data-no-tr style={{ fontSize: 12, color: '#8B8B94' }}>{m.email ?? '—'}</span>
               </span>
               {canManage && !me && m.role !== 'owner' ? (
@@ -417,7 +417,7 @@ function BillingTab({ theme, user, org }: { theme: Theme; user: User; org: OrgSt
               {usage.quota !== null && <span style={{ color: pct >= 80 ? '#FBBF24' : '#8B8B94' }}>{pct} %</span>}
             </span>
             {usage.quota !== null && <span style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${Math.max(2, pct)}%`, background: pct >= 100 ? '#F87171' : pct >= 80 ? '#FBBF24' : theme.accent }} /></span>}
-            <span style={{ fontSize: 12, color: '#71717A' }}>La corbeille compte jusqu’à ce qu’elle soit vidée (7 jours). Au-delà de la limite, les nouveaux envois sont bloqués.</span>
+            <span style={{ fontSize: 12, color: '#7C7C86' }}>La corbeille compte jusqu’à ce qu’elle soit vidée (7 jours). Au-delà de la limite, les nouveaux envois sont bloqués.</span>
           </div>
         </Panel>
       )}
@@ -501,7 +501,7 @@ function IntegrationsTab({ theme, user, org, canManage }: { theme: Theme; user: 
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {!readOnly && <Btn theme={theme} tone="primary" sm label={busy === `save-${field}` ? 'Enregistrement…' : 'Enregistrer'} disabled={!!busy || !vals || vals[field].trim() === saved[field]} onClick={() => void save(field)} />}
           <Btn theme={theme} sm label={busy === `test-${field}` ? 'Test…' : 'Tester'} disabled={!!busy || !vals?.[field].trim()} onClick={() => void test(field)} />
-          <span style={{ fontSize: 12, color: '#71717A' }}>{help}</span>
+          <span style={{ fontSize: 12, color: '#7C7C86' }}>{help}</span>
         </span>
         {readOnly && <span style={{ fontSize: 12, color: '#FBBF24' }}>Seuls owner / admin de l’organisation peuvent modifier cette clé.</span>}
       </div>
@@ -541,7 +541,7 @@ function LinkDomainCard({ theme }: { theme: Theme }) {
           <input value={custom} onChange={e => setCustom(e.target.value)} placeholder="liens.monagence.fr" spellCheck={false} style={{ ...FIELD, flex: 1, minWidth: 200 }} />
           <Btn theme={theme} sm tone={mode === 'custom' ? 'primary' : 'ghost'} label="Utiliser mon domaine" onClick={() => save('custom')} />
         </span>
-        <span style={{ fontSize: 12, color: '#71717A', lineHeight: 1.5 }}>Domaine perso : ajoute un enregistrement CNAME vers <span style={{ fontFamily: MONO }}>cname.vercel-dns.com</span>, puis préviens-nous pour l’activer.</span>
+        <span style={{ fontSize: 12, color: '#7C7C86', lineHeight: 1.5 }}>Domaine perso : ajoute un enregistrement CNAME vers <span style={{ fontFamily: MONO }}>cname.vercel-dns.com</span>, puis préviens-nous pour l’activer.</span>
       </div>
     </Panel>
   )

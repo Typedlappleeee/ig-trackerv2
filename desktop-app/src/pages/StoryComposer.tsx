@@ -295,7 +295,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
             <select value={group} onChange={e => setGroup(e.target.value)} style={{ ...FIELD_SM, width: 'auto', padding: '0 8px', cursor: 'pointer' }}>
               {groups.map(g => <option key={g} value={g} style={{ background: '#161618' }}>{g === 'Tous' ? 'Tous les groupes' : g}</option>)}
             </select>
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{shownPhones.length} affichés · {nSel} cochés</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{shownPhones.length} affichés · {nSel} cochés</span>
           </div>
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
             {loading ? <SkeletonRows rows={5} avatar />
@@ -309,7 +309,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
                       <StatusDot kind={dotKind(p.status)} />
                       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                         <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                        <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                        <span style={{ fontFamily: MONO, fontSize: 11, color: '#7C7C86', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                       </span>
                     </button>
                     {on && (() => {
@@ -334,7 +334,7 @@ export default function StoryComposer({ theme, user, org, onBack }: {
             <PanelHead title="Images de la story" sub={chosenImgs.length > 1 ? 'Réparties entre les comptes' : chosenImgs.length === 1 ? chosenImgs[0].title : 'choisis une ou plusieurs images'}
               right={<Btn theme={theme} sm tone="ghost" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPicker('images')} />} />
             {chosenImgs.length === 0 ? (
-              <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>Aucune image choisie.<br />Clique <b style={{ color: '#EDEDEF', fontWeight: 500 }}>Ouvrir la banque</b>.</div>
+              <div style={{ padding: 24, textAlign: 'center', color: '#7C7C86', fontSize: 12.5, lineHeight: 1.6 }}>Aucune image choisie.<br />Clique <b style={{ color: '#EDEDEF', fontWeight: 500 }}>Ouvrir la banque</b>.</div>
             ) : (<>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(74px,1fr))', gap: 8, padding: 16, maxHeight: 240, overflowY: 'auto' }}>
                 {chosenImgs.map((m, i) => {

@@ -1459,7 +1459,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px,96vw)', maxHeight: '84vh', display: 'flex', flexDirection: 'column', borderRadius: 20, background: '#101012', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px -24px rgba(0,0,0,0.85)', padding: 20, boxSizing: 'border-box', animation: 'aIn .2s cubic-bezier(0.16,1,0.3,1) both' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 11, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)', color: '#FCA5A5' }}><Icon d="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" size={16} /></span>
-              <span style={{ fontSize: 16.5, fontWeight: 750, color: '#F4F4F5', letterSpacing: '-0.025em' }}>Corbeille <span style={{ color: '#71717A', fontWeight: 600 }}>{trash.length}</span></span>
+              <span style={{ fontSize: 16.5, fontWeight: 750, color: '#F4F4F5', letterSpacing: '-0.025em' }}>Corbeille <span style={{ color: '#7C7C86', fontWeight: 600 }}>{trash.length}</span></span>
               <button onClick={() => setShowTrash(false)} aria-label="Fermer" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 99, background: 'rgba(255,255,255,0.04)', border: 'none', color: '#A1A1AA', cursor: 'pointer' }}><Icon d="M18 6L6 18|M6 6l12 12" size={14} /></button>
             </div>
             <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#8B8B94' }}>Médias supprimés — restaurables 7 jours puis purgés définitivement.</p>
@@ -1474,13 +1474,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                 return (
                   <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px 7px 14px', borderRadius: 12, background: '#151517', border: '1px solid rgba(255,255,255,0.07)' }}>
                     <span data-no-tr style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
-                    <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>purge dans {days}j</span>
+                    <span style={{ fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>purge dans {days}j</span>
                     <Btn theme={theme} sm tone="quiet" label="Restaurer" onClick={() => restoreMedia([t.id])} />
                     <button onClick={async () => { if (await confirmDialog({ title: 'Supprimer définitivement ce média ?', confirmLabel: 'Supprimer', danger: true })) purgeMedia([t]) }} title="Supprimer définitivement" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: 'none', border: 'none', color: '#F87171', fontWeight: 500, fontSize: 16, cursor: 'pointer' }}>×</button>
                   </div>
                 )
               })}
-              {trash.length > 200 && <span style={{ padding: '8px 4px', fontSize: 12.5, color: '#71717A' }}>{`+ ${trash.length - 200} autre(s) — utilise « Tout restaurer » ou « Vider définitivement ».`}</span>}
+              {trash.length > 200 && <span style={{ padding: '8px 4px', fontSize: 12.5, color: '#7C7C86' }}>{`+ ${trash.length - 200} autre(s) — utilise « Tout restaurer » ou « Vider définitivement ».`}</span>}
             </div>
           </div>
         </div>,
@@ -1593,7 +1593,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   {/* chevron : replier / déplier les sous-dossiers */}
                   <span role={f.hasChildren ? 'button' : undefined} aria-label={f.hasChildren ? (collapsed.has(f.n) ? 'Déplier' : 'Replier') : undefined}
                     onClick={e => { if (!f.hasChildren) return; e.stopPropagation(); toggleCollapsed(f.n) }}
-                    style={{ width: 14, display: 'flex', justifyContent: 'center', color: '#5A5A63', cursor: f.hasChildren ? 'pointer' : 'inherit', transform: f.hasChildren && !collapsed.has(f.n) ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease', flexShrink: 0 }}>
+                    style={{ width: 14, display: 'flex', justifyContent: 'center', color: '#7C7C86', cursor: f.hasChildren ? 'pointer' : 'inherit', transform: f.hasChildren && !collapsed.has(f.n) ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease', flexShrink: 0 }}>
                     {f.hasChildren && <Icon d="M9 6l6 6-6 6" size={11} sw={2.2} />}
                   </span>
                   <span style={{ display: 'flex', color: f.n === '★ Favoris' ? '#FBBF24' : f.special ? '#4ADE80' : on ? theme.accentText : '#71717A' }}>
@@ -1649,7 +1649,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               )
             })()}
 
-            <span style={{ marginLeft: (tab !== 'caption' && shown.length > 0) ? 12 : 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ marginLeft: (tab !== 'caption' && shown.length > 0) ? 12 : 'auto', fontSize: 12, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>
               {loading ? <Skeleton w={72} h={10} style={{ display: 'inline-block', verticalAlign: 'middle' }} /> : sel.size ? `${sel.size} sélectionnée${sel.size > 1 ? 's' : ''}` : `${folder.split('/').join(' › ')} · ${shown.length} affichée${shown.length > 1 ? 's' : ''}`}
             </span>
           </div>
@@ -1669,7 +1669,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                     <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, borderRadius: 16, background: '#141416', border: '1px solid rgba(255,255,255,0.07)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'Légende'}</span>
-                        <button onClick={() => deleteCaption(c.id)} title="Supprimer" style={{ marginLeft: 'auto', display: 'flex', width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', background: 'transparent', color: '#71717A', cursor: 'pointer' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={13} /></button>
+                        <button onClick={() => deleteCaption(c.id)} title="Supprimer" style={{ marginLeft: 'auto', display: 'flex', width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', background: 'transparent', color: '#7C7C86', cursor: 'pointer' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={13} /></button>
                       </div>
                       <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap', maxHeight: 110, overflow: 'hidden' }}>{c.content}</div>
                       <button onClick={() => { navigator.clipboard?.writeText(c.content); toast('Légende copiée.', 'ok') }} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: '#1A1A1D', color: '#F4F4F5', fontSize: 12.5, fontWeight: 650, cursor: 'pointer' }}><Icon d="M9 9h11v11H9z|M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" size={12} />Copier</button>
@@ -1752,7 +1752,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             {sel.size < shown.length && <Btn label={`Tout sélectionner (${shown.length})`} theme={theme} sm tone="ghost" onClick={() => setSel(new Set(shown.map(m => m.id)))} />}
             <Btn label="Désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
           </span>
-          <span style={{ flexBasis: '100%', fontSize: 11.5, color: '#71717A' }}>Astuce : clique ou glisse sur les vignettes pour en cocher plusieurs · rectangle sur un espace vide · Ctrl+A tout · Suppr supprime · Échap annule</span>
+          <span style={{ flexBasis: '100%', fontSize: 11.5, color: '#7C7C86' }}>Astuce : clique ou glisse sur les vignettes pour en cocher plusieurs · rectangle sur un espace vide · Ctrl+A tout · Suppr supprime · Échap annule</span>
         </div>
       )}
 
@@ -1822,7 +1822,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             ].map(o => (
               <button key={o.l} onClick={() => { o.fn(); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                <span style={{ color: '#71717A', display: 'flex' }}><Icon d={o.d} size={14} /></span>{o.l}
+                <span style={{ color: '#7C7C86', display: 'flex' }}><Icon d={o.d} size={14} /></span>{o.l}
               </button>
             ))}
             <button onClick={() => { setConfirmDel([ctx.item.id]); setCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginTop: 4, borderRadius: 5, border: 'none', boxShadow: '0 -1px 0 rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
@@ -1841,11 +1841,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 190), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
             <button onClick={() => { openNewFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginBottom: 4, borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z|M12 10v6|M9 13h6" size={14} /></span>Nouveau sous-dossier
+              <span style={{ color: '#7C7C86', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z|M12 10v6|M9 13h6" size={14} /></span>Nouveau sous-dossier
             </button>
             <button onClick={() => { setRenameFolderOf(folderCtx.name); setRenameFolderVal(leafOf(folderCtx.name)); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <span style={{ color: '#71717A', display: 'flex' }}><Icon d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" size={14} /></span>Renommer
+              <span style={{ color: '#7C7C86', display: 'flex' }}><Icon d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" size={14} /></span>Renommer
             </button>
             <button onClick={() => { const n = folderCtx.name, on = !favFolders.has(n); setFolderCtx(null); setFavFolders(f => { const x = new Set(f); if (on) x.add(n); else x.delete(n); return x }); void setFolderFav({ orgId: currentOrg?.id ?? null, userId: user.id }, n, on).then(() => toast(on ? `« ${leafOf(n)} » épinglé : il apparaît en premier dans les sélecteurs.` : `« ${leafOf(n)} » n’est plus épinglé.`, 'ok')).catch(() => load()) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -1980,7 +1980,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                 {moveFolders.map(f => <option key={f.n} value={f.n} style={{ background: '#161618' }}>{`${'\u00A0\u00A0\u00A0'.repeat(f.depth)}${f.label}`}</option>)}
               </select>
             </label>
-            {folderName.trim() && <span style={{ fontSize: 12, color: '#71717A' }}>{`→ ${joinPath(folderParent, folderName).split('/').join(' › ')}`}</span>}
+            {folderName.trim() && <span style={{ fontSize: 12, color: '#7C7C86' }}>{`→ ${joinPath(folderParent, folderName).split('/').join(' › ')}`}</span>}
           </div>
         </Modal>
       )}

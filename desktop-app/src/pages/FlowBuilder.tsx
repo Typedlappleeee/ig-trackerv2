@@ -282,7 +282,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
                       style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px', cursor: 'grab', userSelect: 'none' }}>
                       <BlockIcon def={b.type} size={24} />
                       <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{b.label}</span>
-                      {b.credits > 0 && <span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{b.credits}cr</span>}
+                      {b.credits > 0 && <span style={{ fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{b.credits}cr</span>}
                     </div>
                   ))}
                 </div>
@@ -348,7 +348,7 @@ export default function FlowBuilder({ theme, infra, user, org }: { theme: Theme;
                   ))}
                   <span style={{ padding: '0 6px', fontSize: 11.5, color: '#8B8B94', fontVariantNumeric: 'tabular-nums' }}>{Math.round(view.z * 100)}%</span>
                 </div>
-                <div style={{ position: 'absolute', top: 10, right: 16, fontSize: 11.5, color: '#71717A', pointerEvents: 'none' }}>
+                <div style={{ position: 'absolute', top: 10, right: 16, fontSize: 11.5, color: '#7C7C86', pointerEvents: 'none' }}>
                   Glisse le fond pour te déplacer · Ctrl + molette pour zoomer
                 </div>
               </>
@@ -448,8 +448,8 @@ function SaveBadge({ state, error }: { state: 'idle' | 'saving' | 'saved' | 'err
 function Terminal({ label, sub, icon }: { label: string; sub: string; icon: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 12px 0 10px', borderRadius: 6, background: '#111113', border: '1px solid rgba(255,255,255,0.09)', color: '#A1A1AA', fontSize: 12, fontWeight: 500 }}>
-      <span style={{ display: 'flex', color: '#71717A' }}><Icon d={icon} size={11} /></span>
-      {label}<span style={{ fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{sub}</span>
+      <span style={{ display: 'flex', color: '#7C7C86' }}><Icon d={icon} size={11} /></span>
+      {label}<span style={{ fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{sub}</span>
     </div>
   )
 }
@@ -555,9 +555,9 @@ function BlockCard({ theme, block, index, selected, issue, onSelect, onDragStart
             <span style={{ display: 'inline-flex', alignItems: 'center', height: 18, padding: '0 7px', borderRadius: 99, fontSize: 10.5, fontWeight: 700, letterSpacing: '.02em', background: off ? 'rgba(255,255,255,0.05)' : `rgba(${def.color},0.14)`, color: off ? '#71717A' : `rgb(${def.color})` }}>{off ? 'Désactivé' : def.label}</span>
           </div>
           <div style={{ marginTop: 4, fontSize: 13.5, fontWeight: 650, color: '#F4F4F5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: off ? 'line-through' : undefined }}>{blockName(block)}</div>
-          <div style={{ marginTop: 2, fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{fmtMinutes(blockEstimate(block))}{def.credits > 0 ? ` · ${def.credits} cr` : ''}</div>
+          <div style={{ marginTop: 2, fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{fmtMinutes(blockEstimate(block))}{def.credits > 0 ? ` · ${def.credits} cr` : ''}</div>
         </div>
-        <span style={{ fontSize: 11.5, fontWeight: 500, color: '#5A5A63', fontVariantNumeric: 'tabular-nums' }}>{index + 1}</span>
+        <span style={{ fontSize: 11.5, fontWeight: 500, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{index + 1}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px 6px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: issue && !off ? '#F87171' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={issue && !off ? issue : summary(block)}>
@@ -646,9 +646,9 @@ function FlowLibrary({ theme, flows, activeId, loading, onOpen, onNew, onDuplica
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                   <span style={{ display: 'flex', gap: 3 }}>
                     {f.blocks.slice(0, 7).map(b => <span key={b.id} title={BLOCK[b.type].label} style={{ width: 6, height: 6, borderRadius: 99, background: `rgb(${BLOCK[b.type].color})` }} />)}
-                    {f.blocks.length === 0 && <span style={{ fontSize: 11.5, color: '#71717A' }}>vide</span>}
+                    {f.blocks.length === 0 && <span style={{ fontSize: 11.5, color: '#7C7C86' }}>vide</span>}
                   </span>
-                  <span style={{ fontSize: 11.5, color: '#71717A', whiteSpace: 'nowrap' }}>· {ago(f.updatedAt)}</span>
+                  <span style={{ fontSize: 11.5, color: '#7C7C86', whiteSpace: 'nowrap' }}>· {ago(f.updatedAt)}</span>
                 </div>
               </div>
               <span className="fb-lib-actions" style={{ display: 'flex', gap: 1 }}>
@@ -658,7 +658,7 @@ function FlowLibrary({ theme, flows, activeId, loading, onOpen, onNew, onDuplica
             </div>
           )
         })}
-        {flows.length > 0 && shown.length === 0 && <div style={{ padding: 16, fontSize: 12, color: '#71717A' }}>Aucun flow ne correspond.</div>}
+        {flows.length > 0 && shown.length === 0 && <div style={{ padding: 16, fontSize: 12, color: '#7C7C86' }}>Aucun flow ne correspond.</div>}
       </div>
     </Panel>
   )
@@ -698,7 +698,7 @@ function NewFlowModal({ theme, preset, names, onClose, onCreate }: {
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: 12, borderRadius: 8, cursor: 'pointer', textAlign: 'left',
                     background: on ? 'rgba(255,255,255,0.05)' : '#111113', border: `1px solid ${on ? theme.selEdge : 'rgba(255,255,255,0.07)'}` }}>
                   <span style={{ display: 'flex', gap: 4, minHeight: 18 }}>
-                    {o.types.length ? o.types.map((ty, k) => <BlockIcon key={k} def={ty} size={18} />) : <span style={{ fontSize: 11.5, color: '#71717A' }}>—</span>}
+                    {o.types.length ? o.types.map((ty, k) => <BlockIcon key={k} def={ty} size={18} />) : <span style={{ fontSize: 11.5, color: '#7C7C86' }}>—</span>}
                   </span>
                   <span style={{ fontSize: 13, fontWeight: 500, color: '#EDEDEF' }}>{o.title}</span>
                   <span style={{ fontSize: 12, color: '#8B8B94' }}>{o.desc}</span>
@@ -719,7 +719,7 @@ function Field({ label, hint, children }: { label: string; hint?: ReactNode; chi
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>{label}</span>
       {children}
-      {hint && <span style={{ fontSize: 11.5, lineHeight: 1.5, color: '#71717A' }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 11.5, lineHeight: 1.5, color: '#7C7C86' }}>{hint}</span>}
     </label>
   )
 }
@@ -887,7 +887,7 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
         <BlockIcon def={block.type} size={32} />
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 500, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{index + 1}.</span>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{index + 1}.</span>
             <input value={p.label ?? ''} onChange={e => onChange({ label: e.target.value })} placeholder={def.label} aria-label="Nom du bloc" maxLength={40}
               style={{ flex: 1, minWidth: 0, height: 28, padding: '0 8px', marginLeft: -4, borderRadius: 6, border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#EDEDEF', fontSize: 13, fontWeight: 600, outline: 'none' }} />
           </div>
@@ -919,7 +919,7 @@ function Inspector({ theme, block, index, bank, onChange, onPick, onRemove }: {
         </div>
       </details>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <span style={{ flex: 1, fontSize: 11.5, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{fmtMinutes(blockEstimate(block))}{def.credits ? ` · ${def.credits} crédit(s)/compte` : ''}</span>
+        <span style={{ flex: 1, fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{fmtMinutes(blockEstimate(block))}{def.credits ? ` · ${def.credits} crédit(s)/compte` : ''}</span>
         <Btn theme={theme} sm tone="danger" label="Supprimer" onClick={onRemove} />
       </div>
     </>
@@ -1079,7 +1079,7 @@ function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId
             <button onClick={() => setSel(s => { const n = new Set(s); shown.forEach(p => allShown ? n.delete(p.id) : n.add(p.id)); return n })} style={{ border: 'none', background: 'transparent', color: theme.accentText, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{allShown ? 'Tout retirer' : 'Tout sélectionner'}</button>
           </div>
           <div style={{ maxHeight: 300, overflowY: 'auto', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)' }}>
-            {shown.length === 0 ? <div style={{ padding: 20, textAlign: 'center', fontSize: 13, color: '#71717A' }}>Aucun téléphone GeeLark.</div> : shown.map(p => {
+            {shown.length === 0 ? <div style={{ padding: 20, textAlign: 'center', fontSize: 13, color: '#7C7C86' }}>Aucun téléphone GeeLark.</div> : shown.map(p => {
               const on = sel.has(p.id)
               return (
                 <button key={p.id} onClick={() => toggle(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px', border: 'none', cursor: 'pointer', textAlign: 'left', borderLeft: `2px solid ${on ? theme.accent : 'transparent'}`, background: on ? 'rgba(255,255,255,0.05)' : 'transparent' }}>
@@ -1113,7 +1113,7 @@ function LaunchModal({ theme, flow, phones, bearer, bank, ownerId, orgId, userId
             </Field>
           )}
           {needsLogin && chosen.length > 0 && (
-            <div style={{ maxHeight: 110, overflowY: 'auto', fontSize: 11, lineHeight: 1.7, color: '#71717A', fontFamily: MONO }}>
+            <div style={{ maxHeight: 110, overflowY: 'auto', fontSize: 11, lineHeight: 1.7, color: '#7C7C86', fontFamily: MONO }}>
               {chosen.map((p, i) => <div key={p.id} style={{ color: creds[p.id] ? '#A1A1AA' : '#F87171', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i + 1}. {phoneLabel(p)} → {creds[p.id]?.email ?? 'manquant'}</div>)}
             </div>
           )}

@@ -448,7 +448,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
         </select>
         <Btn theme={theme} sm tone="ghost" icon="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z|M17 21v-8H7v8|M7 3v5h8" label="Enregistrer" onClick={doSavePreset} />
         {presetSel && <Btn theme={theme} sm tone="quiet" icon="M3 6h18|M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" label="Supprimer" onClick={doDeletePreset} />}
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A' }}>Tes réglages sont mémorisés automatiquement</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#7C7C86' }}>Tes réglages sont mémorisés automatiquement</span>
       </div>
 
       {/* ── Étape 1 : Comptes ── */}
@@ -471,7 +471,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 14, height: 14, borderRadius: 4, boxSizing: 'border-box', background: healthy ? theme.accentBtn : 'transparent', border: healthy ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{healthy ? '✓' : ''}</span>
               Santé ≥ 70 seulement
             </button>
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>{shownPhones.length} affichés · {nSel} cochés</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{shownPhones.length} affichés · {nSel} cochés</span>
           </div>
           {loading ? <SkeletonRows rows={4} avatar />
             : shownPhones.length === 0 ? <Empty icon={PHONE_ICON} title="Aucun compte." text={null} />
@@ -487,7 +487,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 11, color: '#7C7C86', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                     <StatusDot kind={dotKind(p.status)} />
                   </button>
@@ -505,7 +505,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
             <Btn theme={theme} sm tone="primary" icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" label="Ouvrir la banque" onClick={() => setPicker('videos')} />
             <Chip text={`${nVid} sélectionnée${nVid > 1 ? 's' : ''}`} tone="mute" />
           </>} />
-          {nVid === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>Aucune vidéo choisie.<br />Clique <b style={{ color: '#EDEDEF', fontWeight: 500 }}>Ouvrir la banque</b> pour en sélectionner.</div> : (
+          {nVid === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#7C7C86', fontSize: 12.5, lineHeight: 1.6 }}>Aucune vidéo choisie.<br />Clique <b style={{ color: '#EDEDEF', fontWeight: 500 }}>Ouvrir la banque</b> pour en sélectionner.</div> : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(84px,1fr))', gap: 8, padding: 16, maxHeight: 420, overflowY: 'auto' }}>
               {videos.filter(v => vidSel.has(v.id)).map((v, i) => {
                 const on = vidSel.has(v.id)
@@ -654,7 +654,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
                 <span style={{ fontSize: 13, color: '#8B8B94' }}>Coût</span>
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
                   <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{cost} crédits</span>
-                  {balance !== null && <span style={{ fontSize: 12, color: '#71717A', fontVariantNumeric: 'tabular-nums' }}>solde après : {Math.max(0, balance - cost).toLocaleString('fr-FR')}</span>}
+                  {balance !== null && <span style={{ fontSize: 12, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>solde après : {Math.max(0, balance - cost).toLocaleString('fr-FR')}</span>}
                 </span>
               </div>
               <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -739,7 +739,7 @@ export default function ReelsComposer({ theme, user, org, onBack, platform = 'in
           </span>
           {nextBlock
             ? <span style={{ fontSize: 12, color: '#FBBF24' }}>{nextBlock}</span>
-            : <span style={{ fontSize: 12, color: '#71717A' }}>Étape {step} sur 4 · {STEPS[step - 1]}</span>}
+            : <span style={{ fontSize: 12, color: '#7C7C86' }}>Étape {step} sur 4 · {STEPS[step - 1]}</span>}
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           {step > 1 && <Btn theme={theme} tone="ghost" label="Précédent" onClick={() => setStep(s => s - 1)} />}

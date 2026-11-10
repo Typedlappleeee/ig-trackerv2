@@ -145,7 +145,7 @@ export default function Proxies({ theme, infra, user, org }: {
   const th: CSSProperties = {
     display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center',
     height: 36, boxSizing: 'border-box', padding: '0 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
-    fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#71717A',
+    fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#7C7C86',
   }
 
   return (
@@ -215,16 +215,16 @@ export default function Proxies({ theme, infra, user, org }: {
                   onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
                   onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent' }}>
                   <span><Checkbox on={on} onClick={() => toggle(r.id)} label="Sélectionner" /></span>
-                  <span>{r.group_name ? <Chip text={r.group_name} tone="mute" /> : <span style={{ fontSize: 12, color: '#5A5A63' }}>—</span>}</span>
+                  <span>{r.group_name ? <Chip text={r.group_name} tone="mute" /> : <span style={{ fontSize: 12, color: '#7C7C86' }}>—</span>}</span>
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
                     <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 500, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyName(r)}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyEndpoint(r)}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: '#7C7C86', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proxyEndpoint(r)}</span>
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 6, height: 6, borderRadius: 99, flexShrink: 0, background: '#5A5A63' }} />
                     <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Non testé</span>
                   </span>
-                  <span style={{ fontFamily: MONO, fontSize: 12, color: '#5A5A63' }}>—</span>
+                  <span style={{ fontFamily: MONO, fontSize: 12, color: '#7C7C86' }}>—</span>
                   <span>
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', height: 20, boxSizing: 'border-box', padding: '0 7px', borderRadius: 5,

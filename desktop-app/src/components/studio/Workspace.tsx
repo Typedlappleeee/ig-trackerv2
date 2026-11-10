@@ -307,7 +307,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
         <FieldRow inline label={imgTool ? 'Variantes par photo' : 'Variantes par vidéo'} hint="Chaque copie a une empreinte unique"><Stepper value={copies} onChange={setCopies} /></FieldRow>
         <FieldRow label="Intensité du recadrage"><ChoiceCards value={intensity} onChange={setIntensity} options={INTENSITY} /></FieldRow>
         {spoofExtras}
-        <span style={{ fontSize: 12, color: '#71717A', lineHeight: 1.5 }}>Métadonnées d’origine effacées, puis appareil et GPS réécrits{imgTool ? ' dans l’EXIF du .jpg' : ''}.</span>
+        <span style={{ fontSize: 12, color: '#7C7C86', lineHeight: 1.5 }}>Métadonnées d’origine effacées, puis appareil et GPS réécrits{imgTool ? ' dans l’EXIF du .jpg' : ''}.</span>
       </>
       case 'subs': return <>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: conns.groq ? 'rgba(74,222,128,0.06)' : 'rgba(251,191,36,0.06)', border: `1px solid ${conns.groq ? 'rgba(74,222,128,0.22)' : 'rgba(251,191,36,0.28)'}` }}>
@@ -384,9 +384,9 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
             <Label icon={imgTool ? 'M3 3h18v18H3z|M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' : 'm22 8-6 4 6 4V8Z|M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z'}
               right={<span style={{ display: 'flex', gap: 6 }}>
                 <button type="button" onClick={() => setPicker('src')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 11px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: '#151517', color: '#E4E4E7', fontSize: 12.5, fontWeight: 650, cursor: 'pointer' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={13} />Banque</button>
-                {chosen.length > 0 && <button type="button" onClick={() => setSrc([])} style={{ height: 30, padding: '0 10px', borderRadius: 9, border: 'none', background: 'transparent', color: '#71717A', fontSize: 12.5, fontWeight: 650, cursor: 'pointer' }}>Tout retirer</button>}
+                {chosen.length > 0 && <button type="button" onClick={() => setSrc([])} style={{ height: 30, padding: '0 10px', borderRadius: 9, border: 'none', background: 'transparent', color: '#7C7C86', fontSize: 12.5, fontWeight: 650, cursor: 'pointer' }}>Tout retirer</button>}
               </span>}>
-              {imgTool ? 'Photos' : 'Vidéos'} <span style={{ color: '#5A5A63', fontWeight: 600 }}>{chosen.length}</span>
+              {imgTool ? 'Photos' : 'Vidéos'} <span style={{ color: '#7C7C86', fontWeight: 600 }}>{chosen.length}</span>
             </Label>
             <div style={{ marginTop: 14 }}>
               {chosen.length === 0
@@ -420,7 +420,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
           </Bento>
 
           <Bento pad={18}>
-            <Label icon="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z|M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" right={preview ? <span data-no-tr style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: '#71717A' }}>{preview.title}</span> : undefined}>Aperçu</Label>
+            <Label icon="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z|M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" right={preview ? <span data-no-tr style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: '#7C7C86' }}>{preview.title}</span> : undefined}>Aperçu</Label>
             <div style={{ marginTop: 14 }}>
               <Preview src={mediaUrl(preview)} kind={imgTool ? 'image' : 'video'} tool={tool}
                 caption={tool === 'mixer' ? { text: lines[0] ?? '', x: cap.x, y: cap.y, style: capStyle } : undefined} onCaptionMove={(x, y) => setCap({ x, y })}
@@ -454,7 +454,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
             <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '18px -18px 16px' }} />
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
               <span style={{ fontSize: 13, color: '#8B8B94' }}>{join ? `${chosen.length} vidéos → 1 montage` : `${chosen.length} source(s)${perOut > 1 ? ` × ${perOut}` : ''}`}</span>
-              <span style={{ fontSize: 22, fontWeight: 850, letterSpacing: '-0.04em', color: '#F4F4F5', fontVariantNumeric: 'tabular-nums' }}>{outCount} <span style={{ fontSize: 13, fontWeight: 650, color: '#71717A', letterSpacing: 0 }}>fichier(s)</span></span>
+              <span style={{ fontSize: 22, fontWeight: 850, letterSpacing: '-0.04em', color: '#F4F4F5', fontVariantNumeric: 'tabular-nums' }}>{outCount} <span style={{ fontSize: 13, fontWeight: 650, color: '#7C7C86', letterSpacing: 0 }}>fichier(s)</span></span>
             </div>
             {running ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -475,7 +475,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
                     {blocker.action && <button type="button" onClick={blocker.action.go} style={{ padding: 0, border: 'none', background: 'transparent', color: '#C4B5FD', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>{blocker.action.l} →</button>}
                   </div>
                 )}
-                {!blocker && !imgTool && <div style={{ marginTop: 10, fontSize: 11.5, color: '#5A5A63', textAlign: 'center' }}>Le premier lancement charge le moteur vidéo (~30 Mo, une seule fois).</div>}
+                {!blocker && !imgTool && <div style={{ marginTop: 10, fontSize: 11.5, color: '#7C7C86', textAlign: 'center' }}>Le premier lancement charge le moteur vidéo (~30 Mo, une seule fois).</div>}
               </>
             )}
             {logs.length > 0 && <div style={{ marginTop: 12 }}><RunLog lines={logs} /></div>}

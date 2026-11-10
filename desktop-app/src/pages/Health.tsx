@@ -105,7 +105,7 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
               <div key={l} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, borderRight: i < 4 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
                 <span style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                   <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', color: '#EDEDEF', fontVariantNumeric: 'tabular-nums' }}>{w}</span>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: '#71717A' }}>pts</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: '#7C7C86' }}>pts</span>
                 </span>
                 <span style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                   <span style={{ display: 'block', height: '100%', width: `${(w / 30) * 100}%`, borderRadius: 99, background: theme.accent }} />
@@ -162,7 +162,7 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
                       </span>
                       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <span style={{ fontSize: 13, color: '#A1A1AA' }}>{r.why}</span>
-                        <span style={{ fontSize: 12, color: '#71717A' }}>→ {r.fix}</span>
+                        <span style={{ fontSize: 12, color: '#7C7C86' }}>→ {r.fix}</span>
                       </span>
                       <Btn theme={theme} sm tone="primary" label="Corriger" onClick={() => onNavigate?.('warmup')} />
                     </div>
@@ -176,7 +176,7 @@ export default function Health({ theme, infra, user, org, onNavigate }: {
           <Panel theme={theme}>
             <PanelHead title="Tous les comptes" sub="Trié du plus fragile au plus solide" />
             <div style={{ overflowX: 'auto' }}><div style={{ minWidth: 600 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '0 16px', height: 36, borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 11, fontWeight: 500, color: '#71717A' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '0 16px', height: 36, borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 11, fontWeight: 500, color: '#7C7C86' }}>
               {['Compte', 'Santé', 'Groupe', 'Âge', 'Cadence'].map((h, i) => <span key={i}>{h}</span>)}
             </div>
             {rows.map((p, i) => (

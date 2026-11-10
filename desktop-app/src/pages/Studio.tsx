@@ -77,7 +77,7 @@ function AutoContentHero({ narrow, onOpen }: { narrow: boolean; onOpen: () => vo
         </ol>
         <span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 44, padding: '0 18px', borderRadius: 13, background: '#F4F4F5', color: '#0A0A0B', fontSize: 14.5, fontWeight: 800 }}>Lancer l’Auto-contenu<Icon d="M5 12h14|M13 6l6 6-6 6" size={15} sw={2.4} /></span>
-          <span style={{ fontSize: 12.5, color: '#71717A' }}>Gratuit · sur ton ordinateur</span>
+          <span style={{ fontSize: 12.5, color: '#7C7C86' }}>Gratuit · sur ton ordinateur</span>
         </span>
       </div>
       {/* Visuel : ta vidéo → 3 comptes, 3 textes */}

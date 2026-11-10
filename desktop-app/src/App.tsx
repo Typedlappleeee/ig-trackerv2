@@ -286,7 +286,7 @@ function AppInner({ user }: { user: User }) {
       {SHOW_LINKS_LAUNCH && page === 'hub' && (
         <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, padding: '14px 18px', borderRadius: 18, background: '#0C0C0D', border: '1px solid rgba(167,139,250,0.35)', flexWrap: 'wrap', boxShadow: '0 0 0 1px rgba(167,139,250,0.08), 0 20px 50px -30px rgba(139,92,246,.6)' }}>
           <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#A78BFA', padding: '5px 9px', borderRadius: 7, border: '1px solid rgba(167,139,250,0.4)', background: 'rgba(167,139,250,0.08)' }}>✦ Nouveautés</span>
-          <span style={{ flex: 1, minWidth: 220, fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', textTransform: 'uppercase', color: '#F4F4F5' }}>Liens ScaleFlow · Veille Reels · TikTok <span style={{ color: '#71717A' }}>· nouvelle interface</span></span>
+          <span style={{ flex: 1, minWidth: 220, fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', textTransform: 'uppercase', color: '#F4F4F5' }}>Liens ScaleFlow · Veille Reels · TikTok <span style={{ color: '#7C7C86' }}>· nouvelle interface</span></span>
           <Btn theme={theme} label="Voir les nouveautés" onClick={() => setSpot(true)} />
         </div>
       )}

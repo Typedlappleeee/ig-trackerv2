@@ -257,14 +257,14 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                 <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom affiché <span style={{ color: '#71717A', fontWeight: 400 }}>· name</span></span>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom affiché <span style={{ color: '#7C7C86', fontWeight: 400 }}>· name</span></span>
                       <input value={edit.nickname} onChange={e => setEdit(v => ({ ...v, nickname: e.target.value }))} placeholder="Léa ✨" style={FIELD} />
-                      <span style={{ fontSize: 11.5, color: '#71717A' }}>Le nom en gras sur le profil. Ne touche pas au @.</span>
+                      <span style={{ fontSize: 11.5, color: '#7C7C86' }}>Le nom en gras sur le profil. Ne touche pas au @.</span>
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom d'utilisateur <span style={{ color: '#71717A', fontWeight: 400 }}>· @username</span></span>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: '#8B8B94' }}>Nom d'utilisateur <span style={{ color: '#7C7C86', fontWeight: 400 }}>· @username</span></span>
                       <textarea value={usernames} onChange={e => { setUsernames(e.target.value); setEditError(null) }} rows={2} placeholder={'lea.officiel{4}\nlea_backup'} style={TEXTAREA} />
-                      <span style={{ fontSize: 11.5, color: '#71717A' }}>Un par ligne, attribués dans l'ordre. {'{4}'} = 4 chiffres aléatoires.</span>
+                      <span style={{ fontSize: 11.5, color: '#7C7C86' }}>Un par ligne, attribués dans l'ordre. {'{4}'} = 4 chiffres aléatoires.</span>
                     </label>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -272,7 +272,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <Btn theme={theme} sm tone="ghost" icon="M3 5h18v14H3z|M3 16l5-5 4 4 3-3 6 6" label={avatarIds.length ? `${avatarIds.length} photo${avatarIds.length > 1 ? 's' : ''} choisie${avatarIds.length > 1 ? 's' : ''}` : 'Choisir dans la banque'} onClick={() => setAvatarPicker(true)} />
                       {avatarIds.length > 0 && <Btn theme={theme} sm tone="quiet" label="Retirer" onClick={() => setAvatarIds([])} />}
-                      <span style={{ fontSize: 11.5, color: '#71717A' }}>{avatarIds.length > 1 ? 'Distribuées dans l\'ordre aux comptes.' : 'Plusieurs photos = une différente par compte.'}</span>
+                      <span style={{ fontSize: 11.5, color: '#7C7C86' }}>{avatarIds.length > 1 ? 'Distribuées dans l\'ordre aux comptes.' : 'Plusieurs photos = une différente par compte.'}</span>
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
@@ -305,7 +305,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
               <Panel theme={theme}>
                 <PanelHead title="Connexion automatique" sub="Identifiants IG par compte (flow RPA GeeLark, 2FA supporté)" />
                 {nSel === 0 ? (
-                  <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Sélectionne des comptes à gauche pour saisir leurs identifiants.</div>
+                  <div style={{ padding: 24, textAlign: 'center', color: '#7C7C86', fontSize: 12.5 }}>Sélectionne des comptes à gauche pour saisir leurs identifiants.</div>
                 ) : (
                   <div style={{ maxHeight: 340, overflowY: 'auto' }}>
                     {phones.filter(p => sel.has(p.id)).map(p => {
@@ -359,7 +359,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
           ) : error ? (
             <div style={{ padding: 20, textAlign: 'center', color: '#F87171', fontSize: 12.5 }}>{error}</div>
           ) : shownWarm.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Aucun téléphone.</div>
+            <div style={{ padding: 24, textAlign: 'center', color: '#7C7C86', fontSize: 12.5 }}>Aucun téléphone.</div>
           ) : (
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
               {shownWarm.map(p => {
@@ -376,7 +376,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
                     <StatusDot kind={dotKind(p.status)} />
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <span style={{ fontSize: 13, fontWeight: 500, color: on ? '#EDEDEF' : '#A1A1AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                      <span style={{ fontFamily: MONO, fontSize: 11, color: '#7C7C86', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                     </span>
                   </button>
                 )

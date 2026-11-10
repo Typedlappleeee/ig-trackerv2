@@ -93,7 +93,7 @@ function OrgsPanel({ theme, org }: { theme: Theme; org: OrgState }) {
   return (
     <Panel theme={theme}>
       <PanelHead title="Organisations" sub={rows ? `${rows.length} au total` : undefined} right={
-        <div style={{ ...FIELD, width: 'auto', display: 'flex', alignItems: 'center', gap: 8, color: '#71717A' }}>
+        <div style={{ ...FIELD, width: 'auto', display: 'flex', alignItems: 'center', gap: 8, color: '#7C7C86' }}>
           <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-3.5-3.5" size={13} />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher (nom, email)…" style={{ width: 180, maxWidth: '40vw', border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, outline: 'none' }} />
         </div>} />
@@ -239,7 +239,7 @@ export default function Admin({ theme, user, org }: { theme: Theme; user: User; 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Panel theme={theme}>
             <PanelHead title="Clés de licence" sub={`${keys.length} au total`} right={
-              <div style={{ ...FIELD, width: 'auto', display: 'flex', alignItems: 'center', gap: 8, color: '#71717A' }}>
+              <div style={{ ...FIELD, width: 'auto', display: 'flex', alignItems: 'center', gap: 8, color: '#7C7C86' }}>
                 <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|M20 20l-3.5-3.5" size={13} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (clé, email, note)…" style={{ width: 200, maxWidth: '40vw', border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, outline: 'none' }} />
               </div>} />
@@ -265,9 +265,9 @@ export default function Admin({ theme, user, org }: { theme: Theme; user: User; 
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#8B8B94', flexWrap: 'wrap' }}>
                           <span>{k.user_email ? `👤 ${k.user_email}` : 'Non activée'}</span>
-                          <span style={{ color: '#5A5A63' }}>·</span>
+                          <span style={{ color: '#7C7C86' }}>·</span>
                           <span>créée {new Date(k.created_at).toLocaleDateString('fr-FR')}</span>
-                          {k.notes && <><span style={{ color: '#5A5A63' }}>·</span><span style={{ color: '#A1A1AA' }}>{k.notes}</span></>}
+                          {k.notes && <><span style={{ color: '#7C7C86' }}>·</span><span style={{ color: '#A1A1AA' }}>{k.notes}</span></>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginLeft: -10 }}>
                           <Btn theme={theme} sm tone="quiet" label={k.blowsome ? 'Retirer Blowsome' : 'Ajouter Blowsome'} onClick={() => toggleBlowsome(k)} />

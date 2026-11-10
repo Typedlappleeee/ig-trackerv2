@@ -12,7 +12,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
-import { Icon, Toggle, Segmented, toast, useNarrow, confirmDialog, promptDialog } from '@/lib/ui'
+import { Icon, Toggle, Segmented, toast, useNarrow, confirmDialog, promptDialog, SkeletonRows } from '@/lib/ui'
 import { hfBridge, listLocal, addLocal, reconnectLocal, checkLocal, removeLocal, type HfLocalAccount } from '@/lib/hfLocal'
 import { IS_WEB } from '@/lib/platform'
 import { SPOOF_DEVICES, GPS_CITIES } from '@/lib/studioTools'
@@ -25,7 +25,7 @@ import {
 } from '@/lib/genjutsuHF'
 
 const ACCENT = '#A855F7', ACCENT_TXT = '#D8B4FE'
-const INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#5A5A63'
+const INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#7C7C86'
 const EDGE = 'rgba(255,255,255,0.07)', FIELD_EDGE = 'rgba(255,255,255,0.09)', FIELD_BG = '#161618'
 const OK = '#86EFAC', BAD = '#FCA5A5', WARN = '#FBBF24'
 const CFG_KEY = 'sf-gj-auto3', ACC_KEY = 'sf-gj-account', PICK_KEY = 'sf-gj-picked'
@@ -689,11 +689,11 @@ function Frame({ children }: { children: ReactNode }) {
 }
 function Header({ right }: { right?: ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 5, background: '#18181B', border: `1px solid ${EDGE}`, color: ACCENT_TXT, fontSize: 11.5, fontWeight: 500 }}>✦ Blowsome</span>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <span style={{ fontSize: 19, fontWeight: 700, color: '#F4F4F5', letterSpacing: '-0.02em' }}>Genjutsu</span>
-        <span style={{ fontSize: 12.5, color: MUTED }}>Ta modèle à la place de la fille, sur n’importe quel reel — même mouvement, même cadrage.</span>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: 4, background: '#18181B', border: `1px solid ${EDGE}`, color: ACCENT_TXT, fontSize: 11.5, fontWeight: 600, marginBottom: 10 }}>Blowsome VIP</span>
+        <h1 style={{ margin: 0, fontSize: 'clamp(28px, 3.2vw, 38px)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, color: '#F4F4F5' }}>Genjutsu</h1>
+        <span style={{ marginTop: 8, fontSize: 14.5, lineHeight: 1.5, color: MUTED, maxWidth: 680 }}>Ta modèle à la place de la fille, sur n’importe quel reel — même mouvement, même cadrage.</span>
       </div>
       {right && <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{right}</div>}
     </div>
@@ -1038,7 +1038,7 @@ function FolderPicker({ scope, model, current, onPick, onClose }: { scope: BankS
           <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Ses vidéos Genjutsu iront directement dans ce dossier de la Banque.</div>
         </div>
         <div style={{ flex: 1, minHeight: 120, maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, padding: 6, borderRadius: 10, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
-          {paths === null && <span style={{ fontSize: 12.5, color: MUTED, padding: 6 }}>Chargement des dossiers…</span>}
+          {paths === null && <SkeletonRows rows={4} />}
           {paths !== null && tree.map(n => {
             const on = n.path === current
             return (

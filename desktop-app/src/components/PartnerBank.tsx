@@ -184,7 +184,7 @@ export function SendToPartnerModal({ theme, orgId, partner, ids, defaultFolder, 
             ))}
           </span>
         )}
-        <span style={{ fontSize: 12, color: '#71717A', lineHeight: 1.5 }}>Son site télécharge chaque vidéo (lien valable 24 h) et la range dans ce dossier. Rien n’est retiré de ta banque.</span>
+        <span style={{ fontSize: 12, color: '#7C7C86', lineHeight: 1.5 }}>Son site télécharge chaque vidéo (lien valable 24 h) et la range dans ce dossier. Rien n’est retiré de ta banque.</span>
       </div>
     </Modal>
   )

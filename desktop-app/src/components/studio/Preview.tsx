@@ -62,7 +62,7 @@ export function Preview({ src, kind, tool, caption, onCaptionMove, overlay, onOv
 
   if (!src) {
     return (
-      <div style={{ position: 'relative', width: 'min(100%, 300px)', aspectRatio: '9 / 16', margin: '0 auto', borderRadius: 18, border: '1.5px dashed rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 20, boxSizing: 'border-box', color: '#71717A', fontSize: 13, lineHeight: 1.5 }}>
+      <div style={{ position: 'relative', width: 'min(100%, 300px)', aspectRatio: '9 / 16', margin: '0 auto', borderRadius: 18, border: '1.5px dashed rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 20, boxSizing: 'border-box', color: '#7C7C86', fontSize: 13, lineHeight: 1.5 }}>
         {empty ?? 'Ajoute une source pour voir l’aperçu.'}
       </div>
     )
@@ -126,14 +126,14 @@ export function Preview({ src, kind, tool, caption, onCaptionMove, overlay, onOv
               </label>
             ))}
           </div>
-          <span style={{ fontSize: 12, color: '#71717A', textAlign: 'center' }}>Extrait gardé : <b style={{ color: '#E4E4E7' }}>{fmtT((trim.end ?? dur) - trim.start)}</b> sur {fmtT(dur)}</span>
+          <span style={{ fontSize: 12, color: '#7C7C86', textAlign: 'center' }}>Extrait gardé : <b style={{ color: '#E4E4E7' }}>{fmtT((trim.end ?? dur) - trim.start)}</b> sur {fmtT(dur)}</span>
         </div>
       )}
 
       {/* Remix / Spoof : 3 variantes simulées */}
       {variants && (
         <div style={{ width: '100%', maxWidth: 520 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, fontWeight: 650, color: '#A1A1AA' }}><Icon d="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" size={12} />Aperçu des variantes <span style={{ color: '#5A5A63', fontWeight: 500 }}>(approximatif)</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, fontWeight: 650, color: '#A1A1AA' }}><Icon d="M16 3h5v5|M4 20L21 3|M21 16v5h-5|M15 15l6 6" size={12} />Aperçu des variantes <span style={{ color: '#7C7C86', fontWeight: 500 }}>(approximatif)</span></div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8 }}>
             {variants.map((v, i) => (
               <span key={i} style={{ position: 'relative', aspectRatio: String(ar), borderRadius: 12, overflow: 'hidden', background: '#000', boxShadow: '0 0 0 1px rgba(255,255,255,0.08)' }}>

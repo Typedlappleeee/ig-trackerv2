@@ -268,7 +268,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
           </div>
           {/* Ligne 2 : chemin du dossier ouvert (cliquable) + étoile du dossier */}
           {realFolder && (
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: '#71717A' }}>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: '#7C7C86' }}>
               <button onClick={() => setFolder('Tous')} style={{ background: 'none', border: 'none', color: '#A1A1AA', cursor: 'pointer', fontSize: 12, padding: 0 }}>Banque</button>
               {crumbs.map(c => (
                 <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -306,7 +306,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
             </div>
           )
         ) : kind === 'captions' ? (
-          filteredCaps.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#71717A', fontSize: 12.5 }}>Aucune légende.</div> : (
+          filteredCaps.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#7C7C86', fontSize: 12.5 }}>Aucune légende.</div> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {filteredCaps.map(c => {
                 const on = sel.includes(c.id)
@@ -323,7 +323,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
             </div>
           )
         ) : (
-          filteredMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#71717A', fontSize: 12.5, lineHeight: 1.6 }}>
+          filteredMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#7C7C86', fontSize: 12.5, lineHeight: 1.6 }}>
             {folder === FAVS ? <>Aucun favori ici.<br />Clique l’étoile ☆ d’un média pour l’ajouter.</> : media.length === 0 ? <>{kind === 'images' ? 'Aucune image dans la banque.' : kind === 'audios' ? 'Aucun son dans la banque.' : 'Aucune vidéo dans la banque.'}<br />Glisse-dépose tes fichiers ici ou clique « Mon PC ».</> : <>Rien dans ce dossier.</>}
           </div> : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 8 }}>

@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-10',
+    date: '2026-11-10',
+    title: { fr: 'Interface plus nette', en: 'A cleaner interface' },
+    items: {
+      fr: [
+        'Le bandeau de mise à jour tient sur une seule ligne (au lieu d’un bloc en haut de chaque page).',
+        'Auto-contenu, Genjutsu et iRemoTech ont les mêmes grands titres que le reste de l’app ; petits textes gris plus lisibles ; chargements animés.',
+      ],
+      en: [
+        'The update bar now fits on a single line (instead of a block at the top of every page).',
+        'Auto-content, Genjutsu and iRemoTech use the same large titles as the rest of the app; small grey text is easier to read; animated loading states.',
+      ],
+    },
+  },
+  {
     id: '2026-11-09',
     date: '2026-11-09',
     title: { fr: '🎵 Banque unique avec les sons, favoris, et son remplacé dans Auto-contenu', en: '🎵 One library with sounds, favorites, and sound replacement in Auto-content' },

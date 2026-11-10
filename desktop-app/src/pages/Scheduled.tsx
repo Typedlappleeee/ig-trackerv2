@@ -134,7 +134,7 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 99, flexShrink: 0, background: 'rgba(167,139,250,0.1)', color: '#C4B5FD' }}><Icon d={s.type === 'story' ? 'M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1|M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1' : 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z'} size={14} /></span>
         <span style={{ minWidth: 130, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 14, fontWeight: 650, color: '#F4F4F5' }}>{TYPE_LABEL[s.type] ?? s.type}</span>{s.result?.platform && s.result.platform !== 'instagram' && <Chip text={s.result.platform} tone="mute" />}</div>
-          <div style={{ fontSize: 12, color: '#71717A' }}>{n} compte{n > 1 ? 's' : ''}</div>
+          <div style={{ fontSize: 12, color: '#7C7C86' }}>{n} compte{n > 1 ? 's' : ''}</div>
         </span>
         <span style={{ flex: 1, minWidth: 120, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
           <span data-no-tr style={{ fontSize: 12, color: '#8B8B94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.caption || '—'}</span>
@@ -153,10 +153,10 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
       {loadError && <div style={{ padding: '12px 14px', marginBottom: 14, borderRadius: 14, background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.28)', color: '#F87171', fontSize: 13 }}>Impossible de charger les programmations : {loadError}</div>}
       {!loading && rows.length > 0 && (
         <StatBar items={[
-          { l: 'À venir', v: upcoming.length, sub: <span style={{ color: '#71717A' }}>publications</span> },
+          { l: 'À venir', v: upcoming.length, sub: <span style={{ color: '#7C7C86' }}>publications</span> },
           { l: 'Aujourd’hui', v: todayN, c: todayN ? '#C4B5FD' : undefined },
-          { l: 'Crédits engagés', v: committed.toLocaleString('fr-FR'), sub: <span style={{ color: '#71717A' }}>remboursés si annulés</span> },
-          { l: 'Échecs', v: failedN, c: failedN ? '#F87171' : undefined, sub: failedN ? <span style={{ color: '#71717A' }}>dans les passées</span> : <span style={{ color: '#4ADE80' }}>aucun</span> },
+          { l: 'Crédits engagés', v: committed.toLocaleString('fr-FR'), sub: <span style={{ color: '#7C7C86' }}>remboursés si annulés</span> },
+          { l: 'Échecs', v: failedN, c: failedN ? '#F87171' : undefined, sub: failedN ? <span style={{ color: '#7C7C86' }}>dans les passées</span> : <span style={{ color: '#4ADE80' }}>aucun</span> },
         ]} />
       )}
       <UnderlineTabs value={view} onChange={changeView} items={[{ k: 'list', l: 'Liste', icon: 'M8 6h13|M8 12h13|M8 18h13|M3 6h.01|M3 12h.01|M3 18h.01' }, { k: 'calendar', l: 'Calendrier', icon: 'M8 2v4M16 2v4|M3 10h18|M5 21h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z' }]} />
@@ -179,7 +179,7 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
             <Panel theme={theme}>
               {upcoming.length === 0 ? <div style={{ padding: '28px 16px', textAlign: 'center', color: '#8B8B94', fontSize: 13 }}>Rien de programmé pour l'instant.</div> : grouped(upcoming).map(({ r, head }, i) => (
                 <div key={r.id}>
-                  {head && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px 6px', borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none' }}><span style={{ fontSize: 13, fontWeight: 750, color: '#F4F4F5' }}>{head}</span><span style={{ fontSize: 12, color: '#5A5A63' }}>{upcoming.filter(x => dayOf(x.scheduled_at) === head).length}</span></div>}
+                  {head && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px 6px', borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none' }}><span style={{ fontSize: 13, fontWeight: 750, color: '#F4F4F5' }}>{head}</span><span style={{ fontSize: 12, color: '#7C7C86' }}>{upcoming.filter(x => dayOf(x.scheduled_at) === head).length}</span></div>}
                   {rowView(r, head ? 0 : 1)}
                 </div>
               ))}
@@ -188,7 +188,7 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
               <div>
                 <button type="button" onClick={() => setShowPast(v => !v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 36, padding: '0 6px', border: 'none', background: 'transparent', color: '#A1A1AA', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                   <span style={{ display: 'flex', transform: showPast ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease' }}><Icon d="M9 18l6-6-6-6" size={14} sw={2.2} /></span>
-                  Passées <span style={{ color: '#5A5A63', fontWeight: 600 }}>{past.length}</span>
+                  Passées <span style={{ color: '#7C7C86', fontWeight: 600 }}>{past.length}</span>
                 </button>
                 {showPast && <Panel theme={theme} style={{ marginTop: 8 }}>{past.slice(0, 60).map((s, i) => rowView(s, i))}</Panel>}
               </div>

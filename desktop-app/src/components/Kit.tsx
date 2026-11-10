@@ -10,7 +10,7 @@ export function PageHeader({ kicker, title, sub, actions, style }: { kicker?: Re
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', marginBottom: 22, ...style }}>
       <div style={{ minWidth: 0 }}>
-        {kicker && <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#71717A' }}>{kicker}</span>}
+        {kicker && <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#7C7C86' }}>{kicker}</span>}
         <h1 style={{ margin: kicker ? '4px 0 0' : 0, fontSize: narrow ? 30 : 38, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, color: '#F4F4F5' }}>{title}</h1>
         {sub && <p style={{ margin: '8px 0 0', fontSize: 14.5, lineHeight: 1.5, color: '#8B8B94', maxWidth: 680 }}>{sub}</p>}
       </div>
@@ -163,7 +163,7 @@ export function FieldRow({ label, hint, children, inline }: { label: ReactNode; 
     <div style={{ display: 'flex', flexDirection: inline ? 'row' : 'column', alignItems: inline ? 'center' : 'stretch', justifyContent: 'space-between', gap: inline ? 12 : 8 }}>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
         <span style={{ fontSize: 13, fontWeight: 650, color: '#E4E4E7' }}>{label}</span>
-        {hint && <span style={{ fontSize: 12, color: '#71717A', lineHeight: 1.45 }}>{hint}</span>}
+        {hint && <span style={{ fontSize: 12, color: '#7C7C86', lineHeight: 1.45 }}>{hint}</span>}
       </span>
       <span style={{ flexShrink: 0, minWidth: 0 }}>{children}</span>
     </div>
@@ -174,7 +174,7 @@ export function SwitchRow({ label, hint, on, onChange }: { label: ReactNode; hin
     <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, background: on ? 'rgba(167,139,250,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${on ? 'rgba(167,139,250,0.25)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer', transition: 'background .15s ease, border-color .15s ease' }}>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{ fontSize: 13, fontWeight: 650, color: '#E4E4E7' }}>{label}</span>
-        {hint && <span style={{ fontSize: 11.5, color: '#71717A', lineHeight: 1.4 }}>{hint}</span>}
+        {hint && <span style={{ fontSize: 11.5, color: '#7C7C86', lineHeight: 1.4 }}>{hint}</span>}
       </span>
       <Toggle on={on} onChange={onChange} />
     </label>
@@ -208,7 +208,7 @@ export function RunLog({ lines, defaultOpen = false, title = 'Détails technique
     <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.015)', overflow: 'hidden' }}>
       <button type="button" onClick={() => setOpen(o => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', border: 'none', background: 'transparent', color: '#A1A1AA', fontSize: 12.5, fontWeight: 650, cursor: 'pointer' }}>
         <span style={{ display: 'flex', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease' }}><Icon d="M9 18l6-6-6-6" size={13} sw={2.2} /></span>
-        {title}<span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#5A5A63', fontVariantNumeric: 'tabular-nums' }}>{lines.length}</span>
+        {title}<span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#7C7C86', fontVariantNumeric: 'tabular-nums' }}>{lines.length}</span>
       </button>
       {open && <div data-no-tr style={{ maxHeight: 180, overflowY: 'auto', padding: '0 12px 10px', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, lineHeight: 1.65, color: '#8B8B94', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{lines.join('\n')}</div>}
     </div>

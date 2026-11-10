@@ -181,7 +181,7 @@ function PerfCard({ days, ok7, okPrev7, loading }: { days: DayPoint[]; ok7: numb
           </span>
           <span style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 6 }}>
             {range === 7 ? <Delta now={ok7} prev={okPrev7} /> : <span style={{ fontSize: 12.5, fontWeight: 650, color: failed ? '#FCA5A5' : '#71717A' }}>{fmtNumber(failed)} échec(s)</span>}
-            <span style={{ fontSize: 12.5, color: '#71717A' }}>{range === 7 ? 'vs les 7 jours d’avant' : 'sur les 14 derniers jours'}</span>
+            <span style={{ fontSize: 12.5, color: '#7C7C86' }}>{range === 7 ? 'vs les 7 jours d’avant' : 'sur les 14 derniers jours'}</span>
           </span>
         </div>
       </div>
@@ -251,7 +251,7 @@ function RateCard({ rate, prev, ok, failed, loading, onOpen }: { rate: number | 
           </svg>
           <span style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <b style={{ fontSize: 38, fontWeight: 850, letterSpacing: '-0.05em', lineHeight: 1.1, color: '#F4F4F5', fontVariantNumeric: 'tabular-nums' }}>{v === null ? '—' : `${v} %`}</b>
-            <span style={{ fontSize: 11.5, color: '#71717A' }}>de réussite</span>
+            <span style={{ fontSize: 11.5, color: '#7C7C86' }}>de réussite</span>
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -333,7 +333,7 @@ function LiveCard({ onNavigate, delay }: { onNavigate: (p: PageKey) => void; del
                   <span style={{ width: `${r.total ? (r.done / r.total) * 100 : 0}%`, background: 'linear-gradient(90deg,#22C55E,#4ADE80)', boxShadow: '0 0 10px rgba(74,222,128,.6)', transition: 'width .4s ease' }} />
                   <span style={{ width: `${r.total ? (r.failed / r.total) * 100 : 0}%`, background: C_KO, transition: 'width .4s ease' }} />
                 </div>
-                {r.detail && <div data-no-tr style={{ marginTop: 6, fontSize: 11.5, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.detail}</div>}
+                {r.detail && <div data-no-tr style={{ marginTop: 6, fontSize: 11.5, color: '#7C7C86', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.detail}</div>}
               </div>
             )
           })}
@@ -519,7 +519,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
                       <span style={{ fontSize: 13.5, fontWeight: 600, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {phoneCountOf(r)} compte{phoneCountOf(r) > 1 ? 's' : ''}{r.caption ? ` · ${r.caption.slice(0, 32)}${r.caption.length > 32 ? '…' : ''}` : ''}
                       </span>
-                      <span style={{ fontSize: 11.5, color: '#71717A' }}>{fmtDay(r.scheduled_at)}</span>
+                      <span style={{ fontSize: 11.5, color: '#7C7C86' }}>{fmtDay(r.scheduled_at)}</span>
                     </span>
                   </div>
                 ))}
@@ -555,7 +555,7 @@ export default function Home({ theme, infra, user, org, data, loading, reload, o
                       </span>
                       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <span style={{ fontSize: 13.5, fontWeight: 550, color: '#EDEDEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-                        <span style={{ fontSize: 11.5, color: '#71717A' }}>{date}</span>
+                        <span style={{ fontSize: 11.5, color: '#7C7C86' }}>{date}</span>
                       </span>
                       <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: ok ? '#4ADE80' : '#FBBF24', flexShrink: 0 }}>{stat}</span>
                     </div>

@@ -55,7 +55,7 @@ function EntryView({ e, theme, isNew }: { e: ChangelogEntry; theme: Theme; isNew
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
         <span style={{ fontSize: 13.5, fontWeight: 600, color: '#EDEDEF' }}>{pick(e.title)}</span>
         {isNew && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 500, color: theme.accentText, background: `rgba(${theme.tone},0.12)`, border: `1px solid rgba(${theme.tone},0.25)` }}>{pick({ fr: 'Dernière', en: 'Latest' })}</span>}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#71717A', whiteSpace: 'nowrap' }}>{fmtDay(e.date)}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#7C7C86', whiteSpace: 'nowrap' }}>{fmtDay(e.date)}</span>
       </div>
       <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 5 }}>
         {pick(e.items).map((t, i) => <li key={i} style={{ fontSize: 12.5, lineHeight: 1.5, color: '#A1A1AA' }}>{t}</li>)}
@@ -147,24 +147,23 @@ export function WhatsNewBar({ theme }: { theme: Theme }) {
     <>
       {unseen && (
         <div role="status" data-no-tr style={{
-          flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap', padding: '11px 20px',
+          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, minHeight: 36, padding: '4px 20px',
           background: '#111113', borderBottom: '1px solid rgba(255,255,255,0.07)', boxShadow: `inset 2px 0 0 ${theme.accent}`,
           animation: 'aIn .35s cubic-bezier(0.16,1,0.3,1) both',
         }}>
-          <span style={{ fontSize: 15, lineHeight: '20px' }}>✨</span>
-          <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF' }}>
-              {pick({ fr: 'ScaleFlow a été mis à jour', en: 'ScaleFlow has been updated' })}
-              <span style={{ color: theme.accentText }}> · {pick(LATEST.title)}</span>
-              <span style={{ fontWeight: 500, color: '#71717A' }}> — {fmtDay(LATEST.date)}</span>
-            </span>
-            <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {pick(LATEST.items).slice(0, 3).map((t, i) => <li key={i} style={{ fontSize: 12.5, lineHeight: 1.5, color: '#A1A1AA' }}>{t}</li>)}
-            </ul>
-          </div>
-          <span style={{ display: 'flex', gap: 8, alignSelf: 'center' }}>
-            <Btn sm theme={theme} tone="quiet" label={pick({ fr: 'Toutes les MAJ', en: 'All updates' })} onClick={() => { setOpen(true); markSeen() }} />
-            <Btn sm theme={theme} tone="primary" label={pick({ fr: 'OK, compris', en: 'Got it' })} onClick={markSeen} />
+          <span style={{ width: 6, height: 6, borderRadius: 99, background: theme.accentText, flexShrink: 0 }} />
+          <button type="button" onClick={() => { setOpen(true); markSeen() }} title={pick(LATEST.items).join(' · ')}
+            style={{ flex: 1, minWidth: 0, padding: 0, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', fontSize: 12.5, color: '#A1A1AA', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ fontWeight: 600, color: '#EDEDEF' }}>{pick({ fr: 'Mise à jour', en: 'Updated' })}</span>
+            <span style={{ color: theme.accentText }}> · {pick(LATEST.title)}</span>
+            <span style={{ color: '#7C7C86' }}> — {fmtDay(LATEST.date)}</span>
+          </button>
+          <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <Btn sm theme={theme} tone="quiet" label={pick({ fr: 'Voir', en: 'View' })} onClick={() => { setOpen(true); markSeen() }} />
+            <button type="button" onClick={markSeen} aria-label={pick({ fr: 'Fermer', en: 'Dismiss' })} title={pick({ fr: 'Fermer', en: 'Dismiss' })}
+              style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', border: 'none', borderRadius: 6, background: 'transparent', color: '#8B8B94', cursor: 'pointer' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
           </span>
         </div>
       )}

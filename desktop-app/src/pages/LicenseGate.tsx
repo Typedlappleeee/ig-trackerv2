@@ -58,7 +58,7 @@ export default function LicenseGate({ user, expired, onActivated, onSignOut }: {
 
         <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <a href="https://t.me/justquentin" target="_blank" rel="noreferrer" style={{ fontSize: 13, color: '#C4BBFB', textDecoration: 'none', fontWeight: 500 }}>Pas de clé ? Nous contacter →</a>
-          <button type="button" onClick={onSignOut} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: '#71717A' }}>
+          <button type="button" onClick={onSignOut} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: '#7C7C86' }}>
             Se déconnecter ({user.email})
           </button>
         </div>

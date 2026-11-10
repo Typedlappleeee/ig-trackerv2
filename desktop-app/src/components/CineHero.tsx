@@ -153,7 +153,7 @@ export function HomeHero({ photos, kicker, line1, line2, sub, stats, visual, cta
             {stats.map((x, i) => (
               <span key={x.l} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 16px', borderLeft: i ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
                 <b style={{ fontSize: 19, fontWeight: 900, letterSpacing: '-0.04em', color: '#F4F4F5', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>{x.v}</b>
-                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#71717A' }}>{x.l}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#7C7C86' }}>{x.l}</span>
               </span>
             ))}
           </span>
@@ -181,7 +181,7 @@ export function StatBar({ items }: { items: StatItem[] }) {
           style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, textAlign: 'left', color: 'inherit', background: 'transparent', border: 'none', cursor: x.onClick ? 'pointer' : 'default', padding: narrow ? '15px 16px' : '20px 22px',
             borderLeft: (narrow ? i % 2 : i) ? '1px solid rgba(255,255,255,0.06)' : 'none', borderTop: narrow && i >= 2 ? '1px solid rgba(255,255,255,0.06)' : 'none', transition: 'background .15s ease' }}
           onMouseEnter={e => { if (x.onClick) e.currentTarget.style.background = 'rgba(255,255,255,0.025)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#71717A' }}>{x.l}</span>
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#7C7C86' }}>{x.l}</span>
           <span style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
             <span style={{ fontSize: narrow ? 26 : 34, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, color: x.c ?? '#F4F4F5', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{x.v}</span>
             {!narrow && x.extra}
@@ -255,7 +255,7 @@ export function CineSection({ kicker, line1, line2, right, children, pad = true 
         <div style={{ minWidth: 0 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: LIME }}>● {kicker}</span>
           <h2 style={{ ...H1, marginTop: 8, fontSize: narrow ? 24 : 'clamp(26px, 2.6vw, 36px)' }}>
-            <span style={{ color: '#F4F4F5' }}>{line1}</span>{line2 && <> <span style={{ color: '#71717A' }}>{line2}</span></>}
+            <span style={{ color: '#F4F4F5' }}>{line1}</span>{line2 && <> <span style={{ color: '#7C7C86' }}>{line2}</span></>}
           </h2>
         </div>
         {right && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{right}</div>}

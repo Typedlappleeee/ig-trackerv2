@@ -276,7 +276,7 @@ export default function Activity({ theme, infra, user, org, onNavigate }: {
       <StatBar items={[
         { l: 'Runs · 7 jours', v: kpi.count7 },
         { l: 'Taux de succès', v: kpi.count7 ? `${kpi.rate} %` : '—', c: kpi.count7 ? (kpi.rate < 80 ? '#FBBF24' : '#4ADE80') : undefined },
-        { l: 'Comptes échoués', v: kpi.failed7, c: kpi.failed7 ? '#FBBF24' : undefined, sub: kpi.failed7 ? <span style={{ color: '#71717A' }}>relançables en un clic</span> : <span style={{ color: '#4ADE80' }}>aucun</span>, onClick: kpi.failed7 ? () => setFilter('ko') : undefined },
+        { l: 'Comptes échoués', v: kpi.failed7, c: kpi.failed7 ? '#FBBF24' : undefined, sub: kpi.failed7 ? <span style={{ color: '#7C7C86' }}>relançables en un clic</span> : <span style={{ color: '#4ADE80' }}>aucun</span>, onClick: kpi.failed7 ? () => setFilter('ko') : undefined },
         { l: 'Crédits · 7 jours', v: kpi.credits7.toLocaleString('fr-FR'), c: '#C4B5FD' },
       ]} />
 
@@ -299,7 +299,7 @@ export default function Activity({ theme, infra, user, org, onNavigate }: {
             {day !== prevDay && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px 8px', borderTop: i ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
                 <span style={{ fontSize: 13, fontWeight: 750, color: '#F4F4F5', letterSpacing: '-0.01em' }}>{day}</span>
-                <span style={{ fontSize: 12, color: '#5A5A63' }}>{shown.filter(x => dayLabel(x.ts) === day).length} run(s)</span>
+                <span style={{ fontSize: 12, color: '#7C7C86' }}>{shown.filter(x => dayLabel(x.ts) === day).length} run(s)</span>
               </div>
             )}
             <div style={{
@@ -320,7 +320,7 @@ export default function Activity({ theme, infra, user, org, onNavigate }: {
                   {r.state === 'interrupted' && <Chip text="Interrompu" tone="warn" />}
                   {r.recovered && <Chip text="Récupéré" />}
                 </span>
-                <span style={{ fontSize: 12, color: '#71717A' }}>{r.meta}</span>
+                <span style={{ fontSize: 12, color: '#7C7C86' }}>{r.meta}</span>
               </span>
               <span style={{ width: 120, display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
                 <span style={{ display: 'flex', height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', gap: r.ok && r.ok < r.total ? 2 : 0 }}>
@@ -329,7 +329,7 @@ export default function Activity({ theme, infra, user, org, onNavigate }: {
                 </span>
                 <span style={{ fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: ok ? '#4ADE80' : '#FBBF24', fontFamily: "'JetBrains Mono', monospace" }}>{r.ok}/{r.total}</span>
               </span>
-              <span style={{ fontSize: 12, color: '#71717A', minWidth: 84, textAlign: 'right', flexShrink: 0 }}>{r.when}</span>
+              <span style={{ fontSize: 12, color: '#7C7C86', minWidth: 84, textAlign: 'right', flexShrink: 0 }}>{r.when}</span>
               <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 5, flexShrink: 0, minWidth: 230 }}>
                 <Btn theme={theme} sm tone="quiet" icon="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6" label="Détails" onClick={() => setDetail(r)} />
                 {!ok && r.state !== 'running' && <Btn theme={theme} sm icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8" label={`Relancer ${r.total - r.ok}`} onClick={() => relancer(r)} />}

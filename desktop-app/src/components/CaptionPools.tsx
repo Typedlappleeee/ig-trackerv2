@@ -54,10 +54,10 @@ export default function CaptionPools({ value, onChange, orgId, userId, selStyle,
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
       <select value={cur} title="Pools de légendes enregistrés" style={{ height: 28, fontSize: 12, ...selStyle }}
         onChange={e => { const id = e.target.value; setCur(id); const p = pools.find(x => x.id === id); if (p) onChange(p.content) }}>
-        <option value="">{pools.length ? `📚 Mes pools (${pools.length})…` : '📚 Aucun pool enregistré'}</option>
+        <option value="">{pools.length ? `Mes pools (${pools.length})…` : 'Aucun pool enregistré'}</option>
         {pools.map(p => <option key={p.id} value={p.id} data-no-tr>{`${p.name} · ${p.content.split('\n').filter(s => s.trim()).length}`}</option>)}
       </select>
-      <button type="button" onClick={() => void save()} style={b}>💾 Enregistrer le pool</button>
+      <button type="button" onClick={() => void save()} style={b}>Enregistrer le pool</button>
       {cur && <button type="button" onClick={() => void remove()} style={{ ...b, background: 'transparent', border: '1px solid transparent', color: '#A1A1AA' }}>Supprimer</button>}
     </div>
   )

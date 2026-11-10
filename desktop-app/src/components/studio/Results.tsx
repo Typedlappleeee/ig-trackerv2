@@ -42,14 +42,14 @@ export function Results({ results, onClear, onBank, onPublish }: { results: Stud
     <section style={{ marginTop: 28, animation: 'dbRise .5s cubic-bezier(.2,.8,.2,1) both' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 19, fontWeight: 750, letterSpacing: '-0.025em', color: '#F4F4F5' }}>Résultats <span style={{ fontSize: 14, fontWeight: 600, color: '#5A5A63' }}>{results.length}</span></span>
+          <span style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 19, fontWeight: 750, letterSpacing: '-0.025em', color: '#F4F4F5' }}>Résultats <span style={{ fontSize: 14, fontWeight: 600, color: '#7C7C86' }}>{results.length}</span></span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#4ADE80' }}><Icon d="M20 6L9 17l-5-5" size={13} sw={2.4} />Enregistrés dans ta Banque</span>
         </span>
         <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {btn(zipping ? 'Préparation…' : 'Tout télécharger', 'M12 3v12|M7 10l5 5 5-5|M4 21h16', () => void zipAll(), true)}
           {onBank && btn('Voir dans la Banque', 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z', onBank)}
           {onPublish && btn('Publier', 'M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z', onPublish)}
-          <button type="button" onClick={onClear} style={{ height: 34, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: '#71717A', fontSize: 12.5, fontWeight: 650, cursor: 'pointer' }}>Effacer la liste</button>
+          <button type="button" onClick={onClear} style={{ height: 34, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: '#7C7C86', fontSize: 12.5, fontWeight: 650, cursor: 'pointer' }}>Effacer la liste</button>
         </span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>

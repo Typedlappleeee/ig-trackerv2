@@ -162,7 +162,7 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
             </select>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
-            {shownPhones.length === 0 ? <span style={{ fontSize: 12.5, color: '#71717A' }}>{infra === 'cloud' ? 'Aucun appareil ScaleFlow Cloud.' : 'Aucun appareil GeeLark.'}</span> : shownPhones.map(p => {
+            {shownPhones.length === 0 ? <span style={{ fontSize: 12.5, color: '#7C7C86' }}>{infra === 'cloud' ? 'Aucun appareil ScaleFlow Cloud.' : 'Aucun appareil GeeLark.'}</span> : shownPhones.map(p => {
               const on = sel.has(p.id)
               return (
                 <button key={p.id} onClick={() => toggle(p.id)} style={{
@@ -172,7 +172,7 @@ export default function CreateTaskModal({ theme, user, org, mode, infra, onClose
                   <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: 4, flexShrink: 0, boxSizing: 'border-box', background: on ? theme.accentBtn : 'transparent', border: on ? 'none' : '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
                   <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                     <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#EDEDEF' : '#D4D4D8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneLabel(p)}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: '#71717A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: '#7C7C86', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneSub(p)}</span>
                   </span>
                 </button>
               )
