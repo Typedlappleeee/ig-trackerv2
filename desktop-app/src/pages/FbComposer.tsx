@@ -6,18 +6,17 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
-import { Btn, Chip, Panel, PanelHead, TEXTAREA, FIELD_SM, Segmented, SkeletonRows, Empty, Icon, toast, confirmDialog, useNarrow } from '@/lib/ui'
+import { Btn, Chip, Panel, PanelHead, TEXTAREA, Toggle, Segmented, SkeletonRows, Empty, Icon, toast, confirmDialog, useNarrow } from '@/lib/ui'
 import { PageHeader } from '@/components/Kit'
 import BankPicker from '@/components/BankPicker'
-import CaptionPools from '@/components/CaptionPools'
 import { startCreditRun, isCreditError, CREDIT_COSTS } from '@/lib/credits'
 import { startRun } from '@/lib/runStore'
-import { listFbPages, fbConnectUrl, removeFbPage, publishFbReel, fbReelStatus, planFbJobs, captionFor, type FbPage, type FbError } from '@/lib/fbPages'
+import { listFbPages, fbConnectUrl, removeFbPage, publishFbReel, fbReelStatus, commentFbReel, planFbJobs, type FbPage, type FbError } from '@/lib/fbPages'
 
 const FB = '#1877F2'
 const PAGE_ICON = 'M4 4h16v16H4z|M13 20v-7h2.5l.5-3H13V8.5c0-.9.3-1.5 1.6-1.5H16V4.2A19 19 0 0 0 14 4c-2.2 0-3.6 1.3-3.6 3.8V10H8v3h2.4v7'
 type Phase = 'pending' | 'sending' | 'processing' | 'published' | 'failed'
-interface Item { key: string; page: string; pageName: string; file: string; title: string; phase: Phase; error?: string; link?: string | null }
+interface Item { key: string; page: string; pageName: string; file: string; title: string; phase: Phase; error?: string; link?: string | null; comment?: 'ok' | 'failed' | 'skipped'; commentError?: string }
 const PARALLEL = 4
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
@@ -30,7 +29,11 @@ export default function FbComposer({ theme, user, org, onBack }: { theme: Theme;
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [videos, setVideos] = useState<{ id: string; title: string }[]>([])
   const [picker, setPicker] = useState(false)
-  const [caption, setCaption] = useState('')
+  // Commentaire automatique posté sous chaque Reel (au nom de la Page) — gardé sur ce PC.
+  const [commentOn, setCommentOnState] = useState(() => { try { return localStorage.getItem('sf-fb-comment-on') !== '0' } catch { return true } })
+  const [comment, setCommentState] = useState(() => { try { return localStorage.getItem('sf-fb-comment') ?? '' } catch { return '' } })
+  const setCommentOn = (v: boolean) => { setCommentOnState(v); try { localStorage.setItem('sf-fb-comment-on', v ? '1' : '0') } catch { /* bloqué */ } }
+  const setComment = (v: string) => { setCommentState(v); try { localStorage.setItem('sf-fb-comment', v) } catch { /* bloqué */ } }
   const [mode, setMode] = useState<'rotate' | 'all'>('rotate')
   const [running, setRunning] = useState(false)
   const [items, setItems] = useState<Item[]>([])
@@ -83,7 +86,8 @@ export default function FbComposer({ theme, user, org, onBack }: { theme: Theme;
   const chosen = (pages ?? []).filter(p => sel.has(p.id))
   const jobs = planFbJobs(chosen.map(p => p.id), videos.map(v => v.id), mode)
   const cost = jobs.length * CREDIT_COSTS.mass_posting
-  const blocker = !chosen.length ? 'Choisis au moins une Page' : !videos.length ? 'Choisis au moins une vidéo' : null
+  const message = commentOn ? comment.trim() : ''
+  const blocker = !chosen.length ? 'Choisis au moins une Page' : !videos.length ? 'Choisis au moins une vidéo' : commentOn && !message ? 'Écris le commentaire (ou coupe-le)' : null
 
   async function launch() {
     if (blocker || running) return
@@ -106,7 +110,7 @@ export default function FbComposer({ theme, user, org, onBack }: { theme: Theme;
         if (R.isCancelled()) { credit.markFailed(); set(it.key, { phase: 'failed', error: 'Annulé' }); R.tick(false); continue }
         set(it.key, { phase: 'sending' })
         try {
-          const videoId = await publishFbReel(orgId, it.page, it.file, captionFor(caption, i))
+          const videoId = await publishFbReel(orgId, it.page, it.file)
           set(it.key, { phase: 'processing' })
           // Meta traite la vidéo (souvent 30 s à 2 min) : on suit jusqu'à 4 min, sans jamais republier
           let done = false
@@ -120,6 +124,18 @@ export default function FbComposer({ theme, user, org, onBack }: { theme: Theme;
           }
           if (!done) set(it.key, { phase: 'published', error: 'Envoyée — Facebook finit le traitement, elle apparaîtra sur la Page dans quelques minutes.' })
           R.tick(true)
+          // commentaire sous le Reel, une fois en ligne (un raté ne compte pas comme un échec de publication)
+          if (message) {
+            if (!done) set(it.key, { comment: 'skipped', commentError: 'Commentaire non posté : le Reel n’était pas encore en ligne.' })
+            else {
+              let ok = false, last = ''
+              for (let k = 0; k < 3 && !ok; k++) {
+                if (k) await sleep(5000)
+                try { await commentFbReel(orgId, it.page, videoId, message); ok = true } catch (e) { last = e instanceof Error ? e.message : String(e); if ((e as FbError).reconnect) break }
+              }
+              set(it.key, ok ? { comment: 'ok' } : { comment: 'failed', commentError: `Commentaire non posté : ${last}` })
+            }
+          }
         } catch (e) {
           credit.markFailed()
           set(it.key, { phase: 'failed', error: e instanceof Error ? e.message : String(e) })
@@ -203,11 +219,12 @@ export default function FbComposer({ theme, user, org, onBack }: { theme: Theme;
           </Panel>
 
           <Panel theme={theme}>
-            <PanelHead title="Légende" sub="Une par ligne : elles sont distribuées à tour de rôle. Une seule ligne = la même partout." />
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <CaptionPools value={caption} onChange={setCaption} orgId={orgId} userId={user.id} selStyle={{ ...FIELD_SM, width: 'auto', minWidth: 200 }} btnStyle={{ border: '1px solid rgba(255,255,255,0.09)', background: '#161618', color: '#E4E4E7' }} />
-              <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={4} placeholder="Ta légende…" style={TEXTAREA} />
-            </div>
+            <PanelHead title="Commentaire automatique" sub="Posté sous chaque Reel, au nom de la Page, dès qu’il est en ligne." right={<Toggle on={commentOn} onChange={setCommentOn} label="Commentaire automatique" />} />
+            {commentOn && (
+              <div style={{ padding: 16 }}>
+                <textarea value={comment} onChange={e => setComment(e.target.value)} rows={4} placeholder="Ton message sous le post (lien, appel à l’action…)" style={TEXTAREA} />
+              </div>
+            )}
           </Panel>
         </div>
 
@@ -221,6 +238,8 @@ export default function FbComposer({ theme, user, org, onBack }: { theme: Theme;
                     <span data-no-tr style={{ fontSize: 13, fontWeight: 600, color: '#EDEDEF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.pageName}</span>
                     <span data-no-tr style={{ fontSize: 12, color: '#8B8B94', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title}</span>
                     {it.error && <span data-no-tr style={{ fontSize: 12, lineHeight: 1.45, color: it.phase === 'failed' ? '#FCA5A5' : '#8B8B94' }}>{it.error}</span>}
+                    {it.comment === 'ok' && <span style={{ fontSize: 12, color: '#4ADE80' }}>Commentaire posté</span>}
+                    {it.commentError && <span data-no-tr style={{ fontSize: 12, lineHeight: 1.45, color: '#FBBF24' }}>{it.commentError}</span>}
                   </span>
                   {it.link && <a href={it.link} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: theme.accentText, textDecoration: 'none' }}>Voir</a>}
                   <Chip text={label(it.phase)} tone={tone(it.phase)} />

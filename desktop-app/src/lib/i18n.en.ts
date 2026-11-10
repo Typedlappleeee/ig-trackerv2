@@ -3562,6 +3562,12 @@ export const EN: Dict = {
     "Choisis des Pages et des vidéos, puis lance : chaque Page publie en parallèle et le suivi s’affiche ici.": "Pick Pages and videos, then launch: each Page publishes in parallel and progress shows here.",
     "Sur tes Pages Facebook, par l’API officielle : sans téléphone, toutes en même temps.": "On your Facebook Pages, through the official API: no phone, all at once.",
     "2 crédits / Page": "2 credits / Page",
+    "Écris le commentaire (ou coupe-le)": "Write the comment (or turn it off)",
+    "Commentaire non posté : le Reel n’était pas encore en ligne.": "Comment not posted: the Reel was not live yet.",
+    "Commentaire automatique": "Auto comment",
+    "Posté sous chaque Reel, au nom de la Page, dès qu’il est en ligne.": "Posted under each Reel, as the Page, as soon as it is live.",
+    "Ton message sous le post (lien, appel à l’action…)": "Your message under the post (link, call to action…)",
+    "Commentaire posté": "Comment posted",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4258,5 +4264,6 @@ export const EN: Dict = {
     ["Publier {0} Reel{1} · {2} crédits", "Publish {0} Reel{1} · {2} credits"],
     ["Vidéos{0}", "Videos{0}"],
     ["{0} publié{1}{2}", "{0} published{2}"],
+    ["Commentaire non posté : {0}", "Comment not posted: {0}"],
   ],
 }

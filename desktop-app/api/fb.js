@@ -4,9 +4,10 @@
 //     start                        → adresse de connexion Facebook (state signé, 15 min)
 //     pages                        → Pages connectées de l'espace (sans jeton)
 //     remove  { page }             → retire une Page
-//     publish { page, file_id, caption } → publie UN Reel sur UNE Page (Meta télécharge la vidéo
+//     publish { page, file_id }    → publie UN Reel sur UNE Page, sans légende (Meta télécharge la vidéo
 //                                    lui-même depuis un lien signé de la Banque)
 //     status  { page, video_id }   → où en est le traitement du Reel chez Meta
+//     comment { page, video_id, message } → commentaire automatique sous le Reel publié (au nom de la Page)
 // Variables Vercel : META_APP_ID, META_APP_SECRET (jamais envoyées au navigateur),
 // META_FB_REDIRECT_URI (facultatif ; par défaut https://scaleflow.company/api/fb).
 // SQL : supabase/migrations/20261110_fb_pages.sql. Les jetons de Page restent en base, côté serveur.
@@ -15,7 +16,7 @@ import { db, roleIn, filesByIds, bodyOf } from './_bank.js'
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
 const RUPLOAD = 'https://rupload.facebook.com/video-upload/v21.0'
-export const SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts']
+export const SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'pages_manage_engagement']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const redirectUri = () => process.env.META_FB_REDIRECT_URI || 'https://scaleflow.company/api/fb'
 
@@ -181,13 +182,12 @@ export default async function handler(req, res) {
         const [file] = await filesByIds(s, scope, [b.file_id])
         if (!file?.url) return send(res, { ok: false, error: 'vidéo introuvable dans la Banque' })
         if (file.kind !== 'video') return send(res, { ok: false, error: 'un Reel doit être une vidéo' })
-        const caption = String(b.caption ?? '').slice(0, 2200)
         try {
           const start = await graph(`${GRAPH}/${p.page_id}/video_reels?${q({ upload_phase: 'start', access_token: p.access_token })}`, { method: 'POST' })
           const videoId = String(start.video_id || '')
           if (!videoId) throw new Error('Facebook n’a pas ouvert l’envoi')
           await graph(`${RUPLOAD}/${videoId}`, { method: 'POST', headers: { Authorization: `OAuth ${p.access_token}`, file_url: file.url } })
-          await graph(`${GRAPH}/${p.page_id}/video_reels?${q({ upload_phase: 'finish', video_id: videoId, video_state: 'PUBLISHED', description: caption, access_token: p.access_token })}`, { method: 'POST' })
+          await graph(`${GRAPH}/${p.page_id}/video_reels?${q({ upload_phase: 'finish', video_id: videoId, video_state: 'PUBLISHED', access_token: p.access_token })}`, { method: 'POST' })
           await s.from('sf_fb_pages').update({ last_post_at: new Date().toISOString(), last_error: null }).eq('id', p.id)
           return send(res, { ok: true, video_id: videoId })
         } catch (e) {
@@ -203,6 +203,19 @@ export default async function handler(req, res) {
         const ph = reelPhase(j.status)
         if (ph.phase === 'failed') await s.from('sf_fb_pages').update({ last_error: String(ph.error).slice(0, 300) }).eq('id', p.id)
         return send(res, { ok: true, ...ph, link: j.permalink_url ? `https://www.facebook.com${j.permalink_url}` : null })
+      }
+      case 'comment': {
+        if (!canWrite) return send(res, { ok: false, error: 'accès en lecture seule' })
+        const p = await pageRow(b.page)
+        const message = String(b.message ?? '').trim().slice(0, 8000)
+        if (!p || !/^\d{5,25}$/.test(String(b.video_id || '')) || !message) return send(res, { ok: false, error: 'demande invalide' })
+        try {
+          const j = await graph(`${GRAPH}/${b.video_id}/comments?${q({ message, access_token: p.access_token })}`, { method: 'POST' })
+          return send(res, { ok: true, comment_id: j.id ?? null })
+        } catch (e) {
+          const msg = e?.message || String(e)
+          return send(res, { ok: false, error: msg, reconnect: /code (190|200|10)\b|permission/i.test(msg) })
+        }
       }
       default:
         return send(res, { ok: false, error: 'action inconnue' })

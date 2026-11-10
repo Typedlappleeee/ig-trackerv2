@@ -23,8 +23,11 @@ async function call<T>(orgId: string | null, a: string, body: Record<string, unk
 export const listFbPages = (orgId: string | null) => call<{ pages: FbPage[]; configured: boolean }>(orgId, 'pages')
 export const fbConnectUrl = async (orgId: string | null) => (await call<{ url: string }>(orgId, 'start')).url
 export const removeFbPage = (orgId: string | null, page: string) => call<object>(orgId, 'remove', { page })
-export const publishFbReel = async (orgId: string | null, page: string, fileId: string, caption: string) =>
-  (await call<{ video_id: string }>(orgId, 'publish', { page, file_id: fileId, caption })).video_id
+export const publishFbReel = async (orgId: string | null, page: string, fileId: string) =>
+  (await call<{ video_id: string }>(orgId, 'publish', { page, file_id: fileId })).video_id
+// Commentaire automatique sous le Reel (posté au nom de la Page, une fois le Reel en ligne).
+export const commentFbReel = (orgId: string | null, page: string, videoId: string, message: string) =>
+  call<{ comment_id: string | null }>(orgId, 'comment', { page, video_id: videoId, message })
 export const fbReelStatus = (orgId: string | null, page: string, videoId: string) =>
   call<{ phase: 'processing' | 'published' | 'failed'; error: string | null; link: string | null }>(orgId, 'status', { page, video_id: videoId })
 
@@ -36,9 +39,4 @@ export function planFbJobs(pages: string[], files: string[], mode: 'rotate' | 'a
   if (!pages.length || !files.length) return []
   if (mode === 'all') return pages.flatMap(p => files.map(f => ({ page: p, file: f })))
   return pages.map((p, i) => ({ page: p, file: files[i % files.length] }))
-}
-// Légendes : une par ligne, distribuées à tour de rôle ; une seule ligne = la même partout.
-export function captionFor(text: string, i: number): string {
-  const l = text.split('\n').map(s => s.trim()).filter(Boolean)
-  return l.length ? l[i % l.length] : ''
 }

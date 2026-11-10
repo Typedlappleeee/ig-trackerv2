@@ -16,7 +16,7 @@ describe('Facebook (API Meta) — connexion', () => {
     expect(readState('secret', U, 2000)).toBeNull()   // l'ancien « state = id utilisateur » n'est plus accepté
   })
   it('aucun HTML venu de l’adresse', () => { expect(esc('<script>alert(1)</script>"\'&')).toBe('&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39;&amp;') })
-  it('droits demandés : Pages seulement', () => { expect(SCOPES).toEqual(['pages_show_list', 'pages_read_engagement', 'pages_manage_posts']) })
+  it('droits demandés : Pages seulement (publier + commenter)', () => { expect(SCOPES).toEqual(['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'pages_manage_engagement']) })
 })
 describe('Facebook (API Meta) — suivi du Reel', () => {
   it('en cours, publié, refusé', () => {

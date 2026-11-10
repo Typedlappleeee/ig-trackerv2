@@ -18,11 +18,11 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: {
       fr: [
         'Publication › Reels Facebook : connecte tes Pages Facebook, choisis des vidéos de la Banque et publie sur toutes les Pages en même temps, par l’API officielle de Meta.',
-        'Une vidéo différente par Page ou toutes les vidéos sur chaque Page ; légendes distribuées ; suivi en direct et crédits remboursés en cas d’échec.',
+        'Une vidéo différente par Page ou toutes les vidéos sur chaque Page ; commentaire automatique posté sous chaque Reel ; suivi en direct et crédits remboursés en cas d’échec.',
       ],
       en: [
         'Publishing › Facebook Reels: connect your Facebook Pages, pick videos from the Library and publish to every Page at once through Meta’s official API.',
-        'A different video per Page or every video on each Page; captions handed out in turn; live tracking and credits refunded on failure.',
+        'A different video per Page or every video on each Page; an automatic comment posted under each Reel; live tracking and credits refunded on failure.',
       ],
     },
   },
