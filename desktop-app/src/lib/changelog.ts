@@ -14,10 +14,10 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     id: '2026-11-12b',
     date: '2026-11-12',
-    title: { fr: 'Téléchargements au format iPhone', en: 'Downloads in iPhone format' },
+    title: { fr: 'Téléchargements réparés et au format iPhone', en: 'Downloads fixed, in iPhone format' },
     items: {
-      fr: ['Les médias téléchargés depuis la Banque (un par un, dans un dossier ou en ZIP) sont nommés comme sur un iPhone : IMG_4821.MOV, IMG_4822.JPG… avec des numéros qui se suivent.'],
-      en: ['Media downloaded from the Library (one by one, to a folder or as a ZIP) are named like on an iPhone: IMG_4821.MOV, IMG_4822.JPG… with consecutive numbers.'],
+      fr: ['Les médias téléchargés depuis la Banque (un par un, dans un dossier ou en ZIP) sont nommés comme sur un iPhone : IMG_4821.MOV, IMG_4822.JPG… avec des numéros qui se suivent.', 'Gros téléchargements réparés (dossier et ZIP) : un fichier dont la connexion se bloque est relancé tout seul au lieu de geler tout le lot, et un refus passager du stockage est réessayé (jusqu’à 4 fois). Sur Brave, Firefox ou Safari, plus de 10 fichiers partent automatiquement en ZIP.'],
+      en: ['Media downloaded from the Library (one by one, to a folder or as a ZIP) are named like on an iPhone: IMG_4821.MOV, IMG_4822.JPG… with consecutive numbers.', 'Large downloads fixed (folder and ZIP): a file whose connection stalls is restarted on its own instead of freezing the whole batch, and a temporary storage refusal is retried (up to 4 times). On Brave, Firefox or Safari, more than 10 files go into a ZIP automatically.'],
     },
   },
   {

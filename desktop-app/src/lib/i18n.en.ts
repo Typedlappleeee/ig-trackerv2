@@ -3570,6 +3570,7 @@ export const EN: Dict = {
     "Commentaire posté": "Comment posted",
     "vidéo source illisible pour la coupe": "source video unreadable for trimming",
     "coupe de la vidéo impossible": "could not trim the video",
+    "connexion bloquée (plus rien reçu pendant 45 s)": "connection stalled (nothing received for 45s)",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4270,5 +4271,6 @@ export const EN: Dict = {
     ["Vidéo de {0} s : la coupe automatique à 15 s a échoué ({1}).", "{0}s video: automatic trim to 15s failed ({1})."],
     ["≈ 35 % moins cher que Genjutsu · vidéo de {0} s max (plus longue : coupée automatiquement) · même durée que la vidéo · 9:16. Mets une photo de la modèle qui montre ses formes.", "≈ 35% cheaper than Genjutsu · {0}s video max (longer: trimmed automatically) · same duration as the video · 9:16. Use a model photo that shows her figure."],
     ["Coupée à 15 s (vidéo de {0} s)", "Trimmed to 15s ({0}s video)"],
+    ["{0} fichiers : ton navigateur bloque autant de téléchargements séparés, ils partent dans un ZIP.", "{0} files: your browser blocks that many separate downloads, they go into a ZIP."],
   ],
 }

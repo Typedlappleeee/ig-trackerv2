@@ -613,18 +613,47 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // (…storage.supabase.co, recommandé pour les gros fichiers) → deux connexions au lieu d'une.
   // Même lien signé, même service. Si l'hôte direct échoue, on bascule sur l'habituel pour la suite.
   const directOf = (url: string) => /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\//.test(url) ? url.replace(/^https:\/\/([a-z0-9]+)\.supabase\.co\//, 'https://$1.storage.supabase.co/') : null
-  async function fetchMedia(url: string, i: number, s: DlSession, route: { direct: boolean }): Promise<Response> {
+  async function fetchMedia(url: string, i: number, signal: AbortSignal, route: { direct: boolean }): Promise<Response> {
     const direct = directOf(url)
     if (direct && route.direct && i % 2 === 0) {
       try {
-        const r = await fetch(direct, { cache: 'no-store', signal: s.signal })
+        const r = await fetch(direct, { cache: 'no-store', signal })
         if (r.ok && r.body) return r
         route.direct = false
-      } catch (e) { if (s.signal.aborted) throw e; route.direct = false }
+      } catch (e) { if (signal.aborted) throw e; route.direct = false }
     }
-    const r = await fetch(url, { cache: 'no-store', signal: s.signal })
-    if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`)
+    const r = await fetch(url, { cache: 'no-store', signal })
+    if (!r.ok || !r.body) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status })
     return r
+  }
+
+  // Un fichier, RÉSISTANT aux gros lots : jusqu'à 4 essais (le stockage refuse parfois une partie des
+  // requêtes quand on en lance des centaines : 429 / 5xx / coupure), et une connexion qui ne reçoit
+  // plus rien pendant 45 s est coupée puis relancée (avant : elle restait bloquée pour toujours et
+  // le téléchargement ne finissait jamais). `consume` lit le flux (blob ou écriture sur disque).
+  const STALL_MS = 45_000
+  async function grab<T>(url: string, i: number, s: DlSession, route: { direct: boolean }, consume: (body: ReadableStream<Uint8Array>) => Promise<T>): Promise<T> {
+    let last: unknown = null
+    for (let k = 0; k < 4; k++) {
+      if (s.signal.aborted) throw new DOMException('Annulé', 'AbortError')
+      if (k) await new Promise(r => setTimeout(r, 1500 * k + Math.random() * 1000))
+      const ac = new AbortController(), stop = () => ac.abort()
+      s.signal.addEventListener('abort', stop)
+      let stalled = false, timer = setTimeout(() => { stalled = true; ac.abort() }, STALL_MS)
+      const kick = () => { clearTimeout(timer); timer = setTimeout(() => { stalled = true; ac.abort() }, STALL_MS) }
+      try {
+        const resp = await fetchMedia(url, i, ac.signal, route)
+        kick()
+        const body = s.count(resp.body!).pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform(c, ctl) { kick(); ctl.enqueue(c) } }), { signal: ac.signal })
+        return await consume(body)
+      } catch (e) {
+        if (s.signal.aborted) throw e
+        last = stalled ? new Error('connexion bloquée (plus rien reçu pendant 45 s)') : e
+        const st = (e as { status?: number }).status
+        if (st && st < 500 && st !== 408 && st !== 429) break   // lien expiré / fichier absent : inutile de réessayer
+      } finally { clearTimeout(timer); s.signal.removeEventListener('abort', stop) }
+    }
+    throw last
   }
 
   // Parallélisme qui s'ajuste tout seul : 6 au départ ; toutes les 4 s, +4 (jusqu'à 16) tant que
@@ -661,8 +690,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         void (async () => {
           try {
             const url = urlOf(urls, it); if (!url) throw new Error('lien introuvable')
-            const resp = await fetchMedia(url, i, s, route)
-            ready.push({ it, blob: await new Response(s.count(resp.body!)).blob() })
+            ready.push({ it, blob: await grab(url, i, s, route, body => new Response(body).blob()) })
           } catch (e) { if (!s.signal.aborted) onFail(it, e) }
           active--; finished++; ping()
         })()
@@ -711,6 +739,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     const targets = dlChoice; setDlChoice(null)
     if (!targets) return
     try { localStorage.setItem('sf-dl-mode', mode) } catch { /* ignore */ }
+    // Sans choix de dossier (Brave, Firefox, Safari), le navigateur bloque une rafale de fichiers
+    // séparés au-delà de quelques-uns : au-delà de 10, on passe automatiquement en ZIP.
+    if (mode === 'folder' && !canPickDir && targets.length > 10) {
+      setNotice(`${targets.length} fichiers : ton navigateur bloque autant de téléchargements séparés, ils partent dans un ZIP.`)
+      void downloadZipOf(targets); return
+    }
     void (mode === 'zip' ? downloadZipOf(targets) : canPickDir ? downloadToFolder(targets) : downloadSeparate(targets))
   }
 
@@ -751,9 +785,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         let created = false
         try {
           const url = urlOf(urls, it); if (!url) throw new Error('lien introuvable')
-          const resp = await fetchMedia(url, i, s, route)
           const fh = await dir.getFileHandle(name, { create: true }); created = true
-          await s.count(resp.body!).pipeTo(await fh.createWritable(), { signal: s.signal })
+          // chaque essai réécrit le fichier depuis le début (createWritable repart d'un fichier vide)
+          await grab(url, i, s, route, async body => { await body.pipeTo(await fh.createWritable(), { signal: s.signal }) })
           ok++
         } catch (e) {
           if (!s.signal.aborted) { failed.push(it.title || name); why ??= whyFailed(e) }
