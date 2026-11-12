@@ -564,7 +564,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
 
           <Step n={3} title="Le rendu">
             <Row label="Moteur"><Segmented sm value={engine} onChange={setEngine} options={[{ v: 'genjutsu', l: 'Genjutsu' }, { v: 'wan', l: 'WAN 3.0' }]} /></Row>
-            {engine === 'wan' && <span style={{ marginTop: -4, fontSize: 12, color: MUTED }}>{`≈ 35 % moins cher que Genjutsu · vidéo de référence de ${WAN_MAX_S} s maximum · même durée que la vidéo · 9:16. Mets une photo de la modèle qui montre ses formes.`}</span>}
+            {engine === 'wan' && <span style={{ marginTop: -4, fontSize: 12, color: MUTED }}>{`≈ 35 % moins cher que Genjutsu · vidéo de ${WAN_MAX_S} s max (plus longue : coupée automatiquement) · même durée que la vidéo · 9:16. Mets une photo de la modèle qui montre ses formes.`}</span>}
             <Row label="Résolution"><Segmented sm value={res} onChange={setRes} options={engine === 'wan' ? [{ v: '480p', l: '480p' }, { v: '720p', l: '720p' }] : [{ v: '480p', l: '480p' }, { v: '720p', l: '720p' }, { v: '1080p', l: '1080p' }]} /></Row>
             <Row label="Prompt">
               <select value={mode} onChange={e => { const v = e.target.value; if (v === 'custom' && mode !== 'custom') setCustom(prompt); setMode(v) }} style={{ ...sel, maxWidth: 240 }}>
@@ -789,6 +789,7 @@ function JobCard({ job: j, now, onRespoof }: { job: GjJob; now: number; onRespoo
         {done && <span style={{ fontSize: 11.5, fontWeight: 600, color: j.spoofError ? WARN : st.color }} title={j.spoofError ?? j.spoof?.folder}>
           {j.spoofError ? (j.spoof?.count ? `${j.spoofDone ?? 0}/${j.spoof.count} versions · ${j.spoofError}` : j.spoofError) : st.text}
         </span>}
+        {j.trimmedFrom != null && <span style={{ fontSize: 11, color: MUTED }}>{`Coupée à 15 s (vidéo de ${Math.round(j.trimmedFrom)} s)`}</span>}
         {j.credits != null && <span style={{ fontSize: 11, color: WARN }} title="Crédits Higgsfield utilisés (solde avant / après le lancement)">{`− ${j.credits.toLocaleString('fr-FR')} crédits`}</span>}
         {done && j.spoof?.folder && <span data-no-tr title={j.spoof.folder} style={{ marginTop: -3, fontSize: 11, color: DIM, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{`📁 ${crumbs(j.spoof.folder)}`}</span>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

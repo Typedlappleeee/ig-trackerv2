@@ -11,6 +11,7 @@
 import { supabase } from './supabase'
 import { IS_WEB } from './platform'
 import { saveOutputToBank } from './studioTools'
+import { runFfmpeg } from './ffmpeg'
 
 export const GJ_ORIGIN = IS_WEB && typeof window !== 'undefined' && /^https?:/.test(window.location.origin) ? window.location.origin : 'https://scaleflow.company'
 const RELAY = `${GJ_ORIGIN}/api/hf`
@@ -304,6 +305,46 @@ export function buildDuoPrompt(o: Omit<PromptOpts, 'several' | 'who'>): string {
 export type GjEngine = 'genjutsu' | 'wan'
 export const ENGINE_LABEL: Record<GjEngine, string> = { genjutsu: 'Genjutsu', wan: 'WAN 3.0' }
 export const WAN_MAX_S = 15
+export const WAN_CUT_S = 14.8            // coupe automatique : un peu sous la limite (marge d'une image)
+
+// Vidéo trop longue pour WAN 3.0 : on garde les 14,8 premières secondes (copie sans ré-encodage,
+// ré-encodage en secours), déposée dans le stockage du relais. Une coupe par vidéo source (mémorisée).
+const TRIM_KEY = 'sf-gj-trims'
+let trimsCache: Record<string, string> | null = null
+const trimsMap = () => (trimsCache ??= readJson<Record<string, string>>(TRIM_KEY, {}))
+const trimming = new Map<string, Promise<string>>()
+async function sourceBytes(url: string): Promise<Uint8Array> {
+  try {
+    const r = await fetch(url)
+    if (r.ok) return new Uint8Array(await r.arrayBuffer())
+  } catch { /* lien Instagram bloqué par le navigateur : copie par le relais */ }
+  const kept = (await relay<{ url?: string }>({ a: 'video_garder', url })).url
+  if (!kept) throw new Error('vidéo source illisible pour la coupe')
+  const r = await fetch(kept)
+  if (!r.ok) throw new Error(`vidéo source illisible pour la coupe (HTTP ${r.status})`)
+  return new Uint8Array(await r.arrayBuffer())
+}
+export function trimForWan(url: string): Promise<string> {
+  const known = trimsMap()[url]
+  if (known) return Promise.resolve(known)
+  let p = trimming.get(url)
+  if (!p) {
+    p = (async () => {
+      const input = await sourceBytes(url)
+      const base = ['-t', String(WAN_CUT_S), '-map', '0:v:0', '-map', '0:a:0?']
+      let out: Uint8Array
+      try { out = await runFfmpeg({ input, inputName: 'src.mp4', args: [...base, '-c', 'copy', '-avoid_negative_ts', 'make_zero', '-movflags', '+faststart'], outName: 'cut.mp4' }) }
+      catch { out = await runFfmpeg({ input, inputName: 'src.mp4', args: [...base, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart'], outName: 'cut.mp4' }) }
+      if (!out.byteLength) throw new Error('coupe de la vidéo impossible')
+      const cut = await uploadLocalVideo(new File([out as BlobPart], 'wan-15s.mp4', { type: 'video/mp4' }))
+      const t = trimsMap(); t[url] = cut
+      writeJson(TRIM_KEY, Object.fromEntries(Object.entries(t).slice(-200)))
+      return cut
+    })().finally(() => trimming.delete(url))
+    trimming.set(url, p)
+  }
+  return p
+}
 export interface WanPromptOpts { duo: boolean; keepText: boolean; outfit: string; modelOutfit?: boolean }
 const WAN_COMMON = (both: boolean) => [
   `Realism: the result must look like real smartphone footage, indistinguishable from the original video. Natural skin texture with visible pores, fine lines and subtle imperfections, no beauty filter, no airbrushed or plastic look. Realistic eyes with natural reflections and moisture, individual hair strands reacting naturally to movement and light.`,
@@ -547,6 +588,7 @@ export interface GjJob {
   model2?: GjModelRef | null      // duo : la 2e fille (à droite)
   credits?: number | null         // crédits réellement utilisés (solde avant / après)
   seconds?: number | null         // durée de la vidéo source
+  trimmedFrom?: number | null     // WAN : durée d'origine quand la vidéo a été coupée à 15 s
   status: GjStatus
   sent?: boolean                 // generate_video envoyé (même sans réponse) → jamais relancé tout seul
   hfJobId?: string | null
@@ -679,8 +721,14 @@ async function launch(id: string): Promise<void> {
     // WAN 3.0 : vidéo de référence de 15 s maximum, rendu de la même durée
     let secs = j0.seconds ?? 0
     if (!secs) { secs = await videoSeconds(src.url); if (secs) patch(id, { seconds: Math.round(secs * 10) / 10 }) }
-    if (wan && secs > WAN_MAX_S + 0.5) { patch(id, { status: 'failed', error: `Vidéo de ${Math.round(secs)} s : WAN 3.0 prend 15 s maximum. Coupe-la (Studio › Montage) puis relance.` }); return }
-    const vid = await patient(() => importVideo(j0.account, src.url))
+    // plus longue que 15 s : coupée automatiquement (les 14,8 premières secondes)
+    let refUrl = src.url
+    if (wan && secs > WAN_MAX_S) {
+      try { refUrl = await trimForWan(src.url) } catch (e) { patch(id, { status: 'failed', error: `Vidéo de ${Math.round(secs)} s : la coupe automatique à 15 s a échoué (${errMsg(e)}).` }); return }
+      patch(id, { trimmedFrom: Math.round(secs * 10) / 10 })
+      secs = WAN_CUT_S
+    }
+    const vid = await patient(() => importVideo(j0.account, refUrl))
     const imgId = await patient(() => refFor(j0.account, j0.model))
     const img2 = j0.model2 ? await patient(() => refFor(j0.account, j0.model2!)) : null
     const medias = [{ value: vid, role: 'video_references' }, { value: imgId, role: 'image_references' }, ...(img2 ? [{ value: img2, role: 'image_references' }] : [])]

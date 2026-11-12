@@ -3568,6 +3568,8 @@ export const EN: Dict = {
     "Posté sous chaque Reel, au nom de la Page, dès qu’il est en ligne.": "Posted under each Reel, as the Page, as soon as it is live.",
     "Ton message sous le post (lien, appel à l’action…)": "Your message under the post (link, call to action…)",
     "Commentaire posté": "Comment posted",
+    "vidéo source illisible pour la coupe": "source video unreadable for trimming",
+    "coupe de la vidéo impossible": "could not trim the video",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4229,7 +4231,6 @@ export const EN: Dict = {
     ["{0} {1} duo ajouté{2} à la file", "{0} {1} duo{2} added to the queue"],
     ["{0} {1} ajouté{2} à la file", "{0} {1} added to the queue"],
     ["{0} choisies : garde-en 2", "{0} selected: keep 2"],
-    ["≈ 35 % moins cher que Genjutsu · vidéo de référence de {0} s maximum · même durée que la vidéo · 9:16. Mets une photo de la modèle qui montre ses formes.", "≈ 35% cheaper than Genjutsu · reference video {0}s max · same duration as the video · 9:16. Use a model photo that shows her figure."],
     ["Lancer {0} {1}{2} · ≈ {3} crédits", "Launch {0} {1}{2} · ≈ {3} credits"],
     ["{0} vidéo{1} × {2} · {3} · {4} à la fois sur le compte", "{0} video{1} × {2} · {3} · {4} at once on the account"],
     ["{0} modèle{1}", "{0} model{1}"],
@@ -4265,5 +4266,9 @@ export const EN: Dict = {
     ["Vidéos{0}", "Videos{0}"],
     ["{0} publié{1}{2}", "{0} published{2}"],
     ["Commentaire non posté : {0}", "Comment not posted: {0}"],
+    ["vidéo source illisible pour la coupe (HTTP {0})", "source video unreadable for trimming (HTTP {0})"],
+    ["Vidéo de {0} s : la coupe automatique à 15 s a échoué ({1}).", "{0}s video: automatic trim to 15s failed ({1})."],
+    ["≈ 35 % moins cher que Genjutsu · vidéo de {0} s max (plus longue : coupée automatiquement) · même durée que la vidéo · 9:16. Mets une photo de la modèle qui montre ses formes.", "≈ 35% cheaper than Genjutsu · {0}s video max (longer: trimmed automatically) · same duration as the video · 9:16. Use a model photo that shows her figure."],
+    ["Coupée à 15 s (vidéo de {0} s)", "Trimmed to 15s ({0}s video)"],
   ],
 }

@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-12',
+    date: '2026-11-12',
+    title: { fr: 'WAN 3.0 : vidéos de plus de 15 s coupées automatiquement', en: 'WAN 3.0: videos over 15s trimmed automatically' },
+    items: {
+      fr: ['Une vidéo de référence de plus de 15 s n’est plus refusée : ScaleFlow garde ses 15 premières secondes et lance la génération. La carte du résultat indique « Coupée à 15 s ».'],
+      en: ['A reference video longer than 15s is no longer rejected: ScaleFlow keeps its first 15 seconds and starts the generation. The result card shows “Trimmed to 15s”.'],
+    },
+  },
+  {
     id: '2026-11-10b',
     date: '2026-11-10',
     title: { fr: 'Reels Facebook sur tes Pages, sans téléphone', en: 'Facebook Reels on your Pages, no phone needed' },
