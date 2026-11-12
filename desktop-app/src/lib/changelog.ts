@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-12b',
+    date: '2026-11-12',
+    title: { fr: 'Téléchargements au format iPhone', en: 'Downloads in iPhone format' },
+    items: {
+      fr: ['Les médias téléchargés depuis la Banque (un par un, dans un dossier ou en ZIP) sont nommés comme sur un iPhone : IMG_4821.MOV, IMG_4822.JPG… avec des numéros qui se suivent.'],
+      en: ['Media downloaded from the Library (one by one, to a folder or as a ZIP) are named like on an iPhone: IMG_4821.MOV, IMG_4822.JPG… with consecutive numbers.'],
+    },
+  },
+  {
     id: '2026-11-12',
     date: '2026-11-12',
     title: { fr: 'WAN 3.0 : vidéos de plus de 15 s coupées automatiquement', en: 'WAN 3.0: videos over 15s trimmed automatically' },

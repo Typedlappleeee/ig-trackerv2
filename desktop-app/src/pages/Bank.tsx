@@ -546,7 +546,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [deleting, setDeleting] = useState(false)
   // ── Téléchargements ──────────────────────────────────────────────────────────
   // 1 média → fichier direct ; plusieurs → au choix un ZIP ou des fichiers séparés dans un dossier.
-  // Les VIDÉOS sortent en .mov (les images gardent leur extension réelle).
+  // Noms au format iPhone : vidéos IMG_XXXX.MOV, images IMG_XXXX.JPG (voir fileNameFor).
   // Liens DÉDIÉS (jeton neuf, comme avant le 17 oct.) et fetch sans cache : un téléchargement ne
   // dépend jamais du lien partagé avec la lecture des vidéos ni de ce que le lecteur a chargé.
   async function downloadUrls(targets: ContentItem[]): Promise<Map<string, string>> {
@@ -560,14 +560,24 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   }
   const urlOf = (urls: Map<string, string>, it: ContentItem) => (it.storage_path && urls.get(it.storage_path)) || it.file_url || null
   const whyFailed = (e: unknown) => e instanceof TypeError ? 'connexion interrompue' : e instanceof Error ? e.message : String(e)
-  // Nom de fichier : vidéos → .mov, images → extension réelle. `taken` évite les doublons.
+  // Nom de fichier au format iPhone : IMG_4821.MOV, IMG_4822.JPG… (numéros qui se suivent, départ au
+  // hasard, comme une pellicule). Vidéos → .MOV, images → leur extension (JPG/PNG), sons → leur titre.
+  // `taken` = un téléchargement : la numérotation continue d'un fichier à l'autre, sans doublon.
+  const rollOf = new WeakMap<Set<string>, number>()
   function fileNameFor(it: ContentItem, taken: Set<string>): string {
     const k = inferType(it)
     const realExt = extOfPath(it.storage_path ?? it.file_url ?? '') || (k === 'image' ? 'jpg' : k === 'audio' ? 'mp3' : 'mp4')
-    const ext = k === 'video' ? 'mov' : realExt
-    const base = (it.title || 'media').replace(/[^\w.-]+/g, '_')
-    let name = `${base}.${ext}`; let n = 2
-    while (taken.has(name)) name = `${base}_${n++}.${ext}`
+    if (k === 'audio') {
+      const base = (it.title || 'son').replace(/[^\w.-]+/g, '_')
+      let name = `${base}.${realExt}`; let n = 2
+      while (taken.has(name)) name = `${base}_${n++}.${realExt}`
+      taken.add(name); return name
+    }
+    const ext = (k === 'video' ? 'mov' : realExt === 'jpeg' || realExt === 'heic' || realExt === 'heif' ? 'jpg' : realExt).toUpperCase()
+    let no = rollOf.get(taken) ?? (1000 + Math.floor(Math.random() * 7000))
+    let name = `IMG_${String(no).padStart(4, '0')}.${ext}`
+    while (taken.has(name)) { no = no >= 9999 ? 1 : no + 1; name = `IMG_${String(no).padStart(4, '0')}.${ext}` }
+    rollOf.set(taken, no >= 9999 ? 1 : no + 1)
     taken.add(name); return name
   }
 
