@@ -2,6 +2,34 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
 import { parseLinks, buildPrompt, isDirectVideo, buildWanPrompt, buildDuoPrompt, pickWanId, estimateCredits } from './genjutsuHF'
 
+// prompt WAN par défaut de l'équipe (réglages par défaut : textes gardés, tenue de la vidéo)
+const WAN_DEFAULT = `Perform a photorealistic, full-body character replacement in <<<video_1>>>.
+
+Replace ONLY the adult woman with the character from <<<image_1>>>, matching her exact facial identity, hair, skin tone, body shape, height and proportions. This is a complete character replacement, not a face swap.
+
+SOURCE PRIORITY:
+- IMAGE = character identity and physical anatomy ONLY.
+- VIDEO = everything else, reproduced frame by frame.
+
+STRICT VIDEO FIDELITY:
+Preserve the original woman's exact poses, movements, gestures, hand positions, facial expressions, blinks, lip sync, head rotations, body orientation, motion speed and timing.
+
+Match every camera angle precisely. Front remains front, profile remains profile, back remains back. Never reveal a face when the original shows only the back.
+
+CLOTHING AND EXPOSURE:
+Copy the original woman's clothing state EXACTLY at every frame. If clothed, preserve the identical outfit, fabric, fit and coverage, adapted to the new body. If partially nude or nude, preserve precisely the original level of exposure. Never add, remove, invent or modify clothing or body coverage. Ignore all clothing from <<<image_1>>>.
+
+UNCHANGED ELEMENTS:
+Preserve all other people, background, objects, camera movement, framing, lighting, shadows, colors, original audio and timing.
+
+Preserve every caption character for character, with identical typography, position and timing. Remove only watermarks and logos.
+
+VISUAL QUALITY:
+Authentic smartphone footage, natural skin pores, realistic anatomy, seamless lighting, original grain and color grading. No added tattoos.
+
+ABSOLUTE CONSTRAINT:
+Change ONLY the woman's physical identity. Preserve everything else exactly as recorded. No reinterpretation, no invented details, no temporal inconsistencies.`
+
 describe('Genjutsu — liens collés', () => {
   it('garde les reels Instagram (normalisés, sans doublon) et les fichiers vidéo', () => {
     const l = parseLinks(`https://www.instagram.com/reel/AbC_1-2/?igsh=xyz
@@ -52,13 +80,16 @@ describe('Genjutsu — prompt automatique', () => {
 
 describe('WAN 3.0 + duo', () => {
   it('prompt universel : garde la tenue de la vidéo, image_1 = corps entier', () => {
-    const p = buildWanPrompt({ duo: false, keepText: false, outfit: '' })
-    expect(p.startsWith('Video edit of <<<video_1>>>.')).toBe(true)
-    expect(p).toContain('<<<image_1>>> defines the character\'s full body')
-    expect(p).toContain('she wears exactly the same outfit as the original woman in <<<video_1>>>')
-    expect(p).toContain('Clean frame: remove all captions')
-    expect(p).toContain('Audio: keep the original audio track.')
+    const p = buildWanPrompt({ duo: false, keepText: true, outfit: '' })
+    expect(p).toBe(WAN_DEFAULT)
     expect(p).not.toContain('<<<image_2>>>')
+    const clean = buildWanPrompt({ duo: false, keepText: false, outfit: '' })
+    expect(clean).toContain('Remove all captions')
+    expect(clean).not.toContain('Preserve every caption')
+    const own = buildWanPrompt({ duo: false, keepText: true, outfit: 'a red bikini' })
+    expect(own).toContain('She wears a red bikini')
+    expect(own).not.toContain('CLOTHING AND EXPOSURE')
+    expect(own).toContain("physical identity and her outfit")
   })
   it('prompt duo : gauche = image_1, droite = image_2', () => {
     const p = buildWanPrompt({ duo: true, keepText: true, outfit: 'a red bikini' })

@@ -362,18 +362,31 @@ export function buildWanPrompt(o: WanPromptOpts): string {
   const clean = o.keepText
     ? 'On-screen text: keep the captions and on-screen texts of <<<video_1>>> exactly as they are; remove only watermarks and logos.'
     : 'Clean frame: remove all captions, subtitles, on-screen text, watermarks, logos and stickers, and restore the underlying background.'
-  if (!o.duo) return [
-    'Video edit of <<<video_1>>>.',
-    `Reference roles (strict):\n- <<<image_1>>> defines the character's full body: face, hair, body shape, body proportions, height, build, curves and skin tone. Her entire body must match <<<image_1>>>, not the original woman's body.\n- <<<video_1>>> defines ${o.modelOutfit || outfit ? 'everything else' : 'the outfit and everything else'}: ${o.modelOutfit || outfit ? '' : 'clothing, accessories, '}pose, movements, background, other people, camera motion, framing, lighting and timing.`,
-    'Subject replacement: this is a full-body character replacement, not a face swap. Modify only the adult female character; all other people in the video remain completely unchanged. Replace the original woman entirely with the character from <<<image_1>>>, with exact identity and body consistency in every frame and from every angle.',
-    o.modelOutfit ? 'Outfit: she wears exactly the same outfit as in <<<image_1>>> (same garments, colors, cut, fabric and details), not the outfit of the original woman in <<<video_1>>>.'
-      : outfit ? `Outfit: she wears ${outfit}, fitted naturally to her body from <<<image_1>>>. Do not copy the original woman's clothing from <<<video_1>>> nor any clothing from <<<image_1>>>.`
-      : 'Outfit: she wears exactly the same outfit as the original woman in <<<video_1>>> (same garments, colors, cut, fabric and details), refitted naturally to her new body from <<<image_1>>>. Do not copy any clothing from <<<image_1>>>.',
-    'Motion: her new body performs exactly the same pose, movements, gestures and timing as the original woman in <<<video_1>>>. Retain the original head movements, facial expressions, eye blinks, micro-expressions and lip sync.',
-    'Viewing angle: follow the original orientation of her head and body in every frame. When she is seen from behind, show her hair and her body from behind, matching <<<image_1>>>. Never turn her toward the camera, never reveal or invent a face when it is not visible in <<<video_1>>>. In profile or three-quarter views, show only the parts of the face visible in the original.',
-    'Preservation: keep everything else identical to <<<video_1>>>: background, other people, camera motion, framing, lighting and timing.',
-    ...WAN_COMMON(false), clean, 'Audio: keep the original audio track.',
-  ].join('\n\n')
+  // Solo : prompt par défaut de l'équipe, mot pour mot avec les réglages par défaut (textes gardés,
+  // tenue de la vidéo). Les options « tenue » et « retirer les textes » ne changent que leur paragraphe.
+  if (!o.duo) {
+    const own = !!(o.modelOutfit || outfit)
+    const clothing = o.modelOutfit
+      ? 'CLOTHING:\nShe wears exactly the same outfit as in <<<image_1>>> (same garments, colors, cut, fabric and details), fitted naturally to her body, not the outfit of the original woman in <<<video_1>>>. Never add, remove or invent any other clothing.'
+      : outfit
+        ? `CLOTHING:\nShe wears ${outfit}, fitted naturally to her body from <<<image_1>>>, at every frame. Do not copy the original woman's clothing from <<<video_1>>> nor any clothing from <<<image_1>>>. Never add, remove or invent any other clothing.`
+        : "CLOTHING AND EXPOSURE:\nCopy the original woman's clothing state EXACTLY at every frame. If clothed, preserve the identical outfit, fabric, fit and coverage, adapted to the new body. If partially nude or nude, preserve precisely the original level of exposure. Never add, remove, invent or modify clothing or body coverage. Ignore all clothing from <<<image_1>>>."
+    const captions = o.keepText
+      ? 'Preserve every caption character for character, with identical typography, position and timing. Remove only watermarks and logos.'
+      : 'Remove all captions, subtitles, on-screen text, watermarks, logos and stickers, and restore the underlying background.'
+    return [
+      'Perform a photorealistic, full-body character replacement in <<<video_1>>>.',
+      `Replace ONLY the adult woman with the character from <<<image_1>>>, matching her exact facial identity, hair, skin tone, body shape, height and proportions. This is a complete character replacement, not a face swap.`,
+      `SOURCE PRIORITY:\n- IMAGE = character identity and physical anatomy${o.modelOutfit ? ', plus her outfit' : ''} ONLY.\n- VIDEO = everything else${outfit && !o.modelOutfit ? ' (except the outfit)' : ''}, reproduced frame by frame.`,
+      "STRICT VIDEO FIDELITY:\nPreserve the original woman's exact poses, movements, gestures, hand positions, facial expressions, blinks, lip sync, head rotations, body orientation, motion speed and timing.",
+      'Match every camera angle precisely. Front remains front, profile remains profile, back remains back. Never reveal a face when the original shows only the back.',
+      clothing,
+      'UNCHANGED ELEMENTS:\nPreserve all other people, background, objects, camera movement, framing, lighting, shadows, colors, original audio and timing.',
+      captions,
+      'VISUAL QUALITY:\nAuthentic smartphone footage, natural skin pores, realistic anatomy, seamless lighting, original grain and color grading. No added tattoos.',
+      `ABSOLUTE CONSTRAINT:\nChange ONLY the woman's physical identity${own ? ' and her outfit' : ''}. Preserve everything else exactly as recorded. No reinterpretation, no invented details, no temporal inconsistencies.`,
+    ].join('\n\n')
+  }
   return [
     'Video edit of <<<video_1>>>.',
     `Reference roles (strict):\n- <<<image_1>>> defines the full body of the woman on the left: face, hair, body shape, body proportions, height, build, curves and skin tone.\n- <<<image_2>>> defines the full body of the woman on the right: face, hair, body shape, body proportions, height, build, curves and skin tone.\n- <<<video_1>>> defines ${o.modelOutfit || outfit ? 'everything else' : 'the outfits and everything else'}: ${o.modelOutfit || outfit ? '' : 'clothing, accessories, '}poses, movements, interactions, background, other people, camera motion, framing, lighting and timing.`,

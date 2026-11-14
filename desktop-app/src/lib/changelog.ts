@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-14b',
+    date: '2026-11-14',
+    title: { fr: 'WAN 3.0 : nouveau prompt par défaut', en: 'WAN 3.0: new default prompt' },
+    items: {
+      fr: ['Le prompt automatique de WAN 3.0 (une modèle) est celui de l’équipe : remplacement complet du personnage, fidélité stricte à la vidéo (gestes, angles, tenue et niveau de couverture), textes de la vidéo gardés, seuls les filigranes et logos retirés. « Garder les textes écrits de la vidéo » est maintenant coché par défaut.'],
+      en: ['The automatic WAN 3.0 prompt (one model) is now the team’s: full character replacement, strict fidelity to the video (gestures, angles, outfit and level of coverage), on-screen texts kept, only watermarks and logos removed. “Keep the on-screen texts” is now ticked by default.'],
+    },
+  },
+  {
     id: '2026-11-14',
     date: '2026-11-14',
     title: { fr: 'Genjutsu : même rangement des modèles pour toute l’agence', en: 'Genjutsu: same model layout for the whole agency' },

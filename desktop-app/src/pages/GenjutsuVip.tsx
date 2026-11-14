@@ -225,7 +225,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [engine, setEngineState] = useState<GjEngine>(() => readJson<GjEngine>('sf-gj-engine2', 'wan'))
   const setEngine = (e: GjEngine) => { setEngineState(e); writeJson('sf-gj-engine2', e); if (e === 'wan' && res === '1080p') setRes('480p') }
   const [duo, setDuo] = useState(false)          // 2 filles : modèle 1 = à gauche, modèle 2 = à droite
-  const [popts, setPopts] = useState<PromptOpts>({ several: false, who: '', keepText: false, outfit: '' })
+  const [popts, setPopts] = useState<PromptOpts>({ several: false, who: '', keepText: true, outfit: '' })
   const [outfitOn, setOutfitOn] = useState(false)
   const [modelOutfit, setModelOutfit] = useState(false)
   const [presets, setPresets] = useState<Record<string, string>>({})
