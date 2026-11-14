@@ -4272,5 +4272,6 @@ export const EN: Dict = {
     ["≈ 35 % moins cher que Genjutsu · vidéo de {0} s max (plus longue : coupée automatiquement) · même durée que la vidéo · 9:16. Mets une photo de la modèle qui montre ses formes.", "≈ 35% cheaper than Genjutsu · {0}s video max (longer: trimmed automatically) · same duration as the video · 9:16. Use a model photo that shows her figure."],
     ["Coupée à 15 s (vidéo de {0} s)", "Trimmed to 15s ({0}s video)"],
     ["{0} fichiers : ton navigateur bloque autant de téléchargements séparés, ils partent dans un ZIP.", "{0} files: your browser blocks that many separate downloads, they go into a ZIP."],
+    ["Rangement non partagé : {0}", "Layout not shared: {0}"],
   ],
 }

@@ -17,8 +17,9 @@ import { hfBridge, listLocal, addLocal, reconnectLocal, checkLocal, removeLocal,
 import { IS_WEB } from '@/lib/platform'
 import { SPOOF_DEVICES, GPS_CITIES } from '@/lib/studioTools'
 import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setModelFolder, type BankScope } from '@/lib/bankFolders'
+import { loadGjLayout, mergeLayout, pushGjLayout, saveGjGroup, hideGjModel } from '@/lib/gjLayout'
 import {
-  MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, deleteModel, uploadLocalVideo, hiddenModels, readPromptPresets,
+  MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, deleteModel, uploadLocalVideo, hiddenModels, addHiddenModels, readPromptPresets,
   startAccountLogin, finishAccountLogin, removeAccount, needsReconnect,
   buildPrompt, buildDuoPrompt, buildWanPrompt, ENGINE_LABEL, WAN_MAX_S, estimateCredits, type GjEngine, parseLinks, resolveVideo, cachedSource, isInstagram, enqueue, retryJob, removeJob, clearFinished, respoof,
   getJobs, subscribeJobs, isActive, pump, type HfAccount, type HfModel, type PromptOpts, type GjJob, type SpoofPlan,
@@ -136,8 +137,14 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   // dossier en « aléatoire » : chaque vidéo prend une tenue au hasard dans le dossier
   const [randomGroups, setRandomGroups] = useState<string[]>([])
   // rangement à la main (glisser une modèle sur un dossier / une autre modèle) : gardé sur ce navigateur
+  // rangement PARTAGÉ dans l'espace (agence) dès que la table genjutsu_model_layout existe ; sinon gardé sur ce navigateur
   const [manual, setManualState] = useState<Record<string, string>>(() => readJson('sf-gj-groups', {}))
-  const moveTo = (id: string, group: string) => setManualState(g => { const n = { ...g, [id]: group }; writeJson('sf-gj-groups', n); return n })
+  const sharedRef = useRef<BankScope | null>(null)
+  const moveTo = (id: string, group: string) => {
+    setManualState(g => { const n = { ...g, [id]: group }; if (!sharedRef.current) writeJson('sf-gj-groups', n); return n })
+    const sc = sharedRef.current
+    if (sc) void saveGjGroup(sc, id, group).catch(e => toast(`Rangement non partagé : ${e instanceof Error ? e.message : String(e)}`, 'bad'))
+  }
   const [dragOver, setDragOver] = useState<string | null>(null)
   const autoGroup = (name: string) => name.replace(/[\s_.-]*\d+$/, '').trim() || name
   const groups = useMemo(() => {
@@ -238,6 +245,39 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [modelFolders, setModelFolders] = useState<Record<string, string>>({})
   const [folderPickFor, setFolderPickFor] = useState<HfModel | null>(null)
   useEffect(() => { if (access === 'ok') void loadModelFolders(scope).then(setModelFolders).catch(() => undefined) }, [access, scope])
+  // rangement des modèles : lu dans l'espace au départ, puis toutes les minutes et au retour sur l'onglet
+  // (le rangement fait sur ce navigateur avant le partage est envoyé une fois à l'espace)
+  useEffect(() => {
+    if (access !== 'ok') return
+    let alive = true, first = true
+    const sync = async () => {
+      try {
+        const remote = await loadGjLayout(scope)
+        if (!alive) return
+        if (!remote) { sharedRef.current = null; return }
+        let layout = remote
+        if (first && !readJson('sf-gj-groups-shared', false)) {
+          const m = mergeLayout(remote, { groups: readJson<Record<string, string>>('sf-gj-groups', {}), hidden: hiddenModels() })
+          layout = m.merged
+          if (m.push.length) await pushGjLayout(scope, m.push)
+          writeJson('sf-gj-groups-shared', true)
+        }
+        first = false
+        sharedRef.current = scope
+        setManualState(layout.groups)
+        if (layout.hidden.length) {
+          addHiddenModels(layout.hidden)
+          const h = new Set(layout.hidden)
+          setModels(l => l && l.some(x => h.has(x.id)) ? l.filter(x => !h.has(x.id)) : l)
+        }
+      } catch { /* hors ligne : on garde le rangement affiché */ }
+    }
+    void sync()
+    const t = setInterval(() => { if (document.visibilityState === 'visible') void sync() }, 60000)
+    const onFocus = () => void sync()
+    addEventListener('focus', onFocus)
+    return () => { alive = false; sharedRef.current = null; clearInterval(t); removeEventListener('focus', onFocus) }
+  }, [access, scope])
   // UN dossier de la Banque par DOSSIER de modèles (Zoe › toutes ses tenues → « Genjutsu › Zoe »)
   const groupRef = (m: { id: string; name: string }) => {
     const g0 = manual[m.id] ?? autoGroup(m.name), g = g0.startsWith('__solo:') ? m.name : g0
@@ -503,6 +543,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
                         e.stopPropagation()
                         if (!await confirmDialog({ title: `Supprimer « ${m.name} » ?`, text: 'Elle disparaît de la liste des modèles. Les vidéos déjà faites restent dans la Banque.', confirmLabel: 'Supprimer', danger: true })) return
                         const r = await deleteModel(refAccount, m.id)
+                        if (sharedRef.current) void hideGjModel(sharedRef.current, m.id).catch(() => undefined)
                         setModels(l => (l ?? []).filter(x => x.id !== m.id)); setPicked(picked.filter(x => x !== m.id))
                         toast(r === 'deleted' ? `« ${m.name} » supprimée` : `« ${m.name} » masquée dans ScaleFlow`, 'ok')
                       }}

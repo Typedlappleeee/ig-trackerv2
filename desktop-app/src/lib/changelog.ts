@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-14',
+    date: '2026-11-14',
+    title: { fr: 'Genjutsu : même rangement des modèles pour toute l’agence', en: 'Genjutsu: same model layout for the whole agency' },
+    items: {
+      fr: ['Les mini-dossiers de modèles (« Kenza · 5 »…) et les modèles masquées sont maintenant partagés dans l’espace : tous les membres de l’agence voient le même rangement, mis à jour toutes les minutes. Le rangement déjà fait sur un ordinateur est envoyé à l’espace à la première ouverture.', 'Les liens Instagram collés sans « https:// » (instagram.com/reel/…, www.instagram.com/…, instagr.am/…) sont acceptés.'],
+      en: ['Model folders (“Kenza · 5”…) and hidden models are now shared in the workspace: every member of the agency sees the same layout, refreshed every minute. A layout already made on a computer is sent to the workspace the first time it opens.', 'Instagram links pasted without “https://” (instagram.com/reel/…, www.instagram.com/…, instagr.am/…) are accepted.'],
+    },
+  },
+  {
     id: '2026-11-12b',
     date: '2026-11-12',
     title: { fr: 'Téléchargements réparés et au format iPhone', en: 'Downloads fixed, in iPhone format' },

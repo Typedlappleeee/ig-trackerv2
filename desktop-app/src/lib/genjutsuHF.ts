@@ -246,6 +246,8 @@ const toBase64 = (b: Blob) => new Promise<string>((ok, ko) => {
 // sinon elle est masquée dans ScaleFlow (sur ce navigateur). Rend 'deleted' | 'hidden'.
 const HIDDEN_KEY = 'sf-gj-hidden'
 export const hiddenModels = (): string[] => readJson<string[]>(HIDDEN_KEY, [])
+/** Modèles masquées par l'espace (rangement partagé) : recopiées ici pour que la liste les écarte. */
+export const addHiddenModels = (ids: string[]) => writeJson(HIDDEN_KEY, [...new Set([...hiddenModels(), ...ids])])
 export async function deleteModel(account: string, id: string): Promise<'deleted' | 'hidden'> {
   try {
     const r = await tool<Any>(account, 'show_reference_elements', { action: 'delete', id })
@@ -458,9 +460,13 @@ const writeJson = (k: string, v: unknown) => { try { localStorage.setItem(k, JSO
 // Liens collés (un par ligne, ou mélangés à du texte) → liens uniques, Instagram normalisés.
 export function parseLinks(text: string): string[] {
   const out: string[] = []
-  for (const raw of text.match(/https?:\/\/[^\s<>"')]+/gi) ?? []) {
+  // « instagram.com/reel/… », « www.instagram.com/… » ou « instagr.am/… » collés sans « https:// » comptent aussi
+  const found = text.match(/(?:https?:\/\/)?(?:[\w-]+\.)*(?:instagram\.com|instagr\.am)\/[^\s<>"')]+|https?:\/\/[^\s<>"')]+/gi) ?? []
+  for (const hit of found) {
+    const raw = /^https?:\/\//i.test(hit) ? hit : `https://${hit}`
     let u: URL
     try { u = new URL(raw) } catch { continue }
+    if (/(^|\.)instagr\.am$/i.test(u.hostname)) u = new URL(`https://www.instagram.com${u.pathname}`)
     let link = u.toString()
     if (/(^|\.)instagram\.com$/i.test(u.hostname)) {
       const code = u.pathname.match(/\/(?:reel|reels|p|tv)\/([\w-]+)/i)?.[1]

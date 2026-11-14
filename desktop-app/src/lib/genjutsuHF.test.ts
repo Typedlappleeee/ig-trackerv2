@@ -16,6 +16,20 @@ describe('Genjutsu — liens collés', () => {
     expect(isDirectVideo('https://cdn.exemple.com/v/clip.mp4?sig=1')).toBe(true)
     expect(isDirectVideo('https://exemple.com/page')).toBe(false)
   })
+  it('accepte les liens Instagram collés sans « https:// »', () => {
+    expect(parseLinks(`instagram.com/reel/AAA111/
+      www.instagram.com/reels/BBB222/?igsh=x
+      m.instagram.com/p/CCC333
+      lea.modele instagram.com/lea.modele/reel/DDD444/
+      instagr.am/p/EEE555/
+      https://www.instagram.com/reel/AAA111/`)).toEqual([
+      'https://www.instagram.com/reel/AAA111/',
+      'https://www.instagram.com/reel/BBB222/',
+      'https://www.instagram.com/reel/CCC333/',
+      'https://www.instagram.com/reel/DDD444/',
+      'https://www.instagram.com/reel/EEE555/',
+    ])
+  })
 })
 
 describe('Genjutsu — prompt automatique', () => {
