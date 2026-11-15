@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-15b',
+    date: '2026-11-15',
+    title: { fr: 'DuoPlus : publication de Reels et création de comptes', en: 'DuoPlus: Reels posting and account creation' },
+    items: {
+      fr: ['Publier des Reels sur tes téléphones DuoPlus : vidéos de la Banque (une par téléphone), légende avec accents et emojis, ville propre à chaque compte. Les téléphones éteints peuvent être allumés pour l’occasion puis éteints à la fin. Mode « Test sans publier » pour tout vérifier avant.', 'Créer des comptes Instagram (bêta) : numéro US acheté sur SMSPool, code SMS saisi tout seul, mot de passe, date de naissance et nom générés. Le numéro est annulé et remboursé si le SMS n’arrive pas.'],
+      en: ['Post Reels on your DuoPlus phones: Library videos (one per phone), caption with accents and emojis, a city per account. Phones that are off can be turned on for the run and turned off at the end. “Test without posting” mode to check everything first.', 'Create Instagram accounts (beta): US number bought on SMSPool, SMS code entered automatically, generated password, birthday and name. The number is cancelled and refunded if the SMS does not arrive.'],
+    },
+  },
+  {
     id: '2026-11-15',
     date: '2026-11-15',
     title: { fr: 'DuoPlus dans l’espace Blowsome', en: 'DuoPlus in the Blowsome workspace' },

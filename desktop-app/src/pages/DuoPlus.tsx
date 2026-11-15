@@ -7,12 +7,14 @@ import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { Btn, Chip, Panel, PanelHead, FIELD, SkeletonRows, Empty, toast, confirmDialog, useNarrow } from '@/lib/ui'
 import { PageHeader } from '@/components/Kit'
+import DuoPosting from '@/components/DuoPosting'
+import DuoAccounts from '@/components/DuoAccounts'
 import { duoStatus, duoSetKey, duoDelKey, duoPhones, duoPower, duoCommand, duoState, canPowerOn, canPowerOff, areaName, type DuoPhone, type DuoError } from '@/lib/duoplus'
 
 const PHONE_ICON = 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01'
 const TONE = { on: 'ok', off: 'mute', busy: 'warn', bad: 'bad' } as const
 
-export default function DuoPlus({ theme, org }: { theme: Theme; user: User; org: OrgState }) {
+export default function DuoPlus({ theme, user, org }: { theme: Theme; user: User; org: OrgState }) {
   const orgId = org.currentOrg?.id ?? null
   const narrow = useNarrow(760)
   const [state, setState] = useState<'loading' | 'nokey' | 'ok' | 'nosql' | 'error'>('loading')
@@ -151,6 +153,9 @@ export default function DuoPlus({ theme, org }: { theme: Theme; user: User; org:
                 </div>
               )}
           </Panel>
+
+          <DuoPosting theme={theme} user={user} org={org} phones={selected} onChanged={() => void loadPhones(true)} />
+          <DuoAccounts theme={theme} org={org} phones={selected} />
 
           {manager && (
             <Panel theme={theme} style={{ marginBottom: 16 }}>

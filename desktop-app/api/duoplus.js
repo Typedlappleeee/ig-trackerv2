@@ -5,7 +5,7 @@
 //     delkey                 → retire la clé (propriétaire / admin)
 //     phones                 → tous les téléphones de la clé (champs utiles seulement, jamais l'adresse/mot de passe ADB)
 //     power { ids, on }      → allume (on = true) ou éteint des téléphones
-//     command { id, command } → commande ADB (shell) sur UN téléphone, 10 s max côté DuoPlus (propriétaire / admin)
+//     command { id, command } → commande ADB (shell) sur UN téléphone, 10 s max côté DuoPlus (sert aux automatisations)
 // La clé reste en base (sf_duoplus_keys, service-role seulement) : jamais renvoyée au navigateur.
 // SQL : supabase/migrations/20261115_duoplus.sql. API : https://help.duoplus.net/docs/Introduction
 import { db, roleIn, bodyOf } from './_bank.js'
@@ -108,7 +108,6 @@ export default async (req, res) => {
       return res.status(200).json({ ok: true, success, fail })
     }
     if (a === 'command') {
-      if (!manager) return res.status(200).json({ ok: false, error: 'Commandes ADB réservées au propriétaire et aux admins de l’espace' })
       const id = String(b.id || ''), command = String(b.command || '').replace(/^\s*adb\s+shell\s+/i, '').trim()
       if (!PHONE_ID.test(id) || !command || command.length > 2000) return res.status(200).json({ ok: false, error: 'Commande invalide' })
       const d = await duo(key, '/api/v1/cloudPhone/command', { image_id: id, command })
