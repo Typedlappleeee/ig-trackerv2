@@ -45,6 +45,9 @@
     },
     "api/fb.js": {
       "maxDuration": 60
+    },
+    "api/duoplus.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

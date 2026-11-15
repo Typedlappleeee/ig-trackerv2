@@ -30,6 +30,7 @@ function FloatingLang() {
 // (Bank, Studio, iRemoTech, composers… ne sont récupérés que quand on les ouvre).
 const BlowsomeHome = lazy(() => import('@/pages/BlowsomeHome'))
 const BlowParc = lazy(() => import('@/pages/BlowsomePages').then(m => ({ default: m.BlowParc })))
+const DuoPlus = lazy(() => import('@/pages/DuoPlus'))
 const BlowContent = lazy(() => import('@/pages/BlowsomePages').then(m => ({ default: m.BlowContent })))
 const BlowAutoPilot = lazy(() => import('@/pages/BlowAutoPilot').then(m => ({ default: m.BlowAutoPilot })))
 const Phones = lazy(() => import('@/pages/Phones'))
@@ -205,6 +206,7 @@ function AppInner({ user }: { user: User }) {
       : page === 'blowContent' ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'blowTools' ? <Studio theme={theme} infra={infra} user={user} org={org} />
       : page === 'blowGenjutsu' ? <GenjutsuVip user={user} org={org} isSuperAdmin={license.isSuperAdmin} />
+      : page === 'blowDuo' ? <DuoPlus theme={theme} user={user} org={org} />
       : page === 'publish' ? <Publish theme={theme} infra={infra} user={user} org={org} isSuperAdmin={license.isSuperAdmin} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'bank' ? <Bank theme={theme} infra={infra} user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'insights' ? <Placeholder theme={theme} spec={SPECS.insights!} />

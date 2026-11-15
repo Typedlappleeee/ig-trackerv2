@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-15',
+    date: '2026-11-15',
+    title: { fr: 'DuoPlus dans l’espace Blowsome', en: 'DuoPlus in the Blowsome workspace' },
+    items: {
+      fr: ['Nouvel onglet DuoPlus (Blowsome › Parc) : relie ton compte DuoPlus avec sa clé API (gardée sur le serveur, jamais dans le navigateur), vois tous tes téléphones virtuels et leur état, allume-les ou éteins-les, un par un ou en groupe. Les admins peuvent envoyer une commande ADB de test.'],
+      en: ['New DuoPlus tab (Blowsome › Farm): link your DuoPlus account with its API key (kept on the server, never in the browser), see all your virtual phones and their state, turn them on or off one by one or in bulk. Admins can send a test ADB command.'],
+    },
+  },
+  {
     id: '2026-11-14b',
     date: '2026-11-14',
     title: { fr: 'WAN 3.0 : nouveau prompt par défaut', en: 'WAN 3.0: new default prompt' },

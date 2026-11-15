@@ -15,7 +15,7 @@ export type PageKey =
   | 'flows' | 'recipes' | 'publish' | 'automation' | 'warmup' | 'flowBuilder'
   | 'studio'
   | 'insights' | 'health'
-  | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto' | 'blowGenjutsu'
+  | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto' | 'blowGenjutsu' | 'blowDuo'
   | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
   | 'scheduled' | 'links' | 'viral' | 'explore' | 'pricing' | 'genjutsu'
   | 'admin'
@@ -56,6 +56,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       ] },
       { g: 'Parc', items: [
         { k: 'blowParc', l: 'Phone Farm', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M12 18h.01', n: phoneCount ?? undefined },
+        { k: 'blowDuo', l: 'DuoPlus', i: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z|M9 3v18|M15 3v18', soon: 'Nouveau' },
       ] },
     ]
   }
@@ -131,6 +132,7 @@ const TITLES: Record<PageKey, string[]> = {
   blowContent: ['Blowsome', 'Auto-contenu'],
   blowTools: ['Blowsome', 'Outils VIP'],
   blowGenjutsu: ['Blowsome', 'Genjutsu'],
+  blowDuo: ['Blowsome', 'DuoPlus'],
   irtPhones: ['iRemoTech', 'Téléphones'],
   irtPosting: ['iRemoTech', 'Posting'],
   irtStory: ['iRemoTech', 'Story'],
