@@ -10,6 +10,9 @@ export interface AutoCtx { orgId: string | null; phone: string; log: (m: string)
 
 const IG = 'com.instagram.android'
 const ADB_IME = 'com.android.adbkeyboard/.AdbIME'
+// ADBKeyBoard (github.com/senzhk/ADBKeyBoard, APK de la branche master, contrôlé le 15/11/2026)
+const ADBKB_URL = 'https://github.com/senzhk/ADBKeyBoard/raw/master/ADBKeyboard.apk'
+const ADBKB_SHA256 = 'e698adea5633135a067b038f9a0cf41baa4de09888713a81593fb2b9682cdc59'
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 export class StopError extends Error { constructor() { super('Arrêté') } }
 
@@ -85,13 +88,34 @@ export class Phone {
       for (const part of text.match(/.{1,200}/g) ?? []) await this.sh(`input text ${shq(part.replace(/ /g, '%s'))}`)
       return
     }
-    await this.sh(`pm unhide com.android.adbkeyboard >/dev/null 2>&1; pm enable com.android.adbkeyboard >/dev/null 2>&1; ime enable ${ADB_IME} >/dev/null 2>&1; ime set ${ADB_IME} >/dev/null`)
+    await this.ensureAdbKeyboard()
+    await this.sh(`ime set ${ADB_IME} >/dev/null`)
     await sleep(500)
     await this.tap(at.x, at.y); await sleep(700)
     // par morceaux : une commande trop longue dépasserait la limite de DuoPlus
     const parts = Array.from(text)
     for (let i = 0; i < parts.length; i += 300) { await this.sh(`am broadcast -a ADB_INPUT_B64 --es msg ${b64(parts.slice(i, i + 300).join(''))} >/dev/null`); await sleep(300) }
     await this.sh('ime reset >/dev/null 2>&1 || ime set com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME >/dev/null')
+  }
+  /** Clavier ADB : intégré (caché) sur certaines images DuoPlus, absent sur d'autres → installé depuis
+   *  le dépôt ADBKeyBoard, après contrôle de l'empreinte SHA-256 du fichier. */
+  private kbReady = false
+  async ensureAdbKeyboard() {
+    if (this.kbReady) return
+    const on = await this.sh(`pm unhide com.android.adbkeyboard >/dev/null 2>&1; pm enable com.android.adbkeyboard >/dev/null 2>&1; ime enable ${ADB_IME} 2>&1`)
+    if (/Unknown input method/i.test(on)) {
+      this.c.log('  installation du clavier ADB sur le téléphone')
+      const apk = '/data/local/tmp/sf_adbkb.apk', mark = '/data/local/tmp/sf_adbkb.done'
+      await this.sh(`rm -f ${mark}; (curl -sSL -m 90 -o ${apk} ${ADBKB_URL}; chmod 644 ${apk}; echo $? > ${mark}) >/dev/null 2>&1 &`)
+      for (let k = 0; k < 30 && !/\d/.test(await this.sh(`cat ${mark} 2>/dev/null`)); k++) await sleep(3000)
+      const sum = await this.sh(`sha256sum ${apk} 2>/dev/null`)
+      if (!sum.includes(ADBKB_SHA256)) throw new Error('clavier ADB : fichier téléchargé non conforme (empreinte)')
+      await this.sh(`rm -f ${mark}; (cat ${apk} | pm install -r -S $(stat -c %s ${apk}) > ${mark} 2>&1) >/dev/null 2>&1 &`)
+      for (let k = 0; k < 20 && !/Success|Failure/.test(await this.sh(`cat ${mark} 2>/dev/null`)); k++) await sleep(2000)
+      const again = await this.sh(`ime enable ${ADB_IME} 2>&1`)
+      if (/Unknown input method/i.test(again)) throw new Error('clavier ADB : installation impossible')
+    }
+    this.kbReady = true
   }
   async hideKeyboard() { const s = await this.sh('dumpsys input_method | grep -m1 mInputShown'); if (/mInputShown=true/.test(s)) { await this.key(111); await sleep(600) } }
 }
@@ -226,7 +250,6 @@ export interface NumberSource {
   cancel: (id: string) => Promise<void>
 }
 export interface SignupResult { username: string; password: string; phone: string }
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const has = (ui: UiNode[], re: RegExp) => ui.some(n => re.test(n.text) || re.test(n.desc))
 const button = (ui: UiNode[], re: RegExp) => ui.find(n => n.w > 0 && (re.test(n.desc) || re.test(n.text)) && (n.clickable || /Button/.test(n.cls))) ?? ui.find(n => n.w > 0 && (re.test(n.text) || re.test(n.desc)))
 const field = (ui: UiNode[]) => ui.find(n => /EditText/.test(n.cls) && n.w > 0)
@@ -239,45 +262,32 @@ async function fill(p: Phone, ui: UiNode[], value: string) {
   await p.sh('input keyevent KEYCODE_MOVE_END; for i in $(seq 1 40); do input keyevent 67; done')   // vide le champ
   await p.type(value, f); await sleep(500)
 }
-async function next(p: Phone, ui: UiNode[]) {
-  const b = button(ui, /^(Next|Continue|Suivant)$/)
-  if (!b) throw new Error('bouton « Next » introuvable')
-  await p.hideKeyboard(); await p.tapNode(b); await sleep(2500)
+const titleOf = (ui: UiNode[]) => (ui.find(n => /\?$|^(Enter the confirmation code|Create a password|Create a username|Agree to)/i.test(n.text))?.text ?? screenSummary(ui)).slice(0, 80)
+/** « Next » puis attente que l'écran change (sinon on réessaie, puis on abandonne). */
+async function next(p: Phone, ui: UiNode[], log: (m: string) => void) {
+  const before = titleOf(ui)
+  for (let k = 0; k < 3; k++) {
+    await p.hideKeyboard()
+    const b = button(await p.ui(), /^(Next|Continue|Suivant)$/)
+    if (!b) throw new Error('bouton « Next » introuvable')
+    await p.tapNode(b)
+    for (let t = 0; t < 8; t++) { await sleep(2500); const now = await p.ui(); if (titleOf(now) !== before || has(now, /isn't valid|not valid|try again|something went wrong/i)) return }
+    log(`  « Next » sans effet sur « ${before} », nouvel essai`)
+  }
+  throw new Error(`Instagram ne passe pas l’étape « ${before} » : blocage anti-robot d’Instagram (le plus souvent : l’IP du téléphone n’est pas dans le pays du numéro)`)
 }
-// Date de naissance : sélecteur Android (molettes ou calendrier). On essaie les molettes saisissables,
-// sinon l'en-tête « année » du calendrier.
+// Date de naissance : sélecteur Android à molettes (mois / jour / année). Seule l'année compte (l'âge).
 async function setBirthday(p: Phone, b: SignupProfile['birth'], log: (m: string) => void) {
   let ui = await p.ui()
-  const open = field(ui) ?? button(ui, /birthday/i)
-  if (open) { await p.tapNode(open); await sleep(1500); ui = await p.ui() }
-  const inputs = ui.filter(n => n.id === 'numberpicker_input')
-  if (inputs.length >= 3) {
-    const vals = [MONTHS[b.m - 1].slice(0, 3), String(b.d), String(b.y)]
-    // ordre des molettes : on les trie de gauche à droite, le mois est celle qui contient des lettres
-    const sorted = [...inputs].sort((a, c) => a.x - c.x)
-    const order = sorted.map(n => /[A-Za-z]/.test(n.text) ? 0 : Number(n.text) > 31 ? 2 : 1)
-    for (let i = 0; i < sorted.length; i++) {
-      await p.tapNode(sorted[i]); await sleep(300)
-      await p.sh('input keyevent KEYCODE_MOVE_END; for i in $(seq 1 6); do input keyevent 67; done')
-      await p.sh(`input text ${vals[order[i]]}`); await sleep(300)
-    }
-    await p.key(66)
-  } else {
-    const yearBtn = ui.find(n => n.id === 'date_picker_header_year')
-    if (yearBtn) {
-      await p.tapNode(yearBtn); await sleep(1200)
-      for (let k = 0; k < 25; k++) {
-        const u = await p.ui(), y = u.find(n => n.text === String(b.y))
-        if (y) { await p.tapNode(y); break }
-        const ys = u.map(n => Number(n.text)).filter(v => v > 1900 && v < 2100)
-        const down = ys.length && Math.min(...ys) > b.y
-        await p.sh(down ? 'input swipe 540 700 540 1300 300' : 'input swipe 540 1300 540 700 300'); await sleep(700)
-      }
-    } else log('  sélecteur de date inconnu : date proposée par Instagram gardée')
-  }
-  await sleep(800)
-  const ok = button(await p.ui(), /^(Set|OK|Done|Confirm)$/i)
-  if (ok) { await p.tapNode(ok); await sleep(1200) }
+  const open = button(ui, /^Birthday/i) ?? field(ui)
+  if (open) { await p.tapNode(open); await sleep(2000); ui = await p.ui() }
+  const year = ui.filter(n => n.id === 'numberpicker_input').find(n => Number(n.text) > 1900)
+  if (!year) { log('  sélecteur de date inconnu : date proposée par Instagram gardée'); return }
+  await p.tapNode(year); await sleep(400)
+  await p.sh(`input keyevent KEYCODE_MOVE_END; for i in $(seq 1 6); do input keyevent 67; done; input text ${b.y}; input keyevent 66`)
+  await sleep(600); await p.hideKeyboard()
+  const ok = (await p.ui()).find(n => n.id === 'button1') ?? button(await p.ui(), /^(Set|OK|Done)$/i)
+  if (ok) { await p.tapNode(ok); await sleep(1500) }
 }
 
 export async function createAccount(c: AutoCtx, prof: SignupProfile, nums: NumberSource): Promise<SignupResult> {
@@ -285,7 +295,8 @@ export async function createAccount(c: AutoCtx, prof: SignupProfile, nums: Numbe
   await waitBoot(p, log)
   await p.sh(`pm grant ${IG} android.permission.POST_NOTIFICATIONS >/dev/null 2>&1; am force-stop ${IG}; monkey -p ${IG} -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1`)
   await sleep(8000)
-  let order: { id: string; phone: string } | null = null, codeDone = false, username = prof.username || '', stuck = 0, lastKey = ''
+  let order: { id: string; phone: string } | null = null, gotCode = false, username = prof.username || '', stuck = 0, lastKey = ''
+  const done = new Set<string>()
   const end = Date.now() + 20 * 60_000
   try {
     while (Date.now() < end) {
@@ -294,14 +305,16 @@ export async function createAccount(c: AutoCtx, prof: SignupProfile, nums: Numbe
       stuck = key === lastKey ? stuck + 1 : 0; lastKey = key
       if (stuck >= 6) throw new Error(`bloqué sur l’écran : ${key}`)
       if (findNode(ui, { id: 'feed_tab' }) || findNode(ui, { desc: /^Profile$/ })) { log('  compte créé, fil d’accueil ouvert'); return { username, password: prof.password, phone: order?.phone ?? '' } }
+      if (has(ui, /^Do you need help\?$/)) { const x = button(ui, /^Close$/); if (x) { await p.tapNode(x); await sleep(1500); continue } }
       if (has(ui, /^Join Instagram$/) || button(ui, /^Get started$/)) { const b = button(ui, /^(Get started|Create new account)$/); if (b) { log('  inscription'); await p.tapNode(b); await sleep(4000); continue } }
-      if (has(ui, /^Create new account$/) && !has(ui, /mobile number/i)) { await p.tapNode(button(ui, /^Create new account$/)!); await sleep(4000); continue }
       if (has(ui, /what's your mobile number/i)) {
+        if (done.has('number')) throw new Error('Instagram redemande le numéro (refusé ?)')
         if (!order) { order = await nums.buy(); log(`  numéro US acheté : +${order.phone}`) }
-        await fill(p, ui, `+${order.phone}`); await next(p, await p.ui()); continue
+        await fill(p, ui, `+${order.phone}`); done.add('number'); await next(p, await p.ui(), log); continue
       }
-      if (has(ui, /confirmation code|enter the code|enter code/i) && !codeDone) {
+      if (has(ui, /enter the confirmation code/i)) {
         if (!order) throw new Error('code demandé sans numéro')
+        if (done.has('code')) { if (has(ui, /isn't valid|not valid/i)) throw new Error('code refusé par Instagram'); await sleep(3000); continue }
         // code envoyé par WhatsApp : SMSPool ne le recevra jamais → « I didn't get the code » → par SMS
         if (has(ui, /whatsapp/i)) {
           log('  code envoyé par WhatsApp : demande d’un SMS')
@@ -311,31 +324,37 @@ export async function createAccount(c: AutoCtx, prof: SignupProfile, nums: Numbe
         log('  attente du SMS…')
         const code = await nums.waitCode(order.id)
         if (!code) throw new Error('le SMS n’est pas arrivé')
+        gotCode = true
         const digits = code.match(/\d{4,8}/)?.[0] ?? code
-        await fill(p, await p.ui(), digits); await next(p, await p.ui()); codeDone = true; continue
+        const u2 = await p.ui()
+        if (!has(u2, /enter the confirmation code/i)) continue
+        await fill(p, u2, digits); done.add('code')
+        await sleep(3000)                                                       // Instagram valide souvent tout seul
+        if (has(await p.ui(), /enter the confirmation code/i)) await next(p, await p.ui(), log)
+        continue
       }
-      if (has(ui, /create a password/i)) { log('  mot de passe'); await fill(p, ui, prof.password); await next(p, await p.ui()); continue }
+      if (has(ui, /create a password/i)) { log('  mot de passe'); await fill(p, ui, prof.password); await next(p, await p.ui(), log); continue }
       if (has(ui, /save your login info/i)) { const b = button(ui, /^(Save|Not now)$/); if (b) await p.tapNode(b); await sleep(2500); continue }
-      if (has(ui, /what's your birthday/i)) { log('  date de naissance'); await setBirthday(p, prof.birth, log); await next(p, await p.ui()); continue }
-      if (has(ui, /what's your name/i)) { log('  nom'); await fill(p, ui, prof.fullName); await next(p, await p.ui()); continue }
+      if (has(ui, /what's your birthday/i)) { log('  date de naissance'); await setBirthday(p, prof.birth, log); await next(p, await p.ui(), log); continue }
+      if (has(ui, /what's your name/i)) { log('  nom'); await fill(p, ui, prof.fullName); await next(p, await p.ui(), log); continue }
       if (has(ui, /create a username/i)) {
         if (prof.username) await fill(p, ui, prof.username)
         await sleep(2500)
-        const u2 = await p.ui(), f = field(u2)
+        const u2 = await p.ui()
         if (has(u2, /not available|isn't available|taken/i)) { await fill(p, u2, `${prof.username || 'user'}${Math.floor(Math.random() * 9000 + 1000)}`); await sleep(2500) }
-        username = (field(await p.ui())?.text || f?.text || username).trim()
-        log(`  pseudo : ${username}`); await next(p, await p.ui()); continue
+        username = (field(await p.ui())?.text || username).trim()
+        log(`  pseudo : ${username}`); await next(p, await p.ui(), log); continue
       }
-      if (has(ui, /agree to instagram's terms|terms and policies/i)) { log('  conditions acceptées'); const b = button(ui, /^I agree$/); if (b) await p.tapNode(b); await sleep(6000); continue }
+      if (has(ui, /agree to instagram's terms|terms and policies/i)) { log('  conditions acceptées'); const b = button(ui, /^I agree$/); if (b) await p.tapNode(b); await sleep(8000); continue }
       if (has(ui, /try another number|can't use this number|this number isn't|couldn't send|try again later/i)) throw new Error(`Instagram refuse : ${screenSummary(ui)}`)
       // écrans facultatifs après la création : on passe
-      const skip = button(ui, /^(Skip|Not now|Not Now|Maybe later|Next|Done)$/)
+      const skip = button(ui, /^(Skip|Not now|Not Now|Maybe later|Done)$/)
       if (skip) { await p.tapNode(skip); await sleep(3000); continue }
       await sleep(3000)
     }
     throw new Error('création trop longue (20 min)')
   } catch (e) {
-    if (order && !codeDone) { try { await nums.cancel(order.id); log('  numéro annulé (SMSPool rembourse)') } catch { /* déjà clos */ } }
+    if (order && !gotCode) { try { await nums.cancel(order.id); log('  numéro annulé (SMSPool rembourse)') } catch { /* déjà clos */ } }
     throw e
   }
 }

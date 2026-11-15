@@ -30,7 +30,7 @@ export default function DuoAccounts({ theme, org, phones }: { theme: Theme; org:
   const orgId = org.currentOrg?.id ?? null
   const [key, setKeyState] = useState(() => { try { return localStorage.getItem('sf-smspool-key') ?? '' } catch { return '' } })
   const setKey = (v: string) => { setKeyState(v); try { localStorage.setItem('sf-smspool-key', v) } catch { /* bloqué */ } }
-  const [maxPrice, setMaxPrice] = useState('0.35')
+  const [maxPrice, setMaxPrice] = useState('0.60')
   const [balance, setBalance] = useState<string | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
   const [running, setRunning] = useState(false)
