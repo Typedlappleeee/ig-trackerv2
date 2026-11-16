@@ -3628,6 +3628,12 @@ export const EN: Dict = {
     "Ville, État (ex. Miami, Florida)": "City, State (e.g. Miami, Florida)",
     "Allumer les téléphones éteints, puis les éteindre à la fin": "Turn on phones that are off, then turn them off at the end",
     "Test sans publier (s’arrête juste avant « Partager »)": "Test without posting (stops right before “Share”)",
+    "🇺🇸 États-Unis": "🇺🇸 United States",
+    "🇬🇧 Royaume-Uni": "🇬🇧 United Kingdom",
+    "🇩🇪 Allemagne": "🇩🇪 Germany",
+    "aucun numéro disponible pour ce pays": "no number available for this country",
+    "Sur chaque téléphone coché et allumé, avec Instagram déconnecté : numéro SMSPool du pays choisi, code SMS saisi tout seul.": "On every ticked phone that is on, with Instagram logged out: SMSPool number from the chosen country, SMS code entered automatically.",
+    "Pays du numéro (le même que le proxy du téléphone)": "Number country (same as the phone’s proxy)",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4346,5 +4352,6 @@ export const EN: Dict = {
     ["{0} vidéo(s) choisie(s)", "{0} video(s) selected"],
     ["Tester sur {0} téléphone(s)", "Test on {0} phone(s)"],
     ["Publier {0} Reel(s) · {1} crédits", "Post {0} Reel(s) · {1} credits"],
+    ["numéro {0} : {1} $", "number {0}: {1} $"],
   ],
 }

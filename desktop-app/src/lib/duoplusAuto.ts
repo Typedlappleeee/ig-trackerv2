@@ -316,9 +316,9 @@ export async function createAccount(c: AutoCtx, prof: SignupProfile, nums: Numbe
       if (has(ui, /^Join Instagram$/) || button(ui, /^Get started$/)) { const b = button(ui, /^(Get started|Create new account)$/); if (b) { log('  inscription'); await p.tapNode(b); await sleep(4000); continue } }
       if (has(ui, /what's your mobile number/i)) {
         if (done.has('number')) throw new Error('Instagram redemande le numéro (refusé ?)')
-        if (!order) { order = await nums.buy(); log(`  numéro US acheté : +${order.phone}`) }
-        await fill(p, ui, `+${intlPhone(order.phone)}`); done.add('number'); await next(p, await p.ui(), log)
-        if (has(await p.ui(), /may be incorrect|isn't valid|not a valid|enter a valid/i)) throw new Error(`Instagram refuse le numéro +${intlPhone(order.phone)}`)
+        if (!order) { order = await nums.buy(); log(`  numéro acheté : +${order.phone}`) }
+        await fill(p, ui, `+${order.phone}`); done.add('number'); await next(p, await p.ui(), log)
+        if (has(await p.ui(), /may be incorrect|isn't valid|not a valid|enter a valid/i)) throw new Error(`Instagram refuse le numéro +${order.phone}`)
         continue
       }
       if (has(ui, /enter the confirmation code/i)) {

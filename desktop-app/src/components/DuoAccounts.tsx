@@ -6,14 +6,26 @@ import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { Btn, Chip, Panel, PanelHead, FIELD, toast } from '@/lib/ui'
 import { startRun } from '@/lib/runStore'
-import { smspoolBuy, smspoolWaitCode, smspoolCancel, smspoolPing } from '@/lib/smspool'
+import { smspoolBuy, smspoolWaitCode, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import { addCreatedAccount, loadCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { createAccount, intlPhone, StopError } from '@/lib/duoplusAuto'
 import type { DuoPhone } from '@/lib/duoplus'
 
 const US_FIRST = ['Emily', 'Madison', 'Olivia', 'Ava', 'Sophia', 'Isabella', 'Mia', 'Abigail', 'Chloe', 'Ella', 'Grace', 'Lily', 'Hannah', 'Avery', 'Harper', 'Riley', 'Zoey', 'Nora', 'Layla', 'Brooklyn', 'Savannah', 'Aubrey', 'Claire', 'Skylar', 'Paige', 'Kayla', 'Jasmine', 'Brianna', 'Sydney', 'Taylor']
 const US_LAST = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller', 'Davis', 'Wilson', 'Anderson', 'Taylor', 'Moore', 'Jackson', 'Martin', 'Thompson', 'White', 'Harris', 'Clark', 'Lewis', 'Walker', 'Young', 'Allen', 'King', 'Wright', 'Scott', 'Hill', 'Green', 'Adams', 'Baker', 'Nelson', 'Carter']
-const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]
+const FR_FIRST = ['Camille', 'Léa', 'Manon', 'Chloé', 'Sarah', 'Emma', 'Julie', 'Marie', 'Laura', 'Clara', 'Inès', 'Jade', 'Louise', 'Alice', 'Lucie', 'Anaïs', 'Océane', 'Pauline', 'Justine', 'Margaux', 'Célia', 'Zoé', 'Ambre', 'Lina', 'Nina', 'Romane', 'Eva', 'Lola']
+const FR_LAST = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Michel', 'Garcia', 'Roux', 'Fontaine', 'Girard', 'Bonnet', 'Dupont', 'Lambert', 'Fournier', 'Rousseau', 'Vincent', 'Faure', 'Mercier', 'Blanc', 'Garnier', 'Chevalier']
+const DE_FIRST = ['Lena', 'Mia', 'Hannah', 'Emma', 'Sophie', 'Lea', 'Anna', 'Marie', 'Laura', 'Lisa', 'Julia', 'Sarah', 'Lara', 'Nele', 'Jana', 'Luisa', 'Paula', 'Clara', 'Emilia', 'Maja']
+const DE_LAST = ['Müller', 'Schmidt', 'Schneider', 'Fischer', 'Weber', 'Meyer', 'Wagner', 'Becker', 'Schulz', 'Hoffmann', 'Koch', 'Richter', 'Klein', 'Wolf', 'Neumann', 'Schwarz', 'Braun', 'Zimmermann', 'Krüger', 'Hartmann']
+// Pays du numéro : il doit correspondre au pays du proxy du téléphone (sinon Instagram bloque à l'étape du nom).
+export const SIGNUP_COUNTRIES = {
+  us: { label: '🇺🇸 États-Unis', smspool: 'United States', dial: '1', first: US_FIRST, last: US_LAST },
+  fr: { label: '🇫🇷 France', smspool: 'France', dial: '33', first: FR_FIRST, last: FR_LAST },
+  uk: { label: '🇬🇧 Royaume-Uni', smspool: 'United Kingdom', dial: '44', first: US_FIRST, last: US_LAST },
+  de: { label: '🇩🇪 Allemagne', smspool: 'Germany', dial: '49', first: DE_FIRST, last: DE_LAST },
+} as const
+export type SignupCountry = keyof typeof SIGNUP_COUNTRIES
+const pick = <T,>(a: readonly T[]) => a[Math.floor(Math.random() * a.length)]
 export function randomPassword(n = 14): string {
   const U = 'ABCDEFGHJKLMNPQRSTUVWXYZ', L = 'abcdefghijkmnpqrstuvwxyz', D = '23456789', all = U + L + D
   const p = [pick([...U]), pick([...L]), pick([...D])]
@@ -30,7 +42,10 @@ export default function DuoAccounts({ theme, org, phones }: { theme: Theme; org:
   const orgId = org.currentOrg?.id ?? null
   const [key, setKeyState] = useState(() => { try { return localStorage.getItem('sf-smspool-key') ?? '' } catch { return '' } })
   const setKey = (v: string) => { setKeyState(v); try { localStorage.setItem('sf-smspool-key', v) } catch { /* bloqué */ } }
-  const [maxPrice, setMaxPrice] = useState('0.60')
+  const [country, setCountryState] = useState<SignupCountry>(() => { try { const v = localStorage.getItem('sf-duo-signup-country'); return v && v in SIGNUP_COUNTRIES ? v as SignupCountry : 'us' } catch { return 'us' } })
+  const setCountry = (v: SignupCountry) => { setCountryState(v); setPrice(null); try { localStorage.setItem('sf-duo-signup-country', v) } catch { /* bloqué */ } }
+  const [price, setPrice] = useState<string | null>(null)
+  const [maxPrice, setMaxPrice] = useState('2')
   const [balance, setBalance] = useState<string | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
   const [running, setRunning] = useState(false)
@@ -43,10 +58,11 @@ export default function DuoAccounts({ theme, org, phones }: { theme: Theme; org:
   async function check() {
     const r = await smspoolPing(key.trim())
     setBalance(r.ok ? `solde : ${r.balance?.toFixed(2)} $` : `clé refusée : ${r.error}`)
+    if (r.ok) { const p = await smspoolPrice(key.trim(), SIGNUP_COUNTRIES[country].smspool).catch(() => null); setPrice(p != null ? `numéro ${SIGNUP_COUNTRIES[country].label} : ${p.toFixed(2)} $` : 'aucun numéro disponible pour ce pays') }
   }
   async function launch() {
     if (blocker || running) return
-    const k = key.trim(), max = Number(maxPrice.replace(',', '.'))
+    const k = key.trim(), max = Number(maxPrice.replace(',', '.')), C = SIGNUP_COUNTRIES[country]
     const list: Job[] = ready.map(phone => ({ phone, phase: 'wait', log: [] }))
     setJobs(list); setRunning(true)
     const R = startRun('auto', `${list.length} compte(s) Instagram DuoPlus`, list.length)
@@ -55,19 +71,19 @@ export default function DuoAccounts({ theme, org, phones }: { theme: Theme; org:
       const id = it.phone.id, logs: string[] = []
       const log = (m: string) => { logs.push(m); set(id, j => ({ log: [...j.log, m].slice(-30) })) }
       set(id, { phase: 'run' })
-      const fullName = `${pick(US_FIRST)} ${pick(US_LAST)}`, password = randomPassword()
+      const fullName = `${pick(C.first)} ${pick(C.last)}`, password = randomPassword()
       let phone = '', price: number | undefined
       try {
         const r = await createAccount({ orgId, phone: id, log, shouldStop: () => R.isCancelled() }, { fullName, password, birth: randomBirth() }, {
-          buy: async () => { const o = await smspoolBuy(k, { country: 'United States', service: 'Instagram', maxPrice: Number.isFinite(max) && max > 0 ? max : undefined, onLog: log }); phone = intlPhone(o.phone); price = o.price; return { id: o.id, phone } },
+          buy: async () => { const o = await smspoolBuy(k, { country: C.smspool, service: 'Instagram', maxPrice: Number.isFinite(max) && max > 0 ? max : undefined, onLog: log }); phone = intlPhone(o.phone, C.dial); price = o.price; return { id: o.id, phone } },
           waitCode: (oid) => smspoolWaitCode(k, oid, { onLog: log, shouldStop: () => R.isCancelled(), maxMs: 4 * 60_000 }),
           cancel: (oid) => smspoolCancel(k, oid),
         })
-        const acc: CreatedAccount = { at: Date.now(), device: id, deviceName: it.phone.name, container: 'DuoPlus', username: r.username, password, fullName, phone: r.phone, provider: 'SMSPool', price, country: 'United States', ok: true, log: logs }
+        const acc: CreatedAccount = { at: Date.now(), device: id, deviceName: it.phone.name, container: 'DuoPlus', username: r.username, password, fullName, phone: r.phone, provider: 'SMSPool', price, country: C.smspool, ok: true, log: logs }
         addCreatedAccount(acc); if (alive.current) setMade(m => [acc, ...m])
         set(id, { phase: 'ok', result: `@${r.username}` }); R.tick(true)
       } catch (e) {
-        if (phone) addCreatedAccount({ at: Date.now(), device: id, deviceName: it.phone.name, container: 'DuoPlus', fullName, password, phone, provider: 'SMSPool', price, country: 'United States', ok: false, log: logs })
+        if (phone) addCreatedAccount({ at: Date.now(), device: id, deviceName: it.phone.name, container: 'DuoPlus', fullName, password, phone, provider: 'SMSPool', price, country: C.smspool, ok: false, log: logs })
         set(id, { phase: 'fail', error: e instanceof StopError ? 'Annulé' : e instanceof Error ? e.message : String(e) }); R.tick(false)
       }
     }))
@@ -79,12 +95,19 @@ export default function DuoAccounts({ theme, org, phones }: { theme: Theme; org:
 
   return (
     <Panel theme={theme} style={{ marginBottom: 16 }}>
-      <PanelHead title="Créer des comptes Instagram" sub="Sur chaque téléphone coché et allumé, avec Instagram déconnecté : numéro US SMSPool, code SMS saisi tout seul." />
+      <PanelHead title="Créer des comptes Instagram" sub="Sur chaque téléphone coché et allumé, avec Instagram déconnecté : numéro SMSPool du pays choisi, code SMS saisi tout seul." />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '4px 20px 20px' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="password" autoComplete="off" value={key} disabled={running} onChange={e => setKey(e.target.value.trim())} placeholder="Clé API SMSPool" style={{ ...FIELD, flex: '1 1 240px' }} data-no-tr />
           <Btn theme={theme} sm label="Vérifier" disabled={!key.trim() || running} onClick={() => void check()} />
           {balance && <span data-no-tr style={{ fontSize: 12.5, color: '#A1A1AA' }}>{balance}</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12.5, color: '#A1A1AA' }}>
+          Pays du numéro (le même que le proxy du téléphone)
+          <select value={country} disabled={running} onChange={e => setCountry(e.target.value as SignupCountry)} style={{ ...FIELD, width: 180 }}>
+            {(Object.keys(SIGNUP_COUNTRIES) as SignupCountry[]).map(c => <option key={c} value={c}>{SIGNUP_COUNTRIES[c].label}</option>)}
+          </select>
+          {price && <span data-no-tr>{price}</span>}
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: '#A1A1AA' }}>
           Prix maximum d’un numéro ($)
