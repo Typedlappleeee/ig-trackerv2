@@ -8,7 +8,7 @@ import { Btn, Chip, Panel, PanelHead, FIELD, toast } from '@/lib/ui'
 import { startRun } from '@/lib/runStore'
 import { smspoolBuy, smspoolWaitCode, smspoolCancel, smspoolPing } from '@/lib/smspool'
 import { addCreatedAccount, loadCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
-import { createAccount, StopError } from '@/lib/duoplusAuto'
+import { createAccount, intlPhone, StopError } from '@/lib/duoplusAuto'
 import type { DuoPhone } from '@/lib/duoplus'
 
 const US_FIRST = ['Emily', 'Madison', 'Olivia', 'Ava', 'Sophia', 'Isabella', 'Mia', 'Abigail', 'Chloe', 'Ella', 'Grace', 'Lily', 'Hannah', 'Avery', 'Harper', 'Riley', 'Zoey', 'Nora', 'Layla', 'Brooklyn', 'Savannah', 'Aubrey', 'Claire', 'Skylar', 'Paige', 'Kayla', 'Jasmine', 'Brianna', 'Sydney', 'Taylor']
@@ -59,7 +59,7 @@ export default function DuoAccounts({ theme, org, phones }: { theme: Theme; org:
       let phone = '', price: number | undefined
       try {
         const r = await createAccount({ orgId, phone: id, log, shouldStop: () => R.isCancelled() }, { fullName, password, birth: randomBirth() }, {
-          buy: async () => { const o = await smspoolBuy(k, { country: 'United States', service: 'Instagram', maxPrice: Number.isFinite(max) && max > 0 ? max : undefined, onLog: log }); phone = o.phone; price = o.price; return { id: o.id, phone: o.phone } },
+          buy: async () => { const o = await smspoolBuy(k, { country: 'United States', service: 'Instagram', maxPrice: Number.isFinite(max) && max > 0 ? max : undefined, onLog: log }); phone = intlPhone(o.phone); price = o.price; return { id: o.id, phone } },
           waitCode: (oid) => smspoolWaitCode(k, oid, { onLog: log, shouldStop: () => R.isCancelled(), maxMs: 4 * 60_000 }),
           cancel: (oid) => smspoolCancel(k, oid),
         })

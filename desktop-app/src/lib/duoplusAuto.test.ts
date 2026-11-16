@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
-import { parseUi, findNode, shq, screenSummary } from './duoplusAuto'
+import { parseUi, findNode, shq, screenSummary, intlPhone } from './duoplusAuto'
 import { planDuoJobs } from '@/components/DuoPosting'
 import { randomBirth, randomPassword } from '@/components/DuoAccounts'
 
@@ -18,6 +18,11 @@ describe('DuoPlus — automatisation', () => {
     expect(findNode(ui, { id: 'share_button' })?.y).toBe(1650)
     expect(findNode(ui, { text: /^Test/ })).toBeUndefined()           // élément invisible (0×0) ignoré
     expect(screenSummary(ui)).toContain('Share')
+  })
+  it('numéro US au format international (SMSPool l’envoie sans le 1)', () => {
+    expect(intlPhone('9472998384')).toBe('19472998384')
+    expect(intlPhone('19472998384')).toBe('19472998384')
+    expect(intlPhone('+1 (947) 299-8384')).toBe('19472998384')
   })
   it('échappe le texte pour le shell', () => {
     expect(shq("l'été")).toBe(`'l'\\''été'`)

@@ -271,7 +271,7 @@ async function next(p: Phone, ui: UiNode[], log: (m: string) => void) {
     const b = button(await p.ui(), /^(Next|Continue|Suivant)$/)
     if (!b) throw new Error('bouton « Next » introuvable')
     await p.tapNode(b)
-    for (let t = 0; t < 8; t++) { await sleep(2500); const now = await p.ui(); if (titleOf(now) !== before || has(now, /isn't valid|not valid|try again|something went wrong/i)) return }
+    for (let t = 0; t < 8; t++) { await sleep(2500); const now = await p.ui(); if (titleOf(now) !== before || has(now, /isn't valid|not valid|may be incorrect|try again|something went wrong/i)) return }
     log(`  « Next » sans effet sur « ${before} », nouvel essai`)
   }
   throw new Error(`Instagram ne passe pas l’étape « ${before} » : blocage anti-robot d’Instagram (le plus souvent : l’IP du téléphone n’est pas dans le pays du numéro)`)
@@ -288,6 +288,13 @@ async function setBirthday(p: Phone, b: SignupProfile['birth'], log: (m: string)
   await sleep(600); await p.hideKeyboard()
   const ok = (await p.ui()).find(n => n.id === 'button1') ?? button(await p.ui(), /^(Set|OK|Done)$/i)
   if (ok) { await p.tapNode(ok); await sleep(1500) }
+}
+
+/** Numéro au format international sans « + » : SMSPool renvoie les numéros US sur 10 chiffres,
+ *  sans l'indicatif 1 (ex. 9472998384 → 19472998384). */
+export function intlPhone(raw: string, dial = '1'): string {
+  const d = String(raw).replace(/\D/g, '')
+  return d.length === 10 && dial === '1' ? `1${d}` : d.startsWith(dial) ? d : `${dial}${d}`
 }
 
 export async function createAccount(c: AutoCtx, prof: SignupProfile, nums: NumberSource): Promise<SignupResult> {
@@ -310,7 +317,9 @@ export async function createAccount(c: AutoCtx, prof: SignupProfile, nums: Numbe
       if (has(ui, /what's your mobile number/i)) {
         if (done.has('number')) throw new Error('Instagram redemande le numéro (refusé ?)')
         if (!order) { order = await nums.buy(); log(`  numéro US acheté : +${order.phone}`) }
-        await fill(p, ui, `+${order.phone}`); done.add('number'); await next(p, await p.ui(), log); continue
+        await fill(p, ui, `+${intlPhone(order.phone)}`); done.add('number'); await next(p, await p.ui(), log)
+        if (has(await p.ui(), /may be incorrect|isn't valid|not a valid|enter a valid/i)) throw new Error(`Instagram refuse le numéro +${intlPhone(order.phone)}`)
+        continue
       }
       if (has(ui, /enter the confirmation code/i)) {
         if (!order) throw new Error('code demandé sans numéro')
