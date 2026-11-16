@@ -249,7 +249,7 @@ export interface NumberSource {
   waitCode: (id: string) => Promise<string | null>
   cancel: (id: string) => Promise<void>
 }
-export interface SignupResult { username: string; password: string; phone: string }
+export interface SignupResult { username: string; password: string; phone: string; check?: string }
 const has = (ui: UiNode[], re: RegExp) => ui.some(n => re.test(n.text) || re.test(n.desc))
 const button = (ui: UiNode[], re: RegExp) => ui.find(n => n.w > 0 && (re.test(n.desc) || re.test(n.text)) && (n.clickable || /Button/.test(n.cls))) ?? ui.find(n => n.w > 0 && (re.test(n.text) || re.test(n.desc)))
 const field = (ui: UiNode[]) => ui.find(n => /EditText/.test(n.cls) && n.w > 0)
@@ -271,7 +271,7 @@ async function next(p: Phone, ui: UiNode[], log: (m: string) => void) {
     const b = button(await p.ui(), /^(Next|Continue|Suivant)$/)
     if (!b) throw new Error('bouton « Next » introuvable')
     await p.tapNode(b)
-    for (let t = 0; t < 8; t++) { await sleep(2500); const now = await p.ui(); if (titleOf(now) !== before || has(now, /isn't valid|not valid|may be incorrect|try again|something went wrong/i)) return }
+    for (let t = 0; t < 18; t++) { await sleep(2500); const now = await p.ui(); if (titleOf(now) !== before || has(now, /isn't valid|not valid|may be incorrect|try again|something went wrong/i)) return }
     log(`  « Next » sans effet sur « ${before} », nouvel essai`)
   }
   throw new Error(`Instagram ne passe pas l’étape « ${before} » : blocage anti-robot d’Instagram (le plus souvent : l’IP du téléphone n’est pas dans le pays du numéro)`)
@@ -312,6 +312,14 @@ export async function createAccount(c: AutoCtx, prof: SignupProfile, nums: Numbe
       stuck = key === lastKey ? stuck + 1 : 0; lastKey = key
       if (stuck >= 6) throw new Error(`bloqué sur l’écran : ${key}`)
       if (findNode(ui, { id: 'feed_tab' }) || findNode(ui, { desc: /^Profile$/ })) { log('  compte créé, fil d’accueil ouvert'); return { username, password: prof.password, phone: order?.phone ?? '' } }
+      // vérification « Confirm you're human » (code image) : le compte existe ; on ne la contourne pas, la VA la fait à la main
+      const human = ui.find(n => /confirm you.re human/i.test(n.text || n.desc))
+      if (human) {
+        const who = (human.text || human.desc).match(/profile,\s*([\w.]+)/i)?.[1]
+        if (who) username = who
+        log('  compte créé : Instagram demande une vérification humaine (code image) à faire à la main dans DuoPlus')
+        return { username, password: prof.password, phone: order?.phone ?? '', check: 'Vérification humaine à faire à la main (fenêtre DuoPlus du téléphone)' }
+      }
       if (has(ui, /^Do you need help\?$/)) { const x = button(ui, /^Close$/); if (x) { await p.tapNode(x); await sleep(1500); continue } }
       if (has(ui, /^Join Instagram$/) || button(ui, /^Get started$/)) { const b = button(ui, /^(Get started|Create new account)$/); if (b) { log('  inscription'); await p.tapNode(b); await sleep(4000); continue } }
       if (has(ui, /what's your mobile number/i)) {

@@ -81,7 +81,7 @@ export default function DuoAccounts({ theme, org, phones }: { theme: Theme; org:
         })
         const acc: CreatedAccount = { at: Date.now(), device: id, deviceName: it.phone.name, container: 'DuoPlus', username: r.username, password, fullName, phone: r.phone, provider: 'SMSPool', price, country: C.smspool, ok: true, log: logs }
         addCreatedAccount(acc); if (alive.current) setMade(m => [acc, ...m])
-        set(id, { phase: 'ok', result: `@${r.username}` }); R.tick(true)
+        set(id, { phase: 'ok', result: `@${r.username}`, error: r.check }); R.tick(true)
       } catch (e) {
         if (phone) addCreatedAccount({ at: Date.now(), device: id, deviceName: it.phone.name, container: 'DuoPlus', fullName, password, phone, provider: 'SMSPool', price, country: C.smspool, ok: false, log: logs })
         set(id, { phase: 'fail', error: e instanceof StopError ? 'Annulé' : e instanceof Error ? e.message : String(e) }); R.tick(false)
