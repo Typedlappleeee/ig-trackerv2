@@ -14,6 +14,7 @@ import VideoFrame, { Video } from '@/components/VideoFrame'
 import { readZip } from '@/lib/zipReader'
 import { getPartner, type Partner } from '@/lib/scaleflowLink'
 import { PartnerBankModal, SendToPartnerModal } from '@/components/PartnerBank'
+import BankSpoof from '@/components/BankSpoof'
 import { isHeic, heicToJpeg, sniffHeic } from '@/lib/heic'
 import { niceBase, isUglyTitle, allocTitle, prefixFor } from '@/lib/niceTitle'
 import PoolManager, { POOL_PREFIX } from '@/components/PoolManager'
@@ -1085,6 +1086,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
   // ── Déplacer (réel) + Remixer (renvoi) ──────────────────────────────────────
   const [moveOpen, setMoveOpen] = useState(false)
+  const [spoofIds, setSpoofIds] = useState<string[] | null>(null)   // « Spoofer en copies »
   const [moving, setMoving] = useState(false)
   const [newFolder, setNewFolder] = useState('')
   const [folderModal, setFolderModal] = useState(false)
@@ -1789,6 +1791,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           {(() => { const allFav = [...sel].every(id => { const it = items.find(x => x.id === id); return it ? isFav(it) : true }); return <Btn label={allFav ? '☆ Retirer des favoris' : '★ Favoris'} theme={theme} sm onClick={() => void setFavMany([...sel], !allFav)} /> })()}
           <Btn label="Déplacer" theme={theme} sm icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" onClick={() => { setMoveMode('move'); setMoveOpen(true) }} />
           <Btn label="Dupliquer" theme={theme} sm icon="M8 8h12v12H8z|M4 16V4h12" onClick={() => { setMoveMode('copy'); setMoveOpen(true) }} />
+          {!selKinds.has('audio') && <Btn label="Spoofer en copies" theme={theme} sm icon="M8 8h12v12H8z|M4 16V4h12|M14 11v6|M11 14h6" onClick={() => setSpoofIds([...sel])} />}
           <Btn label="Télécharger" theme={theme} sm icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" onClick={() => downloadMedia([...sel])} />
           {partner && <Btn label={`Envoyer vers ${partner.name}`} theme={theme} sm icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => setSendIds([...sel])} />}
           <Btn label="Supprimer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />
@@ -1815,6 +1818,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         <SendToPartnerModal theme={theme} orgId={currentOrg?.id ?? null} partner={partner} ids={sendIds}
           defaultFolder={!SPECIAL_F.has(folder) ? folder : 'ScaleFlow'} onClose={() => setSendIds(null)} />
       )}
+      {spoofIds && <BankSpoof theme={theme} orgId={currentOrg?.id ?? null}
+        items={spoofIds.map(id => items.find(x => x.id === id)).filter((x): x is ContentItem => !!x).map(x => ({ id: x.id, title: x.title }))}
+        onClose={() => setSpoofIds(null)} onDone={() => void load()} />}
       {moveOpen && (
         <Modal theme={theme} title={moveMode === 'copy' ? `Dupliquer ${sel.size} média(s)` : `Déplacer ${sel.size} média(s)`} sub={moveMode === 'copy' ? 'Une copie va dans le dossier choisi, l’original reste où il est.' : 'Choisis un dossier ou crée-en un.'} icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"
           onClose={() => setMoveOpen(false)}

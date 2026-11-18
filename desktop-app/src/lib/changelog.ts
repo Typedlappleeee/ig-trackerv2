@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-18',
+    date: '2026-11-18',
+    title: { fr: 'Banque : spoofer une image en plusieurs copies', en: 'Library: spoof an image into several copies' },
+    items: {
+      fr: ['Dans la Banque, sélectionne une ou plusieurs images (ou vidéos) puis « Spoofer en copies » : choisis le nombre de copies (jusqu’à 20 par média), l’appareil (aléatoire par défaut, un différent par copie) et la position GPS. Chaque copie est unique et arrive dans le même dossier que l’original.'],
+      en: ['In the Library, select one or more images (or videos) then “Spoof into copies”: choose how many copies (up to 20 per media), the device (random by default, a different one per copy) and the GPS location. Each copy is unique and lands in the same folder as the original.'],
+    },
+  },
+  {
     id: '2026-11-15b',
     date: '2026-11-15',
     title: { fr: 'DuoPlus : publication de Reels et création de comptes', en: 'DuoPlus: Reels posting and account creation' },
