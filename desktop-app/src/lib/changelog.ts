@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-18b',
+    date: '2026-11-18',
+    title: { fr: 'Spoof : l’original est toujours gardé', en: 'Spoof: the original is always kept' },
+    items: {
+      fr: ['Genjutsu : quand le spoof est activé, la vidéo d’origine est maintenant rangée dans la Banque en plus des versions spoofées (avant, seules les versions y allaient). Aucun outil de spoof ne supprime ni ne remplace l’original.'],
+      en: ['Genjutsu: when spoofing is on, the original video is now saved to the Library on top of the spoofed versions (before, only the versions were saved). No spoof tool ever deletes or replaces the original.'],
+    },
+  },
+  {
     id: '2026-11-18',
     date: '2026-11-18',
     title: { fr: 'Banque : spoofer une image en plusieurs copies', en: 'Library: spoof an image into several copies' },

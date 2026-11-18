@@ -616,6 +616,7 @@ export interface GjJob {
   resultUrl?: string | null
   spoof?: SpoofPlan | null
   spoofDone?: number
+  originalSaved?: boolean         // l'original est TOUJOURS gardé dans la Banque, en plus des versions spoofées
   spoofFailed?: number
   spoofError?: string | null
   createdAt: number
@@ -852,7 +853,7 @@ async function collect(id: string, st?: Any): Promise<void> {
     let durable = url
     try { durable = (await relay<{ url?: string }>({ a: 'video_garder', url })).url || url } catch { /* l'adresse Higgsfield reste valable un temps */ }
     patch(id, { resultUrl: durable, doneAt: Date.now() })
-    if (j.spoof && j.spoof.count > 0) await spoofJob(id)
+    if (j.spoof && j.spoof.count > 0) await spoofJob(id)                       // garde aussi l'original
     else if (j.spoof) await saveOriginal(id)
     else patch(id, { status: 'done' })
   } finally { collecting.delete(id) }
@@ -885,20 +886,25 @@ async function titleOf(id: string, userId: string): Promise<string> {
   return videoTitle(j.model.name, no)
 }
 
-// Spoof coupé : la vidéo telle quelle, dans le dossier de la modèle.
+// L'original tel quel, dans le dossier de la modèle. Toujours gardé : seul (spoof coupé) ou en plus des
+// versions spoofées (alors appelé par spoofJob, sans clore le job). Jamais enregistré deux fois.
+async function storeOriginal(id: string): Promise<void> {
+  const j = byId(id)
+  if (!j?.resultUrl || !j.spoof || j.originalSaved) return
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Session expirée : reconnecte-toi.')
+  const r = await fetch(j.resultUrl)
+  if (!r.ok) throw new Error(`vidéo indisponible (HTTP ${r.status})`)
+  const bankId = await saveOutputToBank(session.user.id, j.spoof.orgId, new Uint8Array(await r.arrayBuffer()), await titleOf(id, session.user.id), 'mp4', j.spoof.folder)
+  if (!bankId) throw new Error('enregistrement dans la Banque refusé')
+  patch(id, { originalSaved: true })
+}
 async function saveOriginal(id: string): Promise<void> {
   const j = byId(id)
   if (!j?.resultUrl || !j.spoof) return
   patch(id, { status: 'spoofing', spoofDone: 0, spoofFailed: 0, spoofError: null })
-  try {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) throw new Error('Session expirée : reconnecte-toi.')
-    const r = await fetch(j.resultUrl)
-    if (!r.ok) throw new Error(`vidéo indisponible (HTTP ${r.status})`)
-    const bankId = await saveOutputToBank(session.user.id, j.spoof.orgId, new Uint8Array(await r.arrayBuffer()), await titleOf(id, session.user.id), 'mp4', j.spoof.folder)
-    if (!bankId) throw new Error('enregistrement dans la Banque refusé')
-    patch(id, { status: 'done', spoofDone: 1 })
-  } catch (e) { patch(id, { status: 'done', spoofFailed: 1, spoofError: errMsg(e) }) }
+  try { await storeOriginal(id); patch(id, { status: 'done', spoofDone: 1 }) }
+  catch (e) { patch(id, { status: 'done', spoofFailed: 1, spoofError: errMsg(e) }) }
 }
 
 // X versions uniques (appareil + GPS + empreinte) rangées dans la Banque.
@@ -909,6 +915,8 @@ async function spoofJob(id: string): Promise<void> {
   patch(id, { status: 'spoofing', spoofDone: 0, spoofFailed: 0, spoofError: null })
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) { patch(id, { status: 'done', spoofError: 'Session expirée : reconnecte-toi puis « Spoofer ».' }); return }
+  let origErr: string | null = null
+  try { await storeOriginal(id) } catch (e) { origErr = `original non gardé : ${errMsg(e)}` }
   const base = await titleOf(id, session.user.id)
   let done = 0, failed = 0, lastErr: string | null = null
   await Promise.all(Array.from({ length: n }, async (_, i) => {
@@ -924,5 +932,5 @@ async function spoofJob(id: string): Promise<void> {
     } catch (e) { failed++; lastErr = errMsg(e) }
     patch(id, { spoofDone: done, spoofFailed: failed })
   }))
-  patch(id, { status: 'done', spoofDone: done, spoofFailed: failed, spoofError: failed ? lastErr : null })
+  patch(id, { status: 'done', spoofDone: done, spoofFailed: failed, spoofError: [failed ? lastErr : null, origErr].filter(Boolean).join(' · ') || null })
 }

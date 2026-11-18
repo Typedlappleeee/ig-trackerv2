@@ -789,7 +789,7 @@ function statusLine(j: GjJob, now: number): { text: string; color: string; progr
     case 'saving': return { text: 'Récupération…', color: ACCENT_TXT, progress: 97 }
     case 'spoofing': return { text: j.spoof?.count ? `Spoof ${j.spoofDone ?? 0}/${j.spoof.count}…` : 'Rangement dans la Banque…', color: ACCENT_TXT, progress: 98 }
     case 'done': return j.spoof && (j.spoofDone ?? 0) > 0
-      ? { text: j.spoof.count === 0 ? '✓ Rangée dans la Banque' : `✓ ${j.spoofDone} version${(j.spoofDone ?? 0) > 1 ? 's' : ''} dans la Banque`, color: OK, progress: null }
+      ? { text: j.spoof.count === 0 ? '✓ Rangée dans la Banque' : `✓ Original + ${j.spoofDone} version${(j.spoofDone ?? 0) > 1 ? 's' : ''} dans la Banque`, color: OK, progress: null }
       : { text: '✓ Terminé', color: OK, progress: null }
     case 'failed': return { text: j.filtered ? 'Refusée par le filtre' : 'Échec', color: BAD, progress: null }
   }

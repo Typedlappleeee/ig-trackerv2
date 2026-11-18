@@ -4365,5 +4365,7 @@ export const EN: Dict = {
     ["{0} copie(s) créée(s) dans la Banque", "{0} copy(ies) created in the Library"],
     ["Spoofer en copies ({0} média{1})", "Spoof into copies ({0} media)"],
     ["Créer {0} copie(s)", "Create {0} copy(ies)"],
+    ["original non gardé : {0}", "original not kept: {0}"],
+    ["✓ Original + {0} version{1} dans la Banque", "✓ Original + {0} version(s) in the Library"],
   ],
 }
