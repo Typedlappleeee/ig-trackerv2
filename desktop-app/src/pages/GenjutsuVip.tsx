@@ -18,6 +18,7 @@ import { IS_WEB } from '@/lib/platform'
 import { SPOOF_DEVICES, GPS_CITIES } from '@/lib/studioTools'
 import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setModelFolder, type BankScope } from '@/lib/bankFolders'
 import { loadGjLayout, mergeLayout, pushGjLayout, saveGjGroup, hideGjModel } from '@/lib/gjLayout'
+import { listPresets, savePreset, deletePreset, upsertPreset, type PromptPreset } from '@/lib/gjPresets'
 import {
   MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, deleteModel, uploadLocalVideo, hiddenModels, addHiddenModels, readPromptPresets,
   startAccountLogin, finishAccountLogin, removeAccount, needsReconnect,
@@ -229,7 +230,11 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
   const [outfitOn, setOutfitOn] = useState(false)
   const [modelOutfit, setModelOutfit] = useState(false)
   const [presets, setPresets] = useState<Record<string, string>>({})
-  const [mode, setMode] = useState<string>('auto')          // 'auto' | 'custom' | 'p:<preset>'
+  const [mode, setMode] = useState<string>('auto')          // 'auto' | 'custom' | 'p:<preset du générateur>' | 'm:<preset de l'équipe>'
+  // presets enregistrés par l'équipe (partagés dans l'espace)
+  const [mine, setMine] = useState<PromptPreset[]>([])
+  const [mineShared, setMineShared] = useState(true)
+  const [naming, setNaming] = useState<string | null>(null)
   const [custom, setCustom] = useState('')
   const [showPrompt, setShowPrompt] = useState(false)
   useEffect(() => { if (access === 'ok') void readPromptPresets().then(setPresets) }, [access])
@@ -238,13 +243,29 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     ? buildWanPrompt({ duo, keepText: popts.keepText, outfit: outfitTxt, modelOutfit })
     : duo ? buildDuoPrompt({ keepText: popts.keepText, outfit: outfitTxt, modelOutfit })
     : buildPrompt({ ...popts, outfit: outfitTxt, modelOutfit })
-  const prompt = mode === 'auto' ? autoPrompt : mode === 'custom' ? custom : (presets[mode.slice(2)] ?? autoPrompt)
+  const minePick = mode.startsWith('m:') ? mine.find(p => p.id === mode.slice(2)) ?? null : null
+  const prompt = mode === 'auto' ? autoPrompt : mode === 'custom' ? custom : minePick ? minePick.prompt : (presets[mode.slice(2)] ?? autoPrompt)
 
   // ── chaque modèle a SON dossier de la Banque (par défaut « Genjutsu › <nom> ») : ses vidéos y vont ──
   const scope: BankScope = useMemo(() => ({ orgId, userId: user.id }), [orgId, user.id])
   const [modelFolders, setModelFolders] = useState<Record<string, string>>({})
   const [folderPickFor, setFolderPickFor] = useState<HfModel | null>(null)
   useEffect(() => { if (access === 'ok') void loadModelFolders(scope).then(setModelFolders).catch(() => undefined) }, [access, scope])
+  useEffect(() => { if (access === 'ok') void listPresets(scope).then(r => { setMine(r.list); setMineShared(r.shared) }).catch(() => undefined) }, [access, scope])
+  async function saveMine() {
+    const name = (naming ?? '').trim()
+    try {
+      if (mine.some(p => p.name.toLowerCase() === name.toLowerCase()) && !await confirmDialog({ title: `Remplacer le preset « ${name} » ?`, text: 'Un preset porte déjà ce nom : son prompt sera remplacé par celui-ci.', confirmLabel: 'Remplacer' })) return
+      const p = await savePreset(scope, mineShared, name, prompt)
+      setMine(l => upsertPreset(l, p)); setMode(`m:${p.id}`); setNaming(null)
+      toast(mineShared ? `Preset « ${p.name} » enregistré pour toute l’équipe` : `Preset « ${p.name} » enregistré sur ce navigateur`, 'ok')
+    } catch (e) { toast(e instanceof Error ? e.message : String(e), 'bad') }
+  }
+  async function dropMine(p: PromptPreset) {
+    if (!await confirmDialog({ title: `Supprimer le preset « ${p.name} » ?`, text: mineShared ? 'Il disparaît pour toute l’équipe.' : 'Il disparaît de ce navigateur.', confirmLabel: 'Supprimer', danger: true })) return
+    try { await deletePreset(mineShared, p.id); setMine(l => l.filter(x => x.id !== p.id)); setMode('auto'); toast(`Preset « ${p.name} » supprimé`, 'ok') }
+    catch (e) { toast(e instanceof Error ? e.message : String(e), 'bad') }
+  }
   // rangement des modèles : lu dans l'espace au départ, puis toutes les minutes et au retour sur l'onglet
   // (le rangement fait sur ce navigateur avant le partage est envoyé une fois à l'espace)
   useEffect(() => {
@@ -610,10 +631,21 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             <Row label="Prompt">
               <select value={mode} onChange={e => { const v = e.target.value; if (v === 'custom' && mode !== 'custom') setCustom(prompt); setMode(v) }} style={{ ...sel, maxWidth: 240 }}>
                 <option value="auto" style={opt}>Automatique (options ci-dessous)</option>
-                {Object.keys(presets).map(k => <option key={k} value={`p:${k}`} style={opt}>{k}</option>)}
+                {mine.length > 0 && <optgroup label="Presets de l’équipe">{mine.map(p => <option key={p.id} value={`m:${p.id}`} style={opt}>{p.name}</option>)}</optgroup>}
+                {Object.keys(presets).length > 0 && <optgroup label="Presets du générateur">{Object.keys(presets).map(k => <option key={k} value={`p:${k}`} style={opt}>{k}</option>)}</optgroup>}
                 <option value="custom" style={opt}>Personnalisé</option>
               </select>
             </Row>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', marginTop: -4 }}>
+              {naming === null ? (<>
+                <button type="button" onClick={() => setNaming(minePick?.name ?? '')} style={{ background: 'none', border: 'none', padding: 0, color: ACCENT_TXT, fontSize: 12, cursor: 'pointer' }}>＋ Enregistrer ce prompt comme preset</button>
+                {minePick && <button type="button" onClick={() => void dropMine(minePick)} style={{ background: 'none', border: 'none', padding: 0, color: MUTED, fontSize: 12, cursor: 'pointer' }}>Supprimer ce preset</button>}
+              </>) : (<>
+                <input autoFocus value={naming} maxLength={60} onChange={e => setNaming(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void saveMine(); if (e.key === 'Escape') setNaming(null) }} placeholder="Nom du preset (ex. Duo plage)" style={{ ...field, flex: '1 1 180px' }} data-no-tr />
+                <button type="button" disabled={!naming.trim() || !prompt.trim()} onClick={() => void saveMine()} style={{ ...field, width: 'auto', padding: '0 12px', cursor: 'pointer', color: '#fff', background: ACCENT, border: 'none' }}>Enregistrer</button>
+                <button type="button" onClick={() => setNaming(null)} style={{ background: 'none', border: 'none', padding: 0, color: MUTED, fontSize: 12, cursor: 'pointer' }}>Annuler</button>
+              </>)}
+            </div>
             {mode === 'auto' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '10px 12px', borderRadius: 10, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
                 {!duo && engine === 'genjutsu' && <Opt on={popts.several} onChange={v => setPopts(p => ({ ...p, several: v }))} label="Plusieurs filles dans la vidéo" hint="Précise laquelle remplacer.">

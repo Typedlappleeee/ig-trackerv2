@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-19',
+    date: '2026-11-19',
+    title: { fr: 'Genjutsu : tes propres presets de prompt', en: 'Genjutsu: your own prompt presets' },
+    items: {
+      fr: ['Écris ou modifie un prompt, puis « Enregistrer ce prompt comme preset » : il apparaît dans le menu Prompt (« Presets de l’équipe ») pour toute l’agence. Même nom = preset remplacé (avec confirmation) ; « Supprimer ce preset » pour l’enlever.'],
+      en: ['Write or edit a prompt, then “Save this prompt as a preset”: it shows up in the Prompt menu (“Team presets”) for the whole agency. Same name = preset replaced (after confirmation); “Delete this preset” removes it.'],
+    },
+  },
+  {
     id: '2026-11-18b',
     date: '2026-11-18',
     title: { fr: 'Spoof : l’original est toujours gardé', en: 'Spoof: the original is always kept' },
