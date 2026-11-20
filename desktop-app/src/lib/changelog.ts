@@ -24,6 +24,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Écran des cookies accepté automatiquement (Instagram redémarré s’il ne répond pas).',
         'Mode avion : l’arrêt du mode avion est renvoyé jusqu’à ce qu’iRemoTech l’accepte (il pouvait rester activé).',
         'Prix max SMSPool par défaut : 1 $ (un numéro USA coûte environ 0,42 $).',
+        'Après un essai raté, le container restait sur l’écran du code : il est maintenant remis à zéro (« Stop creating account ») avant le numéro suivant.',
       ],
       en: [
         'Container detection: the list is read without scrolling the picker (scrolling opened a random container). The right container is opened, and we check that the picker actually closed.',
@@ -33,6 +34,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Cookie screen accepted automatically (Instagram restarted if it does not respond).',
         'Airplane mode: turning airplane mode off is resent until iRemoTech accepts it (it could stay on).',
         'Default SMSPool max price: $1 (a US number costs about $0.42).',
+        'After a failed attempt, the container stayed on the code screen: it is now reset (“Stop creating account”) before the next number.',
       ],
     },
   },

@@ -27,6 +27,10 @@ describe('iRemoTech — container vierge ?', () => {
   it('inscription commencée (« What’s your mobile number? ») → mobile', () => {
     expect(classifySignup([word('What\'s', 60, 96), word('mobile', 220, 96), word('number?', 320, 96), word('Change', 360, 216), word('Next', 203, 404)], H)).toBe('mobile')
   })
+  it('essai raté resté sur le code / alerte « stop creating » → code / stop (remis à zéro avant achat)', () => {
+    expect(classifySignup([word('Enter', 60, 90), word('the', 110, 90), word('confirmation', 200, 90), word('code', 300, 90), word('Next', 203, 290)], H)).toBe('code')
+    expect(classifySignup([word('Do', 90, 290), word('stop', 250, 290), word('creating', 300, 290), word('mobile', 220, 96), word('Change', 360, 216)], H)).toBe('stop')
+  })
   it('compte connecté (fil) → null : aucun numéro acheté', () => {
     expect(classifySignup([word('Instagram', 80, 50), word('Your', 40, 140), word('story', 40, 160), word('Suggested', 100, 400)], H)).toBeNull()
   })

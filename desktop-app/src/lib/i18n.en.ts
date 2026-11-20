@@ -3738,6 +3738,8 @@ export const EN: Dict = {
     "🍪 Écran des cookies → « Allow all cookies »": "🍪 Cookie screen → “Allow all cookies”",
     "Allow all cookies": "Allow all cookies",
     "cookies acceptés ✓": "cookies accepted ✓",
+    "écran du code": "code screen",
+    "étape intermédiaire": "intermediate step",
     "⚠ l’écran des cookies ne répond pas : à valider plus tard à la main": "⚠ the cookie screen does not respond: accept it later by hand",
     "⚠ Le sélecteur déborde de l’écran : les containers du bas ne sont pas lisibles sans le faire défiler (ce qui en ouvrirait un). Ajoute-les à la main si besoin.": "⚠ The picker overflows the screen: the bottom containers can't be read without scrolling it (which would open one). Add them by hand if needed.",
     "(IP pas encore lisible, on continue)": "(IP not readable yet, carrying on)",
@@ -4510,6 +4512,7 @@ export const EN: Dict = {
     ["❌ « {0} » n’est pas dans le sélecteur (containers vus : {1})", "❌ “{0}” is not in the picker (containers seen: {1})"],
     ["⚠ le champ affiche @{0} (saisie non prise) → on garde ce nom pour les identifiants", "⚠ the field shows @{0} (typing not taken) → keeping this name for the credentials"],
     ["🍪 Cookies toujours affichés → redémarrage d’Instagram ({0}/2)", "🍪 Cookies still shown → restarting Instagram ({0}/2)"],
+    ["↩ Inscription restée en cours ({0}) → on l’abandonne pour repartir de zéro", "↩ Signup left in progress ({0}) → abandoning it to start from scratch"],
     ["{0} ⛔ refus d'Instagram : pas de nouvel essai sur ce container (un autre numéro serait gaspillé) → container suivant", "{0} ⛔ Instagram refusal: no retry on this container (another number would be wasted) → next container"],
   ],
 }

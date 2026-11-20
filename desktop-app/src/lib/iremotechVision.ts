@@ -81,6 +81,13 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
   return airplaneResetByVision(key, deviceId, hooks, holdMs)
 }
 
+/** Les alertes iOS (« Stop creating account »…) et l'écran des cookies ignorent un tap simple d'iRemoTech :
+ *  deux taps rapprochés passent (vérifié en direct le 20/11/2026). */
+async function doubleTap(key: string, deviceId: string, x: number, y: number): Promise<void> {
+  await sendAction(key, deviceId, { type: 'tap', x, y })
+  await sendAction(key, deviceId, { type: 'tap', x, y })
+}
+
 /** Action renvoyée jusqu'à acceptation (attente croissante : la limite de débit iRemoTech demande ~20 s). */
 async function sendWithRetry(key: string, deviceId: string, action: IrtAction, tries: number): Promise<boolean> {
   for (let i = 0; i < tries; i++) {
@@ -606,19 +613,50 @@ export interface CreateAccountOpts {
 /** Le container est-il « frais » (écran d'inscription « Join Instagram ») ? Vérifié AVANT d'acheter un
  *  numéro : un container déjà connecté (fil, profil) ne doit jamais faire acheter de numéro. */
 export async function isSignupScreen(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
-  return (await signupStage(key, deviceId, hooks)) !== null
+  return (await rewindSignup(key, deviceId, hooks)) !== null
+}
+
+type SignupStage = 'join' | 'mobile' | 'code' | 'midway' | 'stop'
+
+/** Container resté au milieu d'une inscription ratée (écran du code, mot de passe, date, nom…) : Instagram
+ *  y revient même après fermeture. On remonte avec la flèche « < » jusqu'à l'écran du numéro (ou Join).
+ *  Renvoie 'join' | 'mobile' quand on peut (re)commencer, null si ce n'est pas un écran d'inscription. */
+export async function rewindSignup(key: string, deviceId: string, hooks?: VisionHooks): Promise<'join' | 'mobile' | null> {
+  let st = await signupStage(key, deviceId, hooks)
+  for (let i = 0; i < 7 && (st === 'code' || st === 'midway' || st === 'stop'); i++) {
+    if (hooks?.shouldStop?.()) return null
+    if (i === 0) hooks?.log?.(`↩ Inscription restée en cours (${st === 'code' ? 'écran du code' : 'étape intermédiaire'}) → on l’abandonne pour repartir de zéro`)
+    if (st === 'stop') {
+      // « Do you want to stop creating your account? » → « Stop creating account » = retour propre à Join
+      const pt = await findWordPoint(key, deviceId, [/^stop$/i, /^arr[eê]ter$/i], hooks, { tries: 2, minY: 0.45, maxY: 0.7 })
+      if (pt) await doubleTap(key, deviceId, Math.round(pt.x + 70), pt.y)
+      await sleep(2500); st = await signupStage(key, deviceId, hooks, 2); continue
+    }
+    const shot = await snapshot(key, deviceId)
+    const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
+    if (!W || !H) break
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.065 * W), y: Math.round(0.069 * H) }) // flèche « < »
+    await sleep(2200)
+    st = await signupStage(key, deviceId, hooks, 2)
+  }
+  return st === 'join' || st === 'mobile' ? st : null
 }
 
 /** Mots lus → étape d'inscription : « join » (Join Instagram / Get started, bas de l'écran) ou « mobile »
  *  (« What's your mobile number? » : inscription commencée puis abandonnée, container toujours vierge). */
-export function classifySignup(words: { text: string; cy: number }[], H: number): 'join' | 'mobile' | null {
+export function classifySignup(words: { text: string; cy: number }[], H: number): SignupStage | null {
   if (words.some(o => o.cy > H * 0.45 && /^(started|join|s.?inscrire|commencer)$/i.test(o.text.replace(/[^\p{L}']/gu, '')))) return 'join'
   const has = (re: RegExp) => words.some(o => re.test(o.text.replace(/[^\p{L}]/gu, '')))
+  if (has(/^stop$/i) && has(/^creating$/i)) return 'stop'
   if (has(/^mobile$/i) && has(/^(change|changer|modifier|next|suivant)$/i)) return 'mobile'
+  // « Enter the confirmation code » / « I didn't get the code »
+  if (has(/^code$/i) && (has(/^confirmation$/i) || has(/^didnt$/i))) return 'code'
+  // autres écrans du parcours d'inscription (titres)
+  if ((has(/^create$/i) && has(/^(password|username)$/i)) || (has(/^whats$/i) && has(/^(birthday|name)$/i)) || (has(/^agree$/i) && has(/^terms$/i))) return 'midway'
   return null
 }
 
-export async function signupStage(key: string, deviceId: string, hooks?: VisionHooks, tries = 4): Promise<'join' | 'mobile' | null> {
+export async function signupStage(key: string, deviceId: string, hooks?: VisionHooks, tries = 4): Promise<SignupStage | null> {
   for (let i = 0; i < tries; i++) {
     if (hooks?.shouldStop?.()) return null
     const shot = await snapshot(key, deviceId)
@@ -648,7 +686,7 @@ export async function createInstagramAccountByVision(
   // NB : l'OCR renvoie les mots SÉPARÉS → on matche un mot distinctif isolé (« started »),
   // pas la chaîne « get started » (qui ne matcherait aucun mot seul).
   // Inscription déjà commencée (écran du numéro) : on reprend directement à l'étape 2.
-  const stage0 = await signupStage(key, deviceId, hooks, 5)
+  const stage0 = await rewindSignup(key, deviceId, hooks)
   if (!stage0) {
     hooks?.log?.('❌ Écran « Join Instagram » non détecté (container déjà connecté ?).')
     return { ok: false, stage: 'get_started' }
@@ -729,6 +767,8 @@ export async function createInstagramAccountByVision(
   await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny }); await sleep(220)
   await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny })
   await sleep(1000)
+  // ancien numéro d'un essai raté : la touche Backspace d'iRemoTech ne fait rien (testé) → bouton ✕ du champ
+  if (stage0 === 'mobile') { await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.88 * W), y: ny }); await sleep(700); await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny }); await sleep(700) }
   await sendAction(key, deviceId, { type: 'text', text: opts.phoneNumber })
   await sleep(1200)
   // Bouton bleu « Next » (centré, au-dessus de « Sign up with email »).
@@ -1062,7 +1102,9 @@ export async function acceptCookiesIfShown(key: string, deviceId: string, hooks?
       if (!await onCookies()) return true
     }
     for (let i = 0; i < 2; i++) {
-      if (!await findTapText(key, deviceId, [/^allow$/i, /^autoriser$/i], hooks, { label: 'Allow all cookies', tries: 2, minY: 0.8 })) break
+      const pt = await findWordPoint(key, deviceId, [/^allow$/i, /^autoriser$/i], hooks, { tries: 2, minY: 0.8 })
+      if (!pt) break
+      await doubleTap(key, deviceId, pt.x, pt.y)
       await sleep(3000)
       if (!await onCookies()) { hooks?.log?.('   cookies acceptés ✓'); return true }
     }
