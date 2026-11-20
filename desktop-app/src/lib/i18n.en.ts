@@ -3714,6 +3714,9 @@ export const EN: Dict = {
     "Mode avion entre deux containers": "Airplane mode between two containers",
     "Chaque média une seule fois": "Each media only once",
     "Pas de doublon tant qu’il en reste": "No duplicates while some are left",
+    "Actualisation…": "Refreshing…",
+    "sur la clé iRemoTech": "on the iRemoTech key",
+    "· liste actualisée toutes les 15 s. Un iPhone manque ? Vérifie qu’il est rattaché à cette clé dans le tableau de bord iRemoTech (API Access), ou mets une clé plus récente dans Phone Farm → ⚙.": "· list refreshed every 15 s. An iPhone is missing? Check it is attached to this key in the iRemoTech dashboard (API Access), or set a newer key in Phone Farm → ⚙.",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4468,5 +4471,7 @@ export const EN: Dict = {
     ["{0} compte{1} à chauffer sur {2} iPhone{3}", "{0} account(s) to warm up on {2} iPhone(s)"],
     ["{0} iPhone{1} : détection des containers puis un compte dans chaque container vide", "{0} iPhone(s): container detection then one account in each empty container"],
     ["{0} compte{1} à créer", "{0} account(s) to create"],
+    ["Clé iRemoTech utilisée : …{0}", "iRemoTech key in use: …{0}"],
+    ["↻ Actualiser ({0})", "↻ Refresh ({0})"],
   ],
 }

@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-20d',
+    date: '2026-11-20',
+    title: { fr: 'iRemoTech : tous les iPhones de l’agence', en: 'iRemoTech: every agency iPhone' },
+    items: {
+      fr: ['Dans une agence, ScaleFlow utilise maintenant la clé iRemoTech de l’agence en priorité : une ancienne clé perso ne cache plus les nouveaux iPhones. Bouton « ↻ Actualiser » et rappel de la clé utilisée (4 derniers caractères) pour voir tout de suite ce qui est chargé.'],
+      en: ['In an agency, ScaleFlow now uses the agency’s iRemoTech key first: an old personal key no longer hides new iPhones. “↻ Refresh” button and a reminder of the key in use (last 4 characters) to see right away what is loaded.'],
+    },
+  },
+  {
     id: '2026-11-20c',
     date: '2026-11-20',
     title: { fr: 'iRemoTech refait pour être ultra simple', en: 'iRemoTech redesigned to be dead simple' },

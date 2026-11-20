@@ -56,10 +56,11 @@ async function readKey(table: string, col: string, val: string): Promise<string 
     return (data?.iremotech_config as { api_key?: string } | null)?.api_key ?? null
   } catch { return null }
 }
+// Dans une agence, la clé de l'AGENCE passe en premier (c'est elle qui voit les iPhones de l'équipe ;
+// une ancienne clé perso la masquait et les nouveaux iPhones n'apparaissaient pas). Perso : sa clé.
 export async function loadIremotechKey(user: User, org: OrgState): Promise<string | null> {
-  let key = await readKey('app_config', 'user_id', user.id)
-  if (!key && org.currentOrg) key = await readKey('org_config', 'org_id', org.currentOrg.id)
-  return key
+  if (org.currentOrg) { const k = await readKey('org_config', 'org_id', org.currentOrg.id); if (k) return k }
+  return readKey('app_config', 'user_id', user.id)
 }
 export async function saveIremotechKey(orgId: string | null, userId: string, key: string): Promise<{ ok: boolean; error?: string }> {
   const val = { api_key: key.trim() }

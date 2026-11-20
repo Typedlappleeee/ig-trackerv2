@@ -598,10 +598,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const phonePicker = (opts?: { manage?: boolean }) => (
     <Step n={1} title="Où ?" sub={totalJobs ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} · ${totalJobs} container${totalJobs > 1 ? 's' : ''} sélectionné${totalJobs > 1 ? 's' : ''}` : 'Choisis les iPhones et leurs containers'}
       right={<span style={{ display: 'flex', gap: 6 }}>
+        <button style={{ ...btn, height: 28, fontSize: 12 }} disabled={loading} title={`Clé iRemoTech utilisée : …${(irt.key ?? '').slice(-4)}`} onClick={() => load(false)}>{loading ? 'Actualisation…' : `↻ Actualiser (${devices.length})`}</button>
         <button style={{ ...btn, height: 28, fontSize: 12 }} disabled={!devices.length} onClick={() => { const on = devices.filter(isDeviceOn).map(d => d.public_id); setSel(new Set(on)); setSelConts(sc => { const n = { ...sc }; for (const id of on) n[id] = new Set(conts[id] ?? []); return n }) }}>Tous les iPhones en ligne</button>
         {sel.size > 0 && <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => { setSel(new Set()); setSelConts({}) }}>Effacer</button>}
       </span>}>
       {devices.length === 0 && !loading && <div style={{ fontSize: 13, color: MUTED }}>Aucun iPhone trouvé sur ta clé iRemoTech.</div>}
+      <div style={{ marginBottom: 10, fontSize: 12, color: DIM }}>
+        {devices.length} iPhone{devices.length > 1 ? 's' : ''} sur la clé iRemoTech <span data-no-tr style={{ fontFamily: MONO }}>…{(irt.key ?? '').slice(-4)}</span> · liste actualisée toutes les 15 s. Un iPhone manque ? Vérifie qu’il est rattaché à cette clé dans le tableau de bord iRemoTech (API Access), ou mets une clé plus récente dans Phone Farm → ⚙.
+      </div>
       {syncOff && devices.length > 0 && (
         <div style={{ marginBottom: 10, fontSize: 12, color: '#FBBF24', lineHeight: 1.5 }}>
           ⚠ Containers enregistrés sur ce navigateur seulement : colle le SQL <code>20261028_irt_containers.sql</code> dans Supabase pour les partager en temps réel.
