@@ -158,6 +158,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [acctFilter, setAcctFilter] = useState<'all' | 'ok' | 'ko'>('all')
   const [acctLogOpen, setAcctLogOpen] = useState<number | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [pickQ, setPickQ] = useState('')
+  const [showEmptyPhones, setShowEmptyPhones] = useState(false)
   const [importText, setImportText] = useState('')
   const [showLog, setShowLog] = useState(false)   // journal détaillé déplié
   const [keyOpen, setKeyOpen] = useState(false)   // formulaire de la clé iRemoTech
@@ -641,14 +643,27 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           ⚠ Containers enregistrés sur ce navigateur seulement : colle le SQL <code>20261028_irt_containers.sql</code> dans Supabase pour les partager en temps réel.
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
-        {devices.filter(d => !opts?.jbOnly || phoneKind(conts[d.public_id]) !== 'normal').map(d => {
+      {(() => {
+        const base = devices.filter(d => !opts?.jbOnly || phoneKind(conts[d.public_id]) !== 'normal')
+        const qq = pickQ.trim().toLowerCase().replace(/^@/, '')
+        const hit = (d: IrtDevice) => !qq || deviceLabel(d).toLowerCase().includes(qq) || (conts[d.public_id] ?? []).some(c => c.toLowerCase().replace(/^@/, '').includes(qq))
+        const filled = base.filter(d => (conts[d.public_id] ?? []).length > 0 && hit(d))
+        const emptyN = base.filter(d => !(conts[d.public_id] ?? []).length).length
+        const list = [...filled, ...(showEmptyPhones || opts?.manage ? base.filter(d => !(conts[d.public_id] ?? []).length && hit(d)) : [])]
+        return (<>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input value={pickQ} onChange={e => setPickQ(e.target.value)} placeholder="Rechercher un iPhone ou un compte…" style={{ ...inp, flex: '1 1 220px', minWidth: 0 }} />
+            {!opts?.manage && emptyN > 0 && <button style={{ ...btn, height: 32, fontSize: 12 }} onClick={() => setShowEmptyPhones(v => !v)}>{showEmptyPhones ? 'Masquer' : 'Afficher'} les iPhones pas encore détectés ({emptyN})</button>}
+          </div>
+          {!list.length && <div style={{ fontSize: 13, color: MUTED, padding: '6px 2px' }}>{base.length ? 'Aucun iPhone ne correspond. Détecte les comptes / containers dans « Téléphones » ou « Comptes Instagram ».' : 'Aucun iPhone.'}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', borderRadius: 10, border: list.length ? `1px solid ${EDGE}` : 'none', overflow: 'hidden' }}>
+        {list.map(d => {
           const id = d.public_id, on = sel.has(id), live = isDeviceOn(d)
           const list = conts[id] ?? [], picked = selConts[id] ?? new Set<string>()
           const kind = phoneKind(list), unit = kind === 'normal' ? 'compte' : 'container'
           return (
-            <div key={id} style={{ borderRadius: 10, border: `1px solid ${on ? SEL_EDGE : EDGE}`, background: on ? 'rgba(233,196,106,0.04)' : '#0E0E10', padding: 12, display: 'flex', flexDirection: 'column', gap: 10, opacity: live || on ? 1 : 0.6 }}>
-              <div onClick={() => togglePhone(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <div key={id} style={{ borderTop: `1px solid ${EDGE}`, background: on ? 'rgba(233,196,106,0.04)' : '#0E0E10', padding: '10px 12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 14, rowGap: 8, opacity: live || on ? 1 : 0.6 }}>
+              <div onClick={() => togglePhone(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: '0 1 280px', minWidth: 200 }}>
                 <span title={on ? 'Tout décocher' : 'Tout cocher'} style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: on ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 11, fontWeight: 700, border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.2)', flex: 'none' }}>{on ? (list.length && picked.size < list.length ? '–' : '✓') : ''}</span>
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deviceLabel(d)}</span>
@@ -660,7 +675,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 {kind && <span title={kind === 'normal' ? 'iPhone normal : plusieurs comptes connectés dans Instagram' : 'iPhone jailbreaké : un compte par container Crane'} style={{ flex: 'none', height: 22, padding: '0 8px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 600, background: kind === 'normal' ? 'rgba(96,165,250,0.12)' : 'rgba(233,196,106,0.12)', color: kind === 'normal' ? '#93C5FD' : GOLD, border: `1px solid ${kind === 'normal' ? 'rgba(96,165,250,0.3)' : 'rgba(233,196,106,0.3)'}` }}>{kind === 'normal' ? '📱 iPhone normal' : '🔓 Jailbreak'}</span>}
               </div>
               {list.length > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: '1 1 320px', minWidth: 0 }}>
                   {list.map(c => {
                     const cp = on && picked.has(c)
                     return (
@@ -671,12 +686,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     )
                   })}
                 </div>
-              ) : <div style={{ fontSize: 12.5, color: MUTED }}>Clique « Détecter » : ScaleFlow lit les containers (iPhone jailbreaké) ou les comptes Instagram connectés (iPhone normal).</div>}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} disabled={running || !!detecting || !live} title={kind === 'normal' ? 'Ouvre Instagram → Profil → liste des comptes, et lit les comptes connectés' : 'Lit les containers Crane (ou, sur un iPhone normal, les comptes Instagram connectés)'} onClick={() => void detectOne(id)}>{detecting === id ? 'Détection…' : '🔍 Détecter'}</button>
-                {list.length > 0 && <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} onClick={() => { if (!on) togglePhone(id); setSelConts(sc => ({ ...sc, [id]: new Set(list) })) }}>Tout</button>}
-                {list.length > 0 && <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} onClick={() => setSelConts(sc => ({ ...sc, [id]: new Set() }))}>Aucun</button>}
-              </div>
+              ) : <div style={{ fontSize: 12.5, color: MUTED, flex: '1 1 320px' }}>Pas encore détecté : « 🔍 Détecter » lit les containers (jailbreak) ou les comptes Instagram (iPhone normal).</div>}
+              {(opts?.manage || !list.length) && (
+                <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px', marginLeft: 'auto' }} disabled={running || !!detecting || !live} title={kind === 'normal' ? 'Ouvre Instagram → Profil → liste des comptes, et lit les comptes connectés' : 'Lit les containers Crane (ou, sur un iPhone normal, les comptes Instagram connectés)'} onClick={() => void detectOne(id)}>{detecting === id ? 'Détection…' : '🔍 Détecter'}</button>
+              )}
               {opts?.manage && (
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input value={newC[id] ?? ''} onChange={e => setNewC(v => ({ ...v, [id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(id) }} placeholder={kind === 'normal' ? 'Ajouter à la main (ex. @compte)' : 'Ajouter à la main (ex. 6, ou @compte)'} style={{ ...inp, height: 28, flex: 1, minWidth: 0, fontSize: 12 }} />
@@ -687,6 +700,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           )
         })}
       </div>
+        </>)
+      })()}
     </Step>
   )
 
