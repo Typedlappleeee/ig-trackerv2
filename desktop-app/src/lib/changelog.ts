@@ -26,6 +26,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Prix max SMSPool par défaut : 1 $ (un numéro USA coûte environ 0,42 $).',
         'Après un essai raté, le container restait sur l’écran du code : il est maintenant remis à zéro (« Stop creating account ») avant le numéro suivant.',
         'Page « Create a password » : le champ est visé au bon endroit (plus la ligne d’erreur), le mot de passe est bien saisi.',
+        'Si le mot de passe n’est pas pris, ScaleFlow retape le champ (3 essais) au lieu de continuer à l’aveugle ; sinon le compte est marqué échoué. Fini les comptes « password:… » marqués créés à tort.',
       ],
       en: [
         'Container detection: the list is read without scrolling the picker (scrolling opened a random container). The right container is opened, and we check that the picker actually closed.',
@@ -37,6 +38,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Default SMSPool max price: $1 (a US number costs about $0.42).',
         'After a failed attempt, the container stayed on the code screen: it is now reset (“Stop creating account”) before the next number.',
         '“Create a password” page: the field is targeted at the right place (no longer the error line), the password is typed correctly.',
+        'If the password is not taken, ScaleFlow types the field again (3 attempts) instead of carrying on blind; otherwise the account is marked failed. No more “password:…” accounts wrongly marked as created.',
       ],
     },
   },

@@ -956,6 +956,20 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   await sleep(700)
   await tapNext('Next (mot de passe)')
   await sleep(3200)
+  // GARDE : tant qu'on est encore sur « Create a password » (saisie non prise), on ne continue pas à
+  // l'aveugle (vu en vrai : la suite tapait les écrans suivants sur la page mot de passe → faux « créé »).
+  const onPasswordPage = () => hasText(key, deviceId, [/^password$/i], hooks, { tries: 1, cropY: [0.08, 0.2] })
+  for (let k = 0; k < 3 && await onPasswordPage(); k++) {
+    if (hooks?.shouldStop?.()) return { ok: false }
+    hooks?.log?.(`   ↻ mot de passe pas pris (essai ${k + 2}) → on retape le champ`)
+    const err = await findWordPoint(key, deviceId, [/^can.?t$/i], hooks, { minY: 0.3, maxY: 0.5, tries: 1 })
+    const fy = err ? err.y - Math.round(0.069 * H) : Math.round(0.336 * H)
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round([0.3, 0.65, 0.5][k] * W), y: fy }); await sleep(1100)
+    await sendAction(key, deviceId, { type: 'text', text: password }); await sleep(900)
+    await tapNext('Next (mot de passe)')
+    await sleep(3200)
+  }
+  if (await onPasswordPage()) { hooks?.log?.('❌ Mot de passe impossible à saisir : arrêt (compte NON créé)'); return { ok: false } }
 
   // 2. Birthday : scroll aléatoire des molettes. dy > 0 = swipe vers le BAS (recule dans le
   //    temps). Amplitude modérée, peu de swipes (l'utilisateur : « mauvais sens + trop long »).
@@ -1088,7 +1102,10 @@ async function readUsernameField(key: string, deviceId: string, fieldY: number):
   const shot = await snapshot(key, deviceId)
   if (!shot) return null
   const { h: H } = await imgSize(shot)
-  const w = (await ocrWords(shot)).filter(o => Math.abs(o.cy - fieldY) < H * 0.06 && /^[a-z0-9._]{4,30}$/i.test(o.text) && !/^username$/i.test(o.text))
+  const words = await ocrWords(shot)
+  // il faut être sur l'écran « Create a username » (libellé du champ présent), sinon on ne lit rien
+  if (!words.some(o => /^username$/i.test(o.text))) return null
+  const w = words.filter(o => Math.abs(o.cy - fieldY) < H * 0.06 && /^[a-z0-9._]{4,30}$/i.test(o.text) && !/^(username|password|create|next|add|change)$/i.test(o.text))
   return w.length ? w.sort((a, b) => b.text.length - a.text.length)[0].text.toLowerCase() : null
 }
 
