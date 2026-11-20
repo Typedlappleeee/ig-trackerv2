@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
 vi.mock('./iremotech', () => ({ snapshot: vi.fn(), sendAction: vi.fn(), deviceIp: vi.fn() }))
-import { sortContainerNames, pickerRows, classifySignup, decideEndScreen, sameUsername } from './iremotechVision'
+import { sortContainerNames, pickerRows, classifySignup, decideEndScreen, sameUsername, sheetUsernames } from './iremotechVision'
 
 describe('iRemoTech — containers détectés', () => {
   it('Default en premier puis ordre numérique, sans doublon ni bruit OCR', () => {
@@ -79,5 +79,17 @@ describe('iRemoTech — nom d’utilisateur relu', () => {
   it('erreur de lecture OCR (5↔s) = même nom ; suggestion d’Instagram = autre nom', () => {
     expect(sameUsername('maevalwyemg5h', 'maevalwyemgsh')).toBe(true)
     expect(sameUsername('evaqxma4t', 'eva389345')).toBe(false)
+  })
+})
+
+describe('iRemoTech — comptes d’un iPhone non jailbreaké (feuille de bascule)', () => {
+  it('lit les identifiants au-dessus de « Add Instagram account », sans doublon ni texte de la feuille', () => {
+    const w = (text: string, cx: number, cy: number) => ({ text, cx, cy })
+    const words = [w('lucielr5c0', 128, 494), w('celiaq58c0', 128, 440), w('lucielrScO', 128, 494), w('add', 106, 564), w('Add', 106, 564), w('Instagram', 164, 566), w('Go', 107, 638), w('Meta', 160, 638), w('lucielr5c0', 200, 49)]
+    expect(sheetUsernames(words, 406, 720)).toEqual(['celiaq58c0', 'lucielr5c0'])
+  })
+  it('page Profil (boutons « Add photo / Add bio ») : pas une feuille de comptes', () => {
+    const w = (text: string, cx: number, cy: number) => ({ text, cx, cy })
+    expect(sheetUsernames([w('Edit', 100, 240), w('complete', 120, 357), w('Add', 130, 635), w('photo', 170, 635)], 406, 720)).toEqual([])
   })
 })

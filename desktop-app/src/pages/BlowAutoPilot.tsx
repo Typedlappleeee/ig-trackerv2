@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
+import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
@@ -244,7 +244,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // Détecte les containers Crane d'un iPhone (sélecteur lu à l'écran) et remplace sa liste.
   const detectConts = async (dev: string, log: (m: string) => void, stop?: () => boolean): Promise<string[] | null> => {
     if (!irt.key) return null
-    const list = await detectContainersByVision(irt.key, dev, { log, shouldStop: stop })
+    let list = await detectContainersByVision(irt.key, dev, { log, shouldStop: stop })
+    if (!list) {
+      // Pas de sélecteur Crane = iPhone non jailbreaké : on lit les COMPTES connectés dans Instagram (« @nom »)
+      log('↪ Pas de containers : lecture des comptes Instagram connectés…')
+      const accts = await detectAccountsByVision(irt.key, dev, { log, shouldStop: stop })
+      // orthographe exacte reprise des « Comptes créés » quand l'OCR a mal lu un caractère (5↔s, 0↔o…)
+      const known = loadCreatedAccounts().map(a => a.username).filter((u): u is string => !!u)
+      list = accts ? accts.map(u => '@' + (known.find(k => sameUsername(k, u)) ?? u)) : null
+    }
     if (list?.length) { saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list })); setSelConts(sc => ({ ...sc, [dev]: new Set(list) })) }
     return list
   }
@@ -357,8 +365,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         if (R.isCancelled()) break
         push(`\n${tag} 📦 container « ${job.container} » · ${job.vid.title}`)
         if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
-        await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
-        const ok = await selectContainerByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
+        // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
+        if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
+        const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
         if (!ok) { push(`${tag} ⏭ container « ${job.container} » non atteint → suivant`); R.tick(false); continue }
         await sleep(1200)
         const url = await signedUrlFor(job.vid)
@@ -387,7 +396,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   async function createAccounts() {
     const key = irt.key
     if (!key || running) return
-    let jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].map(c => ({ dev, c })))
+    let jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].filter(c => !c.startsWith('@')).map(c => ({ dev, c })))
     if (!autoDetect && jobs.length === 0) { setLogs(['⚠ Coche au moins un container (onglet Téléphones).']); return }
     if (autoDetect && !sel.size) { setLogs(['⚠ Choisis au moins un iPhone.']); return }
     // Config pays : identifiants propres à chaque fournisseur SMS.
@@ -428,6 +437,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
         push(`🔍 [${name}] détection des containers…`)
         const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(() => null) ?? (conts[dev] ?? [])
+        if (list.some(c => c.startsWith('@'))) { push(`[${name}] ⏭ iPhone non jailbreaké (comptes, pas de containers) : pas de création ici`); continue }
         const todo = list.filter(c => !made.has(`${dev}|${c}`))
         push(`[${name}] ${list.length} container(s), ${list.length - todo.length} déjà avec un compte créé ici → ${todo.length} à remplir`)
         next.push(...todo.map(c => ({ dev, c })))
@@ -567,7 +577,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         if (R.isCancelled()) break
         push(`\n${tag} 🔥 conteneur « ${c} »`)
         if (airplaneOn) await airplaneReset(key, p.dev, hooks)
-        const opened = await selectContainerByVision(key, p.dev, c, hooks)
+        const opened = await openTargetByVision(key, p.dev, c, hooks)
         if (!opened) { push(`${tag} ⏭ conteneur non atteint`); R.tick(false); continue }
         await sleep(1200)
         const started = Date.now()

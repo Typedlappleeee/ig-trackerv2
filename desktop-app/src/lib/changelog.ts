@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21a',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : posting sur iPhones normaux avec plusieurs comptes', en: 'iRemoTech: posting on regular iPhones with several accounts' },
+    items: {
+      fr: [
+        '« 🔍 Détecter » sur un iPhone non jailbreaké lit les comptes Instagram connectés (Profil → nom en haut) et les ajoute comme cibles « @nom ».',
+        'Posting, Story et Warm-up : pour une cible « @nom », ScaleFlow bascule sur ce compte et vérifie qu’il est bien actif (coche bleue) avant de publier.',
+        'La création de comptes ignore les iPhones non jailbreakés.',
+      ],
+      en: [
+        '“🔍 Detect” on a non-jailbroken iPhone reads the logged-in Instagram accounts (Profile → name at the top) and adds them as “@name” targets.',
+        'Posting, Story and Warm-up: for an “@name” target, ScaleFlow switches to that account and checks it is active (blue tick) before posting.',
+        'Account creation skips non-jailbroken iPhones.',
+      ],
+    },
+  },
+  {
     id: '2026-11-20g',
     date: '2026-11-20',
     title: { fr: 'iRemoTech : création de comptes testée en vrai et corrigée', en: 'iRemoTech: account creation tested live and fixed' },

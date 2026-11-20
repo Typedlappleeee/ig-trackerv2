@@ -1099,8 +1099,15 @@ export function decideEndScreen(raw: { text: string; cx: number; cy: number; x?:
   return null
 }
 
+/** Capture d'écran avec réessais (iRemoTech refuse parfois une capture rapprochée : limite de débit). */
+async function snapRetry(key: string, deviceId: string): Promise<string | null> {
+  let shot: string | null = null
+  for (let k = 0; k < 4 && !shot; k++) { if (k) await sleep(1500 * k); shot = await snapshot(key, deviceId) }
+  return shot
+}
+
 async function readScreenWords(key: string, deviceId: string): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number } | null> {
-  const shot = await snapshot(key, deviceId)
+  const shot = await snapRetry(key, deviceId)
   if (!shot) return null
   const { w: W, h: H } = await imgSize(shot)
   if (!W || !H) return null
@@ -1613,6 +1620,132 @@ export async function detectContainersByVision(key: string, deviceId: string, ho
   hooks?.log?.(`✅ ${list.length} container(s) détecté(s) : ${list.join(', ')}`)
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   return list
+}
+
+// ── iPhone NON jailbreaké : plusieurs comptes dans Instagram (pas de containers) ────────────────────────
+// Profil → tap sur le nom en haut → feuille « liste des comptes · Add Instagram account · Go to Accounts Center ».
+// Une cible « @username » (au lieu d'un nom de container) = basculer sur ce compte via cette feuille.
+const ACCOUNT_STOP = /^(add|instagram|account|accounts|go|to|center|meta|switch|log|into|existing|create|new|profile)$/i
+
+/** Ligne « Add Instagram account » de la feuille (et pas les boutons « Add photo / Add bio » du profil). */
+function addAccountRowY(words: { text: string; cx: number; cy: number }[]): number | null {
+  const add = words.filter(o => /^add$/i.test(o.text)).find(a => words.some(o => /^instagram$/i.test(o.text) && Math.abs(o.cy - a.cy) < 12))
+  if (add) return add.cy
+  const go = words.find(o => /^go$/i.test(o.text) && words.some(m => /^(meta|accounts)$/i.test(m.text) && Math.abs(m.cy - o.cy) < 12))
+  return go ? go.cy - 70 : null
+}
+
+/** Noms de comptes lus dans la feuille de bascule (pure, testée) : identifiants alignés à gauche, sous le haut de la feuille. */
+export function sheetUsernames(words: { text: string; cx: number; cy: number }[], W: number, H: number): string[] {
+  const top = addAccountRowY(words) // la liste est au-dessus de « Add Instagram account »
+  if (top == null) return [] // pas la feuille des comptes
+  const out: { u: string; y: number }[] = []
+  for (const o of words) {
+    const t = o.text.toLowerCase().replace(/[^a-z0-9._]/g, '')
+    if (t.length < 3 || t.length > 30 || !/[a-z]/.test(t) || ACCOUNT_STOP.test(t)) continue
+    if (o.cy < H * 0.25 || o.cy >= top || o.cx > W * 0.75) continue
+    // même compte lu deux fois (lecture « minuscules/chiffres » d'abord, puis lecture normale : 5↔S, 0↔O…)
+    if (!out.some(x => sameUsername(x.u, t) || Math.abs(x.y - o.cy) < 12)) out.push({ u: t, y: o.cy })
+  }
+  return out.sort((a, b) => a.y - b.y).map(x => x.u)
+}
+
+/** Instagram ouvert à neuf depuis l'accueil. 'picker' = iPhone jailbreaké (sélecteur Crane), 'app' = Instagram direct. */
+async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHooks): Promise<'app' | 'picker' | null> {
+  await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
+  if (!await tapInstagramIcon(key, deviceId, hooks)) { hooks?.log?.('❌ Icône Instagram introuvable sur l’accueil.'); return null }
+  await sleep(3500)
+  const shot = await snapshot(key, deviceId)
+  if (!shot) return 'app'
+  const { w: W, h: H } = await imgSize(shot)
+  // sélecteur Crane = « Default » + au moins un autre container (les compteurs « 0 posts / 0 followers » du profil ne comptent pas)
+  const rows = pickerRows(await ocrWords(shot, '0123456789Defaultefaul'), W, H)
+  return rows.length >= 2 && rows.some(o => /^default$/i.test(o.text)) ? 'picker' : 'app'
+}
+
+/** Ouvre la feuille de bascule de comptes (onglet Profil → nom en haut). Renvoie les mots lus, ou null. */
+async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHooks): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number } | null> {
+  const isSheet = (scr: { words: { text: string; cx: number; cy: number }[]; H: number } | null) => !!scr && (addAccountRowY(scr.words) ?? 0) > scr.H * 0.4
+  const isProfile = (scr: { words: { text: string; cy: number }[]; H: number } | null) => !!scr && scr.words.some(o => /^(edit|share|followers|following|posts)$/i.test(o.text) && o.cy < scr.H * 0.45)
+  let scr = await readScreenWords(key, deviceId)
+  if (!scr) return null
+  if (isSheet(scr)) return scr // Instagram rouvert là où on l'avait laissé : la feuille est déjà ouverte
+  const { W, H } = scr
+  // 1. onglet Profil (vérifié : « Edit profile / followers » à l'écran), jusqu'à 3 taps
+  for (let k = 0; k < 3 && !isProfile(scr); k++) {
+    if (k) hooks?.log?.('   onglet Profil pas ouvert → nouveau tap')
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.963 * H) })
+    await sleep(2500); scr = await readScreenWords(key, deviceId)
+    if (isSheet(scr)) return scr
+  }
+  if (!isProfile(scr)) return null
+  // 2. nom du compte en haut (avec ⌄) → feuille des comptes, jusqu'à 3 taps
+  for (let k = 0; k < 3; k++) {
+    if (k) hooks?.log?.('   liste des comptes pas ouverte → nouveau tap')
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.5 * W), y: Math.round(0.068 * H) })
+    await sleep(2200); scr = await readScreenWords(key, deviceId)
+    if (isSheet(scr)) return scr
+  }
+  return null
+}
+
+async function closeAccountSheet(key: string, deviceId: string, W: number, H: number): Promise<void> {
+  await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.5 * W), y: Math.round(0.15 * H) }) // zone grisée au-dessus
+  await sleep(1200)
+}
+
+/** DÉTECTION des comptes Instagram d'un iPhone non jailbreaké. null = feuille introuvable. */
+export async function detectAccountsByVision(key: string, deviceId: string, hooks?: VisionHooks): Promise<string[] | null> {
+  hooks?.log?.('📲 Ouverture d’Instagram…')
+  const mode = await openInstagramApp(key, deviceId, hooks)
+  if (mode !== 'app') { if (mode === 'picker') await sendAction(key, deviceId, { type: 'press', name: 'home' }); return null }
+  hooks?.log?.('👤 Profil → liste des comptes…')
+  const scr = await openAccountSheet(key, deviceId, hooks)
+  if (!scr) { hooks?.log?.('❌ Liste des comptes introuvable (onglet Profil → nom en haut).'); return null }
+  // lecture « minuscules / chiffres / . _ » en premier : bien plus juste sur les identifiants (lucielr5c0 et non lucielrScO)
+  const shot = await snapRetry(key, deviceId)
+  const exact = shot ? await ocrWords(shot, 'abcdefghijklmnopqrstuvwxyz0123456789._', { threshold: null, scale: 2, psms: ['11'] }) : []
+  const list = sheetUsernames([...exact, ...scr.words], scr.W, scr.H)
+  await closeAccountSheet(key, deviceId, scr.W, scr.H)
+  hooks?.log?.(list.length ? `✅ ${list.length} compte(s) détecté(s) : ${list.map(u => '@' + u).join(', ')}` : '❌ Aucun compte lu dans la liste')
+  return list.length ? list : null
+}
+
+/** Bascule sur @username (iPhone non jailbreaké) et vérifie que c'est bien lui qui est actif : dans la feuille des
+ *  comptes, le compte actif porte la coche bleue (le gros nom en haut, grisé, n'est pas lisible par l'OCR). */
+export async function switchAccountByVision(key: string, deviceId: string, username: string, hooks?: VisionHooks): Promise<boolean> {
+  const u = username.replace(/^@/, '').toLowerCase()
+  hooks?.log?.(`👤 Bascule sur @${u}…`)
+  if (await openInstagramApp(key, deviceId, hooks) !== 'app') { hooks?.log?.('❌ Instagram ne s’ouvre pas directement (iPhone jailbreaké ?)'); return false }
+  for (let k = 0; k < 3; k++) {
+    const scr = await openAccountSheet(key, deviceId, hooks)
+    if (!scr) { hooks?.log?.('❌ Liste des comptes introuvable'); return false }
+    const shot = await snapRetry(key, deviceId)
+    const exact = shot ? await ocrWords(shot, 'abcdefghijklmnopqrstuvwxyz0123456789._', { threshold: null, scale: 2, psms: ['11'] }) : []
+    const all = [...exact, ...scr.words]
+    const top = addAccountRowY(all) ?? scr.H
+    const row = all.find(o => o.cy > scr.H * 0.25 && o.cy < top && sameUsername(u, o.text.toLowerCase().replace(/[^a-z0-9._]/g, '')))
+    if (!row) { hooks?.log?.(`❌ @${u} n’est pas dans la liste des comptes de cet iPhone (lu : ${sheetUsernames(all, scr.W, scr.H).map(x => '@' + x).join(', ') || 'rien'})`); await closeAccountSheet(key, deviceId, scr.W, scr.H); return false }
+    const dots = shot ? await findBlueDots(shot, 0.8, 0.95, 0.25, 0.95) : []
+    if (dots.some(d => Math.abs(d.cy - row.cy) < 20)) {
+      hooks?.log?.(`   ✓ compte actif : @${u}`)
+      await closeAccountSheet(key, deviceId, scr.W, scr.H)
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * scr.W), y: Math.round(0.963 * scr.H) }) // accueil d'Instagram
+      await sleep(1500)
+      return true
+    }
+    const x = Math.round(0.45 * scr.W) // dans la ligne, à côté du texte (un tap pile sur les lettres est parfois ignoré)
+    hooks?.log?.(`   tap sur @${u} (ligne y=${row.cy}, coches y=${dots.map(d => d.cy).join('/') || 'aucune'})`)
+    if (k) await doubleTap(key, deviceId, x, row.cy); else await sendAction(key, deviceId, { type: 'tap', x, y: row.cy })
+    await sleep(4500) // Instagram recharge le profil du compte → on rouvre la feuille pour vérifier la coche
+  }
+  hooks?.log?.(`❌ bascule sur @${u} non confirmée`)
+  return false
+}
+
+/** Ouvre une cible de posting : « @username » (compte d'un iPhone non jailbreaké) ou nom de container Crane. */
+export async function openTargetByVision(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
+  return target.startsWith('@') ? switchAccountByVision(key, deviceId, target, hooks) : selectContainerByVision(key, deviceId, target, hooks)
 }
 
 // Ouvre Instagram (via l'icône → déclenche le sélecteur Crane) puis sélectionne le container.
