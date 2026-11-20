@@ -567,6 +567,12 @@ export interface CreateAccountOpts {
   countryLabel?: RegExp       // mot distinctif du pays à cocher (défaut /kingdom/i)
   countryY?: number           // fraction de hauteur du pays dans les résultats (fallback si OCR rate)
 }
+/** Le container est-il « frais » (écran d'inscription « Join Instagram ») ? Vérifié AVANT d'acheter un
+ *  numéro : un container déjà connecté (fil, profil) ne doit jamais faire acheter de numéro. */
+export async function isSignupScreen(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  return hasText(key, deviceId, [/^started$/i, /^s.?inscrire$/i, /commencer$/i, /^join$/i], hooks, { tries: 4, cropY: [0.45, 1] })
+}
+
 export async function createInstagramAccountByVision(
   key: string, deviceId: string, opts: CreateAccountOpts, hooks?: VisionHooks,
 ): Promise<{ ok: boolean; stage: string }> {

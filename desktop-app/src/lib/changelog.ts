@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-20',
+    date: '2026-11-20',
+    title: { fr: 'iRemoTech : création de comptes container par container, sans gaspiller de numéros', en: 'iRemoTech: account creation container by container, without wasting numbers' },
+    items: {
+      fr: ['Chaque iPhone enchaîne ses containers : un compte créé, puis le container suivant, jusqu’au dernier. Avec « Téléphones en parallèle », tous les iPhones avancent en même temps.', 'Un container déjà connecté est repéré AVANT l’achat du numéro et passé (avant, un numéro était acheté puis annulé en boucle).', 'Nombre d’essais maximum par container (3 par défaut) puis container suivant, au lieu de réessayer sans fin. Bouton « Cocher les containers sans compte » pour remplir d’un coup tous les containers vides. Bilan en fin de série.'],
+      en: ['Each iPhone goes through its containers: one account created, then the next container, up to the last one. With “Phones in parallel”, all iPhones move forward at the same time.', 'A container that is already logged in is detected BEFORE buying a number and skipped (before, a number was bought then cancelled in a loop).', 'Max attempts per container (3 by default) then next container, instead of retrying forever. “Tick the containers without an account” button to fill every empty container at once. Summary at the end.'],
+    },
+  },
+  {
     id: '2026-11-19',
     date: '2026-11-19',
     title: { fr: 'Genjutsu : tes propres presets de prompt', en: 'Genjutsu: your own prompt presets' },

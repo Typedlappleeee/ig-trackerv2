@@ -11,7 +11,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
@@ -118,6 +118,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [smspoolMax, setSmspoolMax] = useState('0.35')          // plafond prix SMSPool ($)
   const [smspoolPriceShown, setSmspoolPriceShown] = useState<string | null>(null)
   const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('usa')
+  // essais max par container avant de passer au suivant (le numéro d'un essai raté est annulé → remboursé)
+  const [acctTries, setAcctTries] = useState(() => { try { return Math.max(1, Math.min(10, Number(localStorage.getItem('sf-irt-acct-tries')) || 3)) } catch { return 3 } })
   const [heroOffers, setHeroOffers] = useState<{ price: number; count: number }[]>([]) // paliers de prix HeroSMS
   const [heroPrice, setHeroPrice] = useState<number | null>(null)                       // prix exact choisi (null = auto)
   const [offersLoading, setOffersLoading] = useState(false)
@@ -381,9 +383,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
     setRunning(true); setLogs([])
     const R = startRun('farm', `Création compte ${CFG.name} · ${jobs.length}`, jobs.length); setRunId(R.id)
-    push(`▶ Création de compte (${CFG.name})${smsKey ? ` + numéro ${provName}` : ' (test, sans numéro)'} : ${jobs.length} container(s)`)
-    for (const { dev, c } of jobs) {
-      if (R.isCancelled()) break
+    const byPhone = [...new Set(jobs.map(j => j.dev))].map(dev => ({ dev, conts: jobs.filter(j => j.dev === dev).map(j => j.c) }))
+    push(`▶ Création de compte (${CFG.name})${smsKey ? ` + numéro ${provName}` : ' (test, sans numéro)'} : ${jobs.length} container(s) sur ${byPhone.length} iPhone(s)${parallel && byPhone.length > 1 ? ' · iPhones en parallèle' : ''} · ${acctTries} essai(s) max par container`)
+    const tally = { ok: 0, skip: 0, fail: 0 }
+
+    // Un container : vérifie qu'il est vierge AVANT d'acheter un numéro, puis jusqu'à `acctTries` cycles complets.
+    const createOne = async (dev: string, c: string): Promise<'ok' | 'skip' | 'fail'> => {
       const devName = devices.find(d => d.public_id === dev)?.name ?? dev
       const tag = `[${devName}·${c}]`
       const acctLog: string[] = []
@@ -393,21 +398,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         await recalibrateTouch(key, dev, hooks)
         if (airplaneOn) await airplaneReset(key, dev, hooks)
         const opened = await selectContainerByVision(key, dev, c, hooks)
-        if (!opened) { push(`${tag} ⏭ container non atteint`); R.tick(false); continue }
+        if (!opened) { push(`${tag} ⏭ container non atteint`); return 'fail' }
         await sleep(1500)
         const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY }, hooks)
-        push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`); R.tick(r.ok); continue
+        push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`); return r.ok ? 'ok' : 'fail'
       }
 
-      // Avec numéro : CYCLE COMPLET (conteneur → numéro → inscription entière), en ILLIMITÉ
-      // jusqu'à réussite (ou arrêt manuel). Un WATCHDOG « bloqué > 60s » (aucun log de progression
-      // = écran figé) OU l'absence de code sous 60s OU un échec d'étape → on ANNULE le numéro et on
-      // RECOMMENCE TOUT DE 0. Chaque numéro non finalisé est annulé (finally) → remboursé.
+      // Avec numéro : CYCLE COMPLET (container → vérif « vierge » → numéro → inscription entière), au plus
+      // `acctTries` fois. Un WATCHDOG « bloqué > 60s » (aucun log de progression = écran figé) OU l'absence de
+      // code sous 60s OU un échec d'étape → on ANNULE le numéro (remboursé) et on recommence de 0.
       let success = false
       let resultOrder: { id: string | number; phone: string; price?: number } | null = null
       let creds: { username: string; password: string; fullName: string } | undefined
-      for (let cycle = 0; !success && !R.isCancelled(); cycle++) {
-        if (cycle > 0) push(`${tag} 🔄 on recommence tout le cycle (essai ${cycle + 1})…`)
+      for (let cycle = 0; !success && cycle < acctTries && !R.isCancelled(); cycle++) {
+        if (cycle > 0) push(`${tag} 🔄 nouvel essai (${cycle + 1}/${acctTries})…`)
         let lastBeat = Date.now(); let stuck = false
         const wd = setInterval(() => { if (Date.now() - lastBeat > 60_000) stuck = true }, 3000)
         const chooks = { log: (m: string) => { push(`${tag} ${m}`); acctLog.push(m); lastBeat = Date.now() }, shouldStop: () => R.isCancelled() || stuck }
@@ -416,43 +420,60 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           await recalibrateTouch(key, dev, chooks)
           if (airplaneOn) await airplaneReset(key, dev, chooks)
           const opened = await selectContainerByVision(key, dev, c, chooks)
-          if (!opened) { push(`${tag} ⏭ container non atteint → on recommence de 0`); continue }
+          if (!opened) { push(`${tag} ⏭ container non atteint → nouvel essai`); continue }
           await sleep(1500)
+          // Jamais de numéro acheté pour un container qui n'est pas sur l'écran d'inscription.
+          if (!await isSignupScreen(key, dev, chooks)) {
+            if (cycle === 0) { push(`${tag} ⏭ pas d'écran « Join Instagram » : container déjà connecté → passé (aucun numéro acheté)`); return 'skip' }
+            push(`${tag} ⚠ écran d'inscription introuvable → nouvel essai`); continue
+          }
           push(`${tag} 🛒 achat d'un numéro ${CFG.name} (${provName})…`)
           order = await buyNumber()
           push(`${tag} 📞 numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}${usingHero && acctCountry === 'usa' ? ' · textnow' : ''}`)
           const num = localPhone(order.phone, CFG.dial)
           const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY, phoneNumber: num }, chooks)
-          if (stuck) { push(`${tag} ⏱ bloqué > 60s → on recommence de 0`); continue }
-          if (r.stage !== 'number_submitted') { push(`${tag} ✗ échec avant SMS (étape ${r.stage}) → on recommence de 0`); continue }
+          if (stuck) { push(`${tag} ⏱ bloqué > 60s → nouvel essai`); continue }
+          if (r.stage !== 'number_submitted') { push(`${tag} ✗ échec avant SMS (étape ${r.stage}) → nouvel essai`); continue }
           // Numéro soumis : on laisse un peu de temps à IG (bascule écran code + envoi du SMS)
           // avant d'attendre le code. Si IG envoie par WhatsApp → forcer la bascule en SMS.
           await sleep(3000)
           await requestSmsIfWhatsApp(key, dev, chooks)
           const code = await waitCode(order.id, 60_000)
-          if (!code) { push(`${tag} ⏱ pas de code sous 60s → fermeture d'Instagram, on recommence de 0`); await forceCloseForegroundApp(key, dev, chooks); continue }
+          if (!code) { push(`${tag} ⏱ pas de code sous 60s → fermeture d'Instagram, nouvel essai`); await forceCloseForegroundApp(key, dev, chooks); continue }
           const okCode = await enterSmsCodeByVision(key, dev, code, chooks)
           try { await finishNum(order.id) } catch { /* noop */ }
           resultOrder = order; order = null // numéro consommé (finishNum) → plus d'annulation
-          if (!okCode) { push(`${tag} ⚠ code non validé → on recommence de 0`); continue }
+          if (!okCode) { push(`${tag} ⚠ code non validé → nouvel essai`); continue }
           const done = await completeSignupByVision(key, dev, chooks, { container: c })
           creds = done.creds
-          if (stuck) { push(`${tag} ⏱ bloqué > 60s pendant l'inscription → on recommence de 0`); continue }
+          if (stuck) { push(`${tag} ⏱ bloqué > 60s pendant l'inscription → nouvel essai`); continue }
           if (done.ok) { success = true; push(`${tag} ✅ compte créé`) }
-          else push(`${tag} ⚠ inscription incomplète → on recommence de 0`)
+          else push(`${tag} ⚠ inscription incomplète → nouvel essai`)
         } catch (e) {
-          push(`${tag} ⚠ ${stuck ? 'bloqué > 60s' : (e instanceof Error ? e.message : String(e))} → on recommence de 0`)
+          push(`${tag} ⚠ ${stuck ? 'bloqué > 60s' : (e instanceof Error ? e.message : String(e))} → nouvel essai`)
         } finally {
           clearInterval(wd)
           if (order) { try { await cancelNum(order.id) } catch { /* noop */ } } // numéro acheté non finalisé → annuler
         }
       }
-      if (!success) push(`${tag} ✗ compte non créé (arrêté)`)
-      R.tick(success)
+      if (!success) push(`${tag} ✗ compte non créé${R.isCancelled() ? ' (arrêté)' : ` après ${acctTries} essai(s) → container suivant`}`)
       // Enregistre le compte (identifiants + numéro + logs) → catégorie « Comptes créés ».
       addCreatedAccount({ at: Date.now(), device: dev, deviceName: devName, container: c, username: creds?.username, password: creds?.password, fullName: creds?.fullName, phone: resultOrder?.phone, provider: provName, price: resultOrder?.price, country: CFG.name, ok: success, log: acctLog })
       setCreatedAccts(loadCreatedAccounts())
+      return success ? 'ok' : 'fail'
     }
+
+    // Chaque iPhone enchaîne SES containers ; les iPhones tournent en même temps si « en parallèle ».
+    const runPhone = async (p: { dev: string; conts: string[] }) => {
+      for (const c of p.conts) {
+        if (R.isCancelled()) break
+        const r = await createOne(p.dev, c)
+        tally[r]++; R.tick(r !== 'fail')
+      }
+    }
+    if (parallel) await Promise.all(byPhone.map(runPhone))
+    else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
+    push(`\n📊 ${tally.ok} compte(s) créé(s) · ${tally.skip} container(s) déjà connecté(s) · ${tally.fail} échec(s)`)
     R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'); setRunning(false); setRunId(null)
   }
 
@@ -883,6 +904,21 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               ? <>✓ {smsProvider === 'herosms' ? 'HeroSMS' : smsProvider === 'smspool' ? 'SMSPool' : '5sim'} branché : achète un numéro {acctCountry === 'usa' ? '🇺🇸' : '🇬🇧'}, le saisit, attend le SMS et rentre le code.</>
               : <>Sans token : le flow va jusqu'au choix du pays (test) puis s'arrête.</>}
           </p>
+        </div>
+        <div style={card}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginBottom: 6 }}>Remplir les containers</div>
+          <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque iPhone enchaîne ses containers : un compte créé, puis le container suivant, jusqu’au dernier. Un container déjà connecté est passé sans acheter de numéro.</p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button style={{ ...btn, height: 30, padding: '0 12px' }} disabled={running || !sel.size} onClick={() => {
+              const done = new Set(createdAccts.filter(a => a.ok).map(a => `${a.device}|${a.container}`))
+              setSelConts(sc => { const n = { ...sc }; for (const d of sel) n[d] = new Set((conts[d] ?? []).filter(c => !done.has(`${d}|${c}`))); return n })
+            }}>Cocher les containers sans compte</button>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+              Essais max par container
+              <input type="number" min={1} max={10} value={acctTries} disabled={running} onChange={e => { const v = Math.max(1, Math.min(10, Number(e.target.value) || 1)); setAcctTries(v); try { localStorage.setItem('sf-irt-acct-tries', String(v)) } catch { /* noop */ } }}
+                style={{ width: 56, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
+            </label>
+          </div>
         </div>
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />
         <LaunchBar label={(smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={createAccounts} />
