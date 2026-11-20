@@ -935,18 +935,22 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   // Champ « Password » : on le localise par son placeholder (zone Y pour éviter le titre) puis on
   // DOUBLE-TAP le centre du champ à cette hauteur ; repli position connue ~0.33. Pas d'icône œil
   // ni de re-focus figé (ça ratait et dé-focusait le champ → saisie perdue).
-  const pwPt = await findWordPoint(key, deviceId, [/^password$/i], hooks, { minY: 0.25, maxY: 0.42, tries: 2 })
-  const pwY = pwPt ? pwPt.y : Math.round(0.33 * H)
+  // Le libellé « Password » du champ (aligné à gauche), PAS la ligne d'erreur « Password can't be empty » juste
+  // dessous (~0,40) ni le texte d'aide au-dessus. Repli : position mesurée du champ (~0,336 sur iPhone 406×720).
+  const pwPt = await findWordPoint(key, deviceId, [/^password$/i], hooks, { minY: 0.25, maxY: 0.38, maxX: 0.45, tries: 2 })
+  const pwY = pwPt ? pwPt.y : Math.round(0.336 * H)
   const pwX = Math.round(0.5 * W)
-  if (!pwPt) hooks?.log?.('   champ mot de passe non lu → tap position connue (0.5, 0.33).')
-  await sendAction(key, deviceId, { type: 'tap', x: pwX, y: pwY }); await sleep(220)
-  await sendAction(key, deviceId, { type: 'tap', x: pwX, y: pwY }); await sleep(600)
+  if (!pwPt) hooks?.log?.('   champ mot de passe non lu → tap position connue (0.5, 0.336).')
+  // Un tap simple (pas de double tap : sur un champ mot de passe iOS il ouvre le menu Coller/Remplissage auto).
+  await sendAction(key, deviceId, { type: 'tap', x: pwX, y: pwY }); await sleep(900)
   await sendAction(key, deviceId, { type: 'text', text: password })
   await sleep(700)
   // Filet : si le champ est resté vide (saisie en bloc refusée), on re-tape le champ et char par char.
   if (await hasText(key, deviceId, [/can.?t be empty/i, /vide/i], hooks, { cropY: [0.2, 0.5], tries: 1 })) {
     hooks?.log?.('   ↻ saisie en bloc refusée → char par char…')
-    await sendAction(key, deviceId, { type: 'tap', x: pwX, y: pwY }); await sleep(300)
+    const err = await findWordPoint(key, deviceId, [/^can.?t$/i], hooks, { minY: 0.3, maxY: 0.5, tries: 1 })
+    const fy = err ? err.y - Math.round(0.069 * H) : Math.round(0.336 * H) // le champ est juste au-dessus de l'erreur
+    await sendAction(key, deviceId, { type: 'tap', x: pwX, y: fy }); await sleep(900)
     for (const ch of password) { await sendAction(key, deviceId, { type: 'text', text: ch }); await sleep(60) }
   }
   await sleep(700)

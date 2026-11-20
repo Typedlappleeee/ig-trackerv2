@@ -3738,6 +3738,7 @@ export const EN: Dict = {
     "🍪 Écran des cookies → « Allow all cookies »": "🍪 Cookie screen → “Allow all cookies”",
     "Allow all cookies": "Allow all cookies",
     "cookies acceptés ✓": "cookies accepted ✓",
+    "champ mot de passe non lu → tap position connue (0.5, 0.336).": "password field not read → tapping the known position (0.5, 0.336).",
     "écran du code": "code screen",
     "étape intermédiaire": "intermediate step",
     "⚠ l’écran des cookies ne répond pas : à valider plus tard à la main": "⚠ the cookie screen does not respond: accept it later by hand",

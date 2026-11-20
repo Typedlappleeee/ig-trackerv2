@@ -25,6 +25,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Mode avion : l’arrêt du mode avion est renvoyé jusqu’à ce qu’iRemoTech l’accepte (il pouvait rester activé).',
         'Prix max SMSPool par défaut : 1 $ (un numéro USA coûte environ 0,42 $).',
         'Après un essai raté, le container restait sur l’écran du code : il est maintenant remis à zéro (« Stop creating account ») avant le numéro suivant.',
+        'Page « Create a password » : le champ est visé au bon endroit (plus la ligne d’erreur), le mot de passe est bien saisi.',
       ],
       en: [
         'Container detection: the list is read without scrolling the picker (scrolling opened a random container). The right container is opened, and we check that the picker actually closed.',
@@ -35,6 +36,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Airplane mode: turning airplane mode off is resent until iRemoTech accepts it (it could stay on).',
         'Default SMSPool max price: $1 (a US number costs about $0.42).',
         'After a failed attempt, the container stayed on the code screen: it is now reset (“Stop creating account”) before the next number.',
+        '“Create a password” page: the field is targeted at the right place (no longer the error line), the password is typed correctly.',
       ],
     },
   },
