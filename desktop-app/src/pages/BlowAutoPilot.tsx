@@ -501,6 +501,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           creds = done.creds
           if (stuck) { push(`${tag} ⏱ bloqué > 60s pendant l'inscription → nouvel essai`); continue }
           if (done.ok) { success = true; push(`${tag} ✅ compte créé`) }
+          else if (done.captcha) { push(`${tag} 🤖 vérification humaine demandée par Instagram (compte @${done.creds?.username ?? '?'} en attente) → container suivant`); break }
           else if (done.refused) { push(`${tag} ⛔ refus d'Instagram : pas de nouvel essai sur ce container (un autre numéro serait gaspillé) → container suivant`); break }
           else push(`${tag} ⚠ inscription incomplète → nouvel essai`)
         } catch (e) {

@@ -263,10 +263,12 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
     if (hit) {
       // Tap dans la ligne mais À CÔTÉ du libellé : un tap pile sur le chiffre n'était parfois pas pris
       // (vérifié en direct sur le « 4 »). Puis on vérifie que la feuille s'est fermée, sinon on retape.
-      for (const fx of [0.72, 0.3, 0.8]) {
+      for (const [i, fx] of [0.72, 0.3, 0.72].entries()) {
         const x = Math.round(W * fx)
-        hooks?.log?.(`🎯 « ${wanted} » → tap (${x}, ${hit.cy})`)
-        await sendAction(key, deviceId, { type: 'tap', x, y: hit.cy })
+        hooks?.log?.(`🎯 « ${wanted} » → ${i ? 'double ' : ''}tap (${x}, ${hit.cy})`)
+        // la feuille Crane est une alerte iOS : un tap simple est parfois ignoré, le double tap passe
+        if (i) await doubleTap(key, deviceId, x, hit.cy)
+        else await sendAction(key, deviceId, { type: 'tap', x, y: hit.cy })
         await sleep(1800)
         // feuille encore ouverte sur 2 captures espacées (pas une simple animation de fermeture) → on retape
         const stillOpen = async () => { const sh = await snapshot(key, deviceId); return !!sh && pickerRows(await ocrWords(sh, whitelist), W, H).length >= 2 }
@@ -919,7 +921,7 @@ export async function forceCloseForegroundApp(key: string, deviceId: string, hoo
 }
 
 export interface SignupCreds { username: string; password: string; fullName: string }
-export async function completeSignupByVision(key: string, deviceId: string, hooks?: VisionHooks, opts?: { container?: string }): Promise<{ ok: boolean; creds?: SignupCreds; refused?: boolean }> {
+export async function completeSignupByVision(key: string, deviceId: string, hooks?: VisionHooks, opts?: { container?: string }): Promise<{ ok: boolean; creds?: SignupCreds; refused?: boolean; captcha?: boolean; ready?: boolean }> {
   const shot0 = await snapshot(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible (inscription)'); return { ok: false } }
@@ -1017,7 +1019,7 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   await sendAction(key, deviceId, { type: 'text', text: username })
   await sleep(1200)
   const inField = await readUsernameField(key, deviceId, uy)
-  if (inField && inField !== username) {
+  if (inField && !sameUsername(username, inField)) {
     hooks?.log?.(`   ⚠ le champ affiche @${inField} (saisie non prise) → on garde ce nom pour les identifiants`)
     username = inField
   }
@@ -1032,69 +1034,139 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   if (!await tapButton(key, deviceId, [/i agree/i, /^agree$/i, /j.?accepte/i], { x: 0.5, y: 0.74 }, W, H, hooks, [0.6, 0.9], 'I agree', 4, [0, 1])) await tapFrac(0.5, 0.74)
   await sleep(3000)
 
-  // 6. Écrans de fin (photo de profil, « vibe », suivre 5 personnes, notifications…) :
-  //    on préfère TOUJOURS « Skip » (n'importe où) ; sinon « Next » (bouton bleu, ex. Follow 5) ;
-  //    sinon on considère qu'on est arrivé au fil → on s'arrête.
-  // ⚠ Ne JAMAIS taper le bouton bleu de ces écrans : c'est un opt-in (Add picture / Follow /
-  // Notifications), pas « Next ». On prend « Skip » par texte en priorité ; sinon le Skip est
-  // le bouton secondaire JUSTE SOUS le bouton bleu → on tape sous le bleu, jamais dessus.
-  hooks?.log?.('⏭ Écrans de fin (Skip / Next)…')
-  let idle = 0
-  for (let i = 0; i < 14 && idle < 3; i++) {
-    if (hooks?.shouldStop?.()) break
-    await sleep(1400)
-    // R. Refus d'Instagram (« We couldn't create an account for you ») ou retour à « Join Instagram » :
-    //    le compte N'EST PAS créé (anti-robot : IP / numéro / trop de créations rapprochées).
-    if (await hasText(key, deviceId, [/^couldn.?t$/i, /^impossible$/i], hooks, { tries: 1, cropY: [0.3, 0.6] })) {
-      hooks?.log?.('⛔ Instagram refuse la création (« We couldn’t create an account for you ») : anti-robot (IP, numéro ou créations trop rapprochées)')
-      await findTapText(key, deviceId, [/^ok$/i], hooks, { label: 'OK', tries: 1, minY: 0.4, maxY: 0.75 })
-      return { ok: false, creds: { username, password, fullName }, refused: true }
-    }
-    if (await signupStage(key, deviceId, hooks, 1) === 'join') {
-      hooks?.log?.('⛔ Retour à l’écran « Join Instagram » : compte non créé (refus d’Instagram)')
-      return { ok: false, creds: { username, password, fullName }, refused: true }
-    }
-    // A0. Écran des cookies (peut arriver avant le fil).
-    if (await hasText(key, deviceId, [/^cookies\??$/i], hooks, { tries: 1, cropY: [0.05, 0.35] })) { if (!await acceptCookiesIfShown(key, deviceId, hooks, opts?.container)) break; idle = 0; continue }
-    // A. « Skip » explicite (jamais un opt-in).
-    if (await findTapText(key, deviceId, [/^skip$/i, /^ignorer$/i, /^plus tard$/i, /^not now$/i, /^pas maintenant$/i], hooks, { label: 'Skip', tries: 1, minY: 0.5 })) { idle = 0; continue }
-    // B. Écran « Review the settings for your new profile » (Turn on Notifications/Contacts/Location) :
-    //    le bouton bleu « Next » est TOUT EN BAS, visible après scroll. On scrolle puis on tape Next
-    //    DIRECTEMENT — surtout PAS les « Turn on » (opt-in), ni « sous » le bouton.
-    if (await hasText(key, deviceId, [/review/i], hooks, { tries: 1 })) {
-      // Le compte est déjà créé à ce stade → on FERME Instagram complètement et on le ROUVRE à
-      // neuf (via le conteneur), ce qui retombe sur le fil sans les écrans « Turn on ».
-      hooks?.log?.('   ⚙ écran « Review the settings » → fermer IG puis rouvrir')
-      await forceCloseForegroundApp(key, deviceId, hooks)
-      if (opts?.container) {
-        const reopened = await selectContainerByVision(key, deviceId, opts.container, hooks)
-        hooks?.log?.(reopened ? '   ✅ Instagram rouvert (compte finalisé)' : '   ⚠ réouverture du conteneur incertaine')
-      }
-      await sleep(4000)
-      await acceptCookiesIfShown(key, deviceId, hooks, opts?.container)
-      hooks?.log?.(`✅ Compte créé — 🔐 @${username} · ${password}`)
-      return { ok: true, creds: { username, password, fullName } }
-    }
-    // C. « Next »/« Suivant » visible (avance légitime, ex. autres écrans) → tap direct.
-    if (await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next', tries: 1, minY: 0.55 })) { idle = 0; continue }
-    // C2. « I agree » / « J'accepte » — l'écran « Agree to Instagram's terms » arrive AVANT
-    //     « Review the settings » (bouton bleu). Tap DIRECT (jamais « sous » : « I already have an
-    //     account » est en dessous). La boucle ré-évalue chaque écran → l'ordre n'importe pas.
-    if (await findTapText(key, deviceId, [/i agree/i, /^agree$/i, /j.?accepte/i, /^accepter$/i], hooks, { label: 'I agree', tries: 1, minY: 0.5 })) { idle = 0; await sleep(2500); continue }
-    // D. Vrai opt-in bleu (Add picture / Follow) avec un « Skip » secondaire JUSTE EN DESSOUS →
-    //    on tape SOUS le bouton bleu (jamais dessus).
-    const endShot = await snapshot(key, deviceId)
-    const blue = endShot ? await findBlueButton(endShot, 0.75, 0.95, 0, 1) : null
-    if (blue) {
-      const belowY = Math.min(H - 6, blue.cy + Math.round(0.075 * H))
-      hooks?.log?.(`   ⏭ opt-in bleu en ${blue.cy} → tap SOUS (Skip) (${blue.cx}, ${belowY})`)
-      await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: belowY })
-      idle = 0; continue
-    }
-    idle++ // rien d'actionnable → probablement le fil d'accueil ; on sort après quelques essais
+  // 6. Écrans de fin : moteur piloté par l'écran (settleToFeed) — chaque écran connu a son action, et on ne
+  //    s'arrête que sur le FIL Instagram (prêt à poster) ou sur un refus.
+  const end = await settleToFeed(key, deviceId, hooks, opts?.container)
+  if (end === 'refused') return { ok: false, creds: { username, password, fullName }, refused: true }
+  if (end === 'captcha') return { ok: false, creds: { username, password, fullName }, captcha: true }
+  hooks?.log?.(end === 'feed' ? `✅ Compte créé et fil Instagram affiché (prêt à poster) — 🔐 @${username} · ${password}` : `✅ Compte créé — 🔐 @${username} · ${password} (⚠ fil Instagram non confirmé à l’écran)`)
+  return { ok: true, creds: { username, password, fullName }, ready: end === 'feed' }
+}
+
+// ── Moteur « écran → action » de fin d'inscription ──────────────────────────────
+export type EndAction =
+  | { kind: 'refused' } | { kind: 'captcha' } | { kind: 'feed' } | { kind: 'reopen'; why: string }
+  | { kind: 'tap'; x: number; y: number; label: string; double?: boolean }
+
+/** Décide quoi faire selon les mots lus à l'écran (pure, testée). null = écran inconnu / transition. */
+export function decideEndScreen(raw: { text: string; cx: number; cy: number; x?: number; w?: number; h?: number }[], W: number, H: number): EndAction | null {
+  const words = withJoined(raw.map(o => ({ ...o, text: o.text.replace(/[^\p{L}\p{N}'’]/gu, '') })).filter(o => o.text))
+  const find = (re: RegExp, minY = 0, maxY = 1) => words.find(o => re.test(o.text) && o.cy >= minY * H && o.cy <= maxY * H)
+  const has = (re: RegExp, minY = 0, maxY = 1) => !!find(re, minY, maxY)
+  // 1. Refus d'Instagram / retour à Join
+  if (has(/^couldn['’]?t$/i) && (has(/^create$/i) || has(/^sign$/i))) return { kind: 'refused' }
+  if (has(/^(started|getstarted)$/i, 0.6) && has(/^join$/i, 0.45)) return { kind: 'refused' }
+  // 1b. Vérification humaine (« Confirm you're human to use your profile », captcha) → on ne la résout PAS :
+  //     on passe au container suivant (règle du propriétaire)
+  if (has(/^human$/i) && (has(/^confirm$/i) || has(/^you['’]?re$/i)) || has(/^(captcha|robot)$/i)) return { kind: 'captcha' }
+  // 2. Alerte iOS de permission (« Would Like to Access Your Contacts / Send You Notifications / Use Your
+  //    Location », suivi publicitaire) → « Don't Allow » / « Ask App Not to Track » (double tap : alerte iOS)
+  if (has(/^would$/i) && has(/^like$/i) || has(/^track$/i) && has(/^ask$/i)) {
+    const b = find(/^(don['’]?t|dontallow|ask|askapp)$/i, 0.3, 0.95)
+    if (b) return { kind: 'tap', x: b.cx + 25, y: b.cy, label: 'Don’t Allow', double: true }
   }
-  hooks?.log?.(`✅ Compte créé — 🔐 @${username} · ${password}`)
-  return { ok: true, creds: { username, password, fullName } }
+  // 3. Cookies → « Allow all cookies » (double tap)
+  if (has(/^cookies\??$/i, 0.05, 0.35)) { const b = find(/^(allow|allowall)$/i, 0.8); if (b) return { kind: 'tap', x: b.cx + 40, y: b.cy, label: 'Allow all cookies', double: true } }
+  // 3a. Feuille « Allow Instagram to access your photos and videos » (par-dessus la galerie) → Continue
+  //     (puis l'alerte iOS « Would Like to Access Your Photos » → Don't Allow, règle 2)
+  // (« Continue » blanc sur bleu est souvent illisible → position du bouton en bas, ~94 %)
+  if (has(/^access$/i, 0.3, 0.5) && has(/^videos$/i, 0.3, 0.5) && !has(/^please$/i)) { const b = find(/^continue$/i, 0.8); return { kind: 'tap', x: b ? b.cx : Math.round(W / 2), y: b ? b.cy : Math.round(0.94 * H), label: 'Continue (photos)' } }
+  // 3b. Galerie photo ouverte par « Add profile picture » (en-tête « Cancel · Library · Done ») → Cancel
+  if (has(/^library$/i, 0, 0.08) || (has(/^cancel$/i, 0, 0.08) && has(/^(photos|recents|library)$/i))) { const b = find(/^cancel$/i, 0, 0.08); if (b) return { kind: 'tap', x: b.cx, y: b.cy, label: 'Cancel (galerie)' } }
+  // 4. « Review the settings for your new profile » (Turn on…) → fermer et rouvrir Instagram
+  if (has(/^review$/i) && has(/^settings$/i)) return { kind: 'reopen', why: 'Review the settings' }
+  // 5. Fil d'accueil : rangée des stories (« Your story ») → prêt à poster
+  if (has(/^(your|yourstory)$/i, 0.08, 0.35) && has(/^story$/i, 0.08, 0.35) || has(/^yourstory$/i, 0.08, 0.35)) return { kind: 'feed' }
+  // 6. « Save your login info? » → Save (évite de redemander la connexion)
+  if (has(/^login$/i) && has(/^save$/i, 0.45)) { const b = find(/^save$/i, 0.45)!; return { kind: 'tap', x: b.cx, y: b.cy, label: 'Save (login)' } }
+  // 7. Passer : Skip / Not now / Plus tard
+  // en bas OU en haut à droite (écran « Create a profile that shows your vibe » : Skip en haut à droite)
+  const skipRe = /^(skip|notnow|ignorer|plustard|pasmaintenant|later|maybelater)$/i
+  const skip = find(skipRe, 0.45) ?? words.find(o => skipRe.test(o.text) && o.cy <= 0.1 * H && o.cx >= 0.6 * W)
+  if (skip) return { kind: 'tap', x: skip.cx, y: skip.cy, label: skip.text }
+  // 8. I agree (conditions)
+  const agree = find(/^(iagree|agree|jaccepte|accepter)$/i, 0.5)
+  if (agree) return { kind: 'tap', x: agree.cx, y: agree.cy, label: 'I agree' }
+  // 9. Avancer : Next / Continue / Done
+  const next = find(/^(next|suivant|continue|continuer|done|ok)$/i, 0.55)
+  if (next) return { kind: 'tap', x: next.cx, y: next.cy, label: next.text }
+  return null
+}
+
+async function readScreenWords(key: string, deviceId: string): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number } | null> {
+  const shot = await snapshot(key, deviceId)
+  if (!shot) return null
+  const { w: W, h: H } = await imgSize(shot)
+  if (!W || !H) return null
+  const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
+  const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
+  return { words: [...wa, ...wb], W, H }
+}
+
+/** Fait défiler les écrans de fin jusqu'au fil Instagram. 'feed' = prêt à poster, 'refused' = refus, 'unknown'. */
+export async function settleToFeed(key: string, deviceId: string, hooks?: VisionHooks, container?: string): Promise<'feed' | 'refused' | 'captcha' | 'unknown'> {
+  hooks?.log?.('⏭ Écrans de fin : lecture de l’écran → action, jusqu’au fil Instagram…')
+  let idle = 0, reopened = false, last = ''
+  let same = 0
+  for (let step = 0; step < 28; step++) {
+    if (hooks?.shouldStop?.()) return 'unknown'
+    await sleep(1500)
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) { idle++; continue }
+    const act = decideEndScreen(scr.words, scr.W, scr.H)
+    if (act?.kind === 'refused') { hooks?.log?.('⛔ Instagram refuse la création (« We couldn’t create an account for you ») : anti-robot (IP, numéro ou créations trop rapprochées)'); await findTapText(key, deviceId, [/^ok$/i], hooks, { label: 'OK', tries: 1, minY: 0.4, maxY: 0.75 }); return 'refused' }
+    if (act?.kind === 'feed') { hooks?.log?.('🏠 Fil Instagram affiché ✓'); return 'feed' }
+    if (act?.kind === 'captcha') { hooks?.log?.('🤖 Vérification humaine demandée par Instagram → on passe au container suivant (non résolue)'); return 'captcha' }
+    if (act?.kind === 'reopen' && !reopened) {
+      hooks?.log?.(`   ⚙ écran « ${act.why} » → fermer Instagram puis rouvrir le MÊME container`)
+      await forceCloseForegroundApp(key, deviceId, hooks)
+      if (container) await selectContainerByVision(key, deviceId, container, hooks)
+      await sleep(5000); reopened = true; idle = 0; continue
+    }
+    if (act?.kind === 'tap') {
+      // même bouton tapé 3 fois sans effet → on bascule en double tap (alerte iOS qui ignore le tap simple)
+      const sig = `${act.label}@${Math.round(act.y / 20)}`
+      same = sig === last ? same + 1 : 0; last = sig
+      const dbl = act.double || same >= 2
+      hooks?.log?.(`   👆 ${act.label} → ${dbl ? 'double ' : ''}tap (${act.x}, ${act.y})`)
+      if (dbl) await doubleTap(key, deviceId, act.x, act.y)
+      else await sendAction(key, deviceId, { type: 'tap', x: act.x, y: act.y })
+      if (same >= 5) { hooks?.log?.('   ⚠ écran bloqué sur le même bouton'); break }
+      idle = 0; await sleep(1500); continue
+    }
+    // Écran inconnu avec un bouton bleu : 1er passage → « Skip » juste dessous ; si l'écran n'a pas bougé →
+    // le bouton bleu lui-même (Next / Continue mal lu). On ne quitte JAMAIS le container ici.
+    const shot = await snapshot(key, deviceId)
+    const blue = shot ? await findBlueButton(shot, 0.6, 0.97, 0, 1) : null
+    if (blue) {
+      if (idle % 2 === 0) {
+        const belowY = Math.min(scr.H - 6, blue.cy + Math.round(0.075 * scr.H))
+        hooks?.log?.(`   ⏭ bouton bleu en ${blue.cy} → d’abord « Skip » dessous (${blue.cx}, ${belowY})`)
+        await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: belowY })
+      } else {
+        hooks?.log?.(`   👆 écran inchangé → bouton bleu (${blue.cx}, ${blue.cy})`)
+        await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: blue.cy })
+      }
+    } else if (idle >= 3) {
+      // rien de lisible : on tente « Retour » du système (sans fermer l'app)
+      hooks?.log?.('   … écran sans bouton reconnu, on attend')
+    }
+    idle++
+    if (idle >= 10) break
+  }
+  return 'unknown'
+}
+
+/** Le nom lu par l'OCR est-il le nom tapé (au bruit de lecture près : 5↔s, 0↔o, 1↔l…) ? */
+export function sameUsername(typed: string, read: string): boolean {
+  const n = (v: string) => v.toLowerCase().replace(/5/g, 's').replace(/0/g, 'o').replace(/[1i|]/g, 'l').replace(/8/g, 'b').replace(/6/g, 'g').replace(/2/g, 'z')
+  const a = n(typed), b = n(read)
+  if (a === b) return true
+  // distance d'édition ≤ 2 (un caractère mal lu / manqué)
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)])
+  for (let j = 1; j <= b.length; j++) d[0][j] = j
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+  return d[a.length][b.length] <= 2
 }
 
 /** Valeur lue dans le champ Username (mot type identifiant sur la ligne du champ), null si illisible. */
@@ -1503,12 +1575,18 @@ export async function detectContainersByVision(key: string, deviceId: string, ho
 
 // Ouvre Instagram (via l'icône → déclenche le sélecteur Crane) puis sélectionne le container.
 export async function selectContainerByVision(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
-  hooks?.log?.('🏠 Retour à l’écran d’accueil…')
-  await sendAction(key, deviceId, { type: 'press', name: 'home' })
-  await sleep(1200)
-  hooks?.log?.('📲 Recherche de l’icône Instagram…')
-  const opened = await tapInstagramIcon(key, deviceId, hooks)
-  if (!opened) { hooks?.log?.('❌ Icône Instagram introuvable sur l’accueil (mets-la sur la 1re page).'); return false }
-  await sleep(2800) // laisse le sélecteur Crane apparaître
-  return findAndTapContainer(key, deviceId, target, hooks)
+  // 2 essais : vu en direct, un « home » ignoré laissait Instagram ouvert → le mot « Instagram » de l'app était
+  // pris pour l'icône, et le sélecteur ne s'ouvrait jamais. On ferme alors l'app et on recommence.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) { hooks?.log?.('   ↻ sélecteur pas ouvert → fermeture d’Instagram et nouvel essai'); await forceCloseForegroundApp(key, deviceId, hooks) }
+    hooks?.log?.('🏠 Retour à l’écran d’accueil…')
+    await sendAction(key, deviceId, { type: 'press', name: 'home' })
+    await sleep(1500)
+    hooks?.log?.('📲 Recherche de l’icône Instagram…')
+    const opened = await tapInstagramIcon(key, deviceId, hooks)
+    if (!opened) { hooks?.log?.('❌ Icône Instagram introuvable sur l’accueil (mets-la sur la 1re page).'); continue }
+    await sleep(2800) // laisse le sélecteur Crane apparaître
+    if (await findAndTapContainer(key, deviceId, target, hooks)) return true
+  }
+  return false
 }
