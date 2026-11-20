@@ -31,7 +31,7 @@ export async function totp(secret: string, at = Date.now(), digits = 6, step = 3
   const msg = new Uint8Array(8)
   let c = counter
   for (let i = 7; i >= 0; i--) { msg[i] = c & 0xff; c = Math.floor(c / 256) }
-  const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
+  const k = await crypto.subtle.importKey('raw', key as BufferSource, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
   const h = new Uint8Array(await crypto.subtle.sign('HMAC', k, msg))
   const o = h[h.length - 1] & 0x0f
   const bin = ((h[o] & 0x7f) << 24) | (h[o + 1] << 16) | (h[o + 2] << 8) | h[o + 3]

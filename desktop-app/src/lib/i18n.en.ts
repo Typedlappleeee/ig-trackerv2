@@ -3738,6 +3738,7 @@ export const EN: Dict = {
     "🍪 Écran des cookies → « Allow all cookies »": "🍪 Cookie screen → “Allow all cookies”",
     "Allow all cookies": "Allow all cookies",
     "cookies acceptés ✓": "cookies accepted ✓",
+    "clé 2FA invalide": "invalid 2FA key",
     "⚠ « Follow 5 » : impossible de tout décocher": "⚠ “Follow 5”: could not untick everything",
     "↓ « Follow 5 » : défilement de la liste pour trouver d’autres comptes cochés": "↓ “Follow 5”: scrolling the list to find other ticked accounts",
     "⚙ « Review the settings » → défilement jusqu’en bas puis « Next »": "⚙ “Review the settings” → scroll to the bottom then “Next”",
