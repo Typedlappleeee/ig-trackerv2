@@ -3748,7 +3748,7 @@ export const EN: Dict = {
     "créateur ouvert → ✕ en haut à gauche": "creator open → ✕ at the top left",
     "page de réglages ouverte par erreur → ✕": "settings page opened by mistake → ✕",
     "Reel plein écran → retour": "full-screen Reel → back",
-    "durée des vignettes non lue → vidéo pré-sélectionnée par Instagram (la plus récente)": "thumbnail durations not read → video pre-selected by Instagram (the latest)",
+    "1re vignette non lue → vidéo pré-sélectionnée par Instagram (la plus récente)": "1st thumbnail not read → video pre-selected by Instagram (the latest)",
     "↪ Pas de containers : lecture des comptes Instagram connectés…": "↪ No containers: reading the logged-in Instagram accounts…",
     "📲 Ouverture d’Instagram…": "📲 Opening Instagram…",
     "👤 Profil → liste des comptes…": "👤 Profile → account list…",

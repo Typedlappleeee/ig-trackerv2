@@ -610,13 +610,15 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
   const rec = await findWordPoint(key, deviceId, [/^recents?$/i, /^r[ée]cents?$/i], hooks, { minY: 0.25, maxY: 0.85, tries: 2 })
   const gshot = rec ? await snapshot(key, deviceId) : null
   const durs = gshot && rec ? (await ocrWords(gshot, '0123456789:', { threshold: null, scale: 2, psms: ['11'] })).filter(o => /^\d{1,2}:\d{2}$/.test(o.text) && o.cy > rec.y) : []
-  if (durs.length) {
-    const first = durs.sort((a, b) => (Math.abs(a.cy - b.cy) < 20 ? a.cx - b.cx : a.cy - b.cy))[0]
+  const first = durs.sort((a, b) => (Math.abs(a.cy - b.cy) < 20 ? a.cx - b.cx : a.cy - b.cy))[0]
+  // la plus récente est dans les 2 premières colonnes (après l'éventuelle case appareil photo) : une durée lue plus à
+  // droite = celle de la 1re vignette a été ratée par l'OCR → on ne tape pas (sinon on choisirait une vidéo PLUS ANCIENNE)
+  if (first && first.cx <= W * 0.5) {
     const x = Math.max(8, first.cx - Math.round(W / 16)), y = first.cy - Math.round(W / 10)
     hooks?.log?.(`🎞️ Dernière vidéo (1re vignette avec durée ${first.text}) → tap (${x}, ${y})`)
     await sendAction(key, deviceId, { type: 'tap', x, y })
     await sleep(1500)
-  } else hooks?.log?.('   durée des vignettes non lue → vidéo pré-sélectionnée par Instagram (la plus récente)')
+  } else hooks?.log?.('   1re vignette non lue → vidéo pré-sélectionnée par Instagram (la plus récente)')
   // b. Avancer jusqu'à l'écran de légende : Next en haut-droite (texte) ou en bas-droite (bouton bleu).
   let atCaption = false
   for (let step = 0; step < 6 && !atCaption; step++) {
