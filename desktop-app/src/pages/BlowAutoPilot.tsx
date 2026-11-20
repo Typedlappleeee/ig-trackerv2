@@ -244,14 +244,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // Détecte les containers Crane d'un iPhone (sélecteur lu à l'écran) et remplace sa liste.
   const detectConts = async (dev: string, log: (m: string) => void, stop?: () => boolean): Promise<string[] | null> => {
     if (!irt.key) return null
-    let list = await detectContainersByVision(irt.key, dev, { log, shouldStop: stop })
-    if (!list) {
-      // Pas de sélecteur Crane = iPhone non jailbreaké : on lit les COMPTES connectés dans Instagram (« @nom »)
-      log('↪ Pas de containers : lecture des comptes Instagram connectés…')
-      const accts = await detectAccountsByVision(irt.key, dev, { log, shouldStop: stop })
+    const key = irt.key
+    const readAccounts = async () => {
+      const accts = await detectAccountsByVision(key, dev, { log, shouldStop: stop })
       // orthographe exacte reprise des « Comptes créés » quand l'OCR a mal lu un caractère (5↔s, 0↔o…)
       const known = loadCreatedAccounts().map(a => a.username).filter((u): u is string => !!u)
-      list = accts ? accts.map(u => '@' + (known.find(k => sameUsername(k, u)) ?? u)) : null
+      return accts ? accts.map(u => '@' + (known.find(k => sameUsername(k, u)) ?? u)) : null
+    }
+    // Type déjà connu → directement la bonne méthode ; sinon (1re détection) containers Crane puis comptes.
+    const kind = phoneKind(conts[dev])
+    let list: string[] | null
+    if (kind === 'normal') { log('📱 iPhone normal : lecture des comptes Instagram connectés…'); list = await readAccounts() }
+    else {
+      list = await detectContainersByVision(key, dev, { log, shouldStop: stop })
+      if (!list) { log('↪ Pas de sélecteur Crane : iPhone normal → lecture des comptes Instagram connectés…'); list = await readAccounts() }
     }
     if (list?.length) { saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list })); setSelConts(sc => ({ ...sc, [dev]: new Set(list) })) }
     return list
@@ -261,7 +267,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
     setDetecting(dev); setLogs([])
     const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(e => { push(`[${name}] ⚠ ${e instanceof Error ? e.message : String(e)}`); return null })
-    if (!list) push(`[${name}] ✗ containers non détectés`)
+    if (!list) push(`[${name}] ✗ ni containers ni comptes détectés`)
     setDetecting(null)
   }
   const toggleCont = (dev: string, name: string) => setSelConts(sc => { const cur = new Set(sc[dev] ?? []); if (cur.has(name)) cur.delete(name); else cur.add(name); return { ...sc, [dev]: cur } })
@@ -610,7 +616,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // Cocher un iPhone coche tous ses containers ; on décoche ensuite ceux qu'on ne veut pas.
   const onlineN = devices.filter(isDeviceOn).length
   const phonePicker = (opts?: { manage?: boolean }) => (
-    <Step n={1} title="Où ?" sub={totalJobs ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} · ${totalJobs} container${totalJobs > 1 ? 's' : ''} sélectionné${totalJobs > 1 ? 's' : ''}` : 'Choisis les iPhones et leurs containers'}
+    <Step n={1} title="Où ?" sub={totalJobs ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} · ${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))} sélectionné(s)` : 'Choisis les iPhones et leurs comptes / containers'}
       right={<span style={{ display: 'flex', gap: 6 }}>
         <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setKeyOpen(o => !o)}>⚙ Clé iRemoTech</button>
         <button style={{ ...btn, height: 28, fontSize: 12 }} disabled={loading} title={`Clé iRemoTech utilisée : …${(irt.key ?? '').slice(-4)}`} onClick={() => load(false)}>{loading ? 'Actualisation…' : `↻ Actualiser (${devices.length})`}</button>
@@ -631,6 +637,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         {devices.map(d => {
           const id = d.public_id, on = sel.has(id), live = isDeviceOn(d)
           const list = conts[id] ?? [], picked = selConts[id] ?? new Set<string>()
+          const kind = phoneKind(list), unit = kind === 'normal' ? 'compte' : 'container'
           return (
             <div key={id} style={{ borderRadius: 10, border: `1px solid ${on ? SEL_EDGE : EDGE}`, background: on ? 'rgba(233,196,106,0.04)' : '#0E0E10', padding: 12, display: 'flex', flexDirection: 'column', gap: 10, opacity: live || on ? 1 : 0.6 }}>
               <div onClick={() => togglePhone(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
@@ -639,9 +646,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                   <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deviceLabel(d)}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>
                     <span style={{ width: 7, height: 7, borderRadius: 99, background: live ? '#22C55E' : '#EF4444', boxShadow: live ? '0 0 6px rgba(34,197,94,.55)' : 'none' }} />
-                    {live ? 'En ligne' : 'Hors ligne'} · {list.length ? `${picked.size}/${list.length} container${list.length > 1 ? 's' : ''}` : 'aucun container'}
+                    {live ? 'En ligne' : 'Hors ligne'} · {list.length ? `${picked.size}/${list.length} ${unit}${list.length > 1 ? 's' : ''}` : 'pas encore détecté'}
                   </span>
                 </span>
+                {kind && <span title={kind === 'normal' ? 'iPhone normal : plusieurs comptes connectés dans Instagram' : 'iPhone jailbreaké : un compte par container Crane'} style={{ flex: 'none', height: 22, padding: '0 8px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 600, background: kind === 'normal' ? 'rgba(96,165,250,0.12)' : 'rgba(233,196,106,0.12)', color: kind === 'normal' ? '#93C5FD' : GOLD, border: `1px solid ${kind === 'normal' ? 'rgba(96,165,250,0.3)' : 'rgba(233,196,106,0.3)'}` }}>{kind === 'normal' ? '📱 iPhone normal' : '🔓 Jailbreak'}</span>}
               </div>
               {list.length > 0 ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -650,20 +658,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     return (
                       <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
                         <span onClick={() => { if (!on) togglePhone(id); toggleCont(id, c) }} style={{ cursor: 'pointer', padding: '0 10px' }} data-no-tr>{c}</span>
-                        {opts?.manage && <span onClick={() => removeC(id, c)} title="Retirer ce container" style={{ cursor: 'pointer', color: DIM, padding: '0 8px 0 0', fontSize: 14 }}>×</span>}
+                        {opts?.manage && <span onClick={() => removeC(id, c)} title="Retirer" style={{ cursor: 'pointer', color: DIM, padding: '0 8px 0 0', fontSize: 14 }}>×</span>}
                       </span>
                     )
                   })}
                 </div>
-              ) : <div style={{ fontSize: 12.5, color: MUTED }}>Clique « Détecter » : ScaleFlow lit les containers sur l’iPhone.</div>}
+              ) : <div style={{ fontSize: 12.5, color: MUTED }}>Clique « Détecter » : ScaleFlow lit les containers (iPhone jailbreaké) ou les comptes Instagram connectés (iPhone normal).</div>}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} disabled={running || !!detecting || !live} title="Ouvre le sélecteur Crane sur l’iPhone et lit tous les containers" onClick={() => void detectOne(id)}>{detecting === id ? 'Détection…' : '🔍 Détecter'}</button>
+                <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} disabled={running || !!detecting || !live} title={kind === 'normal' ? 'Ouvre Instagram → Profil → liste des comptes, et lit les comptes connectés' : 'Lit les containers Crane (ou, sur un iPhone normal, les comptes Instagram connectés)'} onClick={() => void detectOne(id)}>{detecting === id ? 'Détection…' : '🔍 Détecter'}</button>
                 {list.length > 0 && <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} onClick={() => { if (!on) togglePhone(id); setSelConts(sc => ({ ...sc, [id]: new Set(list) })) }}>Tout</button>}
                 {list.length > 0 && <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} onClick={() => setSelConts(sc => ({ ...sc, [id]: new Set() }))}>Aucun</button>}
               </div>
               {opts?.manage && (
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <input value={newC[id] ?? ''} onChange={e => setNewC(v => ({ ...v, [id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(id) }} placeholder="Ajouter à la main (ex. 6)" style={{ ...inp, height: 28, flex: 1, minWidth: 0, fontSize: 12 }} />
+                  <input value={newC[id] ?? ''} onChange={e => setNewC(v => ({ ...v, [id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(id) }} placeholder={kind === 'normal' ? 'Ajouter à la main (ex. @compte)' : 'Ajouter à la main (ex. 6, ou @compte)'} style={{ ...inp, height: 28, flex: 1, minWidth: 0, fontSize: 12 }} />
                   <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => addC(id)}>Ajouter</button>
                 </div>
               )}
@@ -706,7 +714,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
 
   const TAB_TITLE: Record<IrtTab, { title: string; sub: string }> = {
-    phones: { title: 'Mes iPhones', sub: 'Tes iPhones iRemoTech et leurs containers. « Détecter » lit les containers directement sur l’iPhone.' },
+    phones: { title: 'Mes iPhones', sub: 'Tes iPhones iRemoTech : containers Crane (jailbreak) ou comptes Instagram connectés (iPhone normal). « Détecter » les lit directement sur l’iPhone.' },
     posting: { title: 'Publier des Reels', sub: 'Choisis où, quelles vidéos, et lance : chaque container publie un Reel.' },
     story: { title: 'Publier des Stories', sub: 'Une photo et un lien sticker par container.' },
     warmup: { title: 'Warm-up', sub: 'Fais vivre tes comptes comme un humain, container par container.' },
@@ -787,7 +795,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <div style={{ ...lbl, margin: '0 0 6px' }}>Légendes (une par ligne, tirées au hasard)</div>
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={3} placeholder={'Ma légende 1\nMa légende 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 60, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
         </div>
-        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Reel${totalJobs > 1 ? 's' : ''} sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length) || running} running={running} onClick={() => run('reel')} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Reel${totalJobs > 1 ? 's' : ''} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length) || running} running={running} onClick={() => run('reel')} />
         <LogPanel />
       </>)}
 
@@ -831,7 +839,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <div style={{ ...lbl, margin: '14px 0 6px' }}>Textes sticker (une par ligne, au hasard — optionnel)</div>
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={2} placeholder={'Texte 1\nTexte 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 46, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
         </div>
-        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Stor${totalJobs > 1 ? 'ies' : 'y'} sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || (storySrc.mode === 'folder' ? !storySrc.folder : !storyPool.length) || running} running={running} onClick={() => run('story')} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Stor${totalJobs > 1 ? 'ies' : 'y'} sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || (storySrc.mode === 'folder' ? !storySrc.folder : !storyPool.length) || running} running={running} onClick={() => run('story')} />
         <LogPanel />
       </>)}
 
@@ -871,7 +879,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           )}
           <p style={{ margin: '8px 0 0', fontSize: 11, color: DIM }}>Chaque session est aléatoire (durée, temps de visionnage, reels likés) pour rester crédible.</p>
         </div>
-        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à chauffer sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />} label={`Lancer le warm-up (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={runWarmup} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à chauffer sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />} label={`Lancer le warm-up (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={runWarmup} />
         <LogPanel />
       </>)}
 
@@ -982,7 +990,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           </p>
         </div>
         <div style={card}>
-          <StepHead n={3} title="Quels containers ?" sub="Chaque iPhone enchaîne ses containers : un compte, puis le suivant, jusqu’au dernier. Un container déjà connecté est passé sans acheter de numéro." />
+          <StepHead n={3} title="Quels containers ?" sub="Chaque iPhone jailbreaké enchaîne ses containers : un compte, puis le suivant, jusqu’au dernier. Un container déjà connecté est passé sans acheter de numéro. Les iPhones normaux (comptes) ne servent pas à la création." />
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ flex: '1 1 320px' }}>
               <Toggle on={autoDetect} onClick={() => { if (running) return; const v = !autoDetect; setAutoDetect(v); try { localStorage.setItem('sf-irt-auto-detect', v ? '1' : '0') } catch { /* noop */ } }}
@@ -999,7 +1007,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             </label>
           </div>
         </div>
-        <LaunchBar n={4} summary={autoDetect ? (sel.size ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} : détection des containers puis un compte dans chaque container vide` : 'Choisis des iPhones à l’étape 1') : totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à créer` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode forceAirplane />} label={autoDetect ? `Détecter et remplir les containers (${sel.size} iPhone${sel.size > 1 ? 's' : ''})` : (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={(autoDetect ? !sel.size : !totalJobs) || running || !!detecting} running={running} onClick={createAccounts} />
+        <LaunchBar n={4} summary={autoDetect ? (sel.size ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} : détection des containers puis un compte dans chaque container vide` : 'Choisis des iPhones à l’étape 1') : totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à créer` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode forceAirplane />} label={autoDetect ? `Détecter et remplir les containers (${sel.size} iPhone${sel.size > 1 ? 's' : ''})` : (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={(autoDetect ? !sel.size : !totalJobs) || running || !!detecting} running={running} onClick={createAccounts} />
         <LogPanel />
         {createdAccts.length > 0 && (
           <div style={card}>
@@ -1141,6 +1149,18 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 }
 
 // Options d'un lancement : interrupteurs compacts, posés dans la barre « Lancer ».
+/** Type d'iPhone déduit des cibles détectées : comptes « @nom » = iPhone normal, containers Crane = jailbreak. */
+export function phoneKind(list: string[] | undefined): 'normal' | 'jb' | null {
+  if (!list?.length) return null
+  return list.every(c => c.startsWith('@')) ? 'normal' : 'jb'
+}
+/** « 3 containers · 2 comptes » selon les cibles cochées. */
+export function targetsSummary(targets: string[]): string {
+  const acc = targets.filter(c => c.startsWith('@')).length, ct = targets.length - acc
+  const parts = [ct ? `${ct} container${ct > 1 ? 's' : ''}` : '', acc ? `${acc} compte${acc > 1 ? 's' : ''}` : ''].filter(Boolean)
+  return parts.join(' · ')
+}
+
 function OptionsCard({ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel, accountMode, forceAirplane }: {
   airplaneOn: boolean; setAirplaneOn: (f: (v: boolean) => boolean) => void
   uniqueUse: boolean; setUniqueUse: (f: (v: boolean) => boolean) => void

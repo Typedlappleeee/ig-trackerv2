@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
-import { progressRows } from './BlowAutoPilot'
+import { progressRows, phoneKind, targetsSummary } from './BlowAutoPilot'
 
 describe('iRemoTech — progression', () => {
   it('une ligne par cible, statut tiré du dernier message', () => {
@@ -15,5 +15,19 @@ describe('iRemoTech — progression', () => {
     ])
     expect(r.map(x => `${x.tag}:${x.state}`)).toEqual(['iPhone A:run', 'iPhone A·1:run', 'iPhone A·2:skip', 'iPhone A·3:ok', 'iPhone A·4:fail', 'iPhone B:run'])
     expect(r[3].last).toBe('compte créé')
+  })
+})
+
+describe('iRemoTech — type d’iPhone et cibles', () => {
+  it('comptes « @nom » = iPhone normal, containers = jailbreak, rien = pas encore détecté', () => {
+    expect(phoneKind(['@lucielr5c0', '@celiaq58c0'])).toBe('normal')
+    expect(phoneKind(['Default', '1', '2'])).toBe('jb')
+    expect(phoneKind([])).toBeNull()
+    expect(phoneKind(undefined)).toBeNull()
+  })
+  it('résumé des cibles cochées dans la bonne unité', () => {
+    expect(targetsSummary(['1', '2', '@a'])).toBe('2 containers · 1 compte')
+    expect(targetsSummary(['@a', '@b'])).toBe('2 comptes')
+    expect(targetsSummary(['Default'])).toBe('1 container')
   })
 })

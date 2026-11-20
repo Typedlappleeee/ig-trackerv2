@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21b',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : iPhones normaux et jailbreakés bien distingués', en: 'iRemoTech: regular and jailbroken iPhones clearly told apart' },
+    items: {
+      fr: [
+        'Chaque iPhone affiche son type : « 📱 iPhone normal » (comptes Instagram connectés) ou « 🔓 Jailbreak » (containers Crane), et compte ses cibles dans la bonne unité.',
+        '« Détecter » va directement à la bonne méthode une fois le type connu (plus de recherche de containers inutile sur un iPhone normal) ; à la 1re détection, il essaie Crane puis lit les comptes.',
+        'Résumés « 3 containers · 2 comptes » dans les étapes ; la création de comptes indique que les iPhones normaux n’y servent pas.',
+      ],
+      en: [
+        'Each iPhone shows its type: “📱 Regular iPhone” (logged-in Instagram accounts) or “🔓 Jailbreak” (Crane containers), and counts its targets in the right unit.',
+        '“Detect” goes straight to the right method once the type is known (no more useless container search on a regular iPhone); on the first detection it tries Crane, then reads the accounts.',
+        '“3 containers · 2 accounts” summaries in the steps; account creation says regular iPhones are not used for it.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21a',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : posting sur iPhones normaux avec plusieurs comptes', en: 'iRemoTech: posting on regular iPhones with several accounts' },
