@@ -435,6 +435,12 @@ Deno.serve(async (req) => {
     // ── Veille Reels : fiche d'un Reel (vidéo fraîche + légende) et proxy vidéo
     // (lecture / téléchargement : le CDN Instagram bloque le navigateur en CORS) ──
     // Page profil d'un compte suivi (photo, bio, abonnés) — HikerAPI au plus toutes les 6 h.
+    // ── iRemoTech › Comptes : profils (photo, abonnés, publications) des comptes des iPhones (30 max par appel) ──
+    if (body?.irt === 'profiles' && filterUserId && Array.isArray(body.usernames)) {
+      const { irtProfiles } = await import('./irt-profiles.ts')
+      const profiles = await irtProfiles(db, body.usernames, body.force === true)
+      return new Response(JSON.stringify({ ok: true, profiles }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
     if (body?.viral === 'profile' && filterUserId && typeof body.username === 'string') {
       const { accountProfile } = await import('./viral.ts')
       const p = await accountProfile(db, body.username).catch(() => null)

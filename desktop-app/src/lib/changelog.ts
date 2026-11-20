@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21c',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : nouvel onglet « Comptes Instagram »', en: 'iRemoTech: new “Instagram accounts” tab' },
+    items: {
+      fr: [
+        'Tous les comptes de tes iPhones, rangés par iPhone : photo, publications, abonnés, abonnements, statut Instagram et derniers warm-ups.',
+        'Scan des comptes par iRemoTech (sur un iPhone ou tous) : les comptes trouvés deviennent des cibles de posting sur les iPhones normaux.',
+        'Vérifier le statut (6 indicateurs : non recommandé aux non-abonnés, contenu supprimé…) et lancer des warm-ups iRemoTech (5 à 20 min), à l’unité ou en lot.',
+        'Tout est relu depuis l’historique iRemoTech : partagé avec toute l’équipe.',
+      ],
+      en: [
+        'All the accounts on your iPhones, grouped by iPhone: picture, posts, followers, following, Instagram status and latest warm-ups.',
+        'Account scan by iRemoTech (one iPhone or all): accounts found become posting targets on regular iPhones.',
+        'Check the status (6 indicators: not recommended to non-followers, removed content…) and start iRemoTech warm-ups (5 to 20 min), one by one or in bulk.',
+        'Everything is read back from the iRemoTech history: shared with the whole team.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21b',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : iPhones normaux et jailbreakés bien distingués', en: 'iRemoTech: regular and jailbroken iPhones clearly told apart' },

@@ -161,6 +161,44 @@ export async function deviceIp(key: string, deviceId: string): Promise<string | 
   return typeof v === 'string' && v ? v : null
 }
 
+// ── Automations iRemoTech (list_accounts, account_status, warm_up) ──────────────────────────────────────
+export type IrtJobStatus = 'queued' | 'dispatched' | 'completed' | 'failed' | 'needs_review' | 'expired'
+export interface IrtJob {
+  job_id: string; type: 'warm_up' | 'account_status' | 'list_accounts'; device: string; account: string | null
+  status: IrtJobStatus; created_at: string; dispatched_at: string | null; finished_at: string | null; duration_ms: number | null
+  result: Record<string, any> | null; failure: Record<string, any> | null
+}
+export type IrtAutomation = { type: 'list_accounts' } | { type: 'account_status'; account: string; rotate_ip?: boolean } | { type: 'warm_up'; account: string; session_duration_s: number }
+async function irtCall(key: string, op: string, payload: Record<string, unknown>, method: 'GET' | 'POST', path: string, body?: unknown): Promise<{ ok: boolean; status?: number; data?: any }> {
+  try {
+    if (IS_WEB) return await irtProxy(op, key, payload)
+    const r = await fetch(`${BASE}/${path}`, { method, headers: { Authorization: `Bearer ${key}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
+    let data: any = null; try { data = await r.json() } catch { /* vide */ }
+    return { ok: r.ok, status: r.status, data }
+  } catch (e) { return { ok: false, data: { detail: e instanceof Error ? e.message : String(e) } } }
+}
+/** Lance une automation iRemoTech sur un iPhone. Erreur lisible si refusée (jetons, compte inconnu, déjà en cours…). */
+export async function launchAutomation(key: string, deviceId: string, a: IrtAutomation): Promise<{ ok: boolean; job?: IrtJob; error?: string; code?: string }> {
+  const r = await irtCall(key, 'automation', { deviceId, body: a }, 'POST', `devices/${encodeURIComponent(deviceId)}/automations`, a)
+  if (r.ok && r.data?.job_id) return { ok: true, job: r.data as IrtJob }
+  const code = String(r.data?.code ?? r.status ?? '')
+  const msg = code === 'insufficient_tokens' ? 'solde de jetons iRemoTech insuffisant pour ce warm-up'
+    : code === 'account_not_found' ? 'compte inconnu d’iRemoTech sur cet iPhone (ajoute-le dans le tableau de bord iRemoTech)'
+    : code === 'automation_pending' ? 'déjà en cours sur ce compte / cet iPhone'
+    : code === 'forbidden' ? 'clé iRemoTech sans le droit « automations » (crée une nouvelle clé dans le tableau de bord)'
+    : String(r.data?.detail ?? r.data?.error ?? `erreur ${r.status ?? ''}`)
+  return { ok: false, error: msg, code }
+}
+/** Jobs lancés par l'API sur un iPhone (plus récents d'abord). N'utilise pas le téléphone. */
+export async function listJobs(key: string, deviceId: string, limit = 50): Promise<IrtJob[]> {
+  const r = await irtCall(key, 'jobs', { deviceId, limit }, 'GET', `devices/${encodeURIComponent(deviceId)}/automations?limit=${limit}`)
+  return r.ok && Array.isArray(r.data?.jobs) ? r.data.jobs as IrtJob[] : []
+}
+export async function getJob(key: string, jobId: string): Promise<IrtJob | null> {
+  const r = await irtCall(key, 'job', { jobId }, 'GET', `automations/${encodeURIComponent(jobId)}`)
+  return r.ok && r.data?.job_id ? r.data as IrtJob : null
+}
+
 // Upload d'un média (URL signée Supabase) → octets bruts sur l'iPhone.
 export async function uploadMedia(key: string, deviceId: string, mediaUrl: string, filename = 'video.mp4'): Promise<boolean> {
   try {

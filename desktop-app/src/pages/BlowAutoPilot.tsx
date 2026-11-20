@@ -18,6 +18,7 @@ import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
+import IrtAccounts from '@/components/IrtAccounts'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { folderMedia, loadBankSummary, type BankSummary } from '@/lib/flowEngine'
@@ -35,7 +36,7 @@ const EDGE = 'rgba(255,255,255,0.07)', FIELD_EDGE = 'rgba(255,255,255,0.09)', FI
 const MONO = "'JetBrains Mono',monospace"
 const SEL_BG = 'rgba(255,255,255,0.07)', SEL_EDGE = 'rgba(233,196,106,0.45)'
 type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null; used_count?: number }
-export type IrtTab = 'phones' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
+export type IrtTab = 'phones' | 'igaccounts' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
 
 const card: CSSProperties = { background: '#111113', border: `1px solid ${EDGE}`, borderRadius: 8, padding: 16, marginBottom: 12 }
 // Boutons alignés sur <Btn> (lib/ui) : ghost = bordé neutre, `gold` = primaire clair.
@@ -719,15 +720,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     story: { title: 'Publier des Stories', sub: 'Une photo et un lien sticker par container.' },
     warmup: { title: 'Warm-up', sub: 'Fais vivre tes comptes comme un humain, container par container.' },
     account: { title: 'Créer des comptes', sub: 'Un compte Instagram dans chaque container vide, numéro et code SMS automatiques.' },
+    igaccounts: { title: 'Comptes Instagram', sub: 'Tous les comptes de tes iPhones, relus depuis iRemoTech : statut, publications, abonnés, warm-ups. Vérifie et chauffe en un clic.' },
     comptes: { title: 'Comptes créés', sub: 'Identifiants, numéros et historique des comptes créés depuis ScaleFlow.' },
   }
   const TABS: { k: IrtTab; label: string; icon: string }[] = [
     { k: 'phones', label: 'Téléphones', icon: '📱' },
+    { k: 'igaccounts', label: 'Comptes', icon: '👥' },
     { k: 'posting', label: 'Posting', icon: '🎬' },
     { k: 'story', label: 'Story', icon: '📸' },
     { k: 'warmup', label: 'Warm-up', icon: '🔥' },
     { k: 'account', label: 'Création de compte', icon: '🆕' },
-    { k: 'comptes', label: 'Comptes', icon: '👤' },
+    { k: 'comptes', label: 'Comptes créés', icon: '🆕' },
   ]
 
   return (
@@ -771,6 +774,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       </>)}
 
       {/* ─────────────── ONGLET POSTING ─────────────── */}
+      {curTab === 'igaccounts' && irt.key && (
+        <IrtAccounts apiKey={irt.key} devices={devices} known={conts}
+          onScanned={(dev, accs) => {
+            // iPhone normal (ou pas encore détecté) : les comptes trouvés par iRemoTech deviennent ses cibles « @nom »
+            if (phoneKind(conts[dev]) === 'jb') return
+            const list = [...new Set([...(conts[dev] ?? []).filter(c => c.startsWith('@')), ...accs.map(u => '@' + u.toLowerCase())])]
+            saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list }))
+          }} />
+      )}
       {curTab === 'posting' && (<>
         {phonePicker()}
         <div style={card}>

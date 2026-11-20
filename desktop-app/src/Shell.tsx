@@ -16,7 +16,7 @@ export type PageKey =
   | 'studio'
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto' | 'blowGenjutsu' | 'blowDuo'
-  | 'irtPhones' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
+  | 'irtPhones' | 'irtIgAccounts' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
   | 'scheduled' | 'links' | 'viral' | 'explore' | 'pricing' | 'genjutsu'
   | 'admin'
   | 'settings'
@@ -38,7 +38,8 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
         { k: 'irtAccount', l: 'Création de compte', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M19 8v6|M22 11h-6' },
       ] },
       { g: 'Comptes', items: [
-        { k: 'irtComptes', l: 'Comptes', i: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M23 21v-2a4 4 0 0 0-3-3.87|M16 3.13a4 4 0 0 1 0 7.75' },
+        { k: 'irtIgAccounts', l: 'Comptes Instagram', i: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M23 21v-2a4 4 0 0 0-3-3.87|M16 3.13a4 4 0 0 1 0 7.75' },
+        { k: 'irtComptes', l: 'Comptes créés', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M19 8v6|M22 11h-6' },
       ] },
     ]
   }
@@ -138,7 +139,8 @@ const TITLES: Record<PageKey, string[]> = {
   irtStory: ['iRemoTech', 'Story'],
   irtWarmup: ['iRemoTech', 'Warm-up'],
   irtAccount: ['iRemoTech', 'Création de compte'],
-  irtComptes: ['iRemoTech', 'Comptes'],
+  irtIgAccounts: ['iRemoTech', 'Comptes Instagram'],
+  irtComptes: ['iRemoTech', 'Comptes créés'],
   scheduled: ['Diffusion', 'Programmé'],
   links: ['Analyse', 'Liens'],
   viral: ['Analyse', 'Veille Reels'],

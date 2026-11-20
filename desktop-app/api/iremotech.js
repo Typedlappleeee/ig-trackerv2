@@ -57,6 +57,25 @@ export default async (req, res) => {
       })
       return res.status(200).json({ ok: r.ok, status: r.status, data: await jsonOr(r) })
     }
+    // Automations iRemoTech (scope « automations ») : list_accounts / account_status / warm_up, puis suivi des jobs.
+    if (op === 'automation') {
+      const r = await fetch(`${BASE}/devices/${dev}/automations`, {
+        method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body ?? {}), signal: AbortSignal.timeout(20000),
+      })
+      return res.status(200).json({ ok: r.ok, status: r.status, data: await jsonOr(r) })
+    }
+    if (op === 'jobs') {
+      const limit = Math.max(1, Math.min(100, Number(req.body?.limit) || 50))
+      const r = await fetch(`${BASE}/devices/${dev}/automations?limit=${limit}`, { headers: auth, signal: AbortSignal.timeout(20000) })
+      return res.status(200).json({ ok: r.ok, status: r.status, data: await jsonOr(r) })
+    }
+    if (op === 'job') {
+      const id = String(req.body?.jobId ?? '')
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return res.status(200).json({ ok: false, error: 'job invalide' })
+      const r = await fetch(`${BASE}/automations/${encodeURIComponent(id)}`, { headers: auth, signal: AbortSignal.timeout(20000) })
+      return res.status(200).json({ ok: r.ok, status: r.status, data: await jsonOr(r) })
+    }
     if (op === 'media') {
       // Deux sources : fileData (base64, fichier PC ≤ ~4 Mo) OU mediaUrl (banque Supabase).
       let bytes

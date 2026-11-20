@@ -1,0 +1,37 @@
+import { describe, it, expect, vi } from 'vitest'
+vi.mock('./supabase', () => ({ supabase: {} }))
+import { healthOf, deviceAccounts, ago, compactNum } from './irtAccounts'
+import type { IrtJob } from './iremotech'
+
+const job = (p: Partial<IrtJob>): IrtJob => ({ job_id: 'j' + Math.random(), type: 'list_accounts', device: 'd', account: null, status: 'completed', created_at: '2026-11-20T10:00:00Z', dispatched_at: null, finished_at: '2026-11-20T10:01:00Z', duration_ms: 1000, result: null, failure: null, ...p })
+
+describe('iRemoTech — comptes relus depuis les jobs', () => {
+  it('santé : tout vert = sain, un warning = à surveiller avec le libellé, rien = non vérifié', () => {
+    expect(healthOf({ under_18: 'green', monetization: 'green' })).toEqual({ level: 'ok', issues: [] })
+    expect(healthOf({ who_dont_follow_you: 'warning', under_18: 'green' })).toEqual({ level: 'warn', issues: ['Non recommandé aux non-abonnés'] })
+    expect(healthOf(null).level).toBe('unknown')
+  })
+  it('comptes = dernier scan ∪ cibles connues ∪ jobs ; statut, warm-up et job en cours par compte', () => {
+    const jobs = [
+      job({ type: 'list_accounts', result: { accounts: ['lucielr5c0', 'Ines'] }, finished_at: '2026-11-20T10:01:00Z' }),
+      job({ type: 'account_status', account: 'lucielr5c0', result: { account_state: { who_dont_follow_you: 'warning' } }, created_at: '2026-11-20T11:00:00Z', finished_at: '2026-11-20T11:02:00Z' }),
+      job({ type: 'warm_up', account: 'ines', result: { session_duration_s: 420, likes: 3, reels_viewed: 20 }, created_at: '2026-11-20T12:00:00Z', finished_at: '2026-11-20T12:08:00Z' }),
+      job({ type: 'account_status', account: 'ines', status: 'dispatched', created_at: '2026-11-20T13:00:00Z', finished_at: null }),
+    ]
+    const r = deviceAccounts(jobs, ['@celia'])
+    expect(r.accounts.map(a => a.username)).toEqual(['celia', 'ines', 'lucielr5c0'])
+    expect(r.scannedAt).toBe('2026-11-20T10:01:00Z')
+    const l = r.accounts.find(a => a.username === 'lucielr5c0')!
+    expect(l.health.level).toBe('warn'); expect(l.checkedAt).toBe('2026-11-20T11:02:00Z')
+    const i = r.accounts.find(a => a.username === 'ines')!
+    expect(i.warmup).toEqual({ at: '2026-11-20T12:08:00Z', seconds: 420, likes: 3, reels: 20 })
+    expect(i.running).toBe('account_status')
+    expect(r.scanning).toBe(false)
+  })
+  it('formats : « il y a » et nombres compacts', () => {
+    const now = Date.parse('2026-11-20T12:00:00Z')
+    expect(ago('2026-11-20T11:55:00Z', now)).toBe('il y a 5 min')
+    expect(ago(null)).toBe('jamais')
+    expect(compactNum(12300)).toBe('12 k'); expect(compactNum(1500)).toBe('1,5 k'); expect(compactNum(340)).toBe('340'); expect(compactNum(null)).toBe('—')
+  })
+})
