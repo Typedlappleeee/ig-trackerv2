@@ -3728,6 +3728,9 @@ export const EN: Dict = {
     "⚙ Clé iRemoTech": "⚙ iRemoTech key",
     "· liste actualisée toutes les 15 s. Un iPhone manque ? Vérifie qu’il est rattaché à cette clé dans le tableau de bord iRemoTech (API Access), ou mets une clé plus récente avec « ⚙ Clé iRemoTech ».": "· list refreshed every 15 s. An iPhone is missing? Check it is attached to this key in the iRemoTech dashboard (API Access), or set a newer key with “⚙ iRemoTech key”.",
     "Le Parc VIP pilote tes vrais iPhones via iRemoTech. Renseigne ta clé API iRemoTech dans l’onglet iRemoTech (« ⚙ Clé iRemoTech ») et le parc apparaîtra ici.": "The VIP Farm drives your real iPhones through iRemoTech. Enter your iRemoTech API key in the iRemoTech tab (“⚙ iRemoTech key”) and the farm will show up here.",
+    "✈️ Mode avion OFF, attente du réseau…": "✈️ Airplane mode OFF, waiting for the network…",
+    "(IP pas encore lisible, on continue)": "(IP not readable yet, carrying on)",
+    "✈️ Mode avion natif refusé → Centre de contrôle": "✈️ Native airplane mode refused → Control Center",
   },
   templates: [
     ["— {0} crédit(s) remboursé(s)", "— {0} credit(s) refunded"],
@@ -4486,5 +4489,9 @@ export const EN: Dict = {
     ["↻ Actualiser ({0})", "↻ Refresh ({0})"],
     ["Clé enregistrée : {0} iPhone{1} trouvé{2}.", "Key saved: {0} iPhone(s) found."],
     ["Clé refusée par iRemoTech : {0}", "Key refused by iRemoTech: {0}"],
+    ["✈️ Mode avion ON (natif){0}…", "✈️ Airplane mode ON (native){0}…"],
+    ["· IP actuelle {0}", "· current IP {0}"],
+    ["⚠ même IP qu'avant ({0}) : le proxy n'a pas tourné", "⚠ same IP as before ({0}): the proxy did not rotate"],
+    ["nouvelle IP ✓ {0}", "new IP ✓ {0}"],
   ],
 }

@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-20f',
+    date: '2026-11-20',
+    title: { fr: 'iRemoTech : nouvelle IP par le mode avion natif', en: 'iRemoTech: new IP through native airplane mode' },
+    items: {
+      fr: ['La rotation d’IP entre deux containers utilise maintenant l’action « mode avion » d’iRemoTech (plus de Centre de contrôle à ouvrir à l’écran) : plus rapide et plus fiable. L’IP est lue avant et après, et le journal prévient si elle n’a pas changé. Ancienne méthode en secours si l’action est refusée.'],
+      en: ['IP rotation between two containers now uses iRemoTech’s “airplane mode” action (no more opening the Control Center on screen): faster and more reliable. The IP is read before and after, and the log warns if it did not change. The old method is the fallback if the action is refused.'],
+    },
+  },
+  {
     id: '2026-11-20e',
     date: '2026-11-20',
     title: { fr: 'iRemoTech : iPhones de nouveau « en ligne » + champ pour la clé', en: 'iRemoTech: iPhones “online” again + a field for the key' },

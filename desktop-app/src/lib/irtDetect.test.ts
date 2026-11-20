@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
-vi.mock('./iremotech', () => ({ snapshot: vi.fn(), sendAction: vi.fn() }))
+vi.mock('./iremotech', () => ({ snapshot: vi.fn(), sendAction: vi.fn(), deviceIp: vi.fn() }))
 import { sortContainerNames } from './iremotechVision'
 
 describe('iRemoTech — containers détectés', () => {

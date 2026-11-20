@@ -2,7 +2,7 @@
 // container Crane dans le sélecteur « Select Container » et taper dessus, en scrollant
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
-import { snapshot, sendAction } from './iremotech'
+import { snapshot, sendAction, deviceIp } from './iremotech'
 import { ocrWords, findBlueButton } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { findGalleryThumb, findMatchingCell } from './screenMatch'
@@ -51,7 +51,30 @@ export async function recalibrateTouch(key: string, deviceId: string, hooks?: Vi
   }
 }
 
+/** Nouvelle IP : mode avion par l'action NATIVE d'iRemoTech (avion ON → attente → OFF), avec lecture de
+ *  l'IP avant/après (`device_ip`). Si l'action native est refusée, repli sur le Centre de contrôle (vision). */
 export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
+  const before = await deviceIp(key, deviceId)
+  if (await sendAction(key, deviceId, { type: 'airplane', on: true })) {
+    hooks?.log?.(`✈️ Mode avion ON (natif)${before ? ` · IP actuelle ${before}` : ''}…`)
+    await sleep(holdMs)
+    const off = await sendAction(key, deviceId, { type: 'airplane', on: false })
+    if (!off) { await sleep(1500); await sendAction(key, deviceId, { type: 'airplane', on: false }) }
+    hooks?.log?.('✈️ Mode avion OFF, attente du réseau…')
+    for (let i = 0; i < 10; i++) {
+      if (hooks?.shouldStop?.()) return
+      await sleep(3000)
+      const ip = await deviceIp(key, deviceId)
+      if (ip) { hooks?.log?.(before && ip === before ? `   ⚠ même IP qu'avant (${ip}) : le proxy n'a pas tourné` : `   nouvelle IP ✓ ${ip}`); return }
+    }
+    hooks?.log?.('   (IP pas encore lisible, on continue)')
+    return
+  }
+  hooks?.log?.('✈️ Mode avion natif refusé → Centre de contrôle')
+  return airplaneResetByVision(key, deviceId, hooks, holdMs)
+}
+
+async function airplaneResetByVision(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
   // Écran connu d'abord.
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1000)

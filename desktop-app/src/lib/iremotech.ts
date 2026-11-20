@@ -53,6 +53,8 @@ export type IrtAction =
   | { type: 'press'; name?: string; key?: string; modifiers?: string[] }
   | { type: 'open_url'; url: string }
   | { type: 'airplane'; on: boolean }
+  | { type: 'device_ip' }
+  | { type: 'clipboard_set'; text: string }
   | { type: 'calibrate' }
 
 // ── Clé API : perso (app_config) d'abord, sinon agence (org_config) ───────────
@@ -138,6 +140,25 @@ export async function sendAction(key: string, deviceId: string, action: IrtActio
     })
     return res.ok
   } catch { return false }
+}
+
+// Action avec réponse (device_ip → { ip }, clipboard_get…). null = action refusée / iPhone injoignable.
+export async function actionResult(key: string, deviceId: string, action: IrtAction): Promise<Record<string, unknown> | null> {
+  await slot()
+  try {
+    if (IS_WEB) { const j = await irtProxy('action', key, { deviceId, body: action }); return j.ok ? (j.data ?? {}) : null }
+    const res = await fetch(`${BASE}/devices/${encodeURIComponent(deviceId)}/actions`, {
+      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(action),
+    })
+    return res.ok ? await res.json().catch(() => ({})) as Record<string, unknown> : null
+  } catch { return null }
+}
+/** IP publique actuelle de l'iPhone (action native `device_ip`), null si illisible. */
+export async function deviceIp(key: string, deviceId: string): Promise<string | null> {
+  const r = await actionResult(key, deviceId, { type: 'device_ip' })
+  if (!r) return null
+  const v = r.ip ?? r.device_ip ?? r.address ?? Object.values(r).find(x => typeof x === 'string' && /^[\d.:a-f]+$/i.test(x as string))
+  return typeof v === 'string' && v ? v : null
 }
 
 // Upload d'un média (URL signée Supabase) → octets bruts sur l'iPhone.
