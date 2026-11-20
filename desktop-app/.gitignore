@@ -8,3 +8,6 @@ public/tesseract/*.wasm
 public/tesseract/*.wasm.js
 public/tesseract/tesseract-core-*.js
 public/tesseract/worker.min.js
+
+# banc de test local iRemoTech (Supabase simulé), jamais commité
+.harness/
