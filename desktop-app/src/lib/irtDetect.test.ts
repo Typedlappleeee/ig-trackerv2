@@ -61,6 +61,9 @@ describe('iRemoTech — écrans de fin : écran lu → action', () => {
     expect(D([['Add', 120, 100], ['profile', 200, 100], ['picture', 280, 100], ['Add', 180, 618], ['picture', 240, 618], ['Skip', 203, 672]])).toMatchObject({ kind: 'tap', label: 'Skip' })
     expect(D([['Turn', 100, 100], ['on', 150, 100], ['notifications', 250, 100], ['Not', 190, 650], ['now', 220, 650]])).toMatchObject({ kind: 'tap' })
   })
+  it('« Follow 5 » sans Skip en haut → tout décocher (pas la phrase « to skip this step »)', () => {
+    expect(D([['Follow', 70, 120], ['people', 120, 168], ['Follow', 203, 644], ['Unselect', 200, 700], ['all', 250, 700], ['skip', 360, 700]])).toEqual({ kind: 'unfollowAll' })
+  })
   it('« Confirm you’re human » → captcha (container suivant)', () => {
     expect(D([['Confirm', 120, 270], ["you're", 190, 273], ['human', 250, 271], ['maevalwyemg5h', 200, 335]])).toEqual({ kind: 'captcha' })
   })

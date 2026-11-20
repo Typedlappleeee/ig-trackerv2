@@ -3,7 +3,7 @@
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
 import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
-import { ocrWords, findBlueButton } from './ocr'
+import { ocrWords, findBlueButton, findBlueDots } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { findGalleryThumb, findMatchingCell } from './screenMatch'
 
@@ -1045,7 +1045,7 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
 
 // ── Moteur « écran → action » de fin d'inscription ──────────────────────────────
 export type EndAction =
-  | { kind: 'refused' } | { kind: 'captcha' } | { kind: 'feed' } | { kind: 'reopen'; why: string } | { kind: 'review' }
+  | { kind: 'refused' } | { kind: 'captcha' } | { kind: 'feed' } | { kind: 'reopen'; why: string } | { kind: 'review' } | { kind: 'unfollowAll' }
   | { kind: 'tap'; x: number; y: number; label: string; double?: boolean }
 
 /** Décide quoi faire selon les mots lus à l'écran (pure, testée). null = écran inconnu / transition. */
@@ -1083,9 +1083,12 @@ export function decideEndScreen(raw: { text: string; cx: number; cy: number; x?:
   // 6. « Save your login info? » → Save (évite de redemander la connexion)
   if (has(/^login$/i) && has(/^save$/i, 0.45)) { const b = find(/^save$/i, 0.45)!; return { kind: 'tap', x: b.cx, y: b.cy, label: 'Save (login)' } }
   // 7. Passer : Skip / Not now / Plus tard
+  // « Follow 5 or more people » SANS Skip en haut : « Unselect all accounts to skip this step » → tout décocher
+  const followTitle = has(/^follow$/i, 0.1, 0.3) && has(/^(people|more)$/i, 0.1, 0.3)
+  if ((has(/^unselect$/i, 0.85) || followTitle) && !words.some(o => /^skip$/i.test(o.text) && o.cy <= 0.1 * H)) return { kind: 'unfollowAll' }
   // en bas OU en haut à droite (écran « Create a profile that shows your vibe » : Skip en haut à droite)
   const skipRe = /^(skip|notnow|ignorer|plustard|pasmaintenant|later|maybelater)$/i
-  const skip = find(skipRe, 0.45) ?? words.find(o => skipRe.test(o.text) && o.cy <= 0.1 * H && o.cx >= 0.6 * W)
+  const skip = (has(/^unselect$/i) ? undefined : find(skipRe, 0.45)) ?? words.find(o => skipRe.test(o.text) && o.cy <= 0.1 * H && o.cx >= 0.6 * W)
   if (skip) return { kind: 'tap', x: skip.cx, y: skip.cy, label: skip.text }
   // 8. I agree (conditions)
   const agree = find(/^(iagree|agree|jaccepte|accepter)$/i, 0.5)
@@ -1109,7 +1112,7 @@ async function readScreenWords(key: string, deviceId: string): Promise<{ words: 
 /** Fait défiler les écrans de fin jusqu'au fil Instagram. 'feed' = prêt à poster, 'refused' = refus, 'unknown'. */
 export async function settleToFeed(key: string, deviceId: string, hooks?: VisionHooks, container?: string): Promise<'feed' | 'refused' | 'captcha' | 'unknown'> {
   hooks?.log?.('⏭ Écrans de fin : lecture de l’écran → action, jusqu’au fil Instagram…')
-  let idle = 0, reopened = false, last = ''
+  let idle = 0, reopened = false, last = '', unfollowRounds = 0
   let same = 0
   for (let step = 0; step < 28; step++) {
     if (hooks?.shouldStop?.()) return 'unknown'
@@ -1120,6 +1123,32 @@ export async function settleToFeed(key: string, deviceId: string, hooks?: Vision
     if (act?.kind === 'refused') { hooks?.log?.('⛔ Instagram refuse la création (« We couldn’t create an account for you ») : anti-robot (IP, numéro ou créations trop rapprochées)'); await findTapText(key, deviceId, [/^ok$/i], hooks, { label: 'OK', tries: 1, minY: 0.4, maxY: 0.75 }); return 'refused' }
     if (act?.kind === 'feed') { hooks?.log?.('🏠 Fil Instagram affiché ✓'); return 'feed' }
     if (act?.kind === 'captcha') { hooks?.log?.('🤖 Vérification humaine demandée par Instagram → on passe au container suivant (non résolue)'); return 'captcha' }
+    if (act?.kind === 'unfollowAll') {
+      if (++unfollowRounds > 3) { hooks?.log?.('   ⚠ « Follow 5 » : impossible de tout décocher'); break }
+      // décoche tout ce qui est visible, vérifie, défile une fois, revérifie ; puis le bouton du bas (« Next »)
+      let scrolled = false
+      for (let k = 0; k < 6; k++) {
+        const sh = await snapshot(key, deviceId)
+        const dots = sh ? await findBlueDots(sh, 0.84, 0.97, 0.33, 0.84) : []
+        if (dots.length) {
+          hooks?.log?.(`   ☐ « Follow 5 » : ${dots.length} compte(s) coché(s) → décoche`)
+          for (const d of dots) { await sendAction(key, deviceId, { type: 'tap', x: d.cx, y: d.cy }); await sleep(700) }
+          await sleep(800); continue
+        }
+        if (!scrolled) {
+          hooks?.log?.('   ↓ « Follow 5 » : défilement de la liste pour trouver d’autres comptes cochés')
+          await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(0.5 * scr.W), y1: Math.round(0.78 * scr.H), x2: Math.round(0.5 * scr.W), y2: Math.round(0.42 * scr.H), duration_ms: 500 })
+          scrolled = true; await sleep(1200); continue
+        }
+        break
+      }
+      const sh = await snapshot(key, deviceId)
+      const btn = sh ? await findBlueButton(sh, 0.84, 0.97, 0.1, 0.8) : null
+      const bx = btn ? btn.cx : Math.round(scr.W / 2), by = btn ? btn.cy : Math.round(0.895 * scr.H)
+      hooks?.log?.(`   👆 « Follow 5 » : plus rien de coché → bouton du bas (Next) (${bx}, ${by})`)
+      await sendAction(key, deviceId, { type: 'tap', x: bx, y: by })
+      idle = 0; await sleep(2500); continue
+    }
     if (act?.kind === 'review') {
       hooks?.log?.('   ⚙ « Review the settings » → défilement jusqu’en bas puis « Next »')
       for (let k = 0; k < 2; k++) { await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(0.93 * scr.W), y1: Math.round(0.86 * scr.H), x2: Math.round(0.93 * scr.W), y2: Math.round(0.2 * scr.H), duration_ms: 500 }); await sleep(1200) }
@@ -1150,7 +1179,7 @@ export async function settleToFeed(key: string, deviceId: string, hooks?: Vision
     // Écran inconnu avec un bouton bleu : 1er passage → « Skip » juste dessous ; si l'écran n'a pas bougé →
     // le bouton bleu lui-même (Next / Continue mal lu). On ne quitte JAMAIS le container ici.
     const shot = await snapshot(key, deviceId)
-    const blue = shot ? await findBlueButton(shot, 0.6, 0.97, 0, 1) : null
+    const blue = shot ? await findBlueButton(shot, 0.6, 0.97, 0.1, 0.8) : null
     if (blue) {
       if (idle % 2 === 0) {
         const belowY = Math.min(scr.H - 6, blue.cy + Math.round(0.075 * scr.H))

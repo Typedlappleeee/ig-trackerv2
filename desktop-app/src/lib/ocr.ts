@@ -182,6 +182,35 @@ export async function findBlueButton(image: string, yMin = 0.55, yMax = 1, xMin 
   return { cx: Math.round((minX + maxX) / 2), cy: y0 + Math.round((minY + maxY) / 2) }
 }
 
+/** Pastilles bleues cochées (une par ligne de liste) dans une colonne : centres verticaux de chaque amas bleu
+ *  (« Follow 5 or more people » : comptes pré-cochés à décocher). */
+export async function findBlueDots(image: string, xMin: number, xMax: number, yMin: number, yMax: number): Promise<{ cx: number; cy: number }[]> {
+  const img = await loadImg(image)
+  const W = img.naturalWidth, H = img.naturalHeight
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H
+  const ctx = cv.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+  const x0 = Math.round(xMin * W), x1 = Math.round(xMax * W), y0 = Math.round(yMin * H), y1 = Math.round(yMax * H)
+  const data = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data
+  const bw = x1 - x0
+  const out: { cx: number; cy: number }[] = []
+  let start = -1, sx = 0, n = 0
+  for (let yy = 0; yy <= y1 - y0; yy++) {
+    let cnt = 0, rx = 0
+    if (yy < y1 - y0) for (let xx = 0; xx < bw; xx++) {
+      const i = (yy * bw + xx) * 4
+      const r = data[i], g = data[i + 1], b = data[i + 2]
+      if (b > 170 && r < 130 && b > r + 70 && g > 70 && g < 205) { cnt++; rx += xx }
+    }
+    if (cnt >= 4) { if (start < 0) { start = yy; sx = 0; n = 0 } sx += rx; n += cnt }
+    else if (start >= 0) {
+      if (yy - start >= 12) out.push({ cx: x0 + Math.round(sx / n), cy: y0 + Math.round((start + yy) / 2) })
+      start = -1
+    }
+  }
+  return out
+}
+
 export async function terminateOcr(): Promise<void> {
   if (!workerP) return
   try { const w = await workerP; await w.terminate() } catch { /* noop */ }

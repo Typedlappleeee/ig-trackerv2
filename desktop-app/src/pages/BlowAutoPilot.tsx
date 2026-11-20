@@ -1029,13 +1029,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const okN = createdAccts.filter(a => a.ok).length
         const koN = createdAccts.length - okN
         const fmt = (t: number) => new Date(t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
-        // Format compact « username:password » (collé) pour copier-coller / import en masse.
-        const line = (a: CreatedAccount) => `${a.username ?? ''}:${a.password ?? ''}`
+        // Format compact « username:password[:2fa] » (collé) pour copier-coller / import en masse.
+        const line = (a: CreatedAccount) => `${a.username ?? ''}:${a.password ?? ''}${a.twofa ? `:${a.twofa}` : ''}`
         const copyAll = () => { try { navigator.clipboard.writeText(filtered.map(line).join('\n')) } catch { /* noop */ } }
         const exportCsv = () => {
-          const head = ['username', 'password', 'fullName', 'phone', 'provider', 'price', 'country', 'device', 'container', 'statut', 'date']
+          const head = ['username', 'password', '2fa', 'fullName', 'phone', 'provider', 'price', 'country', 'device', 'container', 'statut', 'date']
           const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-          const rows = filtered.map(a => [a.username, a.password, a.fullName, a.phone, a.provider, a.price, a.country, a.deviceName ?? a.device, a.container, a.ok ? 'cree' : 'echec', new Date(a.at).toISOString()].map(esc).join(','))
+          const rows = filtered.map(a => [a.username, a.password, a.twofa, a.fullName, a.phone, a.provider, a.price, a.country, a.deviceName ?? a.device, a.container, a.ok ? 'cree' : 'echec', new Date(a.at).toISOString()].map(esc).join(','))
           const csv = head.join(',') + '\n' + rows.join('\n')
           const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
           const el = document.createElement('a'); el.href = url; el.download = `comptes-ig-${new Date().toISOString().slice(0, 10)}.csv`; el.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)

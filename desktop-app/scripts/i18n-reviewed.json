@@ -887,6 +887,7 @@
  "téléchargement de la vidéo sur le téléphone…",
  "téléchargement de la vidéo trop long",
  "uiautomator dump /sdcard/sf_ui.xml >/dev/null 2>&1; sed -E 's/ (index|package|checkable|checked|enabled|focusable|focused|scrollable|long-clickable|password|selected)=\"[^\"]*\"//g' /sdcard/sf_ui.xml > /sdcard/sf_ui2.xml; stat -c %s /sdcard/sf_ui2.xml",
+ "unfollowAll",
  "upload ·",
  "url(#dbBlur)",
  "url({0})",

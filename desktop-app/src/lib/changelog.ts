@@ -29,6 +29,8 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Création de comptes : mode avion (nouvelle IP) TOUJOURS fait avant chaque container.',
         'Fin d’inscription pilotée par l’écran : chaque écran connu a son action (popups iOS « Don’t Allow », galerie photo, Skip en haut ou en bas, cookies, « Save login info »…) jusqu’au fil Instagram prêt à poster ; on ne quitte plus le container en cours de route.',
         'Vérification humaine (« Confirm you’re human ») : pas résolue, on passe au container suivant.',
+        '« Follow 5 or more people » sans Skip : tous les comptes pré-cochés sont décochés puis « Next ».',
+        'Comptes créés : la clé 2FA (si activée) est copiée au format username:password:2fa et exportée en CSV.',
         'Si le mot de passe n’est pas pris, ScaleFlow retape le champ (3 essais) au lieu de continuer à l’aveugle ; sinon le compte est marqué échoué. Fini les comptes « password:… » marqués créés à tort.',
       ],
       en: [
@@ -44,6 +46,8 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Account creation: airplane mode (new IP) ALWAYS done before each container.',
         'Screen-driven end of signup: each known screen has its action (iOS “Don’t Allow” popups, photo gallery, Skip at the top or bottom, cookies, “Save login info”…) until the Instagram feed is ready to post; the container is no longer left midway.',
         'Human check (“Confirm you’re human”): not solved, we move to the next container.',
+        '“Follow 5 or more people” without Skip: every pre-ticked account is unticked, then “Next”.',
+        'Created accounts: the 2FA key (if enabled) is copied as username:password:2fa and exported to CSV.',
         'If the password is not taken, ScaleFlow types the field again (3 attempts) instead of carrying on blind; otherwise the account is marked failed. No more “password:…” accounts wrongly marked as created.',
       ],
     },

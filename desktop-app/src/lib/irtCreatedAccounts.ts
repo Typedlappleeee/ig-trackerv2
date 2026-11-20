@@ -7,6 +7,7 @@ export interface CreatedAccount {
   container: string
   username?: string
   password?: string
+  twofa?: string             // clé 2FA (TOTP, base32) si la double authentification a été activée
   fullName?: string
   phone?: string             // numéro utilisé
   provider?: string          // HeroSMS / 5sim
