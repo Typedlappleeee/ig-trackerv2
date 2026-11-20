@@ -133,7 +133,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [heroKey, setHeroKey] = useState(() => { try { return localStorage.getItem('sf-herosms-key') ?? '' } catch { return '' } })
   const [smsProvider, setSmsProvider] = useState<'5sim' | 'herosms' | 'smspool'>(() => { try { return (localStorage.getItem('sf-sms-provider') as '5sim' | 'herosms' | 'smspool') || '5sim' } catch { return '5sim' } })
   const [smspoolKey, setSmspoolKey] = useState(() => { try { return localStorage.getItem('sf-smspool-key') ?? '' } catch { return '' } })
-  const [smspoolMax, setSmspoolMax] = useState('0.35')          // plafond prix SMSPool ($)
+  const [smspoolMax, setSmspoolMax] = useState('1')             // plafond prix SMSPool ($) — USA ≈ 0,42 $
   const [smspoolPriceShown, setSmspoolPriceShown] = useState<string | null>(null)
   const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('usa')
   // création « tout auto » : détecter les containers des iPhones choisis puis remplir ceux sans compte
@@ -501,6 +501,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           creds = done.creds
           if (stuck) { push(`${tag} ⏱ bloqué > 60s pendant l'inscription → nouvel essai`); continue }
           if (done.ok) { success = true; push(`${tag} ✅ compte créé`) }
+          else if (done.refused) { push(`${tag} ⛔ refus d'Instagram : pas de nouvel essai sur ce container (un autre numéro serait gaspillé) → container suivant`); break }
           else push(`${tag} ⚠ inscription incomplète → nouvel essai`)
         } catch (e) {
           push(`${tag} ⚠ ${stuck ? 'bloqué > 60s' : (e instanceof Error ? e.message : String(e))} → nouvel essai`)
@@ -921,7 +922,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <div style={{ marginTop: 10, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ ...lbl }}>Prix max $</span>
               <input value={smspoolMax} onChange={e => setSmspoolMax(e.target.value.replace(',', '.'))} inputMode="decimal"
-                style={{ ...inp, width: 90, height: 32 }} placeholder="0.35" />
+                style={{ ...inp, width: 90, height: 32 }} placeholder="1" />
               <button style={{ ...btn, height: 30, padding: '0 12px' }} disabled={!smspoolKey}
                 onClick={async () => {
                   setSmspoolPriceShown('…')

@@ -12,6 +12,31 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-20g',
+    date: '2026-11-20',
+    title: { fr: 'iRemoTech : création de comptes testée en vrai et corrigée', en: 'iRemoTech: account creation tested live and fixed' },
+    items: {
+      fr: [
+        'Détection des containers : la liste est lue sans faire défiler le sélecteur (un défilement ouvrait un container au hasard). Le bon container est ouvert, et on vérifie que le sélecteur s’est bien fermé.',
+        'Un container dont l’inscription avait été commencée puis abandonnée est reconnu comme vierge et repris à l’écran du numéro.',
+        'Le nom d’utilisateur choisi est bien saisi ; si Instagram garde sa propre suggestion, c’est celle-ci qui est enregistrée dans les identifiants.',
+        'Refus d’Instagram (« We couldn’t create an account for you ») détecté : le compte n’est plus marqué créé, et aucun autre numéro n’est acheté pour ce container.',
+        'Écran des cookies accepté automatiquement (Instagram redémarré s’il ne répond pas).',
+        'Mode avion : l’arrêt du mode avion est renvoyé jusqu’à ce qu’iRemoTech l’accepte (il pouvait rester activé).',
+        'Prix max SMSPool par défaut : 1 $ (un numéro USA coûte environ 0,42 $).',
+      ],
+      en: [
+        'Container detection: the list is read without scrolling the picker (scrolling opened a random container). The right container is opened, and we check that the picker actually closed.',
+        'A container whose signup was started then abandoned is recognised as blank and resumed at the phone number screen.',
+        'The chosen username is now typed correctly; if Instagram keeps its own suggestion, that one is saved in the credentials.',
+        'Instagram refusal (“We couldn’t create an account for you”) detected: the account is no longer marked as created, and no other number is bought for that container.',
+        'Cookie screen accepted automatically (Instagram restarted if it does not respond).',
+        'Airplane mode: turning airplane mode off is resent until iRemoTech accepts it (it could stay on).',
+        'Default SMSPool max price: $1 (a US number costs about $0.42).',
+      ],
+    },
+  },
+  {
     id: '2026-11-20f',
     date: '2026-11-20',
     title: { fr: 'iRemoTech : nouvelle IP par le mode avion natif', en: 'iRemoTech: new IP through native airplane mode' },

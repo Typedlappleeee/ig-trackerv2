@@ -2,7 +2,7 @@
 // container Crane dans le sélecteur « Select Container » et taper dessus, en scrollant
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
-import { snapshot, sendAction, deviceIp } from './iremotech'
+import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
 import { ocrWords, findBlueButton } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { findGalleryThumb, findMatchingCell } from './screenMatch'
@@ -54,24 +54,40 @@ export async function recalibrateTouch(key: string, deviceId: string, hooks?: Vi
 /** Nouvelle IP : mode avion par l'action NATIVE d'iRemoTech (avion ON → attente → OFF), avec lecture de
  *  l'IP avant/après (`device_ip`). Si l'action native est refusée, repli sur le Centre de contrôle (vision). */
 export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
+  // `device_ip` passe par le raccourci iOS « iRemotech » (souvent null) et chaque appel compte dans la limite
+  // de débit : un appel avant, et on ne relit après que si la 1re lecture a marché.
   const before = await deviceIp(key, deviceId)
-  if (await sendAction(key, deviceId, { type: 'airplane', on: true })) {
+  if (await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 2)) {
     hooks?.log?.(`✈️ Mode avion ON (natif)${before ? ` · IP actuelle ${before}` : ''}…`)
     await sleep(holdMs)
-    const off = await sendAction(key, deviceId, { type: 'airplane', on: false })
-    if (!off) { await sleep(1500); await sendAction(key, deviceId, { type: 'airplane', on: false }) }
+    // OFF OBLIGATOIRE : vu en direct, un « off » refusé (429 rate_limited) laissait l'iPhone en mode avion.
+    if (!await sendWithRetry(key, deviceId, { type: 'airplane', on: false }, 6)) {
+      await sleep(30000)
+      if (!await sendWithRetry(key, deviceId, { type: 'airplane', on: false }, 3)) { hooks?.log?.('❌ Mode avion OFF refusé par iRemoTech : l’iPhone est peut-être resté en mode avion !'); return }
+    }
     hooks?.log?.('✈️ Mode avion OFF, attente du réseau…')
-    for (let i = 0; i < 10; i++) {
+    await sleep(8000)
+    if (!before) { hooks?.log?.('   (IP non lisible par iRemoTech : rotation non vérifiable, on continue)'); return }
+    for (let i = 0; i < 4; i++) {
       if (hooks?.shouldStop?.()) return
-      await sleep(3000)
       const ip = await deviceIp(key, deviceId)
-      if (ip) { hooks?.log?.(before && ip === before ? `   ⚠ même IP qu'avant (${ip}) : le proxy n'a pas tourné` : `   nouvelle IP ✓ ${ip}`); return }
+      if (ip) { hooks?.log?.(ip === before ? `   ⚠ même IP qu'avant (${ip}) : l'IP n'a pas changé` : `   nouvelle IP ✓ ${ip}`); return }
+      await sleep(5000)
     }
     hooks?.log?.('   (IP pas encore lisible, on continue)')
     return
   }
   hooks?.log?.('✈️ Mode avion natif refusé → Centre de contrôle')
   return airplaneResetByVision(key, deviceId, hooks, holdMs)
+}
+
+/** Action renvoyée jusqu'à acceptation (attente croissante : la limite de débit iRemoTech demande ~20 s). */
+async function sendWithRetry(key: string, deviceId: string, action: IrtAction, tries: number): Promise<boolean> {
+  for (let i = 0; i < tries; i++) {
+    if (await sendAction(key, deviceId, action)) return true
+    if (i < tries - 1) await sleep(Math.min(20000, 4000 * (i + 1)))
+  }
+  return false
 }
 
 async function airplaneResetByVision(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
@@ -216,14 +232,14 @@ export async function dismissPopups(key: string, deviceId: string, hooks?: Visio
 }
 
 // Cherche le container `target` (ex. "12" ou "Default") dans le sélecteur affiché à
-// l'écran et tape dessus. Scrolle haut/bas jusqu'à le trouver. true si tapé.
+// l'écran et tape dessus, UNE fois (un 2e tap tomberait dans Instagram), puis vérifie que la feuille
+// s'est fermée. Jamais de défilement (un balayage sélectionne une ligne). true si tapé.
 export async function findAndTapContainer(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
   const wanted = target.trim()
   const wantedNum = /^\d+$/.test(wanted) ? parseInt(wanted) : null
   const isDefault = /^default$/i.test(wanted)
   const whitelist = '0123456789Defaultefaul'
-  const maxSteps = 12
-  let lastDir = 0
+  const maxSteps = 4
   let sawSheet = false
   for (let step = 0; step < maxSteps; step++) {
     if (hooks?.shouldStop?.()) return false
@@ -232,38 +248,35 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { hooks?.log?.('⚠ image illisible'); await sleep(500); continue }
     const words = await ocrWords(shot, whitelist)
-    // Libellés plausibles de container : chiffres purs ou "Default", dans la moitié basse.
-    // On exclut seulement la barre d'état tout en haut (< 13 %) — sinon un sélecteur
-    // haut à l'écran perdait ses 1res lignes (« Default », « 6 »).
-    const rows = words.filter(o => o.text && (/^\d{1,3}$/.test(o.text) || /^default$/i.test(o.text)) && o.cy > H * 0.13)
+    const rows = pickerRows(words, W, H)
     if (rows.length) sawSheet = true
     hooks?.log?.(`👁 lu : ${rows.map(r => r.text).join(', ') || '(rien)'}`)
     // Cible visible ?
     const hit = rows.find(o => isDefault ? /^default$/i.test(o.text) : o.text === wanted)
     if (hit) {
-      hooks?.log?.(`🎯 « ${wanted} » trouvé → double-tap (${hit.cx}, ${hit.cy})`)
-      await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: hit.cy })
-      await sleep(180)
-      await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: hit.cy })
-      return true
+      // Tap dans la ligne mais À CÔTÉ du libellé : un tap pile sur le chiffre n'était parfois pas pris
+      // (vérifié en direct sur le « 4 »). Puis on vérifie que la feuille s'est fermée, sinon on retape.
+      for (const fx of [0.72, 0.3, 0.8]) {
+        const x = Math.round(W * fx)
+        hooks?.log?.(`🎯 « ${wanted} » → tap (${x}, ${hit.cy})`)
+        await sendAction(key, deviceId, { type: 'tap', x, y: hit.cy })
+        await sleep(1800)
+        // feuille encore ouverte sur 2 captures espacées (pas une simple animation de fermeture) → on retape
+        const stillOpen = async () => { const sh = await snapshot(key, deviceId); return !!sh && pickerRows(await ocrWords(sh, whitelist), W, H).length >= 2 }
+        if (!await stillOpen()) return true
+        await sleep(1200)
+        if (!await stillOpen()) return true
+        hooks?.log?.('   le sélecteur est encore ouvert → nouvel essai')
+      }
+      hooks?.log?.(`❌ « ${wanted} » : le tap n’est pas pris par le sélecteur`)
+      await sendAction(key, deviceId, { type: 'press', name: 'home' })
+      return false
     }
-    // Sens de scroll à partir des numéros lus.
-    const nums = rows.map(r => (/^\d+$/.test(r.text) ? parseInt(r.text) : NaN)).filter(n => !isNaN(n))
-    let dir = 1 // 1 = révéler vers le bas (numéros plus grands) ; -1 = vers le haut
-    if (isDefault) dir = -1
-    else if (wantedNum != null && nums.length) {
-      const minV = Math.min(...nums), maxV = Math.max(...nums)
-      if (wantedNum < minV) dir = -1
-      else if (wantedNum > maxV) dir = 1
-      else dir = lastDir || 1 // dans la plage mais OCR raté → même sens
-    }
-    lastDir = dir
-    const x = Math.round(W * 0.5)
-    const y1 = dir > 0 ? Math.round(H * 0.72) : Math.round(H * 0.45)
-    const y2 = dir > 0 ? Math.round(H * 0.45) : Math.round(H * 0.72)
-    hooks?.log?.(`↕ scroll ${dir > 0 ? 'bas' : 'haut'}…`)
-    await sendAction(key, deviceId, { type: 'swipe', x1: x, y1, x2: x, y2, duration_ms: 450 })
-    await sleep(750)
+    // Pas de défilement : dans la feuille Crane, tout balayage SÉLECTIONNE la ligne touchée (vérifié en
+    // direct le 20/11/2026) et ouvrirait un mauvais container. La feuille montre tous les containers
+    // tant qu'ils tiennent à l'écran ; sinon on s'arrête proprement.
+    if (rows.length) { hooks?.log?.(`❌ « ${wanted} » n’est pas dans le sélecteur (containers vus : ${rows.map(r => r.text).join(', ')})`); await sendAction(key, deviceId, { type: 'press', name: 'home' }); return false }
+    await sleep(900)
   }
   hooks?.log?.(sawSheet ? `❌ « ${wanted} » introuvable après ${maxSteps} essais` : '❌ sélecteur « Select Container » non détecté à l’écran')
   return false
@@ -593,7 +606,32 @@ export interface CreateAccountOpts {
 /** Le container est-il « frais » (écran d'inscription « Join Instagram ») ? Vérifié AVANT d'acheter un
  *  numéro : un container déjà connecté (fil, profil) ne doit jamais faire acheter de numéro. */
 export async function isSignupScreen(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
-  return hasText(key, deviceId, [/^started$/i, /^s.?inscrire$/i, /commencer$/i, /^join$/i], hooks, { tries: 4, cropY: [0.45, 1] })
+  return (await signupStage(key, deviceId, hooks)) !== null
+}
+
+/** Mots lus → étape d'inscription : « join » (Join Instagram / Get started, bas de l'écran) ou « mobile »
+ *  (« What's your mobile number? » : inscription commencée puis abandonnée, container toujours vierge). */
+export function classifySignup(words: { text: string; cy: number }[], H: number): 'join' | 'mobile' | null {
+  if (words.some(o => o.cy > H * 0.45 && /^(started|join|s.?inscrire|commencer)$/i.test(o.text.replace(/[^\p{L}']/gu, '')))) return 'join'
+  const has = (re: RegExp) => words.some(o => re.test(o.text.replace(/[^\p{L}]/gu, '')))
+  if (has(/^mobile$/i) && has(/^(change|changer|modifier|next|suivant)$/i)) return 'mobile'
+  return null
+}
+
+export async function signupStage(key: string, deviceId: string, hooks?: VisionHooks, tries = 4): Promise<'join' | 'mobile' | null> {
+  for (let i = 0; i < tries; i++) {
+    if (hooks?.shouldStop?.()) return null
+    const shot = await snapshot(key, deviceId)
+    if (shot) {
+      const { h: H } = await imgSize(shot)
+      const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
+      const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
+      const st = classifySignup([...wa, ...wb], H)
+      if (st) return st
+    }
+    await sleep(700)
+  }
+  return null
 }
 
 export async function createInstagramAccountByVision(
@@ -609,20 +647,20 @@ export async function createInstagramAccountByVision(
   // 1. Écran « Join Instagram » → bouton bleu « Get started ».
   // NB : l'OCR renvoie les mots SÉPARÉS → on matche un mot distinctif isolé (« started »),
   // pas la chaîne « get started » (qui ne matcherait aucun mot seul).
-  hooks?.log?.('🆕 Création de compte : « Get started »…')
-  // On vérifie d'abord qu'on est bien sur l'écran « Join Instagram » (mot « Instagram »
-  // OU le bouton), sinon inutile de taper à l'aveugle.
-  const onJoin = await hasText(key, deviceId, [isInstagramText, /^started$/i, /^s.?inscrire$/i, /commencer$/i], hooks, { tries: 5 })
-  if (!onJoin) {
+  // Inscription déjà commencée (écran du numéro) : on reprend directement à l'étape 2.
+  const stage0 = await signupStage(key, deviceId, hooks, 5)
+  if (!stage0) {
     hooks?.log?.('❌ Écran « Join Instagram » non détecté (container déjà connecté ?).')
     return { ok: false, stage: 'get_started' }
   }
+  if (stage0 === 'mobile') hooks?.log?.('↪ Inscription déjà commencée : on reprend à l’écran du numéro.')
+  else hooks?.log?.('🆕 Création de compte : « Get started »…')
   // « started » n'est QUE sur le bouton (« get » traîne dans « who get you » plus haut) ;
   // on restreint aussi à la moitié basse pour ne jamais taper le texte de description.
   // ⚠ Le tap simple sur ce bouton « marche pas » parfois (touch avalé) → on TAPE puis on
   // VÉRIFIE qu'on a avancé (écran mobile/number/Change) ; sinon on ré-appuie (double-tap +
   // ancre) jusqu'à 4 essais. On ne continue que quand l'écran suivant est bien apparu.
-  let advanced = false
+  let advanced = stage0 === 'mobile'
   for (let attempt = 0; attempt < 4 && !advanced; attempt++) {
     if (hooks?.shouldStop?.()) return { ok: false, stage: 'get_started' }
     // Position du bouton : OCR du mot, sinon ancre connue (bouton bleu ~80%).
@@ -841,7 +879,7 @@ export async function forceCloseForegroundApp(key: string, deviceId: string, hoo
 }
 
 export interface SignupCreds { username: string; password: string; fullName: string }
-export async function completeSignupByVision(key: string, deviceId: string, hooks?: VisionHooks, opts?: { container?: string }): Promise<{ ok: boolean; creds?: SignupCreds }> {
+export async function completeSignupByVision(key: string, deviceId: string, hooks?: VisionHooks, opts?: { container?: string }): Promise<{ ok: boolean; creds?: SignupCreds; refused?: boolean }> {
   const shot0 = await snapshot(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible (inscription)'); return { ok: false } }
@@ -909,13 +947,22 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   await sleep(3200)
 
   // 4. Username : effacer la suggestion puis saisir prénom + 5–8 car. aléatoires.
-  const username = randomUsername(first)
+  let username = randomUsername(first)
   hooks?.log?.(`🏷 Username : @${username}`)
-  await tapFrac(0.5, 0.24); await sleep(700)
+  // Le champ est sous le texte d'aide (~30 % de la hauteur, libellé « Username » dedans). L'ancien tap à 24 %
+  // tombait sur le texte d'aide, fermait le clavier, et IG gardait sa suggestion (vu en direct).
+  const uLbl = await findWordPoint(key, deviceId, [/^username$/i, /^utilisateur$/i], hooks, { minY: 0.2, maxY: 0.45, tries: 2 })
+  const uy = uLbl ? uLbl.y + Math.round(0.025 * H) : Math.round(0.305 * H)
+  await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.45 * W), y: uy }); await sleep(800)
   for (let i = 0; i < 30; i++) await sendAction(key, deviceId, { type: 'key', key: 'Backspace' }) // vide le champ
   await sleep(500)
   await sendAction(key, deviceId, { type: 'text', text: username })
-  await sleep(900)
+  await sleep(1200)
+  const inField = await readUsernameField(key, deviceId, uy)
+  if (inField && inField !== username) {
+    hooks?.log?.(`   ⚠ le champ affiche @${inField} (saisie non prise) → on garde ce nom pour les identifiants`)
+    username = inField
+  }
   await tapNext('Next (username)')
   await sleep(3200)
   // Éventuel écran/Next intermédiaire.
@@ -938,6 +985,19 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   for (let i = 0; i < 14 && idle < 3; i++) {
     if (hooks?.shouldStop?.()) break
     await sleep(1400)
+    // R. Refus d'Instagram (« We couldn't create an account for you ») ou retour à « Join Instagram » :
+    //    le compte N'EST PAS créé (anti-robot : IP / numéro / trop de créations rapprochées).
+    if (await hasText(key, deviceId, [/^couldn.?t$/i, /^impossible$/i], hooks, { tries: 1, cropY: [0.3, 0.6] })) {
+      hooks?.log?.('⛔ Instagram refuse la création (« We couldn’t create an account for you ») : anti-robot (IP, numéro ou créations trop rapprochées)')
+      await findTapText(key, deviceId, [/^ok$/i], hooks, { label: 'OK', tries: 1, minY: 0.4, maxY: 0.75 })
+      return { ok: false, creds: { username, password, fullName }, refused: true }
+    }
+    if (await signupStage(key, deviceId, hooks, 1) === 'join') {
+      hooks?.log?.('⛔ Retour à l’écran « Join Instagram » : compte non créé (refus d’Instagram)')
+      return { ok: false, creds: { username, password, fullName }, refused: true }
+    }
+    // A0. Écran des cookies (peut arriver avant le fil).
+    if (await hasText(key, deviceId, [/^cookies\??$/i], hooks, { tries: 1, cropY: [0.05, 0.35] })) { if (!await acceptCookiesIfShown(key, deviceId, hooks, opts?.container)) break; idle = 0; continue }
     // A. « Skip » explicite (jamais un opt-in).
     if (await findTapText(key, deviceId, [/^skip$/i, /^ignorer$/i, /^plus tard$/i, /^not now$/i, /^pas maintenant$/i], hooks, { label: 'Skip', tries: 1, minY: 0.5 })) { idle = 0; continue }
     // B. Écran « Review the settings for your new profile » (Turn on Notifications/Contacts/Location) :
@@ -952,7 +1012,8 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
         const reopened = await selectContainerByVision(key, deviceId, opts.container, hooks)
         hooks?.log?.(reopened ? '   ✅ Instagram rouvert (compte finalisé)' : '   ⚠ réouverture du conteneur incertaine')
       }
-      await sleep(2500)
+      await sleep(4000)
+      await acceptCookiesIfShown(key, deviceId, hooks, opts?.container)
       hooks?.log?.(`✅ Compte créé — 🔐 @${username} · ${password}`)
       return { ok: true, creds: { username, password, fullName } }
     }
@@ -976,6 +1037,38 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
   }
   hooks?.log?.(`✅ Compte créé — 🔐 @${username} · ${password}`)
   return { ok: true, creds: { username, password, fullName } }
+}
+
+/** Valeur lue dans le champ Username (mot type identifiant sur la ligne du champ), null si illisible. */
+async function readUsernameField(key: string, deviceId: string, fieldY: number): Promise<string | null> {
+  const shot = await snapshot(key, deviceId)
+  if (!shot) return null
+  const { h: H } = await imgSize(shot)
+  const w = (await ocrWords(shot)).filter(o => Math.abs(o.cy - fieldY) < H * 0.06 && /^[a-z0-9._]{4,30}$/i.test(o.text) && !/^username$/i.test(o.text))
+  return w.length ? w.sort((a, b) => b.text.length - a.text.length)[0].text.toLowerCase() : null
+}
+
+/** Écran « Allow the use of cookies by Instagram? » → « Allow all cookies ». true si l'écran a disparu. */
+export async function acceptCookiesIfShown(key: string, deviceId: string, hooks?: VisionHooks, container?: string): Promise<boolean> {
+  const onCookies = () => hasText(key, deviceId, [/^cookies\??$/i], hooks, { tries: 1, cropY: [0.05, 0.35] })
+  if (!await onCookies()) return true
+  for (let round = 0; round < 3; round++) {
+    hooks?.log?.(round ? `🍪 Cookies toujours affichés → redémarrage d’Instagram (${round}/2)` : '🍪 Écran des cookies → « Allow all cookies »')
+    if (round) {
+      // écran figé (même à la main) : on ferme Instagram et on rouvre le container
+      await forceCloseForegroundApp(key, deviceId, hooks)
+      if (!container || !await selectContainerByVision(key, deviceId, container, hooks)) break
+      await sleep(6000)
+      if (!await onCookies()) return true
+    }
+    for (let i = 0; i < 2; i++) {
+      if (!await findTapText(key, deviceId, [/^allow$/i, /^autoriser$/i], hooks, { label: 'Allow all cookies', tries: 2, minY: 0.8 })) break
+      await sleep(3000)
+      if (!await onCookies()) { hooks?.log?.('   cookies acceptés ✓'); return true }
+    }
+  }
+  hooks?.log?.('   ⚠ l’écran des cookies ne répond pas : à valider plus tard à la main')
+  return false
 }
 
 // ── Warm-up piloté à la VISION (activité humaine sur les Reels) ────────────────
@@ -1303,7 +1396,12 @@ export async function warmupEditsByVision(key: string, deviceId: string, target:
   }
 }
 
-// Ouvre Instagram (via l'icône → déclenche le sélecteur Crane) puis sélectionne le container.
+/** Lignes du sélecteur Crane : noms (chiffres ou « Default ») CENTRÉS horizontalement, sous la barre d'état.
+ *  Les icônes de l'écran d'accueil derrière la feuille (« 40 »…) sont décentrées et écartées. */
+export function pickerRows<T extends { text: string; cx: number; cy: number }>(words: T[], W: number, H: number): T[] {
+  return words.filter(o => o.text && (/^\d{1,3}$/.test(o.text) || /^default$/i.test(o.text)) && o.cy > H * 0.13 && Math.abs(o.cx - W / 2) < W * 0.12)
+}
+
 /** Noms de containers lus à l'écran (chiffres ou « Default »), triés : Default puis 1, 2, 3… */
 export function sortContainerNames(names: Iterable<string>): string[] {
   const l = [...new Set([...names].map(n => /^default$/i.test(n) ? 'Default' : String(parseInt(n, 10))).filter(n => n === 'Default' || /^\d{1,3}$/.test(n)))]
@@ -1311,7 +1409,7 @@ export function sortContainerNames(names: Iterable<string>): string[] {
 }
 
 /** DÉTECTION des containers Crane d'un iPhone : ouvre le sélecteur (tap sur l'icône Instagram), lit tous
- *  les noms en faisant défiler vers le haut puis vers le bas, puis referme (retour à l'accueil).
+ *  les noms visibles SANS faire défiler (un balayage ouvrirait un container), puis referme (accueil).
  *  null = sélecteur introuvable. */
 export async function detectContainersByVision(key: string, deviceId: string, hooks?: VisionHooks): Promise<string[] | null> {
   hooks?.log?.('🏠 Retour à l’écran d’accueil…')
@@ -1321,37 +1419,26 @@ export async function detectContainersByVision(key: string, deviceId: string, ho
   if (!await tapInstagramIcon(key, deviceId, hooks)) { hooks?.log?.('❌ Icône Instagram introuvable sur l’accueil (mets-la sur la 1re page).'); return null }
   await sleep(2800)
   const found = new Set<string>()
-  const readRows = async (): Promise<{ added: number; W: number; H: number }> => {
+  let overflow = false
+  for (let k = 0; k < 3 && !found.size; k++) {
+    if (k) await sleep(1500)
     const shot = await snapshot(key, deviceId)
-    if (!shot) return { added: 0, W: 0, H: 0 }
+    if (!shot) continue
     const { w: W, h: H } = await imgSize(shot)
-    const words = await ocrWords(shot, '0123456789Defaultefaul')
-    const rows = words.filter(o => o.text && (/^\d{1,3}$/.test(o.text) || /^default$/i.test(o.text)) && o.cy > H * 0.13)
-    let added = 0
-    for (const r of sortContainerNames(rows.map(o => o.text))) if (!found.has(r)) { found.add(r); added++ }
-    return { added, W, H }
+    const rows = pickerRows(await ocrWords(shot, '0123456789Defaultefaul'), W, H)
+    for (const r of sortContainerNames(rows.map(o => o.text))) found.add(r)
+    // feuille qui monte jusqu'en haut de l'écran = plus de containers qu'il n'en tient à l'écran
+    if (rows.length && Math.min(...rows.map(o => o.cy)) < H * 0.2) overflow = true
   }
-  let { W, H } = await readRows()
-  if (!found.size) { await sleep(1500); ({ W, H } = await readRows()) }
   if (!found.size) { hooks?.log?.('❌ Sélecteur « Select Container » non détecté (Crane installé ? Instagram en plusieurs containers ?)'); await sendAction(key, deviceId, { type: 'press', name: 'home' }); return null }
-  // haut de liste (Default) puis bas : on s'arrête après 2 défilements sans nouveau nom
-  for (const dir of [-1, 1]) {
-    let idle = 0
-    for (let step = 0; step < 15 && idle < 2; step++) {
-      if (hooks?.shouldStop?.()) break
-      const x = Math.round(W * 0.5), y1 = Math.round(H * (dir > 0 ? 0.72 : 0.45)), y2 = Math.round(H * (dir > 0 ? 0.45 : 0.72))
-      await sendAction(key, deviceId, { type: 'swipe', x1: x, y1, x2: x, y2, duration_ms: 450 })
-      await sleep(750)
-      const r = await readRows()
-      idle = r.added ? 0 : idle + 1
-    }
-  }
+  if (overflow) hooks?.log?.('⚠ Le sélecteur déborde de l’écran : les containers du bas ne sont pas lisibles sans le faire défiler (ce qui en ouvrirait un). Ajoute-les à la main si besoin.')
   const list = sortContainerNames(found)
   hooks?.log?.(`✅ ${list.length} container(s) détecté(s) : ${list.join(', ')}`)
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   return list
 }
 
+// Ouvre Instagram (via l'icône → déclenche le sélecteur Crane) puis sélectionne le container.
 export async function selectContainerByVision(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
   hooks?.log?.('🏠 Retour à l’écran d’accueil…')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
