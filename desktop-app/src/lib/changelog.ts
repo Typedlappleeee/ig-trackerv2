@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-20b',
+    date: '2026-11-20',
+    title: { fr: 'iRemoTech : containers détectés automatiquement', en: 'iRemoTech: containers detected automatically' },
+    items: {
+      fr: ['Bouton « 🔍 Détecter » sur chaque iPhone : ScaleFlow ouvre le sélecteur Crane, lit tous les containers (Default, 1, 2, 3…) et met la liste à jour, sans rien taper.', 'Création de compte « Tout auto » (activé par défaut) : choisis tes iPhones et lance, ScaleFlow détecte les containers puis crée un compte dans chacun de ceux qui n’en ont pas encore.'],
+      en: ['“🔍 Detect” button on each iPhone: ScaleFlow opens the Crane picker, reads every container (Default, 1, 2, 3…) and updates the list, nothing to type.', '“Fully automatic” account creation (on by default): pick your iPhones and launch, ScaleFlow detects the containers then creates an account in each one that doesn’t have one yet.'],
+    },
+  },
+  {
     id: '2026-11-20',
     date: '2026-11-20',
     title: { fr: 'iRemoTech : création de comptes container par container, sans gaspiller de numéros', en: 'iRemoTech: account creation container by container, without wasting numbers' },

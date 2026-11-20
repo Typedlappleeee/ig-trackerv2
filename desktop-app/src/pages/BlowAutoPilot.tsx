@@ -11,13 +11,13 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
+import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
-import { loadDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
+import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { folderMedia, loadBankSummary, type BankSummary } from '@/lib/flowEngine'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
@@ -118,6 +118,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [smspoolMax, setSmspoolMax] = useState('0.35')          // plafond prix SMSPool ($)
   const [smspoolPriceShown, setSmspoolPriceShown] = useState<string | null>(null)
   const [acctCountry, setAcctCountry] = useState<'uk' | 'usa'>('usa')
+  // création « tout auto » : détecter les containers des iPhones choisis puis remplir ceux sans compte
+  const [autoDetect, setAutoDetect] = useState(() => { try { return localStorage.getItem('sf-irt-auto-detect') !== '0' } catch { return true } })
+  const [detecting, setDetecting] = useState<string | null>(null)
   // essais max par container avant de passer au suivant (le numéro d'un essai raté est annulé → remboursé)
   const [acctTries, setAcctTries] = useState(() => { try { return Math.max(1, Math.min(10, Number(localStorage.getItem('sf-irt-acct-tries')) || 3)) } catch { return 3 } })
   const [heroOffers, setHeroOffers] = useState<{ price: number; count: number }[]>([]) // paliers de prix HeroSMS
@@ -219,6 +222,21 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const budget = usage?.actions ?? { remaining: usage?.remaining, budget: usage?.budget }
 
   const togglePhone = (id: string) => setSel(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else { n.add(id); setSelConts(sc => sc[id] ? sc : { ...sc, [id]: new Set() }) } return n })
+  // Détecte les containers Crane d'un iPhone (sélecteur lu à l'écran) et remplace sa liste.
+  const detectConts = async (dev: string, log: (m: string) => void, stop?: () => boolean): Promise<string[] | null> => {
+    if (!irt.key) return null
+    const list = await detectContainersByVision(irt.key, dev, { log, shouldStop: stop })
+    if (list?.length) { saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list })); setSelConts(sc => ({ ...sc, [dev]: new Set(list) })) }
+    return list
+  }
+  const detectOne = async (dev: string) => {
+    if (running || detecting) return
+    const name = devices.find(d => d.public_id === dev)?.name ?? dev
+    setDetecting(dev); setLogs([])
+    const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(e => { push(`[${name}] ⚠ ${e instanceof Error ? e.message : String(e)}`); return null })
+    if (!list) push(`[${name}] ✗ containers non détectés`)
+    setDetecting(null)
+  }
   const toggleCont = (dev: string, name: string) => setSelConts(sc => { const cur = new Set(sc[dev] ?? []); if (cur.has(name)) cur.delete(name); else cur.add(name); return { ...sc, [dev]: cur } })
   const addC = (dev: string) => {
     const name = (newC[dev] ?? '').trim(); if (!name) return
@@ -350,8 +368,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   async function createAccounts() {
     const key = irt.key
     if (!key || running) return
-    const jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].map(c => ({ dev, c })))
-    if (jobs.length === 0) { setLogs(['⚠ Coche au moins un container (onglet Téléphones).']); return }
+    let jobs = [...sel].flatMap(dev => [...(selConts[dev] ?? new Set())].map(c => ({ dev, c })))
+    if (!autoDetect && jobs.length === 0) { setLogs(['⚠ Coche au moins un container (onglet Téléphones).']); return }
+    if (autoDetect && !sel.size) { setLogs(['⚠ Choisis au moins un iPhone.']); return }
     // Config pays : identifiants propres à chaque fournisseur SMS.
     //  - 5sim : simCountry (nom), operator ; HeroSMS : heroCountry (id SMS-Activate : USA=187, UK=16).
     //  - USA : opérateur « textnow » (priorisé), on prend le numéro le PLUS CHER dispo.
@@ -382,6 +401,21 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const finishNum = (id: string | number) => usingHero ? herosmsFinish(heroKey, Number(id)) : usingPool ? smspoolFinish(smspoolKey, String(id)) : fivesimFinish(sim5Key, Number(id))
 
     setRunning(true); setLogs([])
+    // Tout auto : on lit les containers de chaque iPhone, puis on garde ceux qui n'ont pas encore de compte créé.
+    if (autoDetect) {
+      const made = new Set(loadCreatedAccounts().filter(a => a.ok).map(a => `${a.device}|${a.container}`))
+      const next: { dev: string; c: string }[] = []
+      for (const dev of sel) {
+        const name = devices.find(d => d.public_id === dev)?.name ?? dev
+        push(`🔍 [${name}] détection des containers…`)
+        const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(() => null) ?? (conts[dev] ?? [])
+        const todo = list.filter(c => !made.has(`${dev}|${c}`))
+        push(`[${name}] ${list.length} container(s), ${list.length - todo.length} déjà avec un compte créé ici → ${todo.length} à remplir`)
+        next.push(...todo.map(c => ({ dev, c })))
+      }
+      jobs = next
+      if (!jobs.length) { push('✔ Rien à faire : tous les containers ont déjà un compte.'); setRunning(false); return }
+    }
     const R = startRun('farm', `Création compte ${CFG.name} · ${jobs.length}`, jobs.length); setRunId(R.id)
     const byPhone = [...new Set(jobs.map(j => j.dev))].map(dev => ({ dev, conts: jobs.filter(j => j.dev === dev).map(j => j.c) }))
     push(`▶ Création de compte (${CFG.name})${smsKey ? ` + numéro ${provName}` : ' (test, sans numéro)'} : ${jobs.length} container(s) sur ${byPhone.length} iPhone(s)${parallel && byPhone.length > 1 ? ' · iPhones en parallèle' : ''} · ${acctTries} essai(s) max par container`)
@@ -591,6 +625,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                   <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>📱 {d?.name ?? devId}</span>
                   <span style={{ fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{picked.size}/{list.length}</span>
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                    <button style={{ ...btn, height: 28, padding: '0 10px', fontSize: 12 }} disabled={running || !!detecting} title="Ouvre le sélecteur Crane sur l’iPhone et lit tous les containers" onClick={() => void detectOne(devId)}>{detecting === devId ? 'Détection…' : '🔍 Détecter'}</button>
                     <button style={{ ...btn, height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set(list) }))}>Tout</button>
                     <button style={{ ...btn, height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set() }))}>Aucun</button>
                   </span>
@@ -909,6 +944,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginBottom: 6 }}>Remplir les containers</div>
           <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque iPhone enchaîne ses containers : un compte créé, puis le container suivant, jusqu’au dernier. Un container déjà connecté est passé sans acheter de numéro.</p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
+              <input type="checkbox" checked={autoDetect} disabled={running} onChange={e => { setAutoDetect(e.target.checked); try { localStorage.setItem('sf-irt-auto-detect', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              Tout auto : détecter les containers puis remplir ceux sans compte
+            </label>
             <button style={{ ...btn, height: 30, padding: '0 12px' }} disabled={running || !sel.size} onClick={() => {
               const done = new Set(createdAccts.filter(a => a.ok).map(a => `${a.device}|${a.container}`))
               setSelConts(sc => { const n = { ...sc }; for (const d of sel) n[d] = new Set((conts[d] ?? []).filter(c => !done.has(`${d}|${c}`))); return n })
@@ -921,7 +960,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           </div>
         </div>
         <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />
-        <LaunchBar label={(smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={createAccounts} />
+        <LaunchBar label={autoDetect ? `Détecter et remplir les containers (${sel.size} iPhone${sel.size > 1 ? 's' : ''})` : (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={(autoDetect ? !sel.size : !totalJobs) || running || !!detecting} running={running} onClick={createAccounts} />
         <LogPanel />
         {createdAccts.length > 0 && (
           <div style={card}>

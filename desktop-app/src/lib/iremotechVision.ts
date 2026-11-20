@@ -1281,6 +1281,54 @@ export async function warmupEditsByVision(key: string, deviceId: string, target:
 }
 
 // Ouvre Instagram (via l'icône → déclenche le sélecteur Crane) puis sélectionne le container.
+/** Noms de containers lus à l'écran (chiffres ou « Default »), triés : Default puis 1, 2, 3… */
+export function sortContainerNames(names: Iterable<string>): string[] {
+  const l = [...new Set([...names].map(n => /^default$/i.test(n) ? 'Default' : String(parseInt(n, 10))).filter(n => n === 'Default' || /^\d{1,3}$/.test(n)))]
+  return l.sort((a, b) => a === 'Default' ? -1 : b === 'Default' ? 1 : Number(a) - Number(b))
+}
+
+/** DÉTECTION des containers Crane d'un iPhone : ouvre le sélecteur (tap sur l'icône Instagram), lit tous
+ *  les noms en faisant défiler vers le haut puis vers le bas, puis referme (retour à l'accueil).
+ *  null = sélecteur introuvable. */
+export async function detectContainersByVision(key: string, deviceId: string, hooks?: VisionHooks): Promise<string[] | null> {
+  hooks?.log?.('🏠 Retour à l’écran d’accueil…')
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1200)
+  hooks?.log?.('📲 Ouverture du sélecteur de containers (icône Instagram)…')
+  if (!await tapInstagramIcon(key, deviceId, hooks)) { hooks?.log?.('❌ Icône Instagram introuvable sur l’accueil (mets-la sur la 1re page).'); return null }
+  await sleep(2800)
+  const found = new Set<string>()
+  const readRows = async (): Promise<{ added: number; W: number; H: number }> => {
+    const shot = await snapshot(key, deviceId)
+    if (!shot) return { added: 0, W: 0, H: 0 }
+    const { w: W, h: H } = await imgSize(shot)
+    const words = await ocrWords(shot, '0123456789Defaultefaul')
+    const rows = words.filter(o => o.text && (/^\d{1,3}$/.test(o.text) || /^default$/i.test(o.text)) && o.cy > H * 0.13)
+    let added = 0
+    for (const r of sortContainerNames(rows.map(o => o.text))) if (!found.has(r)) { found.add(r); added++ }
+    return { added, W, H }
+  }
+  let { W, H } = await readRows()
+  if (!found.size) { await sleep(1500); ({ W, H } = await readRows()) }
+  if (!found.size) { hooks?.log?.('❌ Sélecteur « Select Container » non détecté (Crane installé ? Instagram en plusieurs containers ?)'); await sendAction(key, deviceId, { type: 'press', name: 'home' }); return null }
+  // haut de liste (Default) puis bas : on s'arrête après 2 défilements sans nouveau nom
+  for (const dir of [-1, 1]) {
+    let idle = 0
+    for (let step = 0; step < 15 && idle < 2; step++) {
+      if (hooks?.shouldStop?.()) break
+      const x = Math.round(W * 0.5), y1 = Math.round(H * (dir > 0 ? 0.72 : 0.45)), y2 = Math.round(H * (dir > 0 ? 0.45 : 0.72))
+      await sendAction(key, deviceId, { type: 'swipe', x1: x, y1, x2: x, y2, duration_ms: 450 })
+      await sleep(750)
+      const r = await readRows()
+      idle = r.added ? 0 : idle + 1
+    }
+  }
+  const list = sortContainerNames(found)
+  hooks?.log?.(`✅ ${list.length} container(s) détecté(s) : ${list.join(', ')}`)
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  return list
+}
+
 export async function selectContainerByVision(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
   hooks?.log?.('🏠 Retour à l’écran d’accueil…')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
