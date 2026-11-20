@@ -20,11 +20,13 @@ export const CHANGELOG: ChangelogEntry[] = [
         '« 🔍 Détecter » sur un iPhone non jailbreaké lit les comptes Instagram connectés (Profil → nom en haut) et les ajoute comme cibles « @nom ».',
         'Posting, Story et Warm-up : pour une cible « @nom », ScaleFlow bascule sur ce compte et vérifie qu’il est bien actif (coche bleue) avant de publier.',
         'La création de comptes ignore les iPhones non jailbreakés.',
+        'Posting sur iPhone normal fiabilisé : popup « Allow iRemotech … ifconfig.me » autorisée, attente du réseau après le mode avion, accès aux photos accordé (« Allow Full Access »), autres alertes iOS gérées, retour automatique au fil (créateur, Reel plein écran, popup « shared as reels »), dernière vidéo choisie par sa durée (la 1re case est l’appareil photo), « Next » en haut à droite.',
       ],
       en: [
         '“🔍 Detect” on a non-jailbroken iPhone reads the logged-in Instagram accounts (Profile → name at the top) and adds them as “@name” targets.',
         'Posting, Story and Warm-up: for an “@name” target, ScaleFlow switches to that account and checks it is active (blue tick) before posting.',
         'Account creation skips non-jailbroken iPhones.',
+        'More reliable posting on regular iPhones: “Allow iRemotech … ifconfig.me” popup allowed, wait for the network after airplane mode, photo access granted (“Allow Full Access”), other iOS alerts handled, automatic return to the feed (creator, full-screen Reel, “shared as reels” popup), latest video picked by its duration (the first cell is the camera), “Next” at the top right.',
       ],
     },
   },

@@ -67,6 +67,14 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
     }
     hooks?.log?.('✈️ Mode avion OFF, attente du réseau…')
     await sleep(8000)
+    await allowShortcutPrompt(key, deviceId, hooks)
+    // réseau mobile revenu ? (« No Service » / « SOS » dans la barre d'état) — jusqu'à ~40 s
+    for (let k = 0; k < 8; k++) {
+      const scr = await readScreenWords(key, deviceId)
+      if (!scr || !scr.words.some(o => o.cy < scr.H * 0.035 && /^(no|sos|searching)$/i.test(o.text))) break
+      if (k === 0) hooks?.log?.('   📶 « No Service » : on attend le retour du réseau…')
+      await sleep(5000)
+    }
     if (!before) { hooks?.log?.('   (IP non lisible par iRemoTech : rotation non vérifiable, on continue)'); return }
     for (let i = 0; i < 4; i++) {
       if (hooks?.shouldStop?.()) return
@@ -86,6 +94,55 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
 async function doubleTap(key: string, deviceId: string, x: number, y: number): Promise<void> {
   await sendAction(key, deviceId, { type: 'tap', x, y })
   await sendAction(key, deviceId, { type: 'tap', x, y })
+}
+
+/** Popup iOS « Allow "iRemotech 1.4" to connect to "ifconfig.me"? » (raccourci iRemoTech qui lit l'IP, à autoriser
+ *  une fois par iPhone) : elle bloque tous les taps → on tape « Allow » (double tap : alerte iOS). true si traitée. */
+export async function allowShortcutPrompt(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  const scr = await readScreenWords(key, deviceId)
+  if (!scr || !scr.words.some(o => /ifconfig|iremotech/i.test(o.text) && o.cy < scr.H * 0.45)) return false
+  const allow = scr.words.find(o => /^allow$/i.test(o.text) && o.cx > scr.W * 0.5 && o.cy < scr.H * 0.5)
+  hooks?.log?.('🔓 Popup « Allow iRemotech to connect to ifconfig.me » → Allow (une seule fois par iPhone)')
+  await doubleTap(key, deviceId, allow ? allow.cx : Math.round(0.73 * scr.W), allow ? allow.cy : Math.round(0.35 * scr.H))
+  await sleep(1500)
+  return true
+}
+
+/** Pour PUBLIER, Instagram doit voir la galerie : feuille « Allow Instagram to access your photos and videos » →
+ *  Continue, puis alerte iOS → « Allow Full Access » / « Allow Access to All Photos » (double tap : alerte iOS).
+ *  (À l'inverse de l'inscription, où l'on refuse.) Autres alertes « would like to… » : caméra / micro → Allow ;
+ *  notifications / contacts / localisation / suivi → Don't Allow. Sans effet si rien n'est demandé. */
+export async function grantPhotoAccessIfAsked(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
+  for (let k = 0; k < 4; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) return
+    const has = (re: RegExp, a = 0, b = 1) => scr.words.some(o => re.test(o.text) && o.cy >= a * scr.H && o.cy <= b * scr.H)
+    if (has(/^access$/i, 0.3, 0.5) && has(/^videos$/i, 0.3, 0.5) && !has(/^please$/i)) {
+      hooks?.log?.('🖼 Accès aux photos demandé → Continue')
+      const c = scr.words.find(o => /^continue$/i.test(o.text) && o.cy > 0.8 * scr.H)
+      await sendAction(key, deviceId, { type: 'tap', x: c ? c.cx : Math.round(scr.W / 2), y: c ? c.cy : Math.round(0.94 * scr.H) })
+      await sleep(2500); continue
+    }
+    if (has(/^would$/i) && (has(/^photos$/i) || has(/^library\.?$/i))) {
+      // ligne « Allow Full Access » / « Allow Access to All Photos », jamais « Limit / Select Photos » ni « Don't Allow »
+      const row = scr.words.find(o => /^full$/i.test(o.text))
+        ?? scr.words.find(o => /^all$/i.test(o.text) && scr.words.some(p => /^photos$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))
+      const y = row ? row.cy : Math.round(0.79 * scr.H)
+      hooks?.log?.('🖼 Alerte iOS → « Allow Full Access » (toutes les photos)')
+      await doubleTap(key, deviceId, Math.round(scr.W / 2), y)
+      await sleep(2500); continue
+    }
+    if (has(/^would$/i) && has(/^like$/i)) {
+      const allowIt = has(/^(camera|camera\.|microphone|microphone\.)$/i)
+      const b = allowIt
+        ? scr.words.find(o => /^allow$/i.test(o.text) && o.cx > scr.W * 0.5)
+        : scr.words.find(o => /^(don['’]?t|dontallow|ask)$/i.test(o.text))
+      hooks?.log?.(`🔔 Alerte iOS (${allowIt ? 'caméra/micro → Allow' : 'permission → Don’t Allow'})`)
+      await doubleTap(key, deviceId, b ? b.cx + (allowIt ? 0 : 25) : Math.round(scr.W * (allowIt ? 0.7 : 0.3)), b ? b.cy : Math.round(0.68 * scr.H))
+      await sleep(2000); continue
+    }
+    return
+  }
 }
 
 /** Action renvoyée jusqu'à acceptation (attente croissante : la limite de débit iRemoTech demande ~20 s). */
@@ -481,6 +538,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   await tapFrac(A.createPlus.x, A.createPlus.y)
   await sleep(2200)
+  await grantPhotoAccessIfAsked(key, deviceId, hooks)
   // 2. Mode POST : galerie directe, dernière vidéo pré-sélectionnée, pas de caméra (ni effets).
   //    Une vidéo publiée en POST devient un Reel. Si POST est introuvable → caméra REEL.
   if (await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i], 'POST', hooks)) {
@@ -547,13 +605,18 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
   await sleep(1800) // la galerie se charge
   // a. Vidéo la plus récente : 1re case de la grille, juste sous « Récents » (x = 1/8 de la largeur :
   //    dans la 1re case en 3 comme en 4 colonnes). Sans repère, on garde la pré-sélection d'Instagram.
+  // La vidéo la plus récente = 1re vignette portant une DURÉE (« 0:06 ») sous « Récents » : sur un iPhone normal
+  // la 1re case est l'APPAREIL PHOTO (la taper ouvrait la caméra).
   const rec = await findWordPoint(key, deviceId, [/^recents?$/i, /^r[ée]cents?$/i], hooks, { minY: 0.25, maxY: 0.85, tries: 2 })
-  if (rec) {
-    const x = Math.round(W / 8), y = Math.round(rec.y + H * 0.03 + W / 8)
-    hooks?.log?.(`🎞️ Dernière vidéo (1re case sous « Récents ») → tap (${x}, ${y})`)
+  const gshot = rec ? await snapshot(key, deviceId) : null
+  const durs = gshot && rec ? (await ocrWords(gshot, '0123456789:', { threshold: null, scale: 2, psms: ['11'] })).filter(o => /^\d{1,2}:\d{2}$/.test(o.text) && o.cy > rec.y) : []
+  if (durs.length) {
+    const first = durs.sort((a, b) => (Math.abs(a.cy - b.cy) < 20 ? a.cx - b.cx : a.cy - b.cy))[0]
+    const x = Math.max(8, first.cx - Math.round(W / 16)), y = first.cy - Math.round(W / 10)
+    hooks?.log?.(`🎞️ Dernière vidéo (1re vignette avec durée ${first.text}) → tap (${x}, ${y})`)
     await sendAction(key, deviceId, { type: 'tap', x, y })
     await sleep(1500)
-  } else hooks?.log?.('   « Récents » non lu → vidéo pré-sélectionnée par Instagram (la plus récente)')
+  } else hooks?.log?.('   durée des vignettes non lue → vidéo pré-sélectionnée par Instagram (la plus récente)')
   // b. Avancer jusqu'à l'écran de légende : Next en haut-droite (texte) ou en bas-droite (bouton bleu).
   let atCaption = false
   for (let step = 0; step < 6 && !atCaption; step++) {
@@ -569,13 +632,19 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
     // (petit « OK » blanc sur bouton BLEU : OCR recadré, sinon le bouton bleu de la popup).
     if (words.some(o => /^reels?[.!]?$/i.test(o.text)) && words.some(o => /^(shared|partag[ée]e?s?)$/i.test(o.text))) {
       hooks?.log?.('   popup « vidéos partagées en reels » → OK')
-      if (!await findTapText(key, deviceId, [/^ok[.!]?$/i], hooks, { label: 'OK', tries: 1, cropY: [0.25, 0.85] })) {
-        const blue = await findBlueButton(shot, 0.25, 0.85)
+      // (le bouton OK peut être tout en bas, ~90 % de la hauteur, sur iPhone normal ; lien « Go to settings » juste dessous)
+      if (!await findTapText(key, deviceId, [/^ok[.!]?$/i], hooks, { label: 'OK', tries: 1, cropY: [0.25, 0.97] })) {
+        const blue = await findBlueButton(shot, 0.25, 0.94, 0.1, 0.9)
         if (blue) await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: blue.cy })
       }
       await sleep(1500); continue
     }
-    const top = await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next (haut)', tries: 2, minX: 0.55, cropY: [0, 0.14] })
+    let top = await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next (haut)', tries: 2, minX: 0.55, cropY: [0, 0.14] })
+    // écran « New post » (iPhone normal) : « Next » violet sur noir en haut à droite, souvent illisible → position connue
+    if (!top && words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.07) && words.some(o => /^post$/i.test(o.text) && o.cy < H * 0.07)) {
+      hooks?.log?.(`   écran « New post » → Next en haut à droite (${Math.round(0.9 * W)}, ${Math.round(0.034 * H)})`)
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.034 * H) }); top = true
+    }
     if (!top && !await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (bas)', 2, [0.5, 1])) return false
     await sleep(step === 0 ? 3000 : 4500) // l'éditeur charge la vidéo
   }
@@ -1380,6 +1449,7 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   await tapFrac(REEL_ANCHORS.createPlus.x, REEL_ANCHORS.createPlus.y)
   await sleep(2200)
+  await grantPhotoAccessIfAsked(key, deviceId, hooks)
   // 2. Mode STORY (bandeau du bas). Barre masquée (Instagram a rouvert la caméra Story, une
   //    bulle d'effet la remplace) + vignette de galerie en bas-gauche → déjà sur la caméra.
   //    (Si c'était la caméra Reel, l'écran « Add link » n'apparaîtrait jamais → abandon sans post.)
@@ -1652,9 +1722,12 @@ export function sheetUsernames(words: { text: string; cx: number; cy: number }[]
 
 /** Instagram ouvert à neuf depuis l'accueil. 'picker' = iPhone jailbreaké (sélecteur Crane), 'app' = Instagram direct. */
 async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHooks): Promise<'app' | 'picker' | null> {
+  await allowShortcutPrompt(key, deviceId, hooks)
+  await grantPhotoAccessIfAsked(key, deviceId, hooks) // alertes iOS restées à l'écran (elles bloquent tous les taps)
   await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
   if (!await tapInstagramIcon(key, deviceId, hooks)) { hooks?.log?.('❌ Icône Instagram introuvable sur l’accueil.'); return null }
   await sleep(3500)
+  await grantPhotoAccessIfAsked(key, deviceId, hooks) // alerte « accès aux photos » restée d'une tentative précédente
   const shot = await snapshot(key, deviceId)
   if (!shot) return 'app'
   const { w: W, h: H } = await imgSize(shot)
@@ -1664,17 +1737,53 @@ async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHoo
 }
 
 /** Ouvre la feuille de bascule de comptes (onglet Profil → nom en haut). Renvoie les mots lus, ou null. */
+/** Ramène Instagram sur un écran avec la barre d'onglets (il rouvre là où on l'a laissé : créateur, Reel plein écran…). */
+async function backToTabs(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
+  for (let k = 0; k < 4; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) return
+    const { words, W, H } = scr
+    const top = (re: RegExp) => words.some(o => re.test(o.text) && o.cy < H * 0.12)
+    if (words.some(o => /^shared$/i.test(o.text)) && words.some(o => /^reels$/i.test(o.text))) {
+      // popup « Video posts are now shared as reels » → OK (bas de la feuille, au-dessus de « Go to settings »)
+      const ok = words.find(o => /^ok$/i.test(o.text) && o.cy > H * 0.6)
+      hooks?.log?.('   popup « vidéos partagées en reels » → OK')
+      await sendAction(key, deviceId, { type: 'tap', x: ok ? ok.cx : Math.round(W / 2), y: ok ? ok.cy : Math.round(0.9 * H) }); await sleep(1800); continue
+    }
+    const discard = words.find(o => /^discard$/i.test(o.text) && o.cy > H * 0.3)
+    if (discard) { hooks?.log?.('   « Discard » (brouillon abandonné)'); await sendAction(key, deviceId, { type: 'tap', x: discard.cx, y: discard.cy }); await sleep(1800); continue }
+    if (top(/^new$/i) && top(/^(reel|post)$/i) || top(/^story$/i) && words.some(o => /^(post|instants|live)$/i.test(o.text) && o.cy > H * 0.9)) {
+      hooks?.log?.('   créateur ouvert → ✕ en haut à gauche')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.09 * W), y: Math.round(0.08 * H) }); await sleep(1800); continue
+    }
+    if (top(/^(controls|settings)$/i)) {
+      hooks?.log?.('   page de réglages ouverte par erreur → ✕')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.08 * W), y: Math.round(0.064 * H) }); await sleep(1800); continue
+    }
+    if (top(/^reels$/i) && top(/^friends$/i)) {
+      hooks?.log?.('   Reel plein écran → retour')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.08 * W), y: Math.round(0.068 * H) }); await sleep(1800); continue
+    }
+    return
+  }
+}
+
 async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHooks): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number } | null> {
   const isSheet = (scr: { words: { text: string; cx: number; cy: number }[]; H: number } | null) => !!scr && (addAccountRowY(scr.words) ?? 0) > scr.H * 0.4
-  const isProfile = (scr: { words: { text: string; cy: number }[]; H: number } | null) => !!scr && scr.words.some(o => /^(edit|share|followers|following|posts)$/i.test(o.text) && o.cy < scr.H * 0.45)
+  // « followers » ET « following » en haut (le mot « posts » seul trompait : popup « Video posts are now shared… »)
+  const isProfile = (scr: { words: { text: string; cy: number }[]; H: number } | null) => !!scr && scr.words.some(o => /^followers$/i.test(o.text) && o.cy < scr.H * 0.35) && scr.words.some(o => /^following$/i.test(o.text) && o.cy < scr.H * 0.35)
   let scr = await readScreenWords(key, deviceId)
   if (!scr) return null
   if (isSheet(scr)) return scr // Instagram rouvert là où on l'avait laissé : la feuille est déjà ouverte
   const { W, H } = scr
-  // 1. onglet Profil (vérifié : « Edit profile / followers » à l'écran), jusqu'à 3 taps
+  // 1. onglet Profil (vérifié : « followers / following » à l'écran), jusqu'à 3 taps ; d'abord retour à un écran
+  //    avec la barre d'onglets (Instagram rouvre là où on l'a laissé : créateur, Reel plein écran, popup…)
   for (let k = 0; k < 3 && !isProfile(scr); k++) {
-    if (k) hooks?.log?.('   onglet Profil pas ouvert → nouveau tap')
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.963 * H) })
+    if (k === 0) await backToTabs(key, deviceId, hooks)
+    else hooks?.log?.('   onglet Profil pas ouvert → nouveau tap')
+    const px = Math.round(0.9 * W), py = Math.round(0.963 * H)
+    if (k) await doubleTap(key, deviceId, px, py) // tap simple parfois ignoré ; double tap sans risque sur cet onglet
+    else await sendAction(key, deviceId, { type: 'tap', x: px, y: py })
     await sleep(2500); scr = await readScreenWords(key, deviceId)
     if (isSheet(scr)) return scr
   }
@@ -1750,6 +1859,7 @@ export async function openTargetByVision(key: string, deviceId: string, target: 
 
 // Ouvre Instagram (via l'icône → déclenche le sélecteur Crane) puis sélectionne le container.
 export async function selectContainerByVision(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
+  await allowShortcutPrompt(key, deviceId, hooks)
   // 2 essais : vu en direct, un « home » ignoré laissait Instagram ouvert → le mot « Instagram » de l'app était
   // pris pour l'icône, et le sélecteur ne s'ouvrait jamais. On ferme alors l'app et on recommence.
   for (let attempt = 0; attempt < 2; attempt++) {
