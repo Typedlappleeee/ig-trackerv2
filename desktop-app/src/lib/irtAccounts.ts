@@ -84,8 +84,9 @@ const PKEY = 'sf-irt-profiles'
 export function loadProfileCache(): Record<string, IgProfile> {
   try { return JSON.parse(localStorage.getItem(PKEY) || '{}') as Record<string, IgProfile> } catch { return {} }
 }
-/** Profils des comptes (30 par appel ; cache navigateur 6 h, cache serveur 6 h). */
-export async function fetchProfiles(usernames: string[], force = false): Promise<Record<string, IgProfile>> {
+/** Profils des comptes (30 par appel ; cache navigateur 6 h, cache serveur 6 h). Source : edge function Supabase,
+ *  sinon relais iRemoTech sur Vercel (`apiKey` = clé iRemoTech) pour les comptes restés sans profil. */
+export async function fetchProfiles(usernames: string[], force = false, apiKey?: string): Promise<Record<string, IgProfile>> {
   const cache = loadProfileCache()
   const todo = [...new Set(usernames.map(u => u.replace(/^@/, '').toLowerCase()))].filter(u => force || !cache[u] || Date.now() - Date.parse(cache[u].at) > 6 * 3600_000)
   if (todo.length) {
@@ -96,6 +97,16 @@ export async function fetchProfiles(usernames: string[], force = false): Promise
         const j = await r.json() as { ok?: boolean; profiles?: Record<string, IgProfile | null> }
         for (const [u, p] of Object.entries(j.profiles ?? {})) if (p) cache[u] = p
       } catch { /* profils facultatifs */ }
+    }
+    const missing = todo.filter(u => !cache[u] || (force && Date.now() - Date.parse(cache[u].at) > 60_000))
+    if (apiKey && missing.length) {
+      for (let i = 0; i < missing.length; i += 30) {
+        try {
+          const r = await fetch('/api/iremotech', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'profiles', apiKey, usernames: missing.slice(i, i + 30) }) })
+          const j = await r.json() as { ok?: boolean; profiles?: Record<string, IgProfile | null> }
+          for (const [u, p] of Object.entries(j.profiles ?? {})) if (p) cache[u] = p
+        } catch { /* relais indisponible */ }
+      }
     }
     try { localStorage.setItem(PKEY, JSON.stringify(cache)) } catch { /* plein */ }
   }

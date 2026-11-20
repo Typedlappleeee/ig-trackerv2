@@ -76,6 +76,28 @@ export default async (req, res) => {
       const r = await fetch(`${BASE}/automations/${encodeURIComponent(id)}`, { headers: auth, signal: AbortSignal.timeout(20000) })
       return res.status(200).json({ ok: r.ok, status: r.status, data: await jsonOr(r) })
     }
+    // Profils Instagram des comptes iRemoTech (photo, abonnés, abonnements, publications) via HikerAPI.
+    // Secours quand l'edge function Supabase n'est pas déployée. Clé iRemoTech vérifiée (réservé aux clients
+    // iRemoTech), 30 comptes max par appel ; HIKERAPI_KEY doit être définie sur Vercel.
+    if (op === 'profiles') {
+      const hk = process.env.HIKERAPI_KEY
+      if (!hk) return res.status(200).json({ ok: false, error: 'HIKERAPI_KEY absente sur Vercel' })
+      const chk = await fetch(`${BASE}/devices`, { headers: auth, signal: AbortSignal.timeout(15000) })
+      if (!chk.ok) return res.status(200).json({ ok: false, error: 'clé iRemoTech refusée' })
+      const list = [...new Set((Array.isArray(req.body?.usernames) ? req.body.usernames : []).map(u => String(u ?? '').toLowerCase().replace(/^@/, '').trim()).filter(u => /^[a-z0-9._]{1,30}$/.test(u)))].slice(0, 30)
+      const profiles = {}
+      await Promise.all(list.map(async u => {
+        try {
+          const r = await fetch(`https://api.hikerapi.com/v1/user/by/username?username=${encodeURIComponent(u)}`, { headers: { 'x-access-key': hk, accept: 'application/json' }, signal: AbortSignal.timeout(15000) })
+          const j = r.ok ? await r.json() : null
+          const x = j?.user ?? j
+          if (!x || !(x.pk || x.username)) { profiles[u] = null; return }
+          const num = v => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : null)
+          profiles[u] = { username: u, full_name: x.full_name || null, profile_pic: x.profile_pic_url_hd || x.profile_pic_url || null, followers: num(x.follower_count), following: num(x.following_count), media_count: num(x.media_count), is_verified: !!x.is_verified, at: new Date().toISOString() }
+        } catch { profiles[u] = null }
+      }))
+      return res.status(200).json({ ok: true, profiles })
+    }
     if (op === 'media') {
       // Deux sources : fileData (base64, fichier PC ≤ ~4 Mo) OU mediaUrl (banque Supabase).
       let bytes

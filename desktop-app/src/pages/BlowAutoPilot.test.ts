@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
-import { progressRows, phoneKind, targetsSummary } from './BlowAutoPilot'
+import { progressRows, phoneKind, targetsSummary, parseAccountLines } from './BlowAutoPilot'
 
 describe('iRemoTech — progression', () => {
   it('une ligne par cible, statut tiré du dernier message', () => {
@@ -29,5 +29,14 @@ describe('iRemoTech — type d’iPhone et cibles', () => {
     expect(targetsSummary(['1', '2', '@a'])).toBe('2 containers · 1 compte')
     expect(targetsSummary(['@a', '@b'])).toBe('2 comptes')
     expect(targetsSummary(['Default'])).toBe('1 container')
+  })
+})
+
+describe('Comptes créés — import', () => {
+  it('identifiant:motdepasse[:2fa] par ligne, lignes invalides ignorées', () => {
+    expect(parseAccountLines('@LucieLR5c0:gQm4Df4mxSmTyk2\nmauvaise ligne\ninesfzdz2o:zhQQ:abcd efgh ijkl mnop\n\n')).toEqual([
+      { username: 'lucielr5c0', password: 'gQm4Df4mxSmTyk2' },
+      { username: 'inesfzdz2o', password: 'zhQQ', twofa: 'ABCDEFGHIJKLMNOP' },
+    ])
   })
 })

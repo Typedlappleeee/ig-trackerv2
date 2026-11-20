@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { deviceLabel, isDeviceOn, listJobs, launchAutomation, type IrtDevice, type IrtJob } from '@/lib/iremotech'
 import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, type IgProfile, type AccountView } from '@/lib/irtAccounts'
 import { toast } from '@/lib/ui'
+import { loadCreatedAccounts } from '@/lib/irtCreatedAccounts'
 
 const GOLD = '#E9C46A', INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#6E6E78'
 const EDGE = 'rgba(255,255,255,0.07)', FIELD_BG = '#161618', FIELD_EDGE = 'rgba(255,255,255,0.09)'
@@ -33,6 +34,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
   const [wuMin, setWuMin] = useState(7)
   const [busy, setBusy] = useState<string | null>(null)
   const scannedRef = useRef<Record<string, string | null>>({})
+  const creds = useMemo(() => Object.fromEntries(loadCreatedAccounts().filter(a => a.username && a.password).map(a => [a.username!.toLowerCase(), a])), [])
 
   const refreshDev = async (dev: string) => { const j = await listJobs(apiKey, dev, 100); setJobs(m => ({ ...m, [dev]: j })) }
 
@@ -74,7 +76,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
 
   // 4. Profils Instagram (photo, abonnés…)
   const allUsers = useMemo(() => [...new Set(Object.values(view).flatMap(v => v.accounts.map(a => a.username)))], [view])
-  useEffect(() => { if (allUsers.length) void fetchProfiles(allUsers).then(setProfiles) }, [allUsers.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (allUsers.length) void fetchProfiles(allUsers, false, apiKey).then(setProfiles) }, [allUsers.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── actions ──
   const launch = async (dev: string, body: Parameters<typeof launchAutomation>[2], label: string) => {
@@ -131,7 +133,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
           ))}
         </div>
         <button style={btn} disabled={!!busy || !devices.length} onClick={() => void scanAll()} title="iRemoTech lit les comptes connectés sur chaque iPhone en ligne (~30 s, ne pas toucher les iPhones)">{busy === 'scan' ? 'Lancement…' : '🔄 Scanner tous les iPhones'}</button>
-        <button style={btn} disabled={!allUsers.length} onClick={() => void fetchProfiles(allUsers, true).then(setProfiles)} title="Relit photo, publications, abonnés et abonnements">↻ Stats</button>
+        <button style={btn} disabled={!allUsers.length} onClick={() => void fetchProfiles(allUsers, true, apiKey).then(setProfiles)} title="Relit photo, publications, abonnés et abonnements">↻ Stats</button>
       </div>
 
       {!loaded && <div style={{ fontSize: 13, color: MUTED, padding: '8px 2px' }}>Lecture de l’historique iRemoTech…</div>}
@@ -167,6 +169,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
                   <span style={{ minWidth: 150, flex: '1 1 170px' }} data-no-tr>
                     <a href={`https://www.instagram.com/${a.username}/`} target="_blank" rel="noreferrer" style={{ display: 'block', fontSize: 14, fontWeight: 600, color: INK, textDecoration: 'none' }}>@{a.username}{p?.is_verified ? ' ✔' : ''}</a>
                     <span style={{ display: 'block', fontSize: 12, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p?.full_name ?? ' '}</span>
+                    {creds[a.username]?.password && <span onClick={() => { try { navigator.clipboard.writeText(`${a.username}:${creds[a.username].password}${creds[a.username].twofa ? ':' + creds[a.username].twofa : ''}`); toast('Identifiants copiés', 'ok') } catch { /* noop */ } }} title="Copier identifiant:mot de passe" style={{ display: 'inline-block', marginTop: 2, fontSize: 11.5, color: '#A1A1AA', fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer' }}>🔑 {creds[a.username].password}</span>}
                   </span>
                   <span style={{ display: 'flex', gap: 16, flex: '1 1 220px', fontVariantNumeric: 'tabular-nums' }}>
                     {([[p?.media_count, 'publications'], [p?.followers, 'abonnés'], [p?.following, 'abonnements']] as const).map(([n, l]) => (

@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21d',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : sélection des comptes corrigée, identifiants visibles', en: 'iRemoTech: account selection fixed, credentials shown' },
+    items: {
+      fr: [
+        'Cliquer sur un compte ne sélectionne plus tous les comptes de l’iPhone : seulement celui-là. La case de l’iPhone coche / décoche tout (état « – » si partiel).',
+        'Création de comptes : seuls les iPhones jailbreakés sont proposés.',
+        'Comptes créés : identifiant et mot de passe dans deux colonnes (copie en un clic, clé 2FA si présente) et bouton « Importer des comptes » (identifiant:motdepasse[:2FA]).',
+        'Comptes Instagram : mot de passe affiché pour les comptes connus ; publications / abonnés aussi relus via le relais iRemoTech quand la fonction serveur n’est pas disponible.',
+      ],
+      en: [
+        'Clicking an account no longer selects every account of the iPhone: only that one. The iPhone box ticks / unticks everything (“–” when partial).',
+        'Account creation: only jailbroken iPhones are offered.',
+        'Created accounts: username and password in two columns (one-click copy, 2FA key if any) and an “Import accounts” button (username:password[:2FA]).',
+        'Instagram accounts: password shown for known accounts; posts / followers also read through the iRemoTech relay when the server function is unavailable.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21c',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : nouvel onglet « Comptes Instagram »', en: 'iRemoTech: new “Instagram accounts” tab' },

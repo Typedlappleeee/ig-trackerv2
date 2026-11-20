@@ -24,7 +24,7 @@ import { startRun, cancelRun } from '@/lib/runStore'
 import { folderMedia, loadBankSummary, type BankSummary } from '@/lib/flowEngine'
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { themeFor } from '@/lib/theme'
-import { confirmDialog } from '@/lib/ui'
+import { confirmDialog, toast } from '@/lib/ui'
 import IrtKeyForm from '@/components/IrtKeyForm'
 
 const BLOW_THEME = themeFor('blowsome')
@@ -157,6 +157,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [acctSearch, setAcctSearch] = useState('')
   const [acctFilter, setAcctFilter] = useState<'all' | 'ok' | 'ko'>('all')
   const [acctLogOpen, setAcctLogOpen] = useState<number | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState('')
   const [showLog, setShowLog] = useState(false)   // journal détaillé déplié
   const [keyOpen, setKeyOpen] = useState(false)   // formulaire de la clé iRemoTech
 
@@ -271,7 +273,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     if (!list) push(`[${name}] ✗ ni containers ni comptes détectés`)
     setDetecting(null)
   }
-  const toggleCont = (dev: string, name: string) => setSelConts(sc => { const cur = new Set(sc[dev] ?? []); if (cur.has(name)) cur.delete(name); else cur.add(name); return { ...sc, [dev]: cur } })
+  const toggleCont = (dev: string, name: string) => {
+    const cur = new Set(sel.has(dev) ? (selConts[dev] ?? []) : [])
+    if (cur.has(name)) cur.delete(name); else cur.add(name)
+    setSelConts(sc => ({ ...sc, [dev]: cur }))
+    setSel(s => { const n = new Set(s); if (cur.size) n.add(dev); else n.delete(dev); return n })
+  }
   const addC = (dev: string) => {
     const name = (newC[dev] ?? '').trim(); if (!name) return
     const list = addDevContainer(dev, name)
@@ -616,7 +623,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // Étape 1 de chaque onglet : les iPhones en CARTES (statut, containers à cocher, Détecter/Tout/Aucun).
   // Cocher un iPhone coche tous ses containers ; on décoche ensuite ceux qu'on ne veut pas.
   const onlineN = devices.filter(isDeviceOn).length
-  const phonePicker = (opts?: { manage?: boolean }) => (
+  const phonePicker = (opts?: { manage?: boolean; jbOnly?: boolean }) => (
     <Step n={1} title="Où ?" sub={totalJobs ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} · ${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))} sélectionné(s)` : 'Choisis les iPhones et leurs comptes / containers'}
       right={<span style={{ display: 'flex', gap: 6 }}>
         <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setKeyOpen(o => !o)}>⚙ Clé iRemoTech</button>
@@ -635,14 +642,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
-        {devices.map(d => {
+        {devices.filter(d => !opts?.jbOnly || phoneKind(conts[d.public_id]) !== 'normal').map(d => {
           const id = d.public_id, on = sel.has(id), live = isDeviceOn(d)
           const list = conts[id] ?? [], picked = selConts[id] ?? new Set<string>()
           const kind = phoneKind(list), unit = kind === 'normal' ? 'compte' : 'container'
           return (
             <div key={id} style={{ borderRadius: 10, border: `1px solid ${on ? SEL_EDGE : EDGE}`, background: on ? 'rgba(233,196,106,0.04)' : '#0E0E10', padding: 12, display: 'flex', flexDirection: 'column', gap: 10, opacity: live || on ? 1 : 0.6 }}>
               <div onClick={() => togglePhone(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <span style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: on ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 11, fontWeight: 700, border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.2)', flex: 'none' }}>{on ? '✓' : ''}</span>
+                <span title={on ? 'Tout décocher' : 'Tout cocher'} style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: on ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 11, fontWeight: 700, border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.2)', flex: 'none' }}>{on ? (list.length && picked.size < list.length ? '–' : '✓') : ''}</span>
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deviceLabel(d)}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>
@@ -655,10 +662,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               {list.length > 0 ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {list.map(c => {
-                    const cp = picked.has(c)
+                    const cp = on && picked.has(c)
                     return (
                       <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
-                        <span onClick={() => { if (!on) togglePhone(id); toggleCont(id, c) }} style={{ cursor: 'pointer', padding: '0 10px' }} data-no-tr>{c}</span>
+                        <span onClick={() => toggleCont(id, c)} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>{cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}</span>
                         {opts?.manage && <span onClick={() => removeC(id, c)} title="Retirer" style={{ cursor: 'pointer', color: DIM, padding: '0 8px 0 0', fontSize: 14 }}>×</span>}
                       </span>
                     )
@@ -897,7 +904,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
       {/* ─────────────── ONGLET CRÉATION DE COMPTE ─────────────── */}
       {curTab === 'account' && (<>
-        {phonePicker()}
+        {phonePicker({ jbOnly: true })}
         <div style={card}>
           <StepHead n={2} title="Quel numéro ?" sub="Pour chaque container vierge : un numéro acheté, le code SMS saisi tout seul, puis le compte rempli jusqu’au bout." />
 
@@ -1088,11 +1095,26 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 ))}
               </div>
             </div>
-            {createdAccts.length > 0 && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <button style={{ ...btn, height: 32 }} onClick={() => setImportOpen(o => !o)}>＋ Importer des comptes</button>
+            {createdAccts.length > 0 && (<>
                 <button style={{ ...btn, height: 32 }} onClick={copyAll}>Copier tout ({filtered.length})</button>
                 <button style={{ ...btn, height: 32 }} onClick={exportCsv}>Exporter CSV</button>
                 <button style={{ ...btn, height: 32, background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={async () => { if (await confirmDialog({ title: 'Vider TOUS les comptes enregistrés ? (irréversible)', confirmLabel: 'Vider', danger: true })) { clearCreatedAccounts(); setCreatedAccts([]) } }}>Vider</button>
+            </>)}
+            </div>
+            {importOpen && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <textarea value={importText} onChange={e => setImportText(e.target.value)} rows={4} placeholder={'Un compte par ligne : identifiant:motdepasse (ou identifiant:motdepasse:clé2FA)'} style={{ ...inp, height: 'auto', padding: 10, fontFamily: MONO, fontSize: 12.5, resize: 'vertical' }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={{ ...btn, height: 32, background: GOLD, color: '#0A0A0B', border: 'none', fontWeight: 600 }} onClick={() => {
+                    const rows = parseAccountLines(importText)
+                    rows.forEach((r, i) => addCreatedAccount({ at: Date.now() + i, device: '', deviceName: 'Importé', container: '—', username: r.username, password: r.password, twofa: r.twofa, ok: true }))
+                    setCreatedAccts(loadCreatedAccounts()); setImportText(''); setImportOpen(false)
+                    toast(rows.length ? `${rows.length} compte(s) importé(s)` : 'Aucune ligne valide (identifiant:motdepasse)', rows.length ? 'ok' : 'bad')
+                  }}>Importer</button>
+                  <button style={{ ...btn, height: 32 }} onClick={() => setImportOpen(false)}>Annuler</button>
+                </div>
               </div>
             )}
           </div>
@@ -1109,7 +1131,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
                   <thead>
                     <tr>
-                      <th style={th}>username:password</th>
+                      <th style={th}>Identifiant</th>
+                      <th style={th}>Mot de passe</th>
                       <th style={th}>Statut</th>
                       <th style={th}>Téléphone · Conteneur</th>
                       <th style={th}>Date</th>
@@ -1120,9 +1143,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     {filtered.map(a => (
                       <Fragment key={a.at}>
                         <tr>
-                          <td style={{ ...td, fontFamily: MONO, fontSize: 12.5, color: INK, cursor: 'pointer' }} title="Cliquer pour copier"
-                            onClick={() => { try { navigator.clipboard.writeText(line(a)) } catch { /* noop */ } }}>
-                            {(a.username ?? '?')}<span style={{ color: DIM }}>:</span>{(a.password ?? '?')}
+                          <td data-no-tr style={{ ...td, fontSize: 13, fontWeight: 600, color: INK, cursor: 'pointer' }} title="Cliquer pour copier l’identifiant"
+                            onClick={() => { try { navigator.clipboard.writeText(a.username ?? ''); toast('Identifiant copié', 'ok') } catch { /* noop */ } }}>
+                            @{a.username ?? '?'}
+                          </td>
+                          <td data-no-tr style={{ ...td, fontFamily: MONO, fontSize: 12.5, color: '#D4D4D8', cursor: 'pointer' }} title="Cliquer pour copier le mot de passe"
+                            onClick={() => { try { navigator.clipboard.writeText(a.password ?? ''); toast('Mot de passe copié', 'ok') } catch { /* noop */ } }}>
+                            {a.password ?? '?'}{a.twofa ? <span style={{ marginLeft: 8, fontSize: 10.5, color: GOLD }} title={`Clé 2FA : ${a.twofa}`}>2FA</span> : null}
                           </td>
                           <td style={td}><span style={{ fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: a.ok ? '#4ADE80' : '#F87171' }}>{a.ok ? 'CRÉÉ' : 'ÉCHEC'}</span></td>
                           <td style={{ ...td, fontSize: 12, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</td>
@@ -1137,7 +1164,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                         </tr>
                         {acctLogOpen === a.at && a.log && (
                           <tr>
-                            <td colSpan={5} style={{ padding: '0 14px 10px' }}>
+                            <td colSpan={6} style={{ padding: '0 14px 10px' }}>
                               <div style={{ ...logBox, maxHeight: 240 }}>{a.log.join('\n')}</div>
                             </td>
                           </tr>
@@ -1161,6 +1188,18 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 }
 
 // Options d'un lancement : interrupteurs compacts, posés dans la barre « Lancer ».
+/** Lignes « identifiant:motdepasse[:clé2FA] » → comptes (lignes invalides ignorées, @ retiré). */
+export function parseAccountLines(text: string): { username: string; password: string; twofa?: string }[] {
+  return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).flatMap(l => {
+    const [u, p, ...rest] = l.split(':')
+    const username = (u ?? '').trim().replace(/^@/, '').toLowerCase()
+    const password = (p ?? '').trim()
+    if (!/^[a-z0-9._]{1,30}$/.test(username) || !password) return []
+    const twofa = rest.join(':').replace(/\s+/g, '').toUpperCase()
+    return [{ username, password, ...(twofa ? { twofa } : {}) }]
+  })
+}
+
 /** Type d'iPhone déduit des cibles détectées : comptes « @nom » = iPhone normal, containers Crane = jailbreak. */
 export function phoneKind(list: string[] | undefined): 'normal' | 'jb' | null {
   if (!list?.length) return null
