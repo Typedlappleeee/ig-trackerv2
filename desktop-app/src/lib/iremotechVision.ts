@@ -5,6 +5,7 @@
 import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
 import { ocrWords, findBlueButton, findBlueDots } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
+import { parseProfileCounts, saveScreenStats } from './irtAccounts'
 import { findGalleryThumb, findMatchingCell } from './screenMatch'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -1877,6 +1878,10 @@ export async function switchAccountByVision(key: string, deviceId: string, usern
     if (dots.some(d => Math.abs(d.cy - row.cy) < 20)) {
       hooks?.log?.(`   ✓ compte actif : @${u}`)
       await closeAccountSheet(key, deviceId, scr.W, scr.H)
+      // on est sur le profil : publications / abonnés / abonnements lus à l'écran → onglet « Comptes Instagram »
+      const prof = await readScreenWords(key, deviceId)
+      const counts = prof ? parseProfileCounts(prof.words) : null
+      if (counts) { saveScreenStats(u, counts); hooks?.log?.(`   📊 ${counts.media_count ?? '?'} publications · ${counts.followers ?? '?'} abonnés · ${counts.following ?? '?'} abonnements`) }
       await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * scr.W), y: Math.round(0.963 * scr.H) }) // accueil d'Instagram
       await sleep(1500)
       return true

@@ -3,6 +3,7 @@
 // Actions : scanner un iPhone, vérifier le statut, lancer un warm-up iRemoTech — à l'unité ou en lot.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { deviceLabel, isDeviceOn, listJobs, launchAutomation, type IrtDevice, type IrtJob } from '@/lib/iremotech'
+import { switchAccountByVision } from '@/lib/iremotechVision'
 import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, type IgProfile, type AccountView } from '@/lib/irtAccounts'
 import { toast } from '@/lib/ui'
 import { loadCreatedAccounts } from '@/lib/irtCreatedAccounts'
@@ -92,6 +93,16 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
     for (const d of devices.filter(isDeviceOn)) { if (await launch(d.public_id, { type: 'list_accounts' }, deviceLabel(d))) n++; await sleep(400) }
     setBusy(null); toast(`${n} scan(s) lancé(s)`, n ? 'ok' : 'bad')
   }
+  // Chiffres relus sur l'iPhone : bascule sur chaque compte (profil affiché → publications / abonnés / abonnements)
+  const readOnPhone = async (d: IrtDevice) => {
+    const accs = view[d.public_id]?.accounts ?? []
+    if (!accs.length) return
+    setBusy('read:' + d.public_id)
+    toast(`Lecture des stats sur ${deviceLabel(d)} (${accs.length} compte(s), ~30 s chacun) — ne touche pas l’iPhone`, 'info')
+    let n = 0
+    for (const a of accs) { if (await switchAccountByVision(apiKey, d.public_id, a.username)) n++; setProfiles(loadProfileCache()) }
+    setBusy(null); toast(`${deviceLabel(d)} : stats relues pour ${n}/${accs.length} compte(s)`, n ? 'ok' : 'bad')
+  }
   const check = (dev: string, u: string) => launch(dev, { type: 'account_status', account: u }, `@${u}`)
   const warm = (dev: string, u: string) => launch(dev, { type: 'warm_up', account: u, session_duration_s: wuMin * 60 }, `@${u}`)
   const bulk = async (kind: 'check' | 'warm') => {
@@ -150,6 +161,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
               <span style={{ fontSize: 12, color: MUTED }}>{v?.accounts.length ?? 0} compte{(v?.accounts.length ?? 0) > 1 ? 's' : ''} · {v?.scanning ? 'scan en cours…' : `scanné ${ago(v?.scannedAt)}`}</span>
               <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                 {!!v?.accounts.length && <button style={ghost} onClick={() => setSel(s => { const n = new Set(s); for (const a of v.accounts) n.add(keyOf(id, a.username)); return n })}>Tout cocher</button>}
+                {!!v?.accounts.length && <button style={ghost} disabled={!!busy || !isDeviceOn(d)} onClick={() => void readOnPhone(d)} title="Ouvre chaque compte sur l’iPhone et lit publications, abonnés et abonnements à l’écran">{busy === 'read:' + id ? 'Lecture…' : '📊 Relire sur l’iPhone'}</button>}
                 <button style={ghost} disabled={!!v?.scanning || !isDeviceOn(d)} onClick={() => void scan(id)}>{v?.scanning ? 'Scan…' : '🔄 Scanner'}</button>
               </span>
             </div>

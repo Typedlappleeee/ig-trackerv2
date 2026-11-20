@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
-import { healthOf, deviceAccounts, ago, compactNum } from './irtAccounts'
+import { healthOf, deviceAccounts, ago, compactNum, parseCount, parseProfileCounts } from './irtAccounts'
 import type { IrtJob } from './iremotech'
 
 const job = (p: Partial<IrtJob>): IrtJob => ({ job_id: 'j' + Math.random(), type: 'list_accounts', device: 'd', account: null, status: 'completed', created_at: '2026-11-20T10:00:00Z', dispatched_at: null, finished_at: '2026-11-20T10:01:00Z', duration_ms: 1000, result: null, failure: null, ...p })
@@ -33,5 +33,17 @@ describe('iRemoTech — comptes relus depuis les jobs', () => {
     expect(ago('2026-11-20T11:55:00Z', now)).toBe('il y a 5 min')
     expect(ago(null)).toBe('jamais')
     expect(compactNum(12300)).toBe('12 k'); expect(compactNum(1500)).toBe('1,5 k'); expect(compactNum(340)).toBe('340'); expect(compactNum(null)).toBe('—')
+  })
+})
+
+describe('iRemoTech — chiffres du profil lus à l’écran', () => {
+  it('nombres Instagram : 1,234 · 12.3K · 1,2M', () => {
+    expect(parseCount('1,234')).toBe(1234); expect(parseCount('12.3K')).toBe(12300); expect(parseCount('1,2M')).toBe(1200000); expect(parseCount('posts')).toBeNull()
+  })
+  it('nombre juste au-dessus de chaque libellé (relevé réel @lucielr5c0 : 1 · 0 · 0)', () => {
+    const w = (text: string, cx: number, cy: number) => ({ text, cx, cy })
+    expect(parseProfileCounts([w('1', 138, 139), w('post', 150, 159), w('0', 211, 139), w('followers', 233, 159), w('0', 308, 139), w('following', 333, 159), w('Edit', 99, 236)]))
+      .toEqual({ media_count: 1, followers: 0, following: 0 })
+    expect(parseProfileCounts([w('Hello', 10, 10)])).toBeNull()
   })
 })

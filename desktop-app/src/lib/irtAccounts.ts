@@ -77,6 +77,37 @@ export function compactNum(n: number | null | undefined): string {
   return String(n)
 }
 
+// ── Chiffres du profil lus sur l'écran de l'iPhone (« 12 posts · 340 followers · 210 following ») ─────────────
+/** « 1,234 » / « 12.3K » / « 1,2 M » → nombre. */
+export function parseCount(t: string): number | null {
+  const m = t.replace(/\s/g, '').match(/^(\d+(?:[.,]\d+)?)([kKmM]?)$/)
+  if (!m) return null
+  const unit = m[2].toLowerCase()
+  if (!unit) return Number(m[1].replace(/[.,]/g, ''))
+  return Math.round(parseFloat(m[1].replace(',', '.')) * (unit === 'k' ? 1000 : 1_000_000))
+}
+/** Les 3 compteurs du profil : le nombre juste au-dessus de chaque libellé posts / followers / following. */
+export function parseProfileCounts(words: { text: string; cx: number; cy: number }[]): { media_count: number | null; followers: number | null; following: number | null } | null {
+  const near = (re: RegExp) => {
+    const lab = words.find(o => re.test(o.text))
+    if (!lab) return null
+    const n = words.filter(o => Math.abs(o.cx - lab.cx) < 45 && lab.cy - o.cy > 8 && lab.cy - o.cy < 40).map(o => parseCount(o.text)).find(v => v != null)
+    return n ?? null
+  }
+  const r = { media_count: near(/^(posts?|publications?)$/i), followers: near(/^(followers?|abonnés?)$/i), following: near(/^(following|abonnements?|suivi\(e\)s)$/i) }
+  return r.media_count == null && r.followers == null && r.following == null ? null : r
+}
+/** Enregistre les compteurs lus sur l'iPhone dans le cache des profils (affichés dans « Comptes Instagram »). */
+export function saveScreenStats(username: string, c: { media_count: number | null; followers: number | null; following: number | null }): void {
+  try {
+    const u = username.replace(/^@/, '').toLowerCase()
+    const cache = loadProfileCache()
+    const prev = cache[u]
+    cache[u] = { username: u, full_name: prev?.full_name ?? null, profile_pic: prev?.profile_pic ?? null, is_verified: prev?.is_verified ?? false, media_count: c.media_count ?? prev?.media_count ?? null, followers: c.followers ?? prev?.followers ?? null, following: c.following ?? prev?.following ?? null, at: new Date().toISOString() }
+    localStorage.setItem(PKEY, JSON.stringify(cache))
+  } catch { /* stockage indisponible */ }
+}
+
 // ── Profils Instagram (photo, abonnés, abonnements, publications) via l'edge function ─────────────────────
 export interface IgProfile { username: string; full_name: string | null; profile_pic: string | null; followers: number | null; following: number | null; media_count: number | null; is_verified: boolean; at: string }
 const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
