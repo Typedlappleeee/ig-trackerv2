@@ -1,5 +1,6 @@
 // ── iRemoTech — Studio d'automatisation (vrais iPhones) ──────────────────────
-// Interface en ONGLETS, propre et user-friendly :
+// Chaque onglet suit les mêmes étapes numérotées : 1 · Où ? (cartes iPhones + containers, « Détecter »)
+// → 2 · Quoi ? (contenu / numéro) → n · Lancer (résumé, options, bouton), puis une progression par container.
 //   • Téléphones : choisir les iPhones + gérer/cocher leurs containers Crane
 //   • Posting    : pool de vidéos → chaque container publie un Reel (vision)
 //   • Story      : pool de photos + lien CTA par container → Story (vision)
@@ -42,7 +43,23 @@ const gold: CSSProperties = { ...btn, background: '#EDEDEF', color: '#0A0A0B', b
 const inp: CSSProperties = { height: 32, padding: '0 10px', borderRadius: 6, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 13, outline: 'none', boxSizing: 'border-box' }
 const lbl: CSSProperties = { fontSize: 12, fontWeight: 500, color: MUTED }
 const seg: CSSProperties = { display: 'inline-flex', gap: 2, padding: 2, borderRadius: 7, background: '#111113', border: `1px solid ${EDGE}` }
+const pill: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 7, height: 28, padding: '0 11px', borderRadius: 99, background: '#141416', border: `1px solid ${EDGE}`, fontSize: 12.5, color: '#C4C4CC', fontVariantNumeric: 'tabular-nums' }
 const logBox: CSSProperties = { padding: 10, borderRadius: 6, background: '#0D0D0F', border: `1px solid ${EDGE}`, overflowY: 'auto', fontFamily: MONO, fontSize: 11, lineHeight: 1.6, color: '#A1A1AA', whiteSpace: 'pre-wrap' }
+
+/** Lignes de progression tirées du journal : `[iPhone·container] message` → statut + dernière étape. */
+export function progressRows(logs: string[]): { tag: string; state: 'run' | 'ok' | 'fail' | 'skip'; last: string }[] {
+  const m = new Map<string, { state: 'run' | 'ok' | 'fail' | 'skip'; last: string }>()
+  for (const raw of logs) {
+    const line = raw.replace(/^\n+/, '')
+    const t = line.match(/^\[([^\]]+)\]\s*(.*)$/)
+    if (!t) continue
+    const [, tag, msg] = t
+    const retry = /nouvel essai|on recommence|→ page suivante/i.test(msg)
+    const state = retry ? 'run' : /✅|✓/.test(msg) ? 'ok' : /⏭.*(passé|déjà connecté)/i.test(msg) ? 'skip' : /✗|❌/.test(msg) ? 'fail' : (m.get(tag)?.state === 'run' || !m.has(tag) ? 'run' : m.get(tag)!.state)
+    m.set(tag, { state, last: msg.replace(/^[^\p{L}\d«(]+/u, '').slice(0, 140) })
+  }
+  return [...m.entries()].map(([tag, v]) => ({ tag, ...v }))
+}
 
 function H({ title, sub, right }: { title: string; sub?: string; right?: ReactNode }) {
   return (
@@ -138,11 +155,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [acctSearch, setAcctSearch] = useState('')
   const [acctFilter, setAcctFilter] = useState<'all' | 'ok' | 'ko'>('all')
   const [acctLogOpen, setAcctLogOpen] = useState<number | null>(null)
+  const [showLog, setShowLog] = useState(false)   // journal détaillé déplié
 
   const [running, setRunning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
-  const [phonesOpen, setPhonesOpen] = useState(true) // sélecteur téléphones déplié
 
   // iPhones + containers. `quiet` = actualisation automatique (pas d'écran de chargement).
   // Les containers viennent de Supabase (partagés dans l'agence) ; null = SQL pas passé.
@@ -221,7 +238,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
   const budget = usage?.actions ?? { remaining: usage?.remaining, budget: usage?.budget }
 
-  const togglePhone = (id: string) => setSel(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else { n.add(id); setSelConts(sc => sc[id] ? sc : { ...sc, [id]: new Set() }) } return n })
+  const togglePhone = (id: string) => setSel(s => { const n = new Set(s); if (n.has(id)) { n.delete(id); setSelConts(sc => ({ ...sc, [id]: new Set() })) } else { n.add(id); setSelConts(sc => ({ ...sc, [id]: new Set(conts[id] ?? []) })) } return n })
   // Détecte les containers Crane d'un iPhone (sélecteur lu à l'écran) et remplace sa liste.
   const detectConts = async (dev: string, log: (m: string) => void, stop?: () => boolean): Promise<string[] | null> => {
     if (!irt.key) return null
@@ -575,100 +592,107 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     )
   }
 
-  // Sélecteur téléphones + containers, INLINE sur chaque page (choisis et lance sans
-  // changer d'onglet, façon GeeLark). Repliable pour gagner de la place.
+  // Étape 1 de chaque onglet : les iPhones en CARTES (statut, containers à cocher, Détecter/Tout/Aucun).
+  // Cocher un iPhone coche tous ses containers ; on décoche ensuite ceux qu'on ne veut pas.
+  const onlineN = devices.filter(isDeviceOn).length
   const phonePicker = (opts?: { manage?: boolean }) => (
-    <div style={card}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setPhonesOpen(o => !o)}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>📱 Téléphones & containers</span>
-        <span style={{ fontSize: 11.5, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: totalJobs ? GOLD : '#F87171', fontVariantNumeric: 'tabular-nums' }}>
-          {totalJobs ? `${totalJobs} container(s) · ${sel.size} iPhone(s)` : 'aucune sélection'}
-        </span>
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          {sel.size > 0 && <span onClick={e => { e.stopPropagation(); setSel(new Set()); setSelConts({}) }} style={{ ...btn, height: 28, display: 'inline-flex', alignItems: 'center' }}>Tout désélectionner</span>}
-          <span style={{ fontSize: 16, color: MUTED, transform: phonesOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>›</span>
-        </span>
-      </div>
-
-      {phonesOpen && (
-        <div style={{ marginTop: 12 }}>
-          {/* Chips téléphones */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {devices.map(d => {
-              const on = sel.has(d.public_id)
-              const list = conts[d.public_id] ?? []
-              const live = isDeviceOn(d)
-              return (
-                <button key={d.public_id} onClick={() => togglePhone(d.public_id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px', borderRadius: 6, cursor: 'pointer', background: on ? SEL_BG : FIELD_BG, color: on ? INK : '#A1A1AA', border: `1px solid ${on ? SEL_EDGE : FIELD_EDGE}`, fontSize: 13, fontWeight: 500 }}>
-                  <span style={{ display: 'grid', placeItems: 'center', width: 14, height: 14, borderRadius: 4, background: on ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 9.5, fontWeight: 600, border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.18)' }}>{on ? '✓' : ''}</span>
-                  <span title={live ? 'En ligne' : `Hors ligne${d.status ? ` (${d.status})` : ''}`} style={{ width: 7, height: 7, borderRadius: '50%', background: live ? '#22C55E' : '#EF4444', boxShadow: live ? '0 0 6px rgba(34,197,94,.55)' : 'none', flex: 'none' }} />
-                  {d.name ?? d.public_id}<span style={{ fontSize: 11.5, color: DIM, fontVariantNumeric: 'tabular-nums' }}>· {list.length}c</span>
-                </button>
-              )
-            })}
-            {devices.length === 0 && !loading && <span style={{ fontSize: 12.5, color: DIM }}>Aucun iPhone détecté sur ta clé iRemoTech.</span>}
-          </div>
-          {syncOff && devices.length > 0 && (
-            <div style={{ marginTop: 9, fontSize: 12, color: '#FBBF24', lineHeight: 1.5 }}>
-              ⚠ Containers enregistrés sur ce navigateur seulement : colle le SQL <code>20261028_irt_containers.sql</code> dans Supabase pour les partager en temps réel.
-            </div>
-          )}
-
-          {/* Containers par téléphone sélectionné */}
-          {[...sel].map(devId => {
-            const d = devices.find(x => x.public_id === devId)
-            const list = conts[devId] ?? []
-            const picked = selConts[devId] ?? new Set()
-            return (
-              <div key={devId} style={{ marginTop: 10, padding: 12, borderRadius: 8, background: 'transparent', border: `1px solid ${EDGE}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 9 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>📱 {d?.name ?? devId}</span>
-                  <span style={{ fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{picked.size}/{list.length}</span>
-                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                    <button style={{ ...btn, height: 28, padding: '0 10px', fontSize: 12 }} disabled={running || !!detecting} title="Ouvre le sélecteur Crane sur l’iPhone et lit tous les containers" onClick={() => void detectOne(devId)}>{detecting === devId ? 'Détection…' : '🔍 Détecter'}</button>
-                    <button style={{ ...btn, height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set(list) }))}>Tout</button>
-                    <button style={{ ...btn, height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setSelConts(sc => ({ ...sc, [devId]: new Set() }))}>Aucun</button>
-                  </span>
-                </div>
-                {list.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 9 }}>
-                    {list.map(c => {
-                      const cp = picked.has(c)
-                      return (
-                        <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 6px 0 10px', borderRadius: 6, fontSize: 12.5, fontWeight: 500, background: cp ? SEL_BG : FIELD_BG, color: cp ? INK : '#A1A1AA', border: `1px solid ${cp ? SEL_EDGE : FIELD_EDGE}` }}>
-                          <span onClick={() => toggleCont(devId, c)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ display: 'grid', placeItems: 'center', width: 14, height: 14, borderRadius: 4, background: cp ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 9.5, fontWeight: 600, border: cp ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.18)' }}>{cp ? '✓' : ''}</span>
-                            {c}
-                          </span>
-                          {opts?.manage && <span onClick={() => removeC(devId, c)} title="Retirer" style={{ cursor: 'pointer', color: DIM, fontWeight: 500, fontSize: 15, padding: '0 2px' }}>×</span>}
-                        </span>
-                      )
-                    })}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 7, maxWidth: 380 }}>
-                  <input value={newC[devId] ?? ''} onChange={e => setNewC(v => ({ ...v, [devId]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(devId) }} placeholder="+ container (ex. 6, Default…)" style={{ ...inp, flex: 1, minWidth: 0 }} />
-                  <button style={gold} onClick={() => addC(devId)}>Ajouter</button>
-                </div>
-              </div>
-            )
-          })}
+    <Step n={1} title="Où ?" sub={totalJobs ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} · ${totalJobs} container${totalJobs > 1 ? 's' : ''} sélectionné${totalJobs > 1 ? 's' : ''}` : 'Choisis les iPhones et leurs containers'}
+      right={<span style={{ display: 'flex', gap: 6 }}>
+        <button style={{ ...btn, height: 28, fontSize: 12 }} disabled={!devices.length} onClick={() => { const on = devices.filter(isDeviceOn).map(d => d.public_id); setSel(new Set(on)); setSelConts(sc => { const n = { ...sc }; for (const id of on) n[id] = new Set(conts[id] ?? []); return n }) }}>Tous les iPhones en ligne</button>
+        {sel.size > 0 && <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => { setSel(new Set()); setSelConts({}) }}>Effacer</button>}
+      </span>}>
+      {devices.length === 0 && !loading && <div style={{ fontSize: 13, color: MUTED }}>Aucun iPhone trouvé sur ta clé iRemoTech.</div>}
+      {syncOff && devices.length > 0 && (
+        <div style={{ marginBottom: 10, fontSize: 12, color: '#FBBF24', lineHeight: 1.5 }}>
+          ⚠ Containers enregistrés sur ce navigateur seulement : colle le SQL <code>20261028_irt_containers.sql</code> dans Supabase pour les partager en temps réel.
         </div>
       )}
-    </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+        {devices.map(d => {
+          const id = d.public_id, on = sel.has(id), live = isDeviceOn(d)
+          const list = conts[id] ?? [], picked = selConts[id] ?? new Set<string>()
+          return (
+            <div key={id} style={{ borderRadius: 10, border: `1px solid ${on ? SEL_EDGE : EDGE}`, background: on ? 'rgba(233,196,106,0.04)' : '#0E0E10', padding: 12, display: 'flex', flexDirection: 'column', gap: 10, opacity: live || on ? 1 : 0.6 }}>
+              <div onClick={() => togglePhone(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <span style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: on ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 11, fontWeight: 700, border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.2)', flex: 'none' }}>{on ? '✓' : ''}</span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name ?? id}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 99, background: live ? '#22C55E' : '#EF4444', boxShadow: live ? '0 0 6px rgba(34,197,94,.55)' : 'none' }} />
+                    {live ? 'En ligne' : 'Hors ligne'} · {list.length ? `${picked.size}/${list.length} container${list.length > 1 ? 's' : ''}` : 'aucun container'}
+                  </span>
+                </span>
+              </div>
+              {list.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {list.map(c => {
+                    const cp = picked.has(c)
+                    return (
+                      <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
+                        <span onClick={() => { if (!on) togglePhone(id); toggleCont(id, c) }} style={{ cursor: 'pointer', padding: '0 10px' }} data-no-tr>{c}</span>
+                        {opts?.manage && <span onClick={() => removeC(id, c)} title="Retirer ce container" style={{ cursor: 'pointer', color: DIM, padding: '0 8px 0 0', fontSize: 14 }}>×</span>}
+                      </span>
+                    )
+                  })}
+                </div>
+              ) : <div style={{ fontSize: 12.5, color: MUTED }}>Clique « Détecter » : ScaleFlow lit les containers sur l’iPhone.</div>}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} disabled={running || !!detecting || !live} title="Ouvre le sélecteur Crane sur l’iPhone et lit tous les containers" onClick={() => void detectOne(id)}>{detecting === id ? 'Détection…' : '🔍 Détecter'}</button>
+                {list.length > 0 && <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} onClick={() => { if (!on) togglePhone(id); setSelConts(sc => ({ ...sc, [id]: new Set(list) })) }}>Tout</button>}
+                {list.length > 0 && <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px' }} onClick={() => setSelConts(sc => ({ ...sc, [id]: new Set() }))}>Aucun</button>}
+              </div>
+              {opts?.manage && (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input value={newC[id] ?? ''} onChange={e => setNewC(v => ({ ...v, [id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addC(id) }} placeholder="Ajouter à la main (ex. 6)" style={{ ...inp, height: 28, flex: 1, minWidth: 0, fontSize: 12 }} />
+                  <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => addC(id)}>Ajouter</button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </Step>
   )
 
-  const LogPanel = () => (logs.length > 0 || running) ? (
-    <div style={card}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>Journal</span>
-        {running && runId && <button style={{ ...btn, marginLeft: 'auto', background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
-        {!running && logs.length > 0 && <button style={{ ...btn, marginLeft: 'auto' }} onClick={() => setLogs([])}>Effacer</button>}
+  // Progression : une ligne par iPhone/container (statut + dernière étape), journal détaillé repliable.
+  const LogPanel = () => {
+    if (!logs.length && !running) return null
+    const rows = progressRows(logs)
+    return (
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: rows.length ? 12 : 6 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: INK }}>{running ? 'En cours' : 'Terminé'}</span>
+          {rows.length > 0 && <span style={{ fontSize: 12.5, color: MUTED }}>{rows.filter(r => r.state === 'ok').length} réussi(s) · {rows.filter(r => r.state === 'fail').length} échec(s){rows.some(r => r.state === 'skip') ? ` · ${rows.filter(r => r.state === 'skip').length} passé(s)` : ''}</span>}
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setShowLog(v => !v)}>{showLog ? 'Masquer le journal' : 'Journal détaillé'}</button>
+            {running && runId && <button style={{ ...btn, height: 28, fontSize: 12, background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
+            {!running && <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setLogs([])}>Effacer</button>}
+          </span>
+        </div>
+        {rows.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {rows.map(r => (
+              <div key={r.tag} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
+                <span style={{ flex: 'none', width: 9, height: 9, borderRadius: 99, background: r.state === 'ok' ? '#22C55E' : r.state === 'fail' ? '#EF4444' : r.state === 'skip' ? '#7C7C86' : GOLD, animation: r.state === 'run' && running ? 'aPulse 1.4s ease-in-out infinite' : 'none' }} />
+                <span data-no-tr style={{ flex: 'none', minWidth: 130, fontSize: 13, fontWeight: 600, color: INK }}>{r.tag}</span>
+                <span data-no-tr style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.last}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {(showLog || !rows.length) && <div data-no-tr style={{ ...logBox, maxHeight: 320, marginTop: rows.length ? 10 : 0 }}>{logs.join('\n') || 'En cours…'}</div>}
       </div>
-      <div style={{ ...logBox, maxHeight: 320 }}>{logs.join('\n') || 'En cours…'}</div>
-    </div>
-  ) : null
+    )
+  }
 
+  const TAB_TITLE: Record<IrtTab, { title: string; sub: string }> = {
+    phones: { title: 'Mes iPhones', sub: 'Tes iPhones iRemoTech et leurs containers. « Détecter » lit les containers directement sur l’iPhone.' },
+    posting: { title: 'Publier des Reels', sub: 'Choisis où, quelles vidéos, et lance : chaque container publie un Reel.' },
+    story: { title: 'Publier des Stories', sub: 'Une photo et un lien sticker par container.' },
+    warmup: { title: 'Warm-up', sub: 'Fais vivre tes comptes comme un humain, container par container.' },
+    account: { title: 'Créer des comptes', sub: 'Un compte Instagram dans chaque container vide, numéro et code SMS automatiques.' },
+    comptes: { title: 'Comptes créés', sub: 'Identifiants, numéros et historique des comptes créés depuis ScaleFlow.' },
+  }
   const TABS: { k: IrtTab; label: string; icon: string }[] = [
     { k: 'phones', label: 'Téléphones', icon: '📱' },
     { k: 'posting', label: 'Posting', icon: '🎬' },
@@ -680,8 +704,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <H title="Studio iRemoTech" sub="Automatise tes vrais iPhones : gère tes téléphones et containers, publie des Reels et des Stories, et crée des comptes — le tout par vision."
-        right={budget?.budget != null ? <span style={{ fontFamily: MONO, fontSize: 12, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }}>{budget.remaining ?? '—'} / {budget.budget ?? '—'} actions</span> : undefined} />
+      <H title={TAB_TITLE[curTab].title} sub={TAB_TITLE[curTab].sub}
+        right={<span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span style={pill}><span style={{ width: 7, height: 7, borderRadius: 99, background: onlineN ? '#22C55E' : '#EF4444' }} />{onlineN}/{devices.length} iPhone{devices.length > 1 ? 's' : ''} en ligne</span>
+          {budget?.budget != null && <span style={pill}>{budget.remaining ?? '—'} / {budget.budget} actions restantes</span>}
+        </span>} />
 
       {/* Barre d'onglets (mode autonome ; en infra, la nav de gauche gère les onglets) */}
       {!onTab && (
@@ -703,13 +730,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
       {/* ─────────────── ONGLET TÉLÉPHONES (gestion complète) ─────────────── */}
       {curTab === 'phones' && (<>
-        <p style={{ margin: '0 0 12px', fontSize: 13, color: MUTED }}>Gère tes iPhones et leurs containers Crane. Tu peux aussi choisir/lancer directement depuis les onglets Posting, Story et Création de compte.</p>
         {phonePicker({ manage: true })}
         {sel.size > 0 && (
           <div style={{ ...card, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button style={gold} onClick={() => goTab('posting')}>🎬 Aller au Posting →</button>
-            <button style={btn} onClick={() => goTab('story')}>📸 Aller à Story →</button>
-            <button style={btn} onClick={() => goTab('account')}>🆕 Créer des comptes →</button>
+            <span style={{ fontSize: 13, color: MUTED, alignSelf: 'center', marginRight: 'auto' }}>Ta sélection te suit dans chaque onglet.</span>
+            <button style={gold} onClick={() => goTab('posting')}>Publier des Reels →</button>
+            <button style={btn} onClick={() => goTab('story')}>Stories →</button>
+            <button style={btn} onClick={() => goTab('warmup')}>Warm-up →</button>
+            <button style={btn} onClick={() => goTab('account')}>Créer des comptes →</button>
           </div>
         )}
       </>)}
@@ -718,8 +746,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {curTab === 'posting' && (<>
         {phonePicker()}
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>🎬 Posting — Reels</div>
-          <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque container coché reçoit une vidéo tirée <b>au hasard</b> du pool et publie un Reel.</p>
+          <StepHead n={2} title="Quelles vidéos ?" sub="Chaque container coché publie un Reel avec une vidéo tirée au hasard, et une légende de la liste." />
           {sourceRow('reel')}
           {reelSrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, toutes les vidéos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.</p>}
           {reelSrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
@@ -740,8 +767,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <div style={{ ...lbl, margin: '0 0 6px' }}>Légendes (une par ligne, tirées au hasard)</div>
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={3} placeholder={'Ma légende 1\nMa légende 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 60, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
         </div>
-        <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />
-        <LaunchBar label={`Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length) || running} running={running} onClick={() => run('reel')} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Reel${totalJobs > 1 ? 's' : ''} sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length) || running} running={running} onClick={() => run('reel')} />
         <LogPanel />
       </>)}
 
@@ -749,8 +775,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {curTab === 'story' && (<>
         {phonePicker()}
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>📸 Story — photo + lien</div>
-          <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque container reçoit une photo tirée au hasard, avec son lien sticker (CTA).</p>
+          <StepHead n={2} title="Quelles photos et quel lien ?" sub="Chaque container publie une Story avec une photo tirée au hasard et son lien sticker." />
           {sourceRow('story')}
           {storySrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, toutes les photos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.</p>}
           {storySrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
@@ -786,8 +811,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <div style={{ ...lbl, margin: '14px 0 6px' }}>Textes sticker (une par ligne, au hasard — optionnel)</div>
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={2} placeholder={'Texte 1\nTexte 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 46, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
         </div>
-        <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />
-        <LaunchBar label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || (storySrc.mode === 'folder' ? !storySrc.folder : !storyPool.length) || running} running={running} onClick={() => run('story')} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Stor${totalJobs > 1 ? 'ies' : 'y'} sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || (storySrc.mode === 'folder' ? !storySrc.folder : !storyPool.length) || running} running={running} onClick={() => run('story')} />
         <LogPanel />
       </>)}
 
@@ -795,8 +819,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {curTab === 'warmup' && (<>
         {phonePicker()}
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>🔥 Warm-up</div>
-          <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Active chaque compte façon humaine (scroll Reels, regard, like…), un conteneur après l'autre, avec <b>rotation d'IP entre chaque</b> (mode avion).</p>
+          <StepHead n={2} title="Quel warm-up ?" sub="Chaque compte scrolle des Reels comme un humain (regarde, like parfois), un container après l’autre." />
 
           <div style={{ ...lbl, marginBottom: 7 }}>Intensité</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -828,8 +851,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           )}
           <p style={{ margin: '8px 0 0', fontSize: 11, color: DIM }}>Chaque session est aléatoire (durée, temps de visionnage, reels likés) pour rester crédible.</p>
         </div>
-        <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />
-        <LaunchBar label={`Lancer le warm-up (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={runWarmup} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à chauffer sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />} label={`Lancer le warm-up (${totalJobs})`} disabled={!totalJobs || running} running={running} onClick={runWarmup} />
         <LogPanel />
       </>)}
 
@@ -837,8 +859,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {curTab === 'account' && (<>
         {phonePicker()}
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: INK, marginBottom: 4 }}>🆕 Création de compte Instagram</div>
-          <p style={{ margin: '0 0 14px', fontSize: 12, color: MUTED }}>Ouvre IG sur chaque container « frais » (déconnecté) et crée un compte. Avec un token 5sim : numéro + code SMS automatiques.</p>
+          <StepHead n={2} title="Quel numéro ?" sub="Pour chaque container vierge : un numéro acheté, le code SMS saisi tout seul, puis le compte rempli jusqu’au bout." />
 
           <div style={{ ...lbl, marginBottom: 7 }}>Pays du numéro</div>
           <div style={{ ...seg, marginBottom: 14 }}>
@@ -941,17 +962,16 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           </p>
         </div>
         <div style={card}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginBottom: 6 }}>Remplir les containers</div>
-          <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Chaque iPhone enchaîne ses containers : un compte créé, puis le container suivant, jusqu’au dernier. Un container déjà connecté est passé sans acheter de numéro.</p>
+          <StepHead n={3} title="Quels containers ?" sub="Chaque iPhone enchaîne ses containers : un compte, puis le suivant, jusqu’au dernier. Un container déjà connecté est passé sans acheter de numéro." />
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
-              <input type="checkbox" checked={autoDetect} disabled={running} onChange={e => { setAutoDetect(e.target.checked); try { localStorage.setItem('sf-irt-auto-detect', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
-              Tout auto : détecter les containers puis remplir ceux sans compte
-            </label>
-            <button style={{ ...btn, height: 30, padding: '0 12px' }} disabled={running || !sel.size} onClick={() => {
+            <div style={{ flex: '1 1 320px' }}>
+              <Toggle on={autoDetect} onClick={() => { if (running) return; const v = !autoDetect; setAutoDetect(v); try { localStorage.setItem('sf-irt-auto-detect', v ? '1' : '0') } catch { /* noop */ } }}
+                label="Tout auto (recommandé)" sub="ScaleFlow détecte les containers de chaque iPhone puis remplit ceux qui n’ont pas de compte" />
+            </div>
+            {!autoDetect && <button style={{ ...btn, height: 30, padding: '0 12px' }} disabled={running || !sel.size} onClick={() => {
               const done = new Set(createdAccts.filter(a => a.ok).map(a => `${a.device}|${a.container}`))
               setSelConts(sc => { const n = { ...sc }; for (const d of sel) n[d] = new Set((conts[d] ?? []).filter(c => !done.has(`${d}|${c}`))); return n })
-            }}>Cocher les containers sans compte</button>
+            }}>Cocher les containers sans compte</button>}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
               Essais max par container
               <input type="number" min={1} max={10} value={acctTries} disabled={running} onChange={e => { const v = Math.max(1, Math.min(10, Number(e.target.value) || 1)); setAcctTries(v); try { localStorage.setItem('sf-irt-acct-tries', String(v)) } catch { /* noop */ } }}
@@ -959,8 +979,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             </label>
           </div>
         </div>
-        <OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />
-        <LaunchBar label={autoDetect ? `Détecter et remplir les containers (${sel.size} iPhone${sel.size > 1 ? 's' : ''})` : (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={(autoDetect ? !sel.size : !totalJobs) || running || !!detecting} running={running} onClick={createAccounts} />
+        <LaunchBar n={4} summary={autoDetect ? (sel.size ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} : détection des containers puis un compte dans chaque container vide` : 'Choisis des iPhones à l’étape 1') : totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à créer` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />} label={autoDetect ? `Détecter et remplir les containers (${sel.size} iPhone${sel.size > 1 ? 's' : ''})` : (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={(autoDetect ? !sel.size : !totalJobs) || running || !!detecting} running={running} onClick={createAccounts} />
         <LogPanel />
         {createdAccts.length > 0 && (
           <div style={card}>
@@ -1040,7 +1059,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
           {filtered.length === 0 ? (
             <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>
-              {createdAccts.length === 0 ? 'Aucun compte créé pour l’instant — lance une création dans l’onglet « Création de compte ».' : 'Aucun compte ne correspond à ta recherche.'}
+              {createdAccts.length === 0 ? <>Aucun compte créé pour l’instant.{' '}<button style={{ ...btn, height: 28, fontSize: 12, marginLeft: 8 }} onClick={() => goTab('account')}>Créer des comptes →</button></> : 'Aucun compte ne correspond à ta recherche.'}
             </div>
           ) : (() => {
             const th: React.CSSProperties = { textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 500, color: DIM, borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }
@@ -1101,7 +1120,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   )
 }
 
-// Carte « Options » réutilisée par chaque onglet d'action.
+// Options d'un lancement : interrupteurs compacts, posés dans la barre « Lancer ».
 function OptionsCard({ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel, accountMode }: {
   airplaneOn: boolean; setAirplaneOn: (f: (v: boolean) => boolean) => void
   uniqueUse: boolean; setUniqueUse: (f: (v: boolean) => boolean) => void
@@ -1109,24 +1128,41 @@ function OptionsCard({ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, paral
   accountMode?: boolean
 }) {
   return (
-    <div style={card}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginBottom: 12 }}>Options</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
-        <Toggle on={airplaneOn} onClick={() => setAirplaneOn(v => !v)} label="Rotation d'IP (mode avion)" sub="Cycle avion entre chaque container" />
-        {!accountMode && <Toggle on={uniqueUse} onClick={() => setUniqueUse(v => !v)} label="Usage unique" sub="Pas de doublon tant que le pool n'est pas épuisé" />}
-        <Toggle on={parallel} onClick={() => setParallel(v => !v)} label="Téléphones en parallèle" sub="Plus rapide (lecture d'écran sérialisée)" />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8 }}>
+      <Toggle on={parallel} onClick={() => setParallel(v => !v)} label="iPhones en même temps" sub="Beaucoup plus rapide avec plusieurs iPhones" />
+      <Toggle on={airplaneOn} onClick={() => setAirplaneOn(v => !v)} label="Nouvelle IP entre chaque compte" sub="Mode avion entre deux containers" />
+      {!accountMode && <Toggle on={uniqueUse} onClick={() => setUniqueUse(v => !v)} label="Chaque média une seule fois" sub="Pas de doublon tant qu’il en reste" />}
+    </div>
+  )
+}
+
+// Étape finale : résumé + options + gros bouton.
+function LaunchBar({ n, summary, options, label, disabled, running, onClick }: { n: number; summary: string; options?: ReactNode; label: string; disabled: boolean; running: boolean; onClick: () => void }) {
+  return (
+    <div style={{ ...card, border: '1px solid rgba(233,196,106,0.25)', background: '#121214' }}>
+      <StepHead n={n} title="Lancer" sub={summary} />
+      {options}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+        <button style={{ ...gold, height: 40, padding: '0 22px', fontSize: 14, fontWeight: 600, background: disabled ? '#2A2A2E' : GOLD, borderColor: disabled ? '#2A2A2E' : GOLD, color: disabled ? MUTED : '#0A0A0B' }} disabled={disabled} onClick={onClick}>
+          {running ? 'En cours…' : `▶ ${label}`}
+        </button>
       </div>
     </div>
   )
 }
 
-// Barre de lancement réutilisée.
-function LaunchBar({ label, disabled, running, onClick }: { label: string; disabled: boolean; running: boolean; onClick: () => void }) {
+function StepHead({ n, title, sub, right }: { n: number; title: string; sub?: string; right?: ReactNode }) {
   return (
-    <div style={{ ...card, display: 'flex', justifyContent: 'flex-end' }}>
-      <button style={{ ...gold, height: 32, padding: '0 16px', opacity: disabled ? 0.4 : 1 }} disabled={disabled} onClick={onClick}>
-        {running ? 'En cours…' : label}
-      </button>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+      <span style={{ flex: 'none', display: 'grid', placeItems: 'center', width: 26, height: 26, borderRadius: 99, background: 'rgba(233,196,106,0.14)', color: GOLD, fontSize: 13, fontWeight: 700, border: '1px solid rgba(233,196,106,0.35)' }}>{n}</span>
+      <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: INK, letterSpacing: '-0.01em' }}>{title}</div>
+        {sub && <div style={{ fontSize: 12.5, color: MUTED, marginTop: 2, lineHeight: 1.45 }}>{sub}</div>}
+      </div>
+      {right}
     </div>
   )
+}
+function Step({ n, title, sub, right, children }: { n: number; title: string; sub?: string; right?: ReactNode; children: ReactNode }) {
+  return <div style={card}><StepHead n={n} title={title} sub={sub} right={right} />{children}</div>
 }

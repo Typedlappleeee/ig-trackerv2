@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-20c',
+    date: '2026-11-20',
+    title: { fr: 'iRemoTech refait pour être ultra simple', en: 'iRemoTech redesigned to be dead simple' },
+    items: {
+      fr: ['Chaque onglet se lit en étapes numérotées : 1 · Où ? (tes iPhones en cartes, avec leurs containers à cocher et « Détecter »), 2 · Quoi ?, puis Lancer (résumé de ce qui va se passer, options en clair, gros bouton).', 'Cocher un iPhone coche tous ses containers ; « Tous les iPhones en ligne » sélectionne tout d’un clic.', 'Pendant un lancement : une ligne par container avec son statut (en cours, réussi, échec, passé) et sa dernière étape ; le journal détaillé reste disponible.'],
+      en: ['Every tab reads as numbered steps: 1 · Where? (your iPhones as cards, with their containers to tick and “Detect”), 2 · What?, then Launch (summary of what will happen, plain options, big button).', 'Ticking an iPhone ticks all its containers; “All online iPhones” selects everything in one click.', 'During a run: one line per container with its status (running, done, failed, skipped) and its last step; the detailed log is still there.'],
+    },
+  },
+  {
     id: '2026-11-20b',
     date: '2026-11-20',
     title: { fr: 'iRemoTech : containers détectés automatiquement', en: 'iRemoTech: containers detected automatically' },
