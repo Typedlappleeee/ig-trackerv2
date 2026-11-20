@@ -286,6 +286,21 @@ async function findWordPoint(
 
 // Ferme les popups Instagram fréquents qui bloquent le flux (« Not now », « OK »,
 // « Skip », notifications, « Add to your story »…). Balayage léger, sans échec.
+/** Feuilles d'info d'Instagram (« Introducing story-to-story sharing », « New: … ») avec un bouton OK → OK.
+ *  true si une feuille a été fermée. */
+export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  const scr = await readScreenWords(key, deviceId)
+  if (!scr) return false
+  const has = (re: RegExp) => scr.words.some(o => re.test(o.text))
+  if (!(has(/^introducing$/i) || (has(/^view$/i) && has(/^settings$/i)) || has(/^new:?$/i) && has(/^ok$/i))) return false
+  const ok = scr.words.find(o => /^ok$/i.test(o.text) && o.cy > scr.H * 0.4)
+  if (!ok) return false
+  hooks?.log?.('   feuille d’info Instagram (« Introducing… ») → OK')
+  await sendAction(key, deviceId, { type: 'tap', x: ok.cx, y: ok.cy })
+  await sleep(1500)
+  return true
+}
+
 export async function dismissPopups(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
   const found = await findTapText(
     key, deviceId,
@@ -1504,9 +1519,12 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
     await tapFrac(A.firstThumb.x, A.firstThumb.y)
   }
   await sleep(3500) // laisse le média se charger (le « Done » apparaît ensuite)
+  await dismissIgInfoSheet(key, deviceId, hooks) // « Introducing story-to-story sharing » (iPhone normal)
   // 5. Done (haut-droite) — si absent, on saute juste l'étape et on continue (des fois il n'y en a pas).
-  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0, 0.16], 'Done', 6)) hooks?.log?.('   (pas de Done → on continue)')
+  //    Zone [0,04 ; 0,16] : la barre d'état (souvent bleue) était prise pour le bouton.
+  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0.04, 0.16], 'Done', 6)) hooks?.log?.('   (pas de Done → on continue)')
   await sleep(2600)
+  await dismissIgInfoSheet(key, deviceId, hooks)
   // 6. Icône sticker (côté droit) → ouvre le tiroir des stickers.
   hooks?.log?.('🔖 Ouverture des stickers…')
   await tapFrac(A.stickerIcon.x, A.stickerIcon.y)
@@ -1754,7 +1772,9 @@ async function backToTabs(key: string, deviceId: string, hooks?: VisionHooks): P
     }
     const discard = words.find(o => /^discard$/i.test(o.text) && o.cy > H * 0.3)
     if (discard) { hooks?.log?.('   « Discard » (brouillon abandonné)'); await sendAction(key, deviceId, { type: 'tap', x: discard.cx, y: discard.cy }); await sleep(1800); continue }
-    const editor = words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.9) && words.some(o => /^video$/i.test(o.text) && o.cy > H * 0.9)
+    const editor = (words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.9) && words.some(o => /^video$/i.test(o.text) && o.cy > H * 0.9))
+      || (top(/^suggested$/i) && top(/^audio$/i)) // éditeur de Reel / Story (« Suggested audio » en haut)
+    if (await dismissIgInfoSheet(key, deviceId, hooks)) continue
     if (editor || top(/^new$/i) && top(/^(reel|post)$/i) || top(/^story$/i) && words.some(o => /^(post|instants|live)$/i.test(o.text) && o.cy > H * 0.9)) {
       hooks?.log?.('   créateur ouvert → ✕ en haut à gauche')
       await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.09 * W), y: Math.round(0.08 * H) }); await sleep(1800); continue
