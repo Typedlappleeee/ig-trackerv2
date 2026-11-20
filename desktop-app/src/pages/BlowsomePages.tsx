@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { themeFor } from '@/lib/theme'
 import {
-  useIremotech, listDevices, fetchUsage, isDeviceOn, loadSequences, saveSequence, deleteSequence, replaySequence, uploadMedia,
+  useIremotech, listDevices, fetchUsage, isDeviceOn, deviceLabel, loadSequences, saveSequence, deleteSequence, replaySequence, uploadMedia,
   type IrtDevice, type IrtUsage, type IrtSequence, type SeqStep,
 } from '@/lib/iremotech'
 import LiveDevice from '@/components/LiveDevice'
@@ -149,7 +149,7 @@ function ConnectIrt({ title }: { title: string }) {
       <div style={{ fontSize: 28 }}>📱</div>
       <div style={{ marginTop: 12, fontSize: 14, fontWeight: 600, color: INK }}>{title}</div>
       <p style={{ margin: '6px auto 0', maxWidth: 460, fontSize: 13, lineHeight: 1.6, color: MUTED }}>
-        Le Parc VIP pilote tes vrais iPhones via iRemoTech. Renseigne ta clé API iRemoTech dans <code>iremotech_config</code> (app_config/org_config) et le parc apparaîtra ici — comme la connexion Meta, c'est prêt côté app.
+        Le Parc VIP pilote tes vrais iPhones via iRemoTech. Renseigne ta clé API iRemoTech dans l’onglet iRemoTech (« ⚙ Clé iRemoTech ») et le parc apparaîtra ici.
       </p>
     </Card>
   )
@@ -421,7 +421,7 @@ export function BlowParc({ user, org }: { user: User; org: OrgState }) {
                       <span style={{ position: 'relative', width: 32, height: 32, borderRadius: 6, display: 'grid', placeItems: 'center', fontSize: 15, color: ACCENT_TXT, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)' }}>📱
                         <span style={{ position: 'absolute', right: -2, bottom: -2, width: 8, height: 8, borderRadius: 99, background: on ? '#4ADE80' : '#F87171', boxShadow: '0 0 0 2px #111113' }} /></span>
                       <span style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name ?? d.public_id}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deviceLabel(d)}</div>
                         <div style={{ fontSize: 12, color: MUTED }}>{d.model ?? 'iPhone'}</div>
                       </span>
                       {runSeq && <span onClick={() => toggleRun(d.public_id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 5, cursor: 'pointer', flexShrink: 0, background: checked ? ACCENT : 'transparent', border: checked ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.18)', color: '#fff', fontSize: 11, fontWeight: 600 }}>{checked ? '✓' : ''}</span>}

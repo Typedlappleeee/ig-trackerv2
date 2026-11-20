@@ -11,7 +11,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
-import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
+import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
@@ -24,6 +24,7 @@ import { folderMedia, loadBankSummary, type BankSummary } from '@/lib/flowEngine
 import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { themeFor } from '@/lib/theme'
 import { confirmDialog } from '@/lib/ui'
+import IrtKeyForm from '@/components/IrtKeyForm'
 
 const BLOW_THEME = themeFor('blowsome')
 
@@ -156,6 +157,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [acctFilter, setAcctFilter] = useState<'all' | 'ok' | 'ko'>('all')
   const [acctLogOpen, setAcctLogOpen] = useState<number | null>(null)
   const [showLog, setShowLog] = useState(false)   // journal détaillé déplié
+  const [keyOpen, setKeyOpen] = useState(false)   // formulaire de la clé iRemoTech
 
   const [running, setRunning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
@@ -248,7 +250,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
   const detectOne = async (dev: string) => {
     if (running || detecting) return
-    const name = devices.find(d => d.public_id === dev)?.name ?? dev
+    const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
     setDetecting(dev); setLogs([])
     const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(e => { push(`[${name}] ⚠ ${e instanceof Error ? e.message : String(e)}`); return null })
     if (!list) push(`[${name}] ✗ containers non détectés`)
@@ -338,7 +340,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
     const byPhone = [...sel].map(dev => ({
       dev,
-      name: devices.find(d => d.public_id === dev)?.name ?? dev,
+      name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(),
       jobs: [...(selConts[dev] ?? [])].map(container => ({ container, vid: pickVid(), caption: pickCap(), link: storyLinks[linkKey(dev, container)] || storyLink.trim() })),
     })).filter(p => p.jobs.length)
 
@@ -423,7 +425,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const made = new Set(loadCreatedAccounts().filter(a => a.ok).map(a => `${a.device}|${a.container}`))
       const next: { dev: string; c: string }[] = []
       for (const dev of sel) {
-        const name = devices.find(d => d.public_id === dev)?.name ?? dev
+        const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
         push(`🔍 [${name}] détection des containers…`)
         const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(() => null) ?? (conts[dev] ?? [])
         const todo = list.filter(c => !made.has(`${dev}|${c}`))
@@ -440,7 +442,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
     // Un container : vérifie qu'il est vierge AVANT d'acheter un numéro, puis jusqu'à `acctTries` cycles complets.
     const createOne = async (dev: string, c: string): Promise<'ok' | 'skip' | 'fail'> => {
-      const devName = devices.find(d => d.public_id === dev)?.name ?? dev
+      const devName = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
       const tag = `[${devName}·${c}]`
       const acctLog: string[] = []
       const hooks = { log: (m: string) => { push(`${tag} ${m}`); acctLog.push(m) }, shouldStop: () => R.isCancelled() }
@@ -546,7 +548,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const key = irt.key
     const cfg = warmupCfg()
     const byPhone = [...sel].map(dev => ({
-      dev, name: devices.find(d => d.public_id === dev)?.name ?? dev,
+      dev, name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(),
       conts: [...(selConts[dev] ?? new Set())],
     })).filter(p => p.conts.length)
     if (byPhone.length === 0) { setLogs(['⚠ Coche au moins un conteneur (sélecteur en haut).']); return }
@@ -587,7 +589,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         <H title="Studio iRemoTech" />
         {irt.loading
           ? <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>Chargement…</div>
-          : <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>iRemoTech pas encore branché. Colle ta clé API dans <b style={{ color: INK, fontWeight: 600 }}>Phone Farm → ⚙</b>.</div>}
+          : <div style={card}><div style={{ fontSize: 15, fontWeight: 700, color: INK, marginBottom: 10 }}>Relier iRemoTech</div><IrtKeyForm orgId={currentOrg?.id ?? null} userId={user.id} onSaved={irt.reload} /></div>}
       </div>
     )
   }
@@ -598,13 +600,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const phonePicker = (opts?: { manage?: boolean }) => (
     <Step n={1} title="Où ?" sub={totalJobs ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} · ${totalJobs} container${totalJobs > 1 ? 's' : ''} sélectionné${totalJobs > 1 ? 's' : ''}` : 'Choisis les iPhones et leurs containers'}
       right={<span style={{ display: 'flex', gap: 6 }}>
+        <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setKeyOpen(o => !o)}>⚙ Clé iRemoTech</button>
         <button style={{ ...btn, height: 28, fontSize: 12 }} disabled={loading} title={`Clé iRemoTech utilisée : …${(irt.key ?? '').slice(-4)}`} onClick={() => load(false)}>{loading ? 'Actualisation…' : `↻ Actualiser (${devices.length})`}</button>
         <button style={{ ...btn, height: 28, fontSize: 12 }} disabled={!devices.length} onClick={() => { const on = devices.filter(isDeviceOn).map(d => d.public_id); setSel(new Set(on)); setSelConts(sc => { const n = { ...sc }; for (const id of on) n[id] = new Set(conts[id] ?? []); return n }) }}>Tous les iPhones en ligne</button>
         {sel.size > 0 && <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => { setSel(new Set()); setSelConts({}) }}>Effacer</button>}
       </span>}>
+      {keyOpen && <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, border: `1px solid ${EDGE}`, background: '#0E0E10' }}><IrtKeyForm orgId={currentOrg?.id ?? null} userId={user.id} current={irt.key} onSaved={() => { setKeyOpen(false); irt.reload() }} onCancel={() => setKeyOpen(false)} /></div>}
       {devices.length === 0 && !loading && <div style={{ fontSize: 13, color: MUTED }}>Aucun iPhone trouvé sur ta clé iRemoTech.</div>}
       <div style={{ marginBottom: 10, fontSize: 12, color: DIM }}>
-        {devices.length} iPhone{devices.length > 1 ? 's' : ''} sur la clé iRemoTech <span data-no-tr style={{ fontFamily: MONO }}>…{(irt.key ?? '').slice(-4)}</span> · liste actualisée toutes les 15 s. Un iPhone manque ? Vérifie qu’il est rattaché à cette clé dans le tableau de bord iRemoTech (API Access), ou mets une clé plus récente dans Phone Farm → ⚙.
+        {devices.length} iPhone{devices.length > 1 ? 's' : ''} sur la clé iRemoTech <span data-no-tr style={{ fontFamily: MONO }}>…{(irt.key ?? '').slice(-4)}</span> · liste actualisée toutes les 15 s. Un iPhone manque ? Vérifie qu’il est rattaché à cette clé dans le tableau de bord iRemoTech (API Access), ou mets une clé plus récente avec « ⚙ Clé iRemoTech ».
       </div>
       {syncOff && devices.length > 0 && (
         <div style={{ marginBottom: 10, fontSize: 12, color: '#FBBF24', lineHeight: 1.5 }}>
@@ -620,7 +624,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               <div onClick={() => togglePhone(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <span style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: on ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 11, fontWeight: 700, border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.2)', flex: 'none' }}>{on ? '✓' : ''}</span>
                 <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name ?? id}</span>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deviceLabel(d)}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>
                     <span style={{ width: 7, height: 7, borderRadius: 99, background: live ? '#22C55E' : '#EF4444', boxShadow: live ? '0 0 6px rgba(34,197,94,.55)' : 'none' }} />
                     {live ? 'En ligne' : 'Hors ligne'} · {list.length ? `${picked.size}/${list.length} container${list.length > 1 ? 's' : ''}` : 'aucun container'}
@@ -805,7 +809,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {[...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => ({ dev, c }))).map(({ dev, c }) => (
                   <div key={`${dev}::${c}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ minWidth: 130, fontSize: 12.5, fontWeight: 500, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{devices.find(d => d.public_id === dev)?.name ?? dev} · {c}</span>
+                    <span style={{ minWidth: 130, fontSize: 12.5, fontWeight: 500, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()} · {c}</span>
                     <input value={storyLinks[linkKey(dev, c)] ?? ''} onChange={e => setLink(dev, c, e.target.value)} placeholder={storyLink.trim() ? `défaut : ${storyLink.trim()}` : 'https://…'} style={{ ...inp, flex: 1, height: 32, fontSize: 12 }} />
                   </div>
                 ))}

@@ -20,13 +20,19 @@ async function irtProxy(op: string, apiKey: string, payload: Record<string, unkn
 }
 const WS_BASE = 'wss://api.iremotech.com/v1'
 
-export interface IrtDevice { public_id: string; name?: string; model?: string; status?: string; [k: string]: unknown }
-/** iPhone en ligne : « online », « connected », « reachable »… (pas « offline »,
- *  « disconnected », « unreachable », qui contiennent aussi « on »/« reachable »). */
+export interface IrtDevice { public_id: string; name?: string | null; custom_name?: string | null; model?: string; status?: string; [k: string]: unknown }
+/** iPhone en ligne. L'API actuelle (GET /devices) ne renvoie PLUS d'état : sans information, l'iPhone est
+ *  considéré joignable (une action sur un iPhone vraiment hors ligne renvoie 503, déjà géré). Si un état
+ *  est fourni : booléens online/connected, ou texte « online », « connected »… (pas « offline »…). */
 export const isDeviceOn = (d: IrtDevice): boolean => {
-  const s = (d.status ?? '').toLowerCase()
-  return !/off|disconn|unreach/.test(s) && (s.includes('on') || s.includes('reachable'))
+  for (const k of ['online', 'connected', 'is_online', 'reachable']) if (typeof d[k] === 'boolean') return d[k] as boolean
+  const raw = d.status ?? d.state ?? d.connection
+  if (raw == null || raw === '') return true
+  const s = String(raw).toLowerCase()
+  return !/off|disconn|unreach|down|error/.test(s)
 }
+/** Nom affiché : celui donné dans iRemoTech (custom_name), sinon le nom de l'appareil. */
+export const deviceLabel = (d: IrtDevice): string => d.custom_name || d.name || d.public_id
 export interface IrtBudget { used?: number; budget?: number; remaining?: number }
 export interface IrtUsage {
   active_minutes?: IrtBudget; actions?: IrtBudget; snapshots?: IrtBudget; uploads?: IrtBudget
@@ -231,15 +237,16 @@ export async function replaySequence(
 }
 
 // Hook : clé + statut. Dormant (key=null) tant que rien n'est configuré.
-export interface IrtState { key: string | null; loading: boolean }
+export interface IrtState { key: string | null; loading: boolean; reload: () => void }
 export function useIremotech(user: User, org: OrgState): IrtState {
   const { currentOrg } = org
-  const [state, setState] = useState<IrtState>({ key: null, loading: true })
+  const [state, setState] = useState<{ key: string | null; loading: boolean }>({ key: null, loading: true })
+  const [n, setN] = useState(0)
   useEffect(() => {
     let cancelled = false
     setState(s => ({ ...s, loading: true }))
     loadIremotechKey(user, org).then(key => { if (!cancelled) setState({ key, loading: false }) })
     return () => { cancelled = true }
-  }, [currentOrg?.id, user.id])
-  return state
+  }, [currentOrg?.id, user.id, n])
+  return { ...state, reload: () => setN(x => x + 1) }
 }

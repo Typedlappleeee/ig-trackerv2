@@ -105,6 +105,8 @@ describe('Containers iRemoTech partagés (temps réel)', () => {
 describe('État en ligne des iPhones', () => {
   it.each([
     ['online', true], ['ON', true], ['connected', true], ['reachable', true],
-    ['offline', false], ['disconnected', false], ['unreachable', false], ['', false], [undefined, false],
+    ['offline', false], ['disconnected', false], ['unreachable', false],
+    // l'API actuelle ne renvoie plus d'état : un iPhone sans état est considéré joignable
+    ['', true], [undefined, true],
   ])('%s → %s', (status, on) => { expect(isDeviceOn({ public_id: 'x', status })).toBe(on) })
 })

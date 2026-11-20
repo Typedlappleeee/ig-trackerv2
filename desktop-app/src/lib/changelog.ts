@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-20e',
+    date: '2026-11-20',
+    title: { fr: 'iRemoTech : iPhones de nouveau « en ligne » + champ pour la clé', en: 'iRemoTech: iPhones “online” again + a field for the key' },
+    items: {
+      fr: ['iRemoTech ne renvoie plus l’état des iPhones : ScaleFlow les croyait tous hors ligne (« 0 en ligne »). Ils sont maintenant considérés joignables, et le nom que tu leur as donné dans iRemoTech est affiché.', 'Nouveau bouton « ⚙ Clé iRemoTech » (étape 1) : colle ta clé, ScaleFlow la vérifie (nombre d’iPhones trouvés) puis l’enregistre pour toi et pour l’agence.'],
+      en: ['iRemoTech no longer returns the iPhones’ state: ScaleFlow thought they were all offline (“0 online”). They are now considered reachable, and the name you gave them in iRemoTech is shown.', 'New “⚙ iRemoTech key” button (step 1): paste your key, ScaleFlow checks it (number of iPhones found) then saves it for you and for the agency.'],
+    },
+  },
+  {
     id: '2026-11-20d',
     date: '2026-11-20',
     title: { fr: 'iRemoTech : tous les iPhones de l’agence', en: 'iRemoTech: every agency iPhone' },
