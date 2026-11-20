@@ -1045,7 +1045,7 @@ export async function completeSignupByVision(key: string, deviceId: string, hook
 
 // ── Moteur « écran → action » de fin d'inscription ──────────────────────────────
 export type EndAction =
-  | { kind: 'refused' } | { kind: 'captcha' } | { kind: 'feed' } | { kind: 'reopen'; why: string }
+  | { kind: 'refused' } | { kind: 'captcha' } | { kind: 'feed' } | { kind: 'reopen'; why: string } | { kind: 'review' }
   | { kind: 'tap'; x: number; y: number; label: string; double?: boolean }
 
 /** Décide quoi faire selon les mots lus à l'écran (pure, testée). null = écran inconnu / transition. */
@@ -1073,8 +1073,11 @@ export function decideEndScreen(raw: { text: string; cx: number; cy: number; x?:
   if (has(/^access$/i, 0.3, 0.5) && has(/^videos$/i, 0.3, 0.5) && !has(/^please$/i)) { const b = find(/^continue$/i, 0.8); return { kind: 'tap', x: b ? b.cx : Math.round(W / 2), y: b ? b.cy : Math.round(0.94 * H), label: 'Continue (photos)' } }
   // 3b. Galerie photo ouverte par « Add profile picture » (en-tête « Cancel · Library · Done ») → Cancel
   if (has(/^library$/i, 0, 0.08) || (has(/^cancel$/i, 0, 0.08) && has(/^(photos|recents|library)$/i))) { const b = find(/^cancel$/i, 0, 0.08); if (b) return { kind: 'tap', x: b.cx, y: b.cy, label: 'Cancel (galerie)' } }
-  // 4. « Review the settings for your new profile » (Turn on…) → fermer et rouvrir Instagram
-  if (has(/^review$/i) && has(/^settings$/i)) return { kind: 'reopen', why: 'Review the settings' }
+  // 4. « Review the settings for your new profile » (Turn on Notifications/Contacts/Location) → faire défiler
+  //    jusqu'en bas puis le bouton bleu « Next » (jamais les « Turn on »), sans quitter l'app
+  if ((has(/^review$/i) && has(/^settings$/i)) || (has(/^location$/i) && has(/^contacts$/i) && has(/^turn$/i))) {
+    if (!has(/^(notnow|not)$/i, 0.6)) return { kind: 'review' }
+  }
   // 5. Fil d'accueil : rangée des stories (« Your story ») → prêt à poster
   if (has(/^(your|yourstory)$/i, 0.08, 0.35) && has(/^story$/i, 0.08, 0.35) || has(/^yourstory$/i, 0.08, 0.35)) return { kind: 'feed' }
   // 6. « Save your login info? » → Save (évite de redemander la connexion)
@@ -1117,6 +1120,16 @@ export async function settleToFeed(key: string, deviceId: string, hooks?: Vision
     if (act?.kind === 'refused') { hooks?.log?.('⛔ Instagram refuse la création (« We couldn’t create an account for you ») : anti-robot (IP, numéro ou créations trop rapprochées)'); await findTapText(key, deviceId, [/^ok$/i], hooks, { label: 'OK', tries: 1, minY: 0.4, maxY: 0.75 }); return 'refused' }
     if (act?.kind === 'feed') { hooks?.log?.('🏠 Fil Instagram affiché ✓'); return 'feed' }
     if (act?.kind === 'captcha') { hooks?.log?.('🤖 Vérification humaine demandée par Instagram → on passe au container suivant (non résolue)'); return 'captcha' }
+    if (act?.kind === 'review') {
+      hooks?.log?.('   ⚙ « Review the settings » → défilement jusqu’en bas puis « Next »')
+      for (let k = 0; k < 2; k++) { await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(0.93 * scr.W), y1: Math.round(0.86 * scr.H), x2: Math.round(0.93 * scr.W), y2: Math.round(0.2 * scr.H), duration_ms: 500 }); await sleep(1200) }
+      const sh = await snapshot(key, deviceId)
+      const blue = sh ? await findBlueButton(sh, 0.85, 0.99, 0, 1) : null
+      const bx = blue ? blue.cx : Math.round(scr.W / 2), by = blue ? blue.cy : Math.round(0.95 * scr.H)
+      hooks?.log?.(`   👆 Next (bas de page) → tap (${bx}, ${by})`)
+      await sendAction(key, deviceId, { type: 'tap', x: bx, y: by })
+      idle = 0; await sleep(2500); continue
+    }
     if (act?.kind === 'reopen' && !reopened) {
       hooks?.log?.(`   ⚙ écran « ${act.why} » → fermer Instagram puis rouvrir le MÊME container`)
       await forceCloseForegroundApp(key, deviceId, hooks)
@@ -1127,7 +1140,7 @@ export async function settleToFeed(key: string, deviceId: string, hooks?: Vision
       // même bouton tapé 3 fois sans effet → on bascule en double tap (alerte iOS qui ignore le tap simple)
       const sig = `${act.label}@${Math.round(act.y / 20)}`
       same = sig === last ? same + 1 : 0; last = sig
-      const dbl = act.double || same >= 2
+      const dbl = act.double || same >= 1
       hooks?.log?.(`   👆 ${act.label} → ${dbl ? 'double ' : ''}tap (${act.x}, ${act.y})`)
       if (dbl) await doubleTap(key, deviceId, act.x, act.y)
       else await sendAction(key, deviceId, { type: 'tap', x: act.x, y: act.y })

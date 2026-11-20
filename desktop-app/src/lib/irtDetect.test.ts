@@ -50,8 +50,9 @@ describe('iRemoTech — écrans de fin : écran lu → action', () => {
   it('cookies → Allow all cookies (double tap)', () => {
     expect(D([['Allow', 80, 133], ['cookies', 260, 133], ['Allow', 160, 680], ['all', 200, 680], ['cookies', 250, 680]])).toMatchObject({ kind: 'tap', double: true })
   })
-  it('Review the settings → fermer et rouvrir', () => {
-    expect(D([['Review', 80, 120], ['the', 140, 120], ['settings', 200, 120], ['Turn', 300, 300]])).toMatchObject({ kind: 'reopen' })
+  it('Review the settings → défiler puis Next (sans quitter) ; popup « Turn on from settings » → Not now', () => {
+    expect(D([['Review', 80, 120], ['the', 140, 120], ['settings', 200, 120], ['Turn', 300, 300]])).toEqual({ kind: 'review' })
+    expect(D([['Contacts', 140, 160], ['Location', 130, 346], ['Turn', 210, 533], ['on', 240, 533], ['Turn', 180, 489], ['Not', 190, 650], ['now', 220, 650]])).toMatchObject({ kind: 'tap' })
   })
   it('fil avec « Your story » → feed (prêt à poster)', () => {
     expect(D([['Instagram', 80, 50], ['Your', 40, 170], ['story', 80, 170]])).toEqual({ kind: 'feed' })
