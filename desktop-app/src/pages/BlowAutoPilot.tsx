@@ -449,7 +449,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       // Sans numéro (test) : cycle unique.
       if (!smsKey) {
         await recalibrateTouch(key, dev, hooks)
-        if (airplaneOn) await airplaneReset(key, dev, hooks)
+        await airplaneReset(key, dev, hooks) // toujours : nouvelle IP avant CHAQUE container (création de comptes)
         const opened = await selectContainerByVision(key, dev, c, hooks)
         if (!opened) { push(`${tag} ⏭ container non atteint`); return 'fail' }
         await sleep(1500)
@@ -471,7 +471,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         let order: { id: string | number; phone: string; price?: number } | null = null
         try {
           await recalibrateTouch(key, dev, chooks)
-          if (airplaneOn) await airplaneReset(key, dev, chooks)
+          await airplaneReset(key, dev, chooks) // toujours, avant chaque container
           const opened = await selectContainerByVision(key, dev, c, chooks)
           if (!opened) { push(`${tag} ⏭ container non atteint → nouvel essai`); continue }
           await sleep(1500)
@@ -988,7 +988,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             </label>
           </div>
         </div>
-        <LaunchBar n={4} summary={autoDetect ? (sel.size ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} : détection des containers puis un compte dans chaque container vide` : 'Choisis des iPhones à l’étape 1') : totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à créer` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode />} label={autoDetect ? `Détecter et remplir les containers (${sel.size} iPhone${sel.size > 1 ? 's' : ''})` : (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={(autoDetect ? !sel.size : !totalJobs) || running || !!detecting} running={running} onClick={createAccounts} />
+        <LaunchBar n={4} summary={autoDetect ? (sel.size ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} : détection des containers puis un compte dans chaque container vide` : 'Choisis des iPhones à l’étape 1') : totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à créer` : 'Choisis des containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode forceAirplane />} label={autoDetect ? `Détecter et remplir les containers (${sel.size} iPhone${sel.size > 1 ? 's' : ''})` : (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={(autoDetect ? !sel.size : !totalJobs) || running || !!detecting} running={running} onClick={createAccounts} />
         <LogPanel />
         {createdAccts.length > 0 && (
           <div style={card}>
@@ -1130,16 +1130,19 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 }
 
 // Options d'un lancement : interrupteurs compacts, posés dans la barre « Lancer ».
-function OptionsCard({ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel, accountMode }: {
+function OptionsCard({ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel, accountMode, forceAirplane }: {
   airplaneOn: boolean; setAirplaneOn: (f: (v: boolean) => boolean) => void
   uniqueUse: boolean; setUniqueUse: (f: (v: boolean) => boolean) => void
   parallel: boolean; setParallel: (f: (v: boolean) => boolean) => void
   accountMode?: boolean
+  forceAirplane?: boolean
 }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8 }}>
       <Toggle on={parallel} onClick={() => setParallel(v => !v)} label="iPhones en même temps" sub="Beaucoup plus rapide avec plusieurs iPhones" />
-      <Toggle on={airplaneOn} onClick={() => setAirplaneOn(v => !v)} label="Nouvelle IP entre chaque compte" sub="Mode avion entre deux containers" />
+      {forceAirplane
+        ? <Toggle on onClick={() => {}} label="Nouvelle IP avant chaque container" sub="Mode avion toujours activé pour la création" />
+        : <Toggle on={airplaneOn} onClick={() => setAirplaneOn(v => !v)} label="Nouvelle IP entre chaque compte" sub="Mode avion entre deux containers" />}
       {!accountMode && <Toggle on={uniqueUse} onClick={() => setUniqueUse(v => !v)} label="Chaque média une seule fois" sub="Pas de doublon tant qu’il en reste" />}
     </div>
   )

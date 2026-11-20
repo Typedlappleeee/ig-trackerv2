@@ -3738,6 +3738,8 @@ export const EN: Dict = {
     "🍪 Écran des cookies → « Allow all cookies »": "🍪 Cookie screen → “Allow all cookies”",
     "Allow all cookies": "Allow all cookies",
     "cookies acceptés ✓": "cookies accepted ✓",
+    "Nouvelle IP avant chaque container": "New IP before each container",
+    "Mode avion toujours activé pour la création": "Airplane mode always on for account creation",
     "❌ Mot de passe impossible à saisir : arrêt (compte NON créé)": "❌ Password could not be typed: stopping (account NOT created)",
     "champ mot de passe non lu → tap position connue (0.5, 0.336).": "password field not read → tapping the known position (0.5, 0.336).",
     "écran du code": "code screen",
