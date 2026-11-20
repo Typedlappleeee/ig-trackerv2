@@ -5,7 +5,7 @@
 import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
 import { ocrWords, findBlueButton, findBlueDots } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
-import { parseProfileCounts, saveScreenStats } from './irtAccounts'
+import { parseProfileCounts, saveScreenStats, parseCount } from './irtAccounts'
 import { findGalleryThumb, findMatchingCell } from './screenMatch'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -1879,8 +1879,37 @@ export async function switchAccountByVision(key: string, deviceId: string, usern
       hooks?.log?.(`   ✓ compte actif : @${u}`)
       await closeAccountSheet(key, deviceId, scr.W, scr.H)
       // on est sur le profil : publications / abonnés / abonnements lus à l'écran → onglet « Comptes Instagram »
-      const prof = await readScreenWords(key, deviceId)
-      const counts = prof ? parseProfileCounts(prof.words) : null
+      let counts = null as { media_count: number | null; followers: number | null; following: number | null } | null
+      for (let k = 0; k < 3; k++) { // la feuille finit de se fermer → jusqu'à 3 lectures, on fusionne
+        if (k) await sleep(1200)
+        const prof = await readScreenWords(key, deviceId)
+        // Lecture zoomée de la seule bande des chiffres (au-dessus de « posts / followers / following ») : un « 0 » isolé
+        // est illisible sur l'écran entier. 3 nombres lus → attribués de gauche à droite.
+        let c = prof ? parseProfileCounts(prof.words) : null
+        // chaque compteur lu DANS SA PROPRE BOÎTE (au-dessus de son libellé), zoomé, chiffres seulement
+        if (prof) {
+          const ps = await snapRetry(key, deviceId)
+          const box = async (re: RegExp) => {
+            const lab = prof.words.find(o => re.test(o.text))
+            if (!ps || !lab) return null
+            const W = prof.W, H = prof.H
+            const crop = { cropY: [Math.max(0, (lab.cy - 36) / H), Math.min(1, (lab.cy - 7) / H)] as [number, number], cropX: [Math.max(0, (lab.x - 12) / W), Math.min(1, (lab.x + lab.w + 12) / W)] as [number, number] }
+            // vote sur 3 lectures (binarisé, gris, plus gros) : un chiffre isolé est parfois mal lu par l'une d'elles
+            const votes: number[] = []
+            for (const o of [{ scale: 4, psms: ['7'] }, { scale: 4, threshold: null, psms: ['7'] }, { scale: 6, psms: ['8'] }]) {
+              const v = (await ocrWords(ps, '0123456789.,KMkm', { ...o, ...crop })).map(w => parseCount(w.text)).find(x => x != null)
+              if (v != null) votes.push(v)
+            }
+            if (!votes.length) return null
+            const tally = new Map<number, number>(); for (const v of votes) tally.set(v, (tally.get(v) ?? 0) + 1)
+            return [...tally.entries()].sort((a, b) => b[1] - a[1])[0][0]
+          }
+          const z = { media_count: await box(/^(posts?|publications?)$/i), followers: await box(/^(followers?|abonnés?)$/i), following: await box(/^(following|abonnements?)$/i) }
+          c = { media_count: z.media_count ?? c?.media_count ?? null, followers: z.followers ?? c?.followers ?? null, following: z.following ?? c?.following ?? null }
+        }
+        if (c) counts = { media_count: counts?.media_count ?? c.media_count, followers: counts?.followers ?? c.followers, following: counts?.following ?? c.following }
+        if (counts && counts.media_count != null && counts.followers != null && counts.following != null) break
+      }
       if (counts) { saveScreenStats(u, counts); hooks?.log?.(`   📊 ${counts.media_count ?? '?'} publications · ${counts.followers ?? '?'} abonnés · ${counts.following ?? '?'} abonnements`) }
       await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * scr.W), y: Math.round(0.963 * scr.H) }) // accueil d'Instagram
       await sleep(1500)

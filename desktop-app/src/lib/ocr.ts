@@ -12,6 +12,7 @@ export interface OcrOpts {
   threshold?: number | null   // binarisation : lum < seuil → noir (défaut 195). null = pas de binarisation
   invert?: boolean     // inverse les tons (texte CLAIR sur fond FONCÉ → lisible par Tesseract)
   cropY?: [number, number]     // recadre verticalement [y0,y1] en fractions (0..1) → OCR focalisé, texte plus gros
+  cropX?: [number, number]     // recadre horizontalement [x0,x1] en fractions (0..1) (ex. un seul compteur du profil)
   psms?: string[]      // modes de segmentation à fusionner (défaut ['6','11'])
   whiteText?: boolean  // isole le texte BLANC plus clair que son voisinage (libellés d'icônes, même sur fond clair)
 }
@@ -40,19 +41,21 @@ function loadImg(src: string): Promise<HTMLImageElement> {
 // Agrandit + met en niveaux de gris + binarise (chiffres foncés → noir sur blanc).
 // Améliore énormément la lecture de chiffres clairs/peu contrastés (sélecteur Crane).
 // Retourne l'image prétraitée + l'offset vertical (px, espace d'origine) dû au recadrage.
-async function preprocess(image: string, scale: number, threshold: number | null, invert: boolean, cropY?: [number, number], whiteText = false): Promise<{ url: string; offY: number }> {
+async function preprocess(image: string, scale: number, threshold: number | null, invert: boolean, cropY?: [number, number], whiteText = false, cropX?: [number, number]): Promise<{ url: string; offY: number; offX: number }> {
   const img = await loadImg(image)
   const oW = img.naturalWidth, oH = img.naturalHeight
   const y0 = cropY ? Math.max(0, Math.round(cropY[0] * oH)) : 0
   const y1 = cropY ? Math.min(oH, Math.round(cropY[1] * oH)) : oH
-  const srcH = Math.max(1, y1 - y0)
-  const W = Math.max(1, Math.round(oW * scale)), H = Math.max(1, Math.round(srcH * scale))
+  const x0 = cropX ? Math.max(0, Math.round(cropX[0] * oW)) : 0
+  const x1 = cropX ? Math.min(oW, Math.round(cropX[1] * oW)) : oW
+  const srcH = Math.max(1, y1 - y0), srcW = Math.max(1, x1 - x0)
+  const W = Math.max(1, Math.round(srcW * scale)), H = Math.max(1, Math.round(srcH * scale))
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H
   const ctx = cv.getContext('2d')!
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
-  ctx.drawImage(img, 0, y0, oW, srcH, 0, 0, W, H)
+  ctx.drawImage(img, x0, y0, srcW, srcH, 0, 0, W, H)
   const d = ctx.getImageData(0, 0, W, H); const p = d.data
-  if (whiteText) { whiteTextMask(p, W, H, scale); ctx.putImageData(d, 0, 0); return { url: cv.toDataURL('image/png'), offY: y0 } }
+  if (whiteText) { whiteTextMask(p, W, H, scale); ctx.putImageData(d, 0, 0); return { url: cv.toDataURL('image/png'), offY: y0, offX: x0 } }
   for (let i = 0; i < p.length; i += 4) {
     let g = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]
     if (invert) g = 255 - g
@@ -60,7 +63,7 @@ async function preprocess(image: string, scale: number, threshold: number | null
     p[i] = p[i + 1] = p[i + 2] = v
   }
   ctx.putImageData(d, 0, 0)
-  return { url: cv.toDataURL('image/png'), offY: y0 }
+  return { url: cv.toDataURL('image/png'), offY: y0, offX: x0 }
 }
 
 // Libellés d'icônes iOS : texte BLANC (avec une légère ombre). Un pixel est du texte s'il est
@@ -115,8 +118,8 @@ async function ocrWordsInner(image: string, whitelist?: string, opts?: OcrOpts):
   const threshold = opts?.threshold === undefined ? 195 : opts.threshold
   const invert = opts?.invert ?? false
   const psms = opts?.psms ?? ['6', '11']
-  const pre = await preprocess(image, scale, threshold, invert, opts?.cropY, opts?.whiteText)
-  const src = pre.url, offY = pre.offY
+  const pre = await preprocess(image, scale, threshold, invert, opts?.cropY, opts?.whiteText, opts?.cropX)
+  const src = pre.url, offY = pre.offY, offX = pre.offX
   const w = await getWorker()
   const merged: OcrWord[] = []
   for (const psm of psms) {
@@ -132,7 +135,7 @@ async function ocrWordsInner(image: string, whitelist?: string, opts?: OcrOpts):
           for (const word of (line.words ?? []) as AnyWord[]) {
             const b = word.bbox; const t = (word.text ?? '').trim()
             if (!b || !t) continue
-            const x = b.x0 / scale, y = b.y0 / scale + offY, ww = (b.x1 - b.x0) / scale, hh = (b.y1 - b.y0) / scale
+            const x = b.x0 / scale + offX, y = b.y0 / scale + offY, ww = (b.x1 - b.x0) / scale, hh = (b.y1 - b.y0) / scale
             merged.push({ text: t, x, y, w: ww, h: hh, cx: Math.round(x + ww / 2), cy: Math.round(y + hh / 2), conf: word.confidence ?? 0 })
           }
         }

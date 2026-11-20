@@ -80,7 +80,7 @@ export function compactNum(n: number | null | undefined): string {
 // ── Chiffres du profil lus sur l'écran de l'iPhone (« 12 posts · 340 followers · 210 following ») ─────────────
 /** « 1,234 » / « 12.3K » / « 1,2 M » → nombre. */
 export function parseCount(t: string): number | null {
-  const m = t.replace(/\s/g, '').match(/^(\d+(?:[.,]\d+)?)([kKmM]?)$/)
+  const m = t.replace(/\s/g, '').replace(/^[oO]$/, '0').match(/^(\d+(?:[.,]\d+)?)([kKmM]?)$/)
   if (!m) return null
   const unit = m[2].toLowerCase()
   if (!unit) return Number(m[1].replace(/[.,]/g, ''))
