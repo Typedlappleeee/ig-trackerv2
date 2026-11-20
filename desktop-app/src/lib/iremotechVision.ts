@@ -1754,7 +1754,8 @@ async function backToTabs(key: string, deviceId: string, hooks?: VisionHooks): P
     }
     const discard = words.find(o => /^discard$/i.test(o.text) && o.cy > H * 0.3)
     if (discard) { hooks?.log?.('   « Discard » (brouillon abandonné)'); await sendAction(key, deviceId, { type: 'tap', x: discard.cx, y: discard.cy }); await sleep(1800); continue }
-    if (top(/^new$/i) && top(/^(reel|post)$/i) || top(/^story$/i) && words.some(o => /^(post|instants|live)$/i.test(o.text) && o.cy > H * 0.9)) {
+    const editor = words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.9) && words.some(o => /^video$/i.test(o.text) && o.cy > H * 0.9)
+    if (editor || top(/^new$/i) && top(/^(reel|post)$/i) || top(/^story$/i) && words.some(o => /^(post|instants|live)$/i.test(o.text) && o.cy > H * 0.9)) {
       hooks?.log?.('   créateur ouvert → ✕ en haut à gauche')
       await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.09 * W), y: Math.round(0.08 * H) }); await sleep(1800); continue
     }
