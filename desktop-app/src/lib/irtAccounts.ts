@@ -17,7 +17,8 @@ export type Health = { level: 'ok' | 'warn' | 'unknown'; issues: string[] }
 /** Santé d'un compte à partir de account_state (green / warning / unknown par indicateur). */
 export function healthOf(state: Record<string, unknown> | null | undefined): Health {
   if (!state || typeof state !== 'object') return { level: 'unknown', issues: [] }
-  const issues = Object.entries(state).filter(([, v]) => v === 'warning').map(([k]) => STATE_LABELS[k] ?? k)
+  // « monetization » en warning = simplement compte non professionnel (iRemoTech : « Healthy (Not Professional) ») → pas un problème
+  const issues = Object.entries(state).filter(([k, v]) => v === 'warning' && k !== 'monetization').map(([k]) => STATE_LABELS[k] ?? k)
   if (issues.length) return { level: 'warn', issues }
   return Object.values(state).some(v => v === 'green') ? { level: 'ok', issues: [] } : { level: 'unknown', issues: [] }
 }

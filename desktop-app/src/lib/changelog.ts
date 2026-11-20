@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21e',
+    date: '2026-11-21',
+    title: { fr: 'Comptes Instagram : vue compacte pour beaucoup d’iPhones', en: 'Instagram accounts: compact view for many iPhones' },
+    items: {
+      fr: [
+        'Une ligne par compte (photo, posts, abonnés, abonnements, statut, activité), groupes par iPhone repliables ou liste simple, filtre par iPhone.',
+        'Les iPhones sans compte connu sont regroupés en une seule ligne en bas.',
+        'Posts / abonnés / abonnements lus directement sur l’écran de l’iPhone (bouton « 📊 Relire », et à chaque posting).',
+        '« Monétisation » n’est plus compté comme un problème : c’est juste un compte non professionnel.',
+      ],
+      en: [
+        'One line per account (picture, posts, followers, following, status, activity), collapsible groups per iPhone or a plain list, iPhone filter.',
+        'iPhones with no known account are grouped into a single line at the bottom.',
+        'Posts / followers / following read directly on the iPhone screen (“📊 Re-read” button, and on every post).',
+        '“Monetization” no longer counts as a problem: it just means a non-professional account.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21d',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : sélection des comptes corrigée, identifiants visibles', en: 'iRemoTech: account selection fixed, credentials shown' },

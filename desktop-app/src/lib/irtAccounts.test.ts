@@ -10,6 +10,7 @@ describe('iRemoTech — comptes relus depuis les jobs', () => {
     expect(healthOf({ under_18: 'green', monetization: 'green' })).toEqual({ level: 'ok', issues: [] })
     expect(healthOf({ who_dont_follow_you: 'warning', under_18: 'green' })).toEqual({ level: 'warn', issues: ['Non recommandé aux non-abonnés'] })
     expect(healthOf(null).level).toBe('unknown')
+    expect(healthOf({ monetization: 'warning', under_18: 'green' })).toEqual({ level: 'ok', issues: [] }) // non pro ≠ problème
   })
   it('comptes = dernier scan ∪ cibles connues ∪ jobs ; statut, warm-up et job en cours par compte', () => {
     const jobs = [
