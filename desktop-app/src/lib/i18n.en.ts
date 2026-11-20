@@ -3738,6 +3738,8 @@ export const EN: Dict = {
     "🍪 Écran des cookies → « Allow all cookies »": "🍪 Cookie screen → “Allow all cookies”",
     "Allow all cookies": "Allow all cookies",
     "cookies acceptés ✓": "cookies accepted ✓",
+    "outil Texte de story → Done": "story Text tool → Done",
+    "page « Locations » → Cancel": "“Locations” page → Cancel",
     "feuille d’info Instagram (« Introducing… ») → OK": "Instagram info sheet (“Introducing…”) → OK",
     "iPhone normal : plusieurs comptes connectés dans Instagram": "Regular iPhone: several accounts logged in to Instagram",
     "iPhone jailbreaké : un compte par container Crane": "Jailbroken iPhone: one account per Crane container",

@@ -292,8 +292,10 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   const scr = await readScreenWords(key, deviceId)
   if (!scr) return false
   const has = (re: RegExp) => scr.words.some(o => re.test(o.text))
-  if (!(has(/^introducing$/i) || (has(/^view$/i) && has(/^settings$/i)) || has(/^new:?$/i) && has(/^ok$/i))) return false
-  const ok = scr.words.find(o => /^ok$/i.test(o.text) && o.cy > scr.H * 0.4)
+  // feuille d'info = un bouton « OK » centré dans la moitié basse, sans les boutons d'une alerte de permission iOS
+  if (has(/^would$/i) && has(/^like$/i)) return false
+  if (has(/^(allow|don['’]?t|cancel|discard)$/i) && !has(/^introducing$/i)) return false
+  const ok = scr.words.find(o => /^ok$/i.test(o.text) && o.cy > scr.H * 0.45 && Math.abs(o.cx - scr.W / 2) < scr.W * 0.2)
   if (!ok) return false
   hooks?.log?.('   feuille d’info Instagram (« Introducing… ») → OK')
   await sendAction(key, deviceId, { type: 'tap', x: ok.cx, y: ok.cy })
@@ -1775,6 +1777,18 @@ async function backToTabs(key: string, deviceId: string, hooks?: VisionHooks): P
     const editor = (words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.9) && words.some(o => /^video$/i.test(o.text) && o.cy > H * 0.9))
       || (top(/^suggested$/i) && top(/^audio$/i)) // éditeur de Reel / Story (« Suggested audio » en haut)
     if (await dismissIgInfoSheet(key, deviceId, hooks)) continue
+    // outil Texte d'une story (« Classic / Modern », « Done » en haut) → Done
+    if (words.some(o => /^(classic|modern|signature)$/i.test(o.text) && o.cy > H * 0.7) && top(/^done$/i)) {
+      const d = words.find(o => /^done$/i.test(o.text) && o.cy < H * 0.12)!
+      hooks?.log?.('   outil Texte de story → Done')
+      await sendAction(key, deviceId, { type: 'tap', x: d.cx, y: d.cy }); await sleep(1500); continue
+    }
+    // page « Locations » ouverte par erreur → Cancel
+    if (top(/^locations$/i) && top(/^cancel$/i)) {
+      const c = words.find(o => /^cancel$/i.test(o.text) && o.cy < H * 0.12)!
+      hooks?.log?.('   page « Locations » → Cancel')
+      await sendAction(key, deviceId, { type: 'tap', x: c.cx, y: c.cy }); await sleep(1500); continue
+    }
     if (editor || top(/^new$/i) && top(/^(reel|post)$/i) || top(/^story$/i) && words.some(o => /^(post|instants|live)$/i.test(o.text) && o.cy > H * 0.9)) {
       hooks?.log?.('   créateur ouvert → ✕ en haut à gauche')
       await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.09 * W), y: Math.round(0.08 * H) }); await sleep(1800); continue
