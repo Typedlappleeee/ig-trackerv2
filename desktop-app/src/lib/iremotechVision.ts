@@ -294,7 +294,8 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   const has = (re: RegExp) => scr.words.some(o => re.test(o.text))
   // feuille d'info = un bouton « OK » centré dans la moitié basse, sans les boutons d'une alerte de permission iOS
   if (has(/^would$/i) && has(/^like$/i)) return false
-  if (has(/^(allow|don['’]?t|cancel|discard)$/i) && !has(/^introducing$/i)) return false
+  // boutons d'alerte à côté du OK (moitié basse) → ce n'est pas une simple feuille d'info
+  if (scr.words.some(o => /^(allow|don['’]?t|cancel|discard)$/i.test(o.text) && o.cy > scr.H * 0.4) && !has(/^introducing$/i)) return false
   const ok = scr.words.find(o => /^ok$/i.test(o.text) && o.cy > scr.H * 0.45 && Math.abs(o.cx - scr.W / 2) < scr.W * 0.2)
   if (!ok) return false
   hooks?.log?.('   feuille d’info Instagram (« Introducing… ») → OK')
