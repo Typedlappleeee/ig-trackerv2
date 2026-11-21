@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21f',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : comptes signalés en rouge, faux comptes retirés', en: 'iRemoTech: flagged accounts in red, fake accounts removed' },
+    items: {
+      fr: [
+        '« ! » rouge sur les comptes signalés par le statut iRemoTech (non recommandé aux non-abonnés, contenu supprimé…) : dans l’étape « Où ? » et dans Comptes Instagram.',
+        'Les lignes « 1 notification », « 3 likes and 4 more »… sous un compte ne sont plus prises pour des comptes ; ceux déjà enregistrés sont retirés automatiquement.',
+      ],
+      en: [
+        'Red “!” on accounts flagged by the iRemoTech status (not recommended to non-followers, removed content…): in the “Where?” step and in Instagram accounts.',
+        'The “1 notification”, “3 likes and 4 more”… lines under an account are no longer taken for accounts; those already saved are removed automatically.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21e',
     date: '2026-11-21',
     title: { fr: 'Comptes Instagram : vue compacte pour beaucoup d’iPhones', en: 'Instagram accounts: compact view for many iPhones' },

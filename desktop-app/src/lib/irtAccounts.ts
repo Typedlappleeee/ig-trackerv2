@@ -23,6 +23,12 @@ export function healthOf(state: Record<string, unknown> | null | undefined): Hea
   return Object.values(state).some(v => v === 'green') ? { level: 'ok', issues: [] } : { level: 'unknown', issues: [] }
 }
 
+/** Faux comptes = lignes secondaires lues sous un compte dans Instagram (« • 1 notification », « 3 likes and
+ *  4 more », « 1 follow and 4 more », « 2 new messages »…) → jamais des comptes. */
+export function isJunkUsername(u: string): boolean {
+  return /notification|likes?and|follows?and|commentsand|andmore$|messages?$|newposts?$|unread/.test(u.replace(/^@/, '').toLowerCase().replace(/[^a-z0-9._]/g, ''))
+}
+
 const pending = (j: IrtJob) => j.status === 'queued' || j.status === 'dispatched'
 const newest = (a: IrtJob, b: IrtJob) => Date.parse(b.created_at) - Date.parse(a.created_at)
 
@@ -44,6 +50,7 @@ export function deviceAccounts(jobs: IrtJob[], known: string[] = []): DeviceAcco
   for (const u of (lastScan?.result?.accounts as string[] | undefined) ?? []) names.add(String(u).toLowerCase())
   for (const u of known) names.add(u.replace(/^@/, '').toLowerCase())
   for (const j of js) if (j.account) names.add(j.account.toLowerCase())
+  for (const u of [...names]) if (isJunkUsername(u)) names.delete(u)
   const accounts: AccountView[] = [...names].sort().map(u => {
     const mine = js.filter(j => (j.account ?? '').toLowerCase() === u)
     const st = mine.find(j => j.type === 'account_status' && j.status === 'completed')

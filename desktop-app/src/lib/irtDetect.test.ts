@@ -88,6 +88,11 @@ describe('iRemoTech — comptes d’un iPhone non jailbreaké (feuille de bascul
     const words = [w('lucielr5c0', 128, 494), w('celiaq58c0', 128, 440), w('lucielrScO', 128, 494), w('add', 106, 564), w('Add', 106, 564), w('Instagram', 164, 566), w('Go', 107, 638), w('Meta', 160, 638), w('lucielr5c0', 200, 49)]
     expect(sheetUsernames(words, 406, 720)).toEqual(['celiaq58c0', 'lucielr5c0'])
   })
+  it('la ligne « • 1 notification » sous un compte n’est pas un compte (vu en vrai : « @einotification »)', () => {
+    const w = (text: string, cx: number, cy: number) => ({ text, cx, cy })
+    const words = [w('celiaq58c0', 110, 375), w('lucielr5c0', 110, 432), w('einotification', 125, 452), w('•1', 80, 452), w('notification', 130, 452), w('Add', 106, 505), w('Instagram', 164, 505), w('Go', 120, 570), w('Accounts', 190, 570)]
+    expect(sheetUsernames(words, 406, 720)).toEqual(['celiaq58c0', 'lucielr5c0'])
+  })
   it('page Profil (boutons « Add photo / Add bio ») : pas une feuille de comptes', () => {
     const w = (text: string, cx: number, cy: number) => ({ text, cx, cy })
     expect(sheetUsernames([w('Edit', 100, 240), w('complete', 120, 357), w('Add', 130, 635), w('photo', 170, 635)], 406, 720)).toEqual([])

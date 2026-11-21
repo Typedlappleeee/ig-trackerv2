@@ -1734,10 +1734,13 @@ export function sheetUsernames(words: { text: string; cx: number; cy: number }[]
   const top = addAccountRowY(words) // la liste est au-dessus de « Add Instagram account »
   if (top == null) return [] // pas la feuille des comptes
   const out: { u: string; y: number }[] = []
-  for (const o of words) {
+  // ligne secondaire sous un compte (« • 1 notification », « 2 new messages », « New posts ») : jamais un compte
+  const SUBLINE = /notification|likes?and|follows?and|commentsand|andmore$|messages?$|newposts?$|unread/
+  for (const o of [...words].sort((a, b) => a.cy - b.cy)) {
     const t = o.text.toLowerCase().replace(/[^a-z0-9._]/g, '')
-    if (t.length < 3 || t.length > 30 || !/[a-z]/.test(t) || ACCOUNT_STOP.test(t)) continue
+    if (t.length < 3 || t.length > 30 || !/[a-z]/.test(t) || ACCOUNT_STOP.test(t) || SUBLINE.test(t)) continue
     if (o.cy < H * 0.25 || o.cy >= top || o.cx > W * 0.75) continue
+    if (out.some(x => o.cy - x.y > 8 && o.cy - x.y < 30)) continue // juste sous un compte déjà lu = sa ligne secondaire
     // même compte lu deux fois (lecture « minuscules/chiffres » d'abord, puis lecture normale : 5↔S, 0↔O…)
     if (!out.some(x => sameUsername(x.u, t) || Math.abs(x.y - o.cy) < 12)) out.push({ u: t, y: o.cy })
   }

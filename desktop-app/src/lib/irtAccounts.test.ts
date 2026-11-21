@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
-import { healthOf, deviceAccounts, ago, compactNum, parseCount, parseProfileCounts } from './irtAccounts'
+import { healthOf, deviceAccounts, ago, compactNum, parseCount, parseProfileCounts, isJunkUsername } from './irtAccounts'
 import type { IrtJob } from './iremotech'
 
 const job = (p: Partial<IrtJob>): IrtJob => ({ job_id: 'j' + Math.random(), type: 'list_accounts', device: 'd', account: null, status: 'completed', created_at: '2026-11-20T10:00:00Z', dispatched_at: null, finished_at: '2026-11-20T10:01:00Z', duration_ms: 1000, result: null, failure: null, ...p })
@@ -46,5 +46,12 @@ describe('iRemoTech — chiffres du profil lus à l’écran', () => {
     expect(parseProfileCounts([w('1', 138, 139), w('post', 150, 159), w('0', 211, 139), w('followers', 233, 159), w('0', 308, 139), w('following', 333, 159), w('Edit', 99, 236)]))
       .toEqual({ media_count: 1, followers: 0, following: 0 })
     expect(parseProfileCounts([w('Hello', 10, 10)])).toBeNull()
+  })
+})
+
+describe('iRemoTech — lignes secondaires prises pour des comptes', () => {
+  it('« e1notification », « e3likesand4more », « e1followand4more » = faux ; vrais comptes gardés', () => {
+    for (const u of ['@e1notification', 'e3likesand4more', 'e1followand4more', 'einotification', '2newmessages']) expect(isJunkUsername(u)).toBe(true)
+    for (const u of ['lucielr5c0', 'celiaq58c0', 'pommesrouge7', 'thrideamaz', 'dailypost']) expect(isJunkUsername(u)).toBe(false)
   })
 })

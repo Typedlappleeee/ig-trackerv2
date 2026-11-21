@@ -19,6 +19,8 @@ import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone }
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import IrtAccounts from '@/components/IrtAccounts'
+import { isJunkUsername, deviceAccounts } from '@/lib/irtAccounts'
+import { listJobs, type IrtJob } from '@/lib/iremotech'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { folderMedia, loadBankSummary, type BankSummary } from '@/lib/flowEngine'
@@ -159,6 +161,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [acctLogOpen, setAcctLogOpen] = useState<number | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [pickQ, setPickQ] = useState('')
+  const [irtJobs, setIrtJobs] = useState<Record<string, IrtJob[]>>({})
   const [showEmptyPhones, setShowEmptyPhones] = useState(false)
   const [importText, setImportText] = useState('')
   const [showLog, setShowLog] = useState(false)   // journal détaillé déplié
@@ -246,6 +249,32 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const budget = usage?.actions ?? { remaining: usage?.remaining, budget: usage?.budget }
 
   const togglePhone = (id: string) => setSel(s => { const n = new Set(s); if (n.has(id)) { n.delete(id); setSelConts(sc => ({ ...sc, [id]: new Set() })) } else { n.add(id); setSelConts(sc => ({ ...sc, [id]: new Set(conts[id] ?? []) })) } return n })
+  // Faux comptes (« @e1notification », « @e3likesand4more »… = lignes sous un compte) : retirés et réenregistrés
+  useEffect(() => {
+    for (const [dev, list] of Object.entries(conts)) {
+      const clean = list.filter(c => !(c.startsWith('@') && isJunkUsername(c)))
+      if (clean.length !== list.length) {
+        saveDevContainers(dev, clean); setConts(cc => ({ ...cc, [dev]: clean }))
+        setSelConts(sc => sc[dev] ? { ...sc, [dev]: new Set([...sc[dev]].filter(c => clean.includes(c))) } : sc)
+      }
+    }
+  }, [conts])
+  // Statut Instagram des comptes (historique iRemoTech) → « ! » rouge sur les comptes signalés
+  useEffect(() => {
+    if (!irt.key || !devices.length) return
+    let alive = true
+    const key = irt.key
+    const pull = async () => { for (const d of devices) { if (!alive) return; const j = await listJobs(key, d.public_id, 100); if (alive) setIrtJobs(m => ({ ...m, [d.public_id]: j })); await sleep(150) } }
+    void pull()
+    const t = setInterval(() => void pull(), 120_000)
+    return () => { alive = false; clearInterval(t) }
+  }, [irt.key, devices.map(d => d.public_id).join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+  const flagOf = (dev: string, target: string): string[] | null => {
+    if (!target.startsWith('@')) return null
+    const a = deviceAccounts(irtJobs[dev] ?? []).accounts.find(x => x.username === target.slice(1).toLowerCase())
+    return a?.health.level === 'warn' ? a.health.issues : null
+  }
+
   // Détecte les containers Crane d'un iPhone (sélecteur lu à l'écran) et remplace sa liste.
   const detectConts = async (dev: string, log: (m: string) => void, stop?: () => boolean): Promise<string[] | null> => {
     if (!irt.key) return null
@@ -680,7 +709,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     const cp = on && picked.has(c)
                     return (
                       <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
-                        <span onClick={() => toggleCont(id, c)} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>{cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}</span>
+                        <span onClick={() => toggleCont(id, c)} title={flagOf(id, c)?.join(' · ')} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
+                          {flagOf(id, c) && <span style={{ display: 'grid', placeItems: 'center', width: 15, height: 15, borderRadius: 99, background: '#EF4444', color: '#fff', fontSize: 10, fontWeight: 800 }}>!</span>}
+                          {cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}
+                        </span>
                         {opts?.manage && <span onClick={() => removeC(id, c)} title="Retirer" style={{ cursor: 'pointer', color: DIM, padding: '0 8px 0 0', fontSize: 14 }}>×</span>}
                       </span>
                     )
@@ -804,7 +836,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           onScanned={(dev, accs) => {
             // iPhone normal (ou pas encore détecté) : les comptes trouvés par iRemoTech deviennent ses cibles « @nom »
             if (phoneKind(conts[dev]) === 'jb') return
-            const list = [...new Set([...(conts[dev] ?? []).filter(c => c.startsWith('@')), ...accs.map(u => '@' + u.toLowerCase())])]
+            const list = [...new Set([...(conts[dev] ?? []).filter(c => c.startsWith('@')), ...accs.filter(u => !isJunkUsername(u)).map(u => '@' + u.toLowerCase())])]
             saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list }))
           }} />
       )}

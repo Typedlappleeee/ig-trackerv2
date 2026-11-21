@@ -163,7 +163,10 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
         <span style={cell}><Num n={p?.media_count} /></span>
         <span style={cell}><Num n={p?.followers} /></span>
         <span style={cell}><Num n={p?.following} /></span>
-        <span style={cell}><span title={a.health.issues.join(' · ') || undefined} style={{ height: 22, padding: '0 9px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11.5, fontWeight: 600, color: pill.c, background: pill.b, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pill.t}</span></span>
+        <span style={{ ...cell, gap: 6 }}>
+          {a.health.level === 'warn' && <span title={a.health.issues.join(' · ')} style={{ flex: 'none', display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 99, background: '#EF4444', color: '#fff', fontSize: 11, fontWeight: 800 }}>!</span>}
+          <span title={a.health.issues.join(' · ') || undefined} style={{ height: 22, padding: '0 9px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11.5, fontWeight: 600, color: a.health.level === 'warn' ? '#F87171' : pill.c, background: a.health.level === 'warn' ? 'rgba(239,68,68,0.1)' : pill.b, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pill.t}</span>
+        </span>
         <span style={{ ...cell, fontSize: 11.5, color: DIM, flexDirection: 'column', alignItems: 'flex-start' }}>
           <span>{a.running === 'warm_up' ? '🔥 warm-up en cours…' : a.warmup ? `🔥 ${a.warmup.seconds ? Math.round(a.warmup.seconds / 60) + ' min' : 'warm-up'} ${ago(a.warmup.at)}` : 'aucun warm-up'}</span>
           <span>vérifié {ago(a.checkedAt)}</span>
