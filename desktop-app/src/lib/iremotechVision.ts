@@ -483,12 +483,21 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
 // Tape l'icône d'une app sur l'écran d'accueil (libellé repéré par OCR). C'est CE geste
 // qui déclenche le sélecteur Crane — l'ouverture par open_url ne le déclenche pas.
 // Cherche sur jusqu'à 3 pages d'accueil (swipe). true si tapé.
+/** Bibliothèque d'apps iOS (au-delà de la dernière page d'accueil) : titres de ses dossiers. Pure. */
+export function isAppLibrary(words: { text: string }[]): boolean {
+  const n = new Set(words.map(o => o.text.toLowerCase()).filter(t => /^(suggestions|recently|added|utilities|productivity|creativity|social|entertainment|information)$/.test(t)))
+  return n.size >= 2
+}
+
 async function tapAppIcon(
   key: string, deviceId: string,
   matcher: (t: string) => boolean, label: string,
   hooks?: VisionHooks,
 ): Promise<boolean> {
-  for (let page = 0; page < 3; page++) {
+  // Sens de défilement : vers la gauche (pages suivantes). Au-delà de la dernière page, iOS affiche la
+  // Bibliothèque d'apps (vu en vrai : « home » ne l'en sortait pas) → on repart vers la droite.
+  let dir: 'left' | 'right' = 'left'
+  for (let page = 0; page < 5; page++) {
     if (hooks?.shouldStop?.()) return false
     const shot = await snapshot(key, deviceId)
     if (!shot) { await sleep(700); continue }
@@ -522,8 +531,16 @@ async function tapAppIcon(
       await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: ty })
       return true
     }
+    // Bibliothèque d'apps : reconnue à ses titres de dossiers (le titre « App Library » se lit mal : « Apr »)
+    if (isAppLibrary(words)) {
+      hooks?.log?.('   Bibliothèque d’apps → retour aux pages d’accueil')
+      dir = 'right'
+      await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.18), y1: Math.round(H * 0.6), x2: Math.round(W * 0.82), y2: Math.round(H * 0.6), duration_ms: 350 })
+      await sleep(900); continue
+    }
     hooks?.log?.(`🔎 ${label} pas sur cette page → page suivante`)
-    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.82), y1: Math.round(H * 0.6), x2: Math.round(W * 0.18), y2: Math.round(H * 0.6), duration_ms: 350 })
+    const [xa, xb] = dir === 'left' ? [0.82, 0.18] : [0.18, 0.82]
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * xa), y1: Math.round(H * 0.6), x2: Math.round(W * xb), y2: Math.round(H * 0.6), duration_ms: 350 })
     await sleep(900)
   }
   return false
@@ -2525,6 +2542,57 @@ export async function switchAccountByVision(key: string, deviceId: string, usern
   }
   hooks?.log?.(`❌ bascule sur @${u} non confirmée`)
   return false
+}
+
+// ─── Vérification à l'écran : qu'y a-t-il VRAIMENT dans un container ? ──────────────────────────────────
+// La liste « Comptes créés » ne dit que ce que ScaleFlow a créé ; un compte peut avoir été déconnecté
+// (boucle, à la main) ou ajouté hors ScaleFlow. On ouvre donc le container et on lit l'écran.
+
+/** Identifiant affiché en haut de l'onglet Profil (« aliceha2nbx ⌄ ») : le plus long mot plausible du bandeau
+ *  du haut, recalé sur un identifiant connu s'il y ressemble (OCR : 5↔s, 0↔o, chevron lu « v »). Pure. */
+export function profileHeaderUsername(words: { text: string; cx: number; cy: number }[], W: number, H: number, known: string[] = []): string | null {
+  const cands = words
+    .filter(o => o.cy < H * 0.11 && o.cy > H * 0.03 && o.cx > W * 0.15 && o.cx < W * 0.85)
+    .map(o => o.text.toLowerCase().replace(/[^a-z0-9._]/g, ''))
+    .filter(t => t.length >= 3 && t.length <= 31 && /[a-z]/.test(t))
+    .sort((a, b) => b.length - a.length)
+  for (const t of cands) {
+    const k = known.find(k => sameUsername(k, t) || (t.endsWith('v') && sameUsername(k, t.slice(0, -1))))
+    if (k) return k
+  }
+  return cands[0] ?? null
+}
+
+export type ContainerState = { state: 'empty' | 'account' | 'blocked' | 'unknown'; username?: string }
+
+/** Ouvre le container et dit ce qu'il contient : 'empty' (écran d'inscription : Join, numéro, ou inscription
+ *  restée en cours), 'account' + identifiant (onglet Profil lu), 'blocked' (vérification humaine), 'unknown'.
+ *  Ne touche à rien d'autre (aucun achat, aucune déconnexion). */
+export async function containerAccountByVision(key: string, deviceId: string, container: string, known: string[] = [], hooks?: VisionHooks): Promise<ContainerState> {
+  if (!await selectContainerByVision(key, deviceId, container, hooks)) return { state: 'unknown' }
+  await sleep(3000)
+  await dismissPopups(key, deviceId, hooks)
+  const st = await signupStage(key, deviceId, hooks, 2)
+  if (st) return { state: 'empty' }
+  const blocked = await accountBlockedScreen(key, deviceId)
+  if (blocked) return { state: blocked.includes('Join') ? 'empty' : 'blocked' }
+  const shot0 = await snapRetry(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) return { state: 'unknown' }
+  // Instagram finit parfois de charger le fil après le changement de container : jusqu'à 3 taps sur Profil
+  for (let k = 0; k < 3; k++) {
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.962 * H) }) // onglet Profil
+    await sleep(2500 + k * 1500)
+    const shot = await snapRetry(key, deviceId)
+    if (!shot) continue
+    const prof = await readScreenWords(key, deviceId)
+    const onProfile = !!prof?.words.some(o => /^(posts?|followers?|following)$/i.test(o.text))
+    if (!onProfile) continue
+    const exact = await ocrWords(shot, 'abcdefghijklmnopqrstuvwxyz0123456789._', { threshold: null, scale: 3, psms: ['11'], cropY: [0, 0.12] })
+    const u = profileHeaderUsername([...exact, ...(prof?.words ?? [])], W, H, known)
+    if (u) return { state: 'account', username: u }
+  }
+  return { state: 'unknown' }
 }
 
 // ─── Boucle de création : déconnexion du compte du container → « Create new account » ──────────────────

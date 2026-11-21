@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21l',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : containers vérifiés à l’écran', en: 'iRemoTech: containers checked on screen' },
+    items: {
+      fr: [
+        'Création de comptes : ScaleFlow ne se fie plus à la liste « Comptes créés » pour savoir quels containers remplir. Il ouvre chaque container et lit ce qu’il contient vraiment : vide, @compte connecté, ou bloqué (« Confirm you’re human »).',
+        'Nouveau bouton « 🔎 Vérifier les containers » (sans rien acheter) ; chaque container affiche son état (@compte / vide / 🤖) et « Cocher les containers vides » s’en sert.',
+        'Ouverture d’Instagram plus fiable : si l’iPhone est resté sur la Bibliothèque d’apps, le moteur revient aux pages d’accueil.',
+      ],
+      en: [
+        'Account creation: ScaleFlow no longer relies on the “Created accounts” list to know which containers to fill. It opens each container and reads what it really holds: empty, logged-in @account, or blocked (“Confirm you’re human”).',
+        'New “🔎 Check the containers” button (buys nothing); each container shows its state (@account / empty / 🤖) and “Tick the empty containers” uses it.',
+        'More reliable Instagram opening: if the iPhone was left on the App Library, the engine goes back to the home pages.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21k',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : création de comptes en boucle (option)', en: 'iRemoTech: account creation loop (option)' },

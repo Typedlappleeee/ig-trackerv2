@@ -12,9 +12,10 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
+import { loadContStates, setContState, containersToFill, type ContStateMap } from '@/lib/irtContState'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
@@ -176,6 +177,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [wCommentPct, setWCommentPct] = useState(0)
   const [wComments, setWComments] = useState('')
   const [createdAccts, setCreatedAccts] = useState<CreatedAccount[]>(() => loadCreatedAccounts())
+  const [contStates, setContStates] = useState<ContStateMap>(() => loadContStates()) // ce qu'il y a VRAIMENT dans chaque container (lu à l'écran)
+  const [checking, setChecking] = useState(false)
   const [acctSearch, setAcctSearch] = useState('')
   const [acctFilter, setAcctFilter] = useState<'all' | 'ok' | 'ko'>('all')
   const [acctLogOpen, setAcctLogOpen] = useState<number | null>(null)
@@ -326,6 +329,37 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(e => { push(`[${name}] ⚠ ${e instanceof Error ? e.message : String(e)}`); return null })
     if (!list) push(`[${name}] ✗ ni containers ni comptes détectés`)
     setDetecting(null)
+  }
+  // Ouvre chaque container et lit ce qu'il contient VRAIMENT (vide / @compte / bloqué) : la liste « Comptes créés »
+  // ne dit que ce que ScaleFlow a créé (un compte peut avoir été déconnecté ou ajouté à la main).
+  const scanContainers = async (dev: string, list: string[], log: (m: string) => void, stop?: () => boolean): Promise<ContStateMap[string]> => {
+    const key = irt.key
+    const out: ContStateMap[string] = {}
+    if (!key) return out
+    const known = loadCreatedAccounts().map(a => a.username).filter((u): u is string => !!u)
+    for (const c of list.filter(x => !x.startsWith('@'))) {
+      if (stop?.()) break
+      const look = () => containerAccountByVision(key, dev, c, known, { log: () => { /* détails masqués */ }, shouldStop: stop }).catch(() => ({ state: 'unknown' as const }))
+      let r = await look()
+      if (r.state === 'unknown' && !stop?.()) r = await look() // icône / profil mal lus une fois → 2e essai
+      const all = setContState(dev, c, r); setContStates(all); out[c] = all[dev][c]
+      log(`   container ${c} : ${r.state === 'account' ? `@${r.username ?? '?'}` : r.state === 'empty' ? 'vide' : r.state === 'blocked' ? '🤖 bloqué (vérification humaine)' : 'illisible'}`)
+    }
+    return out
+  }
+  const checkPhones = async () => {
+    if (running || detecting || checking) return
+    const devs = [...sel].filter(d => phoneKind(conts[d]) !== 'normal' && (conts[d] ?? []).length)
+    if (!devs.length) { setLogs(['⚠ Choisis au moins un iPhone jailbreaké dont les containers sont détectés.']); return }
+    setChecking(true); setLogs([])
+    for (const dev of devs) {
+      const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
+      push(`🔎 [${name}] vérification des containers à l’écran…`)
+      const r = await scanContainers(dev, conts[dev] ?? [], m => push(`[${name}]${m}`))
+      const v = Object.values(r)
+      push(`[${name}] ✔ ${v.filter(x => x.state === 'account').length} avec un compte · ${v.filter(x => x.state === 'empty').length} vide(s)${v.some(x => x.state === 'blocked') ? ` · ${v.filter(x => x.state === 'blocked').length} bloqué(s)` : ''}`)
+    }
+    setChecking(false)
   }
   const toggleCont = (dev: string, name: string) => {
     const cur = new Set(sel.has(dev) ? (selConts[dev] ?? []) : [])
@@ -526,17 +560,19 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const budget = (() => { const n = parseFloat(loopBudget.replace(',', '.')); return loopOn && Number.isFinite(n) && n > 0 ? n : null })()
     let spent = 0 // $ des numéros consommés (les numéros annulés sont remboursés)
     setRunning(true); setLogs([])
-    // Tout auto : on lit les containers de chaque iPhone, puis on garde ceux qui n'ont pas encore de compte créé.
+    // Tout auto : on lit les containers de chaque iPhone, on VÉRIFIE à l'écran ce que chacun contient, puis on remplit les vides.
     if (autoDetect) {
-      const made = new Set(loadCreatedAccounts().filter(a => a.ok).map(a => `${a.device}|${a.container}`))
       const next: { dev: string; c: string }[] = []
       for (const dev of sel) {
         const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
         push(`🔍 [${name}] détection des containers…`)
         const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(() => null) ?? (conts[dev] ?? [])
         if (list.some(c => c.startsWith('@'))) { push(`[${name}] ⏭ iPhone non jailbreaké (comptes, pas de containers) : pas de création ici`); continue }
-        const todo = loopOn && loopLogoutExisting ? list : list.filter(c => !made.has(`${dev}|${c}`))
-        push(`[${name}] ${list.length} container(s), ${list.length - todo.length} déjà avec un compte créé ici → ${todo.length} à remplir`)
+        // On VÉRIFIE à l'écran chaque container (pas la liste « Comptes créés », qui peut être périmée).
+        push(`[${name}] 🔎 vérification à l’écran de ${list.length} container(s)…`)
+        const seen = await scanContainers(dev, list, m => push(`[${name}]${m}`))
+        const todo = containersToFill(list, seen, loopOn && loopLogoutExisting)
+        push(`[${name}] ${list.length} container(s) : ${Object.values(seen).filter(x => x.state === 'account').length} avec un compte, ${Object.values(seen).filter(x => x.state === 'empty').length} vide(s) → ${todo.length} à remplir`)
         next.push(...todo.map(c => ({ dev, c })))
       }
       jobs = next
@@ -590,7 +626,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (!await isSignupScreen(key, dev, chooks)) {
             if (logoutFirst) {
               if (!await logoutToSignupByVision(key, dev, chooks)) { push(`${tag} ⚠ déconnexion / « Create new account » non abouti → nouvel essai`); continue }
-            } else if (cycle === 0) { push(`${tag} ⏭ pas d'écran « Join Instagram » : container déjà connecté → passé (aucun numéro acheté)`); return { r: 'skip' } }
+            } else if (cycle === 0) { push(`${tag} ⏭ pas d'écran « Join Instagram » : container déjà connecté → passé (aucun numéro acheté)`); if (contStates[dev]?.[c]?.state !== 'account') setContStates(setContState(dev, c, { state: 'account' })); return { r: 'skip' } }
             else { push(`${tag} ⚠ écran d'inscription introuvable → nouvel essai`); continue }
           }
           if (budget != null && spent >= budget) { push(`${tag} 💰 budget numéros atteint (${spent.toFixed(2)}$ / ${budget}$) → arrêt`); halt = 'budget'; break }
@@ -631,6 +667,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       // Enregistre le compte (identifiants + numéro + logs) → catégorie « Comptes créés ».
       addCreatedAccount({ at: Date.now(), device: dev, deviceName: devName, container: c, username: creds?.username, password: creds?.password, fullName: creds?.fullName, phone: resultOrder?.phone, provider: provName, price: resultOrder?.price, country: CFG.name, ok: success, log: acctLog })
       setCreatedAccts(loadCreatedAccounts())
+      if (success) setContStates(setContState(dev, c, { state: 'account', username: creds?.username }))
+      else if (halt === 'captcha') setContStates(setContState(dev, c, { state: 'blocked', username: creds?.username }))
       return { r: success ? 'ok' : 'fail', halt }
     }
 
@@ -787,6 +825,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                         <span onClick={() => toggleCont(id, c)} title={flagOf(id, c)?.join(' · ')} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
                           {flagOf(id, c) && <span style={{ display: 'grid', placeItems: 'center', width: 15, height: 15, borderRadius: 99, background: '#EF4444', color: '#fff', fontSize: 10, fontWeight: 800 }}>!</span>}
                           {cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}
+                          {(() => { const cs = contStates[id]?.[c]; if (!cs || c.startsWith('@')) return null
+                            return <span title={`Vérifié à l’écran le ${new Date(cs.at).toLocaleString()}`} style={{ fontSize: 11, fontWeight: 500, color: cs.state === 'account' ? '#86EFAC' : cs.state === 'empty' ? DIM : cs.state === 'blocked' ? '#F87171' : DIM }}>
+                              {cs.state === 'account' ? `· @${cs.username ?? '?'}` : cs.state === 'empty' ? '· vide' : cs.state === 'blocked' ? '· 🤖' : '· ?'}
+                            </span> })()}
                         </span>
                         {opts?.manage && <span onClick={() => removeC(id, c)} title="Retirer" style={{ cursor: 'pointer', color: DIM, padding: '0 8px 0 0', fontSize: 14 }}>×</span>}
                       </span>
@@ -1185,9 +1227,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 label="Tout auto (recommandé)" sub="ScaleFlow détecte les containers de chaque iPhone puis remplit ceux qui n’ont pas de compte" />
             </div>
             {!autoDetect && <button style={{ ...btn, height: 30, padding: '0 12px' }} disabled={running || !sel.size} onClick={() => {
-              const done = new Set(createdAccts.filter(a => a.ok).map(a => `${a.device}|${a.container}`))
-              setSelConts(sc => { const n = { ...sc }; for (const d of sel) n[d] = new Set((conts[d] ?? []).filter(c => !done.has(`${d}|${c}`))); return n })
-            }}>Cocher les containers sans compte</button>}
+              setSelConts(sc => { const n = { ...sc }; for (const d of sel) n[d] = new Set(containersToFill((conts[d] ?? []).filter(c => !c.startsWith('@')), contStates[d], false)); return n })
+            }} title="D’après la dernière vérification à l’écran (🔎 Vérifier)">Cocher les containers vides</button>}
+            <button style={{ ...btn, height: 30, padding: '0 12px' }} disabled={running || checking || !!detecting || !sel.size} onClick={() => void checkPhones()}
+              title="Ouvre chaque container des iPhones choisis et lit ce qu’il contient vraiment (vide / @compte), sans rien acheter">{checking ? 'Vérification…' : '🔎 Vérifier les containers'}</button>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
               Essais max par container
               <input type="number" min={1} max={10} value={acctTries} disabled={running} onChange={e => { const v = Math.max(1, Math.min(10, Number(e.target.value) || 1)); setAcctTries(v); try { localStorage.setItem('sf-irt-acct-tries', String(v)) } catch { /* noop */ } }}

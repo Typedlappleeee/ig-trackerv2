@@ -27,3 +27,11 @@ describe('boucle de création — déconnexion', () => {
     expect(logoutStage([w('Edit', 90, 287), w('profile', 130, 287), w('posts', 70, 162)], H)).toBeNull()
   })
 })
+
+import { isAppLibrary } from './iremotechVision'
+describe('accueil iOS — Bibliothèque d’apps', () => {
+  it('reconnue à ses dossiers, pas une page d’accueil', () => {
+    expect(isAppLibrary([{ text: 'Q' }, { text: 'Apr' }, { text: 'Suggestions' }, { text: 'Recently' }, { text: 'Added' }, { text: 'Social' }])).toBe(true)
+    expect(isAppLibrary([{ text: 'Weather' }, { text: 'Stocks' }, { text: 'Instagram' }, { text: 'Utilities' }])).toBe(false)
+  })
+})
