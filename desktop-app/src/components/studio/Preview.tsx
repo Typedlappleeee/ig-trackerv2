@@ -9,7 +9,7 @@ import { textToPng, type CaptionStyle } from '@/lib/studioTools'
 import { remixParams, type RemixIntensity, type RemixToggles } from '@/lib/studioFilters'
 import { Icon } from '@/lib/ui'
 
-export type StudioToolId = 'remix' | 'spoof' | 'imgspoof' | 'subs' | 'overlay' | 'montage' | 'mixer'
+export type StudioToolId = 'remix' | 'spoof' | 'imgspoof' | 'subs' | 'overlay' | 'montage' | 'mixer' | 'igdl'
 const fmtT = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}${s < 60 ? `.${Math.floor((s % 1) * 10)}` : ''}`
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
 

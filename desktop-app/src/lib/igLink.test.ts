@@ -14,3 +14,13 @@ describe('lien Instagram → code du post', () => {
     expect(igCodeFromLink('https://tiktok.com/@x/video/123')).toBeNull()
   })
 })
+
+import { igLinksFrom } from './igLink'
+import { vi } from 'vitest'
+vi.mock('./supabase', () => ({ supabase: {} }))
+describe('plusieurs liens collés', () => {
+  it('un par ligne, doublons et texte parasite ignorés', () => {
+    const t = 'https://www.instagram.com/reel/AAAAA11111/\ninstagram.com/p/BBBBB22222 bonjour https://www.instagram.com/reel/AAAAA11111/?igsh=x'
+    expect(igLinksFrom(t)).toEqual(['https://www.instagram.com/reel/AAAAA11111/', 'instagram.com/p/BBBBB22222'])
+  })
+})

@@ -14,10 +14,10 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     id: '2026-11-21m',
     date: '2026-11-21',
-    title: { fr: 'Télécharger un Reel ou une photo depuis un lien', en: 'Download a Reel or photo from a link' },
+    title: { fr: 'Studio : Téléchargeur Insta', en: 'Studio: Insta downloader' },
     items: {
-      fr: ['Veille Reels : colle un lien Instagram (Reel, photo ou carrousel) et le média se télécharge directement — vidéo en .mp4, photo(s) en .jpg.'],
-      en: ['Reels watch: paste an Instagram link (Reel, photo or carousel) and the media downloads directly — video as .mp4, photo(s) as .jpg.'],
+      fr: ['Nouvel outil du Studio « Téléchargeur Insta » : colle un ou plusieurs liens Instagram (Reel, photo, carrousel) — vidéos en .mp4 et photos en .jpg rangées directement dans un dossier de la Banque (« Téléchargements Insta » par défaut), ouvert d’un clic avec « Voir dans la Banque ».'],
+      en: ['New Studio tool “Insta downloader”: paste one or more Instagram links (Reel, photo, carousel) — videos as .mp4 and photos as .jpg saved straight into a Bank folder (“Téléchargements Insta” by default), opened in one click with “See in the Bank”.'],
     },
   },
   {

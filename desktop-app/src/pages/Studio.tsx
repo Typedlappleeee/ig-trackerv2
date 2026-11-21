@@ -13,12 +13,13 @@ import { usePhotos, pickerFor, ToolCard, SectionHead } from '@/pages/Explore'
 import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import { Workspace } from '@/components/studio/Workspace'
+import { IgDownloader } from '@/components/studio/IgDownloader'
 import { Results, type StudioResult } from '@/components/studio/Results'
 import type { StudioToolId } from '@/components/studio/Preview'
 import { imgFallback } from '@/lib/curated'
 
 // Outils du Studio (ordre d'affichage) — libellés, icônes et couleurs viennent de lib/tools.ts.
-const IDS: StudioToolId[] = ['remix', 'spoof', 'mixer', 'subs', 'overlay', 'montage', 'imgspoof']
+const IDS: StudioToolId[] = ['igdl', 'remix', 'spoof', 'mixer', 'subs', 'overlay', 'montage', 'imgspoof']
 const STUDIO = IDS.map(id => TOOLS.find(t => t.id === id)!).filter(Boolean)
 const isStudioTool = (k: unknown): k is StudioToolId => typeof k === 'string' && (IDS as string[]).includes(k)
 
@@ -139,8 +140,10 @@ export default function Studio({ theme, user, org, onNavigate }: {
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <UnderlineTabs back={{ label: 'Studio', onClick: () => { setTool(null); top() } }} items={STUDIO.map(t => ({ k: t.id as StudioToolId, l: t.label, icon: t.icon }))} value={tool} onChange={go} />
-      <Workspace key="ws" theme={theme} user={user} org={org} tool={tool} label={T.label} desc={T.desc} icon={T.icon} a={T.a} b={T.b}
-        onNavigate={onNavigate} initialIds={openArg?.ids} addResult={r => setResults(rs => [r, ...rs])} />
+      {tool === 'igdl'
+        ? <IgDownloader theme={theme} user={user} org={org} onNavigate={onNavigate} addResult={r => setResults(rs => [r, ...rs])} />
+        : <Workspace key="ws" theme={theme} user={user} org={org} tool={tool} label={T.label} desc={T.desc} icon={T.icon} a={T.a} b={T.b}
+            onNavigate={onNavigate} initialIds={openArg?.ids} addResult={r => setResults(rs => [r, ...rs])} />}
       <Results results={results} onClear={() => { results.forEach(r => URL.revokeObjectURL(r.url)); setResults([]) }}
         onBank={onNavigate ? () => openTool(onNavigate, 'bank', { tab: tool === 'imgspoof' ? 'image' : 'video' }) : undefined}
         onPublish={onNavigate ? () => openTool(onNavigate, 'publish', { mode: 'reels' }) : undefined} />

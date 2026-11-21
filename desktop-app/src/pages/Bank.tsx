@@ -245,7 +245,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
   // Ouverture depuis un autre outil : { tab: 'video' | 'image' | 'audio' } (ancien format) → banque
   // unique avec le filtre de type correspondant.
-  const openArg = useRef(takeOpenArg<{ tab?: string }>('bank'))
+  const openArg = useRef(takeOpenArg<{ tab?: string; folder?: string }>('bank'))
   const [tab, setTab] = useState<TabKey>(() => { const t = openArg.current?.tab; return t === 'caption' || t === 'pool' ? t : 'media' })
   const [kindF, setKindFState] = useState<KindFilter>(() => {
     const t = openArg.current?.tab
@@ -258,7 +258,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [capTitle, setCapTitle] = useState('')
   const [capContent, setCapContent] = useState('')
   const [savingCap, setSavingCap] = useState(false)
-  const [folder, setFolder] = useState<string>('Tous')
+  const [folder, setFolder] = useState<string>(() => openArg.current?.folder || 'Tous') // ouvert sur un dossier depuis un outil (ex. Téléchargeur Insta)
   // Site partenaire relié (Réglages › Intégrations) : sa banque + envoi de mes médias chez lui.
   const [partner, setPartner] = useState<Partner | null>(null)
   const [partnerOpen, setPartnerOpen] = useState(false)

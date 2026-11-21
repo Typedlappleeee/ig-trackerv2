@@ -76,6 +76,7 @@ export const TOOLS: Tool[] = [
   { id: 'overlay', label: 'Incrustation photo', desc: 'Une photo par-dessus ta vidéo : place-la, choisis sa taille et quand elle apparaît.', cat: 'create', page: 'studio', arg: { tool: 'overlay' }, icon: I.layers, a: '#93C5FD', b: '#1E40AF', cost: 'gratuit' },
   { id: 'montage', label: 'Montage', desc: 'Coupe une vidéo, ou assemble-en plusieurs dans l’ordre.', cat: 'create', page: 'studio', arg: { tool: 'montage' }, icon: I.scissors, a: '#FCA5A5', b: '#991B1B', cost: 'gratuit' },
   { id: 'mixer', label: 'Texte sur vidéo', desc: 'Une légende incrustée, placée où tu veux, une différente par vidéo.', cat: 'create', page: 'studio', arg: { tool: 'mixer' }, icon: I.type, a: '#C4B5FD', b: '#4C1D95', cost: 'gratuit' },
+  { id: 'igdl', label: 'Téléchargeur Insta', desc: 'Colle des liens de Reels ou de posts : vidéos et photos rangées directement dans ta Banque.', cat: 'create', page: 'studio', arg: { tool: 'igdl' }, icon: 'M12 3v12|M7 10l5 5 5-5|M5 21h14', a: '#F9A8D4', b: '#9D174D', badge: 'Nouveau', cost: 'gratuit' },
   { id: 'genjutsu', label: 'Genjutsu IA', desc: 'Recrée un Reel avec tes images de référence (Higgsfield).', cat: 'create', page: 'genjutsu', icon: I.wand, a: '#C4B5FD', b: '#7C3AED', badge: 'Nouveau', cost: 'ta clé Higgsfield', gate: 'admin' },
   // ── Comptes
   { id: 'warmup', label: 'Warmup', desc: 'Sessions de scroll, likes et follows pour chauffer tes comptes.', cat: 'accounts', page: 'warmup', arg: { tab: 'warm' }, icon: I.flame, a: '#FB923C', b: '#7C2D12', badge: 'Populaire', infra: GL },
