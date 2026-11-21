@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21k',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : création de comptes en boucle (option)', en: 'iRemoTech: account creation loop (option)' },
+    items: {
+      fr: [
+        'Nouvelle option « 🔁 Boucle » (Création de comptes, iPhones jailbreakés) : dans chaque container, un compte est créé, rangé dans « Comptes créés », déconnecté (Profil › ☰ › Log out), puis « Create new account » pour le suivant.',
+        'Garde-fous : comptes max par container, pause aléatoire entre deux comptes, budget numéros max, mode avion avant chaque compte, et arrêt de l’iPhone au premier refus ou captcha d’Instagram.',
+        'Le compte déjà présent dans un container n’est déconnecté que si la case « Déconnecter aussi le compte déjà présent » est cochée.',
+      ],
+      en: [
+        'New “🔁 Loop” option (Account creation, jailbroken iPhones): in each container an account is created, saved in “Created accounts”, logged out (Profile › ☰ › Log out), then “Create new account” for the next one.',
+        'Safeguards: max accounts per container, random pause between accounts, max number budget, airplane mode before each account, and the iPhone stops at Instagram’s first refusal or captcha.',
+        'The account already in a container is only logged out if “Also log out the account already there” is ticked.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21j',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : sticker lien en bas à droite', en: 'iRemoTech: link sticker at the bottom right' },

@@ -2527,6 +2527,89 @@ export async function switchAccountByVision(key: string, deviceId: string, usern
   return false
 }
 
+// ─── Boucle de création : déconnexion du compte du container → « Create new account » ──────────────────
+// Écrans relevés en vrai (21/11/2026) : Profil › ☰ → « Settings and activity » ; tout en bas, section « Login » :
+// « Add profile » (bleu) et « Log out » (rouge) ; puis alerte « Log out of your account? » → « Log out » / « Cancel ».
+
+/** Écran lu pendant la déconnexion → étape. Pure. */
+export function logoutStage(words: { text: string; cx: number; cy: number }[], H: number):
+  | { kind: 'dialog'; tap: { x: number; y: number } }
+  | { kind: 'settings_logout'; tap: { x: number; y: number } }
+  | { kind: 'settings' }
+  | { kind: 'save_login'; tap: { x: number; y: number } }
+  | { kind: 'logged_out'; tap?: { x: number; y: number } }
+  | null {
+  const t = (o: { text: string }) => o.text.replace(/[^\p{L}?]/gu, '')
+  const has = (re: RegExp) => words.some(o => re.test(t(o)))
+  const logOuts = words.filter(o => /^log$/i.test(t(o)) && words.some(p => /^out$/i.test(t(p)) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx && p.cx - o.cx < 70))
+  // Alerte « Log out of your account? » : le bouton « Log out » est la ligne « Log out » SOUS le titre, au-dessus de « Cancel »
+  const title = words.find(o => /^account\??$/i.test(t(o)) && words.some(p => /^your$/i.test(t(p)) && Math.abs(p.cy - o.cy) < 12))
+  const cancel = words.find(o => /^cancel$/i.test(t(o)))
+  if (title && cancel) {
+    const btn = logOuts.find(o => o.cy > title.cy + 15 && o.cy < cancel.cy - 10)
+    return { kind: 'dialog', tap: btn ? { x: btn.cx + 15, y: btn.cy } : { x: cancel.cx, y: Math.round(cancel.cy - 0.058 * H) } }
+  }
+  // « Save your login info? » → Not now
+  if (has(/^save$/i) && has(/^(login|info\??)$/i)) {
+    const nn = words.find(o => /^not$/i.test(t(o)))
+    if (nn) return { kind: 'save_login', tap: { x: nn.cx + 15, y: nn.cy } }
+  }
+  // Déconnecté : écran de connexion (« Create new account » / « Log in » / « Use another profile ») ou Join
+  if (has(/^create$/i) && has(/^new$/i) && has(/^account$/i)) {
+    const nw = words.find(o => /^new$/i.test(t(o)) && o.cy > H * 0.5) ?? words.find(o => /^new$/i.test(t(o)))!
+    return { kind: 'logged_out', tap: { x: nw.cx, y: nw.cy } }
+  }
+  if (words.some(o => o.cy > H * 0.45 && /^(started|join)$/i.test(t(o)))) return { kind: 'logged_out' }
+  if (has(/^settings$/i) && has(/^activity$/i)) {
+    const lo = logOuts.find(o => o.cy > H * 0.3)
+    return lo ? { kind: 'settings_logout', tap: { x: lo.cx + 15, y: lo.cy } } : { kind: 'settings' }
+  }
+  return null
+}
+
+/** Déconnecte le compte du container ouvert puis lance « Create new account » → écran d'inscription
+ *  (Join / numéro). true si l'écran d'inscription est atteint. Jamais d'« Add profile » (le compte resterait
+ *  connecté). */
+export async function logoutToSignupByVision(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  const shot0 = await snapRetry(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) return false
+  const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
+  hooks?.log?.('🚪 Déconnexion du compte du container (Profil › ☰ › Log out)…')
+  await dismissPopups(key, deviceId, hooks)
+  await tap(0.9 * W, 0.962 * H) // onglet Profil
+  await sleep(2500)
+  let scrolls = 0, menuTaps = 0, logoutTapped = false
+  for (let step = 0; step < 24; step++) {
+    if (hooks?.shouldStop?.()) return false
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) { await sleep(800); continue }
+    const st = logoutStage(scr.words, scr.H)
+    if (st?.kind === 'logged_out') {
+      if (st.tap) { hooks?.log?.('   déconnecté → « Create new account »'); await tap(st.tap.x, st.tap.y); await sleep(3500) }
+      const ok = await isSignupScreen(key, deviceId, hooks)
+      hooks?.log?.(ok ? '   ✓ écran d’inscription atteint' : '❌ écran d’inscription introuvable après la déconnexion')
+      return ok
+    }
+    if (st?.kind === 'dialog') { hooks?.log?.('   alerte « Log out of your account? » → Log out'); await tap(st.tap.x, st.tap.y); logoutTapped = true; await sleep(4000); continue }
+    if (st?.kind === 'save_login') { hooks?.log?.('   « Save your login info? » → Not now'); await tap(st.tap.x, st.tap.y); await sleep(2500); continue }
+    if (st?.kind === 'settings_logout') { hooks?.log?.('   « Log out » (bas des réglages) → tap'); await tap(st.tap.x, st.tap.y); await sleep(2500); continue }
+    if (st?.kind === 'settings') {
+      if (scrolls++ > 12) break
+      await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(0.86 * H), x2: Math.round(W / 2), y2: Math.round(0.17 * H), duration_ms: 250 })
+      await sleep(900); continue
+    }
+    if (logoutTapped) { await sleep(2000); continue } // Instagram recharge après « Log out »
+    // Profil (ou autre écran d'Instagram) → menu ☰ en haut à droite
+    if (menuTaps++ > 3) break
+    if (menuTaps > 1) { await tap(0.9 * W, 0.962 * H); await sleep(2000) }
+    await tap(0.917 * W, 0.069 * H)
+    await sleep(3000)
+  }
+  hooks?.log?.('❌ déconnexion non aboutie')
+  return false
+}
+
 /** Ouvre une cible de posting : « @username » (compte d'un iPhone non jailbreaké) ou nom de container Crane. */
 export async function openTargetByVision(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
   return target.startsWith('@') ? switchAccountByVision(key, deviceId, target, hooks) : selectContainerByVision(key, deviceId, target, hooks)

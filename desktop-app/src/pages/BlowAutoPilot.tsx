@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
+import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
@@ -156,6 +156,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [detecting, setDetecting] = useState<string | null>(null)
   // essais max par container avant de passer au suivant (le numéro d'un essai raté est annulé → remboursé)
   const [acctTries, setAcctTries] = useState(() => { try { return Math.max(1, Math.min(10, Number(localStorage.getItem('sf-irt-acct-tries')) || 3)) } catch { return 3 } })
+  // Boucle (iPhones JB) : dans un container, compte créé → déconnexion → nouveau compte, avec garde-fous
+  const lsNum = (k: string, d: number, lo: number, hi: number) => { try { const v = Number(localStorage.getItem(k)); return Number.isFinite(v) && v >= lo && v <= hi && localStorage.getItem(k) !== null ? v : d } catch { return d } }
+  const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* noop */ } }
+  const [acctLoop, setAcctLoop] = useState(() => { try { return localStorage.getItem('sf-irt-acct-loop') === '1' } catch { return false } })
+  const [loopMax, setLoopMax] = useState(() => lsNum('sf-irt-loop-max', 3, 1, 20))           // comptes max par container
+  const [loopPause, setLoopPause] = useState(() => lsNum('sf-irt-loop-pause', 5, 1, 60))     // minutes entre deux comptes
+  const [loopBudget, setLoopBudget] = useState(() => { try { return localStorage.getItem('sf-irt-loop-budget') ?? '' } catch { return '' } }) // $ max de numéros
+  const [loopLogoutExisting, setLoopLogoutExisting] = useState(() => { try { return localStorage.getItem('sf-irt-loop-logout-existing') === '1' } catch { return false } })
   const [heroOffers, setHeroOffers] = useState<{ price: number; count: number }[]>([]) // paliers de prix HeroSMS
   const [heroPrice, setHeroPrice] = useState<number | null>(null)                       // prix exact choisi (null = auto)
   const [offersLoading, setOffersLoading] = useState(false)
@@ -512,6 +520,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const cancelNum = (id: string | number) => usingHero ? herosmsCancel(heroKey, Number(id)) : usingPool ? smspoolCancel(smspoolKey, String(id)) : fivesimCancel(sim5Key, Number(id))
     const finishNum = (id: string | number) => usingHero ? herosmsFinish(heroKey, Number(id)) : usingPool ? smspoolFinish(smspoolKey, String(id)) : fivesimFinish(sim5Key, Number(id))
 
+    // Boucle : seulement avec un fournisseur SMS (sans numéro, le flow s'arrête au choix du pays).
+    const loopOn = acctLoop && !!smsKey
+    const perCont = loopOn ? loopMax : 1
+    const budget = (() => { const n = parseFloat(loopBudget.replace(',', '.')); return loopOn && Number.isFinite(n) && n > 0 ? n : null })()
+    let spent = 0 // $ des numéros consommés (les numéros annulés sont remboursés)
     setRunning(true); setLogs([])
     // Tout auto : on lit les containers de chaque iPhone, puis on garde ceux qui n'ont pas encore de compte créé.
     if (autoDetect) {
@@ -522,20 +535,23 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         push(`🔍 [${name}] détection des containers…`)
         const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(() => null) ?? (conts[dev] ?? [])
         if (list.some(c => c.startsWith('@'))) { push(`[${name}] ⏭ iPhone non jailbreaké (comptes, pas de containers) : pas de création ici`); continue }
-        const todo = list.filter(c => !made.has(`${dev}|${c}`))
+        const todo = loopOn && loopLogoutExisting ? list : list.filter(c => !made.has(`${dev}|${c}`))
         push(`[${name}] ${list.length} container(s), ${list.length - todo.length} déjà avec un compte créé ici → ${todo.length} à remplir`)
         next.push(...todo.map(c => ({ dev, c })))
       }
       jobs = next
       if (!jobs.length) { push('✔ Rien à faire : tous les containers ont déjà un compte.'); setRunning(false); return }
     }
-    const R = startRun('farm', `Création compte ${CFG.name} · ${jobs.length}`, jobs.length); setRunId(R.id)
+    const R = startRun('farm', `Création compte ${CFG.name} · ${jobs.length * perCont}`, jobs.length * perCont); setRunId(R.id)
     const byPhone = [...new Set(jobs.map(j => j.dev))].map(dev => ({ dev, conts: jobs.filter(j => j.dev === dev).map(j => j.c) }))
     push(`▶ Création de compte (${CFG.name})${smsKey ? ` + numéro ${provName}` : ' (test, sans numéro)'} : ${jobs.length} container(s) sur ${byPhone.length} iPhone(s)${parallel && byPhone.length > 1 ? ' · iPhones en parallèle' : ''} · ${acctTries} essai(s) max par container`)
+    if (loopOn) push(`🔁 Boucle : jusqu’à ${loopMax} compte(s) par container (déconnexion entre chaque) · pause ~${loopPause} min${budget != null ? ` · budget numéros ${budget}$` : ''}${loopLogoutExisting ? ' · le compte déjà présent est aussi déconnecté' : ''} · arrêt de l’iPhone au 1er refus ou captcha`)
     const tally = { ok: 0, skip: 0, fail: 0 }
 
     // Un container : vérifie qu'il est vierge AVANT d'acheter un numéro, puis jusqu'à `acctTries` cycles complets.
-    const createOne = async (dev: string, c: string): Promise<'ok' | 'skip' | 'fail'> => {
+    // logoutFirst : container déjà connecté → déconnexion puis « Create new account » (mode boucle).
+    // halt : refus / captcha d'Instagram ou budget atteint → la boucle s'arrête sur cet iPhone.
+    const createOne = async (dev: string, c: string, logoutFirst = false): Promise<{ r: 'ok' | 'skip' | 'fail'; halt?: 'captcha' | 'refused' | 'budget' }> => {
       const devName = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
       const tag = `[${devName}·${c}]`
       const acctLog: string[] = []
@@ -545,10 +561,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         await recalibrateTouch(key, dev, hooks)
         await airplaneReset(key, dev, hooks) // toujours : nouvelle IP avant CHAQUE container (création de comptes)
         const opened = await selectContainerByVision(key, dev, c, hooks)
-        if (!opened) { push(`${tag} ⏭ container non atteint`); return 'fail' }
+        if (!opened) { push(`${tag} ⏭ container non atteint`); return { r: 'fail' } }
         await sleep(1500)
         const r = await createInstagramAccountByVision(key, dev, { countryLabel: CFG.label, countryY: CFG.countryY }, hooks)
-        push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`); return r.ok ? 'ok' : 'fail'
+        push(`${tag} ${r.ok ? '✓' : '✗'} étape: ${r.stage}`); return { r: r.ok ? 'ok' : 'fail' }
       }
 
       // Avec numéro : CYCLE COMPLET (container → vérif « vierge » → numéro → inscription entière), au plus
@@ -557,6 +573,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       let success = false
       let resultOrder: { id: string | number; phone: string; price?: number } | null = null
       let creds: { username: string; password: string; fullName: string } | undefined
+      let halt: 'captcha' | 'refused' | 'budget' | undefined
       for (let cycle = 0; !success && cycle < acctTries && !R.isCancelled(); cycle++) {
         if (cycle > 0) push(`${tag} 🔄 nouvel essai (${cycle + 1}/${acctTries})…`)
         let lastBeat = Date.now(); let stuck = false
@@ -571,9 +588,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           await sleep(1500)
           // Jamais de numéro acheté pour un container qui n'est pas sur l'écran d'inscription.
           if (!await isSignupScreen(key, dev, chooks)) {
-            if (cycle === 0) { push(`${tag} ⏭ pas d'écran « Join Instagram » : container déjà connecté → passé (aucun numéro acheté)`); return 'skip' }
-            push(`${tag} ⚠ écran d'inscription introuvable → nouvel essai`); continue
+            if (logoutFirst) {
+              if (!await logoutToSignupByVision(key, dev, chooks)) { push(`${tag} ⚠ déconnexion / « Create new account » non abouti → nouvel essai`); continue }
+            } else if (cycle === 0) { push(`${tag} ⏭ pas d'écran « Join Instagram » : container déjà connecté → passé (aucun numéro acheté)`); return { r: 'skip' } }
+            else { push(`${tag} ⚠ écran d'inscription introuvable → nouvel essai`); continue }
           }
+          if (budget != null && spent >= budget) { push(`${tag} 💰 budget numéros atteint (${spent.toFixed(2)}$ / ${budget}$) → arrêt`); halt = 'budget'; break }
           push(`${tag} 🛒 achat d'un numéro ${CFG.name} (${provName})…`)
           order = await buyNumber()
           push(`${tag} 📞 numéro : ${order.phone}${order.price != null ? ` · ${order.price}$` : ''}${usingHero && acctCountry === 'usa' ? ' · textnow' : ''}`)
@@ -589,14 +609,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (!code) { push(`${tag} ⏱ pas de code sous 60s → fermeture d'Instagram, nouvel essai`); await forceCloseForegroundApp(key, dev, chooks); continue }
           const okCode = await enterSmsCodeByVision(key, dev, code, chooks)
           try { await finishNum(order.id) } catch { /* noop */ }
+          spent += order.price ?? 0
           resultOrder = order; order = null // numéro consommé (finishNum) → plus d'annulation
           if (!okCode) { push(`${tag} ⚠ code non validé → nouvel essai`); continue }
           const done = await completeSignupByVision(key, dev, chooks, { container: c })
           creds = done.creds
           if (stuck) { push(`${tag} ⏱ bloqué > 60s pendant l'inscription → nouvel essai`); continue }
           if (done.ok) { success = true; push(`${tag} ✅ compte créé`) }
-          else if (done.captcha) { push(`${tag} 🤖 vérification humaine demandée par Instagram (compte @${done.creds?.username ?? '?'} en attente) → container suivant`); break }
-          else if (done.refused) { push(`${tag} ⛔ refus d'Instagram : pas de nouvel essai sur ce container (un autre numéro serait gaspillé) → container suivant`); break }
+          else if (done.captcha) { push(`${tag} 🤖 vérification humaine demandée par Instagram (compte @${done.creds?.username ?? '?'} en attente) → container suivant`); halt = 'captcha'; break }
+          else if (done.refused) { push(`${tag} ⛔ refus d'Instagram : pas de nouvel essai sur ce container (un autre numéro serait gaspillé) → container suivant`); halt = 'refused'; break }
           else push(`${tag} ⚠ inscription incomplète → nouvel essai`)
         } catch (e) {
           push(`${tag} ⚠ ${stuck ? 'bloqué > 60s' : (e instanceof Error ? e.message : String(e))} → nouvel essai`)
@@ -605,24 +626,39 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (order) { try { await cancelNum(order.id) } catch { /* noop */ } } // numéro acheté non finalisé → annuler
         }
       }
-      if (!success) push(`${tag} ✗ compte non créé${R.isCancelled() ? ' (arrêté)' : ` après ${acctTries} essai(s) → container suivant`}`)
+      if (halt === 'budget') return { r: 'fail', halt }
+      if (!success) push(`${tag} ✗ compte non créé${R.isCancelled() ? ' (arrêté)' : halt ? '' : ` après ${acctTries} essai(s) → container suivant`}`)
       // Enregistre le compte (identifiants + numéro + logs) → catégorie « Comptes créés ».
       addCreatedAccount({ at: Date.now(), device: dev, deviceName: devName, container: c, username: creds?.username, password: creds?.password, fullName: creds?.fullName, phone: resultOrder?.phone, provider: provName, price: resultOrder?.price, country: CFG.name, ok: success, log: acctLog })
       setCreatedAccts(loadCreatedAccounts())
-      return success ? 'ok' : 'fail'
+      return { r: success ? 'ok' : 'fail', halt }
     }
 
     // Chaque iPhone enchaîne SES containers ; les iPhones tournent en même temps si « en parallèle ».
+    let budgetHit = false
+    const pause = async (min: number) => { const end = Date.now() + min * 60_000; while (Date.now() < end && !R.isCancelled()) await sleep(1000) }
     const runPhone = async (p: { dev: string; conts: string[] }) => {
-      for (const c of p.conts) {
-        if (R.isCancelled()) break
-        const r = await createOne(p.dev, c)
-        tally[r]++; R.tick(r !== 'fail')
+      const devName = (() => { const x = devices.find(d => d.public_id === p.dev); return x ? deviceLabel(x) : p.dev })()
+      phone: for (const c of p.conts) {
+        for (let n = 0; n < perCont; n++) {
+          if (R.isCancelled() || budgetHit) break phone
+          if (n > 0) push(`[${devName}·${c}] 🔁 compte ${n + 1}/${perCont} dans ce container`)
+          const { r, halt } = await createOne(p.dev, c, loopOn && (n > 0 || loopLogoutExisting))
+          tally[r]++; R.tick(r !== 'fail')
+          if (halt === 'budget') { budgetHit = true; break phone }
+          if (halt) { push(`[${devName}] ⏹ ${halt === 'captcha' ? 'captcha' : 'refus'} d’Instagram : cet iPhone est repéré → boucle arrêtée sur cet iPhone`); break phone }
+          if (r !== 'ok') break // container passé ou échec : on ne réessaie pas en boucle
+          if (n < perCont - 1) {
+            const m = Math.round(loopPause * (0.7 + Math.random() * 0.6) * 10) / 10
+            push(`[${devName}·${c}] ⏳ pause ${m} min avant le compte suivant…`)
+            await pause(m)
+          }
+        }
       }
     }
     if (parallel) await Promise.all(byPhone.map(runPhone))
     else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
-    push(`\n📊 ${tally.ok} compte(s) créé(s) · ${tally.skip} container(s) déjà connecté(s) · ${tally.fail} échec(s)`)
+    push(`\n📊 ${tally.ok} compte(s) créé(s) · ${tally.skip} container(s) déjà connecté(s) · ${tally.fail} échec(s)${loopOn ? ` · ${spent.toFixed(2)}$ de numéros` : ''}`)
     R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'); setRunning(false); setRunId(null)
   }
 
@@ -1158,8 +1194,33 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 style={{ width: 56, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
             </label>
           </div>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${EDGE}` }}>
+            <Toggle on={acctLoop} onClick={() => { if (running) return; const v = !acctLoop; setAcctLoop(v); lsSet('sf-irt-acct-loop', v ? '1' : '0') }}
+              label="🔁 Boucle : créer → se déconnecter → recréer" sub="Dans chaque container : un compte, déconnexion (Profil › ☰ › Log out), « Create new account », compte suivant. S’arrête seul sur l’iPhone au premier refus ou captcha d’Instagram." />
+            {acctLoop && (
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginTop: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+                  Comptes max par container
+                  <input type="number" min={1} max={20} value={loopMax} disabled={running} onChange={e => { const v = Math.max(1, Math.min(20, Number(e.target.value) || 1)); setLoopMax(v); lsSet('sf-irt-loop-max', String(v)) }} style={{ width: 56, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+                  Pause entre deux comptes (min)
+                  <input type="number" min={1} max={60} value={loopPause} disabled={running} onChange={e => { const v = Math.max(1, Math.min(60, Number(e.target.value) || 1)); setLoopPause(v); lsSet('sf-irt-loop-pause', String(v)) }} style={{ width: 56, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>
+                  Budget numéros max ($)
+                  <input type="text" inputMode="decimal" placeholder="illimité" value={loopBudget} disabled={running} onChange={e => { setLoopBudget(e.target.value); lsSet('sf-irt-loop-budget', e.target.value) }} style={{ width: 80, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={loopLogoutExisting} disabled={running} onChange={e => { setLoopLogoutExisting(e.target.checked); lsSet('sf-irt-loop-logout-existing', e.target.checked ? '1' : '0') }} />
+                  Déconnecter aussi le compte déjà présent
+                </label>
+                <p style={{ margin: 0, fontSize: 11.5, color: DIM, flexBasis: '100%' }}>Chaque compte est rangé dans « Comptes créés » (identifiant + mot de passe) avant d’être déconnecté. Mode avion (nouvelle IP) avant chaque compte.{loopLogoutExisting ? ' ⚠ Le compte déjà connecté dans un container sera déconnecté : vérifie que tu as ses identifiants.' : ''}</p>
+              </div>
+            )}
+          </div>
         </div>
-        <LaunchBar n={4} summary={autoDetect ? (sel.size ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} : détection des containers puis un compte dans chaque container vide` : 'Choisis des iPhones à l’étape 1') : totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à créer` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode forceAirplane />} label={autoDetect ? `Détecter et remplir les containers (${sel.size} iPhone${sel.size > 1 ? 's' : ''})` : (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? `Créer ${totalJobs} compte(s)` : `Tester le flow (${totalJobs})`} disabled={(autoDetect ? !sel.size : !totalJobs) || running || !!detecting} running={running} onClick={createAccounts} />
+        <LaunchBar n={4} summary={autoDetect ? (sel.size ? `${sel.size} iPhone${sel.size > 1 ? 's' : ''} : détection des containers puis un compte dans chaque container vide` : 'Choisis des iPhones à l’étape 1') : totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à créer` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} accountMode forceAirplane />} label={autoDetect ? `Détecter et remplir les containers (${sel.size} iPhone${sel.size > 1 ? 's' : ''})${acctLoop && (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? ` · boucle ×${loopMax}` : ''}` : (smsProvider === 'herosms' ? heroKey : smsProvider === 'smspool' ? smspoolKey : sim5Key) ? (acctLoop ? `Créer jusqu’à ${totalJobs * loopMax} compte(s) en boucle` : `Créer ${totalJobs} compte(s)`) : `Tester le flow (${totalJobs})`} disabled={(autoDetect ? !sel.size : !totalJobs) || running || !!detecting} running={running} onClick={createAccounts} />
         <LogPanel />
         {createdAccts.length > 0 && (
           <div style={card}>
