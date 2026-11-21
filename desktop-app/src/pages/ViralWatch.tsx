@@ -12,6 +12,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { takeOpenArg, openTool } from '@/lib/openTool'
+import { igCodeFromLink } from '@/lib/igLink'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme } from '@/lib/theme'
@@ -145,11 +146,11 @@ async function callFn(body: Record<string, unknown>): Promise<Response> {
   return fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token ?? ''}` }, body: JSON.stringify(body) })
 }
 /** URL vidéo fraîche (HikerAPI) — seulement si celle stockée a expiré ; réenregistrée côté serveur. */
-const freshCache = new Map<string, { videoUrl: string | null; caption: string; duration: number; images?: string[] }>()
+const freshCache = new Map<string, { videoUrl: string | null; caption: string; duration: number; images?: string[]; thumb?: string | null }>()
 async function freshMedia(code: string) {
   const hit = freshCache.get(code); if (hit) return hit
   try {
-    const j = await (await callFn({ viral: 'media', code })).json() as { ok?: boolean; videoUrl: string | null; caption: string; duration: number; images?: string[] }
+    const j = await (await callFn({ viral: 'media', code })).json() as { ok?: boolean; videoUrl: string | null; caption: string; duration: number; images?: string[]; thumb?: string | null }
     if (!j?.ok) return null
     freshCache.set(code, j); return j
   } catch { return null }
@@ -168,6 +169,34 @@ async function downloadImage(u: string, name: string) {
   try { const b = await (await fetch(img(u))).blob(); const o = URL.createObjectURL(b); saveUrl(o, name); setTimeout(() => URL.revokeObjectURL(o), 10_000) }
   catch { window.open(img(u), '_blank', 'noopener') }
 }
+// Lien Instagram (Reel ou photo / carrousel) → téléchargement direct : vidéo en .mp4, photo(s) en .jpg.
+function LinkDownload({ theme }: { theme: Theme }) {
+  const [link, setLink] = useState('')
+  const [busy, setBusy] = useState(false)
+  const go = async () => {
+    const code = igCodeFromLink(link)
+    if (!code) { toast('Colle un lien de Reel ou de post Instagram (instagram.com/reel/… ou /p/…).', 'bad', 6000); return }
+    setBusy(true)
+    try {
+      const m = await freshMedia(code)
+      if (!m) { toast('Post introuvable (supprimé, compte privé ou lien invalide).', 'bad', 7000); return }
+      if (m.videoUrl) { saveUrl(vid(m.videoUrl, `ig_${code}`), `ig_${code}.mp4`); toast('Téléchargement de la vidéo lancé.', 'ok'); setLink(''); return }
+      const pics = (m.images?.length ? m.images : m.thumb ? [m.thumb] : [])
+      if (!pics.length) { toast('Aucun média trouvé dans ce post.', 'bad', 6000); return }
+      for (let i = 0; i < pics.length; i++) await downloadImage(pics[i], pics.length > 1 ? `ig_${code}_${i + 1}.jpg` : `ig_${code}.jpg`)
+      toast(pics.length > 1 ? `${pics.length} photos téléchargées.` : 'Photo téléchargée.', 'ok'); setLink('')
+    } finally { setBusy(false) }
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14, padding: 10, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#F4F4F5', whiteSpace: 'nowrap' }}>⬇ Télécharger depuis un lien</span>
+      <input value={link} onChange={e => setLink(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !busy) void go() }} placeholder="https://www.instagram.com/reel/… ou /p/…"
+        style={{ flex: '1 1 260px', minWidth: 0, height: 34, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)', background: '#0D0D0F', color: '#F4F4F5', fontSize: 13 }} />
+      <Btn theme={theme} tone="primary" label={busy ? 'Recherche…' : 'Télécharger'} disabled={busy || !link.trim()} onClick={() => void go()} />
+    </div>
+  )
+}
+
 async function copyText(text: string, okMsg: string) {
   try { await navigator.clipboard.writeText(text); toast(okMsg, 'ok') } catch { toast('Copie impossible.', 'bad') }
 }
@@ -1126,6 +1155,8 @@ export default function ViralWatch({ theme, user, org, isAdmin, onNavigate }: { 
           {(admin || mine.length > 0) && <Btn theme={theme} tone="primary" icon={I.refresh} label={refreshing ?? (admin ? 'Actualiser tout' : 'Actualiser mes comptes')} disabled={!!refreshing} onClick={() => void refreshAll()} />}
         </span>
       </div>
+
+      <LinkDownload theme={theme} />
 
       {isAdmin && noV4 && !userView && (
         <div style={{ marginBottom: 12, padding: '9px 12px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 12.5, color: '#FCD34D' }}>

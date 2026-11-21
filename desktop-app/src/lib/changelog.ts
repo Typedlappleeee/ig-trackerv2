@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21m',
+    date: '2026-11-21',
+    title: { fr: 'Télécharger un Reel ou une photo depuis un lien', en: 'Download a Reel or photo from a link' },
+    items: {
+      fr: ['Veille Reels : colle un lien Instagram (Reel, photo ou carrousel) et le média se télécharge directement — vidéo en .mp4, photo(s) en .jpg.'],
+      en: ['Reels watch: paste an Instagram link (Reel, photo or carousel) and the media downloads directly — video as .mp4, photo(s) as .jpg.'],
+    },
+  },
+  {
     id: '2026-11-21l',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : containers vérifiés à l’écran', en: 'iRemoTech: containers checked on screen' },
