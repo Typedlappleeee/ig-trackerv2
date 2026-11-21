@@ -1482,7 +1482,7 @@ const STORY_ANCHORS = {
   customText: { x: 0.5, y: 0.35 },    // « Customize sticker text »
   linkDone: { x: 0.88, y: 0.10 },      // « Done » de « Add link » (haut-droite, ligne du titre)
   stickerFrom: { x: 0.5, y: 0.43 },   // position initiale du sticker lien
-  stickerTo: { x: 0.72, y: 0.68 },    // cible : bas-droite, mais AU-DESSUS de la zone légende/boutons
+  stickerTo: { x: 0.76, y: 0.80 },    // cible : bas-droite, juste AU-DESSUS des boutons du bas (« Your story »…)
   shareArrow: { x: 0.87, y: 0.93 },   // flèche bleue de partage (bas-droite)
   shareSheet: { x: 0.5, y: 0.93 },    // bouton « Share » de la feuille de partage (bas, pleine largeur)
 }
@@ -1558,11 +1558,22 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0.04, 0.16], 'Done', 6)) hooks?.log?.('   (pas de Done → on continue)')
   await sleep(2600)
   await dismissIgInfoSheet(key, deviceId, hooks)
-  // 6. Icône sticker (côté droit) → ouvre le tiroir des stickers.
-  hooks?.log?.('🔖 Ouverture des stickers…')
-  await tapFrac(A.stickerIcon.x, A.stickerIcon.y)
-  await sleep(1600)
+  // 6. Icône sticker (colonne de droite) → tiroir des stickers. VÉRIFIÉ avant d'écrire quoi que ce soit : sur
+  //    certaines stories (photo) la colonne est décalée et le tap ouvrait l'outil Texte (« link » écrit en texte).
   if (!opts.link || !opts.link.trim()) { hooks?.log?.('⚠ Aucun lien fourni pour la story.'); return false }
+  hooks?.log?.('🔖 Ouverture des stickers…')
+  let tray = false
+  for (const fy of [A.stickerIcon.y, 0.22, 0.10, 0.28]) {
+    await tapFrac(A.stickerIcon.x, fy)
+    await sleep(1700)
+    if (await hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.35] })) { tray = true; break }
+    // outil Texte ouvert par erreur (« Classic / Modern », « Done ») → on le referme SANS rien écrire
+    if (await hasText(key, deviceId, [/^(classic|modern|signature|typewriter)$/i], hooks, { tries: 1, cropY: [0.6, 1] })) {
+      hooks?.log?.('   outil Texte ouvert par erreur → fermé sans écrire, icône suivante')
+      await tapFrac(A.doneBtn.x, 0.06); await sleep(1500)
+    } else hooks?.log?.('   tiroir des stickers pas ouvert → icône suivante')
+  }
+  if (!tray) { hooks?.log?.('❌ tiroir des stickers introuvable → rien n’est publié'); return false }
 
   // 7. Recherche → « link ».
   if (!await findTapText(key, deviceId, [/search|rechercher/i], hooks, { label: 'Search', maxY: 0.3, tries: 3 })) {
