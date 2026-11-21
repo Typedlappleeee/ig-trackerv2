@@ -1804,6 +1804,16 @@ async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHoo
 }
 
 /** Ouvre la feuille de bascule de comptes (onglet Profil → nom en haut). Renvoie les mots lus, ou null. */
+/** Écran de blocage d'un compte : vérification humaine, ou retour à « Join Instagram » (compte déconnecté). */
+async function accountBlockedScreen(key: string, deviceId: string): Promise<string | null> {
+  const scr = await readScreenWords(key, deviceId)
+  if (!scr) return null
+  const act = decideEndScreen(scr.words, scr.W, scr.H)
+  if (act?.kind === 'captcha') return 'Instagram demande une vérification humaine (« Confirm you’re human »)'
+  if (classifySignup(scr.words, scr.H) === 'join') return 'Instagram est revenu sur « Join Instagram » (compte déconnecté)'
+  return null
+}
+
 /** Quelques pas pilotés par le cerveau vision (écran inconnu). 'done' / 'stop' / 'none' (pas de cerveau ou pas sûr). */
 export async function brainNavigate(key: string, deviceId: string, goal: string, hooks?: VisionHooks, maxSteps = 4, o: { allowPhotos?: boolean } = {}): Promise<'done' | 'stop' | 'none'> {
   if (!hasVisionBrain()) return 'none'
@@ -1884,6 +1894,7 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
   let scr = await readScreenWords(key, deviceId)
   if (!scr) return null
   if (isSheet(scr)) return scr // Instagram rouvert là où on l'avait laissé : la feuille est déjà ouverte
+  if (decideEndScreen(scr.words, scr.W, scr.H)?.kind === 'captcha') { hooks?.log?.('🤖 Instagram demande une vérification humaine sur le compte actif : rien n’est tapé'); return null }
   const { W, H } = scr
   // 1. onglet Profil (vérifié : « followers / following » à l'écran), jusqu'à 3 taps ; d'abord retour à un écran
   //    avec la barre d'onglets (Instagram rouvre là où on l'a laissé : créateur, Reel plein écran, popup…)
@@ -1990,6 +2001,9 @@ export async function switchAccountByVision(key: string, deviceId: string, usern
     hooks?.log?.(`   tap sur @${u} (ligne y=${row.cy}, coches y=${dots.map(d => d.cy).join('/') || 'aucune'})`)
     if (k) await doubleTap(key, deviceId, x, row.cy); else await sendAction(key, deviceId, { type: 'tap', x, y: row.cy })
     await sleep(4500) // Instagram recharge le profil du compte → on rouvre la feuille pour vérifier la coche
+    // Compte bloqué par Instagram juste après la bascule (vu en vrai) : on n'y touche pas, compte suivant
+    const blocked = await accountBlockedScreen(key, deviceId)
+    if (blocked) { hooks?.log?.(`🤖 @${u} : ${blocked} → compte passé (à régler à la main)`); return false }
   }
   hooks?.log?.(`❌ bascule sur @${u} non confirmée`)
   return false
