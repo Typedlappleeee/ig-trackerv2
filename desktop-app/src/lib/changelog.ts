@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21j',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : sticker lien en bas à droite', en: 'iRemoTech: link sticker at the bottom right' },
+    items: {
+      fr: [
+        'Story CTA : le sticker lien est lu à l’écran puis glissé dans le coin bas-droite, et sa position est vérifiée (jusqu’à 3 essais).',
+        'Publication depuis l’onglet Profil : la feuille « Create » ouverte par le + est fermée et le moteur repasse par le fil (Story, Reel et carrousel).',
+      ],
+      en: [
+        'CTA Story: the link sticker is read on screen, dragged into the bottom-right corner and its position is checked (up to 3 tries).',
+        'Posting from the Profile tab: the “Create” sheet opened by + is closed and the engine goes back through the feed (Story, Reel and carousel).',
+      ],
+    },
+  },
+  {
     id: '2026-11-21i',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : Story CTA fiabilisée', en: 'iRemoTech: more reliable CTA Story' },

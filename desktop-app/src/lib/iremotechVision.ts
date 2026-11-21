@@ -3,7 +3,7 @@
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
 import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
-import { ocrWords, findBlueButton, findBlueDots, findWhiteDisks, meanLuma, pixelRgb } from './ocr'
+import { ocrWords, findBlueButton, findBlueDots, findWhiteDisks, meanLuma, pixelRgb, type OcrWord } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { parseProfileCounts, saveScreenStats, parseCount } from './irtAccounts'
 import { askBrain, hasVisionBrain } from './visionBrain'
@@ -657,6 +657,31 @@ async function selectMode(key: string, deviceId: string, patterns: RegExp[], lab
   return false
 }
 
+/** Feuille « Create » (Reel / Edits / Post / Story / Instants / Highlights / Live) : ce que le + ouvre depuis
+ *  l'onglet PROFIL (depuis le fil, il ouvre directement la galerie « New post »). Pure. */
+export function createSheetShown(words: { text: string; cy: number }[], H: number): boolean {
+  const rows = new Set(words.filter(o => o.cy > H * 0.3 && /^(reel|edits|post|story|instants|highlights|live)$/i.test(o.text)).map(o => o.text.toLowerCase()))
+  return rows.size >= 3 && words.some(o => /^create$/i.test(o.text) && o.cy > H * 0.25 && o.cy < H * 0.6)
+}
+
+/** Tape le + (haut-gauche). S'il ouvre la feuille « Create » (on était sur le profil, ex. après la bascule de
+ *  compte), on la ferme, on passe sur l'onglet Accueil et on retape le + → galerie « New post » (chemin testé). */
+async function tapCreatePlus(key: string, deviceId: string, W: number, H: number, pt: { x: number; y: number }, hooks?: VisionHooks): Promise<void> {
+  const plus = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(pt.x * W), y: Math.round(pt.y * H) })
+  await plus()
+  await sleep(2200)
+  const scr = await readScreenWords(key, deviceId)
+  if (!scr || !createSheetShown(scr.words, scr.H)) return
+  hooks?.log?.('   feuille « Create » (onglet Profil) → fermée, onglet Accueil, puis + à nouveau')
+  await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.5 * W), y: Math.round(0.15 * H) }) // zone grisée au-dessus de la feuille
+  await sleep(1200)
+  // onglet Accueil, puis un 2e tap (séparé) : le fil garde sa position de défilement, le 2e tap le remonte
+  // tout en haut, là où se trouve le + (sinon le tap tombe dans un post / un hashtag).
+  for (let k = 0; k < 2; k++) { await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * W), y: Math.round(0.962 * H) }); await sleep(k ? 2500 : 1800) }
+  await plus()
+  await sleep(2200)
+}
+
 export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
   const shot0 = await snapshot(key, deviceId)
@@ -669,8 +694,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   await dismissIgInfoSheet(key, deviceId, hooks)
   // 1. Ouvrir le créateur (+ haut-gauche)
   hooks?.log?.('➕ Ouverture du créateur (+)…')
-  await tapFrac(A.createPlus.x, A.createPlus.y)
-  await sleep(2200)
+  await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
   if (await grantPhotoAccessIfAsked(key, deviceId, hooks)) {
     hooks?.log?.('   Instagram relancé après l’accès aux photos → on rouvre le créateur')
     await dismissPopups(key, deviceId, hooks)
@@ -1046,8 +1070,7 @@ export async function postCarouselByVision(key: string, deviceId: string, opts: 
     await dismissPopups(key, deviceId, hooks)
     await dismissIgInfoSheet(key, deviceId, hooks)
     hooks?.log?.(`➕ Ouverture du créateur (+) — carrousel de ${count} photo(s)…`)
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(A.createPlus.x * W), y: Math.round(A.createPlus.y * H) })
-    await sleep(2200)
+    await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
     if (!await grantPhotoAccessIfAsked(key, deviceId, hooks)) break
     hooks?.log?.('   Instagram relancé après l’accès aux photos → on rouvre le créateur')
   }
@@ -1851,8 +1874,7 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   await dismissIgInfoSheet(key, deviceId, hooks) // « Stories archive », « Introducing… » : bouton OK au milieu
   // 1. Ouvrir le créateur (+ haut-gauche) — même point d'entrée que le Reel.
   hooks?.log?.('➕ Ouverture du créateur (+)…')
-  await tapFrac(REEL_ANCHORS.createPlus.x, REEL_ANCHORS.createPlus.y)
-  await sleep(2200)
+  await tapCreatePlus(key, deviceId, W, H, REEL_ANCHORS.createPlus, hooks)
   await grantPhotoAccessIfAsked(key, deviceId, hooks)
   // 2. Mode STORY (bandeau du bas). Barre masquée (Instagram a rouvert la caméra Story, une
   //    bulle d'effet la remplace) + vignette de galerie en bas-gauche → déjà sur la caméra.
@@ -1962,6 +1984,47 @@ export function linkStickerPoint(words: { text: string; cx: number; cy: number }
   return null
 }
 
+/** Texte affiché par le sticker lien sans texte perso : le domaine (sans www). Pure. */
+export function stickerDomain(link?: string): string {
+  if (!link) return ''
+  try { return new URL(/^https?:\/\//i.test(link) ? link : `https://${link}`).hostname.replace(/^www\./i, '') } catch { return '' }
+}
+const normTok = (s: string) => s.toLowerCase().replace(/[^a-z0-9.]/g, '')
+/** Boîte du texte du sticker lien dans l'éditeur de Story (ligne qui contient le plus de mots du libellé),
+ *  hors en-tête et barre du bas. Pure. */
+export function findStickerBox(words: { text: string; x: number; w: number; cx: number; cy: number }[], label: string, W: number, H: number): { x0: number; x1: number; cx: number; cy: number } | null {
+  const toks = label.split(/\s+/).map(normTok).filter(t => t.length > 0)
+  if (!toks.length) return null
+  const hits = words.filter(o => {
+    const t = normTok(o.text)
+    if (!t || o.cy < H * 0.1 || o.cy > H * 0.93) return false
+    return toks.some(k => t === k || (k.length >= 4 && t.length >= 4 && (t.includes(k) || k.includes(t))))
+  })
+  if (!hits.length) return null
+  let best: typeof hits = []
+  for (const h of hits) {
+    const line = hits.filter(o => Math.abs(o.cy - h.cy) < H * 0.025)
+    const n = new Set(line.map(o => normTok(o.text))).size
+    if (n > new Set(best.map(o => normTok(o.text))).size) best = line
+  }
+  // le libellé d'une seule lettre/mot court peut traîner ailleurs : au moins la moitié des mots requise
+  if (new Set(best.map(o => normTok(o.text))).size < Math.ceil(toks.length / 2)) return null
+  const x0 = Math.min(...best.map(o => o.x)), x1 = Math.max(...best.map(o => o.x + o.w))
+  const cy = best.reduce((a, o) => a + o.cy, 0) / best.length
+  return { x0, x1, cx: (x0 + x1) / 2, cy }
+}
+/** Sticker dans le coin bas-droite (bord droit du texte ≥ 86 % de la largeur, hauteur 70–88 %). Pure. */
+export function stickerInCorner(box: { x1: number; cy: number }, W: number, H: number): boolean {
+  return box.x1 >= W * 0.86 && box.cy >= H * 0.7 && box.cy <= H * 0.88
+}
+/** Glissement qui amène le bord droit du texte à 92 % de la largeur et le sticker à 80 % de la hauteur
+ *  (au-dessus des boutons « Your story »…, loin de la corbeille centrale). Pure. */
+export function stickerDrag(box: { x1: number; cx: number; cy: number }, W: number, H: number): { x1: number; y1: number; x2: number; y2: number } {
+  const dx = W * 0.92 - box.x1, dy = H * 0.8 - box.cy
+  const clamp = (v: number, lo: number, hi: number) => Math.round(Math.min(hi, Math.max(lo, v)))
+  return { x1: Math.round(box.cx), y1: Math.round(box.cy), x2: clamp(box.cx + dx, W * 0.1, W * 0.95), y2: clamp(box.cy + dy, H * 0.15, H * 0.86) }
+}
+
 // Suite commune de la Story, une fois le média choisi : éditeur → stickers → lien → partage.
 async function finishStoryFromEditor(key: string, deviceId: string, W: number, H: number, A: typeof STORY_ANCHORS, opts: { caption?: string; link?: string }, hooks?: VisionHooks): Promise<boolean> {
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
@@ -2051,13 +2114,30 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   hooks?.log?.('✅ Validation « Done » (haut-droite)…')
   await tapFrac(A.linkDone.x, A.linkDone.y)
   await sleep(2200)
-  // 12. Glisser le sticker (placé au CENTRE par défaut) vers le bas-droite — un seul
-  //     swipe continu (doigt qui reste appuyé), depuis le milieu de l'écran.
-  hooks?.log?.('✋ Glissement du sticker (centre → bas-droite)…')
-  const fromX = Math.round(0.5 * W), fromY = Math.round(0.45 * H)
-  const toX = Math.round(A.stickerTo.x * W), toY = Math.round(A.stickerTo.y * H)
-  await sendAction(key, deviceId, { type: 'swipe', x1: fromX, y1: fromY, x2: toX, y2: toY, duration_ms: 1400 })
-  await sleep(1800)
+  // 12. Glisser le sticker (placé au CENTRE par défaut) dans le coin BAS-DROITE — swipe continu
+  //     (doigt qui reste appuyé). On lit où il est (texte du sticker), on vise son bord droit à
+  //     ~92 % de la largeur, puis on relit : jusqu'à 3 essais tant qu'il n'est pas dans le coin.
+  const stickerLabel = (opts.caption && opts.caption.trim()) || stickerDomain(opts.link)
+  // Le texte du sticker (noir sur pastille blanche) n'est lu qu'en mode « bloc » (psm 6) sur des bandes
+  // horizontales — le mode épars (psm 11) plein écran ne le voit pas (vérifié sur captures réelles).
+  const readSticker = async () => {
+    const shot = await snapRetry(key, deviceId)
+    if (!shot) return null
+    const words: OcrWord[] = []
+    for (const band of [[0.12, 0.4], [0.3, 0.62], [0.55, 0.92]] as [number, number][]) words.push(...await ocrWords(shot, undefined, { threshold: null, scale: 3, psms: ['6'], cropY: band }))
+    return findStickerBox(words, stickerLabel, W, H)
+  }
+  let placed = false
+  for (let attempt = 0; attempt < 3 && !placed; attempt++) {
+    const box = await readSticker()
+    if (box && stickerInCorner(box, W, H)) { placed = true; break }
+    const mv = box ? stickerDrag(box, W, H) : { x1: Math.round(0.5 * W), y1: Math.round(0.45 * H), x2: Math.round(A.stickerTo.x * W), y2: Math.round(A.stickerTo.y * H) }
+    hooks?.log?.(box ? `✋ Sticker lu en (${Math.round(box.cx)}, ${Math.round(box.cy)}) → coin bas-droite${attempt ? ` (essai ${attempt + 1}/3)` : ''}…` : '✋ Sticker non lu → glissement depuis le centre vers le bas-droite…')
+    await sendAction(key, deviceId, { type: 'swipe', ...mv, duration_ms: 1400 })
+    await sleep(1800)
+  }
+  if (!placed) { const box = await readSticker(); placed = !!box && stickerInCorner(box, W, H) }
+  hooks?.log?.(placed ? '📍 Sticker lien en bas à droite.' : '   (position du sticker non confirmée par la lecture — on continue)')
   // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
   const shot2 = await snapshot(key, deviceId)
   let arrowTapped = false
