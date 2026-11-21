@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('./supabase', () => ({ supabase: {} }))
 vi.mock('./iremotech', () => ({ snapshot: vi.fn(), sendAction: vi.fn(), deviceIp: vi.fn() }))
-import { gridCellAt, gridCellPoint, checkedCells, firstTimeOkTap } from './iremotechVision'
+import { gridCellAt, gridCellPoint, checkedCells, firstTimeOkTap, editorHasMusic } from './iremotechVision'
 import { whiteDisksIn } from './ocr'
 
 // Relevés réels (iPhone 406×720, 21/11/2026) : « Recents » y≈483 → grille à y=514, cases de 101,5 px.
@@ -53,5 +53,18 @@ describe('carrousel — détection des pastilles blanches', () => {
   })
   it('petit point blanc (bruit, chiffre) ignoré', () => {
     expect(whiteDisksIn(disk(50, 20, 4), W, 60)).toHaveLength(0)
+  })
+})
+
+describe('carrousel — musique dans l’éditeur photo', () => {
+  const tools = (first: string) => [first, 'Text', 'Overlay', 'Filter', 'Edit'].map((t, i) => ({ text: t, cy: 620, cx: 60 + i * 71 }))
+  it('libellé « Audio » encore là → pas de musique', () => {
+    expect(editorHasMusic(tools('Audio'), 720)).toBe(false)
+  })
+  it('pochette à la place de « Audio » → musique ajoutée', () => {
+    expect(editorHasMusic(tools('').filter(o => o.text), 720)).toBe(true)
+  })
+  it('pas dans l’éditeur → false', () => {
+    expect(editorHasMusic([{ text: 'Share', cy: 680 }], 720)).toBe(false)
   })
 })

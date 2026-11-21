@@ -698,11 +698,65 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
   return finishPostFromGallery(key, deviceId, W, H, A, caption, hooks, 'Vidéo publiée (POST)')
 }
 
+/** Éditeur photo : musique présente ? Le bouton « Audio » (1er de la barre d'outils) affiche la POCHETTE du morceau
+ *  une fois une musique ajoutée → son libellé « Audio » disparaît (Text / Overlay / Filter restent). Pure. */
+export function editorHasMusic(words: { text: string; cy: number }[], H: number): boolean {
+  const tools = words.filter(o => o.cy > H * 0.8 && o.cy < H * 0.9)
+  return tools.some(o => /^(overlay|filter|text)$/i.test(o.text)) && !tools.some(o => /^audio$/i.test(o.text))
+}
+
+/** Ajoute une musique dans l'éditeur photo : la « Suggested audio » d'Instagram (pastille en haut → + → Add),
+ *  sinon bouton Audio → un des 1ers morceaux « For you » → flèche →. Vérifié à l'écran. */
+async function addSuggestedMusic(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (hooks?.shouldStop?.()) return false
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) return false
+    const { words, W, H } = scr
+    if (editorHasMusic(words, H)) { hooks?.log?.('   ✓ musique présente'); return true }
+    const sugg = words.find(o => /^suggested$/i.test(o.text) && o.cy < H * 0.15)
+    if (sugg) {
+      hooks?.log?.('🎵 Musique suggérée par Instagram → +')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.754 * W), y: Math.max(Math.round(0.06 * H), sugg.cy - Math.round(0.011 * H)) })
+    } else {
+      const au = words.find(o => /^audio$/i.test(o.text) && o.cy > H * 0.8 && o.cy < H * 0.9)
+      if (!au) { hooks?.log?.('   ⚠ bouton Audio introuvable'); return false }
+      hooks?.log?.('🎵 Pas de suggestion → Audio › « For you »')
+      await sendAction(key, deviceId, { type: 'tap', x: au.cx, y: au.cy - Math.round(0.016 * H) })
+      await sleep(3500)
+      const list = await readScreenWords(key, deviceId)
+      // lignes de morceaux = sous-titres « Artiste · 30K reels · 1:55 » ; on prend l'un des 3 premiers (varie entre comptes)
+      const rows = (list?.words ?? []).filter(o => /^reels?$/i.test(o.text) && o.cy > H * 0.2).sort((a, b) => a.cy - b.cy)
+        .filter((o, i, a) => i === 0 || o.cy - a[i - 1].cy > 20)
+      const row = rows[Math.floor(Math.random() * Math.min(3, rows.length))]
+      const y = row ? row.cy - Math.round(0.032 * H) : Math.round(0.305 * H)
+      hooks?.log?.(`   morceau ${row ? rows.indexOf(row) + 1 : 1} de la liste → aperçu`)
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.4 * W), y })
+      await sleep(3000)
+      hooks?.log?.('   ✓ choisir ce morceau (→)')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.946 * H) })
+      await sleep(3000)
+      continue
+    }
+    await sleep(3000)
+    // feuille de découpe : « Cancel … Add » → Add (haut-droite de la feuille)
+    const sh = await readScreenWords(key, deviceId)
+    const add = sh?.words.find(o => /^(add|ajouter|done|ok)$/i.test(o.text) && o.cx > W * 0.6 && o.cy > H * 0.3 && o.cy < H * 0.7)
+    hooks?.log?.('   ✓ « Add »')
+    await sendAction(key, deviceId, { type: 'tap', x: add ? add.cx : Math.round(0.897 * W), y: add ? add.cy : Math.round(0.457 * H) })
+    await sleep(2500)
+  }
+  const fin = await readScreenWords(key, deviceId)
+  const ok = !!fin && editorHasMusic(fin.words, fin.H)
+  hooks?.log?.(ok ? '   ✓ musique ajoutée' : '❌ musique non ajoutée')
+  return ok
+}
+
 // Fin commune Vidéo / Carrousel : galerie « New post » (médias choisis) → Next → éditeur → Next → légende → Share.
-async function finishPostFromGallery(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks: VisionHooks | undefined, doneLabel: string): Promise<boolean> {
+async function finishPostFromGallery(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks: VisionHooks | undefined, doneLabel: string, music = false): Promise<boolean> {
   // b. Avancer jusqu'à l'écran de légende : Next en haut-droite (texte) ou en bas-droite (bouton bleu).
   let atCaption = false
-  for (let step = 0; step < 9 && !atCaption; step++) {
+  for (let step = 0; step < 11 && !atCaption; step++) {
     if (hooks?.shouldStop?.()) return false
     const shot = await snapshot(key, deviceId)
     if (!shot) { await sleep(800); continue }
@@ -749,6 +803,11 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     // Éditeur vidéo (« Edit video » + Audio / Text / Captions en bas) : bouton « Next → » bleu en bas à droite
     const inEditor = words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.85) && words.some(o => /^(audio|captions|overlay|voice)$/i.test(o.text) && o.cy > H * 0.75)
     if (inEditor) {
+      // Musique obligatoire (post photo) : ajoutée et vérifiée AVANT de quitter l'éditeur, sinon rien n'est publié
+      if (music && !editorHasMusic(words, H)) {
+        if (!await addSuggestedMusic(key, deviceId, hooks)) { hooks?.log?.('❌ pas de musique → rien n’est publié (container suivant)'); return false }
+        continue
+      }
       const blue = await findBlueButton(shot, 0.86, 0.99, 0.55, 1)
       const nx = blue ? blue.cx : Math.round(0.82 * W), ny = blue ? blue.cy : Math.round(0.925 * H)
       hooks?.log?.(`   éditeur vidéo → « Next → » (${nx}, ${ny})`)
@@ -915,7 +974,7 @@ async function selectCarouselPhotos(key: string, deviceId: string, count: number
 }
 
 /** Post feed CARROUSEL : `count` photos les plus récentes (injectées juste avant, dans l'ordre inverse) → légende → Share. */
-export async function postCarouselByVision(key: string, deviceId: string, opts: { count: number; caption?: string; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
+export async function postCarouselByVision(key: string, deviceId: string, opts: { count: number; caption?: string; music?: boolean; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
   const count = Math.max(1, Math.min(CAROUSEL_MAX, Math.round(opts.count)))
   const shot0 = await snapshot(key, deviceId)
@@ -933,7 +992,7 @@ export async function postCarouselByVision(key: string, deviceId: string, opts: 
   await sleep(1800)
   if (count > 1) { if (!await selectCarouselPhotos(key, deviceId, count, hooks)) return false }
   else hooks?.log?.('🖼 1 photo : la plus récente, pré-sélectionnée par Instagram')
-  return finishPostFromGallery(key, deviceId, W, H, A, opts.caption, hooks, count > 1 ? `Carrousel de ${count} photos publié` : 'Photo publiée')
+  return finishPostFromGallery(key, deviceId, W, H, A, opts.caption, hooks, count > 1 ? `Carrousel de ${count} photos publié` : 'Photo publiée', opts.music !== false)
 }
 
 // ── Création de compte Instagram pilotée à la VISION (début du flow) ────────────

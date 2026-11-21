@@ -120,6 +120,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const setPostType = (v: 'reel' | 'carousel') => { setPostTypeS(v); try { localStorage.setItem('sf-irt-post-type', v) } catch { /* ignore */ } }
   const [carCount, setCarCountS] = useState<number>(() => { try { const n = Number(localStorage.getItem('sf-irt-car-count')); return n >= 2 && n <= CAROUSEL_MAX ? n : 3 } catch { return 3 } })
   const setCarCount = (n: number) => { setCarCountS(n); try { localStorage.setItem('sf-irt-car-count', String(n)) } catch { /* ignore */ } }
+  const [carMusic, setCarMusicS] = useState<boolean>(() => { try { return localStorage.getItem('sf-irt-car-music') !== '0' } catch { return true } })
+  const setCarMusic = (v: boolean) => { setCarMusicS(v); try { localStorage.setItem('sf-irt-car-music', v ? '1' : '0') } catch { /* ignore */ } }
   // Source des médias : choix à la main (pool) ou un DOSSIER de la Banque, lu au lancement
   // (les vidéos ajoutées depuis sont prises). Retenu par onglet.
   type Src = { mode: 'pick' | 'folder'; folder: string }
@@ -454,7 +456,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const posted = kind === 'story'
           ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, vh)
           : kind === 'carousel'
-            ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption }, vh)
+            ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic }, vh)
             : await postReelByVision(key, p.dev, { caption: job.caption }, vh)
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
         if (posted) for (const v of job.vids) void bumpUsed(v.id)
@@ -891,6 +893,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 <select value={carCount} onChange={e => setCarCount(Number(e.target.value))} style={{ ...inp, height: 30, width: 64, cursor: 'pointer' }}>
                   {Array.from({ length: CAROUSEL_MAX - 1 }, (_, i) => i + 2).map(n => <option key={n} value={n} style={{ background: FIELD_BG }}>{n}</option>)}
                 </select>
+              </label>
+            )}
+            {postType === 'carousel' && (
+              <label title="Musique suggérée par Instagram (sinon un des 1ers morceaux « Pour toi »). Si aucune musique ne peut être ajoutée, le post n’est pas publié." style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
+                <input type="checkbox" checked={carMusic} onChange={e => setCarMusic(e.target.checked)} />
+                🎵 Musique (obligatoire)
               </label>
             )}
           </div>
