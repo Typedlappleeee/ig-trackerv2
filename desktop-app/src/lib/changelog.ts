@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21i',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : Story CTA fiabilisée', en: 'iRemoTech: more reliable CTA Story' },
+    items: {
+      fr: [
+        'Story : la photo choisie est toujours la dernière envoyée (galerie « Add to story » lue par position ; la vignette de la caméra montrait parfois une ancienne photo).',
+        'Sticker lien : la puce « Link » est visée sous l’intitulé « Stickers » et l’écran « Add link » est vérifié (URL / Customize) ; s’il n’est pas atteint, rien n’est publié (plus de Story sans lien).',
+        'Correction automatique du clavier iOS coupée une fois par iPhone avant les publications (« Clique ici » ne devient plus « Clique I I », légendes françaises intactes).',
+        'Fenêtres « Introducing story-to-story sharing » et « Stories archive » fermées seules ; la feuille Musique ouverte par erreur est refermée.',
+      ],
+      en: [
+        'Story: the chosen photo is always the last one sent (“Add to story” gallery read by position; the camera thumbnail sometimes showed an older photo).',
+        'Link sticker: the “Link” chip is targeted under the “Stickers” heading and the “Add link” screen is verified (URL / Customize); if it is not reached nothing is published (no more Story without a link).',
+        'iOS keyboard auto-correction turned off once per iPhone before posting (“Clique ici” no longer becomes “Clique I I”, French captions stay intact).',
+        '“Introducing story-to-story sharing” and “Stories archive” windows closed on their own; the Music sheet opened by mistake is closed again.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21h',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : carrousel photo avec musique', en: 'iRemoTech: photo carousel posts with music' },

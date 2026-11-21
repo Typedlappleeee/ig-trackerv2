@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
+import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
@@ -431,6 +431,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const tag = `[${p.name}]`
       const hooks = (m: string) => push(`${tag} ${m}`)
       await recalibrateTouch(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
+      // Correction automatique du clavier iOS coupée une fois par iPhone (sinon légendes / textes français déformés)
+      const acKey = `sf-irt-noautocorrect-${p.dev}`
+      let acDone = false
+      try { acDone = localStorage.getItem(acKey) === '1' } catch { /* ignore */ }
+      if (!acDone && await disableAutoCorrect(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })) { try { localStorage.setItem(acKey, '1') } catch { /* ignore */ } }
       for (const job of p.jobs) {
         if (R.isCancelled()) break
         push(`\n${tag} 📦 container « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)

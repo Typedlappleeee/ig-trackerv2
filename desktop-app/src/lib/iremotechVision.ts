@@ -3,7 +3,7 @@
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
 import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
-import { ocrWords, findBlueButton, findBlueDots, findWhiteDisks, meanLuma } from './ocr'
+import { ocrWords, findBlueButton, findBlueDots, findWhiteDisks, meanLuma, pixelRgb } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { parseProfileCounts, saveScreenStats, parseCount } from './irtAccounts'
 import { askBrain, hasVisionBrain } from './visionBrain'
@@ -341,6 +341,65 @@ async function findWordPoint(
 // « Skip », notifications, « Add to your story »…). Balayage léger, sans échec.
 /** Feuilles d'info d'Instagram (« Introducing story-to-story sharing », « New: … ») avec un bouton OK → OK.
  *  true si une feuille a été fermée. */
+/** Interrupteur iOS ACTIF = piste verte visible à gauche du rond blanc. Pure. */
+export const iosToggleOn = ([r, g, b]: [number, number, number]) => g > 170 && r < 140 && b < 160
+
+/** Coupe la CORRECTION AUTOMATIQUE du clavier iOS (Réglages › Général › Clavier) : sinon le clavier anglais remplace
+ *  les mots français au moment de valider (« Clique ici » → « Clique I I » sur un sticker lien, le 21/11/2026).
+ *  Accès par Spotlight (« Keyboard » → résultat Réglages « Keyboards » ; le schéma app-prefs est refusé par iRemoTech).
+ *  Vérifié à l'écran ; true = coupée (ou déjà coupée). */
+export async function disableAutoCorrect(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  hooks?.log?.('⌨️ Clavier iOS : coupure de la correction automatique (une fois par iPhone)…')
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1200)
+  const s0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = s0 ? await imgSize(s0) : { w: 0, h: 0 }
+  if (!W || !H) return false
+  await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(0.42 * H), x2: Math.round(W / 2), y2: Math.round(0.72 * H), duration_ms: 350 })
+  await sleep(1800)
+  // Spotlight garde la recherche précédente → bouton ⊗ du champ (en bas à droite) avant de taper
+  let scr = await readScreenWords(key, deviceId)
+  if (scr?.words.some(o => o.cy > H * 0.93 && /[a-z]{3,}/i.test(o.text))) { await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.904 * W), y: Math.round(0.96 * H) }); await sleep(800) }
+  // « Keyboard » → résultat Réglages « Keyboards · General » (plus stable que « Auto-Correction », souvent noyé dans le web)
+  await sendAction(key, deviceId, { type: 'text', text: 'Keyboard' })
+  await sleep(2500)
+  scr = await readScreenWords(key, deviceId)
+  const hit = scr?.words.find(o => /^keyboards$/i.test(o.text) && o.cy < H * 0.3)
+  if (!hit || !scr?.words.some(o => /^general$/i.test(o.text) && o.cy < H * 0.3)) { hooks?.log?.('   ⚠ réglage « Keyboards » introuvable dans Spotlight'); await sendAction(key, deviceId, { type: 'press', name: 'home' }); return false }
+  await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: hit.cy })
+  await sleep(2800)
+  for (let k = 0; k < 5; k++) {
+    scr = await readScreenWords(key, deviceId)
+    const row = scr?.words.find(o => /^auto-?correction$/i.test(o.text) && o.cx < W * 0.6 && o.cy > H * 0.1 && o.cy < H * 0.92)
+    if (!scr) { await sleep(1200); continue }
+    if (!row) {
+      // ligne plus bas dans la page (Réglages s'ouvre parfois en haut) → défiler la page des Réglages
+      await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(0.75 * H), x2: Math.round(W / 2), y2: Math.round(0.35 * H), duration_ms: 400 })
+      await sleep(1200); continue
+    }
+    const px = Math.round(0.783 * W)
+    if (!iosToggleOn(await pixelRgb(scr.shot, px, row.cy))) {
+      hooks?.log?.('   ✓ correction automatique coupée')
+      // UN seul appui (deux appuis rapprochés ouvrent le sélecteur d'apps)
+      await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
+      return true
+    }
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.84 * W), y: row.cy })
+    await sleep(1500)
+  }
+  hooks?.log?.('   ⚠ interrupteur « Auto-Correction » non coupé')
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  return false
+}
+
+/** Feuille d'info Instagram à gros bouton bleu « OK » + lien « View settings » / « Manage settings » dessous
+ *  (« Introducing story-to-story sharing », « Sharing posts ») : point du OK (6,8 % de la hauteur au-dessus du lien). Pure. */
+export function okAboveSettingsLink(words: { text: string; cx: number; cy: number }[], H: number): { y: number } | null {
+  const lk = words.find(o => /^(view|manage)$/i.test(o.text) && o.cy > H * 0.5
+    && words.some(p => /^settings$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
+  return lk ? { y: lk.cy - Math.round(0.068 * H) } : null
+}
+
 export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
   const scr = await readScreenWords(key, deviceId)
   if (!scr) return false
@@ -350,9 +409,11 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   // boutons d'alerte à côté du OK (moitié basse) → ce n'est pas une simple feuille d'info
   if (scr.words.some(o => /^(allow|don['’]?t|cancel|discard)$/i.test(o.text) && o.cy > scr.H * 0.4) && !has(/^introducing$/i)) return false
   const ok = scr.words.find(o => /^ok$/i.test(o.text) && o.cy > scr.H * 0.45 && Math.abs(o.cx - scr.W / 2) < scr.W * 0.2)
-  if (!ok) return false
+  // « OK » blanc sur gros bouton bleu souvent illisible : il est juste AU-DESSUS du lien « View settings » / « Manage settings »
+  const link = ok ? null : okAboveSettingsLink(scr.words, scr.H)
+  if (!ok && !link) return false
   hooks?.log?.('   feuille d’info Instagram (« Introducing… ») → OK')
-  await sendAction(key, deviceId, { type: 'tap', x: ok.cx, y: ok.cy })
+  await sendAction(key, deviceId, { type: 'tap', x: ok ? ok.cx : Math.round(scr.W / 2), y: ok ? ok.cy : link!.y })
   await sleep(1500)
   return true
 }
@@ -605,6 +666,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
 
   // 0. Ferme un éventuel popup avant de commencer (sinon il bloque le tap du +).
   await dismissPopups(key, deviceId, hooks)
+  await dismissIgInfoSheet(key, deviceId, hooks)
   // 1. Ouvrir le créateur (+ haut-gauche)
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   await tapFrac(A.createPlus.x, A.createPlus.y)
@@ -982,6 +1044,7 @@ export async function postCarouselByVision(key: string, deviceId: string, opts: 
   if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
   for (let k = 0; k < 2; k++) {
     await dismissPopups(key, deviceId, hooks)
+    await dismissIgInfoSheet(key, deviceId, hooks)
     hooks?.log?.(`➕ Ouverture du créateur (+) — carrousel de ${count} photo(s)…`)
     await sendAction(key, deviceId, { type: 'tap', x: Math.round(A.createPlus.x * W), y: Math.round(A.createPlus.y * H) })
     await sleep(2200)
@@ -1785,6 +1848,7 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
 
   await dismissPopups(key, deviceId, hooks)
+  await dismissIgInfoSheet(key, deviceId, hooks) // « Stories archive », « Introducing… » : bouton OK au milieu
   // 1. Ouvrir le créateur (+ haut-gauche) — même point d'entrée que le Reel.
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   await tapFrac(REEL_ANCHORS.createPlus.x, REEL_ANCHORS.createPlus.y)
@@ -1796,6 +1860,18 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   const inStoryCamera = async (s: string) => !!await findGalleryThumb(s)
   if (!await selectMode(key, deviceId, [/story|stories/i], 'STORY', hooks, inStoryCamera)) return false
   await sleep(1600)
+  // 2bis. Galerie « Add to story » ouverte DIRECTEMENT (depuis la galerie POST, iPhone normal) : 3 colonnes sous « Recents »,
+  //       1re case = appareil photo → le média le plus récent est la case juste après. Pas de caméra ni de vignette.
+  const sg = await readScreenWords(key, deviceId)
+  const sgPick = sg ? storyGalleryPick(sg.words, sg.W, sg.H) : null
+  if (sg && sgPick) {
+    const cw = sg.W / 3
+    const camera = (await meanLuma(sg.shot, 0.04, (sgPick.gridTop + cw * 0.15) / sg.H, 0.29, (sgPick.gridTop + cw * 1.5) / sg.H)) < 60
+    const x = Math.round(camera ? cw * 1.5 : cw * 0.5), y = sgPick.y
+    hooks?.log?.(`🖼️ Galerie « Add to story » → média le plus récent (${camera ? '2e case, après l’appareil photo' : '1re case'}) → tap (${x}, ${y})`)
+    await sendAction(key, deviceId, { type: 'tap', x, y })
+    return finishStoryFromEditor(key, deviceId, W, H, A, opts, hooks)
+  }
   // 3. Ouvrir la galerie : la VIGNETTE en bas-gauche = dernier média de la pellicule, donc la
   //    vidéo qu'on vient d'envoyer. Repérée à l'image (bordure blanche) ; son aperçu sert
   //    ensuite à retrouver CE média dans la galerie.
@@ -1828,6 +1904,18 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   // 4. La vidéo la plus récente : la case de la galerie qui montre le même média que la vignette
   //    (repli : 1re case, position connue).
   hooks?.log?.('🎞️ Sélection de la vidéo la plus récente…')
+  // Galerie « Add to story » reconnue → POSITION (case après l'appareil photo) : la vignette de la caméra montre parfois
+  // le dernier média UTILISÉ, pas le dernier ajouté (testé le 21/11/2026 : elle montrait une ancienne photo).
+  const sg2 = await readScreenWords(key, deviceId)
+  const pick2 = sg2 ? storyGalleryPick(sg2.words, sg2.W, sg2.H) : null
+  if (sg2 && pick2) {
+    const cw = sg2.W / 3
+    const camera = (await meanLuma(sg2.shot, 0.04, (pick2.gridTop + cw * 0.15) / sg2.H, 0.29, (pick2.gridTop + cw * 1.5) / sg2.H)) < 60
+    const x = Math.round(camera ? cw * 1.5 : cw * 0.5)
+    hooks?.log?.(`🖼️ Galerie « Add to story » → média le plus récent (${camera ? '2e case' : '1re case'}) → tap (${x}, ${pick2.y})`)
+    await sendAction(key, deviceId, { type: 'tap', x, y: pick2.y })
+    return finishStoryFromEditor(key, deviceId, W, H, A, opts, hooks)
+  }
   let cell: { cx: number; cy: number } | null = null
   for (let i = 0; i < 2 && thumb && !cell; i++) {
     if (i) await sleep(1200) // vignettes de la galerie encore en chargement
@@ -1841,6 +1929,42 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
     hooks?.log?.('   vidéo non reconnue dans la galerie → 1re case (position connue)')
     await tapFrac(A.firstThumb.x, A.firstThumb.y)
   }
+  return finishStoryFromEditor(key, deviceId, W, H, A, opts, hooks)
+}
+
+/** Galerie « Add to story » (titre en haut, raccourcis Add Yours / Music / Collage, « Recents ») : y du centre de la
+ *  1re rangée de cases (cases hautes : ~1,76 × la largeur d'une colonne) et haut de la grille. null sinon. Pure. */
+export function storyGalleryPick(words: { text: string; cx: number; cy: number }[], W: number, H: number): { y: number; gridTop: number } | null {
+  const top = (re: RegExp) => words.some(o => re.test(o.text) && o.cy < H * 0.12)
+  const title = top(/^add$/i) && top(/^story$/i)
+  const shortcuts = words.some(o => /^(collage|music)$/i.test(o.text) && o.cy < H * 0.35)
+  const rec = words.find(o => /^r[ée]cents?$/i.test(o.text) && o.cy > H * 0.15 && o.cy < H * 0.5)
+  if (!rec || !(title || shortcuts)) return null
+  const cw = W / 3, gridTop = Math.round(rec.cy + 0.067 * W)
+  return { y: Math.round(gridTop + cw * 0.88), gridTop }
+}
+
+/** Écran « Add link » du sticker lien (et non le tiroir des stickers). Pure. */
+export function addLinkScreen(words: { text: string }[]): boolean {
+  const has = (re: RegExp) => words.some(o => re.test(o.text))
+  if (has(/^(giphy|stickers)$/i) || has(/^searching/i)) return false
+  return has(/^url:?$/i) || has(/^customize$/i)
+}
+/** Sticker « Link » dans le tiroir après la recherche « link » : le mot lu (sous « Stickers », au-dessus de « GIPHY »),
+ *  sinon la puce juste sous l'intitulé « Stickers » (+5,8 % de la hauteur). Pure. */
+export function linkStickerPoint(words: { text: string; cx: number; cy: number }[], W: number, H: number): { x: number; y: number } | null {
+  const st = words.find(o => /^stickers$/i.test(o.text) && o.cy < H * 0.4)
+  const gi = words.find(o => /^giphy$/i.test(o.text) && o.cy < H * 0.5)
+  const lo = st ? st.cy + 5 : H * 0.15, hi = gi ? gi.cy - 5 : H * 0.35
+  const w = words.find(o => /^link$/i.test(o.text) && o.cy > lo && o.cy < hi)
+  if (w) return { x: w.cx, y: w.cy }
+  if (st) return { x: Math.round(W * 0.52), y: Math.round(st.cy + 0.058 * H) }
+  return null
+}
+
+// Suite commune de la Story, une fois le média choisi : éditeur → stickers → lien → partage.
+async function finishStoryFromEditor(key: string, deviceId: string, W: number, H: number, A: typeof STORY_ANCHORS, opts: { caption?: string; link?: string }, hooks?: VisionHooks): Promise<boolean> {
+  const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
   await sleep(3500) // laisse le média se charger (le « Done » apparaît ensuite)
   await dismissIgInfoSheet(key, deviceId, hooks) // « Introducing story-to-story sharing » (iPhone normal)
   // 5. Done (haut-droite) — si absent, on saute juste l'étape et on continue (des fois il n'y en a pas).
@@ -1853,10 +1977,17 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   if (!opts.link || !opts.link.trim()) { hooks?.log?.('⚠ Aucun lien fourni pour la story.'); return false }
   hooks?.log?.('🔖 Ouverture des stickers…')
   let tray = false
-  for (const fy of [A.stickerIcon.y, 0.22, 0.10, 0.28]) {
+  // (0,22 = icône MUSIQUE juste sous le sticker sur iPhone normal → essayée en dernier)
+  for (const fy of [A.stickerIcon.y, 0.10, 0.28, 0.22]) {
+    await dismissIgInfoSheet(key, deviceId, hooks) // « Introducing story-to-story sharing » peut arriver en retard
     await tapFrac(A.stickerIcon.x, fy)
     await sleep(1700)
     if (await hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.35] })) { tray = true; break }
+    // feuille MUSIQUE ouverte par erreur (« For you / Trending ») → tap sur l'aperçu en haut pour la fermer
+    if (await hasText(key, deviceId, [/^trending$/i, /^saved$/i], hooks, { tries: 1, cropY: [0.4, 0.75] })) {
+      hooks?.log?.('   feuille Musique ouverte par erreur → fermée, icône suivante')
+      await tapFrac(0.5, 0.2); await sleep(1500); continue
+    }
     // outil Texte ouvert par erreur (« Classic / Modern », « Done ») → on le referme SANS rien écrire
     if (await hasText(key, deviceId, [/^(classic|modern|signature|typewriter)$/i], hooks, { tries: 1, cropY: [0.6, 1] })) {
       hooks?.log?.('   outil Texte ouvert par erreur → fermé sans écrire, icône suivante')
@@ -1875,15 +2006,32 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   // 8. Sticker « Link » : OCR recadré serré sur la ligne « Stickers » (exclut GIPHY),
   //    sinon POSITION connue (après recherche « link » le bouton est toujours au même
   //    endroit) → ne bloque plus.
-  if (!await findTapText(key, deviceId, [/^link$/i], hooks, { label: 'sticker Link', cropY: [0.16, 0.30], tries: 4 })) {
-    hooks?.log?.('   « Link » non lu → position connue (centre de la ligne Stickers)')
-    await tapFrac(0.45, 0.235)
+  // VÉRIF : écran « Add link » = « URL » ou « Customize sticker text », et PLUS le tiroir (« Stickers » / « GIPHY »).
+  // ⚠ « Cancel » seul ne prouve rien : il est aussi à côté de la recherche du tiroir (le 21/11/2026 l'URL a été
+  // tapée dans la recherche et la Story est partie SANS lien).
+  const onAddLink = async () => {
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) return false
+    return addLinkScreen(scr.words)
   }
-  await sleep(1600)
-  // 8b. VÉRIF : on doit être sur l'écran « Add link » (marqueurs mono-mot : URL / Customize /
-  //     Cancel). Sinon (le sticker Link a raté) on n'écrit PAS l'URL.
-  if (!await hasText(key, deviceId, [/^url$/i, /customize/i, /^cancel$/i], hooks, { cropY: [0, 0.4], tries: 4 })) {
-    hooks?.log?.('❌ écran « Add link » non atteint → on abandonne le container')
+  let linkOk = false
+  for (let t = 0; t < 3 && !linkOk; t++) {
+    if (hooks?.shouldStop?.()) return false
+    const scr = await readScreenWords(key, deviceId)
+    const pt = scr ? linkStickerPoint(scr.words, scr.W, scr.H) : null
+    if (pt) {
+      hooks?.log?.(`🔗 sticker « Link » → tap (${pt.x}, ${pt.y})${t ? ` (essai ${t + 1})` : ''}`)
+      await sendAction(key, deviceId, { type: 'tap', x: pt.x, y: pt.y })
+    } else {
+      hooks?.log?.('   « Link » non lu → position connue')
+      await tapFrac(0.52, 0.265)
+    }
+    await sleep(2000)
+    linkOk = await onAddLink()
+    if (!linkOk) { await sleep(1200); linkOk = await onAddLink() }
+  }
+  if (!linkOk) {
+    hooks?.log?.('❌ écran « Add link » non atteint → rien n’est publié (container suivant)')
     return false
   }
   // 9. Saisir l'URL — le champ URL est déjà focus à l'ouverture, on tape directement.

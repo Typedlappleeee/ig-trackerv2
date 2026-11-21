@@ -265,6 +265,18 @@ export function whiteDisksIn(white: (x: number, y: number) => boolean, W: number
   return out
 }
 
+/** Couleur moyenne [r,g,b] d'un petit carré (rayon `r` px) autour d'un point en pixels. */
+export async function pixelRgb(image: string, x: number, y: number, r = 2): Promise<[number, number, number]> {
+  const img = await loadImg(image)
+  const cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight
+  const ctx = cv.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+  const d = ctx.getImageData(Math.max(0, x - r), Math.max(0, y - r), 2 * r + 1, 2 * r + 1).data
+  let R = 0, G = 0, B = 0, n = 0
+  for (let i = 0; i < d.length; i += 4) { R += d[i]; G += d[i + 1]; B += d[i + 2]; n++ }
+  return [R / n, G / n, B / n]
+}
+
 /** Luminance moyenne d'une zone (fractions de l'image) : case « appareil photo » de la galerie = sombre. */
 export async function meanLuma(image: string, x0: number, y0: number, x1: number, y1: number): Promise<number> {
   const img = await loadImg(image)
