@@ -687,6 +687,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                   })}
                 </div>
               ) : <div style={{ fontSize: 12.5, color: MUTED, flex: '1 1 320px' }}>Pas encore détecté : « 🔍 Détecter » lit les containers (jailbreak) ou les comptes Instagram (iPhone normal).</div>}
+              {!opts?.manage && list.length > 0 && (
+                <button style={{ ...btn, height: 28, fontSize: 13, padding: '0 9px', marginLeft: 'auto' }} disabled={running || !!detecting || !live} title="Relire les comptes / containers de cet iPhone (un compte ajouté ? clique ici)" onClick={() => void detectOne(id)}>{detecting === id ? '…' : '↻'}</button>
+              )}
               {(opts?.manage || !list.length) && (
                 <button style={{ ...btn, height: 28, fontSize: 12, padding: '0 10px', marginLeft: 'auto' }} disabled={running || !!detecting || !live} title={kind === 'normal' ? 'Ouvre Instagram → Profil → liste des comptes, et lit les comptes connectés' : 'Lit les containers Crane (ou, sur un iPhone normal, les comptes Instagram connectés)'} onClick={() => void detectOne(id)}>{detecting === id ? 'Détection…' : '🔍 Détecter'}</button>
               )}

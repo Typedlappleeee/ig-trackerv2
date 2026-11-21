@@ -3738,6 +3738,7 @@ export const EN: Dict = {
     "🍪 Écran des cookies → « Allow all cookies »": "🍪 Cookie screen → “Allow all cookies”",
     "Allow all cookies": "Allow all cookies",
     "cookies acceptés ✓": "cookies accepted ✓",
+    "Relire les comptes / containers de cet iPhone (un compte ajouté ? clique ici)": "Re-read this iPhone's accounts / containers (added an account? click here)",
     "Rechercher un iPhone ou un compte…": "Search an iPhone or an account…",
     "les iPhones pas encore détectés (": "the iPhones not detected yet (",
     "Aucun iPhone ne correspond. Détecte les comptes / containers dans « Téléphones » ou « Comptes Instagram ».": "No iPhone matches. Detect the accounts / containers in “Phones” or “Instagram accounts”.",
