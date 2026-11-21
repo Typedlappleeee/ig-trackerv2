@@ -661,6 +661,19 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
       }
       await sleep(1500); continue
     }
+    // Éditeur vidéo (« Edit video » + Audio / Text / Captions en bas) : bouton « Next → » bleu en bas à droite
+    const inEditor = words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.85) && words.some(o => /^(audio|captions|overlay|voice)$/i.test(o.text) && o.cy > H * 0.75)
+    if (inEditor) {
+      const blue = await findBlueButton(shot, 0.86, 0.99, 0.55, 1)
+      const nx = blue ? blue.cx : Math.round(0.82 * W), ny = blue ? blue.cy : Math.round(0.925 * H)
+      hooks?.log?.(`   éditeur vidéo → « Next → » (${nx}, ${ny})`)
+      await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny })
+      await sleep(3500)
+      const after = await snapshot(key, deviceId)
+      const still = after ? (await ocrWords(after, undefined, { threshold: null, scale: 2, psms: ['11'], cropY: [0.85, 1] })).some(o => /^edit$/i.test(o.text)) : false
+      if (still) { hooks?.log?.('   éditeur toujours affiché → double tap'); await doubleTap(key, deviceId, nx, ny); await sleep(3500) }
+      continue
+    }
     let top = await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next (haut)', tries: 2, minX: 0.55, cropY: [0, 0.14] })
     // écran « New post » (iPhone normal) : « Next » violet sur noir en haut à droite, souvent illisible → position connue
     if (!top && words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.07) && words.some(o => /^post$/i.test(o.text) && o.cy < H * 0.07)) {
