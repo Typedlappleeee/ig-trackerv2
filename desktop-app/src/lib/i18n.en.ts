@@ -4650,6 +4650,7 @@ export const EN: Dict = {
     ["❌ « {0} » n’est pas dans le sélecteur (containers vus : {1})", "❌ “{0}” is not in the picker (containers seen: {1})"],
     ["⚠ le champ affiche @{0} (saisie non prise) → on garde ce nom pour les identifiants", "⚠ the field shows @{0} (typing not taken) → keeping this name for the credentials"],
     ["🍪 Cookies toujours affichés → redémarrage d’Instagram ({0}/2)", "🍪 Cookies still shown → restarting Instagram ({0}/2)"],
+    ["tap « {0} »", "tap “{0}”"],
     ["Lecture des stats sur {0} ({1} compte(s), ~30 s chacun) — ne touche pas l’iPhone", "Reading stats on {0} ({1} account(s), ~30 s each) — don't touch the iPhone"],
     ["{0} : stats relues pour {1}/{2} compte(s)", "{0}: stats re-read for {1}/{2} account(s)"],
     ["📊 {0} publications · {1} abonnés · {2} abonnements", "📊 {0} posts · {1} followers · {2} following"],

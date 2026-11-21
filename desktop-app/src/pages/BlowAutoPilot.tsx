@@ -20,6 +20,8 @@ import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing,
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import IrtAccounts from '@/components/IrtAccounts'
 import { isJunkUsername, deviceAccounts } from '@/lib/irtAccounts'
+import { setVisionBrain } from '@/lib/visionBrain'
+import { useConnections } from '@/lib/connections'
 import { listJobs, type IrtJob } from '@/lib/iremotech'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
@@ -162,6 +164,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [importOpen, setImportOpen] = useState(false)
   const [pickQ, setPickQ] = useState('')
   const [irtJobs, setIrtJobs] = useState<Record<string, IrtJob[]>>({})
+  // Cerveau vision des automatisations = clé Groq de l'espace (Réglages › IA)
+  const conns = useConnections(user, org)
+  useEffect(() => { setVisionBrain(conns.groq) }, [conns.groq])
   const [showEmptyPhones, setShowEmptyPhones] = useState(false)
   const [importText, setImportText] = useState('')
   const [showLog, setShowLog] = useState(false)   // journal détaillé déplié

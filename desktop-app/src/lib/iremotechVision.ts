@@ -6,6 +6,7 @@ import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
 import { ocrWords, findBlueButton, findBlueDots } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { parseProfileCounts, saveScreenStats, parseCount } from './irtAccounts'
+import { askBrain, hasVisionBrain } from './visionBrain'
 import { findGalleryThumb, findMatchingCell } from './screenMatch'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -1196,20 +1197,21 @@ async function snapRetry(key: string, deviceId: string): Promise<string | null> 
   return shot
 }
 
-async function readScreenWords(key: string, deviceId: string): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number } | null> {
+async function readScreenWords(key: string, deviceId: string): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number; shot: string } | null> {
   const shot = await snapRetry(key, deviceId)
   if (!shot) return null
   const { w: W, h: H } = await imgSize(shot)
   if (!W || !H) return null
   const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
   const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
-  return { words: [...wa, ...wb], W, H }
+  return { words: [...wa, ...wb], W, H, shot }
 }
 
 /** Fait défiler les écrans de fin jusqu'au fil Instagram. 'feed' = prêt à poster, 'refused' = refus, 'unknown'. */
 export async function settleToFeed(key: string, deviceId: string, hooks?: VisionHooks, container?: string): Promise<'feed' | 'refused' | 'captcha' | 'unknown'> {
   hooks?.log?.('⏭ Écrans de fin : lecture de l’écran → action, jusqu’au fil Instagram…')
   let idle = 0, reopened = false, last = '', unfollowRounds = 0
+  const brainLog: string[] = []
   let same = 0
   for (let step = 0; step < 28; step++) {
     if (hooks?.shouldStop?.()) return 'unknown'
@@ -1272,6 +1274,20 @@ export async function settleToFeed(key: string, deviceId: string, hooks?: Vision
       else await sendAction(key, deviceId, { type: 'tap', x: act.x, y: act.y })
       if (same >= 5) { hooks?.log?.('   ⚠ écran bloqué sur le même bouton'); break }
       idle = 0; await sleep(1500); continue
+    }
+    // Écran inconnu → d'abord le cerveau vision (il lit l'écran et choisit un bouton sûr)
+    if (hasVisionBrain() && idle < 6) {
+      const b = await askBrain(scr.shot, scr.words, scr.W, scr.H, 'Finish Instagram\'s new-account onboarding and reach the home feed ("For you" / "Your story"). Skip every optional step (profile photo, find friends, follow people, notifications, contacts, sync).', brainLog)
+      if (b) {
+        hooks?.log?.(`   🧠 IA : ${b.kind === 'tap' ? `tap « ${b.label} »` : b.kind}${b.reason ? ` — ${b.reason}` : ''}`)
+        if (b.kind === 'stop') return /human|captcha|robot|verif/i.test(b.reason) ? 'captcha' : 'unknown'
+        if (b.kind === 'done') return 'feed'
+        if (b.kind === 'wait') { idle++; await sleep(2500); continue }
+        if (b.kind === 'back') await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.07 * scr.W), y: Math.round(0.065 * scr.H) })
+        else await sendAction(key, deviceId, { type: 'tap', x: b.x, y: b.y })
+        brainLog.push(b.kind === 'tap' ? `tap "${b.label}"` : b.kind)
+        idle++; await sleep(1800); continue
+      }
     }
     // Écran inconnu avec un bouton bleu : 1er passage → « Skip » juste dessous ; si l'écran n'a pas bougé →
     // le bouton bleu lui-même (Next / Continue mal lu). On ne quitte JAMAIS le container ici.
@@ -1764,6 +1780,28 @@ async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHoo
 }
 
 /** Ouvre la feuille de bascule de comptes (onglet Profil → nom en haut). Renvoie les mots lus, ou null. */
+/** Quelques pas pilotés par le cerveau vision (écran inconnu). 'done' / 'stop' / 'none' (pas de cerveau ou pas sûr). */
+export async function brainNavigate(key: string, deviceId: string, goal: string, hooks?: VisionHooks, maxSteps = 4, o: { allowPhotos?: boolean } = {}): Promise<'done' | 'stop' | 'none'> {
+  if (!hasVisionBrain()) return 'none'
+  const history: string[] = []
+  for (let k = 0; k < maxSteps; k++) {
+    if (hooks?.shouldStop?.()) return 'none'
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) return 'none'
+    const act = await askBrain(scr.shot, scr.words, scr.W, scr.H, goal, history, o)
+    if (!act) return k ? 'done' : 'none'
+    hooks?.log?.(`   🧠 IA : ${act.kind === 'tap' ? `tap « ${act.label} »` : act.kind}${act.reason ? ` — ${act.reason}` : ''}`)
+    if (act.kind === 'done') return 'done'
+    if (act.kind === 'stop') return 'stop'
+    if (act.kind === 'wait') { await sleep(3000); continue }
+    if (act.kind === 'back') await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.07 * scr.W), y: Math.round(0.065 * scr.H) })
+    else await sendAction(key, deviceId, { type: 'tap', x: act.x, y: act.y })
+    history.push(act.kind === 'tap' ? `tap "${act.label}"` : act.kind)
+    await sleep(2200)
+  }
+  return 'done'
+}
+
 /** Ramène Instagram sur un écran avec la barre d'onglets (il rouvre là où on l'a laissé : créateur, Reel plein écran…). */
 async function backToTabs(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
   for (let k = 0; k < 4; k++) {
@@ -1810,6 +1848,11 @@ async function backToTabs(key: string, deviceId: string, hooks?: VisionHooks): P
   }
 }
 
+/** Écran sans règle et sans barre d'onglets lisible → le cerveau vision ramène sur l'écran principal d'Instagram. */
+async function brainBackToTabs(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
+  await brainNavigate(key, deviceId, 'Get back to Instagram\'s main screen where the bottom tab bar (Home, Reels, Messages, Search, Profile) is visible. Close popups, sheets, editors and drafts WITHOUT posting, saving or changing anything (Cancel / Not now / Discard / close X / back arrow).', hooks, 4)
+}
+
 async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHooks): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number } | null> {
   const isSheet = (scr: { words: { text: string; cx: number; cy: number }[]; H: number } | null) => !!scr && (addAccountRowY(scr.words) ?? 0) > scr.H * 0.4
   // « followers » ET « following » en haut (le mot « posts » seul trompait : popup « Video posts are now shared… »)
@@ -1822,6 +1865,7 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
   //    avec la barre d'onglets (Instagram rouvre là où on l'a laissé : créateur, Reel plein écran, popup…)
   for (let k = 0; k < 3 && !isProfile(scr); k++) {
     if (k === 0) await backToTabs(key, deviceId, hooks)
+    else if (k === 1 && hasVisionBrain()) await brainBackToTabs(key, deviceId, hooks)
     else hooks?.log?.('   onglet Profil pas ouvert → nouveau tap')
     const px = Math.round(0.9 * W), py = Math.round(0.963 * H)
     if (k) await doubleTap(key, deviceId, px, py) // tap simple parfois ignoré ; double tap sans risque sur cet onglet

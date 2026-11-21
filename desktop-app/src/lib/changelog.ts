@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21g',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : un cerveau IA pour les écrans inconnus', en: 'iRemoTech: an AI brain for unknown screens' },
+    items: {
+      fr: [
+        'Quand l’automatisation tombe sur un écran qu’elle ne connaît pas, elle montre la capture à une IA vision (clé Groq de l’espace, Réglages › IA) qui choisit le bon bouton parmi ceux lus à l’écran, avec sa raison dans le journal (« 🧠 IA : … »).',
+        'Garde-fous codés en dur : jamais « Allow » contacts / notifications / localisation, jamais « Follow », supprimer, se déconnecter ni payer ; captcha → container suivant.',
+        'Utilisé en fin de création de compte et pour revenir au fil Instagram depuis n’importe quel écran.',
+      ],
+      en: [
+        'When the automation hits a screen it does not know, it shows the screenshot to a vision AI (the workspace Groq key, Settings › AI) that picks the right button among those read on screen, with its reason in the log (“🧠 AI: …”).',
+        'Hard-coded guardrails: never “Allow” contacts / notifications / location, never “Follow”, delete, log out or pay; captcha → next container.',
+        'Used at the end of account creation and to get back to the Instagram feed from any screen.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21f',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : comptes signalés en rouge, faux comptes retirés', en: 'iRemoTech: flagged accounts in red, fake accounts removed' },
