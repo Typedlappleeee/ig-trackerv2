@@ -3738,6 +3738,7 @@ export const EN: Dict = {
     "🍪 Écran des cookies → « Allow all cookies »": "🍪 Cookie screen → “Allow all cookies”",
     "Allow all cookies": "Allow all cookies",
     "cookies acceptés ✓": "cookies accepted ✓",
+    "🏠 Sortie d’Instagram (écran d’accueil) avant le mode avion…": "🏠 Leaving Instagram (home screen) before airplane mode…",
     "Instagram demande une vérification humaine (« Confirm you’re human »)": "Instagram asks for a human check (“Confirm you’re human”)",
     "Instagram est revenu sur « Join Instagram » (compte déconnecté)": "Instagram went back to “Join Instagram” (account logged out)",
     "🤖 Instagram demande une vérification humaine sur le compte actif : rien n’est tapé": "🤖 Instagram asks for a human check on the active account: nothing is tapped",

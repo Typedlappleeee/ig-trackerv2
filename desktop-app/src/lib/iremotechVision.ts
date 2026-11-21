@@ -58,6 +58,11 @@ export async function recalibrateTouch(key: string, deviceId: string, hooks?: Vi
 export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
   // `device_ip` passe par le raccourci iOS « iRemotech » (souvent null) et chaque appel compte dans la limite
   // de débit : un appel avant, et on ne relit après que si la 1re lecture a marché.
+  // JAMAIS avec Instagram à l'écran (une coupure réseau en pleine session peut déclencher une vérification) :
+  // on sort sur l'écran d'accueil d'abord ; Instagram ne sera rouvert qu'APRÈS, sur le compte / container suivant.
+  hooks?.log?.('🏠 Sortie d’Instagram (écran d’accueil) avant le mode avion…')
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1800)
   const before = await deviceIp(key, deviceId)
   if (await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 2)) {
     hooks?.log?.(`✈️ Mode avion ON (natif)${before ? ` · IP actuelle ${before}` : ''}…`)
