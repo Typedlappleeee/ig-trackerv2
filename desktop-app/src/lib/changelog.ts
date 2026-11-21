@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-21h',
+    date: '2026-11-21',
+    title: { fr: 'iRemoTech : carrousel photo dans le fil', en: 'iRemoTech: photo carousel feed posts' },
+    items: {
+      fr: [
+        'Posting › « 🖼 Carrousel photo » : chaque compte coché publie un post de 2 à 6 photos différentes (pool ou dossier de la Banque) avec une légende de la liste.',
+        'Les photos sont injectées dans l’ordre puis cochées une à une en sélection multiple ; chaque coche est vérifiée à l’écran avant la suivante (jamais de double tap qui décocherait).',
+        'Fenêtres « première fois » d’Instagram passées seules (« Share more », « Find your vibe », « Sharing posts ») ; si Instagram n’a pas accès aux photos, ScaleFlow coche « All Photos » dans les Réglages iOS puis reprend.',
+        'ScaleFlow attend la fin de « Posting… » avant de quitter Instagram.',
+      ],
+      en: [
+        'Posting › “🖼 Photo carousel”: each checked account publishes a post of 2 to 6 different photos (pool or Bank folder) with a caption from the list.',
+        'Photos are injected in order then checked one by one in multiple selection; each check is verified on screen before the next one (never a double tap that would uncheck).',
+        'Instagram “first time” windows handled on their own (“Share more”, “Find your vibe”, “Sharing posts”); if Instagram has no photo access, ScaleFlow selects “All Photos” in iOS Settings then resumes.',
+        'ScaleFlow waits for “Posting…” to finish before leaving Instagram.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21g',
     date: '2026-11-21',
     title: { fr: 'iRemoTech : un cerveau IA pour les écrans inconnus', en: 'iRemoTech: an AI brain for unknown screens' },

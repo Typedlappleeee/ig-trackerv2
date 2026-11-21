@@ -214,6 +214,71 @@ export async function findBlueDots(image: string, xMin: number, xMax: number, yM
   return out
 }
 
+/** Disques blancs PLEINS (pastille numérotée d'une photo cochée dans la galerie « New post » en sélection
+ *  multiple) dans la bande [yMin,yMax] : diamètre 4–8 % de la largeur, rempli, entouré de pixels NON blancs
+ *  (une photo blanche sous un rond translucide ne compte pas). Centres en pixels de l'image d'origine. */
+export async function findWhiteDisks(image: string, yMin: number, yMax: number): Promise<{ cx: number; cy: number }[]> {
+  const img = await loadImg(image)
+  const W = img.naturalWidth, H = img.naturalHeight
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H
+  const ctx = cv.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+  const y0 = Math.max(0, Math.round(yMin * H)), y1 = Math.min(H, Math.round(yMax * H)), rows = Math.max(1, y1 - y0)
+  const data = ctx.getImageData(0, y0, W, rows).data
+  const white = (x: number, y: number) => { const i = (y * W + x) * 4; return data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240 }
+  return whiteDisksIn(white, W, rows).map(d => ({ cx: d.cx, cy: d.cy + y0 }))
+}
+
+/** Cœur pur de `findWhiteDisks` (testé) : composantes connexes blanches de la taille d'une pastille. */
+export function whiteDisksIn(white: (x: number, y: number) => boolean, W: number, rows: number): { cx: number; cy: number }[] {
+  const seen = new Uint8Array(W * rows)
+  const out: { cx: number; cy: number }[] = []
+  const dMin = W * 0.04, dMax = W * 0.085
+  for (let y = 0; y < rows; y++) for (let x = 0; x < W; x++) {
+    if (seen[y * W + x] || !white(x, y)) continue
+    let n = 0, minX = x, maxX = x, minY = y, maxY = y, big = false
+    const st = [y * W + x]; seen[y * W + x] = 1
+    while (st.length) {
+      const p = st.pop()!, px = p % W, py = (p - px) / W
+      n++
+      if (px < minX) minX = px; if (px > maxX) maxX = px; if (py < minY) minY = py; if (py > maxY) maxY = py
+      if (maxX - minX > dMax * 2 || maxY - minY > dMax * 2) big = true
+      for (const [qx, qy] of [[px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]]) {
+        if (qx < 0 || qy < 0 || qx >= W || qy >= rows) continue
+        const q = qy * W + qx
+        if (!seen[q] && white(qx, qy)) { seen[q] = 1; st.push(q) }
+      }
+    }
+    if (big) continue
+    const w = maxX - minX + 1, h = maxY - minY + 1
+    if (w < dMin || w > dMax || h < dMin || h > dMax || Math.abs(w - h) > 0.3 * Math.max(w, h)) continue
+    if (n / (w * h) < 0.55) continue
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, r = Math.max(w, h) * 0.8
+    let outside = 0, tot = 0
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2, sx = Math.round(cx + Math.cos(a) * r), sy = Math.round(cy + Math.sin(a) * r)
+      if (sx < 0 || sy < 0 || sx >= W || sy >= rows) continue
+      tot++; if (!white(sx, sy)) outside++
+    }
+    if (tot && outside / tot >= 0.6) out.push({ cx: Math.round(cx), cy: Math.round(cy) })
+  }
+  return out
+}
+
+/** Luminance moyenne d'une zone (fractions de l'image) : case « appareil photo » de la galerie = sombre. */
+export async function meanLuma(image: string, x0: number, y0: number, x1: number, y1: number): Promise<number> {
+  const img = await loadImg(image)
+  const W = img.naturalWidth, H = img.naturalHeight
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H
+  const ctx = cv.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+  const ax = Math.round(x0 * W), ay = Math.round(y0 * H), bw = Math.max(1, Math.round((x1 - x0) * W)), bh = Math.max(1, Math.round((y1 - y0) * H))
+  const d = ctx.getImageData(ax, ay, bw, bh).data
+  let s = 0
+  for (let i = 0; i < d.length; i += 4) s += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+  return s / (d.length / 4)
+}
+
 export async function terminateOcr(): Promise<void> {
   if (!workerP) return
   try { const w = await workerP; await w.terminate() } catch { /* noop */ }

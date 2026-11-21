@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
+import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone } from '@/lib/fivesim'
@@ -113,17 +113,25 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
   const [reelPool, setReelPool] = useState<VidRef[]>([])   // pool vidéos (Posting)
   const [storyPool, setStoryPool] = useState<VidRef[]>([]) // pool photos (Story)
-  const [picker, setPicker] = useState<null | 'reel' | 'story'>(null)
+  const [photoPool, setPhotoPool] = useState<VidRef[]>([]) // pool photos (Posting › Carrousel)
+  const [picker, setPicker] = useState<null | 'reel' | 'story' | 'photo'>(null)
+  // Posting : Reel (vidéo) ou Carrousel photo (post feed de N photos)
+  const [postType, setPostTypeS] = useState<'reel' | 'carousel'>(() => { try { return localStorage.getItem('sf-irt-post-type') === 'carousel' ? 'carousel' : 'reel' } catch { return 'reel' } })
+  const setPostType = (v: 'reel' | 'carousel') => { setPostTypeS(v); try { localStorage.setItem('sf-irt-post-type', v) } catch { /* ignore */ } }
+  const [carCount, setCarCountS] = useState<number>(() => { try { const n = Number(localStorage.getItem('sf-irt-car-count')); return n >= 2 && n <= CAROUSEL_MAX ? n : 3 } catch { return 3 } })
+  const setCarCount = (n: number) => { setCarCountS(n); try { localStorage.setItem('sf-irt-car-count', String(n)) } catch { /* ignore */ } }
   // Source des médias : choix à la main (pool) ou un DOSSIER de la Banque, lu au lancement
   // (les vidéos ajoutées depuis sont prises). Retenu par onglet.
   type Src = { mode: 'pick' | 'folder'; folder: string }
-  const loadSrc = (k: 'reel' | 'story'): Src => {
+  type SrcKey = 'reel' | 'story' | 'photo'
+  const loadSrc = (k: SrcKey): Src => {
     try { const v = JSON.parse(localStorage.getItem(`sf-irt-src-${k}`) ?? 'null'); if (v && (v.mode === 'pick' || v.mode === 'folder')) return { mode: v.mode, folder: String(v.folder ?? '') } } catch { /* ignore */ }
     return { mode: 'pick', folder: '' }
   }
   const [reelSrc, setReelSrc] = useState<Src>(() => loadSrc('reel'))
   const [storySrc, setStorySrc] = useState<Src>(() => loadSrc('story'))
-  const setSrc = (k: 'reel' | 'story', v: Src) => { (k === 'story' ? setStorySrc : setReelSrc)(v); try { localStorage.setItem(`sf-irt-src-${k}`, JSON.stringify(v)) } catch { /* ignore */ } }
+  const [photoSrc, setPhotoSrc] = useState<Src>(() => loadSrc('photo'))
+  const setSrc = (k: SrcKey, v: Src) => { (k === 'story' ? setStorySrc : k === 'photo' ? setPhotoSrc : setReelSrc)(v); try { localStorage.setItem(`sf-irt-src-${k}`, JSON.stringify(v)) } catch { /* ignore */ } }
   const [bankSum, setBankSum] = useState<BankSummary | null>(null)
   const [captionPool, setCaptionPool] = useState('')
   const [storyLink, setStoryLink] = useState('')               // lien CTA par défaut (Story)
@@ -215,9 +223,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }, [irt.key, load])
   const bankScope = { orgId: currentOrg?.id ?? null, userId: user.id }
   useEffect(() => {
-    if ((curTab === 'posting' && reelSrc.mode === 'folder') || (curTab === 'story' && storySrc.mode === 'folder'))
+    if ((curTab === 'posting' && (postType === 'carousel' ? photoSrc : reelSrc).mode === 'folder') || (curTab === 'story' && storySrc.mode === 'folder'))
       loadBankSummary(bankScope).then(setBankSum).catch(() => setBankSum(null))
-  }, [curTab, reelSrc.mode, storySrc.mode, currentOrg?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [curTab, reelSrc.mode, storySrc.mode, photoSrc.mode, postType, currentOrg?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   // Après une publication réussie : +1 au compteur du média (« Jamais publiées » / tri
   // « Moins publiées » de la Banque ; le mode dossier prend ainsi des vidéos fraîches).
   async function bumpUsed(id: string) {
@@ -227,9 +235,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     } catch { /* best-effort */ }
   }
   // Choix de la source (à la main / dossier de la Banque) pour Posting et Story.
-  const sourceRow = (k: 'reel' | 'story') => {
-    const src = k === 'story' ? storySrc : reelSrc
-    const img = k === 'story'
+  const sourceRow = (k: SrcKey) => {
+    const src = k === 'story' ? storySrc : k === 'photo' ? photoSrc : reelSrc
+    const img = k !== 'reel'
     const folders = (bankSum?.folders ?? []).filter(f => (img ? f.image : f.video) > 0 || f.name === src.folder)
     return (
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
@@ -335,13 +343,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', r.ids)
     const vids = (data ?? []) as VidRef[]
-    const set = which === 'story' ? setStoryPool : setReelPool
+    const set = which === 'story' ? setStoryPool : which === 'photo' ? setPhotoPool : setReelPool
     set(p => { const ex = new Set(p.map(v => v.id)); return [...p, ...vids.filter(v => !ex.has(v.id))] })
   }
-  function mediaFilename(v: VidRef, kind: 'reel' | 'story'): string {
+  function mediaFilename(v: VidRef, kind: 'reel' | 'story' | 'carousel'): string {
     const src = (v.storage_path ?? v.file_url ?? '').toLowerCase()
     const ext = (src.split('.').pop() || '').replace(/[^a-z0-9]/g, '')
-    const good = ['mp4', 'mov', 'jpg', 'jpeg', 'png', 'webp', 'heic'].includes(ext) ? ext : (kind === 'story' ? 'jpg' : 'mp4')
+    const good = ['mp4', 'mov', 'jpg', 'jpeg', 'png', 'webp', 'heic'].includes(ext) ? ext : (kind === 'reel' ? 'mp4' : 'jpg')
     return (v.title || 'media') + '.' + good
   }
   async function signedUrlFor(v: VidRef): Promise<string | undefined> {
@@ -367,13 +375,16 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
   // ── Posting (Reel) / Story — flow unifié ────────────────────────────────────
-  async function run(kind: 'reel' | 'story') {
+  async function run(kind: 'reel' | 'story' | 'carousel') {
     if (!irt.key || running) return
-    const src = kind === 'story' ? storySrc : reelSrc
-    let pool: VidRef[] = kind === 'story' ? storyPool : reelPool
+    const src = kind === 'story' ? storySrc : kind === 'carousel' ? photoSrc : reelSrc
+    let pool: VidRef[] = kind === 'story' ? storyPool : kind === 'carousel' ? photoPool : reelPool
+    const isImg = kind !== 'reel'
+    const perPost = kind === 'carousel' ? carCount : 1
     if (totalJobs === 0) { setLogs(['⚠ Sélectionne au moins un container (onglet Téléphones).']); return }
     if (src.mode === 'folder' && !src.folder) { setLogs(['⚠ Choisis un dossier de la Banque.']); return }
-    if (src.mode === 'pick' && pool.length === 0) { setLogs([`⚠ Ajoute au moins ${kind === 'story' ? 'une photo' : 'une vidéo'} au pool.`]); return }
+    if (src.mode === 'pick' && pool.length === 0) { setLogs([`⚠ Ajoute au moins ${isImg ? 'une photo' : 'une vidéo'} au pool.`]); return }
+    if (src.mode === 'pick' && pool.length < perPost) { setLogs([`⚠ Un carrousel de ${perPost} photos demande au moins ${perPost} photos dans le pool (${pool.length} actuellement).`]); return }
     if (kind === 'story') {
       const missing = [...sel].flatMap(dev => [...(selConts[dev] ?? [])].filter(c => !(storyLinks[linkKey(dev, c)] || storyLink.trim())))
       if (missing.length) { setLogs([`⚠ ${missing.length} container(s) sans lien CTA — mets un lien par container ou un lien par défaut.`]); return }
@@ -381,9 +392,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     setRunning(true); setLogs([])
     const key = irt.key
     if (src.mode === 'folder') {
-      try { pool = await folderMedia(bankScope, src.folder, kind === 'story' ? 'image' : 'video') }
+      try { pool = await folderMedia(bankScope, src.folder, isImg ? 'image' : 'video') }
       catch (e) { setLogs([`⚠ Banque : ${e instanceof Error ? e.message : String(e)}`]); setRunning(false); return }
-      if (!pool.length) { setLogs([kind === 'story' ? `⚠ Le dossier « ${src.folder} » ne contient aucune photo.` : `⚠ Le dossier « ${src.folder} » ne contient aucune vidéo.`]); setRunning(false); return }
+      if (!pool.length) { setLogs([isImg ? `⚠ Le dossier « ${src.folder} » ne contient aucune photo.` : `⚠ Le dossier « ${src.folder} » ne contient aucune vidéo.`]); setRunning(false); return }
+      if (pool.length < perPost) { setLogs([`⚠ Le dossier « ${src.folder} » n’a que ${pool.length} photo(s) : il en faut ${perPost} par carrousel.`]); setRunning(false); return }
     }
 
     const shuffle = <T,>(a: T[]) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[b[i], b[j]] = [b[j], b[i]] } return b }
@@ -394,16 +406,22 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     let vidQueue = src.mode === 'folder' ? byUse() : uniqueUse ? shuffle(pool) : []
     let capQueue = uniqueUse ? shuffle(captions) : []
     const pickVid = (): VidRef => { if (queued) { if (!vidQueue.length) vidQueue = src.mode === 'folder' ? byUse() : shuffle(pool); return vidQueue.pop()! } return pool[Math.floor(Math.random() * pool.length)] }
+    // Carrousel : N photos DIFFÉRENTES par post (dans l'ordre du tirage)
+    const pickSet = (n: number): VidRef[] => {
+      const out: VidRef[] = []
+      for (let guard = 0; out.length < n && guard < n * 20; guard++) { const v = pickVid(); if (!out.some(x => x.id === v.id)) out.push(v) }
+      return out
+    }
     const pickCap = (): string => { if (!captions.length) return ''; if (uniqueUse) { if (!capQueue.length) capQueue = shuffle(captions); return capQueue.pop()! } return captions[Math.floor(Math.random() * captions.length)] }
 
     const byPhone = [...sel].map(dev => ({
       dev,
       name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(),
-      jobs: [...(selConts[dev] ?? [])].map(container => ({ container, vid: pickVid(), caption: pickCap(), link: storyLinks[linkKey(dev, container)] || storyLink.trim() })),
+      jobs: [...(selConts[dev] ?? [])].map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(), link: storyLinks[linkKey(dev, container)] || storyLink.trim() } }),
     })).filter(p => p.jobs.length)
 
-    push(`▶ ${kind === 'story' ? 'Story' : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
-    if (src.mode === 'folder') push(kind === 'story' ? `📁 « ${src.folder} » : ${pool.length} photo(s)` : `📁 « ${src.folder} » : ${pool.length} vidéo(s)`)
+    push(`▶ ${kind === 'story' ? 'Story' : kind === 'carousel' ? `Carrousel (${perPost} photos)` : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
+    if (src.mode === 'folder') push(isImg ? `📁 « ${src.folder} » : ${pool.length} photo(s)` : `📁 « ${src.folder} » : ${pool.length} vidéo(s)`)
     const R = startRun('farm', `iRemoTech ${kind} · ${byPhone.length} tel × ${totalJobs}`, totalJobs)
     setRunId(R.id)
 
@@ -413,24 +431,33 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       await recalibrateTouch(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
       for (const job of p.jobs) {
         if (R.isCancelled()) break
-        push(`\n${tag} 📦 container « ${job.container} » · ${job.vid.title}`)
+        push(`\n${tag} 📦 container « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
         if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
         // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
         if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
         const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
         if (!ok) { push(`${tag} ⏭ container « ${job.container} » non atteint → suivant`); R.tick(false); continue }
         await sleep(1200)
-        const url = await signedUrlFor(job.vid)
-        if (!url) { push(`${tag} ❌ URL média introuvable → suivant`); R.tick(false); continue }
-        push(`${tag} ⬆ injection du média…`)
-        await uploadMedia(key, p.dev, url, mediaFilename(job.vid, kind))
+        // Carrousel : photos injectées dans l'ordre INVERSE (la 1re du carrousel = la plus récente, pré-cochée n°1)
+        let injected = true
+        for (const [i, v] of [...job.vids].reverse().entries()) {
+          const url = await signedUrlFor(v)
+          if (!url) { injected = false; break }
+          push(`${tag} ⬆ injection ${job.vids.length > 1 ? `de la photo ${job.vids.length - i}/${job.vids.length}` : 'du média'}…`)
+          if (!await uploadMedia(key, p.dev, url, mediaFilename(v, kind))) { injected = false; break }
+          if (job.vids.length > 1) await sleep(2500) // dates distinctes → ordre de la galerie garanti
+        }
+        if (!injected) { push(`${tag} ❌ média introuvable ou injection refusée → suivant`); R.tick(false); continue }
         push(`${tag} ⏳ 10 s (indexation)…`)
         await sleep(10000)
+        const vh = { log: hooks, shouldStop: () => R.isCancelled() }
         const posted = kind === 'story'
-          ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, { log: hooks, shouldStop: () => R.isCancelled() })
-          : await postReelByVision(key, p.dev, { caption: job.caption }, { log: hooks, shouldStop: () => R.isCancelled() })
+          ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, vh)
+          : kind === 'carousel'
+            ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption }, vh)
+            : await postReelByVision(key, p.dev, { caption: job.caption }, vh)
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
-        if (posted) void bumpUsed(job.vid.id)
+        if (posted) for (const v of job.vids) void bumpUsed(v.id)
         R.tick(posted)
       }
     }
@@ -848,28 +875,66 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {curTab === 'posting' && (<>
         {phonePicker()}
         <div style={card}>
-          <StepHead n={2} title="Quelles vidéos ?" sub="Chaque container coché publie un Reel avec une vidéo tirée au hasard, et une légende de la liste." />
-          {sourceRow('reel')}
-          {reelSrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, toutes les vidéos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.</p>}
-          {reelSrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-            <button style={gold} onClick={() => setPicker('reel')}>+ Ajouter des vidéos</button>
-            <span style={{ fontSize: 12, color: MUTED }}>{reelPool.length} vidéo(s) dans le pool</span>
-            {reelPool.length > 0 && <button style={btn} onClick={() => setReelPool([])}>Vider</button>}
-          </div>}
-          {reelSrc.mode === 'pick' && reelPool.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-              {reelPool.map(v => (
-                <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, fontSize: 12, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK }}>
-                  🎞 {v.title.slice(0, 26)}
-                  <span onClick={() => setReelPool(p => p.filter(x => x.id !== v.id))} title="Retirer" style={{ cursor: 'pointer', color: '#F87171', fontWeight: 500 }}>×</span>
-                </span>
+          <StepHead n={2} title={postType === 'carousel' ? 'Quelles photos ?' : 'Quelles vidéos ?'} sub={postType === 'carousel' ? `Chaque container coché publie un carrousel de ${carCount} photos différentes, et une légende de la liste.` : 'Chaque container coché publie un Reel avec une vidéo tirée au hasard, et une légende de la liste.'} />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ display: 'inline-flex', padding: 2, borderRadius: 7, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}` }}>
+              {(['reel', 'carousel'] as const).map(m => (
+                <button key={m} type="button" onClick={() => setPostType(m)}
+                  style={{ height: 28, padding: '0 12px', borderRadius: 5, border: postType === m ? `1px solid ${SEL_EDGE}` : '1px solid transparent', cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: postType === m ? SEL_BG : 'transparent', color: postType === m ? INK : MUTED }}>
+                  {m === 'reel' ? '🎞 Reel (vidéo)' : '🖼 Carrousel photo'}
+                </button>
               ))}
             </div>
-          )}
+            {postType === 'carousel' && (
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: INK }}>
+                Photos par post
+                <select value={carCount} onChange={e => setCarCount(Number(e.target.value))} style={{ ...inp, height: 30, width: 64, cursor: 'pointer' }}>
+                  {Array.from({ length: CAROUSEL_MAX - 1 }, (_, i) => i + 2).map(n => <option key={n} value={n} style={{ background: FIELD_BG }}>{n}</option>)}
+                </select>
+              </label>
+            )}
+          </div>
+          {postType === 'carousel' ? (<>
+            {sourceRow('photo')}
+            {photoSrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, toutes les photos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.</p>}
+            {photoSrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+              <button style={gold} onClick={() => setPicker('photo')}>+ Ajouter des photos</button>
+              <span style={{ fontSize: 12, color: MUTED }}>{photoPool.length} photo(s) dans le pool</span>
+              {photoPool.length > 0 && <button style={btn} onClick={() => setPhotoPool([])}>Vider</button>}
+            </div>}
+            {photoSrc.mode === 'pick' && photoPool.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                {photoPool.map(v => (
+                  <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, fontSize: 12, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK }}>
+                    🖼 {v.title.slice(0, 26)}
+                    <span onClick={() => setPhotoPool(p => p.filter(x => x.id !== v.id))} title="Retirer" style={{ cursor: 'pointer', color: '#F87171', fontWeight: 500 }}>×</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </>) : (<>
+            {sourceRow('reel')}
+            {reelSrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, toutes les vidéos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.</p>}
+            {reelSrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+              <button style={gold} onClick={() => setPicker('reel')}>+ Ajouter des vidéos</button>
+              <span style={{ fontSize: 12, color: MUTED }}>{reelPool.length} vidéo(s) dans le pool</span>
+              {reelPool.length > 0 && <button style={btn} onClick={() => setReelPool([])}>Vider</button>}
+            </div>}
+            {reelSrc.mode === 'pick' && reelPool.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                {reelPool.map(v => (
+                  <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 5, fontSize: 12, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK }}>
+                    🎞 {v.title.slice(0, 26)}
+                    <span onClick={() => setReelPool(p => p.filter(x => x.id !== v.id))} title="Retirer" style={{ cursor: 'pointer', color: '#F87171', fontWeight: 500 }}>×</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </>)}
           <div style={{ ...lbl, margin: '0 0 6px' }}>Légendes (une par ligne, tirées au hasard)</div>
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={3} placeholder={'Ma légende 1\nMa légende 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 60, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
         </div>
-        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Reel${totalJobs > 1 ? 's' : ''} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length) || running} running={running} onClick={() => run('reel')} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} ${postType === 'carousel' ? `carrousel${totalJobs > 1 ? 's' : ''} de ${carCount} photos` : `Reel${totalJobs > 1 ? 's' : ''}`} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={postType === 'carousel' ? `Lancer ${totalJobs} carrousel(s)` : `Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (postType === 'carousel' ? (photoSrc.mode === 'folder' ? !photoSrc.folder : photoPool.length < carCount) : (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length)) || running} running={running} onClick={() => run(postType === 'carousel' ? 'carousel' : 'reel')} />
         <LogPanel />
       </>)}
 
@@ -1235,8 +1300,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       })()}
 
       {picker && (
-        <BankPicker theme={BLOW_THEME} user={user} org={org} kind={picker === 'story' ? 'images' : 'videos'} multi
-          title={picker === 'story' ? 'Ajouter des photos au pool' : 'Ajouter des vidéos au pool'} onClose={() => setPicker(null)} onApply={applyPicker} />
+        <BankPicker theme={BLOW_THEME} user={user} org={org} kind={picker === 'reel' ? 'videos' : 'images'} multi
+          title={picker === 'reel' ? 'Ajouter des vidéos au pool' : 'Ajouter des photos au pool'} onClose={() => setPicker(null)} onApply={applyPicker} />
       )}
     </div>
   )

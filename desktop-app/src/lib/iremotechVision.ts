@@ -3,7 +3,7 @@
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
 import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
-import { ocrWords, findBlueButton, findBlueDots } from './ocr'
+import { ocrWords, findBlueButton, findBlueDots, findWhiteDisks, meanLuma } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { parseProfileCounts, saveScreenStats, parseCount } from './irtAccounts'
 import { askBrain, hasVisionBrain } from './visionBrain'
@@ -119,11 +119,22 @@ export async function allowShortcutPrompt(key: string, deviceId: string, hooks?:
  *  Continue, puis alerte iOS → « Allow Full Access » / « Allow Access to All Photos » (double tap : alerte iOS).
  *  (À l'inverse de l'inscription, où l'on refuse.) Autres alertes « would like to… » : caméra / micro → Allow ;
  *  notifications / contacts / localisation / suivi → Don't Allow. Sans effet si rien n'est demandé. */
-export async function grantPhotoAccessIfAsked(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
+export async function grantPhotoAccessIfAsked(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  let relaunched = false
   for (let k = 0; k < 4; k++) {
     const scr = await readScreenWords(key, deviceId)
-    if (!scr) return
+    if (!scr) return relaunched
     const has = (re: RegExp, a = 0, b = 1) => scr.words.some(o => re.test(o.text) && o.cy >= a * scr.H && o.cy <= b * scr.H)
+    // Accès refusé auparavant : « Please allow access to your photos » + lien « Enable library access » → Réglages iOS
+    // (Instagram › Photos › All Photos / Full Access) → retour à Instagram (iOS le relance : l'appelant rouvre le créateur).
+    if (has(/^please$/i) && has(/^(photos|photos\.)$/i) && has(/^(enable|library)$/i)) {
+      hooks?.log?.('🖼 Instagram n’a pas accès aux photos → Réglages iOS › Photos › Accès complet')
+      const lnk = scr.words.find(o => /^(enable|library)$/i.test(o.text) && o.cy > scr.H * 0.5)
+      await sendAction(key, deviceId, { type: 'tap', x: lnk ? lnk.cx : Math.round(scr.W / 2), y: lnk ? lnk.cy : Math.round(0.615 * scr.H) })
+      await sleep(3000)
+      if (await settingsGrantAllPhotos(key, deviceId, hooks)) { relaunched = true; await sleep(6000) }
+      continue
+    }
     if (has(/^access$/i, 0.3, 0.5) && has(/^videos$/i, 0.3, 0.5) && !has(/^please$/i)) {
       hooks?.log?.('🖼 Accès aux photos demandé → Continue')
       const c = scr.words.find(o => /^continue$/i.test(o.text) && o.cy > 0.8 * scr.H)
@@ -148,8 +159,43 @@ export async function grantPhotoAccessIfAsked(key: string, deviceId: string, hoo
       await doubleTap(key, deviceId, b ? b.cx + (allowIt ? 0 : 25) : Math.round(scr.W * (allowIt ? 0.7 : 0.3)), b ? b.cy : Math.round(0.68 * scr.H))
       await sleep(2000); continue
     }
-    return
+    return relaunched
   }
+  return relaunched
+}
+
+/** Réglages iOS › Instagram : ligne « Photos » → « All Photos » (iOS 17) / « Full Access » (iOS 18) → retour à
+ *  Instagram par le lien « ◀ Instagram » de la barre d'état. true = accès complet coché (Instagram redémarre). */
+async function settingsGrantAllPhotos(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  for (let k = 0; k < 4; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) return false
+    const { words, W, H } = scr
+    const choice = words.find(o => /^full$/i.test(o.text) && words.some(p => /^access$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))
+      ?? words.find(o => /^all$/i.test(o.text) && words.some(p => /^photos$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
+    if (choice) {
+      hooks?.log?.('   ✓ « All Photos » / « Full Access » coché')
+      await sendAction(key, deviceId, { type: 'tap', x: choice.cx, y: choice.cy })
+      await sleep(1800)
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.075 * W), y: Math.round(0.016 * H) }) // « ◀ Instagram »
+      return true
+    }
+    // page Instagram des Réglages : ligne « Photos » (valeur « None » / « Limited » à droite)
+    const row = words.find(o => /^photos$/i.test(o.text) && o.cx < W * 0.5 && o.cy > H * 0.1)
+    if (row) { await sendAction(key, deviceId, { type: 'tap', x: row.cx, y: row.cy }); await sleep(2200); continue }
+    await sleep(1500)
+  }
+  hooks?.log?.('   ⚠ Réglages Photos non reconnus')
+  return false
+}
+
+/** Fenêtres « première fois » d'Instagram avec un seul bouton OK (« Share more », « Find your vibe », « Sharing posts »,
+ *  « Video posts are now shared as reels »…) : renvoie le point à taper, ou null. Jamais une alerte de permission. Pure. */
+export function firstTimeOkTap(words: { text: string; cx: number; cy: number }[], W: number, H: number): { x: number; y: number } | null {
+  const t = (o: { text: string }) => o.text.replace(/[^\p{L}]/gu, '')
+  if (words.some(o => /^(would|allow|dontallow|notifications|contacts|location|track)$/i.test(t(o)))) return null
+  const ok = words.find(o => /^ok[.!]?$/i.test(o.text.trim()) && o.cx > W * 0.3 && o.cx < W * 0.7 && o.cy > H * 0.3 && o.cy < H * 0.95)
+  return ok ? { x: ok.cx, y: ok.cy } : null
 }
 
 /** Action renvoyée jusqu'à acceptation (attente croissante : la limite de débit iRemoTech demande ~20 s). */
@@ -563,7 +609,12 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   await tapFrac(A.createPlus.x, A.createPlus.y)
   await sleep(2200)
-  await grantPhotoAccessIfAsked(key, deviceId, hooks)
+  if (await grantPhotoAccessIfAsked(key, deviceId, hooks)) {
+    hooks?.log?.('   Instagram relancé après l’accès aux photos → on rouvre le créateur')
+    await dismissPopups(key, deviceId, hooks)
+    await tapFrac(A.createPlus.x, A.createPlus.y)
+    await sleep(2200)
+  }
   // 2. Mode POST : galerie directe, dernière vidéo pré-sélectionnée, pas de caméra (ni effets).
   //    Une vidéo publiée en POST devient un Reel. Si POST est introuvable → caméra REEL.
   if (await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i], 'POST', hooks)) {
@@ -644,9 +695,14 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
     await sendAction(key, deviceId, { type: 'tap', x, y })
     await sleep(1500)
   } else hooks?.log?.('   1re vignette non lue → vidéo pré-sélectionnée par Instagram (la plus récente)')
+  return finishPostFromGallery(key, deviceId, W, H, A, caption, hooks, 'Vidéo publiée (POST)')
+}
+
+// Fin commune Vidéo / Carrousel : galerie « New post » (médias choisis) → Next → éditeur → Next → légende → Share.
+async function finishPostFromGallery(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks: VisionHooks | undefined, doneLabel: string): Promise<boolean> {
   // b. Avancer jusqu'à l'écran de légende : Next en haut-droite (texte) ou en bas-droite (bouton bleu).
   let atCaption = false
-  for (let step = 0; step < 6 && !atCaption; step++) {
+  for (let step = 0; step < 9 && !atCaption; step++) {
     if (hooks?.shouldStop?.()) return false
     const shot = await snapshot(key, deviceId)
     if (!shot) { await sleep(800); continue }
@@ -654,7 +710,31 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
       ...await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] }),
       ...await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] }),
     ])
+    // Feuille « Sharing posts » (1re publication : compte public, réutilisation) → gros bouton bleu OK
+    if (words.some(o => /^sharing$/i.test(o.text)) && words.some(o => /^posts?$/i.test(o.text) && o.cy > H * 0.3)) {
+      hooks?.log?.('   feuille « Sharing posts » → OK')
+      // OK = gros bouton bleu JUSTE AU-DESSUS du lien bleu « Manage settings » (le lien fausse le centre du bleu)
+      const ok = words.find(o => /^ok$/i.test(o.text) && o.cy > H * 0.6)
+      const manage = words.find(o => /^manage$/i.test(o.text) && o.cy > H * 0.6)
+      const blue = ok || manage ? null : await findBlueButton(shot, 0.7, 0.88, 0.05, 0.95)
+      const y = ok ? ok.cy : manage ? manage.cy - Math.round(0.067 * H) : blue ? blue.cy : Math.round(0.85 * H)
+      await sendAction(key, deviceId, { type: 'tap', x: ok ? ok.cx : Math.round(W / 2), y })
+      await sleep(1800); continue
+    }
+    // Page « Reels and Remix controls » ouverte par erreur (lien « Manage settings ») → croix en haut à gauche
+    if (words.some(o => /^remix$/i.test(o.text) && o.cy < H * 0.1) && words.some(o => /^controls$/i.test(o.text) && o.cy < H * 0.1)) {
+      hooks?.log?.('   réglages « Reels and Remix » ouverts par erreur → fermeture (✕)')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.08 * W), y: Math.round(0.064 * H) })
+      await sleep(1800); continue
+    }
     if (words.some(o => CAPTION_MARK.some(p => p.test(o.text)))) { atCaption = true; break }
+    // Fenêtre « première fois » à un seul OK (« Find your vibe »…) qui masque l'éditeur
+    const first = !words.some(o => /^reels?[.!]?$/i.test(o.text)) ? firstTimeOkTap(words, W, H) : null
+    if (first) {
+      hooks?.log?.('   fenêtre d’information Instagram → OK')
+      await sendAction(key, deviceId, { type: 'tap', x: first.x, y: first.y })
+      await sleep(1500); continue
+    }
     // Popup « Video posts are now shared as reels » / « … partagées en tant que reels » → OK
     // (petit « OK » blanc sur bouton BLEU : OCR recadré, sinon le bouton bleu de la popup).
     if (words.some(o => /^reels?[.!]?$/i.test(o.text)) && words.some(o => /^(shared|partag[ée]e?s?)$/i.test(o.text))) {
@@ -701,13 +781,159 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
   }
   // d. Partager (bouton bleu en bas).
   if (!await tapButton(key, deviceId, [/^share$/i, /^partager$/i], A.shareBtn, W, H, hooks, [0.80, 1], 'Share', 3, [0, 1])) return false
-  hooks?.log?.('📤 Vidéo publiée (POST).')
+  hooks?.log?.(`📤 ${doneLabel}.`)
   await sleep(4000)
+  // Bandeau « Posting… » en haut du fil : on ne quitte pas Instagram tant que l'envoi n'est pas fini (max ~90 s)
+  for (let k = 0; k < 15; k++) {
+    if (hooks?.shouldStop?.()) break
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr || !scr.words.some(o => /^(posting|publication|envoi|uploading)[.…]*$/i.test(o.text) && o.cy < scr.H * 0.5)) break
+    if (k === 0) hooks?.log?.('   ⏳ envoi en cours (« Posting… »)…')
+    await sleep(5000)
+  }
   await dismissPopups(key, deviceId, hooks)
   hooks?.log?.('🏠 Retour à l’accueil.')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1200)
   return true
+}
+
+// ── Carrousel photo (post feed à plusieurs photos) ──────────────────────────────
+// Galerie « New post » (mode POST) : grille de 4 colonnes sous « Recents » ; sur un iPhone la 1re case peut être
+// l'appareil photo. Les photos sont injectées dans l'ordre INVERSE du carrousel (la 1re du carrousel en dernier =
+// la plus récente, pré-cochée n°1 par Instagram), donc la photo k du carrousel est dans la case (départ + k).
+// Bouton « Select » (sélection multiple) → chaque case cochée porte une pastille blanche numérotée.
+export const CAROUSEL_MAX = 6 // 2 rangées visibles sans défiler la grille (défiler la grille déplace l'aperçu)
+const GRID_COLS = 4
+
+/** Case de la grille sous un point (pure). -1 hors grille. */
+export function gridCellAt(x: number, y: number, gridTop: number, W: number, cols = GRID_COLS): number {
+  const cw = W / cols
+  if (y < gridTop || x < 0 || x >= W) return -1
+  return Math.floor((y - gridTop) / cw) * cols + Math.min(cols - 1, Math.floor(x / cw))
+}
+/** Point à taper pour une case (haut de la case : le bas de la 2e rangée passe sous la barre des modes). Pure. */
+export function gridCellPoint(idx: number, gridTop: number, W: number, cols = GRID_COLS): { x: number; y: number } {
+  const cw = W / cols
+  return { x: Math.round((idx % cols) * cw + cw * 0.42), y: Math.round(gridTop + Math.floor(idx / cols) * cw + cw * 0.4) }
+}
+/** Cases cochées d'après les pastilles blanches (pastille en haut à droite de sa case). Pure. */
+export function checkedCells(disks: { cx: number; cy: number }[], gridTop: number, W: number, cols = GRID_COLS): number[] {
+  const cw = W / cols
+  // la pastille est dans le quart haut-droit de sa case : on recentre avant de chercher la case
+  return [...new Set(disks.map(d => gridCellAt(d.cx - cw * 0.3, d.cy + cw * 0.3, gridTop, W, cols)).filter(i => i >= 0))].sort((a, b) => a - b)
+}
+
+async function readGrid(key: string, deviceId: string, hooks?: VisionHooks) {
+  const scr = await readScreenWords(key, deviceId)
+  if (!scr) return null
+  const { words, W, H, shot } = scr
+  const rec = words.find(o => /^r[ée]cents?$/i.test(o.text) && o.cy > H * 0.25 && o.cy < H * 0.85)
+  if (!rec) return { scr, rec: null, gridTop: 0, checked: [] as number[] }
+  const gridTop = Math.round(rec.cy + 0.076 * W)
+  const disks = await findWhiteDisks(shot, gridTop / H, Math.min(1, (gridTop + 2 * (W / GRID_COLS)) / H))
+  void hooks
+  return { scr, rec, gridTop, checked: checkedCells(disks, gridTop, W) }
+}
+
+/** Coche `count` photos consécutives (la plus récente d'abord) en sélection multiple. Chaque tap est vérifié
+ *  (pastille blanche) avant le suivant : un tap raté est refait UNE fois, jamais en double (re-taper = décocher). */
+async function selectCarouselPhotos(key: string, deviceId: string, count: number, hooks?: VisionHooks): Promise<boolean> {
+  let g = await readGrid(key, deviceId, hooks)
+  for (let k = 0; k < 4 && (!g || !g.rec); k++) { await sleep(1200); g = await readGrid(key, deviceId, hooks) }
+  if (!g || !g.rec) { hooks?.log?.('❌ galerie « New post » non reconnue (« Recents » introuvable)'); return false }
+  // 1. Sélection multiple : « Select » à droite de « Recents » (devient « Cancel » une fois active)
+  // État lu à la COULEUR du bouton (pastille BLANCHE « Cancel » = sélection active, sombre « Select » = inactive) :
+  // l'OCR rate souvent « Cancel » (icône collée) → re-taper « Select » désactivait la sélection.
+  const multiOn = async (gg: NonNullable<typeof g>) => {
+    if (gg.scr.words.some(o => /cancel|annuler/i.test(o.text) && Math.abs(o.cy - gg.rec!.cy) < 25 && o.cx > gg.scr.W * 0.55)) return true
+    const { W, H, shot } = gg.scr, ry = gg.rec!.cy
+    return (await meanLuma(shot, 0.76, (ry - 0.006 * H) / H, 0.93, (ry + 0.006 * H) / H)) > 150 && W > 0
+  }
+  for (let k = 0; k < 4; k++) {
+    const { words, W, H } = g!.scr
+    const ry = g!.rec!.cy
+    const cancel = await multiOn(g!)
+    const ok = firstTimeOkTap(words, W, H)
+    if (ok && words.some(o => /^share$/i.test(o.text)) && words.some(o => /^more$/i.test(o.text))) {
+      hooks?.log?.('   fenêtre « Share more » → OK')
+      await sendAction(key, deviceId, { type: 'tap', x: ok.x, y: ok.y }); await sleep(1500)
+    } else if (cancel) break
+    else {
+      const sel = words.find(o => /^(select|s[ée]lectionner)$/i.test(o.text) && Math.abs(o.cy - ry) < 25 && o.cx > W * 0.55)
+      hooks?.log?.('☑ Sélection multiple (« Select »)…')
+      await sendAction(key, deviceId, { type: 'tap', x: sel ? sel.cx : Math.round(0.84 * W), y: sel ? sel.cy : ry })
+      await sleep(1600)
+      // 1re fois : fenêtre « Share more » (masque « Recents ») → OK
+      const pop = await readScreenWords(key, deviceId)
+      const pok = pop && pop.words.some(o => /^more$/i.test(o.text)) ? firstTimeOkTap(pop.words, pop.W, pop.H) : null
+      if (pok) { hooks?.log?.('   fenêtre « Share more » → OK'); await sendAction(key, deviceId, { type: 'tap', x: pok.x, y: pok.y }); await sleep(1500) }
+    }
+    g = await readGrid(key, deviceId, hooks)
+    if (!g || !g.rec) { hooks?.log?.('❌ galerie perdue après « Select »'); return false }
+  }
+  const { W, shot } = g!.scr
+  if (!await multiOn(g!)) { hooks?.log?.('❌ sélection multiple non activée'); return false }
+  // 2. Case de départ = celle pré-cochée (la plus récente). Sinon 1re case photo (après l'appareil photo, case sombre).
+  let checked = g!.checked
+  if (checked.length > 1) {
+    hooks?.log?.(`   ${checked.length} cases déjà cochées → on repart d’une sélection propre`)
+    for (const i of [...checked].reverse()) { const p = gridCellPoint(i, g!.gridTop, W); await sendAction(key, deviceId, { type: 'tap', x: p.x, y: p.y }); await sleep(900) }
+    g = await readGrid(key, deviceId, hooks); checked = g?.checked ?? []
+    if (checked.length) { hooks?.log?.('❌ impossible de décocher la sélection précédente'); return false }
+  }
+  let start = checked[0]
+  if (start === undefined) {
+    const cw = W / GRID_COLS, H = g!.scr.H
+    const camera = (await meanLuma(shot, 0.04, (g!.gridTop + cw * 0.1) / H, 0.21, (g!.gridTop + cw * 0.9) / H)) < 60
+    start = camera ? 1 : 0
+    hooks?.log?.(`   aucune case pré-cochée → départ case ${start + 1}${camera ? ' (1re = appareil photo)' : ''}`)
+  }
+  if (start + count > 2 * GRID_COLS) { hooks?.log?.(`❌ ${count} photos ne tiennent pas dans les 2 rangées visibles`); return false }
+  // 3. Cocher les cases dans l'ordre, chacune vérifiée
+  for (let i = 0; i < count; i++) {
+    const idx = start + i
+    if (checked.includes(idx)) continue
+    if (hooks?.shouldStop?.()) return false
+    let done = false
+    for (let t = 0; t < 2 && !done; t++) {
+      const p = gridCellPoint(idx, g!.gridTop, W)
+      hooks?.log?.(`🖼 Photo ${i + 1}/${count} → case ${idx + 1}${t ? ' (2e essai)' : ''}`)
+      await sendAction(key, deviceId, { type: 'tap', x: p.x, y: p.y })
+      await sleep(1100)
+      const g2 = await readGrid(key, deviceId, hooks)
+      if (!g2 || !g2.rec) { hooks?.log?.('❌ galerie perdue pendant la sélection'); return false }
+      g = g2; checked = g2.checked
+      done = checked.includes(idx)
+    }
+    if (!done) { hooks?.log?.(`❌ case ${idx + 1} non cochée`); return false }
+  }
+  const want = Array.from({ length: count }, (_, i) => start + i)
+  if (checked.length !== count || !want.every(i => checked.includes(i))) { hooks?.log?.(`❌ sélection inattendue (cases ${checked.map(i => i + 1).join(', ') || 'aucune'})`); return false }
+  hooks?.log?.(`   ✓ ${count} photos cochées dans l’ordre`)
+  return true
+}
+
+/** Post feed CARROUSEL : `count` photos les plus récentes (injectées juste avant, dans l'ordre inverse) → légende → Share. */
+export async function postCarouselByVision(key: string, deviceId: string, opts: { count: number; caption?: string; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
+  const A = opts.anchors ?? REEL_ANCHORS
+  const count = Math.max(1, Math.min(CAROUSEL_MAX, Math.round(opts.count)))
+  const shot0 = await snapshot(key, deviceId)
+  const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
+  if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
+  for (let k = 0; k < 2; k++) {
+    await dismissPopups(key, deviceId, hooks)
+    hooks?.log?.(`➕ Ouverture du créateur (+) — carrousel de ${count} photo(s)…`)
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(A.createPlus.x * W), y: Math.round(A.createPlus.y * H) })
+    await sleep(2200)
+    if (!await grantPhotoAccessIfAsked(key, deviceId, hooks)) break
+    hooks?.log?.('   Instagram relancé après l’accès aux photos → on rouvre le créateur')
+  }
+  if (!await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i], 'POST', hooks)) return false
+  await sleep(1800)
+  if (count > 1) { if (!await selectCarouselPhotos(key, deviceId, count, hooks)) return false }
+  else hooks?.log?.('🖼 1 photo : la plus récente, pré-sélectionnée par Instagram')
+  return finishPostFromGallery(key, deviceId, W, H, A, opts.caption, hooks, count > 1 ? `Carrousel de ${count} photos publié` : 'Photo publiée')
 }
 
 // ── Création de compte Instagram pilotée à la VISION (début du flow) ────────────
