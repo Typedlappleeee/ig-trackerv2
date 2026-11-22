@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22c',
+    date: '2026-11-22',
+    title: { fr: '« Comptes créés » = simple journal', en: '“Created accounts” = a plain log' },
+    items: {
+      fr: ['« Comptes créés » n’est plus lié aux containers : identifiant, mot de passe, numéro, pays, date et log de chaque compte créé (copie et export CSV sans iPhone ni container).'],
+      en: ['“Created accounts” is no longer tied to containers: username, password, number, country, date and log of each created account (copy and CSV export without iPhone or container).'],
+    },
+  },
+  {
     id: '2026-11-22b',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : statut des comptes vérifié automatiquement', en: 'iRemoTech: account status checked automatically' },

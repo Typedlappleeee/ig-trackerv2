@@ -1332,14 +1332,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>✅ Comptes créés ({createdAccts.length})</span>
-              <button style={{ ...btn, marginLeft: 'auto', height: 28 }} onClick={() => { const t = createdAccts.map(a => `${a.username ?? '?'}\t${a.password ?? ''}\t${a.phone ?? ''}\t${a.deviceName ?? a.device}·${a.container}`).join('\n'); try { navigator.clipboard.writeText(t) } catch { /* noop */ } }}>Copier tout</button>
+              <button style={{ ...btn, marginLeft: 'auto', height: 28 }} onClick={() => { const t = createdAccts.map(a => `${a.username ?? '?'}\t${a.password ?? ''}\t${a.phone ?? ''}`).join('\n'); try { navigator.clipboard.writeText(t) } catch { /* noop */ } }}>Copier tout</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto' }}>
               {createdAccts.map(a => (
                 <div key={a.at} style={{ padding: 10, borderRadius: 6, background: 'transparent', border: `1px solid ${a.ok ? EDGE : 'rgba(248,113,113,0.25)'}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: a.ok ? INK : '#F87171' }}>@{a.username ?? '—'}</span>
-                    <span style={{ fontSize: 12, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</span>
+                    <span style={{ fontSize: 12, color: DIM, fontVariantNumeric: 'tabular-nums' }}>{new Date(a.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                     <span style={{ marginLeft: 'auto', fontSize: 11.5, color: DIM, fontVariantNumeric: 'tabular-nums' }}>{a.country}{a.price != null ? ` · ${a.price}$` : ''}</span>
                     <button onClick={() => { removeCreatedAccount(a.at); setCreatedAccts(loadCreatedAccounts()) }} title="Retirer" style={{ cursor: 'pointer', background: 'none', border: 'none', color: '#F87171', fontWeight: 500, fontSize: 15 }}>×</button>
                   </div>
@@ -1361,7 +1361,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (acctFilter === 'ok' && !a.ok) return false
           if (acctFilter === 'ko' && a.ok) return false
           if (!q) return true
-          return [a.username, a.phone, a.container, a.deviceName, a.device, a.fullName, a.country].some(v => (v ?? '').toString().toLowerCase().includes(q))
+          return [a.username, a.phone, a.fullName, a.country].some(v => (v ?? '').toString().toLowerCase().includes(q))
         })
         const okN = createdAccts.filter(a => a.ok).length
         const koN = createdAccts.length - okN
@@ -1370,9 +1370,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const line = (a: CreatedAccount) => `${a.username ?? ''}:${a.password ?? ''}${a.twofa ? `:${a.twofa}` : ''}`
         const copyAll = () => { try { navigator.clipboard.writeText(filtered.map(line).join('\n')) } catch { /* noop */ } }
         const exportCsv = () => {
-          const head = ['username', 'password', '2fa', 'fullName', 'phone', 'provider', 'price', 'country', 'device', 'container', 'statut', 'date']
+          const head = ['username', 'password', '2fa', 'fullName', 'phone', 'provider', 'price', 'country', 'statut', 'date']
           const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-          const rows = filtered.map(a => [a.username, a.password, a.twofa, a.fullName, a.phone, a.provider, a.price, a.country, a.deviceName ?? a.device, a.container, a.ok ? 'cree' : 'echec', new Date(a.at).toISOString()].map(esc).join(','))
+          const rows = filtered.map(a => [a.username, a.password, a.twofa, a.fullName, a.phone, a.provider, a.price, a.country, a.ok ? 'cree' : 'echec', new Date(a.at).toISOString()].map(esc).join(','))
           const csv = head.join(',') + '\n' + rows.join('\n')
           const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
           const el = document.createElement('a'); el.href = url; el.download = `comptes-ig-${new Date().toISOString().slice(0, 10)}.csv`; el.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -1388,7 +1388,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <input value={acctSearch} onChange={e => setAcctSearch(e.target.value)} placeholder="Rechercher (username, numéro, conteneur, téléphone…)" style={{ ...inp, flex: 1, minWidth: 220 }} />
+              <input value={acctSearch} onChange={e => setAcctSearch(e.target.value)} placeholder="Rechercher (identifiant, numéro, nom…)" style={{ ...inp, flex: 1, minWidth: 220 }} />
               <div style={{ ...seg }}>
                 {([['all', 'Tous'], ['ok', 'Réussis'], ['ko', 'Échoués']] as const).map(([k, l]) => (
                   <button key={k} onClick={() => setAcctFilter(k)} style={{ height: 28, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: acctFilter === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: acctFilter === k ? INK : MUTED }}>{l}</button>
@@ -1434,7 +1434,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                       <th style={th}>Identifiant</th>
                       <th style={th}>Mot de passe</th>
                       <th style={th}>Statut</th>
-                      <th style={th}>Téléphone · Conteneur</th>
+                      <th style={th}>Numéro</th>
                       <th style={th}>Date</th>
                       <th style={{ ...th, textAlign: 'right' }}>Actions</th>
                     </tr>
@@ -1452,7 +1452,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                             {a.password ?? '?'}{a.twofa ? <span style={{ marginLeft: 8, fontSize: 10.5, color: GOLD }} title={`Clé 2FA : ${a.twofa}`}>2FA</span> : null}
                           </td>
                           <td style={td}><span style={{ fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 4, background: '#18181B', border: '1px solid rgba(255,255,255,0.08)', color: a.ok ? '#4ADE80' : '#F87171' }}>{a.ok ? 'CRÉÉ' : 'ÉCHEC'}</span></td>
-                          <td style={{ ...td, fontSize: 12, color: MUTED }}>{a.deviceName ?? a.device} · {a.container}</td>
+                          <td data-no-tr style={{ ...td, fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.phone ?? '—'}{a.country ? <span style={{ color: DIM }}> · {a.country}{a.price != null ? ` · ${a.price}$` : ''}</span> : null}</td>
                           <td style={{ ...td, fontSize: 12, color: DIM, fontVariantNumeric: 'tabular-nums' }}>{fmt(a.at)}</td>
                           <td style={{ ...td, textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: 6 }}>

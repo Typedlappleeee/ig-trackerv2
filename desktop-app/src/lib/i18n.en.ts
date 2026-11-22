@@ -200,6 +200,8 @@ export const EN: Dict = {
     "Aucun compte à vérifier (ou déjà en cours).": "No account to check (or already running).",
     "Lance la vérification du statut iRemoTech sur TOUS les comptes, un par un (gratuit, 1 action du quota par compte)": "Launches the iRemoTech status check on ALL accounts, one by one (free, 1 quota action per account)",
     "✅ Vérifier tous les comptes": "✅ Check all accounts",
+    "Rechercher (identifiant, numéro, nom…)": "Search (username, number, name…)",
+    "Numéro": "Number",
     "✋ Sticker non lu → glissement depuis le centre vers le bas-droite…": "✋ Sticker not read → dragging from the center to the bottom right…",
     "📍 Sticker lien en bas à droite.": "📍 Link sticker at the bottom right.",
     "(position du sticker non confirmée par la lecture — on continue)": "(sticker position not confirmed by reading — continuing)",
