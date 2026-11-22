@@ -42,7 +42,9 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
         let n = 0
         for (const f of post.files) {
           const title = post.files.length > 1 ? `${base} (${f.index + 1})` : base
-          const id = await saveOutputToBank(user.id, orgId, f.bytes, title, f.ext, dest)
+          // Reels et photos dans des dossiers SÉPARÉS : « <dossier>/Reels » et « <dossier>/Photos »
+          const sub = f.ext === 'mp4' ? 'Reels' : 'Photos'
+          const id = await saveOutputToBank(user.id, orgId, f.bytes, title, f.ext, dest ? `${dest}/${sub}` : sub)
           if (!id) throw new Error('enregistrement dans la Banque refusé')
           const url = URL.createObjectURL(new Blob([f.bytes as BlobPart], { type: f.ext === 'mp4' ? 'video/mp4' : 'image/jpeg' }))
           addResult({ id, title, url, ext: f.ext, tool: 'igdl', at: Date.now() })
@@ -55,14 +57,14 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
       }
     }
     setBusy(false)
-    if (saved) { toast(`${saved} média(s) rangé(s) dans la Banque${dest ? ` › ${dest}` : ''}.`, 'ok'); setText('') }
+    if (saved) { toast(`${saved} média(s) rangé(s) dans la Banque${dest ? ` › ${dest}` : ''} (Reels et Photos séparés).`, 'ok'); setText('') }
   }
 
   const openBank = () => { if (onNavigate) openTool(onNavigate, 'bank', { folder: folder.trim() || undefined }) }
 
   return (
     <Panel theme={theme} style={{ marginTop: 16 }}>
-      <PanelHead title="⬇ Téléchargeur Insta" sub="Colle des liens de Reels ou de posts photo (un par ligne) : la vidéo ou les photos arrivent directement dans ta Banque." />
+      <PanelHead title="⬇ Téléchargeur Insta" sub="Colle des liens de Reels ou de posts photo (un par ligne) : les vidéos vont dans le sous-dossier « Reels », les photos dans « Photos », directement dans ta Banque." />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <textarea value={text} onChange={e => setText(e.target.value)} disabled={busy} rows={5}
           placeholder={'https://www.instagram.com/reel/…\nhttps://www.instagram.com/p/…'}

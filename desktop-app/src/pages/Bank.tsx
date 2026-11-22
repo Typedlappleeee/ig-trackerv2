@@ -249,6 +249,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [tab, setTab] = useState<TabKey>(() => { const t = openArg.current?.tab; return t === 'caption' || t === 'pool' ? t : 'media' })
   const [kindF, setKindFState] = useState<KindFilter>(() => {
     const t = openArg.current?.tab
+    if (openArg.current?.folder && !t) return 'all' // ouvert sur un dossier (ex. Téléchargeur Insta) : tous les types visibles
     if (t === 'video' || t === 'image' || t === 'audio') return t
     try { const v = localStorage.getItem('sf-bank-kind'); return v === 'video' || v === 'image' || v === 'audio' ? v : 'all' } catch { return 'all' }
   })

@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22t',
+    date: '2026-11-22',
+    title: { fr: 'Téléchargeur Insta : Reels et photos séparés', en: 'Insta downloader: Reels and photos separated' },
+    items: {
+      fr: ['Les vidéos téléchargées vont dans le sous-dossier « Reels » et les photos dans « Photos » du dossier choisi.', 'Corrigé : une vidéo pouvait ne pas être enregistrée (création de la miniature bloquée) ; « Voir dans la Banque » affiche maintenant tous les types (le filtre « Images » cachait les vidéos).'],
+      en: ['Downloaded videos go to the “Reels” subfolder and photos to “Photos” of the chosen folder.', 'Fixed: a video could fail to be saved (stuck thumbnail); “See in the Bank” now shows all types (the “Images” filter hid videos).'],
+    },
+  },
+  {
     id: '2026-11-22s',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : Instagram ouvert directement (plus d’Apple Music)', en: 'iRemoTech: Instagram opened directly (no more Apple Music)' },
