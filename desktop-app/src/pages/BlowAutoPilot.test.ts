@@ -40,3 +40,10 @@ describe('Comptes créés — import', () => {
     ])
   })
 })
+
+describe('type d’iPhone — plus de faux « Jailbreak »', () => {
+  it('noms sans « @ » ni « Default » → à vérifier (null)', () => {
+    expect(phoneKind(['1', '2'])).toBeNull()
+    expect(phoneKind(['Default', '1'])).toBe('jb')
+  })
+})

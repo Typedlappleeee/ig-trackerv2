@@ -20,7 +20,7 @@ import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone }
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import IrtAccounts from '@/components/IrtAccounts'
-import { isJunkUsername, deviceAccounts } from '@/lib/irtAccounts'
+import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt } from '@/lib/irtAccounts'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { useConnections } from '@/lib/connections'
 import { listJobs, type IrtJob } from '@/lib/iremotech'
@@ -285,6 +285,16 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       }
     }
   }, [conts])
+  // Comptes déjà lus par iRemoTech (list_accounts) → cibles « @nom » de l'iPhone, sans passer par la vision.
+  // Corrige aussi les listes douteuses (faux « Jailbreak ») ; un jailbreak vérifié (« Default ») n'est jamais touché.
+  useEffect(() => {
+    for (const [dev, jobs] of Object.entries(irtJobs)) {
+      const next = reconcileWithIrt(conts[dev] ?? [], irtScannedAccounts(jobs))
+      if (!next) continue
+      saveDevContainers(dev, next); setConts(c => ({ ...c, [dev]: next }))
+      setSelConts(sc => sc[dev] ? { ...sc, [dev]: new Set([...sc[dev]].filter(c => next.includes(c))) } : sc)
+    }
+  }, [irtJobs]) // eslint-disable-line react-hooks/exhaustive-deps
   // Statut Instagram des comptes (historique iRemoTech) → « ! » rouge sur les comptes signalés
   useEffect(() => {
     if (!irt.key || !devices.length) return
@@ -814,6 +824,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     {live ? 'En ligne' : 'Hors ligne'} · {list.length ? `${picked.size}/${list.length} ${unit}${list.length > 1 ? 's' : ''}` : 'pas encore détecté'}
                   </span>
                 </span>
+                {!kind && list.length > 0 && <span title="Type pas sûr (ancienne détection ou saisie à la main) : clique ↻ pour relire l’iPhone" style={{ flex: 'none', height: 22, padding: '0 8px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 600, background: 'rgba(251,191,36,0.1)', color: '#FCD34D', border: '1px solid rgba(251,191,36,0.3)' }}>❓ À vérifier</span>}
                 {kind && <span title={kind === 'normal' ? 'iPhone normal : plusieurs comptes connectés dans Instagram' : 'iPhone jailbreaké : un compte par container Crane'} style={{ flex: 'none', height: 22, padding: '0 8px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 600, background: kind === 'normal' ? 'rgba(96,165,250,0.12)' : 'rgba(233,196,106,0.12)', color: kind === 'normal' ? '#93C5FD' : GOLD, border: `1px solid ${kind === 'normal' ? 'rgba(96,165,250,0.3)' : 'rgba(233,196,106,0.3)'}` }}>{kind === 'normal' ? '📱 iPhone normal' : '🔓 Jailbreak'}</span>}
               </div>
               {list.length > 0 ? (
@@ -1438,9 +1449,13 @@ export function parseAccountLines(text: string): { username: string; password: s
 }
 
 /** Type d'iPhone déduit des cibles détectées : comptes « @nom » = iPhone normal, containers Crane = jailbreak. */
+/** Type d'iPhone d'après sa liste : « @comptes » = normal ; « Default » présent = jailbreak (le sélecteur Crane a
+ *  VRAIMENT été lu : il a toujours « Default »). Des noms sans « @ » ni « Default » (vieille détection, saisie à la
+ *  main) ne prouvent rien → null (« À vérifier »), au lieu d'un faux « Jailbreak ». */
 export function phoneKind(list: string[] | undefined): 'normal' | 'jb' | null {
   if (!list?.length) return null
-  return list.every(c => c.startsWith('@')) ? 'normal' : 'jb'
+  if (list.every(c => c.startsWith('@'))) return 'normal'
+  return list.some(c => /^default$/i.test(c.trim())) ? 'jb' : null
 }
 /** « 3 containers · 2 comptes » selon les cibles cochées. */
 export function targetsSummary(targets: string[]): string {

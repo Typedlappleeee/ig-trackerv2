@@ -193,6 +193,8 @@ export const EN: Dict = {
     "aucun média dans ce post": "no media in this post",
     "Téléchargeur Insta": "Insta downloader",
     "Colle des liens de Reels ou de posts : vidéos et photos rangées directement dans ta Banque.": "Paste Reel or post links: videos and photos saved straight into your Bank.",
+    "Type pas sûr (ancienne détection ou saisie à la main) : clique ↻ pour relire l’iPhone": "Type not certain (old detection or typed by hand): click ↻ to re-read the iPhone",
+    "❓ À vérifier": "❓ To check",
     "✋ Sticker non lu → glissement depuis le centre vers le bas-droite…": "✋ Sticker not read → dragging from the center to the bottom right…",
     "📍 Sticker lien en bas à droite.": "📍 Link sticker at the bottom right.",
     "(position du sticker non confirmée par la lecture — on continue)": "(sticker position not confirmed by reading — continuing)",

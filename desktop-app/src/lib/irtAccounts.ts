@@ -67,6 +67,27 @@ export function deviceAccounts(jobs: IrtJob[], known: string[] = []): DeviceAcco
   return { accounts, scannedAt: lastScan?.finished_at ?? null, scanning: js.some(j => j.type === 'list_accounts' && pending(j)) }
 }
 
+/** Comptes de la dernière lecture iRemoTech réussie (`list_accounts`), en minuscules, sans les lectures parasites. */
+export function irtScannedAccounts(jobs: IrtJob[]): string[] {
+  const last = [...jobs].sort(newest).find(j => j.type === 'list_accounts' && j.status === 'completed')
+  return [...new Set(((last?.result?.accounts as string[] | undefined) ?? []).map(u => String(u).toLowerCase().replace(/^@/, '')).filter(u => u && !isJunkUsername(u)))]
+}
+
+/** Liste de cibles d'un iPhone recalée sur ce qu'iRemoTech a déjà lu (pas besoin de vision). null = rien à changer.
+ *  - « Default » dans la liste : jailbreak vérifié → on n'y touche pas (iRemoTech n'y voit que le compte du container ouvert) ;
+ *  - iPhone normal (« @… ») : on ajoute les comptes qu'iRemoTech a lus et qui manquent ;
+ *  - liste vide ou douteuse (noms sans « @ » ni « Default ») : remplacée par les comptes iRemoTech s'il en a lu au
+ *    moins 2 (un iPhone jailbreaké n'en montre qu'un). Pure. */
+export function reconcileWithIrt(list: string[], accs: string[]): string[] | null {
+  if (!accs.length || list.some(c => /^default$/i.test(c.trim()))) return null
+  const at = accs.map(u => '@' + u)
+  if (list.length && list.every(c => c.startsWith('@'))) {
+    const add = at.filter(a => !list.some(c => c.toLowerCase() === a))
+    return add.length ? [...list, ...add] : null
+  }
+  return accs.length >= 2 ? at : null
+}
+
 /** « il y a 5 min » */
 export function ago(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return 'jamais'

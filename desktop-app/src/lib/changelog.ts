@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22a',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : plus de faux « Jailbreak », comptes repris d’iRemoTech', en: 'iRemoTech: no more false “Jailbreak”, accounts taken from iRemoTech' },
+    items: {
+      fr: [
+        'Un iPhone n’est marqué « Jailbreak » que si le sélecteur de containers Crane a vraiment été lu. Une liste douteuse (ancienne détection, saisie à la main) affiche « ❓ À vérifier » : clique ↻ pour relire l’iPhone.',
+        'Les comptes déjà lus par iRemoTech (lecture des comptes du tableau de bord) deviennent automatiquement les comptes de l’iPhone, avec leur statut, sans détection à l’écran.',
+      ],
+      en: [
+        'An iPhone is marked “Jailbreak” only if the Crane container picker was really read. A doubtful list (old detection, typed by hand) shows “❓ To check”: click ↻ to re-read the iPhone.',
+        'Accounts already read by iRemoTech (dashboard account scan) automatically become the iPhone’s accounts, with their status, without on-screen detection.',
+      ],
+    },
+  },
+  {
     id: '2026-11-21m',
     date: '2026-11-21',
     title: { fr: 'Studio : Téléchargeur Insta', en: 'Studio: Insta downloader' },
