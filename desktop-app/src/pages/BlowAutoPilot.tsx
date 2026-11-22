@@ -22,7 +22,7 @@ import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing,
 import IrtAccounts from '@/components/IrtAccounts'
 import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, autoChecksFor } from '@/lib/irtAccounts'
 import { setVisionBrain } from '@/lib/visionBrain'
-import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, loadTargetMarket, saveTargetMarket, countByMarket, type Market } from '@/lib/captionMarkets'
+import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
 import { listJobs, type IrtJob } from '@/lib/iremotech'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
@@ -145,6 +145,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [capBusy, setCapBusy] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState('')
+  // localisation selon le marché du compte (une grande ville du pays, au hasard) sur les Reels / carrousels
+  const [capLocation, setCapLocation] = useState(() => { try { return localStorage.getItem('sf-irt-cap-location') !== '0' } catch { return true } })
   // marché de chaque compte (`${dev}::${cible}`) ; absent = marché par défaut (capMarket)
   const [targetMarkets, setTargetMarkets] = useState<Record<string, Market | null>>({})
   const marketOf = (dev: string, c: string): Market => targetMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c) ?? capMarket
@@ -549,7 +551,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const byPhone = [...sel].map(dev => ({
       dev,
       name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(),
-      jobs: [...(selConts[dev] ?? [])].map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(dev, container), link: storyLinks[linkKey(dev, container)] || storyLink.trim() } }),
+      jobs: [...(selConts[dev] ?? [])].map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(marketOf(dev, container)) : undefined, link: storyLinks[linkKey(dev, container)] || storyLink.trim() } }),
     })).filter(p => p.jobs.length)
 
     push(`▶ ${kind === 'story' ? 'Story' : kind === 'carousel' ? `Carrousel (${perPost} photos)` : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
@@ -591,8 +593,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const posted = kind === 'story'
           ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, vh)
           : kind === 'carousel'
-            ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic }, vh)
-            : await postReelByVision(key, p.dev, { caption: job.caption }, vh)
+            ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic, location: job.location }, vh)
+            : await postReelByVision(key, p.dev, { caption: job.caption, location: job.location }, vh)
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
         if (posted) for (const v of job.vids) void bumpUsed(v.id)
         R.tick(posted)
@@ -1145,6 +1147,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <div style={{ fontSize: 11.5, color: conns.groq ? DIM : '#FCD34D', margin: '8px 0 0' }}>
               {conns.groq ? 'Au lancement, chaque compte reçoit une description de Reel différente, générée avec le prompt de SON marché (sinon le marché par défaut).' : 'Il faut une clé Groq (Réglages › Intégrations) pour générer les descriptions.'}
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
+              <input type="checkbox" checked={capLocation} disabled={running} onChange={e => { setCapLocation(e.target.checked); try { localStorage.setItem('sf-irt-cap-location', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              📍 Localisation selon le marché <span style={{ color: DIM, fontSize: 11.5 }}>(une grande ville du pays du compte, au hasard : Paris, Lyon… · Miami, Los Angeles… · Berlin, Munich…)</span>
+            </label>
             {totalJobs > 0 && (
               <div style={{ marginTop: 10, borderRadius: 8, border: `1px solid ${EDGE}`, overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#111113', flexWrap: 'wrap' }}>

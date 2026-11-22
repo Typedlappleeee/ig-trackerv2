@@ -21,3 +21,41 @@ describe('descriptions par marché', () => {
     for (const m of ['fr', 'us', 'de'] as const) expect(DEFAULT_PROMPTS[m]).toContain('———')
   })
 })
+
+import { MARKET_CITIES, pickCity } from './captionMarkets'
+import { locationRow } from './iremotechVision'
+vi.mock('./iremotech', () => ({ snapshot: vi.fn(), sendAction: vi.fn(), deviceIp: vi.fn() }))
+describe('localisation selon le marché', () => {
+  const w = (text: string, cx: number, cy: number) => ({ text, cx, cy })
+  it('« Paris » : la bonne ligne est « Paris, France », pas « Paris Las Vegas »', () => {
+    const paris = MARKET_CITIES.fr.find(c => c.label === 'Paris, France')!
+    const words = [w('Paris', 60, 223), w('Paris', 30, 275), w('Las', 75, 275), w('Vegas', 110, 275), w('Paris,', 35, 340), w('France', 95, 340), w('75004', 30, 358)]
+    expect(locationRow(words, paris, 230)).toEqual({ x: 35, y: 340 })
+  })
+  it('USA : ville + État (« Los Angeles, California »)', () => {
+    const la = MARKET_CITIES.us.find(c => c.label === 'Los Angeles, California')!
+    expect(locationRow([w('Los', 20, 300), w('Angeles,', 70, 300), w('California', 150, 300)], la, 230)).toEqual({ x: 70, y: 300 })
+  })
+  it('Allemagne : « München, Germany » accepté pour Munich', () => {
+    const mu = MARKET_CITIES.de.find(c => c.label === 'Munich, Germany')!
+    expect(locationRow([w('München,', 50, 320), w('Germany', 120, 320)], mu, 230)).toEqual({ x: 50, y: 320 })
+  })
+  it('ville du bon pays tirée au hasard', () => {
+    expect(pickCity('de', () => 0).label).toBe('Berlin, Germany')
+    expect(MARKET_CITIES.us.every(c => !/france|germany/i.test(c.label))).toBe(true)
+  })
+})
+
+describe('localisation — la ligne commence par la ville', () => {
+  const w = (text: string, cx: number, cy: number) => ({ text, cx, cy })
+  it('« West Miami, Florida » écartée, « Miami, Florida » choisie', () => {
+    const mia = MARKET_CITIES.us.find(c => c.label === 'Miami, Florida')!
+    const words = [w('West', 30, 280), w('Miami,', 80, 280), w('Florida', 140, 280), w('Miami,', 35, 340), w('Florida', 100, 340)]
+    expect(locationRow(words, mia, 230)).toEqual({ x: 35, y: 340 })
+  })
+  it('ville en 2 mots : « Los Angeles, California » gardée, « East Los Angeles » écartée', () => {
+    const la = MARKET_CITIES.us.find(c => c.label === 'Los Angeles, California')!
+    const words = [w('East', 20, 280), w('Los', 60, 280), w('Angeles,', 110, 280), w('California', 190, 280), w('Los', 20, 340), w('Angeles,', 70, 340), w('California', 150, 340)]
+    expect(locationRow(words, la, 230)).toEqual({ x: 70, y: 340 })
+  })
+})

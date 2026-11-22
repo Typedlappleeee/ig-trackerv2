@@ -99,6 +99,13 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
 /** Texte avec accents / emojis / ß…, ou pas : l'action `text` d'iRemoTech ne tape QUE l'ASCII (vu en vrai : « vous êtes
  *  là ou pas ? 🙈 » → « vous tes l ou pas ? ») mais les retours à la ligne passent. Hors ASCII : presse-papiers de
  *  l'iPhone (`clipboard_set`) puis ⌘V (modificateur « gui » chez iRemoTech) → texte exact, lignes comprises. Pure. */
+/** Page de partage encore affichée : titre « New reel » / « New post » en haut, ou bouton « Share » en bas à DROITE
+ *  (le texte d'aide de la localisation, à gauche et plus haut, contient aussi le mot « share »). Pure. */
+export function sharePageShown(words: { text: string; cx: number; cy: number }[], W: number, H: number): boolean {
+  const title = words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.08) && words.some(o => /^(reel|post)$/i.test(o.text) && o.cy < H * 0.08)
+  const btn = words.some(o => /^(share|partager)$/i.test(o.text) && o.cy > H * 0.9 && o.cx > W * 0.5)
+  return title || btn
+}
 /** Fenêtre « Update on your original audio » affichée après Share (le Reel n'est pas encore parti). Pure. */
 export function originalAudioSheet(words: { text: string }[]): boolean {
   const has = (re: RegExp) => words.some(o => re.test(o.text))
@@ -724,15 +731,17 @@ export function createSheetShown(words: { text: string; cy: number }[], H: numbe
  *  - feuille « Create » → ligne « Post » (galerie « New post » avec la barre POST / STORY / REEL : chemin testé) ;
  *  - galerie « Add to story » alors qu'on veut un post → croix ✕ (caméra avec la barre des modes, gérée ensuite).
  *  Renvoie 'story-gallery' si la galerie « Add to story » est ouverte (Story : on choisit le média tout de suite). */
-async function tapCreatePlus(key: string, deviceId: string, W: number, H: number, pt: { x: number; y: number }, hooks?: VisionHooks, want: 'post' | 'story' = 'post'): Promise<'story-gallery' | 'other'> {
+async function tapCreatePlus(key: string, deviceId: string, W: number, H: number, pt: { x: number; y: number }, hooks?: VisionHooks, want: 'post' | 'story' = 'post'): Promise<'story-gallery' | 'post-gallery' | 'other'> {
   const plus = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(pt.x * W), y: Math.round(pt.y * H) })
   const home = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * W), y: Math.round(0.962 * H) })
   // Hors profil (fil d'actualité) : le fil garde sa position de défilement (vu en vrai : bannière « Start Survey »,
   // Reels) et le + du haut n'est plus visible → Accueil, puis 2e tap séparé qui remonte le fil tout en haut.
   const before = await readScreenWords(key, deviceId)
+  if (before && want === 'post' && newPostGallery(before.words, before.H)) return 'post-gallery' // déjà dans la galerie « New post »
   // Jamais dans le créateur / la caméra (en bas à gauche il y a la vignette de la galerie, pas l'onglet Accueil).
   const inCreator = !!before?.words.some(o => /^(post|story|reel|reels|instants|recents|live)$/i.test(o.text) && o.cy > before.H * 0.85)
     || !!before?.words.some(o => /^(recents|collage|yours)$/i.test(o.text))
+    || (!!before && sharePageShown(before.words, before.W, before.H)) // page de partage : en bas à gauche = « Save draft »
   if (before && !inCreator && !isProfileScreen(before.words, before.H)) { await home(); await sleep(1800); await home(); await sleep(2500) }
   await plus()
   await sleep(2200)
@@ -751,12 +760,17 @@ async function tapCreatePlus(key: string, deviceId: string, W: number, H: number
       await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.084 * scr.W), y: Math.round(0.08 * scr.H) })
       await sleep(2200); continue
     }
-    return 'other'
+    // Galerie « New post » ouverte par la ligne « Post » : déjà en mode POST, SANS barre des modes en bas (vu en vrai).
+    return newPostGallery(scr.words, scr.H) ? 'post-gallery' : 'other'
   }
   return 'other'
 }
+/** Galerie « New post » (titre en haut). Pure. */
+export function newPostGallery(words: { text: string; cy: number }[], H: number): boolean {
+  return words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.08) && words.some(o => /^post$/i.test(o.text) && o.cy < H * 0.08)
+}
 
-export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
+export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; location?: LocTarget; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
   const shot0 = await snapshot(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
@@ -768,7 +782,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   await dismissIgInfoSheet(key, deviceId, hooks)
   // 1. Ouvrir le créateur (+ haut-gauche)
   hooks?.log?.('➕ Ouverture du créateur (+)…')
-  await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
+  const landing = await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
   if (await grantPhotoAccessIfAsked(key, deviceId, hooks)) {
     hooks?.log?.('   Instagram relancé après l’accès aux photos → on rouvre le créateur')
     await dismissPopups(key, deviceId, hooks)
@@ -777,8 +791,8 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   }
   // 2. Mode POST : galerie directe, dernière vidéo pré-sélectionnée, pas de caméra (ni effets).
   //    Une vidéo publiée en POST devient un Reel. Si POST est introuvable → caméra REEL.
-  if (await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i], 'POST', hooks)) {
-    return postViaPostMode(key, deviceId, W, H, A, opts.caption, hooks)
+  if (landing === 'post-gallery' || await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i], 'POST', hooks)) {
+    return postViaPostMode(key, deviceId, W, H, A, opts.caption, hooks, opts.location)
   }
   hooks?.log?.('   POST introuvable → passage par la caméra REEL')
   // 2bis. Passer en mode REEL (bandeau du bas POST STORY INSTANTS REEL LIVE) — scroll si besoin.
@@ -844,7 +858,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
 // Next → écran de légende → légende → Share. On n'appuie sur Share QUE si l'écran de légende /
 // partage est reconnu (sinon abandon : jamais de post à moitié).
 const CAPTION_MARK = [/^caption[.…]*$/i, /^l[ée]gende[.…]*$/i]
-async function postViaPostMode(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks?: VisionHooks): Promise<boolean> {
+async function postViaPostMode(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks?: VisionHooks, location?: LocTarget): Promise<boolean> {
   await sleep(1800) // la galerie se charge
   // a. Vidéo la plus récente : 1re case de la grille, juste sous « Récents » (x = 1/8 de la largeur :
   //    dans la 1re case en 3 comme en 4 colonnes). Sans repère, on garde la pré-sélection d'Instagram.
@@ -862,7 +876,7 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
     await sendAction(key, deviceId, { type: 'tap', x, y })
     await sleep(1500)
   } else hooks?.log?.('   1re vignette non lue → vidéo pré-sélectionnée par Instagram (la plus récente)')
-  return finishPostFromGallery(key, deviceId, W, H, A, caption, hooks, 'Vidéo publiée (POST)')
+  return finishPostFromGallery(key, deviceId, W, H, A, caption, hooks, 'Vidéo publiée (POST)', false, location)
 }
 
 /** Éditeur photo : musique présente ? Le bouton « Audio » (1er de la barre d'outils) affiche la POCHETTE du morceau
@@ -920,7 +934,7 @@ async function addSuggestedMusic(key: string, deviceId: string, hooks?: VisionHo
 }
 
 // Fin commune Vidéo / Carrousel : galerie « New post » (médias choisis) → Next → éditeur → Next → légende → Share.
-async function finishPostFromGallery(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks: VisionHooks | undefined, doneLabel: string, music = false): Promise<boolean> {
+async function finishPostFromGallery(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks: VisionHooks | undefined, doneLabel: string, music = false, location?: LocTarget): Promise<boolean> {
   // b. Avancer jusqu'à l'écran de légende : Next en haut-droite (texte) ou en bas-droite (bouton bleu).
   let atCaption = false
   for (let step = 0; step < 11 && !atCaption; step++) {
@@ -1014,17 +1028,21 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       await sleep(1500)
     }
   }
+  // c bis. Localisation (ville du marché du compte) — jamais bloquante : sans elle, on publie quand même.
+  if (location) await addLocationByVision(key, deviceId, location, hooks)
   // d. Partager (bouton bleu en bas), puis VÉRIFIÉ : la page de partage (Share + Tag people / Add location…) doit
   //    avoir disparu. Sinon on retape, et au bout de 3 essais : non publié (plus jamais annoncé à tort).
+  // Toujours sur la page de partage = titre « New reel / New post » en haut OU bouton « Share » en bas à droite.
+  // (Le petit texte « People you share this content with… » sous la localisation contient aussi « share » : ignoré.)
   const onSharePage = async () => {
     const sp = await readScreenWords(key, deviceId)
-    if (!sp) return false
-    return sp.words.some(o => /^(share|partager)$/i.test(o.text) && o.cy > sp.H * 0.8) && sp.words.some(o => /^(tag|location|audience|rename|draft)$/i.test(o.text))
+    if (!sp) return true // illisible : on ne conclut pas à un succès
+    return sharePageShown(sp.words, sp.W, sp.H)
   }
   let shared = false
   for (let k = 0; k < 3 && !shared; k++) {
     if (k) hooks?.log?.(`   toujours sur la page de partage → nouveau tap sur Share (${k + 1}/3)`)
-    if (!await tapButton(key, deviceId, [/^share$/i, /^partager$/i], A.shareBtn, W, H, hooks, [0.80, 1], 'Share', 3, [0, 1])) return false
+    if (!await tapButton(key, deviceId, [/^share$/i, /^partager$/i], A.shareBtn, W, H, hooks, [0.9, 1], 'Share', 3, [0.5, 1])) return false
     await sleep(4000)
     // Fenêtre « Update on your original audio » (vue en vrai le 22/11/2026) : le Reel attend → bouton bleu « Share »
     // de la fenêtre (choix par défaut d'Instagram).
@@ -1054,6 +1072,112 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1200)
   return true
+}
+
+// ── Localisation (page de partage) : « Add location » → recherche « Ville, Pays » → la BONNE ligne → Add ─────────
+// Relevé en vrai le 22/11/2026 (NOJB) : 1re fois, fenêtre « Content tagged with a location will appear on the map »
+// → OK ; feuille « Locations » avec « Search » (jamais « Turn on Location Services ») ; la 1re ligne n'est pas
+// forcément la ville (« Paris » → « Paris Las Vegas ») ; une ligne tapée ouvre « Map preview » → bouton « Add ».
+export type LocTarget = { q: string; city: RegExp; region: RegExp; label: string; first?: RegExp }
+
+/** Ligne de résultat = nom de la ville ET pays / État sur la même ligne, sous le champ de recherche, et la ligne
+ *  COMMENCE par la ville (vu en vrai : « Miami, Florida » donnait d'abord « West Miami, Florida »). Pure. */
+export function locationRow(words: { text: string; cx: number; cy: number }[], loc: { city: RegExp; region: RegExp; first?: RegExp }, belowY: number): { x: number; y: number } | null {
+  const cities = words.filter(o => o.cy > belowY && loc.city.test(o.text)).sort((a, b) => a.cy - b.cy)
+  for (const c of cities) {
+    const line = words.filter(o => Math.abs(o.cy - c.cy) < 12).sort((a, b) => a.cx - b.cx)
+    if (!line.some(o => o !== c && o.cx > c.cx && loc.region.test(o.text.replace(/[,.]$/, '')))) continue
+    if (!(loc.first ?? loc.city).test(line[0].text)) continue // un mot avant la ville (« West », « North »…) : autre lieu
+    return { x: c.cx, y: c.cy }
+  }
+  return null
+}
+
+/** Ajoute la localisation sur la page de partage. true si posée et vérifiée ; sinon referme proprement (Cancel) et
+ *  renvoie false : la publication continue SANS localisation (jamais bloquée pour ça). */
+export async function addLocationByVision(key: string, deviceId: string, loc: LocTarget, hooks?: VisionHooks): Promise<boolean> {
+  const s0 = await readScreenWords(key, deviceId)
+  if (!s0) return false
+  const { W, H } = s0
+  const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
+  hooks?.log?.(`📍 Localisation : ${loc.label}…`)
+  // 1. ligne « Add location » (sous « Tag people », souvent hors écran → on fait défiler la page de partage)
+  let row: { x: number; y: number } | null = null
+  for (let k = 0; k < 3 && !row; k++) {
+    const scr = k ? await readScreenWords(key, deviceId) : s0
+    const lw = scr?.words.find(o => /^location$/i.test(o.text) && o.cy > H * 0.25 && o.cy < H * 0.9 && scr.words.some(a => /^add$/i.test(a.text) && Math.abs(a.cy - o.cy) < 12 && a.cx < o.cx))
+    if (lw) { row = { x: lw.cx, y: lw.cy }; break }
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(0.78 * H), x2: Math.round(W / 2), y2: Math.round(0.42 * H), duration_ms: 500 })
+    await sleep(1200)
+  }
+  if (!row) { hooks?.log?.('   ⚠ ligne « Add location » introuvable → publication sans localisation'); return false }
+  await tap(row.x, row.y)
+  await sleep(2800)
+  const cancel = async () => {
+    const c = await readScreenWords(key, deviceId)
+    const cw = c?.words.find(o => /^cancel$/i.test(o.text) && o.cy < H * 0.12)
+    if (cw) { await tap(cw.cx, cw.cy); await sleep(1500) }
+  }
+  // 2. fenêtre « … will appear on the map » (1re fois) → OK, puis champ « Search »
+  let search: { x: number; y: number } | null = null
+  for (let k = 0; k < 3 && !search; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) { await sleep(800); continue }
+    if (scr.words.some(o => /^map$/i.test(o.text)) && scr.words.some(o => /^tagged$/i.test(o.text))) {
+      const ok = firstTimeOkTap(scr.words, W, H)
+      const blue = ok ? null : await findBlueButton(scr.shot, 0.75, 0.97)
+      hooks?.log?.('   fenêtre « location … on the map » → OK')
+      await tap(ok ? ok.x : blue ? blue.cx : W / 2, ok ? ok.y : blue ? blue.cy : 0.888 * H)
+      await sleep(1800); continue
+    }
+    // « Search » peut être lu avec le curseur collé (« |Search ») → mot nettoyé
+    const sw = scr.words.find(o => o.text.replace(/[^a-z]/gi, '').toLowerCase() === 'search' && o.cy < H * 0.45)
+    if (sw) search = { x: sw.cx, y: sw.cy }
+    else await sleep(1000)
+  }
+  if (!search) { hooks?.log?.('   ⚠ recherche de lieu introuvable → publication sans localisation'); await cancel(); return false }
+  await tap(search.x, search.y)
+  await sleep(1200)
+  await typeRich(key, deviceId, loc.q)
+  // la saisie se fait lettre par lettre (vu en vrai : « Miami, Fl… » encore en cours) et la liste montre d'abord les
+  // anciennes suggestions → on attend que le dernier mot de la recherche soit dans le champ, puis que la liste suive
+  const lastWord = loc.q.split(/[\s,]+/).filter(Boolean).pop()!.toLowerCase()
+  for (let k = 0; k < 10; k++) {
+    await sleep(1000)
+    const f = await readScreenWords(key, deviceId)
+    if (f?.words.some(o => Math.abs(o.cy - search.y) < 18 && o.text.toLowerCase().replace(/[^a-zäöüß]/g, '') === lastWord.replace(/[^a-zäöüß]/g, ''))) break
+  }
+  await sleep(2500)
+  // 3. la bonne ligne (ville + pays/État, commençant par la ville), jamais la 1re au hasard
+  let pt: { x: number; y: number } | null = null
+  for (let k = 0; k < 3 && !pt; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (scr) pt = locationRow(scr.words, loc, search.y + 15)
+    if (!pt) await sleep(1500)
+  }
+  if (!pt) { hooks?.log?.(`   ⚠ « ${loc.label} » absent des résultats → publication sans localisation`); await cancel(); return false }
+  await tap(pt.x, pt.y)
+  // 4. « Map preview » → bouton « Add » (bleu, en bas) — la feuille met un peu de temps à monter
+  for (let k = 0; k < 3; k++) {
+    await sleep(1800)
+    const mp = await readScreenWords(key, deviceId)
+    if (!mp?.words.some(o => /^preview$/i.test(o.text))) continue
+    const addW = mp.words.find(o => /^add$/i.test(o.text) && o.cy > H * 0.85)
+    const blue = addW ? null : await findBlueButton(mp.shot, 0.85, 1)
+    await tap(addW ? addW.cx : blue ? blue.cx : W / 2, addW ? addW.cy : blue ? blue.cy : 0.942 * H)
+    break
+  }
+  // 5. vérifié : retour sur la page de partage, la ligne du lieu remplace « Add location » (relu jusqu'à 4 fois)
+  let set = false
+  for (let k = 0; k < 4 && !set; k++) {
+    await sleep(1500)
+    const v = await readScreenWords(key, deviceId)
+    set = !!v && sharePageShown(v.words, W, H) && v.words.some(o => loc.region.test(o.text.replace(/[,.]$/, ''))) && !v.words.some(o => /^locations$/i.test(o.text))
+  }
+  if (set) { hooks?.log?.(`   ✓ localisation : ${loc.label}`); return true }
+  hooks?.log?.('   ⚠ localisation non confirmée → publication sans');
+  await cancel()
+  return false
 }
 
 // ── Carrousel photo (post feed à plusieurs photos) ──────────────────────────────
@@ -1173,25 +1297,26 @@ async function selectCarouselPhotos(key: string, deviceId: string, count: number
 }
 
 /** Post feed CARROUSEL : `count` photos les plus récentes (injectées juste avant, dans l'ordre inverse) → légende → Share. */
-export async function postCarouselByVision(key: string, deviceId: string, opts: { count: number; caption?: string; music?: boolean; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
+export async function postCarouselByVision(key: string, deviceId: string, opts: { count: number; caption?: string; music?: boolean; location?: LocTarget; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
   const count = Math.max(1, Math.min(CAROUSEL_MAX, Math.round(opts.count)))
   const shot0 = await snapshot(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
+  let landing: Awaited<ReturnType<typeof tapCreatePlus>> = 'other'
   for (let k = 0; k < 2; k++) {
     await dismissPopups(key, deviceId, hooks)
     await dismissIgInfoSheet(key, deviceId, hooks)
     hooks?.log?.(`➕ Ouverture du créateur (+) — carrousel de ${count} photo(s)…`)
-    await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
+    landing = await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
     if (!await grantPhotoAccessIfAsked(key, deviceId, hooks)) break
     hooks?.log?.('   Instagram relancé après l’accès aux photos → on rouvre le créateur')
   }
-  if (!await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i], 'POST', hooks)) return false
+  if (landing !== 'post-gallery' && !await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i], 'POST', hooks)) return false
   await sleep(1800)
   if (count > 1) { if (!await selectCarouselPhotos(key, deviceId, count, hooks)) return false }
   else hooks?.log?.('🖼 1 photo : la plus récente, pré-sélectionnée par Instagram')
-  return finishPostFromGallery(key, deviceId, W, H, A, opts.caption, hooks, count > 1 ? `Carrousel de ${count} photos publié` : 'Photo publiée', opts.music !== false)
+  return finishPostFromGallery(key, deviceId, W, H, A, opts.caption, hooks, count > 1 ? `Carrousel de ${count} photos publié` : 'Photo publiée', opts.music !== false, opts.location)
 }
 
 // ── Création de compte Instagram pilotée à la VISION (début du flow) ────────────

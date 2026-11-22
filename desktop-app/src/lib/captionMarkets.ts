@@ -253,3 +253,21 @@ export function countByMarket(markets: (Market | null)[], fallback: Market): Rec
   for (const m of markets) out[m ?? fallback]++
   return out
 }
+
+// ── Localisation selon le marché : une grande ville du pays du compte, choisie au hasard ─────────────────
+// `q` = recherche tapée dans « Add location » ; la bonne ligne = le nom de la ville ET le pays / l'État sur la même
+// ligne (vu en vrai : « Paris » donne d'abord « Paris Las Vegas », la bonne ligne est « Paris, France »).
+export interface MarketCity { q: string; city: RegExp; region: RegExp; label: string; first: RegExp }
+const FR_REGION = /^france$/i, DE_REGION = /^(germany|deutschland)$/i
+export const MARKET_CITIES: Record<Market, MarketCity[]> = {
+  fr: ['Paris', 'Lyon', 'Marseille', 'Toulouse', 'Bordeaux', 'Lille', 'Nice', 'Nantes', 'Montpellier', 'Strasbourg', 'Rennes']
+    .map(c => ({ q: `${c}, France`, city: new RegExp(`^${c},?$`, 'i'), first: new RegExp(`^${c},?$`, 'i'), region: FR_REGION, label: `${c}, France` })),
+  us: ([['New York', 'New York'], ['Los Angeles', 'California'], ['Miami', 'Florida'], ['Chicago', 'Illinois'], ['Houston', 'Texas'], ['Las Vegas', 'Nevada'], ['San Diego', 'California'], ['Austin', 'Texas'], ['Atlanta', 'Georgia'], ['Dallas', 'Texas']] as const)
+    .map(([c, st]) => ({ q: `${c}, ${st}`, city: new RegExp(`^${c.split(' ').pop()},?$`, 'i'), first: new RegExp(`^${c.split(' ')[0]},?$`, 'i'), region: new RegExp(`^${st.split(' ').pop()}$`, 'i'), label: `${c}, ${st}` })),
+  de: ([['Berlin', 'Berlin'], ['Hamburg', 'Hamburg'], ['Munich', 'Munich|M[uü]nchen'], ['Cologne', 'Cologne|K[oö]ln'], ['Frankfurt', 'Frankfurt'], ['Dusseldorf', 'D[uü]sseldorf'], ['Stuttgart', 'Stuttgart'], ['Leipzig', 'Leipzig'], ['Dresden', 'Dresden'], ['Hannover', 'Hannover|Hanover']] as const)
+    .map(([c, re]) => ({ q: `${c}, Germany`, city: new RegExp(`^(${re}),?$`, 'i'), first: new RegExp(`^(${re}),?$`, 'i'), region: DE_REGION, label: `${c}, Germany` })),
+}
+export function pickCity(m: Market, rnd = Math.random): MarketCity {
+  const l = MARKET_CITIES[m]
+  return l[Math.floor(rnd() * l.length) % l.length]
+}

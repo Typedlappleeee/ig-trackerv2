@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22f',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : localisation selon le marché du compte', en: 'iRemoTech: location based on the account’s market' },
+    items: {
+      fr: [
+        '« 📍 Localisation selon le marché » (Posting › Description auto) : chaque Reel / carrousel reçoit une grande ville du pays du compte (France, USA, Allemagne), choisie au hasard.',
+        'Le bon lieu est vérifié : la ligne doit commencer par la ville et porter le pays ou l’État (« Paris, France », jamais « Paris Las Vegas » ni « West Miami »). Sans lieu trouvé, la publication part quand même, sans localisation.',
+      ],
+      en: [
+        '“📍 Location by market” (Posting › Auto caption): each Reel / carousel gets a big city in the account’s country (France, USA, Germany), picked at random.',
+        'The right place is verified: the row must start with the city and carry the country or state (“Paris, France”, never “Paris Las Vegas” or “West Miami”). If no place is found, the post still goes out, without location.',
+      ],
+    },
+  },
+  {
     id: '2026-11-22e',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : descriptions avec accents et emojis, publication vérifiée', en: 'iRemoTech: captions with accents and emojis, verified posting' },

@@ -61,3 +61,14 @@ describe('saisie et partage', () => {
     expect(originalAudioSheet(['Rename', 'audio', 'Original', 'audio'].map(text => ({ text })))).toBe(false)
   })
 })
+
+import { sharePageShown } from './iremotechVision'
+describe('page de partage', () => {
+  it('texte d’aide « People you share… » sous la localisation : pas le bouton', () => {
+    expect(sharePageShown([{ text: 'share', cx: 106, cy: 627 }], 406, 720)).toBe(false)
+  })
+  it('bouton Share en bas à droite ou titre « New reel » → encore sur la page', () => {
+    expect(sharePageShown([{ text: 'Share', cx: 300, cy: 685 }], 406, 720)).toBe(true)
+    expect(sharePageShown([{ text: 'New', cx: 180, cy: 30 }, { text: 'reel', cx: 220, cy: 30 }], 406, 720)).toBe(true)
+  })
+})
