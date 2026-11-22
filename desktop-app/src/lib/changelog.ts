@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22s',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : Instagram ouvert directement (plus d’Apple Music)', en: 'iRemoTech: Instagram opened directly (no more Apple Music)' },
+    items: {
+      fr: ['iPhones normaux : Instagram est ouvert par l’action iRemoTech « open_app », où que soit son icône (le tap sur l’icône ouvrait parfois Apple Music). L’icône reste le secours, et pour les jailbreaks (sélecteur Crane). Étalonnage du toucher attendu ~12 s.'],
+      en: ['Regular iPhones: Instagram is opened with the iRemoTech “open_app” action, wherever its icon is (tapping the icon sometimes opened Apple Music). The icon remains the fallback, and is used for jailbreaks (Crane picker). Touch calibration now waits ~12 s.'],
+    },
+  },
+  {
     id: '2026-11-22r',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : ouverture d’Instagram vérifiée', en: 'iRemoTech: Instagram opening verified' },

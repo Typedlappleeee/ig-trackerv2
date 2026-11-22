@@ -55,6 +55,7 @@ export type IrtAction =
   | { type: 'key'; key: string }
   | { type: 'press'; name?: string; key?: string; modifiers?: string[] }
   | { type: 'open_url'; url: string }
+  | { type: 'open_app'; target: string }
   | { type: 'airplane'; on: boolean }
   | { type: 'device_ip' }
   | { type: 'clipboard_set'; text: string }

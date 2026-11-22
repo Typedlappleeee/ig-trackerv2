@@ -95,3 +95,9 @@ describe('ouverture d’Instagram vérifiée', () => {
     expect(otherAppOpened(['Select', 'Container', 'Default', '1'].map(text => ({ text })))).toBe(false)
   })
 })
+
+describe('Apple Music « What’s New » reconnue', () => {
+  it('écran de bienvenue d’Apple Music → autre app', () => {
+    expect(otherAppOpened(["What's", 'New', 'in', 'Apple', 'Music', 'AutoMix', 'Continue'].map(text => ({ text })))).toBe(true)
+  })
+})

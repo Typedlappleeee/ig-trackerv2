@@ -45,7 +45,8 @@ export async function recalibrateTouch(key: string, deviceId: string, hooks?: Vi
   try {
     for (const a of variants) {
       const ok = await sendAction(key, deviceId, a).catch(() => false)
-      if (ok) { hooks?.log?.(`   ✓ recalibrage lancé (${JSON.stringify(a)})`); await sleep(4000); return }
+      // ~12 s : avant la fin de l'étalonnage, un tap peut partir ailleurs (vu en vrai : Apple Music au lieu d'Instagram)
+      if (ok) { hooks?.log?.(`   ✓ recalibrage lancé (${JSON.stringify(a)})`); await sleep(12000); return }
     }
     hooks?.log?.('   ⚠ aucune action « calibrate » acceptée par l’API — on continue (dis-moi le nom exact).')
   } catch (e) {
@@ -609,7 +610,8 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
   for (let k = 0; k < 2; k++) {
     if (!await tapAppIcon(key, deviceId, isInstagramText, 'Instagram', hooks)) return false
     await sleep(3200)
-    const scr = await readScreenWords(key, deviceId)
+    let scr = await readScreenWords(key, deviceId)
+    if (scr && otherAppOpened(scr.words)) { await sleep(2500); scr = await readScreenWords(key, deviceId) } // Instagram encore en chargement ?
     if (!scr || !otherAppOpened(scr.words)) return true
     hooks?.log?.('   ⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai')
     await sendAction(key, deviceId, { type: 'press', name: 'home' })
@@ -622,9 +624,12 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
  *  sélecteur Crane, et des mots typiques d'autres apps. Pure. */
 export function otherAppOpened(words: { text: string }[]): boolean {
   const t = new Set(words.map(o => o.text.toLowerCase().replace(/[^a-z]/g, '')))
-  const ig = ['instagram', 'foryou', 'following', 'reels', 'posts', 'followers', 'default', 'join', 'started', 'login', 'create', 'yourstory', 'story', 'select', 'container'].some(w => t.has(w))
+  // indices d'Instagram (fil, profil, inscription, connexion) ou du sélecteur de containers Crane
+  // mots propres à Instagram / Crane uniquement (« you », « story »… existent aussi dans Apple Music : piège vu en vrai)
+  const ig = ['instagram', 'following', 'reels', 'followers', 'default', 'container', 'suggested'].some(w => t.has(w))
   if (ig) return false
-  return ['listennow', 'listen', 'radio', 'browse', 'library', 'applemusic', 'songs', 'albums', 'playlists', 'settings', 'general', 'albums', 'memories', 'wifi'].some(w => t.has(w))
+  // une autre app : Apple Music (« What's New in Apple Music »), Réglages, Photos…
+  return ['music', 'apple', 'listen', 'radio', 'browse', 'songs', 'albums', 'playlists', 'settings', 'general', 'memories', 'wifi', 'automix'].some(w => t.has(w))
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────
@@ -2718,6 +2723,19 @@ async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHoo
   await allowShortcutPrompt(key, deviceId, hooks)
   await grantPhotoAccessIfAsked(key, deviceId, hooks) // alertes iOS restées à l'écran (elles bloquent tous les taps)
   await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
+  // 1. action iRemoTech « open_app » : ouvre Instagram où que soit son icône (aucun tap sur l'accueil). Vérifiée.
+  if (await sendAction(key, deviceId, { type: 'open_app', target: 'instagram' })) {
+    await sleep(4000)
+    const scr = await readScreenWords(key, deviceId)
+    if (scr && !otherAppOpened(scr.words) && !isAppLibrary(scr.words) && !isTodayView(scr.words) && !scr.words.some(o => /^(weather|stocks|wallet)$/i.test(o.text))) {
+      hooks?.log?.('📲 Instagram ouvert (open_app)')
+      await grantPhotoAccessIfAsked(key, deviceId, hooks)
+      return 'app'
+    }
+    hooks?.log?.('   open_app sans effet → icône de l’accueil')
+    await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
+  }
+  // 2. secours : icône trouvée à son nom sur les pages d'accueil
   if (!await tapInstagramIcon(key, deviceId, hooks)) { hooks?.log?.('❌ Icône Instagram introuvable sur l’accueil.'); return null }
   await sleep(3500)
   await grantPhotoAccessIfAsked(key, deviceId, hooks) // alerte « accès aux photos » restée d'une tentative précédente
