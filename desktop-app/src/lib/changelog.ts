@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22i',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : Accueil et Posting regroupé', en: 'iRemoTech: Home and grouped Posting' },
+    items: {
+      fr: [
+        'Nouvelle page Accueil : crédits iRemoTech restants (actions, minutes, captures, envois, remise à zéro), iPhones en ligne, comptes sains / à surveiller / éligibles Trial, comptes créés.',
+        'Posting regroupé comme sur GeeLark : sous-onglets 🎬 Reels · 🖼 Carrousel · 📸 Story CTA (la Story n’a plus son entrée à part).',
+      ],
+      en: [
+        'New Home page: remaining iRemoTech credits (actions, minutes, screenshots, uploads, reset), iPhones online, healthy / to-watch / Trial-eligible accounts, created accounts.',
+        'Posting grouped like on GeeLark: 🎬 Reels · 🖼 Carousel · 📸 CTA Story sub-tabs (Story no longer has its own entry).',
+      ],
+    },
+  },
+  {
     id: '2026-11-22h',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : sessions de posts, crédits restants, éligibilité Trial', en: 'iRemoTech: post sessions, remaining credits, Trial eligibility' },

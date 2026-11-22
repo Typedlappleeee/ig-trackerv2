@@ -193,12 +193,12 @@ function AppInner({ user }: { user: User }) {
   const orgName = org.currentOrg?.name ?? 'Espace perso'
   const roleLabel = org.role ? org.role.charAt(0).toUpperCase() + org.role.slice(1) : ''
 
-  const IRT_TAB = { irtPhones: 'phones', irtIgAccounts: 'igaccounts', irtPosting: 'posting', irtStory: 'story', irtWarmup: 'warmup', irtAccount: 'account', irtComptes: 'comptes' } as const
-  const IRT_PAGE = { phones: 'irtPhones', igaccounts: 'irtIgAccounts', posting: 'irtPosting', story: 'irtStory', warmup: 'irtWarmup', account: 'irtAccount', comptes: 'irtComptes' } as const
+  const IRT_TAB = { irtHome: 'home', irtPhones: 'phones', irtIgAccounts: 'igaccounts', irtPosting: 'posting', irtStory: 'story', irtWarmup: 'warmup', irtAccount: 'account', irtComptes: 'comptes' } as const
+  const IRT_PAGE = { home: 'irtHome', phones: 'irtPhones', igaccounts: 'irtIgAccounts', posting: 'irtPosting', story: 'irtStory', warmup: 'irtWarmup', account: 'irtAccount', comptes: 'irtComptes' } as const
 
   const content = infra === 'iremotech'
     ? <BlowAutoPilot user={user} org={org}
-        tab={(IRT_TAB as Record<string, (typeof IRT_TAB)[keyof typeof IRT_TAB]>)[page] ?? 'phones'}
+        tab={(IRT_TAB as Record<string, (typeof IRT_TAB)[keyof typeof IRT_TAB]>)[page] ?? 'home'}
         onTab={(t) => setPage(IRT_PAGE[t] as PageKey)} />
     : infra === 'blowsome'
     ? (page === 'blowParc' ? <BlowParc user={user} org={org} />

@@ -32,6 +32,7 @@ import BankPicker, { type PickerResult } from '@/components/BankPicker'
 import { themeFor } from '@/lib/theme'
 import { confirmDialog, toast } from '@/lib/ui'
 import IrtKeyForm from '@/components/IrtKeyForm'
+import { UnderlineTabs } from '@/components/Kit'
 
 const BLOW_THEME = themeFor('blowsome')
 
@@ -42,7 +43,7 @@ const EDGE = 'rgba(255,255,255,0.07)', FIELD_EDGE = 'rgba(255,255,255,0.09)', FI
 const MONO = "'JetBrains Mono',monospace"
 const SEL_BG = 'rgba(255,255,255,0.07)', SEL_EDGE = 'rgba(233,196,106,0.45)'
 type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null; used_count?: number }
-export type IrtTab = 'phones' | 'igaccounts' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
+export type IrtTab = 'home' | 'phones' | 'igaccounts' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
 
 const card: CSSProperties = { background: '#111113', border: `1px solid ${EDGE}`, borderRadius: 8, padding: 16, marginBottom: 12 }
 // Boutons alignés sur <Btn> (lib/ui) : ghost = bordé neutre, `gold` = primaire clair.
@@ -118,6 +119,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [photoPool, setPhotoPool] = useState<VidRef[]>([]) // pool photos (Posting › Carrousel)
   const [picker, setPicker] = useState<null | 'reel' | 'story' | 'photo'>(null)
   // Posting : Reel (vidéo) ou Carrousel photo (post feed de N photos)
+  // Posting = un seul onglet, sous-onglets Reels / Carrousel / Story CTA (comme le Posting GeeLark)
+  const [storySub, setStorySub] = useState(false)
   const [postType, setPostTypeS] = useState<'reel' | 'carousel'>(() => { try { return localStorage.getItem('sf-irt-post-type') === 'carousel' ? 'carousel' : 'reel' } catch { return 'reel' } })
   const setPostType = (v: 'reel' | 'carousel') => { setPostTypeS(v); try { localStorage.setItem('sf-irt-post-type', v) } catch { /* ignore */ } }
   const [carCount, setCarCountS] = useState<number>(() => { try { const n = Number(localStorage.getItem('sf-irt-car-count')); return n >= 2 && n <= CAROUSEL_MAX ? n : 3 } catch { return 3 } })
@@ -255,9 +258,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }, [irt.key, load])
   const bankScope = { orgId: currentOrg?.id ?? null, userId: user.id }
   useEffect(() => {
-    if ((curTab === 'posting' && (postType === 'carousel' ? photoSrc : reelSrc).mode === 'folder') || (curTab === 'story' && storySrc.mode === 'folder'))
+    if ((curTab === 'posting' && !storySub && (postType === 'carousel' ? photoSrc : reelSrc).mode === 'folder') || ((curTab === 'story' || storySub) && storySrc.mode === 'folder'))
       loadBankSummary(bankScope).then(setBankSum).catch(() => setBankSum(null))
-  }, [curTab, reelSrc.mode, storySrc.mode, photoSrc.mode, postType, currentOrg?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [curTab, storySub, reelSrc.mode, storySrc.mode, photoSrc.mode, postType, currentOrg?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   // Après une publication réussie : +1 au compteur du média (« Jamais publiées » / tri
   // « Moins publiées » de la Banque ; le mode dossier prend ainsi des vidéos fraîches).
   async function bumpUsed(id: string) {
@@ -997,19 +1000,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
 
   const TAB_TITLE: Record<IrtTab, { title: string; sub: string }> = {
+    home: { title: 'Accueil', sub: 'Tes crédits iRemoTech, tes iPhones et tes comptes en un coup d’œil.' },
     phones: { title: 'Mes iPhones', sub: 'Tes iPhones iRemoTech : containers Crane (jailbreak) ou comptes Instagram connectés (iPhone normal). « Détecter » les lit directement sur l’iPhone.' },
-    posting: { title: 'Publier des Reels', sub: 'Choisis où, quelles vidéos, et lance : chaque container publie un Reel.' },
-    story: { title: 'Publier des Stories', sub: 'Une photo et un lien sticker par container.' },
+    posting: { title: 'Posting', sub: 'Reels, carrousels photo ou Story CTA : choisis où, quoi, et lance. Chaque compte publie à son tour.' },
+    story: { title: 'Posting', sub: 'Reels, carrousels photo ou Story CTA : choisis où, quoi, et lance. Chaque compte publie à son tour.' },
     warmup: { title: 'Warm-up', sub: 'Fais vivre tes comptes comme un humain, container par container.' },
     account: { title: 'Créer des comptes', sub: 'Un compte Instagram dans chaque container vide, numéro et code SMS automatiques.' },
     igaccounts: { title: 'Comptes Instagram', sub: 'Tous les comptes de tes iPhones, relus depuis iRemoTech : statut, publications, abonnés, warm-ups. Vérifie et chauffe en un clic.' },
     comptes: { title: 'Comptes créés', sub: 'Identifiants, numéros et historique des comptes créés depuis ScaleFlow.' },
   }
   const TABS: { k: IrtTab; label: string; icon: string }[] = [
+    { k: 'home', label: 'Accueil', icon: '🏠' },
     { k: 'phones', label: 'Téléphones', icon: '📱' },
     { k: 'igaccounts', label: 'Comptes', icon: '👥' },
     { k: 'posting', label: 'Posting', icon: '🎬' },
-    { k: 'story', label: 'Story', icon: '📸' },
     { k: 'warmup', label: 'Warm-up', icon: '🔥' },
     { k: 'account', label: 'Création de compte', icon: '🆕' },
     { k: 'comptes', label: 'Comptes créés', icon: '🆕' },
@@ -1046,6 +1050,54 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {loading && <div style={{ ...card, color: MUTED, fontSize: 13, textAlign: 'center' }}>Connexion à iRemoTech…</div>}
 
       {/* ─────────────── ONGLET TÉLÉPHONES (gestion complète) ─────────────── */}
+      {curTab === 'home' && (() => {
+        const accs = devices.flatMap(d => deviceAccounts(irtJobs[d.public_id] ?? [], (conts[d.public_id] ?? []).filter(c => c.startsWith('@'))).accounts)
+        const quota = (label: string, icon: string, b?: { used?: number; budget?: number; remaining?: number }) => {
+          if (!b || b.budget == null) return null
+          const left = b.remaining ?? (b.used != null ? b.budget - b.used : null)
+          const pct = left != null && b.budget ? Math.max(0, Math.min(100, (left / b.budget) * 100)) : null
+          const low = pct != null && pct < 15
+          return (
+            <div key={label} style={{ ...card, margin: 0 }}>
+              <div style={{ fontSize: 12, color: MUTED }}>{icon} {label}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: low ? '#F87171' : INK, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{left ?? '—'}<span style={{ fontSize: 13, color: DIM, fontWeight: 500 }}> / {b.budget}</span></div>
+              {pct != null && <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: low ? '#F87171' : GOLD }} /></div>}
+            </div>
+          )
+        }
+        const stat = (label: string, v: number | string, go?: IrtTab) => (
+          <div key={label} onClick={go ? () => goTab(go) : undefined} style={{ ...card, margin: 0, cursor: go ? 'pointer' : 'default' }}>
+            <div style={{ fontSize: 12, color: MUTED }}>{label}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: INK, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
+          </div>
+        )
+        const grid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12, marginBottom: 18 }
+        return (<>
+          <div style={{ fontSize: 13, fontWeight: 700, color: INK, margin: '4px 0 10px' }}>Crédits iRemoTech restants{usage?.resets_at ? <span style={{ color: DIM, fontWeight: 500 }}> · remise à zéro à {new Date(usage.resets_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span> : null}</div>
+          <div style={grid}>
+            {quota('Actions', '⚡', usage?.actions ?? (usage?.budget != null ? { budget: usage.budget, remaining: usage.remaining, used: usage.used } : undefined))}
+            {quota('Minutes d’iPhone', '⏱', usage?.active_minutes)}
+            {quota('Captures d’écran', '📸', usage?.snapshots)}
+            {quota('Envois de médias', '⬆', usage?.uploads)}
+            {!usage && <div style={{ ...card, margin: 0, color: MUTED, fontSize: 12.5 }}>Quotas indisponibles pour le moment.</div>}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: INK, margin: '4px 0 10px' }}>iPhones et comptes</div>
+          <div style={grid}>
+            {stat('iPhones en ligne', `${onlineN} / ${devices.length}`, 'phones')}
+            {stat('Comptes Instagram', accs.length, 'igaccounts')}
+            {stat('Comptes sains', accs.filter(a => a.health.level === 'ok').length, 'igaccounts')}
+            {stat('À surveiller', accs.filter(a => a.health.level === 'warn').length, 'igaccounts')}
+            {stat('Éligibles Trial', accs.filter(a => a.trial === true).length, 'igaccounts')}
+            {stat('Comptes créés', createdAccts.filter(a => a.ok).length, 'comptes')}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button style={{ ...btn, height: 34 }} onClick={() => goTab('posting')}>🎬 Posting</button>
+            <button style={{ ...btn, height: 34 }} onClick={() => goTab('warmup')}>🔥 Warm-up</button>
+            <button style={{ ...btn, height: 34 }} onClick={() => goTab('account')}>🆕 Création de compte</button>
+            <button style={{ ...btn, height: 34 }} onClick={() => irt.key && void fetchUsage(irt.key).then(u => { if (u) setUsage(u) })}>↻ Actualiser les crédits</button>
+          </div>
+        </>)
+      })()}
       {curTab === 'phones' && (<>
         {phonePicker({ manage: true })}
         {sel.size > 0 && (
@@ -1075,19 +1127,16 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list }))
           }} />
       )}
-      {curTab === 'posting' && (<>
+      {(curTab === 'posting' || curTab === 'story') && (
+        <UnderlineTabs<'reel' | 'carousel' | 'story'> value={curTab === 'story' || storySub ? 'story' : postType}
+          onChange={k => { if (running) return; if (k === 'story') setStorySub(true); else { setStorySub(false); setPostType(k); if (curTab === 'story') goTab('posting') } }}
+          items={[{ k: 'reel', l: '🎬 Reels' }, { k: 'carousel', l: '🖼 Carrousel' }, { k: 'story', l: '📸 Story CTA' }]} />
+      )}
+      {curTab === 'posting' && !storySub && (<>
         {phonePicker()}
         <div style={card}>
           <StepHead n={2} title={postType === 'carousel' ? 'Quelles photos ?' : 'Quelles vidéos ?'} sub={postType === 'carousel' ? `Chaque container coché publie un carrousel de ${carCount} photos différentes, et une légende de la liste.` : 'Chaque container coché publie un Reel avec une vidéo tirée au hasard, et une légende de la liste.'} />
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-            <div style={{ display: 'inline-flex', padding: 2, borderRadius: 7, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}` }}>
-              {(['reel', 'carousel'] as const).map(m => (
-                <button key={m} type="button" onClick={() => setPostType(m)}
-                  style={{ height: 28, padding: '0 12px', borderRadius: 5, border: postType === m ? `1px solid ${SEL_EDGE}` : '1px solid transparent', cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: postType === m ? SEL_BG : 'transparent', color: postType === m ? INK : MUTED }}>
-                  {m === 'reel' ? '🎞 Reel (vidéo)' : '🖼 Carrousel photo'}
-                </button>
-              ))}
-            </div>
             {postType === 'carousel' && (
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: INK }}>
                 Photos par post
@@ -1231,7 +1280,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       </>)}
 
       {/* ─────────────── ONGLET STORY ─────────────── */}
-      {curTab === 'story' && (<>
+      {(curTab === 'story' || (curTab === 'posting' && storySub)) && (<>
         {phonePicker()}
         <div style={card}>
           <StepHead n={2} title="Quelles photos et quel lien ?" sub="Chaque container publie une Story avec une photo tirée au hasard et son lien sticker." />

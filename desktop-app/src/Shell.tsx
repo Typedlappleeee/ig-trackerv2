@@ -16,7 +16,7 @@ export type PageKey =
   | 'studio'
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto' | 'blowGenjutsu' | 'blowDuo'
-  | 'irtPhones' | 'irtIgAccounts' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
+  | 'irtHome' | 'irtPhones' | 'irtIgAccounts' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
   | 'scheduled' | 'links' | 'viral' | 'explore' | 'pricing' | 'genjutsu'
   | 'admin'
   | 'settings'
@@ -29,11 +29,11 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
   if (infra === 'iremotech') {
     return [
       { g: null, items: [
+        { k: 'irtHome', l: 'Accueil', i: 'M3 11l9-8 9 8|M5 10v10h14V10' },
         { k: 'irtPhones', l: 'Téléphones', i: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z|M11 18h2' },
       ] },
       { g: 'Automatisation', items: [
         { k: 'irtPosting', l: 'Posting', i: 'M12 2v4|M12 18v4|M4.9 4.9l2.8 2.8|M16.3 16.3l2.8 2.8|M2 12h4|M18 12h4|M4.9 19.1l2.8-2.8|M16.3 7.7l2.8-2.8' },
-        { k: 'irtStory', l: 'Story', i: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z|M12 8v4l3 2' },
         { k: 'irtWarmup', l: 'Warm-up', i: 'M12 2s5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 1-3s0 2 2 2 1-4-2-6c3 1 4 4 4 4' },
         { k: 'irtAccount', l: 'Création de compte', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M19 8v6|M22 11h-6' },
       ] },
@@ -134,6 +134,7 @@ const TITLES: Record<PageKey, string[]> = {
   blowTools: ['Blowsome', 'Outils VIP'],
   blowGenjutsu: ['Blowsome', 'Genjutsu'],
   blowDuo: ['Blowsome', 'DuoPlus'],
+  irtHome: ['iRemoTech', 'Accueil'],
   irtPhones: ['iRemoTech', 'Téléphones'],
   irtPosting: ['iRemoTech', 'Posting'],
   irtStory: ['iRemoTech', 'Story'],
@@ -269,7 +270,7 @@ export default function Shell({
               {Object.values(INFRAS).filter(o => (o.k !== 'blowsome' && o.k !== 'cloud' && o.k !== 'iremotech') || canBlowsome || isAdmin).map(o => {
                 const on = infra === o.k
                 return (
-                  <button key={o.k} onClick={() => { setInfra(o.k); setInfraOpen(false); setPage(o.k === 'iremotech' ? 'irtPhones' : o.k === 'blowsome' ? 'hub' : 'explore') }}
+                  <button key={o.k} onClick={() => { setInfra(o.k); setInfraOpen(false); setPage(o.k === 'iremotech' ? 'irtHome' : o.k === 'blowsome' ? 'hub' : 'explore') }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 12px', border: 'none', cursor: 'pointer', textAlign: 'left',
                       background: on ? 'rgba(255,255,255,0.07)' : 'transparent', transition: 'background .14s ease', boxSizing: 'border-box',
