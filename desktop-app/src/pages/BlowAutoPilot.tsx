@@ -1213,8 +1213,42 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: INK, cursor: 'pointer' }}><input type="checkbox" checked={setupPfp} disabled={running} onChange={e => setSetupPfp(e.target.checked)} />🎨 Photo de profil unique</label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: INK, cursor: 'pointer' }}><input type="checkbox" checked={setupBio} disabled={running} onChange={e => setSetupBio(e.target.checked)} />✏️ Bio selon le marché</label>
           </div>
+          {setupBio && (<>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
+              <span style={{ fontSize: 12, color: MUTED }}>Marché par défaut</span>
+              {MARKETS.map(m => (
+                <button key={m.k} disabled={running} onClick={() => { setCapMarket(m.k); try { localStorage.setItem('sf-irt-cap-market', m.k) } catch { /* noop */ } }}
+                  style={{ ...btn, height: 32, background: capMarket === m.k ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: capMarket === m.k ? GOLD : INK, borderColor: capMarket === m.k ? 'rgba(233,196,106,0.45)' : FIELD_EDGE }}>{m.label}</button>
+              ))}
+            </div>
+            {totalJobs > 0 && (
+              <div style={{ marginTop: 10, borderRadius: 8, border: `1px solid ${EDGE}`, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#111113', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: INK }}>Marché de chaque compte</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11.5, color: DIM }}>Tous en</span>
+                  {MARKETS.map(m => <button key={m.k} disabled={running} onClick={() => { for (const dev of sel) for (const c of selConts[dev] ?? []) setTargetMarket(dev, c, m.k) }} style={{ ...btn, height: 26, fontSize: 11.5, padding: '0 8px' }}>{m.label.split(' ')[0]}</button>)}
+                </div>
+                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                  {[...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => ({ dev, c }))).map(({ dev, c }) => {
+                    const own = targetMarkets[`${dev}::${c}`] !== undefined ? targetMarkets[`${dev}::${c}`] : loadTargetMarket(dev, c)
+                    const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
+                    return (
+                      <div key={`${dev}::${c}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderTop: `1px solid ${EDGE}` }}>
+                        <span data-no-tr style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}<span style={{ color: DIM }}> · {name}</span></span>
+                        {MARKETS.map(m => {
+                          const on = (own ?? capMarket) === m.k
+                          return <button key={m.k} disabled={running} onClick={() => setTargetMarket(dev, c, own === m.k ? null : m.k)}
+                            style={{ height: 26, width: 34, borderRadius: 6, cursor: 'pointer', fontSize: 14, border: `1px solid ${on ? (own ? 'rgba(233,196,106,0.55)' : 'rgba(255,255,255,0.18)') : 'transparent'}`, background: on ? (own ? 'rgba(233,196,106,0.14)' : 'rgba(255,255,255,0.05)') : 'transparent', opacity: on ? 1 : 0.45 }}>{m.label.split(' ')[0]}</button>
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </>)}
           <div style={{ fontSize: 11.5, color: conns.groq || !setupBio ? DIM : '#FCD34D', marginTop: 10 }}>
-            {setupBio && !conns.groq ? 'Il faut une clé Groq (Réglages › Intégrations) pour générer les bios.' : 'Le marché de chaque compte se règle dans Posting › Description › « 🤖 Auto par marché » (sinon le marché par défaut).'}
+            {setupBio && !conns.groq ? 'Il faut une clé Groq (Réglages › Intégrations) pour générer les bios.' : 'Chaque compte reçoit une bio dans la langue de son marché. Ces marchés servent aussi aux descriptions du Posting.'}
           </div>
         </div>
         <LaunchBar n={3} summary={totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à mettre en place` : 'Choisis des comptes à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Mettre en place ${totalJobs} compte(s)`} disabled={!totalJobs || running || (!setupPfp && !setupBio)} running={running} onClick={() => void runSetup()} />

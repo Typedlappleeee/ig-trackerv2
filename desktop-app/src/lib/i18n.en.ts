@@ -319,6 +319,7 @@ export const EN: Dict = {
     "⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai": "⚠ another app opened instead of Instagram → back to home, new try",
     "📲 Instagram ouvert (open_app)": "📲 Instagram opened (open_app)",
     "open_app sans effet → icône de l’accueil": "open_app had no effect → home screen icon",
+    "Chaque compte reçoit une bio dans la langue de son marché. Ces marchés servent aussi aux descriptions du Posting.": "Each account gets a bio in its market's language. These markets are also used for Posting captions.",
     "✋ Sticker non lu → glissement depuis le centre vers le bas-droite…": "✋ Sticker not read → dragging from the center to the bottom right…",
     "📍 Sticker lien en bas à droite.": "📍 Link sticker at the bottom right.",
     "(position du sticker non confirmée par la lecture — on continue)": "(sticker position not confirmed by reading — continuing)",
