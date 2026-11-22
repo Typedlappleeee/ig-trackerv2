@@ -1,7 +1,7 @@
 // Descriptions automatiques PAR MARCHÉ (prompts fournis par l'équipe, 22/11/2026) : France, USA, Allemagne.
 // Le prompt du marché est le message système ; l'IA (Groq) renvoie N descriptions séparées par « ——— ».
 // Chaque prompt peut être modifié dans l'app (sauvegardé dans le navigateur, `sf-cap-prompt-<marché>`).
-import { groqChat } from './ai'
+import { groqText } from './ai'
 
 export type Market = 'fr' | 'us' | 'de'
 export const MARKETS: { k: Market; label: string }[] = [
@@ -228,7 +228,7 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
   for (let guard = 0; out.length < n && guard < Math.ceil(n / 20) + 3; guard++) {
     const ask = Math.min(20, n - out.length)
     messages.push({ role: 'user', content: String(ask) })
-    const raw = await groqChat(groqKey, 'llama-3.3-70b-versatile', messages, Math.min(4000, 120 * ask + 200), 1)
+    const raw = await groqText(groqKey, messages, Math.min(4000, 120 * ask + 400), 1)
     if (!raw) break
     messages.push({ role: 'assistant', content: raw })
     const got = splitCaptions(raw).filter(c => !out.includes(c))

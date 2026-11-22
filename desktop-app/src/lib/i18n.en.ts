@@ -234,6 +234,7 @@ export const EN: Dict = {
     "⚠ localisation non confirmée → publication sans": "⚠ location not confirmed → posting without",
     "📍 Localisation selon le marché": "📍 Location by market",
     "(une grande ville du pays du compte, au hasard : Paris, Lyon… · Miami, Los Angeles… · Berlin, Munich…)": "(a big city in the account's country, at random: Paris, Lyon… · Miami, Los Angeles… · Berlin, Munich…)",
+    "aucun modèle Groq disponible pour cette clé": "no Groq model available for this key",
     "✋ Sticker non lu → glissement depuis le centre vers le bas-droite…": "✋ Sticker not read → dragging from the center to the bottom right…",
     "📍 Sticker lien en bas à droite.": "📍 Link sticker at the bottom right.",
     "(position du sticker non confirmée par la lecture — on continue)": "(sticker position not confirmed by reading — continuing)",

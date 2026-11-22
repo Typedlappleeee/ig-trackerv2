@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22g',
+    date: '2026-11-22',
+    title: { fr: 'Descriptions IA : modèle Groq de secours', en: 'AI captions: fallback Groq model' },
+    items: {
+      fr: ['Corrigé : « The model llama-3.3-70b-versatile does not exist ». Si Groq retire un modèle, ScaleFlow passe automatiquement au suivant (gpt-oss, Llama 4, Kimi, Qwen…) et retient celui qui marche.'],
+      en: ['Fixed: “The model llama-3.3-70b-versatile does not exist”. If Groq retires a model, ScaleFlow automatically switches to the next one (gpt-oss, Llama 4, Kimi, Qwen…) and remembers the one that works.'],
+    },
+  },
+  {
     id: '2026-11-22f',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : localisation selon le marché du compte', en: 'iRemoTech: location based on the account’s market' },
