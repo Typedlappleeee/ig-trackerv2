@@ -592,7 +592,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           const ms = gapMin * 60_000 * (1 + Math.random() * 0.3)
           if (gapScroll) {
             push(`${tag} 📱 ${Math.round(ms / 6000) / 10} min de scroll avant le post…`)
-            try { await warmupByVision(key, p.dev, { minMs: ms, maxMs: ms, likeRate: 0.03, commentRate: 0 }, { log: () => { /* silencieux */ }, shouldStop: () => R.isCancelled() }) } catch { /* noop */ }
+            try { await warmupByVision(key, p.dev, { minMs: ms, maxMs: ms, likeRate: 0.03, commentRate: 0, keepApp: true }, { log: () => { /* silencieux */ }, shouldStop: () => R.isCancelled() }) } catch { /* noop */ }
           } else { push(`${tag} ⏳ pause ${Math.round(ms / 6000) / 10} min avant le post…`); const end = Date.now() + ms; while (Date.now() < end && !R.isCancelled()) await sleep(1000) }
           if (R.isCancelled()) break
         }

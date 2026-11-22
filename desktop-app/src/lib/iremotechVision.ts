@@ -2000,10 +2000,11 @@ export interface WarmupOpts {
   commentRate?: number     // 0..1 : proba de commenter un reel
   comments?: string[]      // pool de commentaires (tirés au hasard)
   glanceRate?: number      // 0..1 : proba de « glance » (regard court) — défaut 0.25
+  keepApp?: boolean        // true : reste dans Instagram à la fin (retour au fil) — scroll entre deux posts d'une session
 }
 export interface WarmupResult { ok: boolean; reels: number; likes: number; comments: number }
 
-const REELS_TAB = { x: 0.70, y: 0.965 } // onglet Reels dans la barre du bas (5 icônes)
+const REELS_TAB = { x: 0.30, y: 0.965 } // onglet Reels = 2e icône de la barre du bas (Accueil · Reels · Messages · Recherche · Profil), vu le 22/11/2026
 const rnd = (a: number, b: number) => a + Math.random() * (b - a)
 
 export async function warmupByVision(key: string, deviceId: string, opts: WarmupOpts, hooks?: VisionHooks): Promise<WarmupResult> {
@@ -2055,8 +2056,14 @@ export async function warmupByVision(key: string, deviceId: string, opts: Warmup
   }
 
   hooks?.log?.(`🏁 Warm-up terminé : ${reels} reels · ${likes} likes · ${comments} comments.`)
-  await sendAction(key, deviceId, { type: 'press', name: 'home' })
-  await sleep(1000)
+  if (opts.keepApp) {
+    // session de posts : on reste dans Instagram, onglet Accueil (le post suivant part du fil)
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * W), y: Math.round(0.962 * H) })
+    await sleep(1800)
+  } else {
+    await sendAction(key, deviceId, { type: 'press', name: 'home' })
+    await sleep(1000)
+  }
   return { ok: true, reels, likes, comments }
 }
 

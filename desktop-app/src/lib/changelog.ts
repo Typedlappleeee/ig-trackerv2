@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22k',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : scroll dans l’onglet Reels', en: 'iRemoTech: scrolling in the Reels tab' },
+    items: {
+      fr: ['Warm-up et scroll entre deux posts : ouverture du vrai onglet Reels (2e icône, Instagram l’a déplacé) au lieu de Rechercher ; après le scroll d’une session, on reste dans Instagram et le post suivant part bien (testé : 2 Reels d’affilée avec 1 min de scroll).'],
+      en: ['Warm-up and scrolling between two posts: opens the real Reels tab (2nd icon, Instagram moved it) instead of Search; after a session scroll we stay in Instagram and the next post goes out (tested: 2 Reels in a row with 1 min of scrolling).'],
+    },
+  },
+  {
     id: '2026-11-22j',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : vrais crédits sur l’Accueil', en: 'iRemoTech: real credits on Home' },
