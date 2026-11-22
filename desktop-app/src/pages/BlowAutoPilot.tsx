@@ -151,7 +151,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // localisation selon le marché du compte (une grande ville du pays, au hasard) sur les Reels / carrousels
   // Session de publication par iPhone : N posts max, et au moins X min entre deux posts passées à scroller
   // (enchaîner les posts sans activité = comportement de robot)
-  const [sessMax, setSessMax] = useState(() => { try { return Math.max(1, Math.min(50, Number(localStorage.getItem('sf-irt-sess-max')) || 8)) } catch { return 8 } })
+  const [sessMax, setSessMax] = useState(() => { try { return Math.max(1, Math.min(50, Number(localStorage.getItem('sf-irt-sess-max')) || 1)) } catch { return 1 } }) // 1 par défaut (demande de l'équipe)
   const [gapMin, setGapMin] = useState(() => { try { return Math.max(1, Math.min(30, Number(localStorage.getItem('sf-irt-gap-min')) || 1)) } catch { return 1 } })
   const [gapScroll, setGapScroll] = useState(() => { try { return localStorage.getItem('sf-irt-gap-scroll') !== '0' } catch { return true } })
   const [capLocation, setCapLocation] = useState(() => { try { return localStorage.getItem('sf-irt-cap-location') !== '0' } catch { return true } })
