@@ -16,7 +16,7 @@ export type PageKey =
   | 'studio'
   | 'insights' | 'health'
   | 'blowParc' | 'blowContent' | 'blowTools' | 'blowAuto' | 'blowGenjutsu' | 'blowDuo'
-  | 'irtHome' | 'irtPhones' | 'irtIgAccounts' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
+  | 'irtHome' | 'irtSetup' | 'irtPhones' | 'irtIgAccounts' | 'irtPosting' | 'irtStory' | 'irtWarmup' | 'irtAccount' | 'irtComptes'
   | 'scheduled' | 'links' | 'viral' | 'explore' | 'pricing' | 'genjutsu'
   | 'admin'
   | 'settings'
@@ -34,6 +34,7 @@ function navFor(infra: InfraKey, phoneCount: number | null, videoCount: number |
       ] },
       { g: 'Automatisation', items: [
         { k: 'irtPosting', l: 'Posting', i: 'M12 2v4|M12 18v4|M4.9 4.9l2.8 2.8|M16.3 16.3l2.8 2.8|M2 12h4|M18 12h4|M4.9 19.1l2.8-2.8|M16.3 7.7l2.8-2.8' },
+        { k: 'irtSetup', l: 'Setup compte', i: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M4 21v-1a6 6 0 0 1 6-6h4|M18 15l1.5 1.5L22 14' },
         { k: 'irtWarmup', l: 'Warm-up', i: 'M12 2s5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 1-3s0 2 2 2 1-4-2-6c3 1 4 4 4 4' },
         { k: 'irtAccount', l: 'Création de compte', i: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M19 8v6|M22 11h-6' },
       ] },
@@ -135,6 +136,7 @@ const TITLES: Record<PageKey, string[]> = {
   blowGenjutsu: ['Blowsome', 'Genjutsu'],
   blowDuo: ['Blowsome', 'DuoPlus'],
   irtHome: ['iRemoTech', 'Accueil'],
+  irtSetup: ['iRemoTech', 'Setup compte'],
   irtPhones: ['iRemoTech', 'Téléphones'],
   irtPosting: ['iRemoTech', 'Posting'],
   irtStory: ['iRemoTech', 'Story'],

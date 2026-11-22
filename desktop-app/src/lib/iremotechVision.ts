@@ -1180,6 +1180,99 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   return false
 }
 
+// ── Mise en place du compte ouvert : photo de profil + bio, via Profil › Edit profile ─────────────────────────────
+// Écrans relevés en vrai le 22/11/2026 (NOJB) : bouton « Edit profile » sous les compteurs ; en haut la photo
+// (tap → feuille « Choose from library / Import from Facebook / Take photo ») ; galerie « Cancel · Library · Done »,
+// grille 4 colonnes sous « Recents », 1re case = appareil photo, la photo la plus récente déjà sélectionnée ;
+// ligne « Bio » → éditeur « Bio » avec « Done » en haut à droite.
+async function openEditProfile(key: string, deviceId: string, W: number, H: number, hooks?: VisionHooks): Promise<boolean> {
+  const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
+  for (let k = 0; k < 3; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (scr?.words.some(o => /^edit$/i.test(o.text) && o.cy < H * 0.08) && scr.words.some(o => /^profile$/i.test(o.text) && o.cy < H * 0.08)) return true
+    const e = scr?.words.find(o => /^edit$/i.test(o.text) && o.cy < H * 0.6 && scr.words.some(p => /^profile$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
+    if (e) { await tap(e.cx + 20, e.cy); await sleep(3500); continue }
+    await tap(0.9 * W, 0.962 * H) // onglet Profil
+    await sleep(2500)
+  }
+  const v = await readScreenWords(key, deviceId)
+  return !!v?.words.some(o => /^bio$/i.test(o.text))
+}
+
+/** Photo de profil = la photo la plus récente de la pellicule (injectée juste avant). Depuis « Edit profile ». */
+async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: number, hooks?: VisionHooks): Promise<boolean> {
+  const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
+  hooks?.log?.('🖼 Photo de profil : Edit picture › Choose from library…')
+  await tap(0.36 * W, 0.215 * H) // la photo actuelle (en haut à gauche)
+  await sleep(2200)
+  const sh = await readScreenWords(key, deviceId)
+  const choose = sh?.words.find(o => /^choose$/i.test(o.text) && o.cy > H * 0.4)
+  if (!choose) { hooks?.log?.('   ⚠ « Choose from library » introuvable'); await tap(0.5 * W, 0.12 * H); await sleep(1200); return false }
+  await tap(choose.cx + 30, choose.cy)
+  await sleep(3000)
+  const lib = await readScreenWords(key, deviceId)
+  const rec = lib?.words.find(o => /^recents?$/i.test(o.text))
+  if (!lib || !rec) { hooks?.log?.('   ⚠ galerie « Library » non reconnue'); return false }
+  const cw = W / 4
+  await tap(cw * 1.5, rec.cy + 0.076 * W + cw * 0.45) // photo la plus récente (case après l'appareil photo)
+  await sleep(1500)
+  const done = (await readScreenWords(key, deviceId))?.words.find(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
+  await tap(done ? done.cx : 0.9 * W, done ? done.cy : 0.056 * H)
+  await sleep(4500)
+  // éventuelle feuille après la photo (partage au fil, etc.) : on ne publie rien → « Not now / Cancel »
+  for (let k = 0; k < 2; k++) {
+    const x = await readScreenWords(key, deviceId)
+    const nn = x?.words.find(o => /^(not|cancel|skip)$/i.test(o.text) && o.cy > H * 0.3)
+    if (!x || x.words.some(o => /^bio$/i.test(o.text)) || !nn) break
+    await tap(nn.cx + 15, nn.cy); await sleep(2000)
+  }
+  // vérifiée : la photo n'est plus l'avatar gris par défaut (rose du générateur)
+  const v = await snapRetry(key, deviceId)
+  const [r, g, b] = v ? await pixelRgb(v, Math.round(0.36 * W), Math.round(0.2 * H), 6) : [128, 128, 128]
+  const grey = Math.abs(r - g) < 12 && Math.abs(g - b) < 12
+  hooks?.log?.(grey ? '   ⚠ photo de profil non confirmée (toujours grise)' : '   ✓ photo de profil changée')
+  return !grey
+}
+
+/** Bio : ligne « Bio » › éditeur › texte remplacé (⌘A puis saisie/collage) › Done, vérifiée. Depuis « Edit profile ». */
+async function setBioOnEditProfile(key: string, deviceId: string, W: number, H: number, bio: string, hooks?: VisionHooks): Promise<boolean> {
+  const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
+  hooks?.log?.('✏️ Bio…')
+  const scr = await readScreenWords(key, deviceId)
+  const b = scr?.words.find(o => /^bio$/i.test(o.text) && o.cx < W * 0.3 && o.cy > H * 0.3 && o.cy < H * 0.8)
+  if (!b) { hooks?.log?.('   ⚠ ligne « Bio » introuvable'); return false }
+  await tap(W * 0.5, b.cy)
+  await sleep(2500)
+  await tap(W * 0.5, H * 0.16)
+  await sleep(600)
+  await sendAction(key, deviceId, { type: 'press', modifiers: ['gui'], key: 'a' })
+  await sleep(500)
+  await typeRich(key, deviceId, bio)
+  await sleep(1500)
+  const done = (await readScreenWords(key, deviceId))?.words.find(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
+  await tap(done ? done.cx : 0.9 * W, done ? done.cy : 0.064 * H)
+  await sleep(3000)
+  const v = await readScreenWords(key, deviceId)
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9äöüßéèàçùêâîôû]/g, '')
+  const first = norm(bio.split('\n')[0]).slice(0, 6)
+  const ok = !!v && v.words.some(o => /^bio$/i.test(o.text)) && (!first || v.words.some(o => norm(o.text).includes(first)))
+  hooks?.log?.(ok ? '   ✓ bio enregistrée' : '   ⚠ bio non confirmée à l’écran')
+  return ok
+}
+
+/** Mise en place du compte ouvert : photo de profil (la plus récente de la pellicule) et/ou bio. */
+export async function setupProfileByVision(key: string, deviceId: string, opts: { bio?: string; pfp?: boolean }, hooks?: VisionHooks): Promise<{ pfp: boolean | null; bio: boolean | null }> {
+  const s0 = await readScreenWords(key, deviceId)
+  if (!s0) return { pfp: null, bio: null }
+  const { W, H } = s0
+  if (!await openEditProfile(key, deviceId, W, H, hooks)) { hooks?.log?.('❌ page « Edit profile » non atteinte'); return { pfp: opts.pfp ? false : null, bio: opts.bio ? false : null } }
+  const pfp = opts.pfp ? await setPfpOnEditProfile(key, deviceId, W, H, hooks) : null
+  const bio = opts.bio ? await setBioOnEditProfile(key, deviceId, W, H, opts.bio, hooks) : null
+  await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.06 * W), y: Math.round(0.056 * H) }) // retour au profil
+  await sleep(1500)
+  return { pfp, bio }
+}
+
 // ── Carrousel photo (post feed à plusieurs photos) ──────────────────────────────
 // Galerie « New post » (mode POST) : grille de 4 colonnes sous « Recents » ; sur un iPhone la 1re case peut être
 // l'appareil photo. Les photos sont injectées dans l'ordre INVERSE du carrousel (la 1re du carrousel en dernier =

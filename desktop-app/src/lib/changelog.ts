@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22l',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : Setup compte (photo de profil + bio) et Story CTA à usage unique', en: 'iRemoTech: Account setup (profile picture + bio) and single-use CTA Story' },
+    items: {
+      fr: [
+        'Nouvel onglet « Setup compte » : pour chaque compte, une photo de profil unique créée par le générateur rose (dégradé, paillettes, cœurs) et une bio de 3 lignes générée avec le prompt du marché du compte (FR / US / DE), posées sur l’iPhone et vérifiées.',
+        'Story CTA : « 🧬 Métadonnées uniques » (chaque photo rendue unique : micro-recadrage + EXIF d’iPhone) et « 🗑 Usage unique » (la photo du dossier est supprimée de la Banque une fois publiée).',
+      ],
+      en: [
+        'New “Account setup” tab: for each account, a unique profile picture from the pink generator (gradient, glitter, hearts) and a 3-line bio generated with the account’s market prompt (FR / US / DE), set on the iPhone and verified.',
+        'CTA Story: “🧬 Unique metadata” (each photo made unique: micro-crop + iPhone EXIF) and “🗑 Single use” (the folder photo is deleted from the Bank once posted).',
+      ],
+    },
+  },
+  {
     id: '2026-11-22k',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : scroll dans l’onglet Reels', en: 'iRemoTech: scrolling in the Reels tab' },

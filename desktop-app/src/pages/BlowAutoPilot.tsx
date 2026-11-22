@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, launchAutomation, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision } from '@/lib/iremotechVision'
+import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision, setupProfileByVision } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { loadContStates, setContState, containersToFill, type ContStateMap } from '@/lib/irtContState'
@@ -22,6 +22,9 @@ import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing,
 import IrtAccounts from '@/components/IrtAccounts'
 import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, autoChecksFor } from '@/lib/irtAccounts'
 import { setVisionBrain } from '@/lib/visionBrain'
+import { runImageSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
+import { generatePfp } from '@/lib/pfpGenerator'
+import { generateBios } from '@/lib/bioMarkets'
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
 import { listJobs, type IrtJob } from '@/lib/iremotech'
@@ -43,7 +46,7 @@ const EDGE = 'rgba(255,255,255,0.07)', FIELD_EDGE = 'rgba(255,255,255,0.09)', FI
 const MONO = "'JetBrains Mono',monospace"
 const SEL_BG = 'rgba(255,255,255,0.07)', SEL_EDGE = 'rgba(233,196,106,0.45)'
 type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null; used_count?: number }
-export type IrtTab = 'home' | 'phones' | 'igaccounts' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
+export type IrtTab = 'home' | 'setup' | 'phones' | 'igaccounts' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
 
 const card: CSSProperties = { background: '#111113', border: `1px solid ${EDGE}`, borderRadius: 8, padding: 16, marginBottom: 12 }
 // Boutons alignés sur <Btn> (lib/ui) : ghost = bordé neutre, `gold` = primaire clair.
@@ -154,6 +157,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [sessMax, setSessMax] = useState(() => { try { return Math.max(1, Math.min(50, Number(localStorage.getItem('sf-irt-sess-max')) || 1)) } catch { return 1 } }) // 1 par défaut (demande de l'équipe)
   const [gapMin, setGapMin] = useState(() => { try { return Math.max(1, Math.min(30, Number(localStorage.getItem('sf-irt-gap-min')) || 3)) } catch { return 3 } }) // 3 min de scroll par défaut
   const [gapScroll, setGapScroll] = useState(() => { try { return localStorage.getItem('sf-irt-gap-scroll') !== '0' } catch { return true } })
+  // Story CTA : chaque photo du dossier sert UNE fois (supprimée de la Banque après publication) + métadonnées uniques
+  const [storyOnce, setStoryOnce] = useState(() => { try { return localStorage.getItem('sf-irt-story-once') === '1' } catch { return false } })
+  const [storyUnique, setStoryUnique] = useState(() => { try { return localStorage.getItem('sf-irt-story-unique') !== '0' } catch { return true } })
+  // Setup compte : photo de profil générée + bio selon le marché du compte
+  const [setupPfp, setSetupPfp] = useState(true)
+  const [setupBio, setSetupBio] = useState(true)
   const [capLocation, setCapLocation] = useState(() => { try { return localStorage.getItem('sf-irt-cap-location') !== '0' } catch { return true } })
   // marché de chaque compte (`${dev}::${cible}`) ; absent = marché par défaut (capMarket)
   const [targetMarkets, setTargetMarkets] = useState<Record<string, Market | null>>({})
@@ -474,6 +483,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const good = ['mp4', 'mov', 'jpg', 'jpeg', 'png', 'webp', 'heic'].includes(ext) ? ext : (kind === 'reel' ? 'mp4' : 'jpg')
     return (v.title || 'media') + '.' + good
   }
+  // Octets → iPhone : dépôt temporaire dans le stockage (lien signé 10 min), envoi iRemoTech, puis suppression.
+  async function uploadBytesToPhone(key: string, dev: string, bytes: Uint8Array, filename: string): Promise<boolean> {
+    const path = `tmp/irt/${user.id}/${crypto.randomUUID()}.jpg`
+    const up = await supabase.storage.from('content').upload(path, new Blob([bytes as BlobPart], { type: 'image/jpeg' }), { contentType: 'image/jpeg', upsert: false })
+    if (up.error) return false
+    try {
+      const { data } = await supabase.storage.from('content').createSignedUrl(path, 600)
+      return !!data?.signedUrl && await uploadMedia(key, dev, data.signedUrl, filename)
+    } finally { void supabase.storage.from('content').remove([path]) }
+  }
+  const imgName = () => `IMG_${1000 + Math.floor(Math.random() * 9000)}.jpg`
   async function signedUrlFor(v: VidRef): Promise<string | undefined> {
     if (v.storage_path) { const { data } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600); return data?.signedUrl ?? undefined }
     return v.file_url ?? undefined
@@ -602,6 +622,16 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           const url = await signedUrlFor(v)
           if (!url) { injected = false; break }
           push(`${tag} ⬆ injection ${job.vids.length > 1 ? `de la photo ${job.vids.length - i}/${job.vids.length}` : 'du média'}…`)
+          if (kind === 'story' && storyUnique) {
+            // métadonnées uniques : micro-recadrage + EXIF réécrit (appareil iPhone au hasard), comme « Spoof image »
+            try {
+              const src = new Uint8Array(await (await fetch(url)).arrayBuffer())
+              const iphones = SPOOF_DEVICES.filter(d => /iphone/i.test(d.k))
+              const spoofed = await runImageSpoof(src, { seed: Math.random() * 1e6, intensity: 'subtle', device: iphones[Math.floor(Math.random() * iphones.length)]?.k ?? null })
+              if (!await uploadBytesToPhone(key, p.dev, spoofed, imgName())) { injected = false; break }
+              continue
+            } catch { push(`${tag}    (métadonnées uniques impossibles sur ce fichier → original)`) }
+          }
           if (!await uploadMedia(key, p.dev, url, mediaFilename(v, kind))) { injected = false; break }
           if (job.vids.length > 1) await sleep(2500) // dates distinctes → ordre de la galerie garanti
         }
@@ -616,6 +646,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             : await postReelByVision(key, p.dev, { caption: job.caption, location: job.location }, vh)
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
         if (posted) for (const v of job.vids) void bumpUsed(v.id)
+        // Story CTA à usage unique : la photo publiée est retirée de la Banque (elle ne resservira jamais)
+        if (posted && kind === 'story' && storyOnce && src.mode === 'folder') for (const v of job.vids) {
+          try { await supabase.from('content_bank').delete().eq('id', v.id); if (v.storage_path) await supabase.storage.from('content').remove([v.storage_path]); push(`${tag} 🗑 « ${v.title} » supprimée de la Banque (usage unique)`) } catch { /* noop */ }
+        }
         R.tick(posted)
       }
     }
@@ -626,6 +660,55 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé — toutes les publications traitées.')
     setRunning(false); setRunId(null)
     void fetchUsage(key).then(u => { if (u) setUsage(u) }) // crédits iRemoTech restants à jour
+  }
+
+  // ── Setup compte : photo de profil générée (unique) + bio selon le marché, compte par compte ──────────────────
+  async function runSetup() {
+    const key = irt.key
+    if (!key || running) return
+    if (!setupPfp && !setupBio) { setLogs(['⚠ Coche au moins « Photo de profil » ou « Bio ».']); return }
+    const byPhone = [...sel].map(dev => ({ dev, name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(), targets: [...(selConts[dev] ?? [])] })).filter(p => p.targets.length)
+    const total = byPhone.reduce((n, p) => n + p.targets.length, 0)
+    if (!total) { setLogs(['⚠ Choisis au moins un compte (étape 1).']); return }
+    setRunning(true); setLogs([])
+    const R = startRun('farm', `Setup compte · ${total}`, total); setRunId(R.id)
+    // bios générées d'avance, par marché (une différente par compte)
+    const bios: Record<Market, string[]> = { fr: [], us: [], de: [] }
+    if (setupBio) {
+      const need = countByMarket(byPhone.flatMap(p => p.targets.map(c => marketOf(p.dev, c))), capMarket)
+      for (const m of MARKETS.map(x => x.k)) {
+        if (!need[m]) continue
+        push(`✍️ Génération de ${need[m]} bio(s) — ${MARKETS.find(x => x.k === m)?.label}…`)
+        try { bios[m] = await generateBios(conns.groq, m, need[m]) } catch (e) { push(`⚠ Bios : ${e instanceof Error ? e.message : String(e)} → rien n’est lancé.`); R.finish(); setRunning(false); setRunId(null); return }
+      }
+    }
+    let ok = 0
+    const runPhone = async (p: typeof byPhone[number]) => {
+      const tag = `[${p.name}]`
+      const hooks = { log: (m: string) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() }
+      await recalibrateTouch(key, p.dev, hooks)
+      for (const c of p.targets) {
+        if (R.isCancelled()) break
+        push(`\n${tag} 🪪 ${c}`)
+        if (!await openTargetByVision(key, p.dev, c, hooks)) { push(`${tag} ⏭ ${c} non atteint`); R.tick(false); continue }
+        if (setupPfp) {
+          const { bytes } = await generatePfp()
+          push(`${tag} 🎨 photo de profil générée → envoi sur l’iPhone`)
+          if (!await uploadBytesToPhone(key, p.dev, bytes, imgName())) { push(`${tag} ❌ envoi de la photo refusé`); R.tick(false); continue }
+          await sleep(9000)
+        }
+        const m = marketOf(p.dev, c)
+        const bio = setupBio ? bios[m].shift() : undefined
+        const r = await setupProfileByVision(key, p.dev, { pfp: setupPfp, bio }, hooks)
+        const good = (r.pfp ?? true) && (r.bio ?? true)
+        if (good) ok++
+        push(`${tag} ${good ? '✅' : '⚠'} ${c} : photo ${r.pfp == null ? '—' : r.pfp ? '✓' : '✗'} · bio ${r.bio == null ? '—' : r.bio ? '✓' : '✗'}`)
+        R.tick(good)
+      }
+    }
+    if (parallel) await Promise.all(byPhone.map(runPhone))
+    else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
+    R.finish(); push(`\n${R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'} ${ok}/${total} compte(s) mis en place.`); setRunning(false); setRunId(null)
   }
 
   // ── Création de compte (UK/USA + 5sim) ──────────────────────────────────────
@@ -1000,6 +1083,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
 
   const TAB_TITLE: Record<IrtTab, { title: string; sub: string }> = {
+    setup: { title: 'Setup compte', sub: 'Photo de profil unique (générateur rose) et bio selon le marché de chaque compte, posées directement sur l’iPhone.' },
     home: { title: 'Accueil', sub: 'Tes crédits iRemoTech, tes iPhones et tes comptes en un coup d’œil.' },
     phones: { title: 'Mes iPhones', sub: 'Tes iPhones iRemoTech : containers Crane (jailbreak) ou comptes Instagram connectés (iPhone normal). « Détecter » les lit directement sur l’iPhone.' },
     posting: { title: 'Posting', sub: 'Reels, carrousels photo ou Story CTA : choisis où, quoi, et lance. Chaque compte publie à son tour.' },
@@ -1014,6 +1098,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     { k: 'phones', label: 'Téléphones', icon: '📱' },
     { k: 'igaccounts', label: 'Comptes', icon: '👥' },
     { k: 'posting', label: 'Posting', icon: '🎬' },
+    { k: 'setup', label: 'Setup compte', icon: '🪪' },
     { k: 'warmup', label: 'Warm-up', icon: '🔥' },
     { k: 'account', label: 'Création de compte', icon: '🆕' },
     { k: 'comptes', label: 'Comptes créés', icon: '🆕' },
@@ -1111,6 +1196,21 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           </div>
         </>)
       })()}
+      {curTab === 'setup' && (<>
+        {phonePicker()}
+        <div style={card}>
+          <StepHead n={2} title="Quoi mettre en place ?" sub="Pour chaque compte coché : une photo de profil unique créée par le générateur (dégradé rose, paillettes, cœurs) et une bio de 3 lignes générée avec le prompt de SON marché." />
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: INK, cursor: 'pointer' }}><input type="checkbox" checked={setupPfp} disabled={running} onChange={e => setSetupPfp(e.target.checked)} />🎨 Photo de profil unique</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: INK, cursor: 'pointer' }}><input type="checkbox" checked={setupBio} disabled={running} onChange={e => setSetupBio(e.target.checked)} />✏️ Bio selon le marché</label>
+          </div>
+          <div style={{ fontSize: 11.5, color: conns.groq || !setupBio ? DIM : '#FCD34D', marginTop: 10 }}>
+            {setupBio && !conns.groq ? 'Il faut une clé Groq (Réglages › Intégrations) pour générer les bios.' : 'Le marché de chaque compte se règle dans Posting › Description › « 🤖 Auto par marché » (sinon le marché par défaut).'}
+          </div>
+        </div>
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à mettre en place` : 'Choisis des comptes à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Mettre en place ${totalJobs} compte(s)`} disabled={!totalJobs || running || (!setupPfp && !setupBio)} running={running} onClick={() => void runSetup()} />
+        <LogPanel />
+      </>)}
       {curTab === 'phones' && (<>
         {phonePicker({ manage: true })}
         {sel.size > 0 && (
@@ -1299,6 +1399,16 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <StepHead n={2} title="Quelles photos et quel lien ?" sub="Chaque container publie une Story avec une photo tirée au hasard et son lien sticker." />
           {sourceRow('story')}
           {storySrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, toutes les photos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.</p>}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '0 0 12px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
+              <input type="checkbox" checked={storyUnique} disabled={running} onChange={e => { setStoryUnique(e.target.checked); try { localStorage.setItem('sf-irt-story-unique', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              🧬 Métadonnées uniques <span style={{ color: DIM, fontSize: 11.5 }}>(chaque photo envoyée est rendue unique : micro-recadrage + EXIF d’iPhone)</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
+              <input type="checkbox" checked={storyOnce} disabled={running} onChange={e => { setStoryOnce(e.target.checked); try { localStorage.setItem('sf-irt-story-once', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              🗑 Usage unique <span style={{ color: DIM, fontSize: 11.5 }}>(mode dossier : la photo est supprimée de la Banque une fois publiée)</span>
+            </label>
+          </div>
           {storySrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
             <button style={gold} onClick={() => setPicker('story')}>+ Ajouter des photos</button>
             <span style={{ fontSize: 12, color: MUTED }}>{storyPool.length} photo(s) dans le pool</span>

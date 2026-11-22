@@ -193,8 +193,8 @@ function AppInner({ user }: { user: User }) {
   const orgName = org.currentOrg?.name ?? 'Espace perso'
   const roleLabel = org.role ? org.role.charAt(0).toUpperCase() + org.role.slice(1) : ''
 
-  const IRT_TAB = { irtHome: 'home', irtPhones: 'phones', irtIgAccounts: 'igaccounts', irtPosting: 'posting', irtStory: 'story', irtWarmup: 'warmup', irtAccount: 'account', irtComptes: 'comptes' } as const
-  const IRT_PAGE = { home: 'irtHome', phones: 'irtPhones', igaccounts: 'irtIgAccounts', posting: 'irtPosting', story: 'irtStory', warmup: 'irtWarmup', account: 'irtAccount', comptes: 'irtComptes' } as const
+  const IRT_TAB = { irtHome: 'home', irtSetup: 'setup', irtPhones: 'phones', irtIgAccounts: 'igaccounts', irtPosting: 'posting', irtStory: 'story', irtWarmup: 'warmup', irtAccount: 'account', irtComptes: 'comptes' } as const
+  const IRT_PAGE = { home: 'irtHome', setup: 'irtSetup', phones: 'irtPhones', igaccounts: 'irtIgAccounts', posting: 'irtPosting', story: 'irtStory', warmup: 'irtWarmup', account: 'irtAccount', comptes: 'irtComptes' } as const
 
   const content = infra === 'iremotech'
     ? <BlowAutoPilot user={user} org={org}
