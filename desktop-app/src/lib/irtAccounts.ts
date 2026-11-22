@@ -23,6 +23,13 @@ export function healthOf(state: Record<string, unknown> | null | undefined): Hea
   return Object.values(state).some(v => v === 'green') ? { level: 'ok', issues: [] } : { level: 'unknown', issues: [] }
 }
 
+/** Trial (Reels d'essai) = compte PROFESSIONNEL. iRemoTech : « monetization » vert = pro, warning = « Healthy (Not
+ *  Professional) ». null = pas de statut / indicateur inconnu. Pure. */
+export function trialEligible(state: Record<string, unknown> | null | undefined): boolean | null {
+  const m = state && typeof state === 'object' ? state.monetization : undefined
+  return m === 'green' ? true : m === 'warning' ? false : null
+}
+
 /** Faux comptes = lignes secondaires lues sous un compte dans Instagram (« • 1 notification », « 3 likes and
  *  4 more », « 1 follow and 4 more », « 2 new messages »…) → jamais des comptes. */
 export function isJunkUsername(u: string): boolean {
@@ -38,6 +45,7 @@ const newest = (a: IrtJob, b: IrtJob) => Date.parse(b.created_at) - Date.parse(a
 export interface AccountView {
   username: string
   health: Health
+  trial: boolean | null  // éligible aux Reels « Trial » (compte professionnel : monétisation verte) ; null = pas encore vérifié
   checkedAt: string | null
   warmup: { at: string; seconds: number | null; likes: number | null; reels: number | null } | null
   running: 'account_status' | 'warm_up' | null
@@ -62,6 +70,7 @@ export function deviceAccounts(jobs: IrtJob[], known: string[] = []): DeviceAcco
     return {
       username: u,
       health: healthOf(st?.result?.account_state as Record<string, unknown> | undefined),
+      trial: trialEligible(st?.result?.account_state as Record<string, unknown> | undefined),
       checkedAt: st?.finished_at ?? null,
       warmup: wu ? { at: wu.finished_at ?? wu.created_at, seconds: (wu.result?.session_duration_s as number) ?? null, likes: (wu.result?.likes as number) ?? null, reels: (wu.result?.reels_viewed as number) ?? null } : null,
       running: run ? (run.type as 'account_status' | 'warm_up') : null,

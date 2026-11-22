@@ -146,6 +146,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState('')
   // localisation selon le marché du compte (une grande ville du pays, au hasard) sur les Reels / carrousels
+  // Session de publication par iPhone : N posts max, et au moins X min entre deux posts passées à scroller
+  // (enchaîner les posts sans activité = comportement de robot)
+  const [sessMax, setSessMax] = useState(() => { try { return Math.max(1, Math.min(50, Number(localStorage.getItem('sf-irt-sess-max')) || 8)) } catch { return 8 } })
+  const [gapMin, setGapMin] = useState(() => { try { return Math.max(1, Math.min(30, Number(localStorage.getItem('sf-irt-gap-min')) || 1)) } catch { return 1 } })
+  const [gapScroll, setGapScroll] = useState(() => { try { return localStorage.getItem('sf-irt-gap-scroll') !== '0' } catch { return true } })
   const [capLocation, setCapLocation] = useState(() => { try { return localStorage.getItem('sf-irt-cap-location') !== '0' } catch { return true } })
   // marché de chaque compte (`${dev}::${cible}`) ; absent = marché par défaut (capMarket)
   const [targetMarkets, setTargetMarkets] = useState<Record<string, Market | null>>({})
@@ -568,7 +573,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       let acDone = false
       try { acDone = localStorage.getItem(acKey) === '1' } catch { /* ignore */ }
       if (!acDone && await disableAutoCorrect(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })) { try { localStorage.setItem(acKey, '1') } catch { /* ignore */ } }
-      for (const job of p.jobs) {
+      const sess = p.jobs.slice(0, sessMax)
+      if (p.jobs.length > sess.length) push(`${tag} ⏭ session limitée à ${sessMax} post(s) : ${p.jobs.length - sess.length} compte(s) non publiés cette fois`)
+      for (const [ji, job] of sess.entries()) {
         if (R.isCancelled()) break
         push(`\n${tag} 📦 container « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
         if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
@@ -577,6 +584,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
         if (!ok) { push(`${tag} ⏭ container « ${job.container} » non atteint → suivant`); R.tick(false); continue }
         await sleep(1200)
+        // Entre deux posts : au moins `gapMin` min, passées à scroller sur CE compte (activité naturelle avant de poster)
+        if (ji > 0) {
+          const ms = gapMin * 60_000 * (1 + Math.random() * 0.3)
+          if (gapScroll) {
+            push(`${tag} 📱 ${Math.round(ms / 6000) / 10} min de scroll avant le post…`)
+            try { await warmupByVision(key, p.dev, { minMs: ms, maxMs: ms, likeRate: 0.03, commentRate: 0 }, { log: () => { /* silencieux */ }, shouldStop: () => R.isCancelled() }) } catch { /* noop */ }
+          } else { push(`${tag} ⏳ pause ${Math.round(ms / 6000) / 10} min avant le post…`); const end = Date.now() + ms; while (Date.now() < end && !R.isCancelled()) await sleep(1000) }
+          if (R.isCancelled()) break
+        }
         // Carrousel : photos injectées dans l'ordre INVERSE (la 1re du carrousel = la plus récente, pré-cochée n°1)
         let injected = true
         for (const [i, v] of [...job.vids].reverse().entries()) {
@@ -606,6 +622,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     R.finish()
     push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé — toutes les publications traitées.')
     setRunning(false); setRunId(null)
+    void fetchUsage(key).then(u => { if (u) setUsage(u) }) // crédits iRemoTech restants à jour
   }
 
   // ── Création de compte (UK/USA + 5sim) ──────────────────────────────────────
@@ -1003,7 +1020,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       <H title={TAB_TITLE[curTab].title} sub={TAB_TITLE[curTab].sub}
         right={<span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <span style={pill}><span style={{ width: 7, height: 7, borderRadius: 99, background: onlineN ? '#22C55E' : '#EF4444' }} />{onlineN}/{devices.length} iPhone{devices.length > 1 ? 's' : ''} en ligne</span>
-          {budget?.budget != null && <span style={pill}>{budget.remaining ?? '—'} / {budget.budget} actions restantes</span>}
+          {budget?.budget != null && <span style={pill} title="Quota iRemoTech du jour">{budget.remaining ?? '—'} / {budget.budget} actions restantes</span>}
+          {usage?.active_minutes?.budget != null && <span style={pill} title="Minutes d’utilisation des iPhones (quota iRemoTech)">{usage.active_minutes.remaining ?? '—'} / {usage.active_minutes.budget} min</span>}
+          {usage?.snapshots?.budget != null && <span style={pill} title="Captures d’écran (quota iRemoTech)">{usage.snapshots.remaining ?? '—'} / {usage.snapshots.budget} captures</span>}
+          {usage?.uploads?.budget != null && <span style={pill} title="Envois de médias (quota iRemoTech)">{usage.uploads.remaining ?? '—'} / {usage.uploads.budget} envois</span>}
+          {usage?.resets_at && <span style={{ ...pill, color: DIM }} title="Remise à zéro des quotas">↻ {new Date(usage.resets_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
         </span>} />
 
       {/* Barre d'onglets (mode autonome ; en infra, la nav de gauche gère les onglets) */}
@@ -1191,6 +1212,19 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               </div>
             )}
           </>)}
+        </div>
+        <div style={{ ...card, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>⏱ Session</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>Posts max par iPhone
+            <input type="number" min={1} max={50} value={sessMax} disabled={running} onChange={e => { const v = Math.max(1, Math.min(50, Number(e.target.value) || 1)); setSessMax(v); try { localStorage.setItem('sf-irt-sess-max', String(v)) } catch { /* noop */ } }} style={{ width: 56, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>Minutes entre 2 posts (min 1)
+            <input type="number" min={1} max={30} value={gapMin} disabled={running} onChange={e => { const v = Math.max(1, Math.min(30, Number(e.target.value) || 1)); setGapMin(v); try { localStorage.setItem('sf-irt-gap-min', String(v)) } catch { /* noop */ } }} style={{ width: 56, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
+            <input type="checkbox" checked={gapScroll} disabled={running} onChange={e => { setGapScroll(e.target.checked); try { localStorage.setItem('sf-irt-gap-scroll', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+            📱 Scroller pendant la pause <span style={{ color: DIM, fontSize: 11.5 }}>(activité naturelle sur le compte avant son post, évite le flag robot)</span>
+          </label>
         </div>
         <LaunchBar n={3} summary={totalJobs ? `${totalJobs} ${postType === 'carousel' ? `carrousel${totalJobs > 1 ? 's' : ''} de ${carCount} photos` : `Reel${totalJobs > 1 ? 's' : ''}`} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={postType === 'carousel' ? `Lancer ${totalJobs} carrousel(s)` : `Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (postType === 'carousel' ? (photoSrc.mode === 'folder' ? !photoSrc.folder : photoPool.length < carCount) : (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length)) || running} running={running} onClick={() => run(postType === 'carousel' ? 'carousel' : 'reel')} />
         <LogPanel />

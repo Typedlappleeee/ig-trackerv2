@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22h',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : sessions de posts, crédits restants, éligibilité Trial', en: 'iRemoTech: post sessions, remaining credits, Trial eligibility' },
+    items: {
+      fr: [
+        'Crédits iRemoTech restants affichés en haut : actions, minutes, captures, envois et heure de remise à zéro (mis à jour après chaque lancement).',
+        'Session de posts : N posts max par iPhone (8 par défaut) et au moins 1 min entre deux posts, passée à scroller sur le compte avant son post (évite le flag robot).',
+        'Comptes Instagram : badge « Trial ✓ / Pas Trial » d’après le statut iRemoTech (compte professionnel ou non).',
+      ],
+      en: [
+        'Remaining iRemoTech credits shown at the top: actions, minutes, screenshots, uploads and reset time (refreshed after each run).',
+        'Post session: N posts max per iPhone (8 by default) and at least 1 min between two posts, spent scrolling the account before its post (avoids the bot flag).',
+        'Instagram accounts: “Trial ✓ / No Trial” badge from the iRemoTech status (professional account or not).',
+      ],
+    },
+  },
+  {
     id: '2026-11-22g',
     date: '2026-11-22',
     title: { fr: 'Descriptions IA : modèle Groq de secours', en: 'AI captions: fallback Groq model' },

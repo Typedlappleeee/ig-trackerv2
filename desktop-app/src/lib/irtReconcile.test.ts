@@ -70,3 +70,13 @@ describe('statut iRemoTech automatique', () => {
     expect(autoChecksFor(jobs, ['@a1', '@b2'], now, { b2: now - 3600_000 })).toEqual({ scan: false, accounts: [] })
   })
 })
+
+import { trialEligible } from './irtAccounts'
+describe('éligibilité Trial', () => {
+  it('monétisation verte = pro = Trial ; warning = non pro ; inconnu = ?', () => {
+    expect(trialEligible({ monetization: 'green' })).toBe(true)
+    expect(trialEligible({ monetization: 'warning' })).toBe(false)
+    expect(trialEligible({ monetization: 'unknown' })).toBeNull()
+    expect(trialEligible(null)).toBeNull()
+  })
+})
