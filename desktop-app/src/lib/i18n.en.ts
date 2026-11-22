@@ -5002,6 +5002,7 @@ export const EN: Dict = {
     ["{0} compte{1} à mettre en place", "{0} account{1} to set up"],
     ["Mettre en place {0} compte(s)", "Set up {0} account(s)"],
     ["🎞️ Vidéo la plus récente ({0}) → tap ({1}, {2})", "🎞️ Most recent video ({0}) → tap ({1}, {2})"],
+    ["réponse vide ({0})", "empty answer ({0})"],
     ["✋ Sticker lu en ({0}, {1}) → coin bas-droite{2}…", "✋ Sticker read at ({0}, {1}) → bottom-right corner{2}…"],
     ["(essai {0})", "(attempt {0})"],
   ],
