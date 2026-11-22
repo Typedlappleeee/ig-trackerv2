@@ -35,3 +35,29 @@ describe('accueil iOS — Bibliothèque d’apps', () => {
     expect(isAppLibrary([{ text: 'Weather' }, { text: 'Stocks' }, { text: 'Instagram' }, { text: 'Utilities' }])).toBe(false)
   })
 })
+
+import { isProfileScreen } from './iremotechVision'
+describe('onglet Profil reconnu', () => {
+  it('« followers » illisible : posts + following suffisent', () => {
+    expect(isProfileScreen([{ text: 'posts', cy: 165 }, { text: 'following', cy: 164 }], 720)).toBe(true)
+  })
+  it('popup « Video posts are now shared » : un seul mot → non', () => {
+    expect(isProfileScreen([{ text: 'posts', cy: 200 }, { text: 'Video', cy: 200 }], 720)).toBe(false)
+  })
+  it('boutons Edit profile / Share profile', () => {
+    expect(isProfileScreen([{ text: 'Edit', cy: 287 }, { text: 'profile', cy: 287 }, { text: 'Share', cy: 287 }], 720)).toBe(true)
+  })
+})
+
+import { needsPaste, originalAudioSheet } from './iremotechVision'
+describe('saisie et partage', () => {
+  it('accents / emojis → collage ; ASCII (même sur plusieurs lignes) → saisie directe', () => {
+    expect(needsPaste('vous êtes là ou pas ? 🙈')).toBe(true)
+    expect(needsPaste('bin müde lol')).toBe(true)
+    expect(needsPaste('drop a song for me\n\n#usa #fypage')).toBe(false)
+  })
+  it('fenêtre « Update on your original audio » reconnue', () => {
+    expect(originalAudioSheet(['Update', 'on', 'your', 'original', 'audio', 'Share', 'Turn', 'off'].map(text => ({ text })))).toBe(true)
+    expect(originalAudioSheet(['Rename', 'audio', 'Original', 'audio'].map(text => ({ text })))).toBe(false)
+  })
+})

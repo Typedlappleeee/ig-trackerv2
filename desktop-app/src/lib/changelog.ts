@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22e',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : descriptions avec accents et emojis, publication vérifiée', en: 'iRemoTech: captions with accents and emojis, verified posting' },
+    items: {
+      fr: [
+        'Les descriptions avec accents, emojis, ü, ß… sont collées telles quelles (presse-papiers de l’iPhone) : avant, « vous êtes là ou pas ? 🙈 » devenait « vous tes l ou pas ? ».',
+        'Après « Share », la publication est vérifiée : la fenêtre « Update on your original audio » est validée, et un Share sans effet n’est plus jamais annoncé comme publié.',
+        'Le + d’Instagram ouvre maintenant une feuille « Create » ou le dernier mode utilisé : le moteur passe par « Post », ou ferme la galerie Story rouverte.',
+      ],
+      en: [
+        'Captions with accents, emojis, ü, ß… are pasted exactly (iPhone clipboard): before, “vous êtes là ou pas ? 🙈” became “vous tes l ou pas ?”.',
+        'After “Share”, posting is verified: the “Update on your original audio” sheet is confirmed, and a Share with no effect is never reported as posted again.',
+        'Instagram’s + now opens a “Create” sheet or the last mode used: the engine goes through “Post”, or closes the reopened Story gallery.',
+      ],
+    },
+  },
+  {
     id: '2026-11-22d',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : description de Reel auto selon le marché de chaque compte', en: 'iRemoTech: auto Reel caption based on each account’s market' },

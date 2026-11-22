@@ -96,6 +96,25 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
   return airplaneResetByVision(key, deviceId, hooks, holdMs)
 }
 
+/** Texte avec accents / emojis / ß…, ou pas : l'action `text` d'iRemoTech ne tape QUE l'ASCII (vu en vrai : « vous êtes
+ *  là ou pas ? 🙈 » → « vous tes l ou pas ? ») mais les retours à la ligne passent. Hors ASCII : presse-papiers de
+ *  l'iPhone (`clipboard_set`) puis ⌘V (modificateur « gui » chez iRemoTech) → texte exact, lignes comprises. Pure. */
+/** Fenêtre « Update on your original audio » affichée après Share (le Reel n'est pas encore parti). Pure. */
+export function originalAudioSheet(words: { text: string }[]): boolean {
+  const has = (re: RegExp) => words.some(o => re.test(o.text))
+  return has(/^original$/i) && has(/^audio$/i) && has(/^(update|turn)$/i)
+}
+export function needsPaste(text: string): boolean {
+  return /[^\x00-\x7F]/.test(text)
+}
+export async function typeRich(key: string, deviceId: string, text: string): Promise<void> {
+  if (!needsPaste(text)) { await sendAction(key, deviceId, { type: 'text', text }); return }
+  const ok = await sendAction(key, deviceId, { type: 'clipboard_set', text })
+  if (!ok) { await sendAction(key, deviceId, { type: 'text', text }); return } // repli : au moins l'ASCII
+  await sleep(700)
+  await sendAction(key, deviceId, { type: 'press', modifiers: ['gui'], key: 'v' })
+}
+
 /** Les alertes iOS (« Stop creating account »…) et l'écran des cookies ignorent un tap simple d'iRemoTech :
  *  deux taps rapprochés passent (vérifié en direct le 20/11/2026). */
 async function doubleTap(key: string, deviceId: string, x: number, y: number): Promise<void> {
@@ -699,22 +718,42 @@ export function createSheetShown(words: { text: string; cy: number }[], H: numbe
   return rows.size >= 3 && words.some(o => /^create$/i.test(o.text) && o.cy > H * 0.25 && o.cy < H * 0.6)
 }
 
-/** Tape le + (haut-gauche). S'il ouvre la feuille « Create » (on était sur le profil, ex. après la bascule de
- *  compte), on la ferme, on passe sur l'onglet Accueil et on retape le + → galerie « New post » (chemin testé). */
-async function tapCreatePlus(key: string, deviceId: string, W: number, H: number, pt: { x: number; y: number }, hooks?: VisionHooks): Promise<void> {
+/** Tape le + (haut-gauche) et ramène sur le bon écran. Vu en vrai (22/11/2026) : le + ouvre selon le cas la galerie
+ *  « New post », la feuille « Create » (Reel / Edits / Post / Story…, sur le profil ET maintenant sur le fil) ou
+ *  DIRECTEMENT le dernier mode utilisé (galerie « Add to story » après une Story).
+ *  - feuille « Create » → ligne « Post » (galerie « New post » avec la barre POST / STORY / REEL : chemin testé) ;
+ *  - galerie « Add to story » alors qu'on veut un post → croix ✕ (caméra avec la barre des modes, gérée ensuite).
+ *  Renvoie 'story-gallery' si la galerie « Add to story » est ouverte (Story : on choisit le média tout de suite). */
+async function tapCreatePlus(key: string, deviceId: string, W: number, H: number, pt: { x: number; y: number }, hooks?: VisionHooks, want: 'post' | 'story' = 'post'): Promise<'story-gallery' | 'other'> {
   const plus = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(pt.x * W), y: Math.round(pt.y * H) })
+  const home = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * W), y: Math.round(0.962 * H) })
+  // Hors profil (fil d'actualité) : le fil garde sa position de défilement (vu en vrai : bannière « Start Survey »,
+  // Reels) et le + du haut n'est plus visible → Accueil, puis 2e tap séparé qui remonte le fil tout en haut.
+  const before = await readScreenWords(key, deviceId)
+  // Jamais dans le créateur / la caméra (en bas à gauche il y a la vignette de la galerie, pas l'onglet Accueil).
+  const inCreator = !!before?.words.some(o => /^(post|story|reel|reels|instants|recents|live)$/i.test(o.text) && o.cy > before.H * 0.85)
+    || !!before?.words.some(o => /^(recents|collage|yours)$/i.test(o.text))
+  if (before && !inCreator && !isProfileScreen(before.words, before.H)) { await home(); await sleep(1800); await home(); await sleep(2500) }
   await plus()
   await sleep(2200)
-  const scr = await readScreenWords(key, deviceId)
-  if (!scr || !createSheetShown(scr.words, scr.H)) return
-  hooks?.log?.('   feuille « Create » (onglet Profil) → fermée, onglet Accueil, puis + à nouveau')
-  await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.5 * W), y: Math.round(0.15 * H) }) // zone grisée au-dessus de la feuille
-  await sleep(1200)
-  // onglet Accueil, puis un 2e tap (séparé) : le fil garde sa position de défilement, le 2e tap le remonte
-  // tout en haut, là où se trouve le + (sinon le tap tombe dans un post / un hashtag).
-  for (let k = 0; k < 2; k++) { await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * W), y: Math.round(0.962 * H) }); await sleep(k ? 2500 : 1800) }
-  await plus()
-  await sleep(2200)
+  for (let k = 0; k < 3; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) return 'other'
+    if (createSheetShown(scr.words, scr.H)) {
+      const row = scr.words.find(o => /^post$/i.test(o.text) && o.cy > scr.H * 0.3)
+      hooks?.log?.('   feuille « Create » → « Post » (galerie New post)')
+      await sendAction(key, deviceId, { type: 'tap', x: row ? row.cx + 20 : Math.round(0.2 * scr.W), y: row ? row.cy : Math.round(0.623 * scr.H) })
+      await sleep(2500); continue
+    }
+    if (storyGalleryPick(scr.words, scr.W, scr.H)) {
+      if (want === 'story') return 'story-gallery'
+      hooks?.log?.('   galerie « Add to story » rouverte (dernier mode utilisé) → ✕, retour à la caméra et sa barre des modes')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.084 * scr.W), y: Math.round(0.08 * scr.H) })
+      await sleep(2200); continue
+    }
+    return 'other'
+  }
+  return 'other'
 }
 
 export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
@@ -768,7 +807,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     hooks?.log?.('✏️ Saisie de la légende…')
     await tapFrac(A.captionField.x, A.captionField.y)
     await sleep(1400) // laisse l'éditeur de légende s'ouvrir
-    await sendAction(key, deviceId, { type: 'text', text: opts.caption.trim() })
+    await typeRich(key, deviceId, opts.caption.trim())
     await sleep(900)
     hooks?.log?.('   validation « OK »…')
     await tapButton(key, deviceId, [/^ok$/i], A.okBtn, W, H, hooks, [0, 0.14], 'OK légende')
@@ -786,6 +825,13 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     hooks?.log?.('📤 Reel partagé.')
   }
   await sleep(4000) // laisse le partage se finaliser
+  // Vérifié : toujours sur la page de partage (Share + Tag people / Add location…) = rien n'est parti.
+  {
+    const sp = await readScreenWords(key, deviceId)
+    if (sp && sp.words.some(o => /^(share|partager)$/i.test(o.text) && o.cy > sp.H * 0.8) && sp.words.some(o => /^(tag|location|audience|rename|draft)$/i.test(o.text))) {
+      hooks?.log?.('❌ Share sans effet (toujours sur la page de partage) → non publié'); return false
+    }
+  }
   await dismissPopups(key, deviceId, hooks) // ferme une éventuelle fenêtre post-partage (pas toujours là)
   hooks?.log?.('🏠 Retour à l’accueil.')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
@@ -955,14 +1001,46 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     const f = await findWordPoint(key, deviceId, CAPTION_MARK, hooks, { tries: 2 })
     await sendAction(key, deviceId, { type: 'tap', x: f ? f.x : Math.round(A.captionField.x * W), y: f ? f.y : Math.round(A.captionField.y * H) })
     await sleep(1400)
-    await sendAction(key, deviceId, { type: 'text', text: caption.trim() })
+    await typeRich(key, deviceId, caption.trim())
     await sleep(900)
     if (await findTapText(key, deviceId, [/^ok$/i, /^done$/i, /^termin[ée]$/i], hooks, { label: 'OK légende', tries: 2, minX: 0.55, cropY: [0, 0.14] })) await sleep(1400)
+    // Éditeur « Caption » encore ouvert (un hashtag en fin de texte ouvre des suggestions, vu en vrai) → OK, vérifié.
+    for (let k = 0; k < 3; k++) {
+      const ce = await readScreenWords(key, deviceId)
+      const editorOpen = !!ce && ce.words.some(o => /^(caption|l[ée]gende)$/i.test(o.text) && o.cy < ce.H * 0.08) && ce.words.some(o => /^(ok|done)$/i.test(o.text) && o.cy < ce.H * 0.1)
+      if (!editorOpen) break
+      hooks?.log?.('   éditeur de légende encore ouvert → OK')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.064 * H) })
+      await sleep(1500)
+    }
   }
-  // d. Partager (bouton bleu en bas).
-  if (!await tapButton(key, deviceId, [/^share$/i, /^partager$/i], A.shareBtn, W, H, hooks, [0.80, 1], 'Share', 3, [0, 1])) return false
+  // d. Partager (bouton bleu en bas), puis VÉRIFIÉ : la page de partage (Share + Tag people / Add location…) doit
+  //    avoir disparu. Sinon on retape, et au bout de 3 essais : non publié (plus jamais annoncé à tort).
+  const onSharePage = async () => {
+    const sp = await readScreenWords(key, deviceId)
+    if (!sp) return false
+    return sp.words.some(o => /^(share|partager)$/i.test(o.text) && o.cy > sp.H * 0.8) && sp.words.some(o => /^(tag|location|audience|rename|draft)$/i.test(o.text))
+  }
+  let shared = false
+  for (let k = 0; k < 3 && !shared; k++) {
+    if (k) hooks?.log?.(`   toujours sur la page de partage → nouveau tap sur Share (${k + 1}/3)`)
+    if (!await tapButton(key, deviceId, [/^share$/i, /^partager$/i], A.shareBtn, W, H, hooks, [0.80, 1], 'Share', 3, [0, 1])) return false
+    await sleep(4000)
+    // Fenêtre « Update on your original audio » (vue en vrai le 22/11/2026) : le Reel attend → bouton bleu « Share »
+    // de la fenêtre (choix par défaut d'Instagram).
+    for (let j = 0; j < 2; j++) {
+      const sh = await readScreenWords(key, deviceId)
+      if (!sh || !originalAudioSheet(sh.words)) break
+      const blue = await findBlueButton(sh.shot, 0.75, 0.97)
+      hooks?.log?.('   fenêtre « Update on your original audio » → Share')
+      await sendAction(key, deviceId, { type: 'tap', x: blue ? blue.cx : Math.round(W / 2), y: blue ? blue.cy : Math.round(0.886 * H) })
+      await sleep(4000)
+    }
+    const after = await readScreenWords(key, deviceId)
+    shared = !!after && !originalAudioSheet(after.words) && !await onSharePage()
+  }
+  if (!shared) { hooks?.log?.('❌ Share sans effet (toujours sur la page de partage) → non publié'); return false }
   hooks?.log?.(`📤 ${doneLabel}.`)
-  await sleep(4000)
   // Bandeau « Posting… » en haut du fil : on ne quitte pas Instagram tant que l'envoi n'est pas fini (max ~90 s)
   for (let k = 0; k < 15; k++) {
     if (hooks?.shouldStop?.()) break
@@ -1909,14 +1987,16 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   await dismissIgInfoSheet(key, deviceId, hooks) // « Stories archive », « Introducing… » : bouton OK au milieu
   // 1. Ouvrir le créateur (+ haut-gauche) — même point d'entrée que le Reel.
   hooks?.log?.('➕ Ouverture du créateur (+)…')
-  await tapCreatePlus(key, deviceId, W, H, REEL_ANCHORS.createPlus, hooks)
+  const landing = await tapCreatePlus(key, deviceId, W, H, REEL_ANCHORS.createPlus, hooks, 'story')
   await grantPhotoAccessIfAsked(key, deviceId, hooks)
-  // 2. Mode STORY (bandeau du bas). Barre masquée (Instagram a rouvert la caméra Story, une
+  // 2. Mode STORY (bandeau du bas) — inutile si le + a rouvert directement la galerie « Add to story ». Barre masquée (Instagram a rouvert la caméra Story, une
   //    bulle d'effet la remplace) + vignette de galerie en bas-gauche → déjà sur la caméra.
   //    (Si c'était la caméra Reel, l'écran « Add link » n'apparaîtrait jamais → abandon sans post.)
   const inStoryCamera = async (s: string) => !!await findGalleryThumb(s)
-  if (!await selectMode(key, deviceId, [/story|stories/i], 'STORY', hooks, inStoryCamera)) return false
-  await sleep(1600)
+  if (landing !== 'story-gallery') {
+    if (!await selectMode(key, deviceId, [/story|stories/i], 'STORY', hooks, inStoryCamera)) return false
+    await sleep(1600)
+  }
   // 2bis. Galerie « Add to story » ouverte DIRECTEMENT (depuis la galerie POST, iPhone normal) : 3 colonnes sous « Recents »,
   //       1re case = appareil photo → le média le plus récent est la case juste après. Pas de caméra ni de vignette.
   const sg = await readScreenWords(key, deviceId)
@@ -2140,7 +2220,7 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   if (opts.caption && opts.caption.trim()) {
     if (await findTapText(key, deviceId, [/customize|sticker text/i], hooks, { label: 'Customize sticker text', tries: 3 })) {
       await sleep(1200)
-      await sendAction(key, deviceId, { type: 'text', text: opts.caption.trim() })
+      await typeRich(key, deviceId, opts.caption.trim())
       await sleep(800)
     }
   }
@@ -2447,10 +2527,20 @@ async function brainBackToTabs(key: string, deviceId: string, hooks?: VisionHook
   await brainNavigate(key, deviceId, 'Get back to Instagram\'s main screen where the bottom tab bar (Home, Reels, Messages, Search, Profile) is visible. Close popups, sheets, editors and drafts WITHOUT posting, saving or changing anything (Cancel / Not now / Discard / close X / back arrow).', hooks, 4)
 }
 
+/** Onglet Profil d'Instagram : 2 des 3 compteurs (posts / followers / following) en haut, ou « Edit profile » et
+ *  « Share profile ». Un seul mot (« posts » d'une popup « Video posts are now shared… ») ne suffit pas. Pure. */
+export function isProfileScreen(words: { text: string; cy: number }[], H: number): boolean {
+  const top = new Set(words.filter(o => o.cy < H * 0.35).map(o => o.text.toLowerCase().replace(/[^a-z]/g, '')).filter(t => /^(posts?|followers?|following)$/.test(t)).map(t => t.replace(/s$/, '')))
+  if (top.size >= 2) return true
+  const has = (re: RegExp) => words.some(o => re.test(o.text) && o.cy < H * 0.6)
+  return has(/^edit$/i) && has(/^share$/i) && has(/^profile$/i)
+}
+
 async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHooks): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number } | null> {
   const isSheet = (scr: { words: { text: string; cx: number; cy: number }[]; H: number } | null) => !!scr && (addAccountRowY(scr.words) ?? 0) > scr.H * 0.4
   // « followers » ET « following » en haut (le mot « posts » seul trompait : popup « Video posts are now shared… »)
-  const isProfile = (scr: { words: { text: string; cy: number }[]; H: number } | null) => !!scr && scr.words.some(o => /^followers$/i.test(o.text) && o.cy < scr.H * 0.35) && scr.words.some(o => /^following$/i.test(o.text) && o.cy < scr.H * 0.35)
+  // 2 des 3 compteurs (« followers » est parfois illisible, vu en vrai) ou les boutons « Edit profile » + « Share profile »
+  const isProfile = (scr: { words: { text: string; cy: number }[]; H: number } | null) => !!scr && isProfileScreen(scr.words, scr.H)
   let scr = await readScreenWords(key, deviceId)
   if (!scr) return null
   if (isSheet(scr)) return scr // Instagram rouvert là où on l'avait laissé : la feuille est déjà ouverte
