@@ -248,7 +248,7 @@ export const EN: Dict = {
     "Remise à zéro des quotas": "Quota reset",
     "⏱ Session": "⏱ Session",
     "Posts par compte": "Posts per account",
-    "Minutes entre 2 posts (min 1)": "Minutes between 2 posts (min 1)",
+    "Scroll entre 2 posts (min, durée aléatoire)": "Scroll between 2 posts (min, random length)",
     "📱 Scroller pendant la pause": "📱 Scroll during the pause",
     "(activité naturelle sur le compte avant son post, évite le flag robot)": "(natural activity on the account before its post, avoids the bot flag)",
     "Tes crédits iRemoTech, tes iPhones et tes comptes en un coup d’œil.": "Your iRemoTech credits, iPhones and accounts at a glance.",

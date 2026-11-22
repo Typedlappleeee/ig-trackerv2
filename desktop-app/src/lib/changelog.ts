@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22p',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : durée de scroll aléatoire', en: 'iRemoTech: random scroll length' },
+    items: {
+      fr: ['Le scroll entre deux posts dure un temps aléatoire à chaque fois : entre 80 % et 180 % du réglage (ex. 3 min → 2,4 à 5,4 min), jamais moins d’1 min.'],
+      en: ['Scrolling between two posts lasts a random time each time: between 80% and 180% of the setting (e.g. 3 min → 2.4 to 5.4 min), never under 1 min.'],
+    },
+  },
+  {
     id: '2026-11-22o',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : session sans sortir d’Instagram, localisation fiabilisée', en: 'iRemoTech: session without leaving Instagram, more reliable location' },

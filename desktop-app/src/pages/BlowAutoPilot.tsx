@@ -616,7 +616,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const nextSame = p.jobs[ji + 1]?.container === job.container
         // Entre deux posts : au moins `gapMin` min, passées à scroller sur CE compte (activité naturelle avant de poster)
         if (ji > 0) {
-          const ms = gapMin * 60_000 * (1 + Math.random() * 0.3)
+          // durée ALÉATOIRE à chaque post : entre 80 % et 180 % du réglage, jamais moins d'1 min (rythme humain)
+          const ms = Math.max(60_000, gapMin * 60_000 * (0.8 + Math.random()))
           if (gapScroll) {
             push(`${tag} 📱 ${Math.round(ms / 6000) / 10} min de scroll avant le post…`)
             try { await warmupByVision(key, p.dev, { minMs: ms, maxMs: ms, likeRate: 0.03, commentRate: 0, keepApp: true }, { log: () => { /* silencieux */ }, shouldStop: () => R.isCancelled() }) } catch { /* noop */ }
@@ -1388,7 +1389,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>Posts par compte
             <input type="number" min={1} max={50} value={sessMax} disabled={running} onChange={e => { const v = Math.max(1, Math.min(50, Number(e.target.value) || 1)); setSessMax(v); try { localStorage.setItem('sf-irt-sess-max', String(v)) } catch { /* noop */ } }} style={{ width: 56, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>Minutes entre 2 posts (min 1)
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>Scroll entre 2 posts (min, durée aléatoire)
             <input type="number" min={1} max={30} value={gapMin} disabled={running} onChange={e => { const v = Math.max(1, Math.min(30, Number(e.target.value) || 1)); setGapMin(v); try { localStorage.setItem('sf-irt-gap-min', String(v)) } catch { /* noop */ } }} style={{ width: 56, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
