@@ -349,7 +349,7 @@ export const iosToggleOn = ([r, g, b]: [number, number, number]) => g > 170 && r
  *  Accès par Spotlight (« Keyboard » → résultat Réglages « Keyboards » ; le schéma app-prefs est refusé par iRemoTech).
  *  Vérifié à l'écran ; true = coupée (ou déjà coupée). */
 export async function disableAutoCorrect(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
-  hooks?.log?.('⌨️ Clavier iOS : coupure de la correction automatique (une fois par iPhone)…')
+  hooks?.log?.('⌨️ Clavier iOS : coupure de la correction et de la majuscule automatiques (une fois par iPhone)…')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1200)
   const s0 = await snapshot(key, deviceId)
@@ -368,26 +368,44 @@ export async function disableAutoCorrect(key: string, deviceId: string, hooks?: 
   if (!hit || !scr?.words.some(o => /^general$/i.test(o.text) && o.cy < H * 0.3)) { hooks?.log?.('   ⚠ réglage « Keyboards » introuvable dans Spotlight'); await sendAction(key, deviceId, { type: 'press', name: 'home' }); return false }
   await sendAction(key, deviceId, { type: 'tap', x: hit.cx, y: hit.cy })
   await sleep(2800)
-  for (let k = 0; k < 5; k++) {
+  // Deux interrupteurs à couper : « Auto-Capitalization » (sinon les descriptions en minuscules prennent une majuscule)
+  // et « Auto-Correction » (sinon « ici » → « I I »). Vert à gauche du pouce = activé.
+  const targets: { re: RegExp; label: string; done: boolean }[] = [
+    { re: /^auto-?capitali[sz]ation$/i, label: 'majuscule automatique', done: false },
+    { re: /^auto-?correction$/i, label: 'correction automatique', done: false },
+  ]
+  // Page Keyboards : tout en haut puis un demi-écran plus bas → section « All Keyboards » (les deux interrupteurs)
+  // au milieu de l'écran (vu en vrai : en haut de page, « Auto-Capitalization » est à 93 % de la hauteur).
+  const swipeV = (y1: number, y2: number) => sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(y1 * H), x2: Math.round(W / 2), y2: Math.round(y2 * H), duration_ms: 350 })
+  for (let i = 0; i < 2; i++) { await swipeV(0.3, 0.85); await sleep(700) }
+  await swipeV(0.75, 0.4); await sleep(1200)
+  for (let k = 0; k < 8 && targets.some(t => !t.done); k++) {
     scr = await readScreenWords(key, deviceId)
-    const row = scr?.words.find(o => /^auto-?correction$/i.test(o.text) && o.cx < W * 0.6 && o.cy > H * 0.1 && o.cy < H * 0.92)
     if (!scr) { await sleep(1200); continue }
-    if (!row) {
-      // ligne plus bas dans la page (Réglages s'ouvre parfois en haut) → défiler la page des Réglages
-      await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(0.75 * H), x2: Math.round(W / 2), y2: Math.round(0.35 * H), duration_ms: 400 })
-      await sleep(1200); continue
+    let seen = false, tapped = false
+    for (const t of targets.filter(x => !x.done)) {
+      const row = scr.words.find(o => t.re.test(o.text) && o.cx < W * 0.6 && o.cy > H * 0.1 && o.cy < H * 0.95)
+      if (!row) continue
+      seen = true
+      if (!iosToggleOn(await pixelRgb(scr.shot, Math.round(0.783 * W), row.cy))) { t.done = true; hooks?.log?.(`   ✓ ${t.label} coupée`); continue }
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.84 * W), y: row.cy })
+      tapped = true
+      await sleep(1200)
     }
-    const px = Math.round(0.783 * W)
-    if (!iosToggleOn(await pixelRgb(scr.shot, px, row.cy))) {
-      hooks?.log?.('   ✓ correction automatique coupée')
-      // UN seul appui (deux appuis rapprochés ouvrent le sélecteur d'apps)
-      await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
-      return true
+    if (tapped) continue // relecture : l'interrupteur doit être passé au gris
+    if (!seen || targets.some(t => !t.done)) {
+      // ligne(s) plus bas dans la page (Réglages s'ouvre parfois en haut) → défiler la page des Réglages
+      // pas encore vu : un coup plus bas, un coup plus haut (la page peut s'ouvrir n'importe où)
+      if (k % 2 === 0) await swipeV(0.7, 0.45); else await swipeV(0.35, 0.75)
+      await sleep(1200)
     }
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.84 * W), y: row.cy })
-    await sleep(1500)
   }
-  hooks?.log?.('   ⚠ interrupteur « Auto-Correction » non coupé')
+  if (targets.every(t => t.done)) {
+    // UN seul appui (deux appuis rapprochés ouvrent le sélecteur d'apps)
+    await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
+    return true
+  }
+  hooks?.log?.(`   ⚠ interrupteur non coupé : ${targets.filter(t => !t.done).map(t => t.label).join(', ')}`)
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   return false
 }

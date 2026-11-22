@@ -22,6 +22,7 @@ import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing,
 import IrtAccounts from '@/components/IrtAccounts'
 import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, autoChecksFor } from '@/lib/irtAccounts'
 import { setVisionBrain } from '@/lib/visionBrain'
+import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, loadTargetMarket, saveTargetMarket, countByMarket, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
 import { listJobs, type IrtJob } from '@/lib/iremotech'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
@@ -137,6 +138,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const setSrc = (k: SrcKey, v: Src) => { (k === 'story' ? setStorySrc : k === 'photo' ? setPhotoSrc : setReelSrc)(v); try { localStorage.setItem(`sf-irt-src-${k}`, JSON.stringify(v)) } catch { /* ignore */ } }
   const [bankSum, setBankSum] = useState<BankSummary | null>(null)
   const [captionPool, setCaptionPool] = useState('')
+  // Description : mes légendes (une par ligne) OU générées par l'IA selon le marché (prompt FR / US / DE)
+  const [capMode, setCapMode] = useState<'pool' | 'ai'>(() => { try { return localStorage.getItem('sf-irt-cap-mode') === 'ai' ? 'ai' : 'pool' } catch { return 'pool' } })
+  const [capMarket, setCapMarket] = useState<Market>(() => { try { const v = localStorage.getItem('sf-irt-cap-market'); return v === 'us' || v === 'de' ? v : 'fr' } catch { return 'fr' } })
+  const [capPreview, setCapPreview] = useState<string[]>([])
+  const [capBusy, setCapBusy] = useState(false)
+  const [promptOpen, setPromptOpen] = useState(false)
+  const [promptDraft, setPromptDraft] = useState('')
+  // marché de chaque compte (`${dev}::${cible}`) ; absent = marché par défaut (capMarket)
+  const [targetMarkets, setTargetMarkets] = useState<Record<string, Market | null>>({})
+  const marketOf = (dev: string, c: string): Market => targetMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c) ?? capMarket
+  const setTargetMarket = (dev: string, c: string, m: Market | null) => { saveTargetMarket(dev, c, m); setTargetMarkets(t => ({ ...t, [`${dev}::${c}`]: m })) }
   const [storyLink, setStoryLink] = useState('')               // lien CTA par défaut (Story)
   const [storyLinks, setStoryLinks] = useState<Record<string, string>>({}) // lien PAR container : `${dev}::${c}`
   const linkKey = (dev: string, c: string) => `${dev}::${c}`
@@ -505,6 +517,21 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const queued = src.mode === 'folder' || uniqueUse
     let vidQueue = src.mode === 'folder' ? byUse() : uniqueUse ? shuffle(pool) : []
     let capQueue = uniqueUse ? shuffle(captions) : []
+    // Description auto par marché : une description DIFFÉRENTE par publication, générée avant le lancement.
+    // Chaque compte a son marché (FR / US / DE) → descriptions générées par marché, puis distribuées compte par compte.
+    const aiCaps: Record<Market, string[]> = { fr: [], us: [], de: [] }
+    if (kind !== 'story' && capMode === 'ai') {
+      const need = countByMarket([...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => marketOf(dev, c))), capMarket)
+      for (const m of MARKETS.map(x => x.k)) {
+        if (!need[m]) continue
+        const label = MARKETS.find(x => x.k === m)?.label ?? m
+        push(`✍️ Génération de ${need[m]} description(s) — ${label}…`)
+        try { aiCaps[m] = shuffle(await generateMarketCaptions(conns.groq, m, need[m], msg => push(msg))) }
+        catch (e) { push(`⚠ Descriptions ${label} : ${e instanceof Error ? e.message : String(e)} → rien n’est lancé.`); setRunning(false); return }
+        if (aiCaps[m].length < need[m]) push(`⚠ ${label} : ${aiCaps[m].length} description(s) reçue(s) pour ${need[m]} publication(s), certaines seront réutilisées.`)
+      }
+    }
+    const aiAll: Record<Market, string[]> = { fr: [...aiCaps.fr], us: [...aiCaps.us], de: [...aiCaps.de] }
     const pickVid = (): VidRef => { if (queued) { if (!vidQueue.length) vidQueue = src.mode === 'folder' ? byUse() : shuffle(pool); return vidQueue.pop()! } return pool[Math.floor(Math.random() * pool.length)] }
     // Carrousel : N photos DIFFÉRENTES par post (dans l'ordre du tirage)
     const pickSet = (n: number): VidRef[] => {
@@ -512,12 +539,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       for (let guard = 0; out.length < n && guard < n * 20; guard++) { const v = pickVid(); if (!out.some(x => x.id === v.id)) out.push(v) }
       return out
     }
-    const pickCap = (): string => { if (!captions.length) return ''; if (uniqueUse) { if (!capQueue.length) capQueue = shuffle(captions); return capQueue.pop()! } return captions[Math.floor(Math.random() * captions.length)] }
+    const pickCap = (dev: string, c: string): string => {
+      if (kind !== 'story' && capMode === 'ai') { const m = marketOf(dev, c); if (!aiCaps[m].length) aiCaps[m] = shuffle(aiAll[m]); return aiCaps[m].pop() ?? '' }
+      if (!captions.length) return ''
+      if (uniqueUse) { if (!capQueue.length) capQueue = shuffle(captions); return capQueue.pop()! }
+      return captions[Math.floor(Math.random() * captions.length)]
+    }
 
     const byPhone = [...sel].map(dev => ({
       dev,
       name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(),
-      jobs: [...(selConts[dev] ?? [])].map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(), link: storyLinks[linkKey(dev, container)] || storyLink.trim() } }),
+      jobs: [...(selConts[dev] ?? [])].map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(dev, container), link: storyLinks[linkKey(dev, container)] || storyLink.trim() } }),
     })).filter(p => p.jobs.length)
 
     push(`▶ ${kind === 'story' ? 'Story' : kind === 'carousel' ? `Carrousel (${perPost} photos)` : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
@@ -530,7 +562,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const hooks = (m: string) => push(`${tag} ${m}`)
       await recalibrateTouch(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
       // Correction automatique du clavier iOS coupée une fois par iPhone (sinon légendes / textes français déformés)
-      const acKey = `sf-irt-noautocorrect-${p.dev}`
+      const acKey = `sf-irt-kbclean2-${p.dev}` // v2 : correction + majuscule automatiques
       let acDone = false
       try { acDone = localStorage.getItem(acKey) === '1' } catch { /* ignore */ }
       if (!acDone && await disableAutoCorrect(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })) { try { localStorage.setItem(acKey, '1') } catch { /* ignore */ } }
@@ -1085,8 +1117,74 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               </div>
             )}
           </>)}
-          <div style={{ ...lbl, margin: '0 0 6px' }}>Légendes (une par ligne, tirées au hasard)</div>
-          <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={3} placeholder={'Ma légende 1\nMa légende 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 60, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 8px' }}>
+            <span style={{ ...lbl, margin: 0 }}>Description</span>
+            <div style={{ ...seg }}>
+              {([['pool', '✍️ Mes légendes'], ['ai', '🤖 Auto par marché']] as const).map(([k, l]) => (
+                <button key={k} disabled={running} onClick={() => { setCapMode(k); try { localStorage.setItem('sf-irt-cap-mode', k) } catch { /* noop */ } }} style={{ height: 28, padding: '0 12px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: capMode === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: capMode === k ? INK : MUTED }}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {capMode === 'pool' ? (<>
+            <div style={{ fontSize: 11.5, color: DIM, margin: '0 0 6px' }}>Une par ligne, tirées au hasard.</div>
+            <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={3} placeholder={'Ma légende 1\nMa légende 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 60, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
+          </>) : (<>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: MUTED }}>Marché par défaut</span>
+              {MARKETS.map(m => (
+                <button key={m.k} disabled={running} onClick={() => { setCapMarket(m.k); setCapPreview([]); setPromptOpen(false); try { localStorage.setItem('sf-irt-cap-market', m.k) } catch { /* noop */ } }}
+                  style={{ ...btn, height: 32, background: capMarket === m.k ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: capMarket === m.k ? GOLD : INK, borderColor: capMarket === m.k ? 'rgba(233,196,106,0.45)' : FIELD_EDGE }}>{m.label}</button>
+              ))}
+              <button style={{ ...btn, height: 32, marginLeft: 'auto' }} disabled={capBusy || !conns.groq} onClick={async () => {
+                setCapBusy(true)
+                try { setCapPreview(await generateMarketCaptions(conns.groq, capMarket, 5)) } catch (e) { toast(`Descriptions : ${e instanceof Error ? e.message : String(e)}`, 'bad') }
+                setCapBusy(false)
+              }}>{capBusy ? 'Génération…' : '👀 Aperçu (5)'}</button>
+              <button style={{ ...btn, height: 32 }} onClick={() => { setPromptDraft(marketPrompt(capMarket)); setPromptOpen(o => !o) }}>✏️ Prompt</button>
+            </div>
+            <div style={{ fontSize: 11.5, color: conns.groq ? DIM : '#FCD34D', margin: '8px 0 0' }}>
+              {conns.groq ? 'Au lancement, chaque compte reçoit une description de Reel différente, générée avec le prompt de SON marché (sinon le marché par défaut).' : 'Il faut une clé Groq (Réglages › Intégrations) pour générer les descriptions.'}
+            </div>
+            {totalJobs > 0 && (
+              <div style={{ marginTop: 10, borderRadius: 8, border: `1px solid ${EDGE}`, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#111113', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: INK }}>Marché de chaque compte</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11.5, color: DIM }}>Tous en</span>
+                  {MARKETS.map(m => <button key={m.k} disabled={running} onClick={() => { for (const dev of sel) for (const c of selConts[dev] ?? []) setTargetMarket(dev, c, m.k) }} style={{ ...btn, height: 26, fontSize: 11.5, padding: '0 8px' }}>{m.label.split(' ')[0]}</button>)}
+                </div>
+                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                  {[...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => ({ dev, c }))).map(({ dev, c }) => {
+                    const own = targetMarkets[`${dev}::${c}`] !== undefined ? targetMarkets[`${dev}::${c}`] : loadTargetMarket(dev, c)
+                    const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
+                    return (
+                      <div key={`${dev}::${c}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderTop: `1px solid ${EDGE}` }}>
+                        <span data-no-tr style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}<span style={{ color: DIM }}> · {name}</span></span>
+                        {MARKETS.map(m => {
+                          const on = (own ?? capMarket) === m.k
+                          return <button key={m.k} disabled={running} title={own ? m.label : `${m.label}${on ? ' (défaut)' : ''}`} onClick={() => setTargetMarket(dev, c, own === m.k ? null : m.k)}
+                            style={{ height: 26, width: 34, borderRadius: 6, cursor: 'pointer', fontSize: 14, border: `1px solid ${on ? (own ? 'rgba(233,196,106,0.55)' : 'rgba(255,255,255,0.18)') : 'transparent'}`, background: on ? (own ? 'rgba(233,196,106,0.14)' : 'rgba(255,255,255,0.05)') : 'transparent', opacity: on ? 1 : 0.45 }}>{m.label.split(' ')[0]}</button>
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            {promptOpen && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <textarea data-no-tr value={promptDraft} onChange={e => setPromptDraft(e.target.value)} rows={10} style={{ ...inp, width: '100%', height: 'auto', padding: 10, resize: 'vertical', fontFamily: MONO, fontSize: 11.5, lineHeight: 1.5 }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={{ ...btn, height: 30, background: GOLD, color: '#0A0A0B', border: 'none', fontWeight: 600 }} onClick={() => { saveMarketPrompt(capMarket, promptDraft); setPromptOpen(false); setCapPreview([]); toast('Prompt enregistré pour ce marché', 'ok') }}>Enregistrer</button>
+                  <button style={{ ...btn, height: 30 }} onClick={() => { setPromptDraft(DEFAULT_PROMPTS[capMarket]); saveMarketPrompt(capMarket, null); toast('Prompt d’origine remis', 'ok') }}>Remettre l’original</button>
+                </div>
+              </div>
+            )}
+            {capPreview.length > 0 && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {capPreview.map((c, i) => <div key={i} data-no-tr style={{ whiteSpace: 'pre-wrap', fontSize: 12.5, lineHeight: 1.5, color: '#D4D4D8', padding: '8px 10px', borderRadius: 7, background: '#111113', border: `1px solid ${EDGE}` }}>{c}</div>)}
+              </div>
+            )}
+          </>)}
         </div>
         <LaunchBar n={3} summary={totalJobs ? `${totalJobs} ${postType === 'carousel' ? `carrousel${totalJobs > 1 ? 's' : ''} de ${carCount} photos` : `Reel${totalJobs > 1 ? 's' : ''}`} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={postType === 'carousel' ? `Lancer ${totalJobs} carrousel(s)` : `Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (postType === 'carousel' ? (photoSrc.mode === 'folder' ? !photoSrc.folder : photoPool.length < carCount) : (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length)) || running} running={running} onClick={() => run(postType === 'carousel' ? 'carousel' : 'reel')} />
         <LogPanel />
