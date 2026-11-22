@@ -49,15 +49,17 @@ export async function groqChat(groqKey: string, model: string, messages: unknown
 // Groq retire régulièrement des modèles (vu le 22/11/2026 : « llama-3.3-70b-versatile does not exist or you do not
 // have access to it »). On essaie la liste dans l'ordre, on passe au suivant si le modèle est refusé, et on retient
 // celui qui marche (`sf-groq-text-model`) pour commencer par lui la fois suivante.
+// Modèles qui écrivent directement d'abord ; ceux qui « raisonnent » (gpt-oss, qwen3) en dernier : avec une limite
+// de longueur serrée, leur raisonnement mangeait tout et la réponse arrivait VIDE (vu le 22/11/2026).
 export const TEXT_MODELS = [
-  'openai/gpt-oss-120b',
-  'llama-3.3-70b-versatile',
   'meta-llama/llama-4-maverick-17b-128e-instruct',
   'moonshotai/kimi-k2-instruct',
-  'qwen/qwen3-32b',
+  'llama-3.3-70b-versatile',
   'meta-llama/llama-4-scout-17b-16e-instruct',
-  'openai/gpt-oss-20b',
   'llama-3.1-8b-instant',
+  'openai/gpt-oss-120b',
+  'qwen/qwen3-32b',
+  'openai/gpt-oss-20b',
 ]
 /** Erreur « ce modèle n'existe pas / n'est pas accessible / est retiré » (on essaie alors le suivant). Pure. */
 export function isModelUnavailable(msg: string): boolean {
@@ -74,10 +76,11 @@ export async function groqText(groqKey: string, messages: unknown[], maxTokens =
   let lastErr: unknown = null
   for (const model of order) {
     try {
-      const t = await groqChat(groqKey, model, messages, maxTokens, temperature)
-      if (t == null) continue
+      const t = await groqChat(groqKey, model, messages, Math.max(maxTokens, /gpt-oss|qwen3/.test(model) ? 4000 : 0), temperature)
+      const clean = t == null ? '' : stripThinking(t)
+      if (!clean) { lastErr = new Error(`réponse vide (${model})`); continue } // réponse vide → modèle suivant
       try { localStorage.setItem('sf-groq-text-model', model) } catch { /* noop */ }
-      return stripThinking(t)
+      return clean
     } catch (e) {
       lastErr = e
       if (!isModelUnavailable(e instanceof Error ? e.message : String(e))) throw e // autre erreur (clé, quota…) : on la remonte

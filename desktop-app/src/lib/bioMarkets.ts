@@ -137,7 +137,7 @@ export async function generateBios(groqKey: string, m: Market, n: number): Promi
   for (let guard = 0; out.length < n && guard < 4; guard++) {
     const ask = Math.min(20, n - out.length)
     const prompt = bioPrompt(m).replace(/\[(NOMBRE|NUMBER|ANZAHL)\]/g, String(ask))
-    const raw = await groqText(groqKey, [{ role: 'user', content: prompt + (out.length ? `\n\n(Déjà écrites, à ne pas répéter :\n${out.join('\n---\n')})` : '') }], Math.min(4000, 90 * ask + 400), 1)
+    const raw = await groqText(groqKey, [{ role: 'user', content: prompt + (out.length ? `\n\n(Déjà écrites, à ne pas répéter :\n${out.join('\n---\n')})` : '') }], Math.min(6000, 120 * ask + 800), 1)
     if (!raw) break
     out.push(...splitBios(raw).filter(b => !out.includes(b)))
   }

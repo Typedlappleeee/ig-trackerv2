@@ -228,7 +228,7 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
   for (let guard = 0; out.length < n && guard < Math.ceil(n / 20) + 3; guard++) {
     const ask = Math.min(20, n - out.length)
     messages.push({ role: 'user', content: String(ask) })
-    const raw = await groqText(groqKey, messages, Math.min(4000, 120 * ask + 400), 1)
+    const raw = await groqText(groqKey, messages, Math.min(6000, 150 * ask + 800), 1)
     if (!raw) break
     messages.push({ role: 'assistant', content: raw })
     const got = splitCaptions(raw).filter(c => !out.includes(c))

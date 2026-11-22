@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22q',
+    date: '2026-11-22',
+    title: { fr: 'Descriptions IA : plus de réponse vide', en: 'AI captions: no more empty answers' },
+    items: {
+      fr: ['Corrigé « aucune description reçue de l’IA » : le modèle qui « raisonne » renvoyait une réponse vide. Une réponse vide passe maintenant au modèle suivant, et les modèles qui écrivent directement sont essayés en premier.'],
+      en: ['Fixed “no caption received from the AI”: the “reasoning” model returned an empty answer. An empty answer now moves on to the next model, and models that write directly are tried first.'],
+    },
+  },
+  {
     id: '2026-11-22p',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : durée de scroll aléatoire', en: 'iRemoTech: random scroll length' },
