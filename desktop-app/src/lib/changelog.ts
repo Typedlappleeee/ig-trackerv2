@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22b',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : statut des comptes vérifié automatiquement', en: 'iRemoTech: account status checked automatically' },
+    items: {
+      fr: [
+        'Nouveau bouton « ✅ Vérifier tous les comptes » (Comptes Instagram) : la vérification du statut iRemoTech est lancée sur tous les comptes, un par un, et le statut s’affiche au fur et à mesure.',
+        'Statut automatique (activé par défaut) : ScaleFlow fait relire les comptes de chaque iPhone et revérifier chaque compte par iRemoTech toutes les 24 h — gratuit, jamais pendant une publication.',
+      ],
+      en: [
+        'New “✅ Check all accounts” button (Instagram accounts): the iRemoTech status check is launched on every account, one by one, and the status shows up as results arrive.',
+        'Automatic status (on by default): ScaleFlow has iRemoTech re-read each iPhone’s accounts and re-check each account every 24 h — free, never during a post.',
+      ],
+    },
+  },
+  {
     id: '2026-11-22a',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : plus de faux « Jailbreak », comptes repris d’iRemoTech', en: 'iRemoTech: no more false “Jailbreak”, accounts taken from iRemoTech' },

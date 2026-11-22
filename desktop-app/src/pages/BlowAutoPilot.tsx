@@ -11,7 +11,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
-import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
+import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, launchAutomation, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
@@ -20,7 +20,7 @@ import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone }
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import IrtAccounts from '@/components/IrtAccounts'
-import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt } from '@/lib/irtAccounts'
+import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, autoChecksFor } from '@/lib/irtAccounts'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { useConnections } from '@/lib/connections'
 import { listJobs, type IrtJob } from '@/lib/iremotech'
@@ -295,6 +295,52 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       setSelConts(sc => sc[dev] ? { ...sc, [dev]: new Set([...sc[dev]].filter(c => next.includes(c))) } : sc)
     }
   }, [irtJobs]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Statut AUTOMATIQUE : ScaleFlow fait vérifier par iRemoTech (gratuit, 1 action du quota par lancement) la liste
+  // des comptes de chaque iPhone et le statut de chaque compte, toutes les 24 h, puis l'affiche. L'API ne montre pas
+  // les vérifications lancées depuis le tableau de bord iRemoTech : c'est la seule façon d'avoir le statut ici.
+  // Jamais pendant une automatisation ScaleFlow (utiliser l'iPhone interromprait le job iRemoTech).
+  const [autoStatus, setAutoStatus] = useState(() => { try { return localStorage.getItem('sf-irt-autostatus') !== '0' } catch { return true } })
+  const jobsRef = useRef(irtJobs); jobsRef.current = irtJobs
+  const contsRef = useRef(conts); contsRef.current = conts
+  useEffect(() => {
+    if (!irt.key || !autoStatus || !devices.length) return
+    const key = irt.key
+    let alive = true
+    const tick = async () => {
+      if (runningRef.current) return
+      const left = usage?.actions?.remaining ?? usage?.remaining
+      if (typeof left === 'number' && left < 50) return // quota d'actions presque épuisé : on garde le reste pour les publications
+      for (const d of devices) {
+        if (!alive || runningRef.current) return
+        const dev = d.public_id
+        if (phoneKind(contsRef.current[dev]) === 'jb') continue // jailbreak : iRemoTech ne voit que le container ouvert
+        const jobs = jobsRef.current[dev]
+        if (!jobs) continue
+        const tk = `sf-irt-autostatus:${dev}`
+        let tried: Record<string, number> = {}
+        try { tried = JSON.parse(localStorage.getItem(tk) ?? '{}') } catch { /* noop */ }
+        const known = (contsRef.current[dev] ?? []).filter(c => c.startsWith('@'))
+        const plan = autoChecksFor(jobs, known, Date.now(), tried)
+        const todo: { k: string; a: Parameters<typeof launchAutomation>[2] }[] = [
+          ...(plan.scan ? [{ k: '#scan', a: { type: 'list_accounts' as const } }] : []),
+          ...plan.accounts.slice(0, 8).map(u => ({ k: u, a: { type: 'account_status' as const, account: u } })),
+        ]
+        if (!todo.length) continue
+        for (const t of todo) {
+          if (!alive || runningRef.current) return
+          await launchAutomation(key, dev, t.a).catch(() => null) // refus (compte inconnu, déjà en cours…) : réessayé dans 24 h
+          tried[t.k] = Date.now()
+          await sleep(7000) // ≤ 10 lancements / min / iPhone côté iRemoTech
+        }
+        try { localStorage.setItem(tk, JSON.stringify(tried)) } catch { /* noop */ }
+        const fresh = await listJobs(key, dev, 100).catch(() => null)
+        if (fresh && alive) setIrtJobs(m => ({ ...m, [dev]: fresh }))
+      }
+    }
+    const first = setTimeout(() => void tick(), 45_000)
+    const t = setInterval(() => void tick(), 15 * 60_000)
+    return () => { alive = false; clearTimeout(first); clearInterval(t) }
+  }, [irt.key, autoStatus, devices, usage]) // eslint-disable-line react-hooks/exhaustive-deps
   // Statut Instagram des comptes (historique iRemoTech) → « ! » rouge sur les comptes signalés
   useEffect(() => {
     if (!irt.key || !devices.length) return
@@ -959,6 +1005,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       </>)}
 
       {/* ─────────────── ONGLET POSTING ─────────────── */}
+      {curTab === 'igaccounts' && irt.key && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10, border: `1px solid ${EDGE}`, background: '#0E0E10' }}>
+          <Toggle on={autoStatus} onClick={() => { const v = !autoStatus; setAutoStatus(v); try { localStorage.setItem('sf-irt-autostatus', v ? '1' : '0') } catch { /* noop */ } }}
+            label="Statut iRemoTech automatique" sub="ScaleFlow fait lire les comptes de chaque iPhone et vérifier le statut de chaque compte par iRemoTech toutes les 24 h, puis l’affiche ici. Gratuit (1 action du quota par vérification), jamais pendant une publication, seulement quand ScaleFlow est ouvert." />
+        </div>
+      )}
       {curTab === 'igaccounts' && irt.key && (
         <IrtAccounts apiKey={irt.key} devices={devices} known={conts}
           onScanned={(dev, accs) => {

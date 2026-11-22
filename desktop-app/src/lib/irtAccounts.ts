@@ -91,6 +91,19 @@ export function reconcileWithIrt(list: string[], accs: string[]): string[] | nul
   return accs.length >= 2 ? at : null
 }
 
+/** Vérifications iRemoTech à lancer AUTOMATIQUEMENT sur un iPhone : lecture des comptes (`list_accounts`) si elle
+ *  date de plus de `maxAgeMs` (ou n'a jamais réussi), et statut (`account_status`) de chaque compte jamais vérifié
+ *  ou vérifié il y a plus de `maxAgeMs`. Rien de ce qui tourne déjà ; un essai récent (`tried`, même raté : compte
+ *  inconnu d'iRemoTech…) n'est pas relancé avant `maxAgeMs`. Pure. */
+export function autoChecksFor(jobs: IrtJob[], known: string[], now: number, tried: Record<string, number>, maxAgeMs = 24 * 3600_000): { scan: boolean; accounts: string[] } {
+  const da = deviceAccounts(jobs, known)
+  const old = (iso: string | null) => !iso || now - Date.parse(iso) > maxAgeMs
+  const fresh = (k: string) => now - (tried[k] ?? 0) < maxAgeMs
+  const scan = !da.scanning && old(da.scannedAt) && !fresh('#scan')
+  const accounts = da.accounts.filter(a => !a.running && old(a.checkedAt) && !fresh(a.username)).map(a => a.username)
+  return { scan, accounts }
+}
+
 /** « il y a 5 min » */
 export function ago(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return 'jamais'

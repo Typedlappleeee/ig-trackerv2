@@ -108,6 +108,32 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
     setBusy(null); toast(`${deviceLabel(d)} : stats relues pour ${n}/${accs.length} compte(s)`, n ? 'ok' : 'bad')
   }
   const check = (dev: string, u: string) => launch(dev, { type: 'account_status', account: u }, `@${u}`)
+  // UN bouton : vérification iRemoTech lancée sur TOUS les comptes, un par un (iPhones entrelacés, ≥ 6,5 s entre
+  // deux lancements sur un même iPhone : iRemoTech en accepte 10 / min / iPhone). Chaque iPhone les fait à la suite.
+  const [allProg, setAllProg] = useState<{ done: number; total: number } | null>(null)
+  const checkAll = async () => {
+    const queues = devices.map(d => ({ dev: d.public_id, accs: (view[d.public_id]?.accounts ?? []).filter(a => !a.running).map(a => a.username) })).filter(q => q.accs.length)
+    const total = queues.reduce((n, q) => n + q.accs.length, 0)
+    if (!total) { toast('Aucun compte à vérifier (ou déjà en cours).', 'info'); return }
+    setBusy('checkall'); setAllProg({ done: 0, total })
+    const last: Record<string, number> = {}
+    let done = 0, ok = 0
+    for (let round = 0; queues.some(q => q.accs.length); round++) {
+      for (const q of queues) {
+        const u = q.accs.shift(); if (!u) continue
+        const wait = (last[q.dev] ?? 0) + 6500 - Date.now()
+        if (wait > 0) await sleep(wait)
+        let r = await launchAutomation(apiKey, q.dev, { type: 'account_status', account: u })
+        if (!r.ok && /rate|429/i.test(r.code ?? '')) { await sleep(7000); r = await launchAutomation(apiKey, q.dev, { type: 'account_status', account: u }) }
+        last[q.dev] = Date.now()
+        if (r.ok) { ok++; setJobs(m => ({ ...m, [q.dev]: [r.job!, ...(m[q.dev] ?? [])] })) }
+        done++; setAllProg({ done, total })
+        await sleep(300)
+      }
+    }
+    setBusy(null); setAllProg(null)
+    toast(`${ok}/${total} vérification(s) lancée(s) : iRemoTech les fait une par une sur chaque iPhone (~1 min par compte), le statut s’affiche au fur et à mesure. Ne touche pas les iPhones pendant ce temps.`, ok ? 'ok' : 'bad', 9000)
+  }
   const warm = (dev: string, u: string) => launch(dev, { type: 'warm_up', account: u, session_duration_s: wuMin * 60 }, `@${u}`)
   const bulk = async (kind: 'check' | 'warm') => {
     setBusy(kind)
@@ -217,6 +243,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
           ))}
         </div>
         <button style={{ ...btn, background: grouped ? 'rgba(255,255,255,0.08)' : FIELD_BG }} onClick={() => setGrouped(g => !g)} title="Regrouper les comptes par iPhone">{grouped ? '▾ Par iPhone' : '☰ Liste'}</button>
+        <button style={{ ...btn, background: '#F4F4F5', color: '#0A0A0B', fontWeight: 700 }} disabled={!!busy || !flat.length} onClick={() => void checkAll()} title="Lance la vérification du statut iRemoTech sur TOUS les comptes, un par un (gratuit, 1 action du quota par compte)">{busy === 'checkall' && allProg ? `Lancement ${allProg.done}/${allProg.total}…` : '✅ Vérifier tous les comptes'}</button>
         <button style={btn} disabled={!!busy || !devices.length} onClick={() => void scanAll()} title="iRemoTech lit les comptes connectés sur chaque iPhone en ligne (~30 s, ne pas toucher les iPhones)">{busy === 'scan' ? 'Lancement…' : '🔄 Tout scanner'}</button>
       </div>
 
