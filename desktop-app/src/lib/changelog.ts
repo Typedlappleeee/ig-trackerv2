@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22j',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : vrais crédits sur l’Accueil', en: 'iRemoTech: real credits on Home' },
+    items: {
+      fr: ['Accueil : dépensé ce mois / plafond, actions, images et envois gratuits restants aujourd’hui, utilisation du jour et warm-ups (jetons) du mois. Le solde de jetons n’est pas fourni par l’API iRemoTech.'],
+      en: ['Home: spent this month / cap, free actions, frames and uploads left today, today’s usage and this month’s warm-ups (tokens). The token balance is not provided by the iRemoTech API.'],
+    },
+  },
+  {
     id: '2026-11-22i',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : Accueil et Posting regroupé', en: 'iRemoTech: Home and grouped Posting' },

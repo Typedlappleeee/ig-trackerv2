@@ -1024,11 +1024,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       <H title={TAB_TITLE[curTab].title} sub={TAB_TITLE[curTab].sub}
         right={<span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <span style={pill}><span style={{ width: 7, height: 7, borderRadius: 99, background: onlineN ? '#22C55E' : '#EF4444' }} />{onlineN}/{devices.length} iPhone{devices.length > 1 ? 's' : ''} en ligne</span>
+          {usage?.billing?.free_remaining_today?.actions != null && <span style={pill} title="Actions gratuites restantes aujourd’hui (iRemoTech)">⚡ {usage.billing.free_remaining_today.actions.toLocaleString('fr-FR')} actions gratuites</span>}
+          {usage?.billing?.cap_micros != null && <span style={pill} title="Dépensé ce mois / plafond (iRemoTech)">💳 {((usage.billing.spent_micros ?? 0) / 1e6).toFixed(2)} / {(usage.billing.cap_micros / 1e6).toFixed(0)} $</span>}
           {budget?.budget != null && <span style={pill} title="Quota iRemoTech du jour">{budget.remaining ?? '—'} / {budget.budget} actions restantes</span>}
-          {usage?.active_minutes?.budget != null && <span style={pill} title="Minutes d’utilisation des iPhones (quota iRemoTech)">{usage.active_minutes.remaining ?? '—'} / {usage.active_minutes.budget} min</span>}
-          {usage?.snapshots?.budget != null && <span style={pill} title="Captures d’écran (quota iRemoTech)">{usage.snapshots.remaining ?? '—'} / {usage.snapshots.budget} captures</span>}
-          {usage?.uploads?.budget != null && <span style={pill} title="Envois de médias (quota iRemoTech)">{usage.uploads.remaining ?? '—'} / {usage.uploads.budget} envois</span>}
-          {usage?.resets_at && <span style={{ ...pill, color: DIM }} title="Remise à zéro des quotas">↻ {new Date(usage.resets_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
         </span>} />
 
       {/* Barre d'onglets (mode autonome ; en infra, la nav de gauche gère les onglets) */}
@@ -1052,19 +1050,6 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {/* ─────────────── ONGLET TÉLÉPHONES (gestion complète) ─────────────── */}
       {curTab === 'home' && (() => {
         const accs = devices.flatMap(d => deviceAccounts(irtJobs[d.public_id] ?? [], (conts[d.public_id] ?? []).filter(c => c.startsWith('@'))).accounts)
-        const quota = (label: string, icon: string, b?: { used?: number; budget?: number; remaining?: number }) => {
-          if (!b || b.budget == null) return null
-          const left = b.remaining ?? (b.used != null ? b.budget - b.used : null)
-          const pct = left != null && b.budget ? Math.max(0, Math.min(100, (left / b.budget) * 100)) : null
-          const low = pct != null && pct < 15
-          return (
-            <div key={label} style={{ ...card, margin: 0 }}>
-              <div style={{ fontSize: 12, color: MUTED }}>{icon} {label}</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: low ? '#F87171' : INK, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{left ?? '—'}<span style={{ fontSize: 13, color: DIM, fontWeight: 500 }}> / {b.budget}</span></div>
-              {pct != null && <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: low ? '#F87171' : GOLD }} /></div>}
-            </div>
-          )
-        }
         const stat = (label: string, v: number | string, go?: IrtTab) => (
           <div key={label} onClick={go ? () => goTab(go) : undefined} style={{ ...card, margin: 0, cursor: go ? 'pointer' : 'default' }}>
             <div style={{ fontSize: 12, color: MUTED }}>{label}</div>
@@ -1073,14 +1058,42 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         )
         const grid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12, marginBottom: 18 }
         return (<>
-          <div style={{ fontSize: 13, fontWeight: 700, color: INK, margin: '4px 0 10px' }}>Crédits iRemoTech restants{usage?.resets_at ? <span style={{ color: DIM, fontWeight: 500 }}> · remise à zéro à {new Date(usage.resets_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span> : null}</div>
-          <div style={grid}>
-            {quota('Actions', '⚡', usage?.actions ?? (usage?.budget != null ? { budget: usage.budget, remaining: usage.remaining, used: usage.used } : undefined))}
-            {quota('Minutes d’iPhone', '⏱', usage?.active_minutes)}
-            {quota('Captures d’écran', '📸', usage?.snapshots)}
-            {quota('Envois de médias', '⬆', usage?.uploads)}
-            {!usage && <div style={{ ...card, margin: 0, color: MUTED, fontSize: 12.5 }}>Quotas indisponibles pour le moment.</div>}
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: INK, margin: '4px 0 10px' }}>Crédits iRemoTech{usage?.billing?.period ? <span style={{ color: DIM, fontWeight: 500 }}> · {usage.billing.period}</span> : null}</div>
+          {(() => {
+            const bl = usage?.billing, free = bl?.free_remaining_today
+            const $ = (m?: number) => m == null ? '—' : `${(m / 1e6).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`
+            const n = (v?: number) => v == null ? '—' : v.toLocaleString('fr-FR')
+            const gb = (v?: number) => v == null ? '—' : `${(v / 1e9).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go`
+            const capPct = bl?.cap_micros ? Math.max(0, Math.min(100, (((bl.spent_micros ?? 0) + (bl.reserved_micros ?? 0)) / bl.cap_micros) * 100)) : null
+            const used = (b?: { used?: number; budget?: number | null; remaining?: number | null; unlimited?: boolean }) => !b ? '—' : b.unlimited || b.budget == null ? `${n(b.used)} utilisées` : `${n(b.remaining ?? (b.budget - (b.used ?? 0)))} / ${n(b.budget)}`
+            const box = (label: string, big: string, small?: string, pct?: number | null) => (
+              <div key={label} style={{ ...card, margin: 0 }}>
+                <div style={{ fontSize: 12, color: MUTED }}>{label}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: pct != null && pct > 85 ? '#F87171' : INK, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{big}</div>
+                {small && <div style={{ fontSize: 11.5, color: DIM, marginTop: 2 }}>{small}</div>}
+                {pct != null && <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', background: pct > 85 ? '#F87171' : GOLD }} /></div>}
+              </div>
+            )
+            if (!usage) return <div style={{ ...card, color: MUTED, fontSize: 12.5 }}>Crédits indisponibles pour le moment.</div>
+            return (<>
+              <div style={grid}>
+                {bl && box('💳 Dépensé ce mois', $(bl.spent_micros), `plafond ${$(bl.cap_micros)}${bl.reserved_micros ? ` · ${$(bl.reserved_micros)} réservés` : ''}${bl.resets_at ? ` · repart le ${new Date(bl.resets_at).toLocaleDateString('fr-FR')}` : ''}`, capPct)}
+                {free && box('⚡ Actions gratuites restantes', n(free.actions), 'aujourd’hui')}
+                {free && box('🎞 Images gratuites restantes', n(free.frames), 'captures + vidéo en direct, aujourd’hui')}
+                {free && box('⬆ Envois gratuits restants', gb(free.upload_bytes), 'aujourd’hui')}
+                {(() => {
+                  // Jetons : l'API iRemoTech ne donne pas le solde → warm-ups lancés via l'API ce mois-ci (ce qui consomme les jetons)
+                  const m0 = new Date(); m0.setDate(1); m0.setHours(0, 0, 0, 0)
+                  const wu = Object.values(irtJobs).flat().filter(j => j.type === 'warm_up' && j.status === 'completed' && Date.parse(j.created_at) >= m0.getTime())
+                  const sec = wu.reduce((t, j) => t + (Number(j.result?.session_duration_s) || 0), 0)
+                  return box('🪙 Warm-ups (jetons) ce mois', String(wu.length), `${Math.round(sec / 60)} min de session · solde de jetons : voir le tableau de bord iRemoTech (pas dans l’API)`)
+                })()}
+              </div>
+              <div style={{ fontSize: 12, color: DIM, margin: '-6px 0 18px' }}>
+                Utilisé aujourd’hui : {used(usage.actions)} actions · {used(usage.snapshots)} captures · {used(usage.active_minutes)} minutes · {used(usage.uploads)} envois{usage.resets_at ? ` · compteurs remis à zéro à ${new Date(usage.resets_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+              </div>
+            </>)
+          })()}
           <div style={{ fontSize: 13, fontWeight: 700, color: INK, margin: '4px 0 10px' }}>iPhones et comptes</div>
           <div style={grid}>
             {stat('iPhones en ligne', `${onlineN} / ${devices.length}`, 'phones')}

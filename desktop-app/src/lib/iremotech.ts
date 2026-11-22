@@ -33,10 +33,13 @@ export const isDeviceOn = (d: IrtDevice): boolean => {
 }
 /** Nom affiché : celui donné dans iRemoTech (custom_name), sinon le nom de l'appareil. */
 export const deviceLabel = (d: IrtDevice): string => d.custom_name || d.name || d.public_id
-export interface IrtBudget { used?: number; budget?: number; remaining?: number }
+export interface IrtBudget { used?: number; budget?: number | null; remaining?: number | null; unlimited?: boolean }
 export interface IrtUsage {
   active_minutes?: IrtBudget; actions?: IrtBudget; snapshots?: IrtBudget; uploads?: IrtBudget
-  max_active_devices?: number; resets_at?: string
+  max_active_devices?: number; devices?: number; resets_at?: string
+  // facturation : plafond du mois (micro-dollars), dépensé, et gratuit restant aujourd'hui
+  billing?: { period?: string; resets_at?: string; cap_micros?: number; spent_micros?: number; reserved_micros?: number
+    free_remaining_today?: { actions?: number; frames?: number; upload_bytes?: number } }
   // compat ancien affichage
   used?: number; budget?: number; remaining?: number
 }
