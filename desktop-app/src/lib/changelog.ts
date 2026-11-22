@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22r',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : ouverture d’Instagram vérifiée', en: 'iRemoTech: Instagram opening verified' },
+    items: {
+      fr: ['Si une autre app s’ouvre à la place d’Instagram (ex. Apple Music), le moteur revient à l’accueil, réétalonne le toucher et réessaie.'],
+      en: ['If another app opens instead of Instagram (e.g. Apple Music), the engine goes back home, recalibrates touch and tries again.'],
+    },
+  },
+  {
     id: '2026-11-22q',
     date: '2026-11-22',
     title: { fr: 'Descriptions IA : plus de réponse vide', en: 'AI captions: no more empty answers' },

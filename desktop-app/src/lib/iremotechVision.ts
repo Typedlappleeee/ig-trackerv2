@@ -605,7 +605,26 @@ async function tapAppIcon(
 async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
   // UNIQUEMENT par son NOM (libellé sous l'icône), lu de façon tolérante (« lnstagram »,
   // « Instagrarn », « Insta » « gram »…). Pas de repérage au logo : il tapait parfois ailleurs.
-  return tapAppIcon(key, deviceId, isInstagramText, 'Instagram', hooks)
+  // Puis VÉRIFIÉ : si une autre app s'est ouverte (vu en vrai : Apple Music), retour à l'accueil et nouvel essai.
+  for (let k = 0; k < 2; k++) {
+    if (!await tapAppIcon(key, deviceId, isInstagramText, 'Instagram', hooks)) return false
+    await sleep(3200)
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr || !otherAppOpened(scr.words)) return true
+    hooks?.log?.('   ⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai')
+    await sendAction(key, deviceId, { type: 'press', name: 'home' })
+    await sleep(1800)
+    await recalibrateTouch(key, deviceId, hooks) // un tap décalé (étalonnage iRemoTech) est la cause la plus probable
+  }
+  return false
+}
+/** Une autre app qu'Instagram est ouverte (Apple Music, Réglages, Photos…) : pas d'indice d'Instagram ni du
+ *  sélecteur Crane, et des mots typiques d'autres apps. Pure. */
+export function otherAppOpened(words: { text: string }[]): boolean {
+  const t = new Set(words.map(o => o.text.toLowerCase().replace(/[^a-z]/g, '')))
+  const ig = ['instagram', 'foryou', 'following', 'reels', 'posts', 'followers', 'default', 'join', 'started', 'login', 'create', 'yourstory', 'story', 'select', 'container'].some(w => t.has(w))
+  if (ig) return false
+  return ['listennow', 'listen', 'radio', 'browse', 'library', 'applemusic', 'songs', 'albums', 'playlists', 'settings', 'general', 'albums', 'memories', 'wifi'].some(w => t.has(w))
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────

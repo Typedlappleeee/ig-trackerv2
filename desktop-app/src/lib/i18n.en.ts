@@ -316,6 +316,7 @@ export const EN: Dict = {
     "alerte iOS « utiliser votre position » → Don’t Allow": "iOS “use your location” alert → Don’t Allow",
     "fenêtre Instagram → OK": "Instagram sheet → OK",
     "📍 2e essai de localisation…": "📍 2nd location attempt…",
+    "⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai": "⚠ another app opened instead of Instagram → back to home, new try",
     "✋ Sticker non lu → glissement depuis le centre vers le bas-droite…": "✋ Sticker not read → dragging from the center to the bottom right…",
     "📍 Sticker lien en bas à droite.": "📍 Link sticker at the bottom right.",
     "(position du sticker non confirmée par la lecture — on continue)": "(sticker position not confirmed by reading — continuing)",

@@ -84,3 +84,14 @@ describe('localisation et accueil iOS', () => {
     expect(isTodayView([{ text: 'Instagram' }, { text: 'Weather' }])).toBe(false)
   })
 })
+
+import { otherAppOpened } from './iremotechVision'
+describe('ouverture d’Instagram vérifiée', () => {
+  it('Apple Music ouverte par erreur → détectée', () => {
+    expect(otherAppOpened(['Listen', 'Now', 'Browse', 'Radio', 'Library'].map(text => ({ text })))).toBe(true)
+  })
+  it('Instagram ou sélecteur Crane → OK', () => {
+    expect(otherAppOpened(['For', 'you', 'Your', 'story'].map(text => ({ text })))).toBe(false)
+    expect(otherAppOpened(['Select', 'Container', 'Default', '1'].map(text => ({ text })))).toBe(false)
+  })
+})
