@@ -39,3 +39,13 @@ describe('sélecteur Crane — jamais sans « Default »', () => {
     expect(cranePickerNames(['0'])).toEqual([])
   })
 })
+
+import { isJunkUsername } from './irtAccounts'
+describe('faux comptes lus sous un compte', () => {
+  it('« 3 likes » / « 2 follows » coupés → jamais un compte ; vrais comptes gardés', () => {
+    expect(isJunkUsername('@3likes')).toBe(true)
+    expect(isJunkUsername('2follows')).toBe(true)
+    expect(isJunkUsername('miley34487')).toBe(false)
+    expect(isJunkUsername('likesarah')).toBe(false)
+  })
+})

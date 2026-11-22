@@ -26,7 +26,10 @@ export function healthOf(state: Record<string, unknown> | null | undefined): Hea
 /** Faux comptes = lignes secondaires lues sous un compte dans Instagram (« • 1 notification », « 3 likes and
  *  4 more », « 1 follow and 4 more », « 2 new messages »…) → jamais des comptes. */
 export function isJunkUsername(u: string): boolean {
-  return /notification|likes?and|follows?and|commentsand|andmore$|messages?$|newposts?$|unread/.test(u.replace(/^@/, '').toLowerCase().replace(/[^a-z0-9._]/g, ''))
+  const t = u.replace(/^@/, '').toLowerCase().replace(/[^a-z0-9._]/g, '')
+  // « 3 likes », « 2 follows »… lus sans la suite (« and 4 more ») : chiffre + mot de notification = jamais un compte
+  if (/^\d+(likes?|follows?|comments?|notifications?|messages?|mentions?|replies|reply)$/.test(t)) return true
+  return /notification|likes?and|follows?and|commentsand|andmore$|messages?$|newposts?$|unread/.test(t)
 }
 
 const pending = (j: IrtJob) => j.status === 'queued' || j.status === 'dispatched'
