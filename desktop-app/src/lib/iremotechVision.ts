@@ -864,18 +864,19 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
   //    dans la 1re case en 3 comme en 4 colonnes). Sans repère, on garde la pré-sélection d'Instagram.
   // La vidéo la plus récente = 1re vignette portant une DURÉE (« 0:06 ») sous « Récents » : sur un iPhone normal
   // la 1re case est l'APPAREIL PHOTO (la taper ouvrait la caméra).
-  const rec = await findWordPoint(key, deviceId, [/^recents?$/i, /^r[ée]cents?$/i], hooks, { minY: 0.25, maxY: 0.85, tries: 2 })
-  const gshot = rec ? await snapshot(key, deviceId) : null
-  const durs = gshot && rec ? (await ocrWords(gshot, '0123456789:', { threshold: null, scale: 2, psms: ['11'] })).filter(o => /^\d{1,2}:\d{2}$/.test(o.text) && o.cy > rec.y) : []
-  const first = durs.sort((a, b) => (Math.abs(a.cy - b.cy) < 20 ? a.cx - b.cx : a.cy - b.cy))[0]
-  // la plus récente est dans les 2 premières colonnes (après l'éventuelle case appareil photo) : une durée lue plus à
-  // droite = celle de la 1re vignette a été ratée par l'OCR → on ne tape pas (sinon on choisirait une vidéo PLUS ANCIENNE)
-  if (first && first.cx <= W * 0.5) {
-    const x = Math.max(8, first.cx - Math.round(W / 16)), y = first.cy - Math.round(W / 10)
-    hooks?.log?.(`🎞️ Dernière vidéo (1re vignette avec durée ${first.text}) → tap (${x}, ${y})`)
-    await sendAction(key, deviceId, { type: 'tap', x, y })
-    await sleep(1500)
-  } else hooks?.log?.('   1re vignette non lue → vidéo pré-sélectionnée par Instagram (la plus récente)')
+  // La plus récente = la case juste APRÈS l'appareil photo (1re case), choisie par POSITION et toujours tapée :
+  // la pré-sélection d'Instagram reprend parfois une ANCIENNE vidéo (vu en vrai le 22/11/2026 : 0:06 au lieu de 0:14).
+  const rec = await findWordPoint(key, deviceId, [/^recents?$/i, /^r[ée]cents?$/i], hooks, { minY: 0.25, maxY: 0.85, tries: 3 })
+  if (!rec) { hooks?.log?.('❌ grille « Recents » introuvable → rien n’est publié'); return false }
+  const gridTop = rec.y + Math.round(0.076 * W)
+  const gshot = await snapshot(key, deviceId)
+  const cw = W / GRID_COLS
+  const camera = gshot ? (await meanLuma(gshot, 0.03, (gridTop + cw * 0.15) / H, 0.22, (gridTop + cw * 0.85) / H)) < 60 : true
+  const cell = camera ? 1 : 0
+  const pt = gridCellPoint(cell, gridTop, W)
+  hooks?.log?.(`🎞️ Vidéo la plus récente (${camera ? 'case après l’appareil photo' : '1re case'}) → tap (${pt.x}, ${pt.y})`)
+  await sendAction(key, deviceId, { type: 'tap', x: pt.x, y: pt.y })
+  await sleep(1800)
   return finishPostFromGallery(key, deviceId, W, H, A, caption, hooks, 'Vidéo publiée (POST)', false, location)
 }
 

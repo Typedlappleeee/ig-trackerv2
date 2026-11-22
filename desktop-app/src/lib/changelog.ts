@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22m',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : toujours la dernière vidéo envoyée', en: 'iRemoTech: always the last video sent' },
+    items: {
+      fr: ['Corrigé : un Reel pouvait partir avec une ancienne vidéo (la pré-sélection d’Instagram). Le moteur tape maintenant toujours la case juste après l’appareil photo = la vidéo qu’on vient d’envoyer.'],
+      en: ['Fixed: a Reel could go out with an old video (Instagram’s pre-selection). The engine now always taps the cell right after the camera = the video just sent.'],
+    },
+  },
+  {
     id: '2026-11-22l',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : Setup compte (photo de profil + bio) et Story CTA à usage unique', en: 'iRemoTech: Account setup (profile picture + bio) and single-use CTA Story' },
