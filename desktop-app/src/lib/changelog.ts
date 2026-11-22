@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22o',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : session sans sortir d’Instagram, localisation fiabilisée', en: 'iRemoTech: session without leaving Instagram, more reliable location' },
+    items: {
+      fr: [
+        'Entre deux posts d’un même compte : plus de sortie d’Instagram, de mode avion ni de réouverture — le scroll démarre directement après le post.',
+        'Localisation : alerte iOS « utiliser votre position » refusée automatiquement, fenêtres Instagram fermées, champ « Search » retrouvé même mal lu, et 2e essai si besoin.',
+        'Ouverture d’Instagram : le moteur sort aussi de la page des widgets.',
+      ],
+      en: [
+        'Between two posts of the same account: no more leaving Instagram, airplane mode or reopening — scrolling starts right after the post.',
+        'Location: iOS “use your location” alert declined automatically, Instagram sheets closed, “Search” field found even when misread, and a 2nd attempt if needed.',
+        'Opening Instagram: the engine also leaves the widgets page.',
+      ],
+    },
+  },
+  {
     id: '2026-11-22n',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : session = posts par compte', en: 'iRemoTech: session = posts per account' },

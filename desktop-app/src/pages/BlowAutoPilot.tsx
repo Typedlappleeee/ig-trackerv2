@@ -598,15 +598,22 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       let acDone = false
       try { acDone = localStorage.getItem(acKey) === '1' } catch { /* ignore */ }
       if (!acDone && await disableAutoCorrect(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })) { try { localStorage.setItem(acKey, '1') } catch { /* ignore */ } }
+      let stayedIn: string | null = null // compte resté ouvert dans Instagram après son post (session)
       for (const [ji, job] of p.jobs.entries()) {
         if (R.isCancelled()) break
         push(`\n${tag} 📦 container « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
-        if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
-        // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
-        if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
-        const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
-        if (!ok) { push(`${tag} ⏭ container « ${job.container} » non atteint → suivant`); R.tick(false); continue }
-        await sleep(1200)
+        // Même compte que le post d'avant (session) : on est encore dans Instagram → ni mode avion, ni réouverture
+        const sameAcct = stayedIn === job.container
+        if (!sameAcct) {
+          if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
+          // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
+          if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
+          const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
+          if (!ok) { push(`${tag} ⏭ container « ${job.container} » non atteint → suivant`); R.tick(false); stayedIn = null; continue }
+          await sleep(1200)
+        }
+        stayedIn = null
+        const nextSame = p.jobs[ji + 1]?.container === job.container
         // Entre deux posts : au moins `gapMin` min, passées à scroller sur CE compte (activité naturelle avant de poster)
         if (ji > 0) {
           const ms = gapMin * 60_000 * (1 + Math.random() * 0.3)
@@ -642,8 +649,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const posted = kind === 'story'
           ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, vh)
           : kind === 'carousel'
-            ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic, location: job.location }, vh)
-            : await postReelByVision(key, p.dev, { caption: job.caption, location: job.location }, vh)
+            ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic, location: job.location, stay: nextSame }, vh)
+            : await postReelByVision(key, p.dev, { caption: job.caption, location: job.location, stay: nextSame }, vh)
+        if (posted && nextSame && kind !== 'story') stayedIn = job.container
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
         if (posted) for (const v of job.vids) void bumpUsed(v.id)
         // Story CTA à usage unique : la photo publiée est retirée de la Banque (elle ne resservira jamais)

@@ -72,3 +72,15 @@ describe('page de partage', () => {
     expect(sharePageShown([{ text: 'New', cx: 180, cy: 30 }, { text: 'reel', cx: 220, cy: 30 }], 406, 720)).toBe(true)
   })
 })
+
+import { locationAlertDontAllow, isTodayView } from './iremotechVision'
+describe('localisation et accueil iOS', () => {
+  it('alerte « Allow Instagram to use your location? » → Don’t Allow', () => {
+    const w = [{ text: 'Allow', cx: 100, cy: 300 }, { text: 'location?', cx: 250, cy: 300 }, { text: 'Allow', cx: 200, cy: 420 }, { text: 'Once', cx: 240, cy: 420 }, { text: "Don't", cx: 180, cy: 520 }, { text: 'Allow', cx: 230, cy: 520 }]
+    expect(locationAlertDontAllow(w)).toEqual({ x: 205, y: 520 })
+  })
+  it('page des widgets reconnue', () => {
+    expect(isTodayView([{ text: 'Photos' }, { text: 'will' }, { text: 'appear' }])).toBe(true)
+    expect(isTodayView([{ text: 'Instagram' }, { text: 'Weather' }])).toBe(false)
+  })
+})
