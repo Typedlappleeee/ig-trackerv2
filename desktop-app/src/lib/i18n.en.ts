@@ -247,7 +247,7 @@ export const EN: Dict = {
     "envois": "uploads",
     "Remise à zéro des quotas": "Quota reset",
     "⏱ Session": "⏱ Session",
-    "Posts max par iPhone": "Max posts per iPhone",
+    "Posts par compte": "Posts per account",
     "Minutes entre 2 posts (min 1)": "Minutes between 2 posts (min 1)",
     "📱 Scroller pendant la pause": "📱 Scroll during the pause",
     "(activité naturelle sur le compte avant son post, évite le flag robot)": "(natural activity on the account before its post, avoids the bot flag)",

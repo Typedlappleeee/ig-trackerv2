@@ -523,6 +523,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     let pool: VidRef[] = kind === 'story' ? storyPool : kind === 'carousel' ? photoPool : reelPool
     const isImg = kind !== 'reel'
     const perPost = kind === 'carousel' ? carCount : 1
+    const perAcct = kind === 'story' ? 1 : sessMax // posts par compte (session) ; une seule Story CTA par compte
     if (totalJobs === 0) { setLogs(['⚠ Sélectionne au moins un container (onglet Téléphones).']); return }
     if (src.mode === 'folder' && !src.folder) { setLogs(['⚠ Choisis un dossier de la Banque.']); return }
     if (src.mode === 'pick' && pool.length === 0) { setLogs([`⚠ Ajoute au moins ${isImg ? 'une photo' : 'une vidéo'} au pool.`]); return }
@@ -551,7 +552,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     // Chaque compte a son marché (FR / US / DE) → descriptions générées par marché, puis distribuées compte par compte.
     const aiCaps: Record<Market, string[]> = { fr: [], us: [], de: [] }
     if (kind !== 'story' && capMode === 'ai') {
-      const need = countByMarket([...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => marketOf(dev, c))), capMarket)
+      const need = countByMarket([...sel].flatMap(dev => [...(selConts[dev] ?? [])].flatMap(c => Array.from({ length: perAcct }, () => marketOf(dev, c)))), capMarket)
       for (const m of MARKETS.map(x => x.k)) {
         if (!need[m]) continue
         const label = MARKETS.find(x => x.k === m)?.label ?? m
@@ -579,12 +580,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const byPhone = [...sel].map(dev => ({
       dev,
       name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(),
-      jobs: [...(selConts[dev] ?? [])].map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(marketOf(dev, container)) : undefined, link: storyLinks[linkKey(dev, container)] || storyLink.trim() } }),
+      // Session = N posts PAR COMPTE (chaque compte coché publie N fois d'affilée, scroll entre deux posts)
+      jobs: [...(selConts[dev] ?? [])].flatMap(container => Array.from({ length: perAcct }, () => container)).map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(marketOf(dev, container)) : undefined, link: storyLinks[linkKey(dev, container)] || storyLink.trim() } }),
     })).filter(p => p.jobs.length)
 
     push(`▶ ${kind === 'story' ? 'Story' : kind === 'carousel' ? `Carrousel (${perPost} photos)` : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
     if (src.mode === 'folder') push(isImg ? `📁 « ${src.folder} » : ${pool.length} photo(s)` : `📁 « ${src.folder} » : ${pool.length} vidéo(s)`)
-    const R = startRun('farm', `iRemoTech ${kind} · ${byPhone.length} tel × ${totalJobs}`, totalJobs)
+    const R = startRun('farm', `iRemoTech ${kind} · ${byPhone.length} tel × ${totalJobs * perAcct}`, totalJobs * perAcct)
     setRunId(R.id)
 
     const runPhone = async (p: typeof byPhone[number]) => {
@@ -596,9 +598,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       let acDone = false
       try { acDone = localStorage.getItem(acKey) === '1' } catch { /* ignore */ }
       if (!acDone && await disableAutoCorrect(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })) { try { localStorage.setItem(acKey, '1') } catch { /* ignore */ } }
-      const sess = p.jobs.slice(0, sessMax)
-      if (p.jobs.length > sess.length) push(`${tag} ⏭ session limitée à ${sessMax} post(s) : ${p.jobs.length - sess.length} compte(s) non publiés cette fois`)
-      for (const [ji, job] of sess.entries()) {
+      for (const [ji, job] of p.jobs.entries()) {
         if (R.isCancelled()) break
         push(`\n${tag} 📦 container « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
         if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
@@ -1377,7 +1377,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         </div>
         <div style={{ ...card, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: INK }}>⏱ Session</span>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>Posts max par iPhone
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>Posts par compte
             <input type="number" min={1} max={50} value={sessMax} disabled={running} onChange={e => { const v = Math.max(1, Math.min(50, Number(e.target.value) || 1)); setSessMax(v); try { localStorage.setItem('sf-irt-sess-max', String(v)) } catch { /* noop */ } }} style={{ width: 56, height: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#0D0D0F', color: INK, textAlign: 'center' }} />
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: MUTED }}>Minutes entre 2 posts (min 1)
@@ -1388,7 +1388,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             📱 Scroller pendant la pause <span style={{ color: DIM, fontSize: 11.5 }}>(activité naturelle sur le compte avant son post, évite le flag robot)</span>
           </label>
         </div>
-        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} ${postType === 'carousel' ? `carrousel${totalJobs > 1 ? 's' : ''} de ${carCount} photos` : `Reel${totalJobs > 1 ? 's' : ''}`} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={postType === 'carousel' ? `Lancer ${totalJobs} carrousel(s)` : `Lancer ${totalJobs} Reel(s)`} disabled={!totalJobs || (postType === 'carousel' ? (photoSrc.mode === 'folder' ? !photoSrc.folder : photoPool.length < carCount) : (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length)) || running} running={running} onClick={() => run(postType === 'carousel' ? 'carousel' : 'reel')} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} ${postType === 'carousel' ? `carrousel${totalJobs > 1 ? 's' : ''} de ${carCount} photos` : `Reel${totalJobs > 1 ? 's' : ''}`} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={postType === 'carousel' ? `Lancer ${totalJobs * sessMax} carrousel(s)` : `Lancer ${totalJobs * sessMax} Reel(s)`} disabled={!totalJobs || (postType === 'carousel' ? (photoSrc.mode === 'folder' ? !photoSrc.folder : photoPool.length < carCount) : (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length)) || running} running={running} onClick={() => run(postType === 'carousel' ? 'carousel' : 'reel')} />
         <LogPanel />
       </>)}
 

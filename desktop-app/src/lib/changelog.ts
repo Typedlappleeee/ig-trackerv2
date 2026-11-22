@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-22n',
+    date: '2026-11-22',
+    title: { fr: 'iRemoTech : session = posts par compte', en: 'iRemoTech: session = posts per account' },
+    items: {
+      fr: ['« Posts par compte » : chaque compte coché publie N fois d’affilée (vidéo, description et lieu différents à chaque fois), avec le scroll entre deux posts — même s’il est seul sur son iPhone.'],
+      en: ['“Posts per account”: each ticked account posts N times in a row (different video, caption and place each time), with scrolling between two posts — even if it is alone on its iPhone.'],
+    },
+  },
+  {
     id: '2026-11-22m',
     date: '2026-11-22',
     title: { fr: 'iRemoTech : toujours la dernière vidéo envoyée', en: 'iRemoTech: always the last video sent' },
