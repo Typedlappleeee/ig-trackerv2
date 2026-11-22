@@ -2261,6 +2261,13 @@ export function sortContainerNames(names: Iterable<string>): string[] {
   return l.sort((a, b) => a === 'Default' ? -1 : b === 'Default' ? 1 : Number(a) - Number(b))
 }
 
+/** Noms du sélecteur Crane, seulement s'il y a la ligne « Default » (toujours présente dans le vrai sélecteur).
+ *  Sans elle, ce sont des chiffres d'Instagram (compteurs du profil, « 1 » d'une photo, pastilles…) : un iPhone
+ *  normal était alors pris pour un jailbreak avec de faux containers. Pure. */
+export function cranePickerNames(names: string[]): string[] {
+  return names.some(n => /^default$/i.test(n)) ? sortContainerNames(names) : []
+}
+
 /** DÉTECTION des containers Crane d'un iPhone : ouvre le sélecteur (tap sur l'icône Instagram), lit tous
  *  les noms visibles SANS faire défiler (un balayage ouvrirait un container), puis referme (accueil).
  *  null = sélecteur introuvable. */
@@ -2279,7 +2286,7 @@ export async function detectContainersByVision(key: string, deviceId: string, ho
     if (!shot) continue
     const { w: W, h: H } = await imgSize(shot)
     const rows = pickerRows(await ocrWords(shot, '0123456789Defaultefaul'), W, H)
-    for (const r of sortContainerNames(rows.map(o => o.text))) found.add(r)
+    for (const r of cranePickerNames(rows.map(o => o.text))) found.add(r)
     // feuille qui monte jusqu'en haut de l'écran = plus de containers qu'il n'en tient à l'écran
     if (rows.length && Math.min(...rows.map(o => o.cy)) < H * 0.2) overflow = true
   }

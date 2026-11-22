@@ -19,10 +19,12 @@ export const CHANGELOG: ChangelogEntry[] = [
       fr: [
         'Un iPhone n’est marqué « Jailbreak » que si le sélecteur de containers Crane a vraiment été lu. Une liste douteuse (ancienne détection, saisie à la main) affiche « ❓ À vérifier » : clique ↻ pour relire l’iPhone.',
         'Les comptes déjà lus par iRemoTech (lecture des comptes du tableau de bord) deviennent automatiquement les comptes de l’iPhone, avec leur statut, sans détection à l’écran.',
+        'Corrigé : la détection des containers prenait des chiffres d’Instagram (compteurs, pastilles) pour des containers sur un iPhone normal. Elle exige maintenant la ligne « Default » du vrai sélecteur Crane.',
       ],
       en: [
         'An iPhone is marked “Jailbreak” only if the Crane container picker was really read. A doubtful list (old detection, typed by hand) shows “❓ To check”: click ↻ to re-read the iPhone.',
         'Accounts already read by iRemoTech (dashboard account scan) automatically become the iPhone’s accounts, with their status, without on-screen detection.',
+        'Fixed: container detection took Instagram numbers (counters, badges) for containers on a regular iPhone. It now requires the “Default” row of the real Crane picker.',
       ],
     },
   },

@@ -27,3 +27,15 @@ describe('comptes repris d’iRemoTech (list_accounts)', () => {
     expect(irtScannedAccounts(jobs)).toEqual(['thrideamaz', 'kittyisgd'])
   })
 })
+
+import { cranePickerNames } from './iremotechVision'
+vi.mock('./iremotech', () => ({ snapshot: vi.fn(), sendAction: vi.fn(), deviceIp: vi.fn() }))
+describe('sélecteur Crane — jamais sans « Default »', () => {
+  it('vrai sélecteur → containers triés', () => {
+    expect(cranePickerNames(['3', 'Default', '1'])).toEqual(['Default', '1', '3'])
+  })
+  it('chiffres d’Instagram sur un iPhone normal (compteurs, « 1 » d’une photo) → rien', () => {
+    expect(cranePickerNames(['1', '2'])).toEqual([])
+    expect(cranePickerNames(['0'])).toEqual([])
+  })
+})
