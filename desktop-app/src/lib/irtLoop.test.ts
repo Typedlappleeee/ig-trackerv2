@@ -101,3 +101,12 @@ describe('Apple Music « What’s New » reconnue', () => {
     expect(otherAppOpened(["What's", 'New', 'in', 'Apple', 'Music', 'AutoMix', 'Continue'].map(text => ({ text })))).toBe(true)
   })
 })
+
+import { stillAirplane } from './iremotechVision'
+describe('mode avion resté actif', () => {
+  it('barre d’état sans opérateur → encore en mode avion ; « SOCIAL LIKE » / « Searching » → réseau', () => {
+    expect(stillAirplane([{ text: '9:36', cx: 203, cy: 11 }], 406, 720)).toBe(true)
+    expect(stillAirplane([{ text: 'SOCIAL', cx: 53, cy: 11 }, { text: '9:36', cx: 203, cy: 11 }], 406, 720)).toBe(false)
+    expect(stillAirplane([{ text: 'Searching', cx: 60, cy: 11 }], 406, 720)).toBe(false)
+  })
+})

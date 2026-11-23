@@ -56,6 +56,12 @@ export async function recalibrateTouch(key: string, deviceId: string, hooks?: Vi
 
 /** Nouvelle IP : mode avion par l'action NATIVE d'iRemoTech (avion ON → attente → OFF), avec lecture de
  *  l'IP avant/après (`device_ip`). Si l'action native est refusée, repli sur le Centre de contrôle (vision). */
+/** Mode avion encore actif : aucun texte d'opérateur / réseau dans la barre d'état à gauche (hors heure). Pure. */
+export function stillAirplane(words: { text: string; cx: number; cy: number }[], W: number, H: number): boolean {
+  const left = words.filter(o => o.cy < H * 0.035 && o.cx < W * 0.42 && /[a-z]{2,}/i.test(o.text) && !/^\d/.test(o.text))
+  return left.length === 0
+}
+
 export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
   // `device_ip` passe par le raccourci iOS « iRemotech » (souvent null) et chaque appel compte dans la limite
   // de débit : un appel avant, et on ne relit après que si la 1re lecture a marché.
@@ -76,6 +82,16 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
     hooks?.log?.('✈️ Mode avion OFF, attente du réseau…')
     await sleep(8000)
     await allowShortcutPrompt(key, deviceId, hooks)
+    // VÉRIFIÉ à l'écran : iRemoTech accepte l'ordre mais le raccourci iOS ne s'exécute pas toujours (vu en vrai :
+    // iPhone resté en mode avion → publications en échec). En mode avion, la barre d'état n'affiche AUCUN texte
+    // d'opérateur à gauche (seulement ✈) ; on renvoie OFF jusqu'à 3 fois tant que c'est le cas.
+    for (let k = 0; k < 3; k++) {
+      const scr = await readScreenWords(key, deviceId)
+      if (!scr || !stillAirplane(scr.words, scr.W, scr.H)) break
+      hooks?.log?.(`   ⚠ toujours en mode avion (barre d’état vide) → OFF renvoyé (${k + 1}/3)`)
+      await sendWithRetry(key, deviceId, { type: 'airplane', on: false }, 3)
+      await sleep(9000)
+    }
     // réseau mobile revenu ? (« No Service » / « SOS » dans la barre d'état) — jusqu'à ~40 s
     for (let k = 0; k < 8; k++) {
       const scr = await readScreenWords(key, deviceId)

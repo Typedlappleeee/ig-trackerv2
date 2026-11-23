@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-23a',
+    date: '2026-11-23',
+    title: { fr: 'iRemoTech : plus d’iPhone bloqué en mode avion', en: 'iRemoTech: no more iPhone stuck in airplane mode' },
+    items: {
+      fr: ['Après le changement d’IP, le moteur vérifie à l’écran que le mode avion est vraiment coupé (opérateur visible dans la barre d’état) et renvoie l’ordre sinon. Un iPhone resté en mode avion faisait échouer les publications.'],
+      en: ['After the IP change, the engine checks on screen that airplane mode is really off (carrier visible in the status bar) and resends the command otherwise. An iPhone left in airplane mode made posts fail.'],
+    },
+  },
+  {
     id: '2026-11-22t',
     date: '2026-11-22',
     title: { fr: 'Téléchargeur Insta : Reels et photos séparés', en: 'Insta downloader: Reels and photos separated' },
