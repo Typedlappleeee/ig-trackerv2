@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-23b',
+    date: '2026-11-23',
+    title: { fr: 'iRemoTech : journaux des lancements gardés', en: 'iRemoTech: run logs kept' },
+    items: {
+      fr: ['Chaque lancement garde son journal complet (20 derniers, même après rafraîchissement) : « 📜 Journaux des lancements précédents » pour savoir pourquoi un post a échoué, et « 📋 Copier le journal » pour l’envoyer.'],
+      en: ['Each run keeps its full log (last 20, even after a refresh): “📜 Logs of previous runs” to see why a post failed, and “📋 Copy log” to send it.'],
+    },
+  },
+  {
     id: '2026-11-23a',
     date: '2026-11-23',
     title: { fr: 'iRemoTech : plus d’iPhone bloqué en mode avion', en: 'iRemoTech: no more iPhone stuck in airplane mode' },

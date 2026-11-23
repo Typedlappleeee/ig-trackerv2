@@ -151,6 +151,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [capBusy, setCapBusy] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState('')
+  // Journaux des lancements : gardés dans le navigateur (20 derniers) pour savoir APRÈS COUP pourquoi un post a échoué
+  const [runHistory, setRunHistory] = useState<{ at: number; title: string; logs: string[] }[]>(() => { try { return JSON.parse(localStorage.getItem('sf-irt-run-logs') ?? '[]') } catch { return [] } })
+  const wasRunning = useRef(false)
   // localisation selon le marché du compte (une grande ville du pays, au hasard) sur les Reels / carrousels
   // Session de publication par iPhone : N posts max, et au moins X min entre deux posts passées à scroller
   // (enchaîner les posts sans activité = comportement de robot)
@@ -1061,8 +1064,25 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   )
 
   // Progression : une ligne par iPhone/container (statut + dernière étape), journal détaillé repliable.
+  // fin d'un lancement → journal complet enregistré (titre = 1re ligne utile)
+  useEffect(() => {
+    if (wasRunning.current && !running && logs.length) {
+      const title = (logs.find(l => /^▶|^✍️|^🔍|^🔎/.test(l.trim())) ?? logs[0] ?? 'Lancement').trim().slice(0, 90)
+      const entry = { at: Date.now(), title, logs: logs.slice(-800) }
+      setRunHistory(h => { const n = [entry, ...h].slice(0, 20); try { localStorage.setItem('sf-irt-run-logs', JSON.stringify(n)) } catch { try { localStorage.setItem('sf-irt-run-logs', JSON.stringify(n.slice(0, 5))) } catch { /* plein */ } } return n })
+    }
+    wasRunning.current = running
+  }, [running]) // eslint-disable-line react-hooks/exhaustive-deps
   const LogPanel = () => {
-    if (!logs.length && !running) return null
+    if (!logs.length && !running) return runHistory.length ? (
+      <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12.5, color: MUTED }}>📜 Journaux des lancements précédents</span>
+        <select onChange={e => { const h = runHistory[Number(e.target.value)]; if (h) { setLogs(h.logs); setShowLog(true) } }} defaultValue="" style={{ ...inp, height: 30, maxWidth: 360, cursor: 'pointer' }}>
+          <option value="" disabled>Choisir un lancement…</option>
+          {runHistory.map((h, i) => <option key={h.at} value={i} style={{ background: FIELD_BG }}>{new Date(h.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {h.title}</option>)}
+        </select>
+      </div>
+    ) : null
     const rows = progressRows(logs)
     return (
       <div style={card}>
@@ -1072,6 +1092,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setShowLog(v => !v)}>{showLog ? 'Masquer le journal' : 'Journal détaillé'}</button>
             {running && runId && <button style={{ ...btn, height: 28, fontSize: 12, background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
+            {!running && <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => { try { navigator.clipboard.writeText(logs.join('\n')); toast('Journal copié : colle-le à Claude ou à l’équipe', 'ok') } catch { /* noop */ } }}>📋 Copier le journal</button>}
             {!running && <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setLogs([])}>Effacer</button>}
           </span>
         </div>
