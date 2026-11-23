@@ -110,3 +110,14 @@ describe('mode avion resté actif', () => {
     expect(stillAirplane([{ text: 'Searching', cx: 60, cy: 11 }], 406, 720)).toBe(false)
   })
 })
+
+import { classifySignup } from './iremotechVision'
+describe('profil connecté ≠ écran d’inscription', () => {
+  it('« Follow some accounts to get started » sur un profil → pas « Join »', () => {
+    const w = [{ text: 'posts', cy: 230 }, { text: 'follower', cy: 230 }, { text: 'following', cy: 230 }, { text: 'get', cy: 450 }, { text: 'started', cy: 450 }]
+    expect(classifySignup(w, 720)).toBeNull()
+  })
+  it('vrai écran « Join Instagram / Get started » → join', () => {
+    expect(classifySignup([{ text: 'Join', cy: 360 }, { text: 'Get', cy: 470 }, { text: 'started', cy: 470 }], 720)).toBe('join')
+  })
+})

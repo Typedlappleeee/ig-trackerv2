@@ -9,6 +9,11 @@ import { parseProfileCounts, saveScreenStats, parseCount } from './irtAccounts'
 import { askBrain, hasVisionBrain } from './visionBrain'
 import { findGalleryThumb, findMatchingCell } from './screenMatch'
 
+// Barre d'onglets d'Instagram : l'ancienne barre pleine largeur (Accueil 0,1 · Reels 0,3 · … · Profil 0,9 W, à 0,962 H)
+// ET la nouvelle barre FLOTTANTE arrondie (vue le 23/11/2026 sur STEVIE1 : Accueil 0,18 · Reels 0,35 · Profil 0,85 W,
+// à 0,933 H). Positions choisies pour tomber juste dans les deux.
+export const TAB = { y: 0.945, home: { x: 0.15 }, reels: { x: 0.33 }, profile: { x: 0.86 } }
+
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 function imgSize(dataUrl: string): Promise<{ w: number; h: number }> {
@@ -785,7 +790,7 @@ export function createSheetShown(words: { text: string; cy: number }[], H: numbe
  *  Renvoie 'story-gallery' si la galerie « Add to story » est ouverte (Story : on choisit le média tout de suite). */
 async function tapCreatePlus(key: string, deviceId: string, W: number, H: number, pt: { x: number; y: number }, hooks?: VisionHooks, want: 'post' | 'story' = 'post'): Promise<'story-gallery' | 'post-gallery' | 'other'> {
   const plus = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(pt.x * W), y: Math.round(pt.y * H) })
-  const home = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * W), y: Math.round(0.962 * H) })
+  const home = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(TAB.home.x * W), y: Math.round(TAB.y * H) })
   // Hors profil (fil d'actualité) : le fil garde sa position de défilement (vu en vrai : bannière « Start Survey »,
   // Reels) et le + du haut n'est plus visible → Accueil, puis 2e tap séparé qui remonte le fil tout en haut.
   const before = await readScreenWords(key, deviceId)
@@ -1126,7 +1131,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
   await dismissPopups(key, deviceId, hooks)
   if (stay) {
     // session : le compte reposte juste après → on reste dans Instagram (onglet Accueil), le scroll part d'ici
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * W), y: Math.round(0.962 * H) })
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(TAB.home.x * W), y: Math.round(TAB.y * H) })
     await sleep(1200)
     return true
   }
@@ -1274,7 +1279,7 @@ async function openEditProfile(key: string, deviceId: string, W: number, H: numb
     if (scr?.words.some(o => /^edit$/i.test(o.text) && o.cy < H * 0.08) && scr.words.some(o => /^profile$/i.test(o.text) && o.cy < H * 0.08)) return true
     const e = scr?.words.find(o => /^edit$/i.test(o.text) && o.cy < H * 0.6 && scr.words.some(p => /^profile$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
     if (e) { await tap(e.cx + 20, e.cy); await sleep(3500); continue }
-    await tap(0.9 * W, 0.962 * H) // onglet Profil
+    await tap(TAB.profile.x * W, TAB.y * H) // onglet Profil
     await sleep(2500)
   }
   const v = await readScreenWords(key, deviceId)
@@ -1540,6 +1545,8 @@ export async function rewindSignup(key: string, deviceId: string, hooks?: Vision
 /** Mots lus → étape d'inscription : « join » (Join Instagram / Get started, bas de l'écran) ou « mobile »
  *  (« What's your mobile number? » : inscription commencée puis abandonnée, container toujours vierge). */
 export function classifySignup(words: { text: string; cy: number }[], H: number): SignupStage | null {
+  // un profil connecté n'est jamais l'inscription (« Follow some accounts to get started » contient « started »)
+  if (isProfileScreen(words, H)) return null
   if (words.some(o => o.cy > H * 0.45 && /^(started|join|s.?inscrire|commencer)$/i.test(o.text.replace(/[^\p{L}']/gu, '')))) return 'join'
   const has = (re: RegExp) => words.some(o => re.test(o.text.replace(/[^\p{L}]/gu, '')))
   if (has(/^stop$/i) && has(/^creating$/i)) return 'stop'
@@ -2179,7 +2186,7 @@ export interface WarmupOpts {
 }
 export interface WarmupResult { ok: boolean; reels: number; likes: number; comments: number }
 
-const REELS_TAB = { x: 0.30, y: 0.965 } // onglet Reels = 2e icône de la barre du bas (Accueil · Reels · Messages · Recherche · Profil), vu le 22/11/2026
+const REELS_TAB = { x: TAB.reels.x, y: TAB.y } // onglet Reels = 2e icône de la barre du bas (Accueil · Reels · Messages · Recherche · Profil), vu le 22/11/2026
 const rnd = (a: number, b: number) => a + Math.random() * (b - a)
 
 export async function warmupByVision(key: string, deviceId: string, opts: WarmupOpts, hooks?: VisionHooks): Promise<WarmupResult> {
@@ -2233,7 +2240,7 @@ export async function warmupByVision(key: string, deviceId: string, opts: Warmup
   hooks?.log?.(`🏁 Warm-up terminé : ${reels} reels · ${likes} likes · ${comments} comments.`)
   if (opts.keepApp) {
     // session de posts : on reste dans Instagram, onglet Accueil (le post suivant part du fil)
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * W), y: Math.round(0.962 * H) })
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(TAB.home.x * W), y: Math.round(TAB.y * H) })
     await sleep(1800)
   } else {
     await sendAction(key, deviceId, { type: 'press', name: 'home' })
@@ -2872,7 +2879,7 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
     if (k === 0) await backToTabs(key, deviceId, hooks)
     else if (k === 1 && hasVisionBrain()) await brainBackToTabs(key, deviceId, hooks)
     else hooks?.log?.('   onglet Profil pas ouvert → nouveau tap')
-    const px = Math.round(0.9 * W), py = Math.round(0.963 * H)
+    const px = Math.round(TAB.profile.x * W), py = Math.round(TAB.y * H)
     if (k) await doubleTap(key, deviceId, px, py) // tap simple parfois ignoré ; double tap sans risque sur cet onglet
     else await sendAction(key, deviceId, { type: 'tap', x: px, y: py })
     await sleep(2500); scr = await readScreenWords(key, deviceId)
@@ -2963,14 +2970,31 @@ export async function switchAccountByVision(key: string, deviceId: string, usern
         if (counts && counts.media_count != null && counts.followers != null && counts.following != null) break
       }
       if (counts) { saveScreenStats(u, counts); hooks?.log?.(`   📊 ${counts.media_count ?? '?'} publications · ${counts.followers ?? '?'} abonnés · ${counts.following ?? '?'} abonnements`) }
-      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * scr.W), y: Math.round(0.963 * scr.H) }) // accueil d'Instagram
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(TAB.home.x * scr.W), y: Math.round(TAB.y * scr.H) }) // accueil d'Instagram
       await sleep(1500)
       return true
     }
     const x = Math.round(0.45 * scr.W) // dans la ligne, à côté du texte (un tap pile sur les lettres est parfois ignoré)
+    // SÉCURITÉ : la liste doit être ouverte JUSTE avant de taper (vu en vrai : la liste refermée, le tap tombait sur
+    // les comptes suggérés du profil et ouvrait un inconnu — un « Follow » aurait pu partir)
+    const fresh = await readScreenWords(key, deviceId)
+    if (!fresh || addAccountRowY(fresh.words) == null) { hooks?.log?.('   liste des comptes refermée → pas de tap, on la rouvre'); continue }
     hooks?.log?.(`   tap sur @${u} (ligne y=${row.cy}, coches y=${dots.map(d => d.cy).join('/') || 'aucune'})`)
     if (k) await doubleTap(key, deviceId, x, row.cy); else await sendAction(key, deviceId, { type: 'tap', x, y: row.cy })
-    await sleep(4500) // Instagram recharge le profil du compte → on rouvre la feuille pour vérifier la coche
+    await sleep(4500) // Instagram recharge le profil du compte
+    // vérifié d'abord par le NOM en haut du profil (plus fiable que la coche bleue avec la nouvelle barre d'Instagram)
+    const after = await readScreenWords(key, deviceId)
+    if (after && isProfileScreen(after.words, after.H)) {
+      const shotA = await snapRetry(key, deviceId)
+      const exactA = shotA ? await ocrWords(shotA, 'abcdefghijklmnopqrstuvwxyz0123456789._', { threshold: null, scale: 3, psms: ['11'], cropY: [0, 0.12] }) : []
+      const head = profileHeaderUsername([...exactA, ...after.words], after.W, after.H, [u])
+      if (head && sameUsername(u, head)) {
+        hooks?.log?.(`   ✓ compte actif : @${u} (nom du profil)`)
+        await sendAction(key, deviceId, { type: 'tap', x: Math.round(TAB.home.x * after.W), y: Math.round(TAB.y * after.H) }) // accueil d'Instagram
+        await sleep(1500)
+        return true
+      }
+    }
     // Compte bloqué par Instagram juste après la bascule (vu en vrai) : on n'y touche pas, compte suivant
     const blocked = await accountBlockedScreen(key, deviceId)
     if (blocked) { hooks?.log?.(`🤖 @${u} : ${blocked} → compte passé (à régler à la main)`); return false }
@@ -3016,7 +3040,7 @@ export async function containerAccountByVision(key: string, deviceId: string, co
   if (!W || !H) return { state: 'unknown' }
   // Instagram finit parfois de charger le fil après le changement de container : jusqu'à 3 taps sur Profil
   for (let k = 0; k < 3; k++) {
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.962 * H) }) // onglet Profil
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(TAB.profile.x * W), y: Math.round(TAB.y * H) }) // onglet Profil
     await sleep(2500 + k * 1500)
     const shot = await snapRetry(key, deviceId)
     if (!shot) continue
@@ -3080,7 +3104,7 @@ export async function logoutToSignupByVision(key: string, deviceId: string, hook
   const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
   hooks?.log?.('🚪 Déconnexion du compte du container (Profil › ☰ › Log out)…')
   await dismissPopups(key, deviceId, hooks)
-  await tap(0.9 * W, 0.962 * H) // onglet Profil
+  await tap(TAB.profile.x * W, TAB.y * H) // onglet Profil
   await sleep(2500)
   let scrolls = 0, menuTaps = 0, logoutTapped = false
   for (let step = 0; step < 24; step++) {
@@ -3105,7 +3129,7 @@ export async function logoutToSignupByVision(key: string, deviceId: string, hook
     if (logoutTapped) { await sleep(2000); continue } // Instagram recharge après « Log out »
     // Profil (ou autre écran d'Instagram) → menu ☰ en haut à droite
     if (menuTaps++ > 3) break
-    if (menuTaps > 1) { await tap(0.9 * W, 0.962 * H); await sleep(2000) }
+    if (menuTaps > 1) { await tap(TAB.profile.x * W, TAB.y * H); await sleep(2000) }
     await tap(0.917 * W, 0.069 * H)
     await sleep(3000)
   }

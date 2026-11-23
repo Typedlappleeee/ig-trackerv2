@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-23c',
+    date: '2026-11-23',
+    title: { fr: 'iRemoTech : nouvelle barre d’Instagram et bascule de compte sûre', en: 'iRemoTech: new Instagram bar and safe account switching' },
+    items: {
+      fr: [
+        'Compatible avec la nouvelle barre d’onglets flottante d’Instagram (l’onglet Profil n’était plus touché : « compte non atteint »). Testé sur un iPhone à 5 comptes : bascule réussie sur chacun.',
+        'Bascule vérifiée par le nom en haut du profil ; aucun tap n’est envoyé si la liste des comptes s’est refermée (un tap pouvait tomber sur un compte suggéré).',
+        'Un profil connecté n’est plus pris pour l’écran « Join Instagram ». Les journaux disent « compte » (et non « container ») sur un iPhone normal.',
+      ],
+      en: [
+        'Works with Instagram’s new floating tab bar (the Profile tab wasn’t hit anymore: “account not reached”). Tested on an iPhone with 5 accounts: switched to each one.',
+        'Switch verified by the name at the top of the profile; no tap is sent if the account list closed (a tap could land on a suggested account).',
+        'A logged-in profile is no longer mistaken for the “Join Instagram” screen. Logs say “account” (not “container”) on a regular iPhone.',
+      ],
+    },
+  },
+  {
     id: '2026-11-23b',
     date: '2026-11-23',
     title: { fr: 'iRemoTech : journaux des lancements gardés', en: 'iRemoTech: run logs kept' },

@@ -604,7 +604,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       let stayedIn: string | null = null // compte resté ouvert dans Instagram après son post (session)
       for (const [ji, job] of p.jobs.entries()) {
         if (R.isCancelled()) break
-        push(`\n${tag} 📦 container « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
+        push(`\n${tag} 📦 ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
         // Même compte que le post d'avant (session) : on est encore dans Instagram → ni mode avion, ni réouverture
         const sameAcct = stayedIn === job.container
         if (!sameAcct) {
@@ -612,7 +612,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
           if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
           const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
-          if (!ok) { push(`${tag} ⏭ container « ${job.container} » non atteint → suivant`); R.tick(false); stayedIn = null; continue }
+          if (!ok) { push(`${tag} ⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); R.tick(false); stayedIn = null; continue }
           await sleep(1200)
         }
         stayedIn = null
