@@ -5016,6 +5016,8 @@ export const EN: Dict = {
     ["{0} média(s) rangé(s) dans la Banque{1} (Reels et Photos séparés).", "{0} media saved to the Bank{1} (Reels and Photos separate)."],
     ["⚠ toujours en mode avion (barre d’état vide) → OFF renvoyé ({0}/3)", "⚠ still in airplane mode (empty status bar) → OFF sent again ({0}/3)"],
     ["✓ compte actif : @{0} (nom du profil)", "✓ active account: @{0} (profile name)"],
+    ["{0} ⏭ {1} « {2} » non atteint → suivant", "{0} ⏭ {1} “{2}” not reached → next"],
+    ["{0} 📦 {1} « {2} » · {3}", "{0} 📦 {1} “{2}” · {3}"],
     ["✋ Sticker lu en ({0}, {1}) → coin bas-droite{2}…", "✋ Sticker read at ({0}, {1}) → bottom-right corner{2}…"],
     ["(essai {0})", "(attempt {0})"],
   ],
