@@ -17,13 +17,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: { fr: 'iRemoTech : groupes, marchés et comptes plus clairs', en: 'iRemoTech: groups, markets and clearer accounts' },
     items: {
       fr: [
-        'Groupes et marché par iPhone, partagés avec toute l’équipe (onglet Téléphones), avec filtres Groupe / Marché et « Cocher ces iPhones » partout.',
+        'Groupes : bouton « ＋ Créer un groupe », menu pour mettre chaque iPhone dans un groupe (ou tous les iPhones cochés d’un coup), puis filtre par groupe dans Posting, Story, Warm-up… Marché par iPhone aussi. Tout est partagé avec l’équipe.',
         'Comptes détectés automatiquement toutes les 12 h : un compte déconnecté disparaît, 5 comptes max par iPhone.',
         'Statuts des comptes retirés (iRemoTech ne donne pas ceux du tableau de bord) : plus d’icônes rouges trompeuses.',
         'Story CTA : pool de textes CTA de l’équipe et lien CTA de chaque compte enregistré pour tous, pré-rempli à chaque Story.',
       ],
       en: [
-        'Groups and market per iPhone, shared with the whole team (Phones tab), with Group / Market filters and “Select these iPhones” everywhere.',
+        'Groups: “＋ Create a group” button, a menu to put each iPhone in a group (or all selected iPhones at once), then filter by group in Posting, Story, Warm-up… Market per iPhone too. Everything is shared with the team.',
         'Accounts detected automatically every 12 h: a logged-out account disappears, 5 accounts max per iPhone.',
         'Account statuses removed (iRemoTech doesn’t provide the dashboard ones): no more misleading red icons.',
         'Story CTA: team CTA text pool, and each account’s CTA link saved for everyone and pre-filled for every Story.',

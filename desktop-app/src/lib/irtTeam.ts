@@ -8,12 +8,13 @@ import type { Market } from './captionMarkets'
 export const TEAM_ROW = '__sf_team__'
 export interface IrtTeam {
   groups: Record<string, string>        // iPhone → nom du groupe
+  groupNames: string[]                  // groupes créés (même vides)
   markets: Record<string, Market>       // iPhone → marché
   acctMarkets: Record<string, Market>   // `${iPhone}::${cible}` → marché du compte (prioritaire sur celui de l'iPhone)
   links: Record<string, string>         // `${iPhone}::${cible}` → lien CTA du compte
   ctaTexts: string[]                    // pool de textes CTA enregistrés
 }
-export const emptyTeam = (): IrtTeam => ({ groups: {}, markets: {}, acctMarkets: {}, links: {}, ctaTexts: [] })
+export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [] })
 
 const isMarket = (v: unknown): v is Market => v === 'fr' || v === 'us' || v === 'de'
 const strMap = (v: unknown): Record<string, string> => {
@@ -26,7 +27,9 @@ const mktMap = (v: unknown): Record<string, Market> => Object.fromEntries(Object
 export function parseTeam(raw: unknown): IrtTeam {
   const o = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>
   return {
-    groups: strMap(o.groups), markets: mktMap(o.markets), acctMarkets: mktMap(o.acctMarkets), links: strMap(o.links),
+    groups: strMap(o.groups),
+    groupNames: Array.isArray(o.groupNames) ? [...new Set(o.groupNames.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean))].slice(0, 100) : [],
+    markets: mktMap(o.markets), acctMarkets: mktMap(o.acctMarkets), links: strMap(o.links),
     ctaTexts: Array.isArray(o.ctaTexts) ? [...new Set(o.ctaTexts.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean))].slice(0, 200) : [],
   }
 }
@@ -67,7 +70,7 @@ export async function updateTeam(s: Scope, change: (t: IrtTeam) => void): Promis
 export function teamMarketOf(t: IrtTeam, dev: string, target: string, fallback: Market): Market {
   return t.acctMarkets[`${dev}::${target}`] ?? t.markets[dev] ?? fallback
 }
-/** Groupes existants, triés. Pure. */
+/** Groupes créés ou attribués, triés. Pure. */
 export function teamGroups(t: IrtTeam): string[] {
-  return [...new Set(Object.values(t.groups))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }))
+  return [...new Set([...t.groupNames, ...Object.values(t.groups)])].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }))
 }

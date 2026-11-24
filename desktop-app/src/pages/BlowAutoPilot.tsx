@@ -189,6 +189,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const setTargetMarket = (dev: string, c: string, m: Market | null) => { saveTargetMarket(dev, c, m); editTeam(t => { if (m) t.acctMarkets[`${dev}::${c}`] = m; else delete t.acctMarkets[`${dev}::${c}`] }) }
   const setPhoneMarket = (dev: string, m: Market | null) => editTeam(t => { if (m) t.markets[dev] = m; else delete t.markets[dev] })
   const setPhoneGroup = (dev: string, g: string) => editTeam(t => { if (g.trim()) t.groups[dev] = g.trim(); else delete t.groups[dev] })
+  const createGroup = (name: string) => { const g = name.trim(); if (g) editTeam(t => { if (!t.groupNames.includes(g)) t.groupNames.push(g) }) }
+  const deleteGroup = (g: string) => editTeam(t => { t.groupNames = t.groupNames.filter(x => x !== g); for (const [d, x] of Object.entries(t.groups)) if (x === g) delete t.groups[d] })
+  const [newGroup, setNewGroup] = useState<string | null>(null)   // champ « Créer un groupe » ouvert
+  const pendingGroupPhone = useRef<string | null>(null)            // iPhone à mettre dans le groupe qu'on crée
+  const submitNewGroup = (name: string) => { const g = name.trim(); if (g) { createGroup(g); if (pendingGroupPhone.current) setPhoneGroup(pendingGroupPhone.current, g) } pendingGroupPhone.current = null; setNewGroup(null) }
   const [grpFilter, setGrpFilter] = useState('')   // '' = tous les groupes
   const [mktFilter, setMktFilter] = useState<Market | ''>('')
   const [storyLink, setStoryLink] = useState('')               // lien CTA par défaut (Story)
@@ -1011,7 +1016,6 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           ⚠ Containers enregistrés sur ce navigateur seulement : colle le SQL <code>20261028_irt_containers.sql</code> dans Supabase pour les partager en temps réel.
         </div>
       )}
-      <datalist id="sf-irt-groups">{teamGroups(team).map(g => <option key={g} value={g} />)}</datalist>
       {(() => {
         const base = devices.filter(d => !opts?.jbOnly || phoneKind(conts[d.public_id]) !== 'normal')
         const qq = pickQ.trim().toLowerCase().replace(/^@/, '')
@@ -1035,9 +1039,24 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <button style={chip(!grpFilter)} onClick={() => setGrpFilter('')}>Tous</button>
             {groups.map(g => <button key={g} style={chip(grpFilter === g)} onClick={() => setGrpFilter(grpFilter === g ? '' : g)} data-no-tr>📁 {g} · {devices.filter(d => team.groups[d.public_id] === g).length}</button>)}
             {groups.length > 0 && <button style={chip(grpFilter === '∅')} onClick={() => setGrpFilter(grpFilter === '∅' ? '' : '∅')}>Sans groupe</button>}
+            {newGroup === null
+              ? <button style={{ ...btn, height: 28, fontSize: 12, borderStyle: 'dashed' }} onClick={() => setNewGroup('')}>＋ Créer un groupe</button>
+              : <span style={{ display: 'inline-flex', gap: 4 }}>
+                  <input autoFocus value={newGroup} onChange={e => setNewGroup(e.target.value)} placeholder="Nom du groupe" onKeyDown={e => { if (e.key === 'Enter') submitNewGroup(newGroup); if (e.key === 'Escape') { pendingGroupPhone.current = null; setNewGroup(null) } }} style={{ ...inp, width: 150, height: 28, fontSize: 12 }} />
+                  <button style={{ ...btn, height: 28, fontSize: 12 }} disabled={!newGroup.trim()} onClick={() => submitNewGroup(newGroup)}>Créer</button>
+                  <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => { pendingGroupPhone.current = null; setNewGroup(null) }}>×</button>
+                </span>}
+            {opts?.manage && grpFilter && grpFilter !== '∅' && <button style={{ ...btn, height: 28, fontSize: 12, color: '#F87171' }} onClick={() => void confirmDialog({ title: `Supprimer le groupe « ${grpFilter} » ?`, text: 'Les iPhones du groupe passent « Sans groupe » (rien d’autre n’est touché).', confirmLabel: 'Supprimer', danger: true }).then(ok => { if (ok) { deleteGroup(grpFilter); setGrpFilter('') } })}>Supprimer ce groupe</button>}
             <span style={{ fontSize: 12, color: DIM, margin: '0 2px 0 10px' }}>Marché</span>
             <button style={chip(!mktFilter)} onClick={() => setMktFilter('')}>Tous</button>
             {MARKETS.map(m => <button key={m.k} style={chip(mktFilter === m.k)} onClick={() => setMktFilter(mktFilter === m.k ? '' : m.k)}>{m.label}</button>)}
+            {sel.size > 0 && groups.length > 0 && (
+              <select value="" onChange={e => { const g = e.target.value; if (!g) return; const ids = [...sel]; editTeam(t => { for (const d of ids) { if (g === '∅') delete t.groups[d]; else t.groups[d] = g } }); toast(`${ids.length} iPhone(s) → ${g === '∅' ? 'sans groupe' : g}`, 'ok') }} style={{ ...inp, height: 28, fontSize: 12, cursor: 'pointer', marginLeft: 'auto' }}>
+                <option value="" style={{ background: FIELD_BG }}>{`Mettre les ${sel.size} iPhone(s) cochés dans…`}</option>
+                {groups.map(g => <option key={g} value={g} style={{ background: FIELD_BG }}>📁 {g}</option>)}
+                <option value="∅" style={{ background: FIELD_BG }}>Sans groupe</option>
+              </select>
+            )}
             {!opts?.manage && (grpFilter || mktFilter) && list.length > 0 && <button style={{ ...btn, height: 28, fontSize: 12, marginLeft: 'auto' }} onClick={() => pickAll(list.filter(isDeviceOn).map(d => d.public_id))}>Cocher ces iPhones ({list.filter(isDeviceOn).length})</button>}
           </div>
           {opts?.manage && <div style={{ fontSize: 12, color: DIM, marginBottom: 10 }}>Groupe et marché de chaque iPhone : partagés avec toute l’équipe. Le marché de l’iPhone sert aux descriptions, à la localisation et aux bios de ses comptes (sauf marché propre à un compte).</div>}
@@ -1065,7 +1084,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               </div>
               {opts?.manage && (
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                  <input list="sf-irt-groups" defaultValue={team.groups[id] ?? ''} key={`g-${id}-${team.groups[id] ?? ''}`} placeholder="Groupe…" onBlur={e => { if (e.target.value.trim() !== (team.groups[id] ?? '')) setPhoneGroup(id, e.target.value) }} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} style={{ ...inp, width: 130, height: 28, fontSize: 12 }} />
+                  <select value={team.groups[id] ?? ''} onChange={e => { if (e.target.value === '＋') { pendingGroupPhone.current = id; setNewGroup('') } else setPhoneGroup(id, e.target.value) }} style={{ ...inp, height: 28, fontSize: 12, cursor: 'pointer', maxWidth: 160 }}>
+                    <option value="" style={{ background: FIELD_BG }}>📁 Sans groupe</option>
+                    {teamGroups(team).map(g => <option key={g} value={g} style={{ background: FIELD_BG }}>📁 {g}</option>)}
+                    <option value="＋" style={{ background: FIELD_BG }}>＋ Nouveau groupe…</option>
+                  </select>
                   <select value={team.markets[id] ?? ''} onChange={e => setPhoneMarket(id, (e.target.value || null) as Market | null)} style={{ ...inp, height: 28, fontSize: 12, cursor: 'pointer' }}>
                     <option value="" style={{ background: FIELD_BG }}>Marché…</option>
                     {MARKETS.map(m => <option key={m.k} value={m.k} style={{ background: FIELD_BG }}>{m.label}</option>)}

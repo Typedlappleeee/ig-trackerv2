@@ -7,6 +7,12 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "＋ Créer un groupe": "＋ Create a group",
+    "Les iPhones du groupe passent « Sans groupe » (rien d’autre n’est touché).": "The group’s iPhones become “No group” (nothing else is changed).",
+    "Supprimer ce groupe": "Delete this group",
+    "sans groupe": "no group",
+    "📁 Sans groupe": "📁 No group",
+    "＋ Nouveau groupe…": "＋ New group…",
     "Comptes et warm-ups : relus depuis l’historique iRemoTech (partagé avec l’équipe) ; la dernière lecture des comptes fait foi (un compte déconnecté disparaît, 5 max par iPhone). Pendant un job, ne touche pas l’iPhone. Les warm-ups consomment des jetons iRemoTech. Posts / abonnés / abonnements : lus sur l’écran de l’iPhone à chaque passage sur le compte (bouton « 📊 Relire »).": "Accounts and warm-ups: read from the iRemoTech history (shared with the team); the latest account read is the source of truth (a logged-out account disappears, 5 max per iPhone). During a job, don’t touch the iPhone. Warm-ups use iRemoTech tokens. Posts / followers / following: read on the iPhone screen each time the account is opened (“📊 Re-read” button).",
     "Enregistré sur ce navigateur seulement (synchro équipe indisponible).": "Saved in this browser only (team sync unavailable).",
     "Marché": "Market",
@@ -5040,5 +5046,8 @@ export const EN: Dict = {
     ["{0} 📦 {1} « {2} » · {3}", "{0} 📦 {1} “{2}” · {3}"],
     ["✋ Sticker lu en ({0}, {1}) → coin bas-droite{2}…", "✋ Sticker read at ({0}, {1}) → bottom-right corner{2}…"],
     ["(essai {0})", "(attempt {0})"],
+    ["Supprimer le groupe « {0} » ?", "Delete the group “{0}”?"],
+    ["{0} iPhone(s) → {1}", "{0} iPhone(s) → {1}"],
+    ["Mettre les {0} iPhone(s) cochés dans…", "Put the {0} selected iPhone(s) in…"],
   ],
 }
