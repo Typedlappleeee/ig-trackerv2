@@ -32,7 +32,7 @@ export async function generateTOTP(secret: string, digits = 6, period = 30): Pro
   view.setUint32(0, Math.floor(counter / 0x100000000))   // 32 bits de poids fort
   view.setUint32(4, counter >>> 0)                        // 32 bits de poids faible
 
-  const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
+  const cryptoKey = await crypto.subtle.importKey('raw', new Uint8Array(key), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
   const sig = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, buf))
 
   // Troncature dynamique (RFC 6238).
