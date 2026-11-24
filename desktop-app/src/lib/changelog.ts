@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24d',
+    date: '2026-11-24',
+    title: { fr: 'Nouvelle page d’accueil', en: 'New home page' },
+    items: {
+      fr: ['La page publique de ScaleFlow a une nouvelle vidéo en fond : un mur de téléphones qui publient, en boucle.'],
+      en: ['ScaleFlow’s public page has a new background video: a looping wall of phones posting.'],
+    },
+  },
+  {
     id: '2026-11-24c',
     date: '2026-11-24',
     title: { fr: 'iRemoTech : groupes, marchés et comptes plus clairs', en: 'iRemoTech: groups, markets and clearer accounts' },

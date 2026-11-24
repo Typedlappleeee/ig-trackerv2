@@ -467,7 +467,8 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
       <main>
         {/* HERO : mur de téléphones qui publient */}
         <section id="top" className="sfl-hero">
-          <PhoneWall />
+          {/* Fond : mur de téléphones filmé (généré avec Higgsfield), boucle aller-retour de 10 s */}
+          <video className="sfl-hero-vid" src="/site/hero-loop.mp4" poster="/site/hero-poster.webp" autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
           <div className="sfl-hero-veil" aria-hidden="true" />
           <div className="sfl-wrap sfl-hero-in">
             <span className="sfl-pill sfl-rv"><i className="sfl-dot" />Instagram · TikTok · cloud phones GeeLark</span>
@@ -696,7 +697,9 @@ const CSS = `
 .sfl-col-dn{animation-name:sflDn}
 @keyframes sflUp{from{transform:translateY(0)}to{transform:translateY(calc(-50% - 11px))}}
 @keyframes sflDn{from{transform:translateY(calc(-50% - 11px))}to{transform:translateY(0)}}
-.sfl-hero-veil{position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse 70% 62% at 50% 50%,rgba(10,10,11,.94) 0%,rgba(10,10,11,.8) 45%,rgba(10,10,11,.35) 100%),linear-gradient(180deg,rgba(10,10,11,.85) 0%,transparent 18%,transparent 78%,#0A0A0B 100%)}
+.sfl-hero-vid{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;opacity:.9}
+@media (prefers-reduced-motion:reduce){.sfl-hero-vid{display:none}.sfl-hero{background:#0A0A0B url(/site/hero-poster.webp) center/cover no-repeat}}
+.sfl-hero-veil{position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse 56% 58% at 50% 52%,rgba(10,10,11,.82) 0%,rgba(10,10,11,.55) 50%,rgba(10,10,11,.15) 100%),linear-gradient(180deg,rgba(10,10,11,.85) 0%,transparent 18%,transparent 78%,#0A0A0B 100%)}
 .sfl-hero-in{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:120px;padding-bottom:110px}
 .sfl-pill{display:inline-flex;align-items:center;gap:9px;height:32px;padding:0 14px;border-radius:99px;border:1px solid rgba(167,139,250,.35);background:rgba(167,139,250,.1);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-size:12.5px;font-weight:700;color:var(--v2)}
 .sfl-dot{width:7px;height:7px;border-radius:99px;background:var(--v);box-shadow:0 0 0 4px rgba(167,139,250,.2);animation:sflPulse 1.8s ease-in-out infinite}
