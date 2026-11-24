@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-24',
     title: { fr: 'iRemoTech : légende validée avec la nouvelle coche', en: 'iRemoTech: caption confirmed with the new checkmark' },
     items: {
-      fr: ['Instagram a remplacé le bouton « OK » de l’éditeur de légende par une coche bleue en haut à droite : ScaleFlow la tape et vérifie que l’éditeur est fermé avant de publier (sinon le Reel n’était pas publié).'],
-      en: ['Instagram replaced the caption editor’s “OK” button with a blue checkmark at the top right: ScaleFlow taps it and checks the editor is closed before posting (otherwise the Reel was not posted).'],
+      fr: ['Instagram a remplacé le bouton « OK » de l’éditeur de légende par une coche bleue en haut à droite : ScaleFlow la tape et vérifie que l’éditeur est fermé avant de publier ; s’il reste ouvert, un 1er tap sur Share le ferme et le 2e publie.'],
+      en: ['Instagram replaced the caption editor’s “OK” button with a blue checkmark at the top right: ScaleFlow taps it and checks the editor is closed before posting; if it stays open, a 1st tap on Share closes it and the 2nd posts.'],
     },
   },
   {

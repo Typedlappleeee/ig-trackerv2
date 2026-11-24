@@ -1196,9 +1196,22 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     if (!sp) return true // illisible : on ne conclut pas à un succès
     return sharePageShown(sp.words, sp.W, sp.H)
   }
+  // Éditeur de légende encore ouvert par-dessus (OK = coche sans texte, pas toujours prise) : un 1er tap sur Share
+  // le ferme, le 2e publie (vu en vrai le 24/11/2026). On ferme donc d'abord l'éditeur par un tap sur Share.
+  const closeCaptionEditor = async () => {
+    for (let j = 0; j < 2; j++) {
+      const ce = await readScreenWords(key, deviceId)
+      if (!ce || !captionEditorOpen(ce.words, ce.H)) return
+      hooks?.log?.('   éditeur de légende encore ouvert → 1er tap sur Share pour le fermer')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(A.shareBtn.x * W), y: Math.round(A.shareBtn.y * H) })
+      await sleep(1800)
+    }
+  }
+  await closeCaptionEditor()
   let shared = false
   for (let k = 0; k < 3 && !shared; k++) {
     if (k) hooks?.log?.(`   toujours sur la page de partage → nouveau tap sur Share (${k + 1}/3)`)
+    if (k) await closeCaptionEditor()
     if (!await tapButton(key, deviceId, [/^share$/i, /^partager$/i], A.shareBtn, W, H, hooks, [0.9, 1], 'Share', 3, [0.5, 1])) return false
     await sleep(4000)
     // Fenêtre « Update on your original audio » (vue en vrai le 22/11/2026) : le Reel attend → bouton bleu « Share »
@@ -1212,7 +1225,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       await sleep(4000)
     }
     const after = await readScreenWords(key, deviceId)
-    shared = !!after && !originalAudioSheet(after.words) && !await onSharePage()
+    shared = !!after && !originalAudioSheet(after.words) && !captionEditorOpen(after.words, after.H) && !await onSharePage()
   }
   if (!shared) { hooks?.log?.('❌ Share sans effet (toujours sur la page de partage) → non publié'); return false }
   hooks?.log?.(`📤 ${doneLabel}.`)
