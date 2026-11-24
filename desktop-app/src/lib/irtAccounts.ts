@@ -42,6 +42,9 @@ export function isJunkUsername(u: string): boolean {
 const pending = (j: IrtJob) => j.status === 'queued' || j.status === 'dispatched'
 const newest = (a: IrtJob, b: IrtJob) => Date.parse(b.created_at) - Date.parse(a.created_at)
 
+/** Un iPhone = 5 comptes Instagram au maximum. */
+export const MAX_ACCOUNTS_PER_PHONE = 5
+
 export interface AccountView {
   username: string
   health: Health
@@ -52,17 +55,15 @@ export interface AccountView {
 }
 export interface DeviceAccounts { accounts: AccountView[]; scannedAt: string | null; scanning: boolean }
 
-/** Comptes d'un iPhone : dernier scan terminé (list_accounts) ∪ comptes déjà connus (`known`, ex. cibles « @nom »)
- *  ∪ comptes vus dans un job de statut / warm-up. Statut et warm-up = derniers jobs terminés de chaque compte. */
+/** Comptes d'un iPhone : dernier scan terminé (list_accounts), sinon les comptes déjà connus (`known`, cibles « @nom »). Statut et warm-up = derniers jobs terminés de chaque compte. */
 export function deviceAccounts(jobs: IrtJob[], known: string[] = []): DeviceAccounts {
   const js = [...jobs].sort(newest)
   const lastScan = js.find(j => j.type === 'list_accounts' && j.status === 'completed')
-  const names = new Set<string>()
-  for (const u of (lastScan?.result?.accounts as string[] | undefined) ?? []) names.add(String(u).toLowerCase())
-  for (const u of known) names.add(u.replace(/^@/, '').toLowerCase())
-  for (const j of js) if (j.account) names.add(j.account.toLowerCase())
-  for (const u of [...names]) if (isJunkUsername(u)) names.delete(u)
-  const accounts: AccountView[] = [...names].sort().map(u => {
+  // La dernière lecture iRemoTech fait foi : un compte déconnecté de l'iPhone disparaît (plus d'union avec les
+  // anciens jobs). Sans lecture : les cibles connues. 5 comptes max par iPhone.
+  const src = lastScan ? ((lastScan.result?.accounts as string[] | undefined) ?? []) : known
+  const names = [...new Set(src.map(u => String(u).replace(/^@/, '').toLowerCase()).filter(u => u && !isJunkUsername(u)))].slice(0, MAX_ACCOUNTS_PER_PHONE)
+  const accounts: AccountView[] = names.sort().map(u => {
     const mine = js.filter(j => (j.account ?? '').toLowerCase() === u)
     const st = mine.find(j => j.type === 'account_status' && j.status === 'completed')
     const wu = mine.find(j => j.type === 'warm_up' && j.status === 'completed')
@@ -87,30 +88,27 @@ export function irtScannedAccounts(jobs: IrtJob[]): string[] {
 
 /** Liste de cibles d'un iPhone recalée sur ce qu'iRemoTech a déjà lu (pas besoin de vision). null = rien à changer.
  *  - « Default » dans la liste : jailbreak vérifié → on n'y touche pas (iRemoTech n'y voit que le compte du container ouvert) ;
- *  - iPhone normal (« @… ») : on ajoute les comptes qu'iRemoTech a lus et qui manquent ;
+ *  - iPhone normal (« @… ») : la liste devient celle d'iRemoTech (déconnectés retirés, nouveaux ajoutés, 5 max) ;
  *  - liste vide ou douteuse (noms sans « @ » ni « Default ») : remplacée par les comptes iRemoTech s'il en a lu au
  *    moins 2 (un iPhone jailbreaké n'en montre qu'un). Pure. */
 export function reconcileWithIrt(list: string[], accs: string[]): string[] | null {
   if (!accs.length || list.some(c => /^default$/i.test(c.trim()))) return null
-  const at = accs.map(u => '@' + u)
+  const at = accs.slice(0, MAX_ACCOUNTS_PER_PHONE).map(u => '@' + u)
   if (list.length && list.every(c => c.startsWith('@'))) {
-    const add = at.filter(a => !list.some(c => c.toLowerCase() === a))
-    return add.length ? [...list, ...add] : null
+    // iRemoTech fait foi : comptes déconnectés retirés, nouveaux ajoutés (ordre et orthographe d'origine gardés)
+    const kept = list.filter(c => at.includes(c.toLowerCase()))
+    const next = [...kept, ...at.filter(a => !kept.some(c => c.toLowerCase() === a))].slice(0, MAX_ACCOUNTS_PER_PHONE)
+    return next.length === list.length && next.every((c, i) => c === list[i]) ? null : next
   }
   return accs.length >= 2 ? at : null
 }
 
-/** Vérifications iRemoTech à lancer AUTOMATIQUEMENT sur un iPhone : lecture des comptes (`list_accounts`) si elle
- *  date de plus de `maxAgeMs` (ou n'a jamais réussi), et statut (`account_status`) de chaque compte jamais vérifié
- *  ou vérifié il y a plus de `maxAgeMs`. Rien de ce qui tourne déjà ; un essai récent (`tried`, même raté : compte
- *  inconnu d'iRemoTech…) n'est pas relancé avant `maxAgeMs`. Pure. */
-export function autoChecksFor(jobs: IrtJob[], known: string[], now: number, tried: Record<string, number>, maxAgeMs = 24 * 3600_000): { scan: boolean; accounts: string[] } {
-  const da = deviceAccounts(jobs, known)
-  const old = (iso: string | null) => !iso || now - Date.parse(iso) > maxAgeMs
-  const fresh = (k: string) => now - (tried[k] ?? 0) < maxAgeMs
-  const scan = !da.scanning && old(da.scannedAt) && !fresh('#scan')
-  const accounts = da.accounts.filter(a => !a.running && old(a.checkedAt) && !fresh(a.username)).map(a => a.username)
-  return { scan, accounts }
+/** Lecture automatique des comptes d'un iPhone (`list_accounts`) due ? Oui si la dernière réussie date de plus de
+ *  `maxAgeMs` (12 h : au moins 2 fois par jour), sauf si une lecture tourne ou a été tentée récemment. Pure. */
+export function scanDue(jobs: IrtJob[], now: number, triedAt: number, maxAgeMs = 12 * 3600_000): boolean {
+  const da = deviceAccounts(jobs)
+  const old = !da.scannedAt || now - Date.parse(da.scannedAt) > maxAgeMs
+  return !da.scanning && old && now - triedAt > maxAgeMs
 }
 
 /** « il y a 5 min » */

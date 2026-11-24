@@ -12,7 +12,7 @@ describe('iRemoTech — comptes relus depuis les jobs', () => {
     expect(healthOf(null).level).toBe('unknown')
     expect(healthOf({ monetization: 'warning', under_18: 'green' })).toEqual({ level: 'ok', issues: [] }) // non pro ≠ problème
   })
-  it('comptes = dernier scan ∪ cibles connues ∪ jobs ; statut, warm-up et job en cours par compte', () => {
+  it('comptes = dernier scan seulement (déconnectés retirés) ; statut, warm-up et job en cours par compte', () => {
     const jobs = [
       job({ type: 'list_accounts', result: { accounts: ['lucielr5c0', 'Ines'] }, finished_at: '2026-11-20T10:01:00Z' }),
       job({ type: 'account_status', account: 'lucielr5c0', result: { account_state: { who_dont_follow_you: 'warning' } }, created_at: '2026-11-20T11:00:00Z', finished_at: '2026-11-20T11:02:00Z' }),
@@ -20,7 +20,8 @@ describe('iRemoTech — comptes relus depuis les jobs', () => {
       job({ type: 'account_status', account: 'ines', status: 'dispatched', created_at: '2026-11-20T13:00:00Z', finished_at: null }),
     ]
     const r = deviceAccounts(jobs, ['@celia'])
-    expect(r.accounts.map(a => a.username)).toEqual(['celia', 'ines', 'lucielr5c0'])
+    expect(r.accounts.map(a => a.username)).toEqual(['ines', 'lucielr5c0'])
+    expect(deviceAccounts([], ['@celia', '@a', '@b', '@c', '@d', '@e']).accounts.length).toBe(5) // 5 max par iPhone
     expect(r.scannedAt).toBe('2026-11-20T10:01:00Z')
     const l = r.accounts.find(a => a.username === 'lucielr5c0')!
     expect(l.health.level).toBe('warn'); expect(l.checkedAt).toBe('2026-11-20T11:02:00Z')

@@ -1,0 +1,73 @@
+// Réglages iRemoTech PARTAGÉS dans l'espace (toute l'équipe voit la même chose) : groupe et marché de chaque
+// iPhone, marché propre à un compte, lien CTA de chaque compte (Story CTA) et pool de textes CTA enregistrés.
+// Stockés dans une ligne sentinelle de `iremotech_device_meta` (device_id `__sf_team__`, colonne jsonb
+// `accounts`) : aucun SQL à passer. Le localStorage sert de cache immédiat et de repli hors ligne.
+import { supabase } from './supabase'
+import type { Market } from './captionMarkets'
+
+export const TEAM_ROW = '__sf_team__'
+export interface IrtTeam {
+  groups: Record<string, string>        // iPhone → nom du groupe
+  markets: Record<string, Market>       // iPhone → marché
+  acctMarkets: Record<string, Market>   // `${iPhone}::${cible}` → marché du compte (prioritaire sur celui de l'iPhone)
+  links: Record<string, string>         // `${iPhone}::${cible}` → lien CTA du compte
+  ctaTexts: string[]                    // pool de textes CTA enregistrés
+}
+export const emptyTeam = (): IrtTeam => ({ groups: {}, markets: {}, acctMarkets: {}, links: {}, ctaTexts: [] })
+
+const isMarket = (v: unknown): v is Market => v === 'fr' || v === 'us' || v === 'de'
+const strMap = (v: unknown): Record<string, string> => {
+  const out: Record<string, string> = {}
+  if (v && typeof v === 'object' && !Array.isArray(v)) for (const [k, x] of Object.entries(v)) if (typeof x === 'string' && x.trim()) out[k] = x.trim()
+  return out
+}
+const mktMap = (v: unknown): Record<string, Market> => Object.fromEntries(Object.entries(strMap(v)).filter(([, x]) => isMarket(x))) as Record<string, Market>
+/** Valeur brute (jsonb) → réglages propres. Pure. */
+export function parseTeam(raw: unknown): IrtTeam {
+  const o = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>
+  return {
+    groups: strMap(o.groups), markets: mktMap(o.markets), acctMarkets: mktMap(o.acctMarkets), links: strMap(o.links),
+    ctaTexts: Array.isArray(o.ctaTexts) ? [...new Set(o.ctaTexts.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean))].slice(0, 200) : [],
+  }
+}
+
+type Scope = { orgId: string | null; userId: string }
+const scopeRow = (s: Scope) => s.orgId ? { scope_id: s.orgId, is_org: true } : { scope_id: s.userId, is_org: false }
+const cacheKey = (s: Scope) => `sf-irt-team:${scopeRow(s).scope_id}`
+
+export function loadTeamCache(s: Scope): IrtTeam {
+  try { return parseTeam(JSON.parse(localStorage.getItem(cacheKey(s)) ?? '{}')) } catch { return emptyTeam() }
+}
+function cache(s: Scope, t: IrtTeam): void { try { localStorage.setItem(cacheKey(s), JSON.stringify(t)) } catch { /* noop */ } }
+
+/** Réglages de l'espace depuis Supabase (null = indisponible → on garde le cache). */
+export async function pullTeam(s: Scope): Promise<IrtTeam | null> {
+  const { data, error } = await supabase.from('iremotech_device_meta').select('accounts').eq('scope_id', scopeRow(s).scope_id).eq('device_id', TEAM_ROW).maybeSingle()
+  if (error) return null
+  const t = parseTeam(data?.accounts)
+  cache(s, t)
+  return t
+}
+
+/** Modifie les réglages : relit la version la plus récente, applique `change`, enregistre. Renvoie le résultat
+ *  (appliqué au cache même si l'envoi échoue). */
+export async function updateTeam(s: Scope, change: (t: IrtTeam) => void): Promise<{ team: IrtTeam; shared: boolean }> {
+  const fresh = (await pullTeam(s).catch(() => null)) ?? loadTeamCache(s)
+  change(fresh)
+  const team = parseTeam(fresh)
+  cache(s, team)
+  const { error } = await supabase.from('iremotech_device_meta').upsert(
+    { ...scopeRow(s), device_id: TEAM_ROW, accounts: team, updated_at: new Date().toISOString() },
+    { onConflict: 'scope_id,device_id' },
+  )
+  return { team, shared: !error }
+}
+
+/** Marché d'un compte : le sien, sinon celui de son iPhone, sinon `fallback`. Pure. */
+export function teamMarketOf(t: IrtTeam, dev: string, target: string, fallback: Market): Market {
+  return t.acctMarkets[`${dev}::${target}`] ?? t.markets[dev] ?? fallback
+}
+/** Groupes existants, triés. Pure. */
+export function teamGroups(t: IrtTeam): string[] {
+  return [...new Set(Object.values(t.groups))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }))
+}

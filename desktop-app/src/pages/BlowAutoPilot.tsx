@@ -20,7 +20,8 @@ import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone }
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import IrtAccounts from '@/components/IrtAccounts'
-import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, autoChecksFor } from '@/lib/irtAccounts'
+import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue } from '@/lib/irtAccounts'
+import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
 import { generatePfp } from '@/lib/pfpGenerator'
@@ -168,13 +169,39 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [setupBio, setSetupBio] = useState(true)
   const [capLocation, setCapLocation] = useState(() => { try { return localStorage.getItem('sf-irt-cap-location') !== '0' } catch { return true } })
   // marché de chaque compte (`${dev}::${cible}`) ; absent = marché par défaut (capMarket)
-  const [targetMarkets, setTargetMarkets] = useState<Record<string, Market | null>>({})
-  const marketOf = (dev: string, c: string): Market => targetMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c) ?? capMarket
-  const setTargetMarket = (dev: string, c: string, m: Market | null) => { saveTargetMarket(dev, c, m); setTargetMarkets(t => ({ ...t, [`${dev}::${c}`]: m })) }
+  // Réglages PARTAGÉS dans l'espace (groupes, marché par iPhone / compte, liens CTA, pool de textes CTA) : lib/irtTeam
+  const teamScope = { orgId: currentOrg?.id ?? null, userId: user.id }
+  const [team, setTeam] = useState<IrtTeam>(() => loadTeamCache(teamScope))
+  useEffect(() => {
+    let alive = true
+    setTeam(loadTeamCache(teamScope))
+    const pull = () => void pullTeam(teamScope).then(t => { if (t && alive) setTeam(t) }, () => undefined)
+    pull()
+    const t = setInterval(pull, 60_000)
+    return () => { alive = false; clearInterval(t) }
+  }, [currentOrg?.id, user.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const editTeam = (change: (t: IrtTeam) => void) => {
+    setTeam(t => { const n = structuredClone(t); change(n); return n })
+    void updateTeam(teamScope, change).then(r => { setTeam(r.team); if (!r.shared) toast('Enregistré sur ce navigateur seulement (synchro équipe indisponible).', 'bad') })
+  }
+  // marché de chaque compte (`${dev}::${cible}`) ; absent = marché de l'iPhone, sinon marché par défaut (capMarket)
+  const marketOf = (dev: string, c: string): Market => team.acctMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c) ?? teamMarketOf(team, dev, c, capMarket)
+  const setTargetMarket = (dev: string, c: string, m: Market | null) => { saveTargetMarket(dev, c, m); editTeam(t => { if (m) t.acctMarkets[`${dev}::${c}`] = m; else delete t.acctMarkets[`${dev}::${c}`] }) }
+  const setPhoneMarket = (dev: string, m: Market | null) => editTeam(t => { if (m) t.markets[dev] = m; else delete t.markets[dev] })
+  const setPhoneGroup = (dev: string, g: string) => editTeam(t => { if (g.trim()) t.groups[dev] = g.trim(); else delete t.groups[dev] })
+  const [grpFilter, setGrpFilter] = useState('')   // '' = tous les groupes
+  const [mktFilter, setMktFilter] = useState<Market | ''>('')
   const [storyLink, setStoryLink] = useState('')               // lien CTA par défaut (Story)
   const [storyLinks, setStoryLinks] = useState<Record<string, string>>({}) // lien PAR container : `${dev}::${c}`
   const linkKey = (dev: string, c: string) => `${dev}::${c}`
-  const setLink = (dev: string, c: string, url: string) => { setStoryLinks(m => ({ ...m, [linkKey(dev, c)]: url })); saveStoryLink(dev, c, url) }
+  const setLink = (dev: string, c: string, url: string) => {
+    setStoryLinks(m => ({ ...m, [linkKey(dev, c)]: url })); saveStoryLink(dev, c, url)
+    // partagé avec l'équipe (enregistré quand on arrête de taper)
+    clearTimeout(linkTimers.current[linkKey(dev, c)])
+    linkTimers.current[linkKey(dev, c)] = setTimeout(() => editTeam(t => { if (url.trim()) t.links[linkKey(dev, c)] = url.trim(); else delete t.links[linkKey(dev, c)] }), 800)
+  }
+  const linkTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const linkOf = (dev: string, c: string) => storyLinks[linkKey(dev, c)] ?? team.links[linkKey(dev, c)] ?? ''
 
   const [airplaneOn, setAirplaneOn] = useState(true)
   const [uniqueUse, setUniqueUse] = useState(false)
@@ -329,11 +356,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       setSelConts(sc => sc[dev] ? { ...sc, [dev]: new Set([...sc[dev]].filter(c => next.includes(c))) } : sc)
     }
   }, [irtJobs]) // eslint-disable-line react-hooks/exhaustive-deps
-  // Statut AUTOMATIQUE : ScaleFlow fait vérifier par iRemoTech (gratuit, 1 action du quota par lancement) la liste
-  // des comptes de chaque iPhone et le statut de chaque compte, toutes les 24 h, puis l'affiche. L'API ne montre pas
-  // les vérifications lancées depuis le tableau de bord iRemoTech : c'est la seule façon d'avoir le statut ici.
-  // Jamais pendant une automatisation ScaleFlow (utiliser l'iPhone interromprait le job iRemoTech).
-  const [autoStatus, setAutoStatus] = useState(() => { try { return localStorage.getItem('sf-irt-autostatus') !== '0' } catch { return true } })
+  // Lecture AUTOMATIQUE des comptes : iRemoTech relit les comptes connectés de chaque iPhone normal (list_accounts,
+  // 1 action du quota) dès que la dernière lecture a plus de 12 h — donc au moins 2 fois par jour tant que ScaleFlow
+  // est ouvert. Un compte déconnecté disparaît de la liste (reconcileWithIrt). Jamais pendant une automatisation.
+  // (Le statut des comptes n'est plus affiché : l'API iRemoTech ne donne pas celui du tableau de bord.)
+  const [autoStatus, setAutoStatus] = useState(() => { try { return localStorage.getItem('sf-irt-autoscan') !== '0' } catch { return true } })
   const jobsRef = useRef(irtJobs); jobsRef.current = irtJobs
   const contsRef = useRef(conts); contsRef.current = conts
   useEffect(() => {
@@ -347,35 +374,23 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       for (const d of devices) {
         if (!alive || runningRef.current) return
         const dev = d.public_id
-        if (phoneKind(contsRef.current[dev]) === 'jb') continue // jailbreak : iRemoTech ne voit que le container ouvert
+        if (!isDeviceOn(d) || phoneKind(contsRef.current[dev]) === 'jb') continue // jailbreak : iRemoTech ne voit que le container ouvert
         const jobs = jobsRef.current[dev]
         if (!jobs) continue
-        const tk = `sf-irt-autostatus:${dev}`
-        let tried: Record<string, number> = {}
-        try { tried = JSON.parse(localStorage.getItem(tk) ?? '{}') } catch { /* noop */ }
-        const known = (contsRef.current[dev] ?? []).filter(c => c.startsWith('@'))
-        const plan = autoChecksFor(jobs, known, Date.now(), tried)
-        const todo: { k: string; a: Parameters<typeof launchAutomation>[2] }[] = [
-          ...(plan.scan ? [{ k: '#scan', a: { type: 'list_accounts' as const } }] : []),
-          ...plan.accounts.slice(0, 8).map(u => ({ k: u, a: { type: 'account_status' as const, account: u } })),
-        ]
-        if (!todo.length) continue
-        for (const t of todo) {
-          if (!alive || runningRef.current) return
-          await launchAutomation(key, dev, t.a).catch(() => null) // refus (compte inconnu, déjà en cours…) : réessayé dans 24 h
-          tried[t.k] = Date.now()
-          await sleep(7000) // ≤ 10 lancements / min / iPhone côté iRemoTech
-        }
-        try { localStorage.setItem(tk, JSON.stringify(tried)) } catch { /* noop */ }
-        const fresh = await listJobs(key, dev, 100).catch(() => null)
-        if (fresh && alive) setIrtJobs(m => ({ ...m, [dev]: fresh }))
+        const tk = `sf-irt-autoscan:${dev}`
+        let tried = 0
+        try { tried = Number(localStorage.getItem(tk)) || 0 } catch { /* noop */ }
+        if (!scanDue(jobs, Date.now(), tried)) continue
+        await launchAutomation(key, dev, { type: 'list_accounts' }).catch(() => null)
+        try { localStorage.setItem(tk, String(Date.now())) } catch { /* noop */ }
+        await sleep(7000)
       }
     }
     const first = setTimeout(() => void tick(), 45_000)
     const t = setInterval(() => void tick(), 15 * 60_000)
     return () => { alive = false; clearTimeout(first); clearInterval(t) }
   }, [irt.key, autoStatus, devices, usage]) // eslint-disable-line react-hooks/exhaustive-deps
-  // Statut Instagram des comptes (historique iRemoTech) → « ! » rouge sur les comptes signalés
+  // Historique iRemoTech (lectures des comptes, warm-ups) relu toutes les 2 min
   useEffect(() => {
     if (!irt.key || !devices.length) return
     let alive = true
@@ -385,12 +400,6 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const t = setInterval(() => void pull(), 120_000)
     return () => { alive = false; clearInterval(t) }
   }, [irt.key, devices.map(d => d.public_id).join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
-  const flagOf = (dev: string, target: string): string[] | null => {
-    if (!target.startsWith('@')) return null
-    const a = deviceAccounts(irtJobs[dev] ?? []).accounts.find(x => x.username === target.slice(1).toLowerCase())
-    return a?.health.level === 'warn' ? a.health.issues : null
-  }
-
   // Détecte les containers Crane d'un iPhone (sélecteur lu à l'écran) et remplace sa liste.
   const detectConts = async (dev: string, log: (m: string) => void, stop?: () => boolean): Promise<string[] | null> => {
     if (!irt.key) return null
@@ -418,6 +427,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     setDetecting(dev); setLogs([])
     const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(e => { push(`[${name}] ⚠ ${e instanceof Error ? e.message : String(e)}`); return null })
     if (!list) push(`[${name}] ✗ ni containers ni comptes détectés`)
+    // iPhone normal : iRemoTech relit aussi les comptes, pour que sa liste (qui fait foi) soit à jour tout de suite
+    else if (irt.key && phoneKind(list) === 'normal') void launchAutomation(irt.key, dev, { type: 'list_accounts' }).catch(() => null)
     setDetecting(null)
   }
   // Ouvre chaque container et lit ce qu'il contient VRAIMENT (vide / @compte / bloqué) : la liste « Comptes créés »
@@ -532,7 +543,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     if (src.mode === 'pick' && pool.length === 0) { setLogs([`⚠ Ajoute au moins ${isImg ? 'une photo' : 'une vidéo'} au pool.`]); return }
     if (src.mode === 'pick' && pool.length < perPost) { setLogs([`⚠ Un carrousel de ${perPost} photos demande au moins ${perPost} photos dans le pool (${pool.length} actuellement).`]); return }
     if (kind === 'story') {
-      const missing = [...sel].flatMap(dev => [...(selConts[dev] ?? [])].filter(c => !(storyLinks[linkKey(dev, c)] || storyLink.trim())))
+      const missing = [...sel].flatMap(dev => [...(selConts[dev] ?? [])].filter(c => !(linkOf(dev, c) || storyLink.trim())))
       if (missing.length) { setLogs([`⚠ ${missing.length} container(s) sans lien CTA — mets un lien par container ou un lien par défaut.`]); return }
     }
     setRunning(true); setLogs([])
@@ -584,7 +595,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       dev,
       name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(),
       // Session = N posts PAR COMPTE (chaque compte coché publie N fois d'affilée, scroll entre deux posts)
-      jobs: [...(selConts[dev] ?? [])].flatMap(container => Array.from({ length: perAcct }, () => container)).map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(marketOf(dev, container)) : undefined, link: storyLinks[linkKey(dev, container)] || storyLink.trim() } }),
+      jobs: [...(selConts[dev] ?? [])].flatMap(container => Array.from({ length: perAcct }, () => container)).map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(marketOf(dev, container)) : undefined, link: linkOf(dev, container) || storyLink.trim() } }),
     })).filter(p => p.jobs.length)
 
     push(`▶ ${kind === 'story' ? 'Story' : kind === 'carousel' ? `Carrousel (${perPost} photos)` : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
@@ -1000,18 +1011,36 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           ⚠ Containers enregistrés sur ce navigateur seulement : colle le SQL <code>20261028_irt_containers.sql</code> dans Supabase pour les partager en temps réel.
         </div>
       )}
+      <datalist id="sf-irt-groups">{teamGroups(team).map(g => <option key={g} value={g} />)}</datalist>
       {(() => {
         const base = devices.filter(d => !opts?.jbOnly || phoneKind(conts[d.public_id]) !== 'normal')
         const qq = pickQ.trim().toLowerCase().replace(/^@/, '')
-        const hit = (d: IrtDevice) => !qq || deviceLabel(d).toLowerCase().includes(qq) || (conts[d.public_id] ?? []).some(c => c.toLowerCase().replace(/^@/, '').includes(qq))
+        const hit = (d: IrtDevice) => (!qq || deviceLabel(d).toLowerCase().includes(qq) || (conts[d.public_id] ?? []).some(c => c.toLowerCase().replace(/^@/, '').includes(qq)))
+          && (!grpFilter || (grpFilter === '∅' ? !team.groups[d.public_id] : team.groups[d.public_id] === grpFilter))
+          && (!mktFilter || team.markets[d.public_id] === mktFilter)
+        const byGroup = (a: IrtDevice, b: IrtDevice) => (team.groups[a.public_id] ?? '\uffff').localeCompare(team.groups[b.public_id] ?? '\uffff', 'fr', { numeric: true })
+        const groups = teamGroups(team)
         const filled = base.filter(d => (conts[d.public_id] ?? []).length > 0 && hit(d))
         const emptyN = base.filter(d => !(conts[d.public_id] ?? []).length).length
-        const list = [...filled, ...(showEmptyPhones || opts?.manage ? base.filter(d => !(conts[d.public_id] ?? []).length && hit(d)) : [])]
+        const list = [...filled, ...(showEmptyPhones || opts?.manage ? base.filter(d => !(conts[d.public_id] ?? []).length && hit(d)) : [])].sort(byGroup)
+        const chip = (on: boolean): CSSProperties => ({ ...btn, height: 28, fontSize: 12, padding: '0 10px', background: on ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: on ? GOLD : '#A1A1AA', border: `1px solid ${on ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}` })
+        const pickAll = (ids: string[]) => { setSel(new Set(ids)); setSelConts(sc => { const n = { ...sc }; for (const id of ids) n[id] = new Set(conts[id] ?? []); return n }) }
         return (<>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <input value={pickQ} onChange={e => setPickQ(e.target.value)} placeholder="Rechercher un iPhone ou un compte…" style={{ ...inp, flex: '1 1 220px', minWidth: 0 }} />
             {!opts?.manage && emptyN > 0 && <button style={{ ...btn, height: 32, fontSize: 12 }} onClick={() => setShowEmptyPhones(v => !v)}>{showEmptyPhones ? 'Masquer' : 'Afficher'} les iPhones pas encore détectés ({emptyN})</button>}
           </div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: DIM, marginRight: 2 }}>Groupe</span>
+            <button style={chip(!grpFilter)} onClick={() => setGrpFilter('')}>Tous</button>
+            {groups.map(g => <button key={g} style={chip(grpFilter === g)} onClick={() => setGrpFilter(grpFilter === g ? '' : g)} data-no-tr>📁 {g} · {devices.filter(d => team.groups[d.public_id] === g).length}</button>)}
+            {groups.length > 0 && <button style={chip(grpFilter === '∅')} onClick={() => setGrpFilter(grpFilter === '∅' ? '' : '∅')}>Sans groupe</button>}
+            <span style={{ fontSize: 12, color: DIM, margin: '0 2px 0 10px' }}>Marché</span>
+            <button style={chip(!mktFilter)} onClick={() => setMktFilter('')}>Tous</button>
+            {MARKETS.map(m => <button key={m.k} style={chip(mktFilter === m.k)} onClick={() => setMktFilter(mktFilter === m.k ? '' : m.k)}>{m.label}</button>)}
+            {!opts?.manage && (grpFilter || mktFilter) && list.length > 0 && <button style={{ ...btn, height: 28, fontSize: 12, marginLeft: 'auto' }} onClick={() => pickAll(list.filter(isDeviceOn).map(d => d.public_id))}>Cocher ces iPhones ({list.filter(isDeviceOn).length})</button>}
+          </div>
+          {opts?.manage && <div style={{ fontSize: 12, color: DIM, marginBottom: 10 }}>Groupe et marché de chaque iPhone : partagés avec toute l’équipe. Le marché de l’iPhone sert aux descriptions, à la localisation et aux bios de ses comptes (sauf marché propre à un compte).</div>}
           {!list.length && <div style={{ fontSize: 13, color: MUTED, padding: '6px 2px' }}>{base.length ? 'Aucun iPhone ne correspond. Détecte les comptes / containers dans « Téléphones » ou « Comptes Instagram ».' : 'Aucun iPhone.'}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', borderRadius: 10, border: list.length ? `1px solid ${EDGE}` : 'none', overflow: 'hidden' }}>
         {list.map(d => {
@@ -1031,15 +1060,25 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 </span>
                 {!kind && list.length > 0 && <span title="Type pas sûr (ancienne détection ou saisie à la main) : clique ↻ pour relire l’iPhone" style={{ flex: 'none', height: 22, padding: '0 8px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 600, background: 'rgba(251,191,36,0.1)', color: '#FCD34D', border: '1px solid rgba(251,191,36,0.3)' }}>❓ À vérifier</span>}
                 {kind && <span title={kind === 'normal' ? 'iPhone normal : plusieurs comptes connectés dans Instagram' : 'iPhone jailbreaké : un compte par container Crane'} style={{ flex: 'none', height: 22, padding: '0 8px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 600, background: kind === 'normal' ? 'rgba(96,165,250,0.12)' : 'rgba(233,196,106,0.12)', color: kind === 'normal' ? '#93C5FD' : GOLD, border: `1px solid ${kind === 'normal' ? 'rgba(96,165,250,0.3)' : 'rgba(233,196,106,0.3)'}` }}>{kind === 'normal' ? '📱 iPhone normal' : '🔓 Jailbreak'}</span>}
+                {!opts?.manage && team.groups[id] && <span style={{ flex: 'none', fontSize: 11, color: MUTED }} data-no-tr>📁 {team.groups[id]}</span>}
+                {!opts?.manage && team.markets[id] && <span style={{ flex: 'none', fontSize: 12 }} title={MARKETS.find(m => m.k === team.markets[id])?.label}>{MARKETS.find(m => m.k === team.markets[id])?.label.split(' ')[0]}</span>}
               </div>
+              {opts?.manage && (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                  <input list="sf-irt-groups" defaultValue={team.groups[id] ?? ''} key={`g-${id}-${team.groups[id] ?? ''}`} placeholder="Groupe…" onBlur={e => { if (e.target.value.trim() !== (team.groups[id] ?? '')) setPhoneGroup(id, e.target.value) }} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} style={{ ...inp, width: 130, height: 28, fontSize: 12 }} />
+                  <select value={team.markets[id] ?? ''} onChange={e => setPhoneMarket(id, (e.target.value || null) as Market | null)} style={{ ...inp, height: 28, fontSize: 12, cursor: 'pointer' }}>
+                    <option value="" style={{ background: FIELD_BG }}>Marché…</option>
+                    {MARKETS.map(m => <option key={m.k} value={m.k} style={{ background: FIELD_BG }}>{m.label}</option>)}
+                  </select>
+                </div>
+              )}
               {list.length > 0 ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: '1 1 320px', minWidth: 0 }}>
                   {list.map(c => {
                     const cp = on && picked.has(c)
                     return (
                       <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
-                        <span onClick={() => toggleCont(id, c)} title={flagOf(id, c)?.join(' · ')} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
-                          {flagOf(id, c) && <span style={{ display: 'grid', placeItems: 'center', width: 15, height: 15, borderRadius: 99, background: '#EF4444', color: '#fff', fontSize: 10, fontWeight: 800 }}>!</span>}
+                        <span onClick={() => toggleCont(id, c)} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
                           {cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}
                           {(() => { const cs = contStates[id]?.[c]; if (!cs || c.startsWith('@')) return null
                             return <span title={`Vérifié à l’écran le ${new Date(cs.at).toLocaleString()}`} style={{ fontSize: 11, fontWeight: 500, color: cs.state === 'account' ? '#86EFAC' : cs.state === 'empty' ? DIM : cs.state === 'blocked' ? '#F87171' : DIM }}>
@@ -1214,9 +1253,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <div style={grid}>
             {stat('iPhones en ligne', `${onlineN} / ${devices.length}`, 'phones')}
             {stat('Comptes Instagram', accs.length, 'igaccounts')}
-            {stat('Comptes sains', accs.filter(a => a.health.level === 'ok').length, 'igaccounts')}
-            {stat('À surveiller', accs.filter(a => a.health.level === 'warn').length, 'igaccounts')}
-            {stat('Éligibles Trial', accs.filter(a => a.trial === true).length, 'igaccounts')}
+            {stat('Groupes', teamGroups(team).length, 'phones')}
             {stat('Comptes créés', createdAccts.filter(a => a.ok).length, 'comptes')}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1252,7 +1289,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 </div>
                 <div style={{ maxHeight: 260, overflowY: 'auto' }}>
                   {[...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => ({ dev, c }))).map(({ dev, c }) => {
-                    const own = targetMarkets[`${dev}::${c}`] !== undefined ? targetMarkets[`${dev}::${c}`] : loadTargetMarket(dev, c)
+                    const own = team.acctMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c)
                     const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
                     return (
                       <div key={`${dev}::${c}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderTop: `1px solid ${EDGE}` }}>
@@ -1292,8 +1329,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       {/* ─────────────── ONGLET POSTING ─────────────── */}
       {curTab === 'igaccounts' && irt.key && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10, border: `1px solid ${EDGE}`, background: '#0E0E10' }}>
-          <Toggle on={autoStatus} onClick={() => { const v = !autoStatus; setAutoStatus(v); try { localStorage.setItem('sf-irt-autostatus', v ? '1' : '0') } catch { /* noop */ } }}
-            label="Statut iRemoTech automatique" sub="ScaleFlow fait lire les comptes de chaque iPhone et vérifier le statut de chaque compte par iRemoTech toutes les 24 h, puis l’affiche ici. Gratuit (1 action du quota par vérification), jamais pendant une publication, seulement quand ScaleFlow est ouvert." />
+          <Toggle on={autoStatus} onClick={() => { const v = !autoStatus; setAutoStatus(v); try { localStorage.setItem('sf-irt-autoscan', v ? '1' : '0') } catch { /* noop */ } }}
+            label="Détection automatique des comptes" sub="iRemoTech relit les comptes connectés de chaque iPhone toutes les 12 h (2 fois par jour minimum) : un compte déconnecté disparaît, 5 comptes max par iPhone. 1 action du quota par iPhone, jamais pendant une publication, seulement quand ScaleFlow est ouvert." />
         </div>
       )}
       {curTab === 'igaccounts' && irt.key && (
@@ -1301,8 +1338,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           onScanned={(dev, accs) => {
             // iPhone normal (ou pas encore détecté) : les comptes trouvés par iRemoTech deviennent ses cibles « @nom »
             if (phoneKind(conts[dev]) === 'jb') return
-            const list = [...new Set([...(conts[dev] ?? []).filter(c => c.startsWith('@')), ...accs.filter(u => !isJunkUsername(u)).map(u => '@' + u.toLowerCase())])]
-            saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list }))
+            const list = reconcileWithIrt(conts[dev] ?? [], accs.filter(u => !isJunkUsername(u)).map(u => u.toLowerCase()))
+            if (list) { saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list })) }
           }} />
       )}
       {(curTab === 'posting' || curTab === 'story') && (
@@ -1408,7 +1445,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 </div>
                 <div style={{ maxHeight: 260, overflowY: 'auto' }}>
                   {[...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => ({ dev, c }))).map(({ dev, c }) => {
-                    const own = targetMarkets[`${dev}::${c}`] !== undefined ? targetMarkets[`${dev}::${c}`] : loadTargetMarket(dev, c)
+                    const own = team.acctMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c)
                     const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
                     return (
                       <div key={`${dev}::${c}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderTop: `1px solid ${EDGE}` }}>
@@ -1493,12 +1530,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <input value={storyLink} onChange={e => setStoryLink(e.target.value)} placeholder="https://mon-lien.com" style={{ ...inp, width: '100%', height: 32, marginBottom: 12 }} />
           {totalJobs > 0 && (
             <>
-              <div style={{ ...lbl, margin: '0 0 8px' }}>Lien par container (prioritaire sur le défaut)</div>
+              <div style={{ ...lbl, margin: '0 0 8px' }}>Lien CTA de chaque compte (prioritaire sur le défaut) · enregistré pour toute l’équipe, pré-rempli à chaque Story</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {[...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => ({ dev, c }))).map(({ dev, c }) => (
                   <div key={`${dev}::${c}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ minWidth: 130, fontSize: 12.5, fontWeight: 500, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()} · {c}</span>
-                    <input value={storyLinks[linkKey(dev, c)] ?? ''} onChange={e => setLink(dev, c, e.target.value)} placeholder={storyLink.trim() ? `défaut : ${storyLink.trim()}` : 'https://…'} style={{ ...inp, flex: 1, height: 32, fontSize: 12 }} />
+                    <input value={linkOf(dev, c)} onChange={e => setLink(dev, c, e.target.value)} placeholder={storyLink.trim() ? `défaut : ${storyLink.trim()}` : 'https://…'} style={{ ...inp, flex: 1, height: 32, fontSize: 12 }} />
                   </div>
                 ))}
               </div>
@@ -1506,6 +1543,33 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           )}
           <div style={{ ...lbl, margin: '14px 0 6px' }}>Textes sticker (une par ligne, au hasard — optionnel)</div>
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={2} placeholder={'Texte 1\nTexte 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 46, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
+          {(() => {
+            const lines = captionPool.split('\n').map(x => x.trim()).filter(Boolean)
+            const fresh = lines.filter(x => !team.ctaTexts.includes(x))
+            const add = (t: string) => setCaptionPool(p => p.split('\n').map(x => x.trim()).includes(t) ? p : (p.trim() ? `${p.trimEnd()}\n${t}` : t))
+            return (
+              <div style={{ marginTop: 8, padding: 10, borderRadius: 9, border: `1px solid ${EDGE}`, background: '#0E0E10' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: team.ctaTexts.length ? 8 : 0 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: INK }}>💬 Pool de textes CTA de l’équipe ({team.ctaTexts.length})</span>
+                  <span style={{ fontSize: 11.5, color: DIM }}>clique un texte pour l’ajouter</span>
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                    {team.ctaTexts.length > 0 && <button style={{ ...btn, height: 26, fontSize: 11.5 }} disabled={running} onClick={() => setCaptionPool(team.ctaTexts.join('\n'))}>Tout utiliser</button>}
+                    <button style={{ ...btn, height: 26, fontSize: 11.5 }} disabled={running || !fresh.length} onClick={() => editTeam(t => { t.ctaTexts = [...t.ctaTexts, ...fresh] })} title="Enregistre les textes ci-dessus dans le pool partagé">💾 Enregistrer {fresh.length ? `(${fresh.length})` : ''}</button>
+                  </span>
+                </div>
+                {team.ctaTexts.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {team.ctaTexts.map(t => (
+                      <span key={t} style={{ display: 'inline-flex', alignItems: 'center', maxWidth: 320, height: 26, borderRadius: 6, fontSize: 12, background: lines.includes(t) ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: lines.includes(t) ? GOLD : '#A1A1AA', border: `1px solid ${lines.includes(t) ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}` }}>
+                        <span onClick={() => !running && add(t)} data-no-tr style={{ cursor: 'pointer', padding: '0 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t}</span>
+                        <span onClick={() => editTeam(x => { x.ctaTexts = x.ctaTexts.filter(y => y !== t) })} title="Retirer du pool" style={{ cursor: 'pointer', color: DIM, padding: '0 7px 0 0' }}>×</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
         <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Stor${totalJobs > 1 ? 'ies' : 'y'} sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || (storySrc.mode === 'folder' ? !storySrc.folder : !storyPool.length) || running} running={running} onClick={() => run('story')} />
         <LogPanel />

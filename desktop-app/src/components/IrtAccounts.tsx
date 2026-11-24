@@ -16,7 +16,6 @@ const WARMUP_MIN = [5, 7, 10, 15, 20]
 const keyOf = (dev: string, u: string) => `${dev}|${u}`
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
-type Filter = 'all' | 'ok' | 'warn' | 'unknown'
 
 export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
   apiKey: string
@@ -30,7 +29,6 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
   const [loaded, setLoaded] = useState(false)
   const [profiles, setProfiles] = useState<Record<string, IgProfile>>(() => loadProfileCache())
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<Filter>('all')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [wuMin, setWuMin] = useState(7)
   const [busy, setBusy] = useState<string | null>(null)
@@ -107,48 +105,21 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
     for (const a of accs) { if (await switchAccountByVision(apiKey, d.public_id, a.username)) n++; setProfiles(loadProfileCache()) }
     setBusy(null); toast(`${deviceLabel(d)} : stats relues pour ${n}/${accs.length} compte(s)`, n ? 'ok' : 'bad')
   }
-  const check = (dev: string, u: string) => launch(dev, { type: 'account_status', account: u }, `@${u}`)
-  // UN bouton : vérification iRemoTech lancée sur TOUS les comptes, un par un (iPhones entrelacés, ≥ 6,5 s entre
-  // deux lancements sur un même iPhone : iRemoTech en accepte 10 / min / iPhone). Chaque iPhone les fait à la suite.
-  const [allProg, setAllProg] = useState<{ done: number; total: number } | null>(null)
-  const checkAll = async () => {
-    const queues = devices.map(d => ({ dev: d.public_id, accs: (view[d.public_id]?.accounts ?? []).filter(a => !a.running).map(a => a.username) })).filter(q => q.accs.length)
-    const total = queues.reduce((n, q) => n + q.accs.length, 0)
-    if (!total) { toast('Aucun compte à vérifier (ou déjà en cours).', 'info'); return }
-    setBusy('checkall'); setAllProg({ done: 0, total })
-    const last: Record<string, number> = {}
-    let done = 0, ok = 0
-    for (let round = 0; queues.some(q => q.accs.length); round++) {
-      for (const q of queues) {
-        const u = q.accs.shift(); if (!u) continue
-        const wait = (last[q.dev] ?? 0) + 6500 - Date.now()
-        if (wait > 0) await sleep(wait)
-        let r = await launchAutomation(apiKey, q.dev, { type: 'account_status', account: u })
-        if (!r.ok && /rate|429/i.test(r.code ?? '')) { await sleep(7000); r = await launchAutomation(apiKey, q.dev, { type: 'account_status', account: u }) }
-        last[q.dev] = Date.now()
-        if (r.ok) { ok++; setJobs(m => ({ ...m, [q.dev]: [r.job!, ...(m[q.dev] ?? [])] })) }
-        done++; setAllProg({ done, total })
-        await sleep(300)
-      }
-    }
-    setBusy(null); setAllProg(null)
-    toast(`${ok}/${total} vérification(s) lancée(s) : iRemoTech les fait une par une sur chaque iPhone (~1 min par compte), le statut s’affiche au fur et à mesure. Ne touche pas les iPhones pendant ce temps.`, ok ? 'ok' : 'bad', 9000)
-  }
   const warm = (dev: string, u: string) => launch(dev, { type: 'warm_up', account: u, session_duration_s: wuMin * 60 }, `@${u}`)
-  const bulk = async (kind: 'check' | 'warm') => {
-    setBusy(kind)
+  const bulk = async () => {
+    setBusy('warm')
     let n = 0
-    for (const k of sel) { const [dev, u] = k.split('|'); if (await (kind === 'check' ? check(dev, u) : warm(dev, u))) n++; await sleep(600) }
+    for (const k of sel) { const [dev, u] = k.split('|'); if (await warm(dev, u)) n++; await sleep(600) }
     setBusy(null); setSel(new Set())
-    toast(kind === 'check' ? `${n} vérification(s) lancée(s)` : `${n} warm-up(s) lancé(s) (${wuMin} min)`, n ? 'ok' : 'bad')
+    toast(`${n} warm-up(s) lancé(s) (${wuMin} min)`, n ? 'ok' : 'bad')
   }
 
   // ── chiffres + filtres ──
   const flat = devices.flatMap(d => (view[d.public_id]?.accounts ?? []).map(a => ({ d, a })))
   const count = (f: (a: AccountView) => boolean) => flat.filter(x => f(x.a)).length
-  const stats = { total: flat.length, ok: count(a => a.health.level === 'ok'), warn: count(a => a.health.level === 'warn'), running: count(a => !!a.running) }
+  const stats = { total: flat.length, running: count(a => !!a.running) }
   const qq = q.trim().toLowerCase().replace(/^@/, '')
-  const match = (a: AccountView) => (filter === 'all' || a.health.level === filter) && (!qq || a.username.includes(qq) || (profiles[a.username]?.full_name ?? '').toLowerCase().includes(qq))
+  const match = (a: AccountView) => (!qq || a.username.includes(qq) || (profiles[a.username]?.full_name ?? '').toLowerCase().includes(qq))
   const toggle = (k: string) => setSel(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
   const withAccounts = devices.filter(d => (view[d.public_id]?.accounts.length ?? 0) > 0)
   const empty = devices.filter(d => !(view[d.public_id]?.accounts.length))
@@ -158,7 +129,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
   const allChecked = allShownKeys.length > 0 && allShownKeys.every(k => sel.has(k))
 
   // colonne iPhone seulement en vue liste (en vue « Par iPhone », le nom est dans l'en-tête du groupe)
-  const COLS = grouped ? '28px minmax(200px,1.8fr) 78px 78px 88px minmax(150px,1.1fr) minmax(130px,1fr) 150px' : '28px minmax(180px,1.6fr) minmax(110px,1fr) 78px 78px 88px minmax(150px,1.1fr) minmax(130px,1fr) 150px'
+  const COLS = grouped ? '28px minmax(200px,1.8fr) 78px 78px 88px minmax(130px,1fr) 90px' : '28px minmax(180px,1.6fr) minmax(110px,1fr) 78px 78px 88px minmax(130px,1fr) 90px'
   const cell: CSSProperties = { display: 'flex', alignItems: 'center', minWidth: 0 }
   const th: CSSProperties = { fontSize: 11, fontWeight: 500, color: DIM, textTransform: 'uppercase', letterSpacing: '.04em' }
   const Num = ({ n }: { n: number | null | undefined }) => <span style={{ fontSize: 13.5, fontWeight: 600, color: n == null ? DIM : INK, fontVariantNumeric: 'tabular-nums' }}>{compactNum(n ?? null)}</span>
@@ -166,10 +137,6 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
   const Row = ({ d, a }: { d: IrtDevice; a: AccountView }) => {
     const id = d.public_id, p = profiles[a.username], k = keyOf(id, a.username), on = sel.has(k)
     const pic = avatarSrc(p?.profile_pic, a.username)
-    const pill = a.running === 'account_status' ? { t: 'Vérification…', c: GOLD, b: 'rgba(233,196,106,0.1)' }
-      : a.health.level === 'ok' ? { t: 'Sain', c: '#4ADE80', b: 'rgba(74,222,128,0.1)' }
-      : a.health.level === 'warn' ? { t: a.health.issues[0] + (a.health.issues.length > 1 ? ` +${a.health.issues.length - 1}` : ''), c: '#FBBF24', b: 'rgba(251,191,36,0.1)' }
-      : { t: 'Non vérifié', c: MUTED, b: 'rgba(255,255,255,0.05)' }
     const cr = creds[a.username]
     return (
       <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '8px 14px', borderTop: `1px solid ${EDGE}`, background: on ? 'rgba(233,196,106,0.05)' : 'transparent' }}>
@@ -189,17 +156,10 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
         <span style={cell}><Num n={p?.media_count} /></span>
         <span style={cell}><Num n={p?.followers} /></span>
         <span style={cell}><Num n={p?.following} /></span>
-        <span style={{ ...cell, gap: 6 }}>
-          {a.health.level === 'warn' && <span title={a.health.issues.join(' · ')} style={{ flex: 'none', display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 99, background: '#EF4444', color: '#fff', fontSize: 11, fontWeight: 800 }}>!</span>}
-          <span title={a.health.issues.join(' · ') || undefined} style={{ height: 22, padding: '0 9px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11.5, fontWeight: 600, color: a.health.level === 'warn' ? '#F87171' : pill.c, background: a.health.level === 'warn' ? 'rgba(239,68,68,0.1)' : pill.b, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pill.t}</span>
-          {a.trial !== null && <span title={a.trial ? 'Compte professionnel : éligible aux Reels Trial' : 'Compte non professionnel : pas de Reels Trial (passe-le en compte pro)'} style={{ marginLeft: 6, height: 22, padding: '0 8px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 600, color: a.trial ? '#93C5FD' : MUTED, background: a.trial ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)', whiteSpace: 'nowrap' }}>{a.trial ? 'Trial ✓' : 'Pas Trial'}</span>}
-        </span>
         <span style={{ ...cell, fontSize: 11.5, color: DIM, flexDirection: 'column', alignItems: 'flex-start' }}>
           <span>{a.running === 'warm_up' ? '🔥 warm-up en cours…' : a.warmup ? `🔥 ${a.warmup.seconds ? Math.round(a.warmup.seconds / 60) + ' min' : 'warm-up'} ${ago(a.warmup.at)}` : 'aucun warm-up'}</span>
-          <span>vérifié {ago(a.checkedAt)}</span>
         </span>
         <span style={{ ...cell, gap: 6, justifyContent: 'flex-end' }}>
-          <button style={ghost} disabled={!!a.running} onClick={() => void check(id, a.username).then(ok => ok && toast(`Vérification de @${a.username} lancée`, 'info'))} title="iRemoTech lit le statut du compte (6 indicateurs Instagram)">Vérifier</button>
           <button style={ghost} disabled={!!a.running} onClick={() => void warm(id, a.username).then(ok => ok && toast(`Warm-up de ${wuMin} min lancé sur @${a.username}`, 'info'))} title={`Warm-up iRemoTech de ${wuMin} min (jetons iRemoTech)`}>🔥 {wuMin}′</button>
         </span>
       </div>
@@ -227,7 +187,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', padding: '4px 2px' }}>
-        {([[stats.total, 'comptes', INK], [stats.ok, 'sains', '#4ADE80'], [stats.warn, 'à surveiller', '#FBBF24'], [stats.running, 'en cours', GOLD], [withAccounts.length, 'iPhones', INK]] as const).map(([n, l, c]) => (
+        {([[stats.total, 'comptes', INK], [stats.running, 'en cours', GOLD], [withAccounts.length, 'iPhones', INK]] as const).map(([n, l, c]) => (
           <span key={l} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}><b style={{ fontSize: 22, fontWeight: 700, color: c, fontVariantNumeric: 'tabular-nums' }}>{n}</b><span style={{ fontSize: 12.5, color: MUTED }}>{l}</span></span>
         ))}
       </div>
@@ -238,13 +198,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
           <option value="all">Tous les iPhones ({withAccounts.length})</option>
           {withAccounts.map(d => <option key={d.public_id} value={d.public_id}>{deviceLabel(d)} · {view[d.public_id]?.accounts.length ?? 0}</option>)}
         </select>
-        <div style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 8, background: '#111113', border: `1px solid ${EDGE}` }}>
-          {([['all', 'Tous'], ['ok', 'Sains'], ['warn', 'À surveiller'], ['unknown', 'Non vérifiés']] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setFilter(k)} style={{ height: 28, padding: '0 11px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, fontWeight: 500, background: filter === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: filter === k ? INK : MUTED }}>{l}</button>
-          ))}
-        </div>
         <button style={{ ...btn, background: grouped ? 'rgba(255,255,255,0.08)' : FIELD_BG }} onClick={() => setGrouped(g => !g)} title="Regrouper les comptes par iPhone">{grouped ? '▾ Par iPhone' : '☰ Liste'}</button>
-        <button style={{ ...btn, background: '#F4F4F5', color: '#0A0A0B', fontWeight: 700 }} disabled={!!busy || !flat.length} onClick={() => void checkAll()} title="Lance la vérification du statut iRemoTech sur TOUS les comptes, un par un (gratuit, 1 action du quota par compte)">{busy === 'checkall' && allProg ? `Lancement ${allProg.done}/${allProg.total}…` : '✅ Vérifier tous les comptes'}</button>
         <button style={btn} disabled={!!busy || !devices.length} onClick={() => void scanAll()} title="iRemoTech lit les comptes connectés sur chaque iPhone en ligne (~30 s, ne pas toucher les iPhones)">{busy === 'scan' ? 'Lancement…' : '🔄 Tout scanner'}</button>
       </div>
 
@@ -252,7 +206,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
         <div style={{ minWidth: 980 }}>
           <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '10px 14px' }}>
             <span style={cell}><span onClick={() => setSel(s => { const x = new Set(s); if (allChecked) allShownKeys.forEach(k => x.delete(k)); else allShownKeys.forEach(k => x.add(k)); return x })} title="Tout cocher / décocher" style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, cursor: 'pointer', background: allChecked ? GOLD : 'transparent', border: allChecked ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.2)', color: '#0A0A0B', fontSize: 11, fontWeight: 700 }}>{allChecked ? '✓' : ''}</span></span>
-            <span style={th}>Compte</span>{!grouped && <span style={th}>iPhone</span>}<span style={th}>Posts</span><span style={th}>Abonnés</span><span style={th}>Abonnem.</span><span style={th}>Statut</span><span style={th}>Activité</span><span />
+            <span style={th}>Compte</span>{!grouped && <span style={th}>iPhone</span>}<span style={th}>Posts</span><span style={th}>Abonnés</span><span style={th}>Abonnem.</span><span style={th}>Activité</span><span />
           </div>
           {!loaded && !rows.length && <div style={{ padding: 16, fontSize: 13, color: MUTED, borderTop: `1px solid ${EDGE}` }}>Lecture de l’historique iRemoTech…</div>}
           {loaded && !rows.length && <div style={{ padding: 16, fontSize: 13, color: MUTED, borderTop: `1px solid ${EDGE}` }}>{flat.length ? 'Aucun compte ne correspond.' : 'Aucun compte connu : « 🔄 Tout scanner » lit les comptes connectés sur tes iPhones.'}</div>}
@@ -287,17 +241,16 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
         <div style={{ position: 'sticky', bottom: 12, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: '#18181B', border: `1px solid ${EDGE}`, boxShadow: '0 10px 30px rgba(0,0,0,.45)', flexWrap: 'wrap' }}>
           <b style={{ fontSize: 13, color: INK }}>{sel.size} compte{sel.size > 1 ? 's' : ''} sélectionné{sel.size > 1 ? 's' : ''}</b>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button style={btn} disabled={!!busy} onClick={() => void bulk('check')}>{busy === 'check' ? 'Lancement…' : 'Vérifier le statut'}</button>
             <select value={wuMin} onChange={e => setWuMin(Number(e.target.value))} style={{ ...btn, paddingRight: 8 }}>
               {WARMUP_MIN.map(m => <option key={m} value={m}>Warm-up {m} min</option>)}
             </select>
-            <button style={{ ...btn, background: GOLD, color: '#0A0A0B', border: 'none', fontWeight: 600 }} disabled={!!busy} onClick={() => void bulk('warm')}>{busy === 'warm' ? 'Lancement…' : '🔥 Lancer les warm-ups'}</button>
+            <button style={{ ...btn, background: GOLD, color: '#0A0A0B', border: 'none', fontWeight: 600 }} disabled={!!busy} onClick={() => void bulk()}>{busy === 'warm' ? 'Lancement…' : '🔥 Lancer les warm-ups'}</button>
             <button style={ghost} onClick={() => setSel(new Set())}>Annuler</button>
           </span>
         </div>
       )}
       <div style={{ fontSize: 11.5, color: DIM, lineHeight: 1.5 }}>
-        Comptes, statuts et warm-ups : relus depuis l’historique iRemoTech (partagé avec l’équipe). Pendant un job, ne touche pas l’iPhone. Les warm-ups consomment des jetons iRemoTech. Posts / abonnés / abonnements : lus sur l’écran de l’iPhone à chaque passage sur le compte (bouton « 📊 Relire »).
+        Comptes et warm-ups : relus depuis l’historique iRemoTech (partagé avec l’équipe) ; la dernière lecture des comptes fait foi (un compte déconnecté disparaît, 5 max par iPhone). Pendant un job, ne touche pas l’iPhone. Les warm-ups consomment des jetons iRemoTech. Posts / abonnés / abonnements : lus sur l’écran de l’iPhone à chaque passage sur le compte (bouton « 📊 Relire »).
       </div>
     </div>
   )

@@ -10,9 +10,11 @@ describe('comptes repris d’iRemoTech (list_accounts)', () => {
     expect(reconcileWithIrt(['1', '2'], ['a.b', 'c_d'])).toEqual(['@a.b', '@c_d'])
     expect(reconcileWithIrt(['1', '2'], ['seul'])).toBeNull()
   })
-  it('iPhone normal : comptes manquants ajoutés, rien sinon', () => {
+  it('iPhone normal : liste iRemoTech (déconnectés retirés, nouveaux ajoutés, 5 max)', () => {
     expect(reconcileWithIrt(['@a.b'], ['a.b', 'c_d'])).toEqual(['@a.b', '@c_d'])
     expect(reconcileWithIrt(['@A.b', '@c_d'], ['a.b', 'c_d'])).toBeNull()
+    expect(reconcileWithIrt(['@a.b', '@old'], ['a.b'])).toEqual(['@a.b'])
+    expect(reconcileWithIrt(['@a'], ['a', 'b', 'c', 'd', 'e', 'f'])).toHaveLength(5)
   })
   it('liste vide : remplie si au moins 2 comptes', () => {
     expect(reconcileWithIrt([], ['x1', 'y2'])).toEqual(['@x1', '@y2'])
@@ -50,24 +52,15 @@ describe('faux comptes lus sous un compte', () => {
   })
 })
 
-import { autoChecksFor } from './irtAccounts'
-describe('statut iRemoTech automatique', () => {
+import { scanDue } from './irtAccounts'
+describe('lecture automatique des comptes (2 fois par jour)', () => {
   const now = Date.parse('2026-11-22T12:00:00Z')
-  const j = (type: string, status: string, at: string, account: string | null = null, result: unknown = null) => ({ job_id: at + account, type, status, created_at: at, finished_at: at, account, result }) as never
-  it('comptes jamais vérifiés ou vérifiés il y a plus de 24 h ; scan si trop vieux', () => {
-    const jobs = [
-      j('list_accounts', 'completed', '2026-11-20T10:00:00Z', null, { accounts: ['a1', 'b2', 'c3'] }),
-      j('account_status', 'completed', '2026-11-22T08:00:00Z', 'a1', { account_state: { under_18: 'green' } }),
-      j('account_status', 'completed', '2026-11-20T08:00:00Z', 'b2', { account_state: { under_18: 'green' } }),
-    ]
-    expect(autoChecksFor(jobs, [], now, {})).toEqual({ scan: true, accounts: ['b2', 'c3'] })
-  })
-  it('déjà en cours ou essayé récemment → pas relancé', () => {
-    const jobs = [
-      j('list_accounts', 'queued', '2026-11-22T11:59:00Z'),
-      j('account_status', 'dispatched', '2026-11-22T11:58:00Z', 'a1'),
-    ]
-    expect(autoChecksFor(jobs, ['@a1', '@b2'], now, { b2: now - 3600_000 })).toEqual({ scan: false, accounts: [] })
+  const j = (type: string, status: string, at: string, result: unknown = null) => ({ job_id: at, type, status, created_at: at, finished_at: at, account: null, result }) as never
+  it('due si la dernière lecture a plus de 12 h ; pas si elle tourne ou a été tentée récemment', () => {
+    expect(scanDue([j('list_accounts', 'completed', '2026-11-21T23:00:00Z', { accounts: ['a1'] })], now, 0)).toBe(true)
+    expect(scanDue([j('list_accounts', 'completed', '2026-11-22T06:00:00Z', { accounts: ['a1'] })], now, 0)).toBe(false)
+    expect(scanDue([j('list_accounts', 'queued', '2026-11-22T11:59:00Z')], now, 0)).toBe(false)
+    expect(scanDue([], now, now - 3600_000)).toBe(false)
   })
 })
 

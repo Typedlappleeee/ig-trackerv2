@@ -7,6 +7,21 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Comptes et warm-ups : relus depuis l’historique iRemoTech (partagé avec l’équipe) ; la dernière lecture des comptes fait foi (un compte déconnecté disparaît, 5 max par iPhone). Pendant un job, ne touche pas l’iPhone. Les warm-ups consomment des jetons iRemoTech. Posts / abonnés / abonnements : lus sur l’écran de l’iPhone à chaque passage sur le compte (bouton « 📊 Relire »).": "Accounts and warm-ups: read from the iRemoTech history (shared with the team); the latest account read is the source of truth (a logged-out account disappears, 5 max per iPhone). During a job, don’t touch the iPhone. Warm-ups use iRemoTech tokens. Posts / followers / following: read on the iPhone screen each time the account is opened (“📊 Re-read” button).",
+    "Enregistré sur ce navigateur seulement (synchro équipe indisponible).": "Saved in this browser only (team sync unavailable).",
+    "Marché": "Market",
+    "Cocher ces iPhones (": "Select these iPhones (",
+    "Groupe et marché de chaque iPhone : partagés avec toute l’équipe. Le marché de l’iPhone sert aux descriptions, à la localisation et aux bios de ses comptes (sauf marché propre à un compte).": "Each iPhone’s group and market are shared with the whole team. The iPhone’s market is used for its accounts’ captions, location and bios (unless an account has its own market).",
+    "Groupe…": "Group…",
+    "Marché…": "Market…",
+    "Détection automatique des comptes": "Automatic account detection",
+    "iRemoTech relit les comptes connectés de chaque iPhone toutes les 12 h (2 fois par jour minimum) : un compte déconnecté disparaît, 5 comptes max par iPhone. 1 action du quota par iPhone, jamais pendant une publication, seulement quand ScaleFlow est ouvert.": "iRemoTech re-reads each iPhone’s logged-in accounts every 12 h (at least twice a day): a logged-out account disappears, 5 accounts max per iPhone. 1 quota action per iPhone, never during a post, only while ScaleFlow is open.",
+    "Lien CTA de chaque compte (prioritaire sur le défaut) · enregistré pour toute l’équipe, pré-rempli à chaque Story": "Each account’s CTA link (overrides the default) · saved for the whole team, pre-filled for every Story",
+    "💬 Pool de textes CTA de l’équipe (": "💬 Team CTA text pool (",
+    "clique un texte pour l’ajouter": "click a text to add it",
+    "Tout utiliser": "Use all",
+    "Enregistre les textes ci-dessus dans le pool partagé": "Saves the texts above to the shared pool",
+    "Retirer du pool": "Remove from pool",
     "— Charger un preset —": "— Load a preset —",
     "— Choisir un dossier —": "— Choose a folder —",
     "— un « Sync GeeLark » les ferait réapparaître. Les @comptes/liens associés dans l'app seront perdus.": "— a \"Sync GeeLark\" would bring them back. The @accounts/links associated in the app will be lost.",
