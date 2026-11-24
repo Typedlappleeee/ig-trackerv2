@@ -578,7 +578,6 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         push(`✍️ Génération de ${need[m]} description(s) — ${label}…`)
         try { aiCaps[m] = shuffle(await generateMarketCaptions(conns.groq, m, need[m], msg => push(msg))) }
         catch (e) { push(`⚠ Descriptions ${label} : ${e instanceof Error ? e.message : String(e)} → rien n’est lancé.`); setRunning(false); return }
-        if (aiCaps[m].length < need[m]) push(`⚠ ${label} : ${aiCaps[m].length} description(s) reçue(s) pour ${need[m]} publication(s), certaines seront réutilisées.`)
       }
     }
     const aiAll: Record<Market, string[]> = { fr: [...aiCaps.fr], us: [...aiCaps.us], de: [...aiCaps.de] }

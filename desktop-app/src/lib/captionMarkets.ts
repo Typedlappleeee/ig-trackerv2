@@ -220,33 +220,38 @@ export function splitCaptions(raw: string): string[] {
     .filter(c => c.length > 0 && !/^(here are|voici|hier sind)\b/i.test(c))
 }
 
-/** N descriptions pour le marché (lots de 10, avec le lot précédent en mémoire pour ne pas répéter). */
-export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void): Promise<string[]> {
+/** N descriptions pour le marché, TOUTES ou erreur (jamais un posting avec des descriptions réutilisées).
+ *  Lots de 10 (5 après un échec, pour des réponses plus rapides que le délai du relais), seul le dernier échange est
+ *  renvoyé (limite de jetons par minute de Groq). Échec d'un lot (relais lent, limite de débit, réponse vide…) →
+ *  pause croissante (10, 20, 30… s) puis on recommence, jusqu'à 25 essais / 8 min au total. */
+export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; maxTries?: number; maxMs?: number }): Promise<string[]> {
   if (!groqKey) throw new Error('clé Groq manquante (Réglages › Intégrations)')
+  const sleep = opts?.sleep ?? ((ms: number) => new Promise<void>(r => setTimeout(r, ms)))
+  const maxTries = opts?.maxTries ?? 25, deadline = Date.now() + (opts?.maxMs ?? 8 * 60_000)
   const out: string[] = []
   const messages: { role: string; content: string }[] = [{ role: 'system', content: marketPrompt(m) }]
-  // Lots de 10, et seulement le DERNIER échange renvoyé (pas toute la conversation) : sinon la 2e demande dépassait la
-  // limite de jetons par minute de Groq (« aucun modèle disponible » à 30 descriptions, vu le 24/11/2026).
-  for (let guard = 0; out.length < n && guard < Math.ceil(n / 10) + 3; guard++) {
-    const ask = Math.min(10, n - out.length)
-    messages.push({ role: 'user', content: String(ask) })
-    const req = messages.length > 4 ? [messages[0], ...messages.slice(-3)] : messages
-    let raw: string | null = null
-    try { raw = await groqText(groqKey, req, Math.min(4000, 150 * ask + 600), 1) }
-    catch (e) {
-      // lot raté (relais Groq lent, limite de débit…) : une 2e chance après une pause, sans perdre ce qui est déjà généré
-      onLog?.(`   ⏳ lot raté (${e instanceof Error ? e.message.slice(0, 90) : 'erreur'}) → nouvel essai dans 15 s`)
-      await new Promise(r => setTimeout(r, 15000))
-      try { raw = await groqText(groqKey, req, Math.min(4000, 150 * ask + 600), 1) }
-      catch (e2) { if (out.length) { onLog?.(`   ⚠ génération arrêtée à ${out.length}/${n}`); break } throw e2 }
+  let fails = 0, lastErr = ''
+  for (let tries = 0; out.length < n && tries < maxTries && Date.now() < deadline; tries++) {
+    const ask = Math.min(fails ? 5 : 10, n - out.length)
+    const req = [messages[0], ...messages.slice(-2).filter(x => x.role === 'assistant'), { role: 'user', content: String(ask) }]
+    let got: string[] = []
+    try {
+      const raw = await groqText(groqKey, req, Math.min(4000, 150 * ask + 600), 1)
+      if (raw) { got = splitCaptions(raw).filter(c => !out.includes(c)); messages.push({ role: 'user', content: String(ask) }, { role: 'assistant', content: raw }) }
+      if (!got.length) lastErr = 'réponse vide'
+    } catch (e) { lastErr = e instanceof Error ? e.message.slice(0, 110) : String(e) }
+    if (got.length) {
+      fails = 0
+      out.push(...got)
+      onLog?.(`✍️ ${Math.min(out.length, n)}/${n} description(s) générée(s)`)
+      continue
     }
-    if (!raw) break
-    messages.push({ role: 'assistant', content: raw })
-    const got = splitCaptions(raw).filter(c => !out.includes(c))
-    out.push(...got)
-    onLog?.(`✍️ ${out.length}/${n} description(s) générée(s)`)
+    fails++
+    const wait = Math.min(60, 10 * fails)
+    onLog?.(`   ⏳ lot raté (${lastErr}) → nouvel essai dans ${wait} s (${out.length}/${n} déjà prêtes)`)
+    await sleep(wait * 1000)
   }
-  if (!out.length) throw new Error('aucune description reçue de l’IA')
+  if (out.length < n) throw new Error(`${out.length}/${n} description(s) seulement après plusieurs essais (${lastErr || 'Groq indisponible'}) — relance dans quelques minutes`)
   return out.slice(0, n)
 }
 

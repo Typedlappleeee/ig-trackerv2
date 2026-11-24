@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-24',
     title: { fr: 'Descriptions IA : plus de « aucun modèle disponible »', en: 'AI captions: no more “no model available”' },
     items: {
-      fr: ['Descriptions générées par lots de 10 (au lieu de 20) sans renvoyer tout l’historique : la limite de débit de Groq n’est plus dépassée. Si un modèle est saturé, ScaleFlow passe au suivant ; si tout échoue, la vraie raison s’affiche.', 'Relais Groq lent ou en erreur : le lot est relancé après 15 s, sans perdre les descriptions déjà générées.'],
-      en: ['Captions generated in batches of 10 (instead of 20) without resending the whole history: Groq’s rate limit is no longer exceeded. If a model is saturated, ScaleFlow moves to the next one; if all fail, the real reason is shown.', 'Slow or failing Groq relay: the batch is retried after 15 s, keeping the captions already generated.'],
+      fr: ['Descriptions générées par lots de 10 (au lieu de 20) sans renvoyer tout l’historique : la limite de débit de Groq n’est plus dépassée. Si un modèle est saturé, ScaleFlow passe au suivant ; si tout échoue, la vraie raison s’affiche.', 'Toutes les descriptions sont générées : un lot raté est relancé (pauses croissantes, lots plus petits) jusqu’à les avoir toutes ; jamais de posting avec des descriptions réutilisées.'],
+      en: ['Captions generated in batches of 10 (instead of 20) without resending the whole history: Groq’s rate limit is no longer exceeded. If a model is saturated, ScaleFlow moves to the next one; if all fail, the real reason is shown.', 'All captions are generated: a failed batch is retried (growing pauses, smaller batches) until all are ready; never a run with reused captions.'],
     },
   },
   {

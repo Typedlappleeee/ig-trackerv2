@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "réponse vide": "empty answer",
     "Ta ferme de téléphones": "Your phone farm",
     "Des téléphones en charge sur un bureau, chacun connecté à un compte": "Phones charging on a desk, each one logged into an account",
     "Des dizaines de téléphones.": "Dozens of phones.",
@@ -5061,5 +5062,7 @@ export const EN: Dict = {
     ["relais Groq indisponible (HTTP {0}) — try again in a moment", "Groq relay unavailable (HTTP {0}) — try again in a moment"],
     ["⏳ lot raté ({0}) → nouvel essai dans 15 s", "⏳ batch failed ({0}) → retrying in 15 s"],
     ["⚠ génération arrêtée à {0}/{1}", "⚠ generation stopped at {0}/{1}"],
+    ["⏳ lot raté ({0}) → nouvel essai dans {1} s ({2}/{3} déjà prêtes)", "⏳ batch failed ({0}) → retrying in {1} s ({2}/{3} ready)"],
+    ["{0}/{1} description(s) seulement après plusieurs essais ({2}) — relance dans quelques minutes", "only {0}/{1} caption(s) after several attempts ({2}) — relaunch in a few minutes"],
   ],
 }
