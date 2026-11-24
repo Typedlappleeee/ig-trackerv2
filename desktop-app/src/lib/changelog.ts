@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24m',
+    date: '2026-11-24',
+    title: { fr: 'iRemoTech : corrections après la grosse session', en: 'iRemoTech: fixes after the big session' },
+    items: {
+      fr: [
+        'Localisation : la ville n’est plus retapée pendant la frappe (« Stuttgart, GermanyStuttgart… » ne donnait aucun résultat) ; lieu confirmé aussi par le nom de la ville.',
+        'Page de partage plus prise pour l’éditeur de légende (fini les « ✓ » en boucle puis « Add location introuvable »).',
+        'Offre « Meta Verified » par-dessus le créateur → fermée (aucun abonnement) ; feuille « accès aux photos » qui restait → bouton bleu repéré à sa couleur.',
+        'Journal : un post raté relancé sur le même compte est indiqué comme tel.',
+      ],
+      en: [
+        'Location: the city is no longer retyped mid-typing (“Stuttgart, GermanyStuttgart…” gave no results); location also confirmed by the city name.',
+        'The share page is no longer mistaken for the caption editor (no more looping “✓” then “Add location not found”).',
+        '“Meta Verified” offer over the creator → closed (no subscription); stuck “photo access” sheet → blue button found by colour.',
+        'Log: a failed post retried on the same account is labelled as such.',
+      ],
+    },
+  },
+  {
     id: '2026-11-24l',
     date: '2026-11-24',
     title: { fr: 'iRemoTech et GeeLark : nouvelles bannières', en: 'iRemoTech and GeeLark: new banners' },

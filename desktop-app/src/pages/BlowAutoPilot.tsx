@@ -636,7 +636,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const sameAcct = stayedIn === job.container
         if (!sameAcct) {
           // Changement de compte : on QUITTE Instagram, puis nouvelle IP (mode avion), puis on rouvre sur le compte suivant
-          if (ji > 0 && job.container.startsWith('@')) { push(`${tag} 🚪 fin du compte précédent → Instagram fermé`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }) }
+          if (ji > 0 && job.container.startsWith('@')) { push(p.jobs[ji - 1].container === job.container ? `${tag} 🔄 post précédent raté → Instagram relancé sur le même compte` : `${tag} 🚪 fin du compte précédent → Instagram fermé`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }) }
           if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
           // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
           if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })

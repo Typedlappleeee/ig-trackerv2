@@ -221,8 +221,10 @@ export async function grantPhotoAccessIfAsked(key: string, deviceId: string, hoo
     }
     if (has(/^access$/i, 0.3, 0.5) && has(/^videos$/i, 0.3, 0.5) && !has(/^please$/i)) {
       hooks?.log?.('🖼 Accès aux photos demandé → Continue')
-      const c = scr.words.find(o => /^continue$/i.test(o.text) && o.cy > 0.8 * scr.H)
-      await sendAction(key, deviceId, { type: 'tap', x: c ? c.cx : Math.round(scr.W / 2), y: c ? c.cy : Math.round(0.94 * scr.H) })
+      const c = scr.words.find(o => /^continue$/i.test(o.text) && o.cy > 0.7 * scr.H)
+      // vu en vrai : le tap « Continue » répété 4 fois sans effet → dès le 2e essai, le gros bouton bleu repéré à sa couleur
+      const blue = !c && k > 0 ? await findBlueButton(scr.shot, 0.7, 1).catch(() => null) : null
+      await sendAction(key, deviceId, { type: 'tap', x: c ? c.cx : blue ? blue.cx : Math.round(scr.W / 2), y: c ? c.cy : blue ? blue.cy : Math.round((k % 2 ? 0.9 : 0.94) * scr.H) })
       await sleep(2500); continue
     }
     if (has(/^would$/i) && (has(/^photos$/i) || has(/^library\.?$/i))) {
@@ -539,6 +541,11 @@ async function tapCaptionCheck(key: string, deviceId: string, W: number, H: numb
  *  souvent PAS lu par l'OCR → ScaleFlow croyait l'éditeur fermé, défilait dans les hashtags suggérés puis tapait Share. */
 async function captionEditorShown(scr: { words: { text: string; cy: number }[]; H: number; shot: string }): Promise<boolean> {
   if (captionEditorOpen(scr.words, scr.H)) return true
+  // coche bleue en haut à droite ET puces « Hashtags / Poll / Prompt » HAUTES (≤ 40 % : dans l'éditeur ; sur la page de
+  // partage elles sont vers 60 %). Sans cette 2e condition, la page de partage passait pour l'éditeur (vu en vrai : 15
+  // taps « ✓ » de suite, puis « Add location » introuvable).
+  const chipsHigh = scr.words.some(o => /^(hashtags|poll|prompt)$/i.test(o.text) && o.cy < scr.H * 0.4)
+  if (!chipsHigh) return false
   return !!await findBlueButton(scr.shot, 0.035, 0.12, 0.75, 1).catch(() => null)
 }
 
@@ -572,6 +579,16 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   if (!scr) return false
   const has = (re: RegExp) => scr.words.some(o => re.test(o.text))
   if (cameraSheet(scr.words, scr.H)) return grantPhotoAccessIfAsked(key, deviceId, hooks).then(() => true) // → Continue, puis Allow (caméra / micro)
+  // Offre « Meta Verified » (abonnement payant, vue en vrai le 24/11/2026 par-dessus le créateur) → Cancel / Not now,
+  // sinon la feuille glissée vers le bas. JAMAIS le bouton d'abonnement.
+  if (has(/^verified$/i) && (has(/^meta$/i) || has(/^subscription/i))) {
+    const no = scr.words.find(o => /^(cancel|cance!|not|close|dismiss)$/i.test(o.text) && o.cy > scr.H * 0.3)
+    hooks?.log?.('   offre « Meta Verified » → fermée (aucun abonnement)')
+    if (no) await sendAction(key, deviceId, { type: 'tap', x: no.cx + (/^not$/i.test(no.text) ? 18 : 0), y: no.cy })
+    else await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(scr.W / 2), y1: Math.round(scr.H * 0.35), x2: Math.round(scr.W / 2), y2: Math.round(scr.H * 0.95), duration_ms: 300 })
+    await sleep(1500)
+    return true
+  }
   const ads = adsConsentTaps(scr.words, scr.W, scr.H)
   if (ads) {
     // enchaînement Get started → gratuit avec pub + Continue → Agree → OK : on suit jusqu'à revenir sur Instagram
@@ -884,6 +901,8 @@ async function selectMode(key: string, deviceId: string, patterns: RegExp[], lab
     if (!bar.length) {
       if (alreadyIn && await alreadyIn(shot)) { hooks?.log?.(`   ✓ caméra ${label} déjà ouverte (barre des modes masquée)`); return true }
       if (i === 0) { await sleep(1500); continue } // caméra encore en chargement
+      // une feuille couvre le créateur (« Meta Verified… », accès aux photos…) : on la ferme puis on relit
+      if (i === 1 && (await dismissIgInfoSheet(key, deviceId, hooks) || await grantPhotoAccessIfAsked(key, deviceId, hooks))) { await sleep(1500); continue }
       hooks?.log?.(`❌ mode ${label} : barre des modes invisible → aucun balayage (il changerait l'effet de la caméra)`)
       return false
     }
@@ -1390,25 +1409,27 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   await tap(search.x, search.y)
   await sleep(1200)
   await typeRich(key, deviceId, loc.q)
-  // la saisie peut ne pas prendre (champ pas encore actif) : champ toujours vide → on retape le champ et la ville
-  {
-    await sleep(1500)
-    const f = await readScreenWords(key, deviceId)
-    const firstWord = loc.q.split(/[\s,]+/)[0].toLowerCase()
-    const typed = f?.words.some(o => Math.abs(o.cy - search!.y) < 18 && o.text.toLowerCase().includes(firstWord.slice(0, 4)))
-    if (f && !typed && f.words.some(o => /^locations?$/i.test(o.text))) {
-      hooks?.log?.('   champ de recherche resté vide → nouvelle saisie')
-      await tap(search.x, search.y); await sleep(1200)
-      await typeRich(key, deviceId, loc.q)
-    }
-  }
   // la saisie se fait lettre par lettre (vu en vrai : « Miami, Fl… » encore en cours) et la liste montre d'abord les
   // anciennes suggestions → on attend que le dernier mot de la recherche soit dans le champ, puis que la liste suive
   const lastWord = loc.q.split(/[\s,]+/).filter(Boolean).pop()!.toLowerCase()
-  for (let k = 0; k < 10; k++) {
-    await sleep(1000)
-    const f = await readScreenWords(key, deviceId)
-    if (f?.words.some(o => Math.abs(o.cy - search.y) < 18 && o.text.toLowerCase().replace(/[^a-zäöüß]/g, '') === lastWord.replace(/[^a-zäöüß]/g, ''))) break
+  const waitTyped = async (): Promise<'done' | 'partial' | 'empty'> => {
+    let seen = false
+    for (let k = 0; k < 10; k++) {
+      await sleep(1000)
+      const f = await readScreenWords(key, deviceId)
+      const row = f?.words.filter(o => Math.abs(o.cy - search!.y) < 18 && !/^search$/i.test(o.text.replace(/[^a-z]/gi, ''))) ?? []
+      if (row.some(o => o.text.toLowerCase().replace(/[^a-zäöüß]/g, '') === lastWord.replace(/[^a-zäöüß]/g, ''))) return 'done'
+      if (row.some(o => /[a-z]{2,}/i.test(o.text))) seen = true
+    }
+    return seen ? 'partial' : 'empty'
+  }
+  // champ resté VIDE après 10 s (la saisie n'a pas pris) → on retape le champ et la ville, une seule fois.
+  // (Vérifier trop tôt retapait pendant la frappe : « Stuttgart, GermanyStuttgart… » → aucun résultat, vu le 24/11/2026.)
+  if (await waitTyped() === 'empty') {
+    hooks?.log?.('   champ de recherche resté vide → nouvelle saisie')
+    await tap(search.x, search.y); await sleep(1200)
+    await typeRich(key, deviceId, loc.q)
+    await waitTyped()
   }
   await sleep(2500)
   // 3. la bonne ligne (ville + pays/État, commençant par la ville), jamais la 1re au hasard
@@ -1437,7 +1458,7 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   for (let k = 0; k < 4 && !set; k++) {
     await sleep(1500)
     const v = await readScreenWords(key, deviceId)
-    set = !!v && sharePageShown(v.words, W, H) && v.words.some(o => loc.region.test(o.text.replace(/[,.]$/, ''))) && !v.words.some(o => /^locations$/i.test(o.text))
+    set = !!v && sharePageShown(v.words, W, H) && v.words.some(o => loc.region.test(o.text.replace(/[,.]$/, '')) || loc.city.test(o.text)) && !v.words.some(o => /^(locations|search)$/i.test(o.text))
   }
   if (set) { hooks?.log?.(`   ✓ localisation : ${loc.label}`); return true }
   hooks?.log?.('   ⚠ localisation non confirmée → publication sans');

@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "offre « Meta Verified » → fermée (aucun abonnement)": "“Meta Verified” offer → closed (no subscription)",
     "champ de recherche resté vide → nouvelle saisie": "search field still empty → typing again",
     "⚠ fil d’accueil non reconnu après le scroll": "⚠ home feed not recognised after scrolling",
     "⚠ Liste de ce navigateur seulement : colle le SQL": "⚠ This browser’s list only: paste the SQL",
@@ -5071,5 +5072,6 @@ export const EN: Dict = {
     ["{0}/{1} description(s) seulement après plusieurs essais ({2}) — relance dans quelques minutes", "only {0}/{1} caption(s) after several attempts ({2}) — relaunch in a few minutes"],
     ["accueil pas encore affiché → autre position ({0}/{1})", "home not shown yet → other position ({0}/{1})"],
     ["{0} 🚪 fin du compte précédent → Instagram fermé", "{0} 🚪 previous account done → Instagram closed"],
+    ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
   ],
 }
