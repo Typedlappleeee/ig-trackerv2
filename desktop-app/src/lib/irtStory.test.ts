@@ -133,3 +133,12 @@ describe('écrans Meta « pub » : suite', () => {
     expect(adsConsentTaps([...base, { text: 'OK', cx: 180, cy: 590 }], 360, 640)).toEqual([{ x: 180, y: 590 }])
   })
 })
+
+import { captionEditorOpen } from './iremotechVision'
+describe('éditeur de légende (OK = coche sans texte)', () => {
+  it('ouvert : titre Caption + puces Hashtags/Poll/Prompt ; fermé sur la page de partage', () => {
+    const H = 600
+    expect(captionEditorOpen([{ text: 'Caption', cy: 33 }, { text: 'Hashtags', cy: 170 }, { text: 'Poll', cy: 170 }, { text: 'Prompt', cy: 170 }], H)).toBe(true)
+    expect(captionEditorOpen([{ text: 'Tag', cy: 420 }, { text: 'Share', cy: 545 }, { text: 'Hashtags', cy: 367 }, { text: 'Poll', cy: 367 }], H)).toBe(false)
+  })
+})

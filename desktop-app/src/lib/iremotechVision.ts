@@ -505,6 +505,16 @@ export function adsConsentTaps(words: { text: string; cx: number; cy: number }[]
   return ok && !has(/^subscribe$/i) ? [{ x: ok.cx, y: ok.cy }] : null
 }
 
+/** Éditeur plein écran « Caption » encore ouvert : titre « Caption » en haut ET (OK / Done en haut, ou les puces
+ *  « Hashtags / Poll / Prompt » sous le texte). Depuis le 24/11/2026 le OK est une coche bleue SANS texte en haut à
+ *  droite : sans les puces, ScaleFlow croyait l'éditeur fermé et tapait Share dessous (rien n'était publié). Pure. */
+export function captionEditorOpen(words: { text: string; cy: number }[], H: number): boolean {
+  const title = words.some(o => /^(caption|l[ée]gende)$/i.test(o.text) && o.cy < H * 0.1)
+  const ok = words.some(o => /^(ok|done)$/i.test(o.text) && o.cy < H * 0.1)
+  const chips = words.filter(o => /^(hashtags|poll|prompt)$/i.test(o.text) && o.cy < H * 0.45).length >= 2
+  return title && (ok || chips)
+}
+
 /** Feuille « Finish setting up your profile » (ou autre feuille à gros bouton bleu « Continue » + lien « Not now »
  *  dessous) : point du lien « Not now » — JAMAIS « Continue ». Vu en vrai le 24/11/2026 pendant le scroll des Reels
  *  entre deux posts. Pure. */
@@ -964,6 +974,12 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     hooks?.log?.('   validation « OK »…')
     await tapButton(key, deviceId, [/^ok$/i], A.okBtn, W, H, hooks, [0, 0.14], 'OK légende')
     await sleep(1400)
+    for (let k = 0; k < 3; k++) { // OK = coche bleue sans texte : éditeur encore ouvert → ✓ haut-droite, vérifié
+      const ce = await readScreenWords(key, deviceId)
+      if (!ce || !captionEditorOpen(ce.words, ce.H)) break
+      hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
+      await tapFrac(0.9, [0.064, 0.076, 0.054][k]); await sleep(1500)
+    }
   }
   // 7. Publier : « Share » direct, sinon un « Next » intermédiaire puis « Share ».
   //    Si Share n'est jamais détecté → on abandonne (container suivant).
@@ -1160,10 +1176,9 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     // Éditeur « Caption » encore ouvert (un hashtag en fin de texte ouvre des suggestions, vu en vrai) → OK, vérifié.
     for (let k = 0; k < 3; k++) {
       const ce = await readScreenWords(key, deviceId)
-      const editorOpen = !!ce && ce.words.some(o => /^(caption|l[ée]gende)$/i.test(o.text) && o.cy < ce.H * 0.08) && ce.words.some(o => /^(ok|done)$/i.test(o.text) && o.cy < ce.H * 0.1)
-      if (!editorOpen) break
-      hooks?.log?.('   éditeur de légende encore ouvert → OK')
-      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.064 * H) })
+      if (!ce || !captionEditorOpen(ce.words, ce.H)) break
+      hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round([0.064, 0.076, 0.054][k] * H) })
       await sleep(1500)
     }
   }

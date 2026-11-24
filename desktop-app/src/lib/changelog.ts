@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24f',
+    date: '2026-11-24',
+    title: { fr: 'iRemoTech : légende validée avec la nouvelle coche', en: 'iRemoTech: caption confirmed with the new checkmark' },
+    items: {
+      fr: ['Instagram a remplacé le bouton « OK » de l’éditeur de légende par une coche bleue en haut à droite : ScaleFlow la tape et vérifie que l’éditeur est fermé avant de publier (sinon le Reel n’était pas publié).'],
+      en: ['Instagram replaced the caption editor’s “OK” button with a blue checkmark at the top right: ScaleFlow taps it and checks the editor is closed before posting (otherwise the Reel was not posted).'],
+    },
+  },
+  {
     id: '2026-11-24e',
     date: '2026-11-24',
     title: { fr: 'iRemoTech : popups Instagram gérés', en: 'iRemoTech: Instagram popups handled' },

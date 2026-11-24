@@ -4036,6 +4036,7 @@ export const EN: Dict = {
     "page « Locations » → Cancel": "“Locations” page → Cancel",
     "feuille d’info Instagram (« Introducing… ») → OK": "Instagram info sheet (“Introducing…”) → OK",
     "feuille « Finish setting up your profile » → Not now": "“Finish setting up your profile” sheet → Not now",
+    "éditeur de légende encore ouvert → ✓ (haut-droite)": "caption editor still open → ✓ (top right)",
     "écran Meta « pub » (UE) → version gratuite avec pub, on continue": "Meta “ads” screen (EU) → free version with ads, continuing",
     "📷 « Allow Instagram to access your camera and microphone » → Continue": "📷 “Allow Instagram to access your camera and microphone” → Continue",
     "iPhone normal : plusieurs comptes connectés dans Instagram": "Regular iPhone: several accounts logged in to Instagram",
