@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24h',
+    date: '2026-11-24',
+    title: { fr: 'Descriptions IA : plus de « aucun modèle disponible »', en: 'AI captions: no more “no model available”' },
+    items: {
+      fr: ['Descriptions générées par lots de 10 (au lieu de 20) sans renvoyer tout l’historique : la limite de débit de Groq n’est plus dépassée. Si un modèle est saturé, ScaleFlow passe au suivant ; si tout échoue, la vraie raison s’affiche.'],
+      en: ['Captions generated in batches of 10 (instead of 20) without resending the whole history: Groq’s rate limit is no longer exceeded. If a model is saturated, ScaleFlow moves to the next one; if all fail, the real reason is shown.'],
+    },
+  },
+  {
     id: '2026-11-24g',
     date: '2026-11-24',
     title: { fr: 'Accueil et Explorer : nouveaux visuels', en: 'Home and Explore: new visuals' },

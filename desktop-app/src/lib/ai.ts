@@ -65,6 +65,15 @@ export const TEXT_MODELS = [
 export function isModelUnavailable(msg: string): boolean {
   return /model_not_found|does not exist|do not have access|decommission|no longer supported|not supported|404|model.*(invalid|unknown)/i.test(msg)
 }
+/** Limite de débit / demande trop grosse pour CE modèle (quotas par modèle chez Groq) : on essaie le suivant. Pure. */
+export function isModelBusy(msg: string): boolean {
+  return /rate.?limit|tokens per minute|requests per minute|\bTPM\b|\bRPM\b|too large|429|413|over capacity|overloaded|503|try again in/i.test(msg)
+}
+/** Raison lisible d'une erreur Groq (message de l'API si présent). Pure. */
+export function groqReason(msg: string): string {
+  const m = /"message"\s*:\s*"([^"]+)"/.exec(msg)
+  return (m ? m[1] : msg).replace(/ in organization `[^`]+`/, '').slice(0, 220)
+}
 /** Retire un éventuel raisonnement affiché (« <think>…</think> » de certains modèles). Pure. */
 export function stripThinking(t: string): string {
   return t.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
@@ -83,9 +92,14 @@ export async function groqText(groqKey: string, messages: unknown[], maxTokens =
       return clean
     } catch (e) {
       lastErr = e
-      if (!isModelUnavailable(e instanceof Error ? e.message : String(e))) throw e // autre erreur (clé, quota…) : on la remonte
+      const msg = e instanceof Error ? e.message : String(e)
+      // modèle retiré OU limite de débit propre à ce modèle → modèle suivant ; autre erreur (clé invalide…) → remontée
+      if (!isModelUnavailable(msg) && !isModelBusy(msg)) throw new Error(groqReason(msg))
     }
   }
-  if (lastErr) throw new Error('aucun modèle Groq disponible pour cette clé')
+  if (lastErr) {
+    const msg = lastErr instanceof Error ? lastErr.message : String(lastErr)
+    throw new Error(`aucun modèle Groq n’a répondu (dernière erreur : ${groqReason(msg)})`)
+  }
   return null
 }

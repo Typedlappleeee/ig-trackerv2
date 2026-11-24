@@ -220,15 +220,18 @@ export function splitCaptions(raw: string): string[] {
     .filter(c => c.length > 0 && !/^(here are|voici|hier sind)\b/i.test(c))
 }
 
-/** N descriptions pour le marché (lots de 20 au plus, dans la même conversation pour ne jamais répéter). */
+/** N descriptions pour le marché (lots de 10, avec le lot précédent en mémoire pour ne pas répéter). */
 export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void): Promise<string[]> {
   if (!groqKey) throw new Error('clé Groq manquante (Réglages › Intégrations)')
   const out: string[] = []
   const messages: { role: string; content: string }[] = [{ role: 'system', content: marketPrompt(m) }]
-  for (let guard = 0; out.length < n && guard < Math.ceil(n / 20) + 3; guard++) {
-    const ask = Math.min(20, n - out.length)
+  // Lots de 10, et seulement le DERNIER échange renvoyé (pas toute la conversation) : sinon la 2e demande dépassait la
+  // limite de jetons par minute de Groq (« aucun modèle disponible » à 30 descriptions, vu le 24/11/2026).
+  for (let guard = 0; out.length < n && guard < Math.ceil(n / 10) + 3; guard++) {
+    const ask = Math.min(10, n - out.length)
     messages.push({ role: 'user', content: String(ask) })
-    const raw = await groqText(groqKey, messages, Math.min(6000, 150 * ask + 800), 1)
+    const req = messages.length > 4 ? [messages[0], ...messages.slice(-3)] : messages
+    const raw = await groqText(groqKey, req, Math.min(4000, 150 * ask + 600), 1)
     if (!raw) break
     messages.push({ role: 'assistant', content: raw })
     const got = splitCaptions(raw).filter(c => !out.includes(c))

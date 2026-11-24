@@ -5057,5 +5057,6 @@ export const EN: Dict = {
     ["Supprimer le groupe « {0} » ?", "Delete the group “{0}”?"],
     ["{0} iPhone(s) → {1}", "{0} iPhone(s) → {1}"],
     ["Mettre les {0} iPhone(s) cochés dans…", "Put the {0} selected iPhone(s) in…"],
+    ["aucun modèle Groq n’a répondu (dernière erreur : {0})", "no Groq model answered (last error: {0})"],
   ],
 }

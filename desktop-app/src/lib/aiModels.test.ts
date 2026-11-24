@@ -18,3 +18,15 @@ describe('Groq — modèles de secours', () => {
     expect(TEXT_MODELS.length).toBeGreaterThan(3)
   })
 })
+
+import { isModelBusy, groqReason } from './ai'
+describe('Groq : limite de débit → modèle suivant, vraie raison affichée', () => {
+  it('limite de débit / demande trop grosse reconnues', () => {
+    expect(isModelBusy('{"error":{"message":"Request too large for model `x` in organization `o` on tokens per minute (TPM): Limit 6000, Requested 7400","code":"rate_limit_exceeded"}}')).toBe(true)
+    expect(isModelBusy('Groq HTTP 429')).toBe(true)
+    expect(isModelBusy('{"error":{"message":"Invalid API Key"}}')).toBe(false)
+  })
+  it('raison lisible', () => {
+    expect(groqReason('{"error":{"message":"Invalid API Key","type":"invalid_request_error"}}')).toBe('Invalid API Key')
+  })
+})
