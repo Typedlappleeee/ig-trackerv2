@@ -55,7 +55,6 @@ const Brand = () => <span className="sfl-brand"><LogoTile s={26} /><span>ScaleFl
 
 // ── Données (alignées sur l'app : tarifs, coûts, fonctionnalités réelles) ──────
 const NAV: [string, string][] = [['#live', 'Le produit'], ['#features', 'Fonctionnalités'], ['#pricing', 'Tarifs'], ['#faq', 'FAQ']]
-const MARQUEE = ['Mass Posting', 'Stories avec lien', 'Veille Reels', 'Studio vidéo', 'Programmation', 'Warmup', 'Flow Builder', 'Liens trackés', 'Instagram', 'TikTok']
 const STEPS: [string, string, string][] = [
   ['01', 'Connecte GeeLark', 'Colle ton token : ScaleFlow importe tous tes cloud phones et leurs comptes en quelques secondes.'],
   ['02', 'Charge ton contenu', 'Importe tes vidéos dans la banque, ou génère des dizaines de variantes uniques avec le Studio.'],
@@ -117,24 +116,6 @@ function Phone({ n, delay = 0, status = true, className, style }: { n: number; d
         <span className="sfl-ph-user"><i style={{ backgroundImage: `url(${photo(n + 5)})` }} />@{handle(n)}</span>
         <span className="sfl-ph-cap" /><span className="sfl-ph-cap sfl-ph-cap2" />
       </span>
-    </div>
-  )
-}
-
-// Mur de téléphones du hero : colonnes qui défilent en sens alternés, en perspective.
-function PhoneWall({ cols = 7, per = 5, seed = 0 }: { cols?: number; per?: number; seed?: number }) {
-  return (
-    <div className="sfl-wall" aria-hidden="true">
-      <div className="sfl-wall-in">
-        {Array.from({ length: cols }, (_, c) => (
-          <div key={c} className={'sfl-col ' + (c % 2 ? 'sfl-col-dn' : 'sfl-col-up')} style={{ animationDuration: `${46 + (c % 3) * 9}s` }}>
-            {[0, 1].map(dup => Array.from({ length: per }, (_, i) => {
-              const n = seed + c * 3 + i * 2
-              return <Phone key={`${dup}-${i}`} n={n} delay={((c * 1.7 + i * 2.3) % 6)} />
-            }))}
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
@@ -465,31 +446,22 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
       </header>
 
       <main>
-        {/* HERO : mur de téléphones qui publient */}
-        <section id="top" className="sfl-hero">
-          {/* Fond : mur de téléphones filmé (généré avec Higgsfield), boucle aller-retour de 10 s */}
-          <video className="sfl-hero-vid" src="/site/hero-loop.mp4" poster="/site/hero-poster.webp" autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
-          <div className="sfl-hero-veil" aria-hidden="true" />
-          <div className="sfl-wrap sfl-hero-in">
+        {/* HERO : photo d'une vraie ferme de téléphones, texte à gauche */}
+        <section id="top" className="sfl-hero sfl-hero2">
+          <img className="sfl-hero-img" src="/site/photo-a.webp" alt="" aria-hidden="true" decoding="async" fetchPriority="high" />
+          <div className="sfl-hero-veil2" aria-hidden="true" />
+          <div className="sfl-wrap sfl-hero2-in">
             <span className="sfl-pill sfl-rv"><i className="sfl-dot" />Instagram · TikTok · cloud phones GeeLark</span>
-            <h1 className="sfl-h1 sfl-rv" style={dl(80)}><span>Un clic.</span><span className="sfl-grad">Cent comptes.</span></h1>
-            <p className="sfl-hero-sub sfl-rv" style={dl(160)}>Publication en masse, stories, programmation, warmup et studio vidéo dans un seul poste de pilotage. Ce qui te prenait la semaine part en quelques minutes.</p>
+            <h1 className="sfl-h1b sfl-rv" style={dl(80)}>Un clic.<br /><span>Cent comptes.</span></h1>
+            <p className="sfl-hero-sub2 sfl-rv" style={dl(160)}>Publication en masse, stories, programmation, warmup et studio vidéo dans un seul poste de pilotage. Ce qui te prenait la semaine part en quelques minutes.</p>
             <div className="sfl-rv" style={dl(240)}>{cta(true)}</div>
-            <div className="sfl-hero-facts sfl-rv" style={dl(320)}>
+            <dl className="sfl-facts2 sfl-rv" style={dl(320)}>
               {[['×100', 'comptes en parallèle'], ['2 cr', 'par Reel publié'], ['0 €', 'les outils vidéo'], ['24/7', 'PC éteint, ça poste']].map(([v, l]) => (
-                <span key={l}><b>{v}</b>{l}</span>
+                <div key={l}><dt>{v}</dt><dd>{l}</dd></div>
               ))}
-            </div>
+            </dl>
           </div>
-          <a href="#live" className="sfl-scroll" aria-label="Défiler"><i /></a>
         </section>
-
-        {/* BANDEAU */}
-        <div className="sfl-marq" aria-hidden="true">
-          <div className="sfl-marq-track">
-            {[0, 1].map(k => MARQUEE.map((m, i) => <span key={`${k}-${i}`} className={'sfl-marq-i' + (i % 2 ? ' sfl-outline' : '')}>{m}<em>✦</em></span>))}
-          </div>
-        </div>
 
         {/* LE PRODUIT EN DIRECT */}
         <section id="live" className="sfl-sec">
@@ -503,6 +475,15 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
               </ul>
             </div>
             <div className="sfl-rv" style={dl(100)}><LiveRun /></div>
+          </div>
+        </section>
+
+        {/* BANDEAU PHOTO */}
+        <section className="sfl-band" aria-label="Ta ferme de téléphones">
+          <img src="/site/photo-b.webp" alt="Des téléphones en charge sur un bureau, chacun connecté à un compte" loading="lazy" decoding="async" />
+          <div className="sfl-band-veil" aria-hidden="true" />
+          <div className="sfl-wrap sfl-band-in sfl-rv">
+            <p>Des dizaines de téléphones.<br /><span>Un seul écran pour tout piloter.</span></p>
           </div>
         </section>
 
@@ -574,11 +555,11 @@ export function SiteLanding({ onStudio }: { onStudio: () => void }) {
 
         {/* CTA FINAL */}
         <section className="sfl-final">
-          <PhoneWall cols={9} per={4} seed={4} />
-          <div className="sfl-final-veil" aria-hidden="true" />
+          <img className="sfl-final-img" src="/site/photo-c.webp" alt="" aria-hidden="true" loading="lazy" decoding="async" />
+          <div className="sfl-final-veil sfl-final-veil2" aria-hidden="true" />
           <div className="sfl-wrap sfl-final-in sfl-rv">
             <span className="sfl-kick">● C’est le moment</span>
-            <h2 className="sfl-h1 sfl-h1-final"><span>Prêt à</span><span className="sfl-grad">scaler ?</span></h2>
+            <h2 className="sfl-h1b sfl-h1b-final">Prêt à <span>scaler ?</span></h2>
             <p className="sfl-hero-sub">Connecte ton GeeLark, charge tes vidéos et lance ton premier run aujourd’hui.</p>
             {cta(true)}
           </div>
@@ -697,8 +678,6 @@ const CSS = `
 .sfl-col-dn{animation-name:sflDn}
 @keyframes sflUp{from{transform:translateY(0)}to{transform:translateY(calc(-50% - 11px))}}
 @keyframes sflDn{from{transform:translateY(calc(-50% - 11px))}to{transform:translateY(0)}}
-.sfl-hero-vid{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;opacity:.9}
-@media (prefers-reduced-motion:reduce){.sfl-hero-vid{display:none}.sfl-hero{background:#0A0A0B url(/site/hero-poster.webp) center/cover no-repeat}}
 .sfl-hero-veil{position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse 56% 58% at 50% 52%,rgba(10,10,11,.82) 0%,rgba(10,10,11,.55) 50%,rgba(10,10,11,.15) 100%),linear-gradient(180deg,rgba(10,10,11,.85) 0%,transparent 18%,transparent 78%,#0A0A0B 100%)}
 .sfl-hero-in{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:120px;padding-bottom:110px}
 .sfl-pill{display:inline-flex;align-items:center;gap:9px;height:32px;padding:0 14px;border-radius:99px;border:1px solid rgba(167,139,250,.35);background:rgba(167,139,250,.1);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-size:12.5px;font-weight:700;color:var(--v2)}
@@ -965,6 +944,47 @@ const CSS = `
   .sfl-root *{animation:none!important;transition:none!important}
   .sfl-rv{opacity:1;transform:none}
   .sfl-st-a{opacity:1}
+}
+
+/* ── Refonte : sobre, photo réelle, typo éditoriale ── */
+.sfl-root{--grad:linear-gradient(180deg,#8B7CF6,#7462E8)}
+.sfl-btn-p{background:#F4F4F5;color:#0A0A0B;box-shadow:none}
+.sfl-btn-p:hover{background:#fff}
+.sfl-pill{border-color:var(--b2);background:rgba(10,10,11,.55);color:var(--t2)}
+.sfl-dot{background:#22C55E !important;box-shadow:0 0 0 3px rgba(34,197,94,.18) !important}
+.sfl-kick{color:var(--t3);font-weight:700}
+.sfl-h2{text-transform:none;font-weight:700;letter-spacing:-0.045em;line-height:1.02;font-size:clamp(34px,4.6vw,60px)}
+.sfl-grey{color:#6B6B74}
+.sfl-feat h3{text-transform:none;font-weight:700;letter-spacing:-0.035em;line-height:1.1}
+.sfl-hero2{align-items:flex-end}
+.sfl-hero-img{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;object-position:62% 50%;filter:saturate(.85)}
+.sfl-hero-veil2{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(10,10,11,.94) 0%,rgba(10,10,11,.78) 38%,rgba(10,10,11,.2) 75%,rgba(10,10,11,.35) 100%),linear-gradient(180deg,rgba(10,10,11,.7) 0%,transparent 22%,transparent 70%,#0A0A0B 100%)}
+.sfl-hero2-in{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding-top:150px;padding-bottom:84px;max-width:1180px}
+.sfl-h1b{margin:24px 0 0;font-weight:700;letter-spacing:-0.055em;line-height:.95;font-size:clamp(52px,8vw,112px);color:var(--t1)}
+.sfl-h1b span{color:#8E8E98}
+.sfl-hero-sub2{margin:26px 0 0;max-width:540px;font-size:clamp(15px,1.4vw,18px);line-height:1.6;color:#C4C4CC}
+.sfl-hero2-in .sfl-ctas{margin-top:32px;justify-content:flex-start}
+.sfl-facts2{margin:56px 0 0;display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--b2);padding-top:22px;width:100%;max-width:720px}
+.sfl-facts2 div{flex:1 1 140px;padding-right:20px}
+.sfl-facts2 dt{font-size:26px;font-weight:700;letter-spacing:-0.04em;color:var(--t1);line-height:1}
+.sfl-facts2 dd{margin:6px 0 0;font-size:12.5px;color:var(--t3)}
+.sfl-band{position:relative;isolation:isolate;overflow:hidden;min-height:520px;display:flex;align-items:flex-end}
+.sfl-band img{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;filter:saturate(.8)}
+.sfl-band-veil{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,#0A0A0B 0%,rgba(10,10,11,.15) 30%,rgba(10,10,11,.3) 60%,#0A0A0B 100%)}
+.sfl-band-in{padding-bottom:64px}
+.sfl-band-in p{margin:0;font-size:clamp(28px,4vw,52px);font-weight:700;letter-spacing:-0.045em;line-height:1.05;color:var(--t1)}
+.sfl-band-in p span{color:#A1A1AA}
+.sfl-final-img{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;filter:saturate(.8)}
+.sfl-final-veil2{background:radial-gradient(ellipse 60% 70% at 50% 50%,rgba(10,10,11,.85),rgba(10,10,11,.55) 70%,rgba(10,10,11,.75)) !important}
+.sfl-h1b-final{font-size:clamp(46px,7vw,96px)}
+.sfl-step h3{text-transform:none;font-weight:700;letter-spacing:-0.03em}
+.sfl-step-n{opacity:.55}
+@media (max-width:760px){
+  .sfl-hero-img{object-position:70% 50%}
+  .sfl-hero-veil2{background:linear-gradient(180deg,rgba(10,10,11,.6) 0%,rgba(10,10,11,.85) 45%,#0A0A0B 100%)}
+  .sfl-hero2-in{padding-top:120px;padding-bottom:56px}
+  .sfl-facts2 div{flex:1 1 45%;margin-bottom:14px}
+  .sfl-band{min-height:380px}
 }
 `
 

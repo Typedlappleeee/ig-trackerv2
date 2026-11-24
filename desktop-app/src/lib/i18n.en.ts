@@ -7,6 +7,10 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Ta ferme de téléphones": "Your phone farm",
+    "Des téléphones en charge sur un bureau, chacun connecté à un compte": "Phones charging on a desk, each one logged into an account",
+    "Des dizaines de téléphones.": "Dozens of phones.",
+    "Un seul écran pour tout piloter.": "One screen to run them all.",
     "＋ Créer un groupe": "＋ Create a group",
     "Les iPhones du groupe passent « Sans groupe » (rien d’autre n’est touché).": "The group’s iPhones become “No group” (nothing else is changed).",
     "Supprimer ce groupe": "Delete this group",

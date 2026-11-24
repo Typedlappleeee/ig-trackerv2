@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-24',
     title: { fr: 'Nouvelle page d’accueil', en: 'New home page' },
     items: {
-      fr: ['La page publique de ScaleFlow a une nouvelle vidéo en fond : un mur de téléphones qui publient, en boucle.'],
-      en: ['ScaleFlow’s public page has a new background video: a looping wall of phones posting.'],
+      fr: ['Page publique refaite : plus sobre, photos d’une vraie ferme de téléphones, titres plus lisibles, mise en page éditoriale.'],
+      en: ['Public page redesigned: more understated, photos of a real phone farm, more readable headings, editorial layout.'],
     },
   },
   {
