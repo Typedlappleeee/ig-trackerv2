@@ -231,7 +231,15 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
     const ask = Math.min(10, n - out.length)
     messages.push({ role: 'user', content: String(ask) })
     const req = messages.length > 4 ? [messages[0], ...messages.slice(-3)] : messages
-    const raw = await groqText(groqKey, req, Math.min(4000, 150 * ask + 600), 1)
+    let raw: string | null = null
+    try { raw = await groqText(groqKey, req, Math.min(4000, 150 * ask + 600), 1) }
+    catch (e) {
+      // lot raté (relais Groq lent, limite de débit…) : une 2e chance après une pause, sans perdre ce qui est déjà généré
+      onLog?.(`   ⏳ lot raté (${e instanceof Error ? e.message.slice(0, 90) : 'erreur'}) → nouvel essai dans 15 s`)
+      await new Promise(r => setTimeout(r, 15000))
+      try { raw = await groqText(groqKey, req, Math.min(4000, 150 * ask + 600), 1) }
+      catch (e2) { if (out.length) { onLog?.(`   ⚠ génération arrêtée à ${out.length}/${n}`); break } throw e2 }
+    }
     if (!raw) break
     messages.push({ role: 'assistant', content: raw })
     const got = splitCaptions(raw).filter(c => !out.includes(c))

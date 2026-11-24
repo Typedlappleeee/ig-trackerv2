@@ -5058,5 +5058,8 @@ export const EN: Dict = {
     ["{0} iPhone(s) → {1}", "{0} iPhone(s) → {1}"],
     ["Mettre les {0} iPhone(s) cochés dans…", "Put the {0} selected iPhone(s) in…"],
     ["aucun modèle Groq n’a répondu (dernière erreur : {0})", "no Groq model answered (last error: {0})"],
+    ["relais Groq indisponible (HTTP {0}) — try again in a moment", "Groq relay unavailable (HTTP {0}) — try again in a moment"],
+    ["⏳ lot raté ({0}) → nouvel essai dans 15 s", "⏳ batch failed ({0}) → retrying in 15 s"],
+    ["⚠ génération arrêtée à {0}/{1}", "⚠ generation stopped at {0}/{1}"],
   ],
 }

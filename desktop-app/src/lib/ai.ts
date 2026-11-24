@@ -28,7 +28,10 @@ export async function groqChat(groqKey: string, model: string, messages: unknown
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey: groqKey, model, messages, temperature, maxTokens }),
     })
-    const j = await res.json() as { ok: boolean; error?: string; data?: any }   // eslint-disable-line @typescript-eslint/no-explicit-any
+    // Le relais peut répondre une page d'erreur Vercel (« An error occurred… », délai dépassé) au lieu de JSON
+    const txt = await res.text()
+    let j: { ok: boolean; error?: string; data?: any }   // eslint-disable-line @typescript-eslint/no-explicit-any
+    try { j = JSON.parse(txt) } catch { throw new Error(`relais Groq indisponible (HTTP ${res.status}) — try again in a moment`) }
     if (!j.ok) throw new Error(j.error || 'Groq indisponible')
     const t = j.data?.choices?.[0]?.message?.content
     return typeof t === 'string' ? t : null
