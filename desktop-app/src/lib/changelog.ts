@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24i',
+    date: '2026-11-24',
+    title: { fr: 'Genjutsu : les derniers rendus ne disparaissent plus', en: 'Genjutsu: latest renders no longer disappear' },
+    items: {
+      fr: ['Quand le stockage du navigateur était plein, les derniers rendus Genjutsu n’étaient plus enregistrés et disparaissaient au rechargement. ScaleFlow allège maintenant les anciens rendus terminés pour toujours garder les nouveaux.'],
+      en: ['When the browser storage was full, the latest Genjutsu renders were no longer saved and disappeared on reload. ScaleFlow now slims down old finished renders to always keep the new ones.'],
+    },
+  },
+  {
     id: '2026-11-24h',
     date: '2026-11-24',
     title: { fr: 'Descriptions IA : plus de « aucun modèle disponible »', en: 'AI captions: no more “no model available”' },

@@ -639,9 +639,23 @@ function recoverAfterReload(j: GjJob): GjJob {
   return j
 }
 const subs = new Set<() => void>()
+/** Écrit la file en gardant TOUJOURS les rendus récents : si le stockage du navigateur est plein (vu le 24/11/2026,
+ *  les 3 derniers rendus n'apparaissaient plus après un rechargement), on allège les anciens rendus terminés
+ *  (prompt, erreur) puis on en garde de moins en moins — jamais l'inverse. true si enregistré. */
+export function saveJobs(list: GjJob[], set: (k: string, v: string) => void = (k, v) => localStorage.setItem(k, v)): boolean {
+  const lite = (j: GjJob, i: number): GjJob => i < 40 || isActive(j.status) || j.status === 'waiting' ? j : { ...j, prompt: '', error: j.error ? j.error.slice(0, 120) : j.error }
+  for (const n of [300, 150, 80, 40, 15]) {
+    try { set(JOBS_KEY, JSON.stringify(list.slice(0, n).map(lite))); return true } catch { /* plein : on garde moins d'anciens */ }
+  }
+  return false
+}
 function commit(next: GjJob[]): void {
   jobs = next
-  writeJson(JOBS_KEY, jobs.slice(0, 300))
+  if (!saveJobs(jobs)) {
+    // toujours plein : on libère les caches de Genjutsu (reconstruits à la demande) puis on réessaie
+    for (const k of [SRC_KEY, IMPORT_KEY, 'sf-gj-refs', 'sf-gj-trims']) { try { localStorage.removeItem(k) } catch { /* noop */ } }
+    saveJobs(jobs)
+  }
   subs.forEach(f => f())
 }
 const patch = (id: string, p: Partial<GjJob>) => commit(jobs.map(j => j.id === id ? { ...j, ...p } : j))
