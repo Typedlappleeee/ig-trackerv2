@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24e',
+    date: '2026-11-24',
+    title: { fr: 'iRemoTech : popup « Finish setting up your profile » géré', en: 'iRemoTech: “Finish setting up your profile” popup handled' },
+    items: {
+      fr: ['Si Instagram affiche « Finish setting up your profile » (pendant le scroll entre deux posts ou avant un post), ScaleFlow tape « Not now » et continue le posting.'],
+      en: ['If Instagram shows “Finish setting up your profile” (while scrolling between posts or before a post), ScaleFlow taps “Not now” and keeps posting.'],
+    },
+  },
+  {
     id: '2026-11-24d',
     date: '2026-11-24',
     title: { fr: 'Nouvelle page d’accueil', en: 'New home page' },

@@ -466,10 +466,30 @@ export function okAboveSettingsLink(words: { text: string; cx: number; cy: numbe
   return lk ? { y: lk.cy - Math.round(0.068 * H) } : null
 }
 
+/** Feuille « Finish setting up your profile » (ou autre feuille à gros bouton bleu « Continue » + lien « Not now »
+ *  dessous) : point du lien « Not now » — JAMAIS « Continue ». Vu en vrai le 24/11/2026 pendant le scroll des Reels
+ *  entre deux posts. Pure. */
+export function notNowUnderContinue(words: { text: string; cx: number; cy: number }[], H: number): { x: number; y: number } | null {
+  const now = words.find(o => /^now$/i.test(o.text) && o.cy > H * 0.3
+    && words.some(p => /^not$/i.test(p.text) && Math.abs(p.cy - o.cy) < 14 && p.cx < o.cx))
+  const cont = words.find(o => /^continue$/i.test(o.text) && o.cy > H * 0.3)
+  const setup = words.some(o => /^finish$/i.test(o.text)) && words.some(o => /^setting$/i.test(o.text)) && words.some(o => /^profile\.?$/i.test(o.text))
+  if (!(setup || (cont && now && now.cy > cont.cy))) return null
+  if (now) { const n = words.find(p => /^not$/i.test(p.text) && Math.abs(p.cy - now.cy) < 14)!; return { x: Math.round((n.cx + now.cx) / 2), y: now.cy } }
+  return cont ? { x: cont.cx, y: cont.cy + Math.round(0.072 * H) } : null // « Not now » ~7 % sous « Continue »
+}
+
 export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
   const scr = await readScreenWords(key, deviceId)
   if (!scr) return false
   const has = (re: RegExp) => scr.words.some(o => re.test(o.text))
+  const nn = notNowUnderContinue(scr.words, scr.H)
+  if (nn) {
+    hooks?.log?.('   feuille « Finish setting up your profile » → Not now')
+    await sendAction(key, deviceId, { type: 'tap', x: nn.x, y: nn.y })
+    await sleep(1500)
+    return true
+  }
   // feuille d'info = un bouton « OK » centré dans la moitié basse, sans les boutons d'une alerte de permission iOS
   if (has(/^would$/i) && has(/^like$/i)) return false
   // boutons d'alerte à côté du OK (moitié basse) → ce n'est pas une simple feuille d'info
@@ -2209,6 +2229,9 @@ export async function warmupByVision(key: string, deviceId: string, opts: Warmup
 
   while (Date.now() < endAt) {
     if (hooks?.shouldStop?.()) break
+    // Toutes les 3 vidéos : une feuille Instagram (« Finish setting up your profile »…) a-t-elle recouvert les Reels ?
+    // Sinon le double-tap « like » ou le swipe tomberait dedans et la suite (post suivant) serait bloquée.
+    if (reels % 3 === 0 && await dismissIgInfoSheet(key, deviceId, hooks)) continue
     // Regarder le reel : dwell aléatoire (glance court OU visionnage plus long).
     const glance = Math.random() < glanceRate
     await sleep(Math.round(glance ? rnd(800, 2200) : rnd(3500, 9000)))
@@ -2238,6 +2261,7 @@ export async function warmupByVision(key: string, deviceId: string, opts: Warmup
   }
 
   hooks?.log?.(`🏁 Warm-up terminé : ${reels} reels · ${likes} likes · ${comments} comments.`)
+  await dismissIgInfoSheet(key, deviceId, hooks)
   if (opts.keepApp) {
     // session de posts : on reste dans Instagram, onglet Accueil (le post suivant part du fil)
     await sendAction(key, deviceId, { type: 'tap', x: Math.round(TAB.home.x * W), y: Math.round(TAB.y * H) })

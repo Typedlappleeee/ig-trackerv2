@@ -83,3 +83,17 @@ describe('+ depuis le profil → feuille « Create »', () => {
     expect(createSheetShown([{ text: 'New', cy: 50 }, { text: 'post', cy: 50 }, { text: 'POST', cy: 690 }, { text: 'STORY', cy: 690 }, { text: 'REEL', cy: 690 }], H)).toBe(false)
   })
 })
+
+import { notNowUnderContinue } from './iremotechVision'
+describe('feuille « Finish setting up your profile »', () => {
+  const H = 720
+  it('tape « Not now », jamais « Continue »', () => {
+    const w = [{ text: 'Finish', cx: 90, cy: 230 }, { text: 'setting', cx: 160, cy: 230 }, { text: 'profile', cx: 120, cy: 262 },
+      { text: 'Continue', cx: 200, cy: 530 }, { text: 'Not', cx: 185, cy: 582 }, { text: 'now', cx: 215, cy: 582 }]
+    expect(notNowUnderContinue(w, H)).toEqual({ x: 200, y: 582 })
+  })
+  it('« Not now » illisible : sous « Continue » ; rien sur un écran ordinaire', () => {
+    expect(notNowUnderContinue([{ text: 'Finish', cx: 90, cy: 230 }, { text: 'setting', cx: 160, cy: 230 }, { text: 'profile', cx: 120, cy: 262 }, { text: 'Continue', cx: 200, cy: 530 }], H)).toEqual({ x: 200, y: 582 })
+    expect(notNowUnderContinue([{ text: 'Follow', cx: 300, cy: 40 }, { text: 'Reels', cx: 60, cy: 40 }], H)).toBeNull()
+  })
+})
