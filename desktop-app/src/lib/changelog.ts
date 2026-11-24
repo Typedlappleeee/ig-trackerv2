@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-24',
     title: { fr: 'iRemoTech : popups Instagram gérés', en: 'iRemoTech: Instagram popups handled' },
     items: {
-      fr: ['Si Instagram affiche « Finish setting up your profile » (pendant le scroll entre deux posts ou avant un post), ScaleFlow tape « Not now » et continue le posting.', 'Écran « Allow Instagram to access your camera and microphone » → Continue, puis Allow sur les alertes iOS caméra / micro.'],
-      en: ['If Instagram shows “Finish setting up your profile” (while scrolling between posts or before a post), ScaleFlow taps “Not now” and keeps posting.', '“Allow Instagram to access your camera and microphone” screen → Continue, then Allow on the iOS camera / microphone alerts.'],
+      fr: ['Si Instagram affiche « Finish setting up your profile » (pendant le scroll entre deux posts ou avant un post), ScaleFlow tape « Not now » et continue le posting.', 'Écran « Allow Instagram to access your camera and microphone » → Continue, puis Allow sur les alertes iOS caméra / micro.', 'Écrans Meta « pub » (UE) : Get started → « Use free of charge with ads » (jamais l’abonnement payant) → Continue → Agree → OK.'],
+      en: ['If Instagram shows “Finish setting up your profile” (while scrolling between posts or before a post), ScaleFlow taps “Not now” and keeps posting.', '“Allow Instagram to access your camera and microphone” screen → Continue, then Allow on the iOS camera / microphone alerts.', 'Meta “ads” screens (EU): Get started → “Use free of charge with ads” (never the paid subscription) → Continue → Agree → OK.'],
     },
   },
   {

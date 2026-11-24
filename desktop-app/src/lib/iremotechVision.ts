@@ -479,6 +479,32 @@ export function okAboveSettingsLink(words: { text: string; cx: number; cy: numbe
   return lk ? { y: lk.cy - Math.round(0.068 * H) } : null
 }
 
+/** Écrans Meta « pub » (UE) pendant le posting. Pure : renvoie les taps à faire.
+ *  1. « Choose if we process your data for ads » → « Get started » ;
+ *  2. « Want to subscribe or continue using our products free of charge with ads? » → ligne « Use free of charge
+ *     with ads » (JAMAIS « Subscribe », payant) puis « Continue » ;
+ *  3. puis « Agree », puis « OK » (vu en vrai le 24/11/2026). */
+export function adsConsentTaps(words: { text: string; cx: number; cy: number }[], W: number, H: number): { x: number; y: number }[] | null {
+  const has = (re: RegExp) => words.some(o => re.test(o.text))
+  const btn = (re: RegExp, minY = 0.45) => words.find(o => re.test(o.text) && o.cy > H * minY)
+  const adsTalk = has(/^ads\??\.?$/i) && (has(/^meta$/i) || has(/^personali[sz]ed$/i) || has(/^consent$/i) || has(/^process$/i))
+  if (!adsTalk) return null
+  const gs = btn(/^started$/i)
+  if (gs && has(/^choose$/i)) return [{ x: Math.round(W / 2), y: gs.cy }]
+  if (has(/^subscribe$/i) && has(/^free$/i)) {
+    // « Use free of charge with ads » : mot « Use » en début de ligne, à côté de « free »
+    const use = words.find(o => /^use$/i.test(o.text) && o.cy > H * 0.35
+      && words.some(p => /^free$/i.test(p.text) && Math.abs(p.cy - o.cy) < 14 && p.cx > o.cx))
+    const cont = btn(/^continue$/i, 0.8)
+    const out: { x: number; y: number }[] = []
+    if (use) out.push({ x: Math.round(W * 0.5), y: use.cy })
+    out.push({ x: Math.round(W / 2), y: cont ? cont.cy : Math.round(0.925 * H) })
+    return out
+  }
+  const ok = btn(/^(agree|continue|confirm|ok)$/i, 0.6)
+  return ok && !has(/^subscribe$/i) ? [{ x: ok.cx, y: ok.cy }] : null
+}
+
 /** Feuille « Finish setting up your profile » (ou autre feuille à gros bouton bleu « Continue » + lien « Not now »
  *  dessous) : point du lien « Not now » — JAMAIS « Continue ». Vu en vrai le 24/11/2026 pendant le scroll des Reels
  *  entre deux posts. Pure. */
@@ -497,6 +523,25 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   if (!scr) return false
   const has = (re: RegExp) => scr.words.some(o => re.test(o.text))
   if (cameraSheet(scr.words, scr.H)) return grantPhotoAccessIfAsked(key, deviceId, hooks).then(() => true) // → Continue, puis Allow (caméra / micro)
+  const ads = adsConsentTaps(scr.words, scr.W, scr.H)
+  if (ads) {
+    // enchaînement Get started → gratuit avec pub + Continue → Agree → OK : on suit jusqu'à revenir sur Instagram
+    let taps: { x: number; y: number }[] | null = ads, okAfter = false
+    for (let k = 0; k < 6 && taps; k++) {
+      hooks?.log?.('   écran Meta « pub » (UE) → version gratuite avec pub, on continue')
+      for (const t of taps) { await sendAction(key, deviceId, { type: 'tap', x: t.x, y: t.y }); await sleep(1500) }
+      await sleep(2000)
+      const nx = await readScreenWords(key, deviceId)
+      if (!nx) break
+      taps = adsConsentTaps(nx.words, nx.W, nx.H)
+      if (!taps) {
+        // dernier écran « OK » (souvent sans le mot « ads ») : bouton OK seul dans la moitié basse
+        const ok = nx.words.find(o => /^(ok|agree)$/i.test(o.text) && o.cy > nx.H * 0.45) 
+        if (ok && !okAfter && !nx.words.some(o => /^subscribe$/i.test(o.text))) { okAfter = true; taps = [{ x: ok.cx, y: ok.cy }] }
+      }
+    }
+    return true
+  }
   const nn = notNowUnderContinue(scr.words, scr.H)
   if (nn) {
     hooks?.log?.('   feuille « Finish setting up your profile » → Not now')

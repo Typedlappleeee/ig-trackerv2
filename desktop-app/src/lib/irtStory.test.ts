@@ -107,3 +107,29 @@ describe('feuille caméra / micro', () => {
     expect(cameraSheet([{ text: 'Continue', cy: 660 }], 720)).toBe(false)
   })
 })
+
+import { adsConsentTaps } from './iremotechVision'
+describe('écrans Meta « pub » (UE)', () => {
+  const W = 360, H = 640
+  it('« Choose if we process your data for ads » → Get started', () => {
+    const w = [{ text: 'Choose', cx: 150, cy: 265 }, { text: 'process', cx: 170, cy: 297 }, { text: 'ads', cx: 220, cy: 329 }, { text: 'Get', cx: 155, cy: 481 }, { text: 'started', cx: 195, cy: 481 }]
+    expect(adsConsentTaps(w, W, H)).toEqual([{ x: 180, y: 481 }])
+  })
+  it('abonnement ou gratuit avec pub → ligne gratuite puis Continue, jamais Subscribe', () => {
+    const w = [{ text: 'Meta', cx: 180, cy: 90 }, { text: 'subscribe', cx: 250, cy: 140 }, { text: 'ads?', cx: 200, cy: 196 },
+      { text: 'Subscribe', cx: 90, cy: 338 }, { text: 'Use', cx: 60, cy: 468 }, { text: 'free', cx: 100, cy: 468 }, { text: 'Continue', cx: 180, cy: 586 }]
+    const t = adsConsentTaps(w, W, H)!
+    expect(t).toEqual([{ x: 180, y: 468 }, { x: 180, y: 586 }])
+    expect(t.some(p => p.y === 338)).toBe(false)
+  })
+  it('écran ordinaire → rien', () => {
+    expect(adsConsentTaps([{ text: 'Continue', cx: 180, cy: 600 }], W, H)).toBeNull()
+  })
+})
+describe('écrans Meta « pub » : suite', () => {
+  it('Agree puis OK', () => {
+    const base = [{ text: 'Meta', cx: 180, cy: 90 }, { text: 'personalized', cx: 180, cy: 200 }, { text: 'ads', cx: 240, cy: 200 }]
+    expect(adsConsentTaps([...base, { text: 'Agree', cx: 180, cy: 590 }], 360, 640)).toEqual([{ x: 180, y: 590 }])
+    expect(adsConsentTaps([...base, { text: 'OK', cx: 180, cy: 590 }], 360, 640)).toEqual([{ x: 180, y: 590 }])
+  })
+})
