@@ -97,3 +97,13 @@ describe('feuille « Finish setting up your profile »', () => {
     expect(notNowUnderContinue([{ text: 'Follow', cx: 300, cy: 40 }, { text: 'Reels', cx: 60, cy: 40 }], H)).toBeNull()
   })
 })
+
+import { cameraSheet } from './iremotechVision'
+describe('feuille caméra / micro', () => {
+  it('reconnue (→ Continue), pas l’alerte iOS ni un écran ordinaire', () => {
+    const w = [{ text: 'Allow', cy: 210 }, { text: 'access', cy: 230 }, { text: 'camera', cy: 236 }, { text: 'microphone', cy: 262 }, { text: 'Continue', cy: 660 }]
+    expect(cameraSheet(w, 720)).toBe(true)
+    expect(cameraSheet([...w, { text: 'Would', cy: 300 }], 720)).toBe(false)
+    expect(cameraSheet([{ text: 'Continue', cy: 660 }], 720)).toBe(false)
+  })
+})

@@ -163,6 +163,13 @@ export async function allowShortcutPrompt(key: string, deviceId: string, hooks?:
   return true
 }
 
+/** Feuille Instagram « Allow Instagram to access your camera and microphone » (bouton « Continue » seul). Pure. */
+export function cameraSheet(words: { text: string; cy: number }[], H: number): boolean {
+  const top = (re: RegExp) => words.some(o => re.test(o.text) && o.cy < H * 0.5)
+  return top(/^camera$/i) && top(/^microphone$/i) && top(/^(allow|access)$/i) && !words.some(o => /^would$/i.test(o.text))
+    && words.some(o => /^continue$/i.test(o.text) && o.cy > H * 0.7)
+}
+
 /** Pour PUBLIER, Instagram doit voir la galerie : feuille « Allow Instagram to access your photos and videos » →
  *  Continue, puis alerte iOS → « Allow Full Access » / « Allow Access to All Photos » (double tap : alerte iOS).
  *  (À l'inverse de l'inscription, où l'on refuse.) Autres alertes « would like to… » : caméra / micro → Allow ;
@@ -182,6 +189,12 @@ export async function grantPhotoAccessIfAsked(key: string, deviceId: string, hoo
       await sleep(3000)
       if (await settingsGrantAllPhotos(key, deviceId, hooks)) { relaunched = true; await sleep(6000) }
       continue
+    }
+    if (cameraSheet(scr.words, scr.H)) {
+      hooks?.log?.('📷 « Allow Instagram to access your camera and microphone » → Continue')
+      const c = scr.words.find(o => /^continue$/i.test(o.text) && o.cy > 0.7 * scr.H)
+      await sendAction(key, deviceId, { type: 'tap', x: c ? c.cx : Math.round(scr.W / 2), y: c ? c.cy : Math.round(0.93 * scr.H) })
+      await sleep(2500); continue // puis alertes iOS caméra / micro → Allow (règle plus bas)
     }
     if (has(/^access$/i, 0.3, 0.5) && has(/^videos$/i, 0.3, 0.5) && !has(/^please$/i)) {
       hooks?.log?.('🖼 Accès aux photos demandé → Continue')
@@ -483,6 +496,7 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   const scr = await readScreenWords(key, deviceId)
   if (!scr) return false
   const has = (re: RegExp) => scr.words.some(o => re.test(o.text))
+  if (cameraSheet(scr.words, scr.H)) return grantPhotoAccessIfAsked(key, deviceId, hooks).then(() => true) // → Continue, puis Allow (caméra / micro)
   const nn = notNowUnderContinue(scr.words, scr.H)
   if (nn) {
     hooks?.log?.('   feuille « Finish setting up your profile » → Not now')
@@ -491,6 +505,8 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
     return true
   }
   // feuille d'info = un bouton « OK » centré dans la moitié basse, sans les boutons d'une alerte de permission iOS
+  // alerte iOS « "Instagram" would like to access the Camera / Microphone » → Allow (via grantPhotoAccessIfAsked)
+  if (has(/^would$/i) && has(/^like$/i) && has(/^(camera|camera\.|microphone|microphone\.)$/i)) return grantPhotoAccessIfAsked(key, deviceId, hooks).then(() => true)
   if (has(/^would$/i) && has(/^like$/i)) return false
   // boutons d'alerte à côté du OK (moitié basse) → ce n'est pas une simple feuille d'info
   if (scr.words.some(o => /^(allow|don['’]?t|cancel|discard)$/i.test(o.text) && o.cy > scr.H * 0.4) && !has(/^introducing$/i)) return false
