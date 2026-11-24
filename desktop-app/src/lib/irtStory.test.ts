@@ -140,5 +140,7 @@ describe('éditeur de légende (OK = coche sans texte)', () => {
     const H = 600
     expect(captionEditorOpen([{ text: 'Caption', cy: 33 }, { text: 'Hashtags', cy: 170 }, { text: 'Poll', cy: 170 }, { text: 'Prompt', cy: 170 }], H)).toBe(true)
     expect(captionEditorOpen([{ text: 'Tag', cy: 420 }, { text: 'Share', cy: 545 }, { text: 'Hashtags', cy: 367 }, { text: 'Poll', cy: 367 }], H)).toBe(false)
+    // titre illisible mais liste des hashtags suggérés ouverte sous les puces → éditeur ouvert
+    expect(captionEditorOpen([{ text: 'Poll', cy: 200 }, { text: 'Prompt', cy: 200 }, { text: '#rvlifestyle', cy: 270 }, { text: 'posts', cy: 290 }, { text: '#gvlifestyle', cy: 330 }, { text: 'posts', cy: 350 }, { text: '#menslifestyle', cy: 390 }], H)).toBe(true)
   })
 })

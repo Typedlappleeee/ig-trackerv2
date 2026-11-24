@@ -515,10 +515,12 @@ async function tapCaptionCheck(key: string, deviceId: string, W: number, H: numb
  *  « Hashtags / Poll / Prompt » sous le texte). Depuis le 24/11/2026 le OK est une coche bleue SANS texte en haut à
  *  droite : sans les puces, ScaleFlow croyait l'éditeur fermé et tapait Share dessous (rien n'était publié). Pure. */
 export function captionEditorOpen(words: { text: string; cy: number }[], H: number): boolean {
-  const title = words.some(o => /^(caption|l[ée]gende)$/i.test(o.text) && o.cy < H * 0.1)
-  const ok = words.some(o => /^(ok|done)$/i.test(o.text) && o.cy < H * 0.1)
-  const chips = words.filter(o => /^(hashtags|poll|prompt)$/i.test(o.text) && o.cy < H * 0.45).length >= 2
-  return title && (ok || chips)
+  // titre « Caption » tout en haut = éditeur (la page de partage s'intitule « New reel / New post »)
+  const title = words.some(o => /^(caption|l[ée]gende)$/i.test(o.text) && o.cy < H * 0.12)
+  const chips = words.filter(o => /^(hashtags|poll|prompt)$/i.test(o.text) && o.cy < H * 0.45).length >= 1
+  // liste des hashtags suggérés (« #rvlifestyle · 814K posts »…) ouverte sous un « #… » en fin de légende
+  const suggest = words.filter(o => /^#\w/.test(o.text) && o.cy > H * 0.3).length >= 3 && words.filter(o => /^posts$/i.test(o.text)).length >= 2
+  return title || (chips && suggest)
 }
 
 /** Feuille « Finish setting up your profile » (ou autre feuille à gros bouton bleu « Continue » + lien « Not now »
@@ -1293,10 +1295,16 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   hooks?.log?.(`📍 Localisation : ${loc.label}…`)
   // 1. ligne « Add location » (sous « Tag people », souvent hors écran → on fait défiler la page de partage)
   let row: { x: number; y: number } | null = null
+  let closeTries = 0
   for (let k = 0; k < 3 && !row; k++) {
-    const scr = k ? await readScreenWords(key, deviceId) : s0
+    const scr = k || closeTries ? await readScreenWords(key, deviceId) : s0
     const lw = scr?.words.find(o => /^location$/i.test(o.text) && o.cy > H * 0.25 && o.cy < H * 0.9 && scr.words.some(a => /^add$/i.test(a.text) && Math.abs(a.cy - o.cy) < 12 && a.cx < o.cx))
     if (lw) { row = { x: lw.cx, y: lw.cy }; break }
+    // éditeur de légende encore ouvert (liste des hashtags suggérés) : JAMAIS de défilement ici → coche ✓ d'abord
+    if (scr && captionEditorOpen(scr.words, scr.H)) {
+      hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
+      await tapCaptionCheck(key, deviceId, W, H, scr.shot); await sleep(1600); k--; if (++closeTries > 3) break; continue
+    }
     await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(0.78 * H), x2: Math.round(W / 2), y2: Math.round(0.42 * H), duration_ms: 500 })
     await sleep(1200)
   }
