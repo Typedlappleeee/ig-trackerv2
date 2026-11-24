@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-24',
     title: { fr: 'iRemoTech : légende validée avec la nouvelle coche', en: 'iRemoTech: caption confirmed with the new checkmark' },
     items: {
-      fr: ['Instagram a remplacé le bouton « OK » de l’éditeur de légende par une coche bleue en haut à droite : ScaleFlow la tape et vérifie que l’éditeur est fermé avant de publier (coche repérée à sa couleur, aussi quand la liste des hashtags suggérés est ouverte). Plus de défilement dans cette liste pendant la recherche de « Add location ».'],
-      en: ['Instagram replaced the caption editor’s “OK” button with a blue checkmark at the top right: ScaleFlow taps it and checks the editor is closed before posting (checkmark found by its colour, even when the suggested hashtags list is open). No more scrolling in that list while looking for “Add location”.'],
+      fr: ['Instagram a remplacé le bouton « OK » de l’éditeur de légende par une coche bleue en haut à droite : ScaleFlow la tape et vérifie que l’éditeur est fermé avant de publier (coche repérée à sa couleur, aussi quand la liste des hashtags suggérés est ouverte). Plus de défilement dans cette liste pendant la recherche de « Add location ». Testé en vrai sur STEVIE2 : l’éditeur est reconnu à sa coche bleue (le titre « Caption » sur fond gris n’était pas lu).'],
+      en: ['Instagram replaced the caption editor’s “OK” button with a blue checkmark at the top right: ScaleFlow taps it and checks the editor is closed before posting (checkmark found by its colour, even when the suggested hashtags list is open). No more scrolling in that list while looking for “Add location”. Tested live on STEVIE2: the editor is recognised by its blue checkmark (the “Caption” title on grey wasn’t read).'],
     },
   },
   {

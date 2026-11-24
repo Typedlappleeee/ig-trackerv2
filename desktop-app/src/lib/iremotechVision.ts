@@ -507,8 +507,16 @@ export function adsConsentTaps(words: { text: string; cx: number; cy: number }[]
 
 /** Coche bleue « ✓ » (OK) de l'éditeur de légende, en haut à droite : repérée à sa couleur (repli 90 % / 7,5 %). */
 async function tapCaptionCheck(key: string, deviceId: string, W: number, H: number, shot?: string): Promise<void> {
-  const b = shot ? await findBlueButton(shot, 0, 0.16, 0.6, 1).catch(() => null) : null
+  const b = shot ? await findBlueButton(shot, 0.035, 0.16, 0.6, 1).catch(() => null) : null
   await sendAction(key, deviceId, { type: 'tap', x: b ? b.cx : Math.round(0.9 * W), y: b ? b.cy : Math.round(0.075 * H) })
+}
+
+/** Éditeur de légende ouvert, vu À L'ÉCRAN : titre / puces lus (captionEditorOpen) OU coche bleue en haut à droite
+ *  repérée à sa couleur. Testé en vrai sur STEVIE2 le 24/11/2026 : le titre « Caption » (blanc sur bandeau gris) n'est
+ *  souvent PAS lu par l'OCR → ScaleFlow croyait l'éditeur fermé, défilait dans les hashtags suggérés puis tapait Share. */
+async function captionEditorShown(scr: { words: { text: string; cy: number }[]; H: number; shot: string }): Promise<boolean> {
+  if (captionEditorOpen(scr.words, scr.H)) return true
+  return !!await findBlueButton(scr.shot, 0.035, 0.12, 0.75, 1).catch(() => null)
 }
 
 /** Éditeur plein écran « Caption » encore ouvert : titre « Caption » en haut ET (OK / Done en haut, ou les puces
@@ -984,7 +992,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     await sleep(1400)
     for (let k = 0; k < 3; k++) { // OK = coche bleue sans texte : éditeur encore ouvert → ✓ haut-droite, vérifié
       const ce = await readScreenWords(key, deviceId)
-      if (!ce || !captionEditorOpen(ce.words, ce.H)) break
+      if (!ce || !await captionEditorShown(ce)) break
       hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
       await tapCaptionCheck(key, deviceId, W, H, ce.shot); await sleep(1500)
     }
@@ -1184,7 +1192,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     // Éditeur « Caption » encore ouvert (un hashtag en fin de texte ouvre des suggestions, vu en vrai) → OK, vérifié.
     for (let k = 0; k < 3; k++) {
       const ce = await readScreenWords(key, deviceId)
-      if (!ce || !captionEditorOpen(ce.words, ce.H)) break
+      if (!ce || !await captionEditorShown(ce)) break
       hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
       await tapCaptionCheck(key, deviceId, W, H, ce.shot)
       await sleep(1500)
@@ -1209,7 +1217,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
   const closeCaptionEditor = async () => {
     for (let j = 0; j < 2; j++) {
       const ce = await readScreenWords(key, deviceId)
-      if (!ce || !captionEditorOpen(ce.words, ce.H)) return
+      if (!ce || !await captionEditorShown(ce)) return
       hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
       await tapCaptionCheck(key, deviceId, W, H, ce.shot) // jamais Share ici : la liste des hashtags suggérés est dessous
       await sleep(1800)
@@ -1233,7 +1241,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       await sleep(4000)
     }
     const after = await readScreenWords(key, deviceId)
-    shared = !!after && !originalAudioSheet(after.words) && !captionEditorOpen(after.words, after.H) && !await onSharePage()
+    shared = !!after && !originalAudioSheet(after.words) && !await captionEditorShown(after) && !await onSharePage()
   }
   if (!shared) { hooks?.log?.('❌ Share sans effet (toujours sur la page de partage) → non publié'); return false }
   hooks?.log?.(`📤 ${doneLabel}.`)
@@ -1301,7 +1309,7 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
     const lw = scr?.words.find(o => /^location$/i.test(o.text) && o.cy > H * 0.25 && o.cy < H * 0.9 && scr.words.some(a => /^add$/i.test(a.text) && Math.abs(a.cy - o.cy) < 12 && a.cx < o.cx))
     if (lw) { row = { x: lw.cx, y: lw.cy }; break }
     // éditeur de légende encore ouvert (liste des hashtags suggérés) : JAMAIS de défilement ici → coche ✓ d'abord
-    if (scr && captionEditorOpen(scr.words, scr.H)) {
+    if (scr && await captionEditorShown(scr)) {
       hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
       await tapCaptionCheck(key, deviceId, W, H, scr.shot); await sleep(1600); k--; if (++closeTries > 3) break; continue
     }
