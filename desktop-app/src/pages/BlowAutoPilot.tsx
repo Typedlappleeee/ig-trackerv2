@@ -1068,11 +1068,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           const kind = phoneKind(list), unit = kind === 'normal' ? 'compte' : 'container'
           return (
             <div key={id} style={{ borderTop: `1px solid ${EDGE}`, background: on ? 'rgba(233,196,106,0.04)' : '#0E0E10', padding: '10px 12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 14, rowGap: 8, opacity: live || on ? 1 : 0.6 }}>
-              <div onClick={() => togglePhone(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: '0 1 280px', minWidth: 200 }}>
+              <div onClick={() => togglePhone(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: '0 1 440px', minWidth: 240, flexWrap: 'wrap', rowGap: 6 }}>
                 <span title={on ? 'Tout décocher' : 'Tout cocher'} style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, background: on ? GOLD : 'transparent', color: '#0A0A0B', fontSize: 11, fontWeight: 700, border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.2)', flex: 'none' }}>{on ? (list.length && picked.size < list.length ? '–' : '✓') : ''}</span>
-                <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deviceLabel(d)}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED }}>
+                <span style={{ minWidth: 140, flex: '1 1 auto' }}>
+                  <span title={deviceLabel(d)} style={{ display: 'block', fontSize: 14, fontWeight: 600, color: INK, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25 }}>{deviceLabel(d)}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: MUTED, whiteSpace: 'nowrap' }}>
                     <span style={{ width: 7, height: 7, borderRadius: 99, background: live ? '#22C55E' : '#EF4444', boxShadow: live ? '0 0 6px rgba(34,197,94,.55)' : 'none' }} />
                     {live ? 'En ligne' : 'Hors ligne'} · {list.length ? `${picked.size}/${list.length} ${unit}${list.length > 1 ? 's' : ''}` : 'pas encore détecté'}
                   </span>
