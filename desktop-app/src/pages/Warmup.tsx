@@ -196,7 +196,7 @@ export default function Warmup({ theme, infra, user, org, isSuperAdmin }: {
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHeader
+      <PageHeader image="site/gl-warmup.webp"
         kicker="Comptes"
         title="Warmup"
         sub={subFor[wtab]}

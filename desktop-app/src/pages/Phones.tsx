@@ -297,7 +297,7 @@ export default function Phones({ theme, infra, user, org, isSuperAdmin, onNaviga
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       {/* En-tête */}
-      <PageHeader kicker={loading ? '…' : `${fmtNumber(total)} appareil${total > 1 ? 's' : ''} · ${fmtNumber(online)} en ligne`} title={title} sub={sub} actions={isCloud
+      <PageHeader image="site/gl-phones.webp" kicker={loading ? '…' : `${fmtNumber(total)} appareil${total > 1 ? 's' : ''} · ${fmtNumber(online)} en ligne`} title={title} sub={sub} actions={isCloud
         ? <Btn label="Créer un appareil" theme={theme} tone="primary" icon="M12 5v14|M5 12h14" onClick={() => setCreateOpen(true)} />
         : <Btn label={syncing ? 'Synchro…' : 'Sync GeeLark'} theme={theme} tone="primary" disabled={syncing} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" onClick={syncFromGeelark} />} />
 

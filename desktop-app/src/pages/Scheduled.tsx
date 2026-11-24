@@ -148,7 +148,7 @@ export default function Scheduled({ theme, infra, user, org }: { theme: Theme; i
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <PageHeader kicker={loading ? 'Diffusion' : `${upcoming.length} à venir`} title="Programmé" sub="Toutes tes publications programmées : elles partent même PC éteint. Annule ici pour récupérer les crédits."
+      <PageHeader image="site/gl-scheduled.webp" kicker={loading ? 'Diffusion' : `${upcoming.length} à venir`} title="Programmé" sub="Toutes tes publications programmées : elles partent même PC éteint. Annule ici pour récupérer les crédits."
         actions={<Btn theme={theme} icon="M21 2v6h-6|M3 12a9 9 0 0 1 15-6.7L21 8|M3 22v-6h6|M21 12a9 9 0 0 1-15 6.7L3 16" label="Rafraîchir" onClick={() => load()} />} />
       {loadError && <div style={{ padding: '12px 14px', marginBottom: 14, borderRadius: 14, background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.28)', color: '#F87171', fontSize: 13 }}>Impossible de charger les programmations : {loadError}</div>}
       {!loading && rows.length > 0 && (

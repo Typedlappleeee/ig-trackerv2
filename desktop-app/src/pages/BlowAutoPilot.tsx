@@ -74,7 +74,19 @@ export function progressRows(logs: string[]): { tag: string; state: 'run' | 'ok'
   return [...m.entries()].map(([tag, v]) => ({ tag, ...v }))
 }
 
-function H({ title, sub, right }: { title: string; sub?: string; right?: ReactNode }) {
+function H({ title, sub, right, image }: { title: string; sub?: string; right?: ReactNode; image?: string }) {
+  if (image) return (
+    <div style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 18, border: '1px solid rgba(255,255,255,0.08)', minHeight: 200, display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap', padding: '26px 28px', marginBottom: 22, background: '#0E0E10' }}>
+      <img src={`${import.meta.env.BASE_URL}${image.replace(/^\//, '')}`} alt="" aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: -2, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '60% 50%' }} />
+      <span aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: -1, background: 'linear-gradient(90deg, rgba(10,10,11,.95) 0%, rgba(10,10,11,.8) 42%, rgba(10,10,11,.3) 80%, rgba(10,10,11,.45) 100%)' }} />
+      <div style={{ flex: 1, minWidth: 0, maxWidth: 680 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 7px', borderRadius: 4, background: 'rgba(24,24,27,.8)', border: '1px solid rgba(255,255,255,0.1)', color: GOLD, fontSize: 11.5, fontWeight: 600, marginBottom: 10 }}>iRemoTech · Studio</div>
+        <h1 style={{ margin: 0, fontSize: 'clamp(28px, 3.4vw, 40px)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, color: '#F4F4F5' }}>{title}</h1>
+        {sub && <p style={{ margin: '8px 0 0', fontSize: 14.5, color: '#C4C4CC', lineHeight: 1.5 }}>{sub}</p>}
+      </div>
+      {right}
+    </div>
+  )
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 22, flexWrap: 'wrap' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -989,7 +1001,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   if (!irt.key) {
     return (
       <div>
-        <H title="Studio iRemoTech" />
+        <H title="Studio iRemoTech" image="site/irt-home.webp" />
         {irt.loading
           ? <div style={{ ...card, textAlign: 'center', color: MUTED, fontSize: 13 }}>Chargement…</div>
           : <div style={card}><div style={{ fontSize: 15, fontWeight: 700, color: INK, marginBottom: 10 }}>Relier iRemoTech</div><IrtKeyForm orgId={currentOrg?.id ?? null} userId={user.id} onSaved={irt.reload} /></div>}
@@ -1188,6 +1200,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     igaccounts: { title: 'Comptes Instagram', sub: 'Tous les comptes de tes iPhones, relus depuis iRemoTech : statut, publications, abonnés, warm-ups. Vérifie et chauffe en un clic.' },
     comptes: { title: 'Comptes créés', sub: 'Identifiants, numéros et historique des comptes créés depuis ScaleFlow.' },
   }
+  // Bannière photo de chaque onglet (images générées, public/site/irt-*.webp)
+  const TAB_IMAGE: Record<IrtTab, string> = {
+    home: 'site/irt-home.webp', phones: 'site/irt-phones.webp', igaccounts: 'site/irt-phones.webp', posting: 'site/irt-posting.webp',
+    story: 'site/irt-story.webp', warmup: 'site/irt-warmup.webp', account: 'site/irt-account.webp', comptes: 'site/irt-account.webp', setup: 'site/irt-setup.webp',
+  }
   const TABS: { k: IrtTab; label: string; icon: string }[] = [
     { k: 'home', label: 'Accueil', icon: '🏠' },
     { k: 'phones', label: 'Téléphones', icon: '📱' },
@@ -1201,7 +1218,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
-      <H title={TAB_TITLE[curTab].title} sub={TAB_TITLE[curTab].sub}
+      <H title={TAB_TITLE[curTab].title} sub={TAB_TITLE[curTab].sub} image={TAB_IMAGE[curTab === 'posting' && storySub ? 'story' : curTab]}
         right={<span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <span style={pill}><span style={{ width: 7, height: 7, borderRadius: 99, background: onlineN ? '#22C55E' : '#EF4444' }} />{onlineN}/{devices.length} iPhone{devices.length > 1 ? 's' : ''} en ligne</span>
           {usage?.billing?.free_remaining_today?.actions != null && <span style={pill} title="Actions gratuites restantes aujourd’hui (iRemoTech)">⚡ {usage.billing.free_remaining_today.actions.toLocaleString('fr-FR')} actions gratuites</span>}

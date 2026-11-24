@@ -71,7 +71,7 @@ export default function Publish({ theme, infra, user, org, isSuperAdmin }: {
   return (
     <div style={{ animation: 'aIn .3s cubic-bezier(0.16,1,0.3,1) both' }}>
       <style>{SPOT_KEYFRAMES}</style>
-      <PageHeader kicker="Diffusion" title="Publication" sub="Choisis un format : les comptes, la vidéo et la légende se règlent à l’étape suivante. Chaque téléphone publie en parallèle, ou plus tard (programmé)." />
+      <PageHeader image="site/gl-publish.webp" kicker="Diffusion" title="Publication" sub="Choisis un format : les comptes, la vidéo et la légende se règlent à l’étape suivante. Chaque téléphone publie en parallèle, ou plus tard (programmé)." />
       {/* Catégories par plateforme (tous les formats) ; la programmation a son propre onglet */}
       {(() => {
         const head = (label: string, color: string, icon: string, count: number, sub: string) => (

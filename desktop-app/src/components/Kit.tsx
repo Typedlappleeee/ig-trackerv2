@@ -5,8 +5,21 @@ import { useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import { Icon, Toggle, useNarrow } from '@/lib/ui'
 
 // ── En-tête de page : sur-titre, titre (casse normale), sous-titre, actions ─────
-export function PageHeader({ kicker, title, sub, actions, style }: { kicker?: ReactNode; title: ReactNode; sub?: ReactNode; actions?: ReactNode; style?: CSSProperties }) {
+// `image` (photo de public/site/…) → bannière photo : même contenu, posé sur une vraie photo assombrie à gauche.
+export function PageHeader({ kicker, title, sub, actions, style, image }: { kicker?: ReactNode; title: ReactNode; sub?: ReactNode; actions?: ReactNode; style?: CSSProperties; image?: string }) {
   const narrow = useNarrow(760)
+  if (image) return (
+    <div style={{ position: 'relative', overflow: 'hidden', isolation: 'isolate', borderRadius: 18, border: '1px solid rgba(255,255,255,0.08)', minHeight: narrow ? 190 : 210, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', padding: narrow ? '22px 18px' : '28px 30px', marginBottom: 22, background: '#0E0E10', ...style }}>
+      <img src={`${import.meta.env.BASE_URL}${image.replace(/^\//, '')}`} alt="" aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: -2, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '60% 50%' }} />
+      <span aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: -1, background: narrow ? 'linear-gradient(180deg, rgba(10,10,11,.35) 0%, rgba(10,10,11,.92) 85%)' : 'linear-gradient(90deg, rgba(10,10,11,.94) 0%, rgba(10,10,11,.78) 40%, rgba(10,10,11,.25) 80%, rgba(10,10,11,.4) 100%)' }} />
+      <div style={{ minWidth: 0, maxWidth: 640 }}>
+        {kicker && <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#A1A1AA' }}>{kicker}</span>}
+        <h1 style={{ margin: kicker ? '4px 0 0' : 0, fontSize: narrow ? 30 : 40, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, color: '#F4F4F5' }}>{title}</h1>
+        {sub && <p style={{ margin: '8px 0 0', fontSize: 14.5, lineHeight: 1.5, color: '#C4C4CC' }}>{sub}</p>}
+      </div>
+      {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{actions}</div>}
+    </div>
+  )
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', marginBottom: 22, ...style }}>
       <div style={{ minWidth: 0 }}>

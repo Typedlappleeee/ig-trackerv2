@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24l',
+    date: '2026-11-24',
+    title: { fr: 'iRemoTech et GeeLark : nouvelles bannières', en: 'iRemoTech and GeeLark: new banners' },
+    items: {
+      fr: ['Chaque onglet iRemoTech (Accueil, Téléphones, Posting, Story CTA, Warm-up, Création de compte, Setup) et les pages GeeLark (Publication, Téléphones, Warmup, Programmé) ont une bannière photo réaliste, avec le titre et les infos par-dessus.'],
+      en: ['Every iRemoTech tab (Home, Phones, Posting, Story CTA, Warm-up, Account creation, Setup) and the GeeLark pages (Publishing, Phones, Warmup, Scheduled) get a realistic photo banner, with the title and info on top.'],
+    },
+  },
+  {
     id: '2026-11-24k',
     date: '2026-11-24',
     title: { fr: 'iRemoTech : la localisation ne bloque plus la session', en: 'iRemoTech: location no longer blocks the session' },
