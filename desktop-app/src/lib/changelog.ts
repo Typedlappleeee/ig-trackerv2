@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24j',
+    date: '2026-11-24',
+    title: { fr: 'iRemoTech : bascule de compte réparée', en: 'iRemoTech: account switching fixed' },
+    items: {
+      fr: ['Sur certains iPhones, la barre d’onglets flottante est plus étroite : le tap sur « Profil » tombait au bord et la bascule de compte échouait. ScaleFlow vise maintenant l’icône dans les deux barres (testé en vrai sur STEVIE10).'],
+      en: ['On some iPhones the floating tab bar is narrower: the “Profile” tap landed on the edge and account switching failed. ScaleFlow now targets the icon in both bars (tested live on STEVIE10).'],
+    },
+  },
+  {
     id: '2026-11-24i',
     date: '2026-11-24',
     title: { fr: 'Genjutsu : rendus partagés dans l’agence', en: 'Genjutsu: renders shared across the agency' },

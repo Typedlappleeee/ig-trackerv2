@@ -12,7 +12,11 @@ import { findGalleryThumb, findMatchingCell } from './screenMatch'
 // Barre d'onglets d'Instagram : l'ancienne barre pleine largeur (Accueil 0,1 · Reels 0,3 · … · Profil 0,9 W, à 0,962 H)
 // ET la nouvelle barre FLOTTANTE arrondie (vue le 23/11/2026 sur STEVIE1 : Accueil 0,18 · Reels 0,35 · Profil 0,85 W,
 // à 0,933 H). Positions choisies pour tomber juste dans les deux.
-export const TAB = { y: 0.945, home: { x: 0.15 }, reels: { x: 0.33 }, profile: { x: 0.86 } }
+// Profil à 0,82 W : dans la zone de l'icône pour l'ANCIENNE barre pleine largeur (0,8–1) comme pour la barre FLOTTANTE
+// étroite (icône à 0,78 W, vue en vrai sur STEVIE10 le 24/11/2026 : à 0,86 le tap tombait au bord et le Profil ne
+// s'ouvrait jamais → bascule de compte ratée). Les boucles essaient aussi 0,78 puis 0,86.
+export const TAB = { y: 0.945, home: { x: 0.15 }, reels: { x: 0.33 }, profile: { x: 0.82 } }
+export const PROFILE_XS = [0.82, 0.78, 0.86]
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -1410,7 +1414,7 @@ async function openEditProfile(key: string, deviceId: string, W: number, H: numb
     if (scr?.words.some(o => /^edit$/i.test(o.text) && o.cy < H * 0.08) && scr.words.some(o => /^profile$/i.test(o.text) && o.cy < H * 0.08)) return true
     const e = scr?.words.find(o => /^edit$/i.test(o.text) && o.cy < H * 0.6 && scr.words.some(p => /^profile$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
     if (e) { await tap(e.cx + 20, e.cy); await sleep(3500); continue }
-    await tap(TAB.profile.x * W, TAB.y * H) // onglet Profil
+    await tap(PROFILE_XS[k % PROFILE_XS.length] * W, TAB.y * H) // onglet Profil (plusieurs positions : barre flottante ou pleine)
     await sleep(2500)
   }
   const v = await readScreenWords(key, deviceId)
@@ -3014,7 +3018,7 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
     if (k === 0) await backToTabs(key, deviceId, hooks)
     else if (k === 1 && hasVisionBrain()) await brainBackToTabs(key, deviceId, hooks)
     else hooks?.log?.('   onglet Profil pas ouvert → nouveau tap')
-    const px = Math.round(TAB.profile.x * W), py = Math.round(TAB.y * H)
+    const px = Math.round(PROFILE_XS[k % PROFILE_XS.length] * W), py = Math.round(TAB.y * H)
     if (k) await doubleTap(key, deviceId, px, py) // tap simple parfois ignoré ; double tap sans risque sur cet onglet
     else await sendAction(key, deviceId, { type: 'tap', x: px, y: py })
     await sleep(2500); scr = await readScreenWords(key, deviceId)
