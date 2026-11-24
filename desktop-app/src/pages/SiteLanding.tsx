@@ -8,14 +8,16 @@ import type { ReactNode, CSSProperties, MouseEvent as ReactMouseEvent } from 're
  * la landing est donc SON PROPRE conteneur de défilement (.sfl-root, 100dvh, overflow-y:auto),
  * et les ancres (#features, #pricing…) défilent en douceur à l'intérieur de ce conteneur.
  * Même DA que l'app : noir, violet ScaleFlow, titres XXL en capitales.
- * Photos : public/site/c1…c13.webp (Unsplash, licence libre). Styles : bloc <style> préfixé « sfl- ».
+ * Vignettes : public/site/t1…t8.webp (scènes du quotidien façon vidéo de téléphone). Styles : bloc <style> préfixé « sfl- ».
  */
 
 const WIN_URL = 'https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-Setup.exe'
 const TG_URL = 'https://t.me/justquentin'
 const APP_URL = './index.html?auth=login'
-const N_PHOTOS = 13
-const photo = (n: number) => `/site/c${(((n % N_PHOTOS) + N_PHOTOS) % N_PHOTOS) + 1}.webp`
+// Vignettes de Reels (public/site/t1…t8.webp) : scènes du quotidien filmées au téléphone, sans visage en gros plan.
+const N_THUMBS = 8
+const THUMBS = Array.from({ length: N_THUMBS }, (_, i) => "/site/t" + (i + 1) + ".webp")
+const photo = (n: number) => THUMBS[((n % N_THUMBS) + N_THUMBS) % N_THUMBS]
 const HANDLES = ['lea.daily', 'manon.off', 'ines.paris', 'jade.xo', 'chloe.fit', 'emma.vibes', 'lou.officiel', 'sarah.ugc', 'nina.club', 'zoe.mood', 'ashley.rose', 'mila.studio', 'luna.reels']
 const handle = (n: number) => HANDLES[(((n % HANDLES.length) + HANDLES.length) % HANDLES.length)]
 const dl = (ms: number) => ({ '--d': ms + 'ms' } as CSSProperties)
