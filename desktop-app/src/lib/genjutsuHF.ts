@@ -622,8 +622,15 @@ export interface GjJob {
   createdAt: number
   startedAt?: number | null
   doneAt?: number | null
+  by?: string | null              // navigateur qui l'a lancé : lui SEUL le fait avancer (les autres le voient via le serveur)
+  byName?: string | null          // qui l'a lancé (affiché aux collègues)
 }
 export const isActive = (s: GjStatus) => s === 'preparing' || s === 'running' || s === 'saving' || s === 'spoofing'
+
+// Identifiant de CE navigateur : un rendu partagé dans l'agence n'est lancé / suivi / rangé que par celui qui l'a créé.
+const CLIENT = (() => { try { let c = localStorage.getItem('sf-gj-client'); if (!c) { c = crypto.randomUUID(); localStorage.setItem('sf-gj-client', c) } return c } catch { return 'local' } })()
+export const isMine = (j: GjJob) => !j.by || j.by === CLIENT
+let myName: string | null = null
 
 let jobs: GjJob[] = (() => {
   const l = readJson<GjJob[]>(JOBS_KEY, [])
@@ -632,6 +639,7 @@ let jobs: GjJob[] = (() => {
 // Après un rechargement : ce qui n'était pas encore parti repart, ce qui a peut-être été envoyé
 // est signalé (à vérifier dans Higgsfield avant de relancer), le reste reprend son suivi.
 function recoverAfterReload(j: GjJob): GjJob {
+  if (!isMine(j)) return j
   if (j.status === 'preparing') return j.sent
     ? { ...j, status: 'failed', error: 'Lancement interrompu (page rechargée) : la vidéo est peut-être partie sur Higgsfield. Vérifie ton historique Higgsfield avant de relancer.' }
     : { ...j, status: 'waiting' }
@@ -656,6 +664,7 @@ function commit(next: GjJob[]): void {
     for (const k of [SRC_KEY, IMPORT_KEY, 'sf-gj-refs', 'sf-gj-trims']) { try { localStorage.removeItem(k) } catch { /* noop */ } }
     saveJobs(jobs)
   }
+  schedulePush()
   subs.forEach(f => f())
 }
 const patch = (id: string, p: Partial<GjJob>) => commit(jobs.map(j => j.id === id ? { ...j, ...p } : j))
@@ -669,7 +678,7 @@ export function enqueue(items: NewJob[]): void {
   const now = Date.now()
   const fresh: GjJob[] = items.map((it, i) => {
     const src = cachedSource(it.source)
-    return { ...it, id: crypto.randomUUID(), status: 'waiting', createdAt: now + i, sourceUrl: src?.url ?? null, sourceUser: src?.user ?? null }
+    return { ...it, id: crypto.randomUUID(), status: 'waiting', createdAt: now + i, sourceUrl: src?.url ?? null, sourceUser: src?.user ?? null, by: CLIENT, byName: myName }
   })
   commit([...fresh.reverse(), ...jobs])
   pump()
@@ -679,13 +688,20 @@ export function retryJob(id: string): void {
   if (!j) return
   enqueue([{ account: j.account, model: j.model, model2: j.model2 ?? null, engine: j.engine, source: j.source, label: j.label, prompt: j.prompt, res: j.res, spoof: j.spoof ?? null }])
   commit(jobs.filter(x => x.id !== id))
+  void deleteRemote([id])
 }
 export function removeJob(id: string): void {
   const j = byId(id)
   if (!j || isActive(j.status)) return
   commit(jobs.filter(x => x.id !== id))
+  void deleteRemote([id])
 }
-export function clearFinished(): void { commit(jobs.filter(j => j.status !== 'done' && j.status !== 'failed')) }
+/** Vide MES rendus terminés (ceux des collègues restent : c'est à eux de les retirer). */
+export function clearFinished(): void {
+  const gone = jobs.filter(j => isMine(j) && (j.status === 'done' || j.status === 'failed')).map(j => j.id)
+  commit(jobs.filter(j => !gone.includes(j.id)))
+  void deleteRemote(gone)
+}
 export function respoof(id: string, plan: SpoofPlan): void {
   const j = byId(id)
   if (!j || !j.resultUrl || isActive(j.status)) return
@@ -698,15 +714,15 @@ export function pump(): void {
   if (!password) return
   const active = new Map<string, number>()
   for (const j of jobs) if (j.status === 'preparing' || j.status === 'running') active.set(j.account, (active.get(j.account) ?? 0) + 1)
-  const waiting = jobs.filter(j => j.status === 'waiting').sort((a, b) => a.createdAt - b.createdAt)
+  const waiting = jobs.filter(j => j.status === 'waiting' && isMine(j)).sort((a, b) => a.createdAt - b.createdAt)
   for (const j of waiting) {
     const n = active.get(j.account) ?? 0
     if (n >= MAX_RUNNING) continue
     active.set(j.account, n + 1)
     void launch(j.id)
   }
-  for (const acc of new Set(jobs.filter(j => j.status === 'running').map(j => j.account))) void pollAccount(acc)
-  for (const j of jobs.filter(x => x.status === 'saving')) void collect(j.id)
+  for (const acc of new Set(jobs.filter(j => j.status === 'running' && isMine(j)).map(j => j.account))) void pollAccount(acc)
+  for (const j of jobs.filter(x => x.status === 'saving' && isMine(x))) void collect(j.id)
 }
 
 let noRatio = false
@@ -809,7 +825,7 @@ async function pollAccount(account: string): Promise<void> {
   try {
     for (;;) {
       if (!password) break
-      const running = jobs.filter(j => j.account === account && j.status === 'running' && j.hfJobId)
+      const running = jobs.filter(j => j.account === account && j.status === 'running' && j.hfJobId && isMine(j))
       if (!running.length) break
       for (const j of running) if (Date.now() - (j.startedAt ?? j.createdAt) > RUN_TIMEOUT_MS)
         patch(j.id, { status: 'failed', error: 'Toujours en cours après 1 h 30 : regarde ton historique Higgsfield.' })
@@ -947,4 +963,60 @@ async function spoofJob(id: string): Promise<void> {
     patch(id, { spoofDone: done, spoofFailed: failed })
   }))
   patch(id, { status: 'done', spoofDone: done, spoofFailed: failed, spoofError: [failed ? lastErr : null, origErr].filter(Boolean).join(' · ') || null })
+}
+
+
+// ── Liste PARTAGÉE dans l'agence (table genjutsu_jobs, SQL 20261124_genjutsu_jobs.sql) ─────────────────────────────
+// Chaque rendu = une ligne. Ce navigateur n'écrit que SES rendus ; ceux des collègues arrivent par syncJobs()
+// (toutes les 20 s, page ouverte). Sans la table (SQL pas encore passé) : liste de ce navigateur seulement.
+type Space = { orgId: string | null; userId: string; name?: string | null }
+let space: Space | null = null
+let remoteOff = false
+const pushed = new Map<string, string>()   // id → dernière version envoyée
+let pushTimer: ReturnType<typeof setTimeout> | null = null
+export function setJobsSpace(s: Space): void {
+  if (space && (space.orgId !== s.orgId || space.userId !== s.userId)) pushed.clear()
+  space = s; myName = s.name ?? null; remoteOff = false
+}
+function schedulePush(): void {
+  if (!space || remoteOff) return
+  if (pushTimer) clearTimeout(pushTimer)
+  pushTimer = setTimeout(() => { pushTimer = null; void pushMine() }, 1500)
+}
+async function pushMine(): Promise<void> {
+  if (!space || remoteOff) return
+  const sp = space
+  const rows = jobs.slice(0, 500).filter(isMine).filter(j => pushed.get(j.id) !== JSON.stringify(j))
+  if (!rows.length) return
+  const { error } = await supabase.from('genjutsu_jobs').upsert(rows.map(j => ({
+    id: j.id, org_id: sp.orgId, user_id: sp.userId, data: { ...j, by: j.by ?? CLIENT }, created_at: new Date(j.createdAt).toISOString(), updated_at: new Date().toISOString(),
+  })), { onConflict: 'id' })
+  if (error) { if (/relation|does not exist|schema cache|not find/i.test(error.message)) remoteOff = true; return }
+  for (const j of rows) pushed.set(j.id, JSON.stringify(j))
+}
+async function deleteRemote(ids: string[]): Promise<void> {
+  if (!space || remoteOff || !ids.length) return
+  for (const id of ids) pushed.delete(id)
+  await supabase.from('genjutsu_jobs').delete().in('id', ids)
+}
+/** Fusion pure : mes rendus = version locale ; ceux des collègues = version du serveur (un rendu d'un collègue absent
+ *  du serveur a été retiré). Mes rendus absents du serveur y seront envoyés. Le plus récent d'abord, 500 au plus. */
+export function mergeJobs(local: GjJob[], remote: GjJob[], mine: (j: GjJob) => boolean): GjJob[] {
+  const byIdR = new Map(remote.map(j => [j.id, j]))
+  const out = new Map<string, GjJob>()
+  for (const j of local) { if (mine(j)) out.set(j.id, j); else if (byIdR.has(j.id)) out.set(j.id, byIdR.get(j.id)!) }
+  for (const j of remote) if (!out.has(j.id)) out.set(j.id, j)
+  return [...out.values()].sort((a, b) => b.createdAt - a.createdAt).slice(0, 500)
+}
+/** Récupère la liste de l'agence et la fusionne. false = synchro indisponible (SQL pas encore passé). */
+export async function syncJobs(): Promise<boolean> {
+  if (!space || remoteOff) return false
+  const { data, error } = await supabase.from('genjutsu_jobs').select('data').eq('space', space.orgId ?? `u:${space.userId}`).order('created_at', { ascending: false }).limit(500)
+  if (error) { if (/relation|does not exist|schema cache|not find/i.test(error.message)) remoteOff = true; return false }
+  const remote = ((data ?? []) as { data: GjJob }[]).map(r => r.data).filter(j => j && j.id)
+  for (const j of remote) if (isMine(j)) pushed.set(j.id, pushed.get(j.id) ?? JSON.stringify(j))
+  const next = mergeJobs(jobs, remote, isMine)
+  if (JSON.stringify(next) !== JSON.stringify(jobs)) commit(next)
+  else void pushMine()
+  return true
 }

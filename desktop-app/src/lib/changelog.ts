@@ -14,10 +14,10 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     id: '2026-11-24i',
     date: '2026-11-24',
-    title: { fr: 'Genjutsu : les derniers rendus ne disparaissent plus', en: 'Genjutsu: latest renders no longer disappear' },
+    title: { fr: 'Genjutsu : rendus partagés dans l’agence', en: 'Genjutsu: renders shared across the agency' },
     items: {
-      fr: ['Quand le stockage du navigateur était plein, les derniers rendus Genjutsu n’étaient plus enregistrés et disparaissaient au rechargement. ScaleFlow allège maintenant les anciens rendus terminés pour toujours garder les nouveaux. Jusqu’à 500 rendus gardés.'],
-      en: ['When the browser storage was full, the latest Genjutsu renders were no longer saved and disappeared on reload. ScaleFlow now slims down old finished renders to always keep the new ones. Up to 500 renders kept.'],
+      fr: ['Quand le stockage du navigateur était plein, les derniers rendus Genjutsu n’étaient plus enregistrés et disparaissaient au rechargement. ScaleFlow allège maintenant les anciens rendus terminés pour toujours garder les nouveaux. Jusqu’à 500 rendus gardés.', 'La liste des rendus est maintenant sur le serveur, partagée avec toute l’agence (avec le nom de qui l’a lancé) ; chaque rendu avance sur le navigateur qui l’a lancé.'],
+      en: ['When the browser storage was full, the latest Genjutsu renders were no longer saved and disappeared on reload. ScaleFlow now slims down old finished renders to always keep the new ones. Up to 500 renders kept.', 'The render list now lives on the server, shared with the whole agency (with who launched it); each render progresses in the browser that launched it.'],
     },
   },
   {

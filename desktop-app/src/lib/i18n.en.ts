@@ -7,6 +7,9 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "⚠ Liste de ce navigateur seulement : colle le SQL": "⚠ This browser’s list only: paste the SQL",
+    "dans Supabase pour partager les rendus avec toute l’agence.": "into Supabase to share renders with the whole agency.",
+    "Rendus partagés avec toute l’agence (500 derniers). Chaque rendu avance sur le navigateur qui l’a lancé.": "Renders shared with the whole agency (last 500). Each render progresses in the browser that launched it.",
     "réponse vide": "empty answer",
     "Ta ferme de téléphones": "Your phone farm",
     "Des téléphones en charge sur un bureau, chacun connecté à un compte": "Phones charging on a desk, each one logged into an account",

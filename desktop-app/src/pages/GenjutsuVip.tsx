@@ -23,7 +23,7 @@ import {
   MAX_RUNNING, TYPICAL_MS, setRelayPassword, relayReady, listAccounts, readCredits, listModels, createModel, deleteModel, uploadLocalVideo, hiddenModels, addHiddenModels, readPromptPresets,
   startAccountLogin, finishAccountLogin, removeAccount, needsReconnect,
   buildPrompt, buildDuoPrompt, buildWanPrompt, ENGINE_LABEL, WAN_MAX_S, estimateCredits, type GjEngine, parseLinks, resolveVideo, cachedSource, isInstagram, enqueue, retryJob, removeJob, clearFinished, respoof,
-  getJobs, subscribeJobs, isActive, pump, type HfAccount, type HfModel, type PromptOpts, type GjJob, type SpoofPlan,
+  getJobs, subscribeJobs, isActive, pump, setJobsSpace, syncJobs, isMine, type HfAccount, type HfModel, type PromptOpts, type GjJob, type SpoofPlan,
 } from '@/lib/genjutsuHF'
 
 const ACCENT = '#A855F7', ACCENT_TXT = '#D8B4FE'
@@ -248,6 +248,16 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
 
   // ── chaque modèle a SON dossier de la Banque (par défaut « Genjutsu › <nom> ») : ses vidéos y vont ──
   const scope: BankScope = useMemo(() => ({ orgId, userId: user.id }), [orgId, user.id])
+  // Liste des rendus PARTAGÉE dans l'agence (serveur) : resynchronisée toutes les 20 s
+  const [jobsShared, setJobsShared] = useState<boolean | null>(null)
+  useEffect(() => {
+    setJobsSpace({ orgId, userId: user.id, name: (user.user_metadata?.full_name as string | undefined) ?? user.email?.split('@')[0] ?? null })
+    let alive = true
+    const tick = () => void syncJobs().then(ok => { if (alive) setJobsShared(ok) }, () => undefined)
+    tick()
+    const t = setInterval(tick, 20_000)
+    return () => { alive = false; clearInterval(t) }
+  }, [orgId, user.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [modelFolders, setModelFolders] = useState<Record<string, string>>({})
   const [folderPickFor, setFolderPickFor] = useState<HfModel | null>(null)
   useEffect(() => { if (access === 'ok') void loadModelFolders(scope).then(setModelFolders).catch(() => undefined) }, [access, scope])
@@ -708,6 +718,8 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             ]} />
             {(counts.done + counts.failed) > 0 && <button type="button" onClick={clearFinished} style={{ ...ghostBtn, marginLeft: 'auto', height: 26, fontSize: 12, color: MUTED }}>Vider les terminés</button>}
           </div>
+          {jobsShared === false && <span style={{ fontSize: 12, color: '#FBBF24', lineHeight: 1.45 }}>⚠ Liste de ce navigateur seulement : colle le SQL <code>20261124_genjutsu_jobs.sql</code> dans Supabase pour partager les rendus avec toute l’agence.</span>}
+          {jobsShared && <span style={{ fontSize: 12, color: DIM }}>Rendus partagés avec toute l’agence (500 derniers). Chaque rendu avance sur le navigateur qui l’a lancé.</span>}
           {counts.active > 0 && <span style={{ fontSize: 12, color: MUTED }}>Garde ScaleFlow ouvert pendant la génération (quelques minutes par vidéo) : le suivi reprend tout seul après un rechargement.</span>}
           {shown.length === 0 ? (
             <div style={{ flex: 1, display: 'grid', placeItems: 'center', textAlign: 'center', color: DIM, fontSize: 13, padding: 40 }}>
@@ -844,6 +856,7 @@ function JobCard({ job: j, now, onRespoof }: { job: GjJob; now: number; onRespoo
           {j.model.photo && <img src={j.model.photo} alt="" style={{ width: 22, height: 22, borderRadius: 99, objectFit: 'cover', border: '1.5px solid rgba(255,255,255,.7)' }} />}
           {j.model2?.photo && <img src={j.model2.photo} alt="" style={{ width: 22, height: 22, marginLeft: -12, borderRadius: 99, objectFit: 'cover', border: '1.5px solid rgba(255,255,255,.7)' }} />}
           <span data-no-tr style={{ fontSize: 11.5, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.model2 ? `${j.model.name} + ${j.model2.name}` : j.model.name}</span>
+          {!isMine(j) && j.byName && <span data-no-tr style={{ fontSize: 10.5, color: '#E4E4E7', textShadow: '0 1px 4px rgba(0,0,0,.8)', whiteSpace: 'nowrap' }}>{`par ${j.byName}`}</span>}
           <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,.75)', textShadow: '0 1px 4px rgba(0,0,0,.8)', whiteSpace: 'nowrap' }}>{`${j.engine === 'wan' ? 'WAN · ' : ''}${j.model2 ? 'duo · ' : ''}${j.res}`}</span>
         </div>
         {!done && (
