@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24k',
+    date: '2026-11-24',
+    title: { fr: 'iRemoTech : la localisation ne bloque plus la session', en: 'iRemoTech: location no longer blocks the session' },
+    items: {
+      fr: ['Feuille « Locations » restée ouverte (champ vide) : ScaleFlow retape la ville, et en cas d’échec ferme la feuille par la croix ✕ (ou en la glissant), vérifié, puis publie sans lieu au lieu de bloquer toute la session.'],
+      en: ['“Locations” sheet left open (empty field): ScaleFlow retypes the city and, if it still fails, closes the sheet with the ✕ (or by swiping it down), verified, then posts without a location instead of blocking the whole session.'],
+    },
+  },
+  {
     id: '2026-11-24j',
     date: '2026-11-24',
     title: { fr: 'iRemoTech : bascule de compte réparée', en: 'iRemoTech: account switching fixed' },

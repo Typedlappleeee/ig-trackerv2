@@ -1342,10 +1342,22 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   if (!row) { hooks?.log?.('   ⚠ ligne « Add location » introuvable → publication sans localisation'); return false }
   await tap(row.x, row.y)
   await sleep(2800)
+  // Fermeture SÛRE de la feuille de lieu : « Cancel » (anciennes versions) OU croix ✕ en haut à droite, à la hauteur du
+  // titre « Locations » ; sinon on la glisse vers le bas. VÉRIFIÉE (vu en vrai le 24/11/2026 : la feuille restait
+  // ouverte, champ vide, et bloquait toute la session).
   const cancel = async () => {
-    const c = await readScreenWords(key, deviceId)
-    const cw = c?.words.find(o => /^cancel$/i.test(o.text) && o.cy < H * 0.12)
-    if (cw) { await tap(cw.cx, cw.cy); await sleep(1500) }
+    for (let k = 0; k < 3; k++) {
+      const c = await readScreenWords(key, deviceId)
+      if (!c) { await sleep(800); continue }
+      const title = c.words.find(o => /^locations?$/i.test(o.text) && o.cy < H * 0.25)
+      const cw = c.words.find(o => /^cancel$/i.test(o.text) && o.cy < H * 0.2)
+      const search = c.words.some(o => o.text.replace(/[^a-z]/gi, '').toLowerCase() === 'search' && o.cy < H * 0.45)
+      if (!title && !cw && !search && !c.words.some(o => /^preview$/i.test(o.text))) return // plus de feuille : page de partage
+      if (cw) await tap(cw.cx, cw.cy)
+      else if (title && k < 2) await tap(0.9 * W, title.cy)          // croix ✕ alignée sur le titre
+      else await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(0.2 * H), x2: Math.round(W / 2), y2: Math.round(0.9 * H), duration_ms: 300 })
+      await sleep(1600)
+    }
   }
   // 2. fenêtre « … will appear on the map » (1re fois) → OK, puis champ « Search »
   let search: { x: number; y: number } | null = null
@@ -1378,6 +1390,18 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   await tap(search.x, search.y)
   await sleep(1200)
   await typeRich(key, deviceId, loc.q)
+  // la saisie peut ne pas prendre (champ pas encore actif) : champ toujours vide → on retape le champ et la ville
+  {
+    await sleep(1500)
+    const f = await readScreenWords(key, deviceId)
+    const firstWord = loc.q.split(/[\s,]+/)[0].toLowerCase()
+    const typed = f?.words.some(o => Math.abs(o.cy - search!.y) < 18 && o.text.toLowerCase().includes(firstWord.slice(0, 4)))
+    if (f && !typed && f.words.some(o => /^locations?$/i.test(o.text))) {
+      hooks?.log?.('   champ de recherche resté vide → nouvelle saisie')
+      await tap(search.x, search.y); await sleep(1200)
+      await typeRich(key, deviceId, loc.q)
+    }
+  }
   // la saisie se fait lettre par lettre (vu en vrai : « Miami, Fl… » encore en cours) et la liste montre d'abord les
   // anciennes suggestions → on attend que le dernier mot de la recherche soit dans le champ, puis que la liste suive
   const lastWord = loc.q.split(/[\s,]+/).filter(Boolean).pop()!.toLowerCase()

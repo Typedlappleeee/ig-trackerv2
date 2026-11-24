@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "champ de recherche resté vide → nouvelle saisie": "search field still empty → typing again",
     "⚠ fil d’accueil non reconnu après le scroll": "⚠ home feed not recognised after scrolling",
     "⚠ Liste de ce navigateur seulement : colle le SQL": "⚠ This browser’s list only: paste the SQL",
     "dans Supabase pour partager les rendus avec toute l’agence.": "into Supabase to share renders with the whole agency.",
