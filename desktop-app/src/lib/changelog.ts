@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24g',
+    date: '2026-11-24',
+    title: { fr: 'Accueil et Explorer : nouveaux visuels', en: 'Home and Explore: new visuals' },
+    items: {
+      fr: ['Nouvelles photos façon contenu de créatrice (scènes du quotidien filmées au téléphone) pour les aperçus des outils, à la une et les cartes, quand ton feed n’a pas encore assez de photos.'],
+      en: ['New creator-style photos (everyday scenes shot on a phone) for tool previews, featured tiles and cards, when your feed doesn’t have enough photos yet.'],
+    },
+  },
+  {
     id: '2026-11-24f',
     date: '2026-11-24',
     title: { fr: 'iRemoTech : légende validée avec la nouvelle coche', en: 'iRemoTech: caption confirmed with the new checkmark' },
