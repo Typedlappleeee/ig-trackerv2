@@ -101,7 +101,7 @@ export default function Auth({ initial = 'login', onDone }: { initial?: AuthMode
       {/* Vitrine animée */}
       {!narrow && (
         <div style={{ position: 'relative', flex: '1 1 52%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '40px 48px', overflow: 'hidden', background: '#0A0A0B' }}>
-          <img src="/site/photo-a.webp" alt="" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '60% 50%', filter: 'saturate(.85)' }} />
+          <img src="/site/photo-a.webp" alt="" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '60% 50%' }} />
           <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,11,.75) 0%, rgba(10,10,11,.25) 35%, rgba(10,10,11,.35) 60%, rgba(10,10,11,.92) 100%)' }} />
           <span style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, background: '#fff', color: '#5B21B6' }}>
