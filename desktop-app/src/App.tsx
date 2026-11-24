@@ -32,6 +32,7 @@ const BlowsomeHome = lazy(() => import('@/pages/BlowsomeHome'))
 const BlowParc = lazy(() => import('@/pages/BlowsomePages').then(m => ({ default: m.BlowParc })))
 const DuoPlus = lazy(() => import('@/pages/DuoPlus'))
 const BlowContent = lazy(() => import('@/pages/BlowsomePages').then(m => ({ default: m.BlowContent })))
+import ErrorBoundary from '@/components/ErrorBoundary'
 const BlowAutoPilot = lazy(() => import('@/pages/BlowAutoPilot').then(m => ({ default: m.BlowAutoPilot })))
 const Phones = lazy(() => import('@/pages/Phones'))
 const Bank = lazy(() => import('@/pages/Bank'))
@@ -197,12 +198,12 @@ function AppInner({ user }: { user: User }) {
   const IRT_PAGE = { home: 'irtHome', setup: 'irtSetup', phones: 'irtPhones', igaccounts: 'irtIgAccounts', posting: 'irtPosting', story: 'irtStory', warmup: 'irtWarmup', account: 'irtAccount', comptes: 'irtComptes' } as const
 
   const content = infra === 'iremotech'
-    ? <BlowAutoPilot user={user} org={org}
+    ? <ErrorBoundary name="iRemoTech" resetPrefix="sf-irt-"><BlowAutoPilot user={user} org={org}
         tab={(IRT_TAB as Record<string, (typeof IRT_TAB)[keyof typeof IRT_TAB]>)[page] ?? 'home'}
-        onTab={(t) => setPage(IRT_PAGE[t] as PageKey)} />
+        onTab={(t) => setPage(IRT_PAGE[t] as PageKey)} /></ErrorBoundary>
     : infra === 'blowsome'
     ? (page === 'blowParc' ? <BlowParc user={user} org={org} />
-      : page === 'blowAuto' ? <BlowAutoPilot user={user} org={org} />
+      : page === 'blowAuto' ? <ErrorBoundary name="iRemoTech" resetPrefix="sf-irt-"><BlowAutoPilot user={user} org={org} /></ErrorBoundary>
       : page === 'blowContent' ? <BlowContent user={user} org={org} onNavigate={(p) => setPage(p as PageKey)} />
       : page === 'blowTools' ? <Studio theme={theme} infra={infra} user={user} org={org} />
       : page === 'blowGenjutsu' ? <GenjutsuVip user={user} org={org} isSuperAdmin={license.isSuperAdmin} />

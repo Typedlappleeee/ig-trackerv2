@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24b',
+    date: '2026-11-24',
+    title: { fr: 'iRemoTech : plus de page noire', en: 'iRemoTech: no more black page' },
+    items: {
+      fr: ['Si la page iRemoTech rencontre une erreur, elle affiche le message exact (bouton « Copier l’erreur ») avec « Réessayer » et « Réinitialiser les réglages iRemoTech de ce navigateur », au lieu d’une page noire. Après une mise à jour, la page se recharge seule si besoin.'],
+      en: ['If the iRemoTech page hits an error, it shows the exact message (“Copy the error” button) with “Retry” and “Reset this browser’s iRemoTech settings”, instead of a black page. After an update, the page reloads itself if needed.'],
+    },
+  },
+  {
     id: '2026-11-24a',
     date: '2026-11-24',
     title: { fr: 'iRemoTech : page noire corrigée', en: 'iRemoTech: black page fixed' },
