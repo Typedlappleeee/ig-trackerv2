@@ -966,7 +966,7 @@ async function spoofJob(id: string): Promise<void> {
 }
 
 
-// ── Liste PARTAGÉE dans l'agence (table genjutsu_jobs, SQL 20261124_genjutsu_jobs.sql) ─────────────────────────────
+// ── Liste PARTAGÉE dans l'agence (table genjutsu_renders, SQL 20261124_genjutsu_renders.sql) ─────────────────────────────
 // Chaque rendu = une ligne. Ce navigateur n'écrit que SES rendus ; ceux des collègues arrivent par syncJobs()
 // (toutes les 20 s, page ouverte). Sans la table (SQL pas encore passé) : liste de ce navigateur seulement.
 type Space = { orgId: string | null; userId: string; name?: string | null }
@@ -988,7 +988,7 @@ async function pushMine(): Promise<void> {
   const sp = space
   const rows = jobs.slice(0, 500).filter(isMine).filter(j => pushed.get(j.id) !== JSON.stringify(j))
   if (!rows.length) return
-  const { error } = await supabase.from('genjutsu_jobs').upsert(rows.map(j => ({
+  const { error } = await supabase.from('genjutsu_renders').upsert(rows.map(j => ({
     id: j.id, org_id: sp.orgId, user_id: sp.userId, data: { ...j, by: j.by ?? CLIENT }, created_at: new Date(j.createdAt).toISOString(), updated_at: new Date().toISOString(),
   })), { onConflict: 'id' })
   if (error) { if (/relation|does not exist|schema cache|not find/i.test(error.message)) remoteOff = true; return }
@@ -997,7 +997,7 @@ async function pushMine(): Promise<void> {
 async function deleteRemote(ids: string[]): Promise<void> {
   if (!space || remoteOff || !ids.length) return
   for (const id of ids) pushed.delete(id)
-  await supabase.from('genjutsu_jobs').delete().in('id', ids)
+  await supabase.from('genjutsu_renders').delete().in('id', ids)
 }
 /** Fusion pure : mes rendus = version locale ; ceux des collègues = version du serveur (un rendu d'un collègue absent
  *  du serveur a été retiré). Mes rendus absents du serveur y seront envoyés. Le plus récent d'abord, 500 au plus. */
@@ -1011,7 +1011,7 @@ export function mergeJobs(local: GjJob[], remote: GjJob[], mine: (j: GjJob) => b
 /** Récupère la liste de l'agence et la fusionne. false = synchro indisponible (SQL pas encore passé). */
 export async function syncJobs(): Promise<boolean> {
   if (!space || remoteOff) return false
-  const { data, error } = await supabase.from('genjutsu_jobs').select('data').eq('space', space.orgId ?? `u:${space.userId}`).order('created_at', { ascending: false }).limit(500)
+  const { data, error } = await supabase.from('genjutsu_renders').select('data').eq('space', space.orgId ?? `u:${space.userId}`).order('created_at', { ascending: false }).limit(500)
   if (error) { if (/relation|does not exist|schema cache|not find/i.test(error.message)) remoteOff = true; return false }
   const remote = ((data ?? []) as { data: GjJob }[]).map(r => r.data).filter(j => j && j.id)
   for (const j of remote) if (isMine(j)) pushed.set(j.id, pushed.get(j.id) ?? JSON.stringify(j))

@@ -718,7 +718,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             ]} />
             {(counts.done + counts.failed) > 0 && <button type="button" onClick={clearFinished} style={{ ...ghostBtn, marginLeft: 'auto', height: 26, fontSize: 12, color: MUTED }}>Vider les terminés</button>}
           </div>
-          {jobsShared === false && <span style={{ fontSize: 12, color: '#FBBF24', lineHeight: 1.45 }}>⚠ Liste de ce navigateur seulement : colle le SQL <code>20261124_genjutsu_jobs.sql</code> dans Supabase pour partager les rendus avec toute l’agence.</span>}
+          {jobsShared === false && <span style={{ fontSize: 12, color: '#FBBF24', lineHeight: 1.45 }}>⚠ Liste de ce navigateur seulement : colle le SQL <code>20261124_genjutsu_renders.sql</code> dans Supabase pour partager les rendus avec toute l’agence.</span>}
           {jobsShared && <span style={{ fontSize: 12, color: DIM }}>Rendus partagés avec toute l’agence (500 derniers). Chaque rendu avance sur le navigateur qui l’a lancé.</span>}
           {counts.active > 0 && <span style={{ fontSize: 12, color: MUTED }}>Garde ScaleFlow ouvert pendant la génération (quelques minutes par vidéo) : le suivi reprend tout seul après un rechargement.</span>}
           {shown.length === 0 ? (
