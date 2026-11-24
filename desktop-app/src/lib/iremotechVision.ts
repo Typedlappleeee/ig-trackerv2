@@ -17,6 +17,25 @@ import { findGalleryThumb, findMatchingCell } from './screenMatch'
 // s'ouvrait jamais → bascule de compte ratée). Les boucles essaient aussi 0,78 puis 0,86.
 export const TAB = { y: 0.945, home: { x: 0.15 }, reels: { x: 0.33 }, profile: { x: 0.82 } }
 export const PROFILE_XS = [0.82, 0.78, 0.86]
+export const HOME_XS = [0.17, 0.22, 0.12]   // Accueil : barre pleine (≈0,1) ou flottante étroite (≈0,22)
+
+/** Fil d'accueil d'Instagram à l'écran (le « + » du créateur est en haut à gauche) : « Your story » ou l'en-tête
+ *  « For you / Following » en haut. Pure. */
+export function homeFeedShown(words: { text: string; cy: number }[], H: number): boolean {
+  const top = (re: RegExp) => words.some(o => re.test(o.text) && o.cy < H * 0.3)
+  return (top(/^your$/i) && top(/^story$/i)) || (top(/^for$/i) && top(/^you$/i) && words.some(o => /^for$/i.test(o.text) && o.cy < H * 0.1)) || words.some(o => /^following$/i.test(o.text) && o.cy < H * 0.1)
+}
+/** Onglet Accueil, VÉRIFIÉ (après le scroll des Reels, sinon le « + » est introuvable et le post suivant échoue). */
+export async function goHomeTab(key: string, deviceId: string, W: number, H: number, hooks?: VisionHooks): Promise<boolean> {
+  for (let k = 0; k < HOME_XS.length; k++) {
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(HOME_XS[k] * W), y: Math.round(TAB.y * H) })
+    await sleep(1800)
+    const scr = await readScreenWords(key, deviceId)
+    if (scr && homeFeedShown(scr.words, scr.H)) return true
+    hooks?.log?.(`   accueil pas encore affiché → autre position (${k + 2}/${HOME_XS.length})`)
+  }
+  return false
+}
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -2378,9 +2397,8 @@ export async function warmupByVision(key: string, deviceId: string, opts: Warmup
   hooks?.log?.(`🏁 Warm-up terminé : ${reels} reels · ${likes} likes · ${comments} comments.`)
   await dismissIgInfoSheet(key, deviceId, hooks)
   if (opts.keepApp) {
-    // session de posts : on reste dans Instagram, onglet Accueil (le post suivant part du fil)
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(TAB.home.x * W), y: Math.round(TAB.y * H) })
-    await sleep(1800)
+    // session de posts : on reste dans Instagram, onglet Accueil VÉRIFIÉ (le « + » du post suivant est sur le fil)
+    if (!await goHomeTab(key, deviceId, W, H, hooks)) hooks?.log?.('   ⚠ fil d’accueil non reconnu après le scroll')
   } else {
     await sendAction(key, deviceId, { type: 'press', name: 'home' })
     await sleep(1000)

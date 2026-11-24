@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "⚠ fil d’accueil non reconnu après le scroll": "⚠ home feed not recognised after scrolling",
     "⚠ Liste de ce navigateur seulement : colle le SQL": "⚠ This browser’s list only: paste the SQL",
     "dans Supabase pour partager les rendus avec toute l’agence.": "into Supabase to share renders with the whole agency.",
     "Rendus partagés avec toute l’agence (500 derniers). Chaque rendu avance sur le navigateur qui l’a lancé.": "Renders shared with the whole agency (last 500). Each render progresses in the browser that launched it.",
@@ -5067,5 +5068,7 @@ export const EN: Dict = {
     ["⚠ génération arrêtée à {0}/{1}", "⚠ generation stopped at {0}/{1}"],
     ["⏳ lot raté ({0}) → nouvel essai dans {1} s ({2}/{3} déjà prêtes)", "⏳ batch failed ({0}) → retrying in {1} s ({2}/{3} ready)"],
     ["{0}/{1} description(s) seulement après plusieurs essais ({2}) — relance dans quelques minutes", "only {0}/{1} caption(s) after several attempts ({2}) — relaunch in a few minutes"],
+    ["accueil pas encore affiché → autre position ({0}/{1})", "home not shown yet → other position ({0}/{1})"],
+    ["{0} 🚪 fin du compte précédent → Instagram fermé", "{0} 🚪 previous account done → Instagram closed"],
   ],
 }

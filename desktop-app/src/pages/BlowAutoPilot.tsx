@@ -623,6 +623,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         // Même compte que le post d'avant (session) : on est encore dans Instagram → ni mode avion, ni réouverture
         const sameAcct = stayedIn === job.container
         if (!sameAcct) {
+          // Changement de compte : on QUITTE Instagram, puis nouvelle IP (mode avion), puis on rouvre sur le compte suivant
+          if (ji > 0 && job.container.startsWith('@')) { push(`${tag} 🚪 fin du compte précédent → Instagram fermé`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }) }
           if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
           // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
           if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
@@ -632,8 +634,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         }
         stayedIn = null
         const nextSame = p.jobs[ji + 1]?.container === job.container
-        // Entre deux posts : au moins `gapMin` min, passées à scroller sur CE compte (activité naturelle avant de poster)
-        if (ji > 0) {
+        // Entre deux posts DU MÊME COMPTE : au moins `gapMin` min à scroller sur ce compte (activité naturelle), puis
+        // retour au fil d'accueil pour le « + ». Pas de scroll avant le 1er post d'un compte (on vient d'y basculer).
+        if (sameAcct) {
           // durée ALÉATOIRE à chaque post : entre 80 % et 180 % du réglage, jamais moins d'1 min (rythme humain)
           const ms = Math.max(60_000, gapMin * 60_000 * (0.8 + Math.random()))
           if (gapScroll) {

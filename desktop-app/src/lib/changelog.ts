@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-24',
     title: { fr: 'iRemoTech : bascule de compte réparée', en: 'iRemoTech: account switching fixed' },
     items: {
-      fr: ['Sur certains iPhones, la barre d’onglets flottante est plus étroite : le tap sur « Profil » tombait au bord et la bascule de compte échouait. ScaleFlow vise maintenant l’icône dans les deux barres (testé en vrai sur STEVIE10).'],
-      en: ['On some iPhones the floating tab bar is narrower: the “Profile” tap landed on the edge and account switching failed. ScaleFlow now targets the icon in both bars (tested live on STEVIE10).'],
+      fr: ['Sur certains iPhones, la barre d’onglets flottante est plus étroite : le tap sur « Profil » tombait au bord et la bascule de compte échouait. ScaleFlow vise maintenant l’icône dans les deux barres (testé en vrai sur STEVIE10).', 'Session de posts : sur un compte, post → scroll → retour VÉRIFIÉ au fil d’accueil (le « + ») → post… ; une fois ses posts finis, Instagram est fermé, l’IP change (mode avion) et on passe au compte suivant. Plus de scroll avant le 1er post d’un compte.'],
+      en: ['On some iPhones the floating tab bar is narrower: the “Profile” tap landed on the edge and account switching failed. ScaleFlow now targets the icon in both bars (tested live on STEVIE10).', 'Post sessions: on one account, post → scroll → VERIFIED return to the home feed (the “+”) → post…; once its posts are done, Instagram is closed, the IP changes (airplane mode) and the next account starts. No more scrolling before an account’s first post.'],
     },
   },
   {

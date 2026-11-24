@@ -144,3 +144,11 @@ describe('éditeur de légende (OK = coche sans texte)', () => {
     expect(captionEditorOpen([{ text: 'Poll', cy: 200 }, { text: 'Prompt', cy: 200 }, { text: '#rvlifestyle', cy: 270 }, { text: 'posts', cy: 290 }, { text: '#gvlifestyle', cy: 330 }, { text: 'posts', cy: 350 }, { text: '#menslifestyle', cy: 390 }], H)).toBe(true)
   })
 })
+
+import { homeFeedShown } from './iremotechVision'
+describe('fil d’accueil reconnu (le « + » est là)', () => {
+  it('Your story / For you en haut ; pas sur un Reel plein écran', () => {
+    expect(homeFeedShown([{ text: 'For', cy: 50 }, { text: 'you', cy: 50 }, { text: 'Your', cy: 190 }, { text: 'story', cy: 190 }], 720)).toBe(true)
+    expect(homeFeedShown([{ text: 'Follow', cy: 553 }, { text: 'lesotwins', cy: 540 }], 720)).toBe(false)
+  })
+})
