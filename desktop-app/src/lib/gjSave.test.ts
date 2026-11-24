@@ -7,7 +7,7 @@ type GjJob = import('./genjutsuHF').GjJob
 
 describe('Genjutsu : stockage plein → les rendus récents restent', () => {
   it('allège / raccourcit la liste au lieu de perdre les nouveaux', () => {
-    const jobs = Array.from({ length: 300 }, (_, i) => ({ id: 'j' + i, status: 'done', prompt: 'x'.repeat(3000), createdAt: 1000 - i } as unknown as GjJob))
+    const jobs = Array.from({ length: 500 }, (_, i) => ({ id: 'j' + i, status: 'done', prompt: 'x'.repeat(3000), createdAt: 1000 - i } as unknown as GjJob))
     let saved = ''
     const ok = saveJobs(jobs, (_k, v) => { if (v.length > 200_000) throw new Error('QuotaExceededError'); saved = v })
     expect(ok).toBe(true)

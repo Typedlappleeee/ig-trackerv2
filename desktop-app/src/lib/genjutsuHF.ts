@@ -644,7 +644,7 @@ const subs = new Set<() => void>()
  *  (prompt, erreur) puis on en garde de moins en moins — jamais l'inverse. true si enregistré. */
 export function saveJobs(list: GjJob[], set: (k: string, v: string) => void = (k, v) => localStorage.setItem(k, v)): boolean {
   const lite = (j: GjJob, i: number): GjJob => i < 40 || isActive(j.status) || j.status === 'waiting' ? j : { ...j, prompt: '', error: j.error ? j.error.slice(0, 120) : j.error }
-  for (const n of [300, 150, 80, 40, 15]) {
+  for (const n of [500, 300, 150, 80, 40, 15]) {
     try { set(JOBS_KEY, JSON.stringify(list.slice(0, n).map(lite))); return true } catch { /* plein : on garde moins d'anciens */ }
   }
   return false
