@@ -34,8 +34,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-24',
     title: { fr: 'Nouvelle page d’accueil', en: 'New home page' },
     items: {
-      fr: ['Page publique refaite : plus sobre, photos d’une vraie ferme de téléphones, vignettes de Reels du quotidien (plus de visages de banque d’images), titres plus lisibles, mise en page éditoriale.'],
-      en: ['Public page redesigned: more understated, photos of a real phone farm, everyday Reel thumbnails (no more stock faces), more readable headings, editorial layout.'],
+      fr: ['Page publique refaite : plus sobre, photos d’une vraie ferme de téléphones, vignettes de Reels du quotidien (plus de visages de banque d’images), titres plus lisibles, mise en page éditoriale. L’écran de connexion prend le même style.'],
+      en: ['Public page redesigned: more understated, photos of a real phone farm, everyday Reel thumbnails (no more stock faces), more readable headings, editorial layout. The sign-in screen gets the same style.'],
     },
   },
   {

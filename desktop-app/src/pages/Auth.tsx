@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { IS_WEB } from '@/lib/platform'
 import { useNarrow } from '@/lib/ui'
-import { SPOT_KEYFRAMES, VisualLinks, VisualViral } from '@/components/LaunchSpotlight'
+import { SPOT_KEYFRAMES } from '@/components/LaunchSpotlight'
 
 export type AuthMode = 'login' | 'signup' | 'forgot' | 'reset'
 
@@ -100,17 +100,15 @@ export default function Auth({ initial = 'login', onDone }: { initial?: AuthMode
       <style>{SPOT_KEYFRAMES}</style>
       {/* Vitrine animée */}
       {!narrow && (
-        <div style={{ position: 'relative', flex: '1 1 52%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '40px 48px', overflow: 'hidden', background: 'radial-gradient(120% 90% at 10% 0%, #6D28D9 0%, #2E1065 40%, #0A0A0B 85%)' }}>
-          <span style={{ position: 'absolute', width: 380, height: 380, borderRadius: 999, background: '#EC4899', filter: 'blur(110px)', opacity: 0.35, bottom: -140, right: -80, animation: 'sfsGlow 10s ease-in-out infinite' }} />
+        <div style={{ position: 'relative', flex: '1 1 52%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '40px 48px', overflow: 'hidden', background: '#0A0A0B' }}>
+          <img src="/site/photo-a.webp" alt="" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '60% 50%', filter: 'saturate(.85)' }} />
+          <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,10,11,.75) 0%, rgba(10,10,11,.25) 35%, rgba(10,10,11,.35) 60%, rgba(10,10,11,.92) 100%)' }} />
           <span style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, background: '#fff', color: '#5B21B6' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M5 8h14M5 16h9" /></svg>
             </span>scaleflow
           </span>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28, flex: 1, padding: '30px 0' }}>
-            <div style={{ transform: 'scale(.9)' }}><VisualLinks /></div>
-            <div style={{ transform: 'scale(.8)', marginLeft: -20 }}><VisualViral /></div>
-          </div>
+          <div style={{ flex: 1 }} />
           <div style={{ position: 'relative', maxWidth: 480 }}>
             <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.08, fontWeight: 700, letterSpacing: '-0.04em' }}>Toute ton agence, en pilote automatique.</h1>
             <p style={{ margin: '12px 0 0', fontSize: 15, lineHeight: 1.55, color: 'rgba(255,255,255,0.72)' }}>Publie sur des centaines de comptes Instagram et TikTok, suis tes liens et repère les Reels qui explosent.</p>
@@ -168,7 +166,7 @@ export default function Auth({ initial = 'login', onDone }: { initial?: AuthMode
           {err && <div role="alert" style={{ padding: '10px 12px', borderRadius: 9, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#FCA5A5', fontSize: 13, lineHeight: 1.45 }}>{err}</div>}
           {info && <div role="status" style={{ padding: '10px 12px', borderRadius: 9, background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', color: '#86EFAC', fontSize: 13, lineHeight: 1.45 }}>{info}</div>}
 
-          <button type="submit" disabled={busy} style={{ height: 46, border: 'none', borderRadius: 10, background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', color: '#fff', fontSize: 15, fontWeight: 650, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.7 : 1, boxShadow: '0 12px 30px -12px rgba(139,92,246,.7)' }}>
+          <button type="submit" disabled={busy} style={{ height: 46, border: 'none', borderRadius: 10, background: '#F4F4F5', color: '#0A0A0B', fontSize: 15, fontWeight: 650, cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.7 : 1 }}>
             {busy ? '…' : cta}
           </button>
 
