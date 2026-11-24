@@ -958,6 +958,16 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Warm-up terminé.'); setRunning(false); setRunId(null)
   }
 
+  // (AVANT tout retour anticipé : un hook placé après faisait planter la page — écran noir — au chargement de la clé)
+  // fin d'un lancement → journal complet enregistré (titre = 1re ligne utile)
+  useEffect(() => {
+    if (wasRunning.current && !running && logs.length) {
+      const title = (logs.find(l => /^▶|^✍️|^🔍|^🔎/.test(l.trim())) ?? logs[0] ?? 'Lancement').trim().slice(0, 90)
+      const entry = { at: Date.now(), title, logs: logs.slice(-800) }
+      setRunHistory(h => { const n = [entry, ...h].slice(0, 20); try { localStorage.setItem('sf-irt-run-logs', JSON.stringify(n)) } catch { try { localStorage.setItem('sf-irt-run-logs', JSON.stringify(n.slice(0, 5))) } catch { /* plein */ } } return n })
+    }
+    wasRunning.current = running
+  }, [running]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!irt.key) {
     return (
       <div>
@@ -1064,15 +1074,6 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   )
 
   // Progression : une ligne par iPhone/container (statut + dernière étape), journal détaillé repliable.
-  // fin d'un lancement → journal complet enregistré (titre = 1re ligne utile)
-  useEffect(() => {
-    if (wasRunning.current && !running && logs.length) {
-      const title = (logs.find(l => /^▶|^✍️|^🔍|^🔎/.test(l.trim())) ?? logs[0] ?? 'Lancement').trim().slice(0, 90)
-      const entry = { at: Date.now(), title, logs: logs.slice(-800) }
-      setRunHistory(h => { const n = [entry, ...h].slice(0, 20); try { localStorage.setItem('sf-irt-run-logs', JSON.stringify(n)) } catch { try { localStorage.setItem('sf-irt-run-logs', JSON.stringify(n.slice(0, 5))) } catch { /* plein */ } } return n })
-    }
-    wasRunning.current = running
-  }, [running]) // eslint-disable-line react-hooks/exhaustive-deps
   const LogPanel = () => {
     if (!logs.length && !running) return runHistory.length ? (
       <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

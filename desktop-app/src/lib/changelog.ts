@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-24a',
+    date: '2026-11-24',
+    title: { fr: 'iRemoTech : page noire corrigée', en: 'iRemoTech: black page fixed' },
+    items: {
+      fr: ['Corrigé : l’onglet iRemoTech pouvait planter (page noire) au chargement, depuis l’ajout des journaux de lancements.'],
+      en: ['Fixed: the iRemoTech tab could crash (black page) on load, since run logs were added.'],
+    },
+  },
+  {
     id: '2026-11-23c',
     date: '2026-11-23',
     title: { fr: 'iRemoTech : nouvelle barre d’Instagram et bascule de compte sûre', en: 'iRemoTech: new Instagram bar and safe account switching' },
