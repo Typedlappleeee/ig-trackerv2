@@ -505,6 +505,12 @@ export function adsConsentTaps(words: { text: string; cx: number; cy: number }[]
   return ok && !has(/^subscribe$/i) ? [{ x: ok.cx, y: ok.cy }] : null
 }
 
+/** Coche bleue « ✓ » (OK) de l'éditeur de légende, en haut à droite : repérée à sa couleur (repli 90 % / 7,5 %). */
+async function tapCaptionCheck(key: string, deviceId: string, W: number, H: number, shot?: string): Promise<void> {
+  const b = shot ? await findBlueButton(shot, 0, 0.16, 0.6, 1).catch(() => null) : null
+  await sendAction(key, deviceId, { type: 'tap', x: b ? b.cx : Math.round(0.9 * W), y: b ? b.cy : Math.round(0.075 * H) })
+}
+
 /** Éditeur plein écran « Caption » encore ouvert : titre « Caption » en haut ET (OK / Done en haut, ou les puces
  *  « Hashtags / Poll / Prompt » sous le texte). Depuis le 24/11/2026 le OK est une coche bleue SANS texte en haut à
  *  droite : sans les puces, ScaleFlow croyait l'éditeur fermé et tapait Share dessous (rien n'était publié). Pure. */
@@ -978,7 +984,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
       const ce = await readScreenWords(key, deviceId)
       if (!ce || !captionEditorOpen(ce.words, ce.H)) break
       hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
-      await tapFrac(0.9, [0.064, 0.076, 0.054][k]); await sleep(1500)
+      await tapCaptionCheck(key, deviceId, W, H, ce.shot); await sleep(1500)
     }
   }
   // 7. Publier : « Share » direct, sinon un « Next » intermédiaire puis « Share ».
@@ -1178,7 +1184,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       const ce = await readScreenWords(key, deviceId)
       if (!ce || !captionEditorOpen(ce.words, ce.H)) break
       hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
-      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round([0.064, 0.076, 0.054][k] * H) })
+      await tapCaptionCheck(key, deviceId, W, H, ce.shot)
       await sleep(1500)
     }
   }
@@ -1196,14 +1202,14 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     if (!sp) return true // illisible : on ne conclut pas à un succès
     return sharePageShown(sp.words, sp.W, sp.H)
   }
-  // Éditeur de légende encore ouvert par-dessus (OK = coche sans texte, pas toujours prise) : un 1er tap sur Share
-  // le ferme, le 2e publie (vu en vrai le 24/11/2026). On ferme donc d'abord l'éditeur par un tap sur Share.
+  // Éditeur de légende encore ouvert par-dessus (souvent avec la liste des hashtags suggérés après un « #… » final) :
+  // on le ferme par la coche bleue en haut à droite avant de taper Share (vu en vrai le 24/11/2026).
   const closeCaptionEditor = async () => {
     for (let j = 0; j < 2; j++) {
       const ce = await readScreenWords(key, deviceId)
       if (!ce || !captionEditorOpen(ce.words, ce.H)) return
-      hooks?.log?.('   éditeur de légende encore ouvert → 1er tap sur Share pour le fermer')
-      await sendAction(key, deviceId, { type: 'tap', x: Math.round(A.shareBtn.x * W), y: Math.round(A.shareBtn.y * H) })
+      hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
+      await tapCaptionCheck(key, deviceId, W, H, ce.shot) // jamais Share ici : la liste des hashtags suggérés est dessous
       await sleep(1800)
     }
   }
