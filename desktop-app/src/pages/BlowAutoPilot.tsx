@@ -209,8 +209,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [newGroup, setNewGroup] = useState<string | null>(null)   // champ « Créer un groupe » ouvert
   const pendingGroupPhone = useRef<string | null>(null)            // iPhone à mettre dans le groupe qu'on crée
   const submitNewGroup = (name: string) => { const g = name.trim(); if (g) { createGroup(g); if (pendingGroupPhone.current) setPhoneGroup(pendingGroupPhone.current, g) } pendingGroupPhone.current = null; setNewGroup(null) }
-  // Posting Reels SUR LE SERVEUR (PC éteint) : la session est envoyée dans la file au lieu de tourner dans cette page
-  const [serverMode, setServerModeS] = useState(() => { try { return localStorage.getItem('sf-irt-server-mode') === '1' } catch { return false } })
+  // Posting Reels SUR LE SERVEUR (PC éteint) : la session est envoyée dans la file au lieu de tourner dans cette page.
+  // MASQUÉ pour l'instant (demande de l'équipe) : passer SERVER_MODE_VISIBLE à true pour réafficher la case.
+  const SERVER_MODE_VISIBLE = false
+  const [serverModeRaw, setServerModeS] = useState(() => { try { return localStorage.getItem('sf-irt-server-mode') === '1' } catch { return false } })
+  const serverMode = SERVER_MODE_VISIBLE && serverModeRaw
   const setServerMode = (v: boolean) => { setServerModeS(v); try { localStorage.setItem('sf-irt-server-mode', v ? '1' : '0') } catch { /* noop */ } }
   const [serverN, setServerN] = useState<number | null>(0)
   const [srvRefresh, setSrvRefresh] = useState(0)
@@ -383,7 +386,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     }
   }, [irtJobs]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (curTab !== 'posting') return
+    if (curTab !== 'posting' || !SERVER_MODE_VISIBLE) return
     let alive = true
     const tick = () => void serversOnline().then(n => { if (alive) setServerN(n) })
     tick()
@@ -1571,9 +1574,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             📱 Scroller pendant la pause <span style={{ color: DIM, fontSize: 11.5 }}>(activité naturelle sur le compte avant son post, évite le flag robot)</span>
           </label>
         </div>
-        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} ${postType === 'carousel' ? `carrousel${totalJobs > 1 ? 's' : ''} de ${carCount} photos` : `Reel${totalJobs > 1 ? 's' : ''}`} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<>{postType !== 'carousel' && serverN !== null && <div style={{ marginBottom: 10 }}><Toggle on={serverMode} onClick={() => setServerMode(!serverMode)} label="☁ Sur le serveur (PC éteint)" sub={serverN ? `${serverN} serveur${serverN > 1 ? 's' : ''} en ligne : la session tourne sur le serveur, tu peux fermer ScaleFlow et éteindre ce PC.` : 'Aucun serveur en ligne pour l’instant : la session attendra qu’un serveur démarre.'} /></div>}<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} /></>} label={postType === 'carousel' ? `Lancer ${totalJobs * sessMax} carrousel(s)` : serverMode && serverN !== null ? `Envoyer ${totalJobs * sessMax} Reel(s) au serveur` : `Lancer ${totalJobs * sessMax} Reel(s)`} disabled={!totalJobs || (postType === 'carousel' ? (photoSrc.mode === 'folder' ? !photoSrc.folder : photoPool.length < carCount) : (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length)) || running} running={running} onClick={() => run(postType === 'carousel' ? 'carousel' : 'reel')} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} ${postType === 'carousel' ? `carrousel${totalJobs > 1 ? 's' : ''} de ${carCount} photos` : `Reel${totalJobs > 1 ? 's' : ''}`} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<>{SERVER_MODE_VISIBLE && postType !== 'carousel' && serverN !== null && <div style={{ marginBottom: 10 }}><Toggle on={serverMode} onClick={() => setServerMode(!serverMode)} label="☁ Sur le serveur (PC éteint)" sub={serverN ? `${serverN} serveur${serverN > 1 ? 's' : ''} en ligne : la session tourne sur le serveur, tu peux fermer ScaleFlow et éteindre ce PC.` : 'Aucun serveur en ligne pour l’instant : la session attendra qu’un serveur démarre.'} /></div>}<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} /></>} label={postType === 'carousel' ? `Lancer ${totalJobs * sessMax} carrousel(s)` : serverMode && serverN !== null ? `Envoyer ${totalJobs * sessMax} Reel(s) au serveur` : `Lancer ${totalJobs * sessMax} Reel(s)`} disabled={!totalJobs || (postType === 'carousel' ? (photoSrc.mode === 'folder' ? !photoSrc.folder : photoPool.length < carCount) : (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length)) || running} running={running} onClick={() => run(postType === 'carousel' ? 'carousel' : 'reel')} />
         <LogPanel />
-        {postType !== 'carousel' && <IrtServerRuns scope={{ orgId: currentOrg?.id ?? null, userId: user.id }} refreshKey={srvRefresh} />}
+        {SERVER_MODE_VISIBLE && postType !== 'carousel' && <IrtServerRuns scope={{ orgId: currentOrg?.id ?? null, userId: user.id }} refreshKey={srvRefresh} />}
       </>)}
 
       {/* ─────────────── ONGLET STORY ─────────────── */}

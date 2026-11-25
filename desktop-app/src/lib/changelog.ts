@@ -12,15 +12,6 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    id: '2026-11-25e',
-    date: '2026-11-25',
-    title: { fr: 'iRemoTech : Posting Reels sur le serveur (PC éteint)', en: 'iRemoTech: Reels posting on the server (PC off)' },
-    items: {
-      fr: ['Nouvelle case « ☁ Sur le serveur (PC éteint) » dans Posting › Reels : la session est envoyée à un serveur ScaleFlow qui la fait tourner, tu peux fermer ScaleFlow et éteindre ton PC. Suivi en direct (journal, progression, bouton Arrêter) pour toute l’agence. Nécessite un serveur installé (une commande) et le SQL 20261125_irt_server.sql.'],
-      en: ['New “☁ On the server (PC off)” option in Posting › Reels: the session is sent to a ScaleFlow server that runs it, you can close ScaleFlow and turn your PC off. Live follow-up (log, progress, Stop button) for the whole agency. Requires an installed server (one command) and the SQL 20261125_irt_server.sql.'],
-    },
-  },
-  {
     id: '2026-11-25d',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : plus de compte « perdu » (STEVIE1)', en: 'iRemoTech: no more “lost” account (STEVIE1)' },
