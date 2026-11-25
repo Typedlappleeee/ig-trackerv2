@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-25',
     title: { fr: 'Story CTA : jamais l’original d’une photo spoofée', en: 'Story CTA: never the original of a spoofed photo' },
     items: {
-      fr: ['Quand une photo a été « Spoofée en copies », la Story CTA ne publie que ses copies, jamais l’original — même quand toutes les copies ont été utilisées. L’original reste dans la Banque comme source.'],
-      en: ['When a photo has been “Spoofed into copies”, the Story CTA only posts its copies, never the original — even once every copy has been used. The original stays in the Bank as the source.'],
+      fr: ['Quand une photo a été « Spoofée en copies », la Story CTA ne publie que ses copies, jamais l’original — même quand toutes les copies ont été utilisées. L’original reste dans la Banque comme source.', 'Chaque copie publiée en Story CTA est consommée (corbeille, récupérable 7 jours) : le badge « N copies » baisse, et « ⚠ 0 copie » apparaît sur l’original quand il faut le re-spoofer.'],
+      en: ['When a photo has been “Spoofed into copies”, the Story CTA only posts its copies, never the original — even once every copy has been used. The original stays in the Bank as the source.', 'Each copy posted as a Story CTA is used up (trash, recoverable 7 days): the “N copies” badge goes down, and “⚠ 0 copies” shows on the original when it needs re-spoofing.'],
     },
   },
   {

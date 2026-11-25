@@ -835,7 +835,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         // Reel / carrousel publié : ses vidéos d'origine retenues pour ce compte (jamais une autre copie plus tard)
         if (posted && kind !== 'story') { const own = `${p.dev}::${job.container}`, b = job.vids.map(baseOf); editTeam(t => { t.posted[own] = [...new Set([...(t.posted[own] ?? []), ...b])].slice(-200) }) }
         // Story CTA à usage unique : la photo publiée est retirée de la Banque (elle ne resservira jamais)
-        if (posted && kind === 'story' && storyOnce && src.mode === 'folder') for (const v of job.vids) {
+        // Story CTA : une COPIE spoofée publiée est consommée (corbeille, récupérable 7 j) → le compteur « N copies »
+        // de l'original baisse ; quand il n'y en a plus, on re-spoofe l'original (jamais publié lui-même)
+        const consumed = new Set<string>()
+        if (posted && kind === 'story') for (const v of job.vids) if (/ · copie \d+/i.test(v.title)) {
+          try { await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).eq('id', v.id); consumed.add(v.id); push(`${tag} 🧬 copie « ${v.title} » consommée (corbeille)`) } catch { /* noop */ }
+        }
+        if (posted && kind === 'story' && storyOnce && src.mode === 'folder') for (const v of job.vids.filter(x => !consumed.has(x.id))) {
           try { await supabase.from('content_bank').delete().eq('id', v.id); if (v.storage_path) await supabase.storage.from('content').remove([v.storage_path]); push(`${tag} 🗑 « ${v.title} » supprimée de la Banque (usage unique)`) } catch { /* noop */ }
         }
         // Reels / carrousels : média supprimé de la Banque une fois publié (option)

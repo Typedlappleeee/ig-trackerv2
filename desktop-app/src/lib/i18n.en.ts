@@ -7,6 +7,8 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Original spoofé : plus aucune copie — sélectionne-le puis « Spoofer en copies »": "Spoofed original: no copy left — select it then “Spoof into copies”",
+    "⚠ 0 copie": "⚠ 0 copies",
     "⚠ Aucune photo publiable : ce sont toutes des originaux spoofés. Les copies sont-elles dans ce dossier ?": "⚠ No postable photo: they are all spoofed originals. Are the copies in this folder?",
     "déjà téléchargé ces 30 derniers jours (doublon évité)": "already downloaded in the last 30 days (duplicate avoided)",
     "👤 Banques des modèles": "👤 Model banks",
@@ -5249,6 +5251,7 @@ export const EN: Dict = {
     ["Logo de « {0} » retiré.", "Logo of “{0}” removed."],
     ["Logo : {0}", "Logo: {0}"],
     ["🧬 {0} photo(s) originale(s) écartée(s) : seules leurs copies spoofées sont publiées", "🧬 {0} original photo(s) set aside: only their spoofed copies are posted"],
+    ["{0} 🧬 copie « {1} » consommée (corbeille)", "{0} 🧬 copy “{1}” used up (trash)"],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],

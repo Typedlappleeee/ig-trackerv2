@@ -2138,6 +2138,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   onStale={() => void refreshLinks(i)}
                   suspend={!!player}
                 />
+                {(stacked.size.get(i.id) ?? 0) <= 1 && (i.tags ?? []).includes('spoof-src') && (
+                  <span title="Original spoofé : plus aucune copie — sélectionne-le puis « Spoofer en copies »" style={{ position: 'absolute', left: 8, top: 40, zIndex: 3, height: 22, padding: '0 8px', display: 'inline-flex', alignItems: 'center', borderRadius: 99, fontSize: 11, fontWeight: 700, border: '1px solid rgba(251,191,36,0.5)', background: 'rgba(30,22,6,0.85)', color: '#FCD34D' }}>⚠ 0 copie</span>
+                )}
                 {(stacked.size.get(i.id) ?? 0) > 1 && (() => {
                   const k = stacked.keyOf.get(i.id)!, open = openStacks.has(k), n = stacked.size.get(i.id)!
                   return (
