@@ -7,6 +7,14 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Texte du sticker": "Sticker text",
+    "Mes textes": "My texts",
+    "✨ IA (prompt CTA du marché)": "✨ AI (market CTA prompt)",
+    "👀 Aperçu (8)": "👀 Preview (8)",
+    "Au lancement, chaque compte reçoit un texte CTA différent (2 à 6 mots, ❤️ 💕 💗), généré avec le prompt CTA du marché choisi.": "At launch, each account gets a different CTA text (2 to 6 words, ❤️ 💕 💗), generated with the chosen market’s CTA prompt.",
+    "Il faut une clé Groq (Réglages › Intégrations) pour générer les textes CTA.": "A Groq key is needed (Settings › Integrations) to generate CTA texts.",
+    "Prompt CTA enregistré pour ce marché": "CTA prompt saved for this market",
+    "Prompt CTA d’origine remis": "Original CTA prompt restored",
     "outil de l’éditeur ouvert par erreur → fermé": "editor tool opened by mistake → closed",
     "❌ galerie non ouverte depuis la caméra REEL → rien n’est publié (Instagram sera relancé)": "❌ gallery not opened from the REEL camera → nothing posted (Instagram will be restarted)",
     "⚠ écran illisible après Share → considéré comme publié (jamais retapé : risque de double post)": "⚠ screen unreadable after Share → counted as posted (never re-tapped: double-post risk)",
@@ -5159,6 +5167,9 @@ export const EN: Dict = {
     ["✍️ {0}/{1} description(s) reprise(s) de la réserve", "✍️ {0}/{1} caption(s) taken from the reserve"],
     ["⏳ {0} : {1} → nouvel essai dans {2} s ({3}/{4} prêtes)", "⏳ {0}: {1} → retrying in {2} s ({3}/{4} ready)"],
     ["{0}/{1} description(s) seulement : Groq ne répond plus depuis {2} min ({3}) — relance plus tard, les {4} prêtes sont gardées dans la réserve", "only {0}/{1} caption(s): Groq hasn’t answered for {2} min ({3}) — relaunch later, the {4} ready ones are kept in the reserve"],
+    ["✍️ Génération de {0} texte(s) CTA — {1}…", "✍️ Generating {0} CTA text(s) — {1}…"],
+    ["⚠ Textes CTA : {0} → rien n’est lancé.", "⚠ CTA texts: {0} → nothing is launched."],
+    ["Textes CTA : {0}", "CTA texts: {0}"],
     ["{0}/{1} description(s) : aucun modèle Groq disponible pour cette clé ({2})", "{0}/{1} caption(s): no Groq model available for this key ({2})"],
     ["↪ {0} : quota du jour atteint → autre modèle ({1}/{2} prêtes)", "↪ {0}: daily quota reached → other model ({1}/{2} ready)"],
   ],

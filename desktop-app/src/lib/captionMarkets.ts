@@ -242,17 +242,21 @@ export function retryAfterMs(msg: string): number | null {
 export const captionKey = (c: string) => c.toLowerCase().replace(/#\S+/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 6).join(' ')
 
 // Réserve par marché : descriptions générées en trop, gardées pour la prochaine fois (jamais servies deux fois).
-const cacheKey = (m: Market) => `sf-cap-cache-${m}`
-function loadCache(m: Market): string[] { try { const a = JSON.parse(localStorage.getItem(cacheKey(m)) ?? '[]'); return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [] } catch { return [] } }
-function saveCache(m: Market, list: string[]): void { try { localStorage.setItem(cacheKey(m), JSON.stringify(list.slice(0, 400))) } catch { /* plein */ } }
+const cacheKey = (m: Market, ns = 'cap') => `sf-${ns}-cache-${m}`
+function loadCache(m: Market, ns = 'cap'): string[] { try { const a = JSON.parse(localStorage.getItem(cacheKey(m, ns)) ?? '[]'); return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [] } catch { return [] } }
+function saveCache(m: Market, list: string[], ns = 'cap'): void { try { localStorage.setItem(cacheKey(m, ns), JSON.stringify(list.slice(0, 400))) } catch { /* plein */ } }
+
+/** Variante du générateur (ex. textes CTA de Story) : prompt, demande, découpage, validation et réserve propres. */
+export interface GenSpec { ns: string; system: string; ask: (k: number, prev: string[]) => string; split: (raw: string) => string[]; valid?: (c: string) => boolean; tokPer?: number }
 
 /** N descriptions pour le marché, TOUTES ou erreur (jamais un posting avec des descriptions réutilisées), sans limite de
  *  nombre. Réserve d'abord ; puis jusqu'à 3 modèles Groq EN PARALLÈLE (un quota chacun), lots de 10, requêtes légères
  *  (prompt du marché + nombre, sans renvoyer les lots précédents : les doublons sont filtrés ici). Limite de débit →
  *  attente du délai exact donné par Groq ; modèle retiré → modèle suivant. Arrêt seulement après `stallMs` sans aucune
  *  nouvelle description (5 min). Les descriptions en trop vont dans la réserve. */
-export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; stallMs?: number; workers?: number; useCache?: boolean; shouldStop?: () => boolean; batch?: number; models?: string[] }): Promise<string[]> {
+export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; stallMs?: number; workers?: number; useCache?: boolean; shouldStop?: () => boolean; batch?: number; models?: string[]; gen?: GenSpec }): Promise<string[]> {
   if (!groqKey) throw new Error('clé Groq manquante (Réglages › Intégrations)')
+  const g = opts?.gen, ns = g?.ns ?? 'cap'
   const sleep = opts?.sleep ?? ((ms: number) => new Promise<void>(r => setTimeout(r, ms)))
   const stallMs = opts?.stallMs ?? 5 * 60_000
   const foreground = !opts?.shouldStop
@@ -260,16 +264,16 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
   try {
   const out: string[] = []
   const keys = new Set<string>()
-  const add = (c: string) => { const k = captionKey(c); if (!c.trim() || keys.has(k) || out.length >= n) return false; keys.add(k); out.push(c); return true }
+  const add = (c: string) => { const k = captionKey(c); if (!c.trim() || (g?.valid && !g.valid(c)) || keys.has(k) || out.length >= n) return false; keys.add(k); out.push(c); return true }
   if (opts?.useCache !== false) {
-    const cache = loadCache(m)
+    const cache = loadCache(m, ns)
     const take = cache.splice(0, n)
     take.forEach(add)
-    saveCache(m, cache)
+    saveCache(m, cache, ns)
     if (out.length) onLog?.(`✍️ ${out.length}/${n} description(s) reprise(s) de la réserve`)
   }
   if (out.length >= n) return out.slice(0, n)
-  const system = { role: 'system', content: marketPrompt(m) }
+  const system = { role: 'system', content: g?.system ?? marketPrompt(m) }
   const extra: string[] = []
   let lastProgress = Date.now(), lastErr = ''
   // modèles VRAIMENT proposés par Groq pour cette clé (ceux qu'il retire disparaissent de la liste)
@@ -287,8 +291,8 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
       // lots de 15 (le long prompt du marché n'est envoyé qu'une fois pour 15 descriptions) ; 6 minimum
       const ask = Math.min(opts?.batch ?? 15, Math.max(6, n - out.length))
       try {
-        const raw = await groqChat(groqKey, model, [system, { role: 'user', content: String(ask) }], THINKS(model) ? 8000 : Math.min(4000, 160 * ask + 400), 1)
-        const got = splitCaptions(stripThinking(raw ?? ''))
+        const raw = await groqChat(groqKey, model, [system, { role: 'user', content: g?.ask ? g.ask(ask, out.slice(-40)) : String(ask) }], THINKS(model) ? 8000 : Math.min(4000, (g?.tokPer ?? 160) * ask + 400), 1)
+        const got = (g?.split ?? splitCaptions)(stripThinking(raw ?? ''))
         let added = 0
         for (const c of got) { if (add(c)) added++; else if (out.length >= n && !keys.has(captionKey(c))) { keys.add(captionKey(c)); extra.push(c) } }
         if (added) { lastProgress = Date.now(); fails = 0; onLog?.(`✍️ ${Math.min(out.length, n)}/${n} description(s) générée(s)`) }
@@ -314,9 +318,9 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
   }
   // un travailleur par modèle (chaque modèle a son propre quota Groq), 6 au plus
   await Promise.all(Array.from({ length: Math.max(1, opts?.workers ?? Math.min(6, models.length)) }, (_, w) => worker(w)))
-  if (out.length < n && dead.size >= models.length) { if (out.length) saveCache(m, [...out, ...loadCache(m)]); throw new Error(`${out.length}/${n} description(s) : aucun modèle Groq disponible pour cette clé (${lastErr})`) }
-  if (extra.length) saveCache(m, [...loadCache(m), ...extra])
-  if (out.length < n) { if (out.length) saveCache(m, [...out, ...loadCache(m)]); throw new Error(`${out.length}/${n} description(s) seulement : Groq ne répond plus depuis ${Math.round(stallMs / 60000)} min (${lastErr || 'indisponible'}) — relance plus tard, les ${out.length} prêtes sont gardées dans la réserve`) }
+  if (out.length < n && dead.size >= models.length) { if (out.length) saveCache(m, [...out, ...loadCache(m, ns)], ns); throw new Error(`${out.length}/${n} description(s) : aucun modèle Groq disponible pour cette clé (${lastErr})`) }
+  if (extra.length) saveCache(m, [...loadCache(m, ns), ...extra], ns)
+  if (out.length < n) { if (out.length) saveCache(m, [...out, ...loadCache(m, ns)], ns); throw new Error(`${out.length}/${n} description(s) seulement : Groq ne répond plus depuis ${Math.round(stallMs / 60000)} min (${lastErr || 'indisponible'}) — relance plus tard, les ${out.length} prêtes sont gardées dans la réserve`) }
   return out.slice(0, n)
   } finally { if (foreground) activeGens-- }
 }

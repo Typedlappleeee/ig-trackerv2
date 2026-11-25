@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25r',
+    date: '2026-11-25',
+    title: { fr: 'Story CTA : textes générés par IA', en: 'Story CTA: AI-generated texts' },
+    items: {
+      fr: ['Onglet Story › Texte du sticker › « ✨ IA » : chaque compte reçoit un texte CTA différent (2 à 6 mots, ❤️ 💕 💗), généré avec le prompt CTA de l’équipe pour le marché choisi (FR / DE / US). Aperçu et prompt modifiable ; « Mes textes » reste disponible.'],
+      en: ['Story tab › Sticker text › “✨ AI”: each account gets a different CTA text (2 to 6 words, ❤️ 💕 💗), generated with the team’s CTA prompt for the chosen market (FR / DE / US). Preview and editable prompt; “My texts” is still available.'],
+    },
+  },
+  {
     id: '2026-11-25q',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : « Next » de l’éditeur fiable', en: 'iRemoTech: reliable editor “Next”' },

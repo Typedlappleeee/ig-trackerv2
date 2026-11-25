@@ -29,6 +29,7 @@ import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
 import { generatePfp } from '@/lib/pfpGenerator'
 import { generateBios } from '@/lib/bioMarkets'
+import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } from '@/lib/ctaMarkets'
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
 import { listJobs, type IrtJob } from '@/lib/iremotech'
@@ -164,6 +165,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [capMode, setCapMode] = useState<'pool' | 'ai'>(() => { try { return localStorage.getItem('sf-irt-cap-mode') === 'ai' ? 'ai' : 'pool' } catch { return 'pool' } })
   const [capMarket, setCapMarket] = useState<Market>(() => { try { const v = localStorage.getItem('sf-irt-cap-market'); return v === 'us' || v === 'de' ? v : 'fr' } catch { return 'fr' } })
   const [capPreview, setCapPreview] = useState<string[]>([])
+  // Story CTA : textes du sticker générés par IA (prompt du marché) ou pris dans le pool
+  const [ctaMode, setCtaMode] = useState<'pool' | 'ai'>(() => { try { return localStorage.getItem('sf-irt-cta-mode') === 'ai' ? 'ai' : 'pool' } catch { return 'pool' } })
+  const [ctaPreview, setCtaPreview] = useState<string[]>([])
+  const [ctaBusy, setCtaBusy] = useState(false)
+  const [ctaPromptOpen, setCtaPromptOpen] = useState(false)
+  const [ctaDraft, setCtaDraft] = useState('')
   const [capBusy, setCapBusy] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState('')
@@ -644,6 +651,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       try { localStorage.setItem('sf-cap-last-markets', JSON.stringify(todo)) } catch { /* noop */ }
       for (const m of todo) void topUpReserve(conns.groq, m)
     }
+    // Story CTA en mode IA : un texte DIFFÉRENT par compte, avec le prompt CTA du marché choisi
+    let aiCtas: string[] = []
+    if (kind === 'story' && ctaMode === 'ai') {
+      const n = [...sel].reduce((k, d) => k + (selConts[d]?.size ?? 0), 0)
+      const label = MARKETS.find(x => x.k === capMarket)?.label ?? capMarket
+      push(`✍️ Génération de ${n} texte(s) CTA — ${label}…`)
+      try { aiCtas = shuffle(await generateMarketCtas(conns.groq, capMarket, n, msg => push(msg))) }
+      catch (e) { push(`⚠ Textes CTA : ${e instanceof Error ? e.message : String(e)} → rien n’est lancé.`); setRunning(false); return }
+    }
     const aiAll: Record<Market, string[]> = { fr: [...aiCaps.fr], us: [...aiCaps.us], de: [...aiCaps.de] }
     const pickVid = (): VidRef => { if (queued) { if (!vidQueue.length && !noRepeat) vidQueue = src.mode === 'folder' ? byUse() : shuffle(pool); return vidQueue.pop()! } return pool[Math.floor(Math.random() * pool.length)] }
     // Même vidéo d'origine = même titre avant « · » (« kenz 122 », « kenz 122 · v1 », « kenz 122 · copie 2 ») :
@@ -667,6 +683,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       return out
     }
     const pickCap = (dev: string, c: string): string => {
+      if (kind === 'story' && ctaMode === 'ai') return aiCtas.pop() ?? ''
       if (kind !== 'story' && capMode === 'ai') { const m = capMarket; if (!aiCaps[m].length) aiCaps[m] = shuffle(aiAll[m]); return aiCaps[m].pop() ?? '' }
       if (!captions.length) return ''
       if (uniqueUse) { if (!capQueue.length) capQueue = shuffle(captions); return capQueue.pop()! }
@@ -1668,7 +1685,50 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               </div>
             </>
           )}
-          <div style={{ ...lbl, margin: '14px 0 6px' }}>Textes sticker (une par ligne, au hasard — optionnel)</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '14px 0 8px' }}>
+            <span style={{ ...lbl, margin: 0 }}>Texte du sticker</span>
+            <div style={{ display: 'inline-flex', padding: 2, borderRadius: 7, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}` }}>
+              {([['pool', 'Mes textes'], ['ai', '✨ IA (prompt CTA du marché)']] as const).map(([k, l]) => (
+                <button key={k} disabled={running} onClick={() => { setCtaMode(k); try { localStorage.setItem('sf-irt-cta-mode', k) } catch { /* noop */ } }} style={{ height: 26, padding: '0 10px', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: ctaMode === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: ctaMode === k ? INK : MUTED }}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {ctaMode === 'ai' && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: MUTED }}>Marché</span>
+                {MARKETS.map(m => (
+                  <button key={m.k} disabled={running} onClick={() => { setCapMarket(m.k); setCtaPreview([]); setCtaPromptOpen(false); try { localStorage.setItem('sf-irt-cap-market', m.k) } catch { /* noop */ } }}
+                    style={{ ...btn, height: 30, background: capMarket === m.k ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: capMarket === m.k ? GOLD : INK, borderColor: capMarket === m.k ? 'rgba(233,196,106,0.45)' : FIELD_EDGE }}>{m.label}</button>
+                ))}
+                <button style={{ ...btn, height: 30, marginLeft: 'auto' }} disabled={ctaBusy || !conns.groq} onClick={async () => {
+                  setCtaBusy(true)
+                  try { setCtaPreview(await generateMarketCtas(conns.groq, capMarket, 8, undefined, { useCache: false })) } catch (e) { toast(`Textes CTA : ${e instanceof Error ? e.message : String(e)}`, 'bad') }
+                  setCtaBusy(false)
+                }}>{ctaBusy ? 'Génération…' : '👀 Aperçu (8)'}</button>
+                <button style={{ ...btn, height: 30 }} onClick={() => { setCtaDraft(ctaPrompt(capMarket)); setCtaPromptOpen(o => !o) }}>✏️ Prompt</button>
+              </div>
+              <div style={{ fontSize: 11.5, color: conns.groq ? DIM : '#FCD34D', marginTop: 6 }}>
+                {conns.groq ? 'Au lancement, chaque compte reçoit un texte CTA différent (2 à 6 mots, ❤️ 💕 💗), généré avec le prompt CTA du marché choisi.' : 'Il faut une clé Groq (Réglages › Intégrations) pour générer les textes CTA.'}
+              </div>
+              {ctaPromptOpen && (
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <textarea data-no-tr value={ctaDraft} onChange={e => setCtaDraft(e.target.value)} rows={10} style={{ ...inp, width: '100%', height: 'auto', padding: 10, resize: 'vertical', fontFamily: MONO, fontSize: 11.5, lineHeight: 1.5 }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button style={{ ...btn, height: 30, background: GOLD, color: '#0A0A0B', border: 'none', fontWeight: 600 }} onClick={() => { saveCtaPrompt(capMarket, ctaDraft); setCtaPromptOpen(false); setCtaPreview([]); toast('Prompt CTA enregistré pour ce marché', 'ok') }}>Enregistrer</button>
+                    <button style={{ ...btn, height: 30 }} onClick={() => { setCtaDraft(DEFAULT_CTA_PROMPTS[capMarket]); saveCtaPrompt(capMarket, null); toast('Prompt CTA d’origine remis', 'ok') }}>Remettre l’original</button>
+                  </div>
+                </div>
+              )}
+              {ctaPreview.length > 0 && (
+                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {ctaPreview.map(t => <span key={t} data-no-tr style={{ height: 26, display: 'inline-flex', alignItems: 'center', padding: '0 9px', borderRadius: 6, fontSize: 12.5, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK }}>{t}</span>)}
+                </div>
+              )}
+            </div>
+          )}
+          {ctaMode === 'pool' && <>
+          <div style={{ ...lbl, margin: '0 0 6px' }}>Textes sticker (une par ligne, au hasard — optionnel)</div>
           <textarea value={captionPool} onChange={e => setCaptionPool(e.target.value)} rows={2} placeholder={'Texte 1\nTexte 2\n…'} style={{ ...inp, width: '100%', height: 'auto', minHeight: 46, padding: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
           {(() => {
             const lines = captionPool.split('\n').map(x => x.trim()).filter(Boolean)
@@ -1697,6 +1757,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               </div>
             )
           })()}
+          </>}
         </div>
         <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Stor${totalJobs > 1 ? 'ies' : 'y'} sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || (storySrc.mode === 'folder' ? !storySrc.folder : !storyPool.length) || running} running={running} onClick={() => run('story')} />
         <LogPanel />
