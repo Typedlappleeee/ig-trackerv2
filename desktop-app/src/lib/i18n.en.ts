@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Réglages de la modèle": "Model settings",
     "🗂 Banque principale": "🗂 Main bank",
     "👤 Banque modèles": "👤 Models bank",
     "toutes": "all",

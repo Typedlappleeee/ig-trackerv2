@@ -1638,8 +1638,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   ]
 
   const isCloud = infra === 'cloud'
-  const TABS: { k: TabKey; l: string; n: number }[] = [
-    { k: 'media', l: 'Médias', n: items.length },
+  const TABS: { k: TabKey | 'models'; l: string; n: number }[] = [
+    { k: 'media', l: 'Médias', n: mainCount },
+    { k: 'models', l: 'Modèles', n: items.length - mainCount },
     { k: 'caption', l: 'Légendes', n: captions.length },
     { k: 'pool', l: 'Pools', n: poolCount },
   ]
@@ -1751,8 +1752,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         </div>
       )}
 
-      <UnderlineTabs<TabKey> value={tab} onChange={k => { setTab(k); setFolder('Tous') }}
-        items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'media' ? 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' : t.k === 'pool' ? 'M4 6h16|M4 12h16|M4 18h10' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
+      <UnderlineTabs<TabKey | 'models'> value={tab === 'media' && bankMode === 'models' ? 'models' : tab}
+        onChange={k => { if (k === 'models' || k === 'media') { setTab('media'); setBankMode(k === 'models' ? 'models' : 'main') } else setTab(k); setFolder('Tous') }}
+        items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'models' ? 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M4 21a8 8 0 0 1 16 0' : t.k === 'media' ? 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' : t.k === 'pool' ? 'M4 6h16|M4 12h16|M4 18h10' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
 
       {tab === 'media' && undoDel && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 13, color: '#FDE68A' }}>
@@ -1765,69 +1767,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
       {tab === 'media' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px' }}>
-          {/* Deux banques distinctes : principale (sans les modèles) / modèles */}
-          <div style={{ display: 'inline-flex', padding: 3, borderRadius: 11, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
-            {([['main', '🗂 Banque principale', mainCount], ['models', '👤 Banque modèles', items.length - mainCount]] as const).map(([k, l, n]) => (
-              <button key={k} type="button" onClick={() => setBankMode(k)}
-                style={{ height: 32, padding: '0 14px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, background: bankMode === k ? 'rgba(139,124,246,0.18)' : 'transparent', color: bankMode === k ? '#DDD6FE' : '#A1A1AA', boxShadow: bankMode === k ? 'inset 0 0 0 1px rgba(139,124,246,0.5)' : 'none' }}>
-                {l} <span style={{ color: '#6E6E78', fontWeight: 500, marginLeft: 4 }}>{n}</span>
-              </button>
-            ))}
-          </div>
-          {/* Menu déroulant des modèles (banque modèles seulement), groupées par marché */}
-          {bankMode === 'models' && (() => {
-            const hue = (n: string) => [...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)
-            const flag = (k: ModelMarket) => MODEL_MARKETS.find(x => x.k === k)?.label.split(' ')[0] ?? ''
-            const avatar = (m: string, size = 22) => <span style={{ width: size, height: size, flex: 'none', borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.48, fontWeight: 700, color: '#fff', background: `linear-gradient(135deg, hsl(${hue(m)} 70% 62%), hsl(${(hue(m) + 40) % 360} 70% 48%))` }}>{m.slice(0, 1).toUpperCase()}</span>
-            const count = (m: string) => items.filter(i => isWithin(i.folder, m)).length
-            const real = models.filter(m => m !== COMMON_SPACE)
-            const groups = groupModelsByMarket(real, m => modelMkts[m] ?? [])
-            const cur = spaceOn ? space : null
-            const curMkt = !spaceOn && mktF !== 'all' ? MODEL_MARKETS.find(m => m.k === mktF) : null
-            const row = (on: boolean): CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 36, padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, background: on ? 'rgba(139,124,246,0.16)' : 'transparent', color: on ? '#DDD6FE' : '#E4E4E7' })
-            const pick = (sp: string, mk: 'all' | ModelMarket = 'all') => { setSpace(sp); setMktF(mk); setFolder('Tous'); setModelMenu(false) }
-            return (
-              <div style={{ position: 'relative' }}>
-                <button type="button" onClick={() => setModelMenu(o => !o)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 10, height: 38, minWidth: 220, padding: '0 12px 0 8px', borderRadius: 10, cursor: 'pointer', background: '#141416', border: `1px solid ${cur || curMkt ? 'rgba(139,124,246,0.55)' : 'rgba(255,255,255,0.1)'}`, color: '#F4F4F5', fontSize: 13.5, fontWeight: 600 }}>
-                  {cur ? avatar(cur, 24) : <span style={{ width: 24, height: 24, borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#1F1F23', fontSize: 13 }}>{curMkt ? curMkt.label.split(' ')[0] : '🗂'}</span>}
-                  <span data-no-tr={cur ? true : undefined} style={{ flex: 1, textAlign: 'left' }}>{cur ?? (curMkt ? `Modèles ${curMkt.label}` : 'Toutes les modèles')}</span>
-                  {cur && (modelMkts[cur] ?? []).length > 0 && <span style={{ fontSize: 12 }}>{(modelMkts[cur] ?? []).map(flag).join('')}</span>}
-                  <span style={{ color: '#8B8B94', fontSize: 11, transform: modelMenu ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▼</span>
-                </button>
-                {modelMenu && <>
-                  <div onClick={() => setModelMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 70 }} />
-                  <div style={{ position: 'absolute', top: 44, left: 0, zIndex: 71, width: 300, maxHeight: 440, overflowY: 'auto', padding: 6, borderRadius: 12, background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 60px -16px rgba(0,0,0,0.85)' }}>
-                    <button type="button" onClick={() => pick('all')} style={row(!cur && !curMkt)}>
-                      <span style={{ width: 22, height: 22, borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#1F1F23', fontSize: 12 }}>🗂</span>
-                      <span style={{ flex: 1 }}>Toutes les modèles</span><span style={{ color: '#6E6E78', fontSize: 12 }}>{items.length - mainCount}</span>
-                    </button>
-                    {groups.map(g => {
-                      const mk = MODEL_MARKETS.find(m => m.label === g.label)
-                      return (
-                        <div key={g.label} style={{ marginTop: 6 }}>
-                          <button type="button" onClick={() => mk && pick('all', mk.k)} disabled={!mk}
-                            style={{ ...row(!!mk && !cur && curMkt?.k === mk.k), minHeight: 28, fontSize: 11.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: '#8B8B94', cursor: mk ? 'pointer' : 'default' }}>
-                            {g.label}{mk && <span style={{ marginLeft: 'auto', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>toutes</span>}
-                          </button>
-                          {g.models.map(m => (
-                            <button key={`${g.label}:${m}`} type="button" onClick={() => pick(m)} onContextMenu={e => { e.preventDefault(); setModelMenu(false); setModelForm({ edit: m, name: m, mkts: modelMkts[m] ?? [] }) }} style={row(cur === m)}>
-                              {avatar(m)}<span data-no-tr style={{ flex: 1 }}>{m}</span><span style={{ color: '#6E6E78', fontSize: 12 }}>{count(m)}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )
-                    })}
-                    <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '6px 4px' }} />
-                    <button type="button" onClick={() => { setModelMenu(false); setModelForm({ edit: null, name: '', mkts: mktF === 'all' ? [] : [mktF] }) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>＋</span>Nouvelle modèle</button>
-                    {cur && <button type="button" onClick={() => { setModelMenu(false); setModelForm({ edit: cur, name: cur, mkts: modelMkts[cur] ?? [] }) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>⚙</span>{`Réglages de ${cur}`}</button>}
-                    <button type="button" onClick={() => { setModelMenu(false); setTplOpen((bankTpl.length ? bankTpl : templatePaths('', []).map(p => p.slice(1))).join('\n')) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>📐</span>Template des dossiers</button>
-                    {real.length > 0 && <button type="button" onClick={() => { setModelMenu(false); openArrange() }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>🧭</span>Ranger les dossiers par modèle</button>}
-                  </div>
-                </>}
-              </div>
-            )
-          })()}
+          {bankMode === 'models' && <>
+            <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Nouvelle modèle" onClick={() => setModelForm({ edit: null, name: '', mkts: [] })} />
+            <Btn theme={theme} sm tone="quiet" label="📐 Template" onClick={() => setTplOpen((bankTpl.length ? bankTpl : templatePaths('', []).map(p => p.slice(1))).join('\n'))} />
+            {modelRoots.length > 0 && <Btn theme={theme} sm tone="quiet" label="🧭 Ranger" onClick={openArrange} />}
+          </>}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#A1A1AA', cursor: 'pointer' }}>
               <input type="checkbox" checked={stackOn} onChange={e => { setStackOn(e.target.checked); try { localStorage.setItem('sf-bank-stack', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
@@ -1979,7 +1923,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                     flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: on ? 650 : 550,
                     color: on ? '#F4F4F5' : '#A1A1AA',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>{f.label}{favFolders.has(f.n) && <span style={{ color: '#FBBF24', marginLeft: 5 }}>★</span>}</span>
+                  }}>{f.label}{models.includes(f.n) && (modelMkts[f.n] ?? []).length > 0 && <span style={{ marginLeft: 6, fontSize: 11 }}>{(modelMkts[f.n] ?? []).map(k => MODEL_MARKETS.find(x => x.k === k)?.label.split(' ')[0] ?? '').join('')}</span>}{favFolders.has(f.n) && <span style={{ color: '#FBBF24', marginLeft: 5 }}>★</span>}</span>
                   <span style={{
                     fontSize: 11.5, fontVariantNumeric: 'tabular-nums',
                     color: on ? '#A1A1AA' : '#5A5A63',
@@ -2244,7 +2188,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#FBBF24', display: 'flex', width: 14, justifyContent: 'center' }}>{favFolders.has(folderCtx.name) ? '☆' : '★'}</span>{favFolders.has(folderCtx.name) ? 'Retirer des favoris' : 'Épingler en favori'}
             </button>
-            {models.some(m => !isWithin(folderCtx.name, m) || m !== folderCtx.name) && (
+            {models.includes(folderCtx.name) && (
+              <button onClick={() => { const m = folderCtx.name; setFolderCtx(null); setModelForm({ edit: m, name: m, mkts: modelMkts[m] ?? [] }) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span style={{ color: '#A78BFA', display: 'flex', width: 14, justifyContent: 'center' }}>⚙</span>Réglages de la modèle
+              </button>
+            )}
+            {bankMode === 'main' && models.some(m => !isWithin(folderCtx.name, m) || m !== folderCtx.name) && (
               <button onClick={() => { const m0 = models.find(m => m !== COMMON_SPACE && !isWithin(m, folderCtx.name)) ?? models[0]; setSendTo({ src: folderCtx.name, model: m0, dest: m0, merge: false }); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <span style={{ color: '#A78BFA', display: 'flex', width: 14, justifyContent: 'center' }}>➜</span>Envoyer vers une modèle

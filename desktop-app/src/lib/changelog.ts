@@ -12,12 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25z6',
+    date: '2026-11-25',
+    title: { fr: 'Drapeaux visibles sur Windows', en: 'Flags visible on Windows' },
+    items: {
+      fr: ['Windows n’affiche pas les drapeaux emoji (🇫🇷 apparaissait en « FR ») : ScaleFlow embarque maintenant une police de drapeaux, chargée seulement quand le système en a besoin.'],
+      en: ['Windows doesn’t show flag emoji (🇫🇷 showed as “FR”): ScaleFlow now ships a flag font, loaded only when the system needs it.'],
+    },
+  },
+  {
     id: '2026-11-25z5',
     date: '2026-11-25',
-    title: { fr: 'Deux banques séparées : principale et modèles', en: 'Two separate banks: main and models' },
+    title: { fr: 'Banque : onglet « Modèles » séparé', en: 'Bank: separate “Models” tab' },
     items: {
-      fr: ['En haut de la Banque : « 🗂 Banque principale » et « 👤 Banque modèles ». La principale ne montre plus rien des modèles (impossible d’y toucher par erreur) ; la Banque modèles ne montre que les modèles, avec leur menu déroulant. Un dossier passe de l’une à l’autre par clic droit › « Envoyer vers une modèle ».'],
-      en: ['At the top of the Bank: “🗂 Main bank” and “👤 Models bank”. The main one no longer shows anything from the models (no accidental changes); the models bank shows only the models, with their dropdown. A folder moves from one to the other via right-click › “Send to a model”.'],
+      fr: ['Nouvel onglet « Modèles » à côté de « Médias », avec exactement le même affichage. « Médias » ne contient plus les dossiers des modèles (impossible d’y toucher par erreur) ; « Modèles » ne contient qu’elles (drapeaux de leurs marchés, clic droit › Réglages de la modèle). Un dossier passe de Médias à une modèle par clic droit › « Envoyer vers une modèle ».'],
+      en: ['New “Models” tab next to “Media”, with exactly the same layout. “Media” no longer contains the models’ folders (no accidental changes); “Models” contains only them (market flags, right-click › Model settings). A folder moves from Media to a model via right-click › “Send to a model”.'],
     },
   },
   {
