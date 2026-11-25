@@ -7,6 +7,8 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "déjà téléchargé ces 30 derniers jours (doublon évité)": "already downloaded in the last 30 days (duplicate avoided)",
+    "👤 Banques des modèles": "👤 Model banks",
     "image illisible": "unreadable image",
     "🖼 Changer le logo": "🖼 Change the logo",
     "🖼 Ajouter un logo": "🖼 Add a logo",

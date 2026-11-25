@@ -8,6 +8,7 @@ import { useBankThumbs } from '@/lib/data'
 import { Modal, Btn, FIELD, Skeleton, SkeletonRows } from '@/lib/ui'
 import VideoFrame from './VideoFrame'
 import { folderTree, isWithin, childFolders, normPath, setFolderFav } from '@/lib/bankFolders'
+import { MODEL_TAG, groupModelsByMarket, marketsOfTags, OTHER_TAG, type ModelMarket } from '@/lib/bankSpaces'
 import { mediaKindOf, kindOfFile, extOfPath, isFav, withFav, AUDIO_MIME, type MediaKind } from '@/lib/mediaKind'
 import { heicToJpeg } from '@/lib/heic'
 import { niceBase } from '@/lib/niceTitle'
@@ -97,6 +98,9 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   const [folder, setFolderState] = useState<string>(() => { try { return localStorage.getItem(lastKey) || 'Tous' } catch { return 'Tous' } })
   const setFolder = (f: string) => { setFolderState(f); try { localStorage.setItem(lastKey, f) } catch { /* ignore */ } }
   const [favFolders, setFavFolders] = useState<string[]>([])
+  // Banques des modèles (Kenza FR, Kenza US…) : 1er menu « Banque », puis 2e menu « Dossier » de cette banque
+  const [bankModels, setBankModels] = useState<{ path: string; mkts: ModelMarket[]; other: boolean }[]>([])
+  const MAIN = '__main__'
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
@@ -114,6 +118,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
       const rows = (data ?? []) as Media[]
       const isSent = (m: Media) => SENTINELS.includes(m.notes ?? '') && !m.storage_path && !m.file_url
       setFavFolders([...new Set(rows.filter(m => isSent(m) && m.folder && isFav(m)).map(m => normPath(m.folder as string)))])
+      setBankModels(rows.filter(m => isSent(m) && m.folder && (m.tags ?? []).includes(MODEL_TAG) && normPath(m.folder) !== 'Commun').map(m => ({ path: normPath(m.folder as string), mkts: marketsOfTags(m.tags), other: (m.tags ?? []).includes(OTHER_TAG) })))
       // STRICT : un sélecteur de vidéos ne montre QUE des vidéos (jamais d'image ni de son),
       // même si la banque n'en contient aucune (avant : repli sur « tout » → images au posting Reels).
       setMedia(rows.filter(m => !isSent(m) && mediaKindOf(m) === want))
@@ -125,7 +130,9 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   // Navigation par niveau : on ne montre que les sous-dossiers du dossier ouvert (+ les favoris),
   // au lieu de la liste à plat de TOUS les dossiers.
   const allPaths = useMemo(() => folderTree(media.map(m => m.folder)).map(n => n.path), [media])
-  const realFolder = folder !== 'Tous' && folder !== FAVS ? folder : null
+  const realFolder = folder !== 'Tous' && folder !== FAVS && folder !== MAIN ? folder : null
+  const modelOf = (p: string | null | undefined) => bankModels.find(b => isWithin(p, b.path))?.path ?? null
+  const bankSel = folder === MAIN ? 'main' : realFolder ? (modelOf(realFolder) ?? 'main') : 'all'
   useEffect(() => {   // dossier mémorisé disparu → racine
     if (!loading && realFolder && !allPaths.some(p => isWithin(p, realFolder)) && !favFolders.includes(realFolder)) setFolder('Tous')
   }, [loading, allPaths, realFolder])
@@ -135,11 +142,11 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   const filteredMedia = useMemo(() => {
     const s = q.trim().toLowerCase()
     return media
-      .filter(m => folder === 'Tous' || (folder === FAVS ? isFav(m) : isWithin(m.folder, folder)))
+      .filter(m => folder === 'Tous' || (folder === FAVS ? isFav(m) : folder === MAIN ? !modelOf(m.folder) : isWithin(m.folder, folder)))
       .filter(m => !s || (m.title ?? '').toLowerCase().includes(s))
       // favoris en premier
       .sort((a, b) => Number(isFav(b)) - Number(isFav(a)))
-  }, [media, q, folder])
+  }, [media, q, folder, bankModels])
   // Affichage progressif (60 puis la suite en défilant) et liens des SEULES vignettes affichées.
   const [limit, setLimit] = useState(60)
   useEffect(() => { setLimit(60) }, [q, folder])
@@ -254,6 +261,28 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 0 10px' }}>
           {/* Ligne 1 : Tous · Favoris · dossiers favoris (toujours visibles) */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {bankModels.length > 0 && (() => {
+              const sel: React.CSSProperties = { height: 28, padding: '0 8px', borderRadius: 7, background: '#161618', border: '1px solid rgba(255,255,255,0.12)', color: '#EDEDEF', fontSize: 12.5, cursor: 'pointer', maxWidth: 220 }
+              const o: React.CSSProperties = { background: '#161618' }
+              const root = bankSel === 'main' ? null : bankSel === 'all' ? null : bankSel
+              const bankPaths = bankSel === 'all' ? [] : allPaths.filter(p => bankSel === 'main' ? !modelOf(p) : isWithin(p, bankSel) && p !== bankSel)
+              return <>
+                <select value={bankSel} onChange={e => { const v = e.target.value; setFolder(v === 'all' ? 'Tous' : v === 'main' ? MAIN : v) }} style={sel} title="Banque">
+                  <option value="all" style={o}>Toute la Banque</option>
+                  <option value="main" style={o}>🗂 Banque principale</option>
+                  {groupModelsByMarket(bankModels.map(b => b.path), m => bankModels.find(b => b.path === m)?.mkts ?? [], m => !!bankModels.find(b => b.path === m)?.other).map(g => (
+                    <optgroup key={g.label} label={g.label} style={o}>{g.models.map(m => <option key={`${g.label}:${m}`} value={m} style={o} data-no-tr>{m}</option>)}</optgroup>
+                  ))}
+                </select>
+                {bankSel !== 'all' && bankPaths.length > 0 && (
+                  <select value={realFolder && realFolder !== root ? realFolder : ''} onChange={e => setFolder(e.target.value || (root ?? MAIN))} style={sel} title="Dossier">
+                    <option value="" style={o}>Tous les dossiers</option>
+                    {bankPaths.map(p => <option key={p} value={p} style={o} data-no-tr>{(root ? p.slice(root.length + 1) : p).split('/').join(' › ')}</option>)}
+                  </select>
+                )}
+                <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
+              </>
+            })()}
             <button onClick={() => setFolder('Tous')} style={chip(folder === 'Tous')}>Tous</button>
             {(hasFavMedia || folder === FAVS) && <button onClick={() => setFolder(FAVS)} style={{ ...chip(folder === FAVS), color: '#FBBF24' }}>★ Favoris</button>}
             {favFolders.filter(f => allPaths.includes(f)).map(f => (

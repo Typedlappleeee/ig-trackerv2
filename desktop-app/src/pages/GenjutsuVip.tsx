@@ -7,6 +7,7 @@
 // passe pour l'utilisateur. Les comptes Higgsfield de l'équipe se connectent depuis la page.
 // Moteur et file : src/lib/genjutsuHF.ts (relais /api/hf, mot de passe remis par sf_genjutsu_access,
 // gardé en mémoire seulement).
+import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
@@ -1120,8 +1121,15 @@ function FolderPicker({ scope, model, current, onPick, onClose }: { scope: BankS
   const [models, setModels] = useState<string[]>([])
   useEffect(() => { void listBankFolders(scope).then(setPaths).catch(() => setPaths([])); void loadBankModels(scope).then(setModels).catch(() => undefined) }, [scope])
   const tree = useMemo(() => folderTree([...(paths ?? []), current]), [paths, current])
+  // banques des modèles EN PREMIER (Kenza FR, Kenza US… et leurs dossiers), puis la Banque principale
+  const inModel = (p: string) => models.some(m => p === m || p.startsWith(`${m}/`))
+  const sections = useMemo(() => [
+    { label: '👤 Banques des modèles', nodes: tree.filter(n => inModel(n.path)) },
+    { label: '🗂 Banque principale', nodes: tree.filter(n => !inModel(n.path)) },
+  ].filter(x => x.nodes.length), [tree, models]) // eslint-disable-line react-hooks/exhaustive-deps
   const suggestion = joinPath('Genjutsu', model.name)
-  return (
+  // rendu dans <body> : dans la page, un parent animé décalait la fenêtre hors de l'écran (fond assombri seul, vu le 25/11/2026)
+  return createPortal(
     <div onClick={e => { if (e.target === e.currentTarget) onClose() }}
       style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.6)', display: 'grid', placeItems: 'center', padding: 16 }}>
       <div style={{ ...card, width: 'min(460px, 100%)', maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column', gap: 12, padding: 20 }}>
@@ -1129,9 +1137,11 @@ function FolderPicker({ scope, model, current, onPick, onClose }: { scope: BankS
           <div style={{ fontSize: 15, fontWeight: 700, color: INK }} data-no-tr>{`Dossier de ${model.name}`}</div>
           <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Ses vidéos Genjutsu iront directement dans ce dossier de la Banque.</div>
         </div>
-        <div style={{ flex: 1, minHeight: 120, maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, padding: 6, borderRadius: 10, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
+        <div style={{ flex: 1, minHeight: 120, maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, padding: 6, borderRadius: 10, background: '#0D0D0F', border: `1px solid ${EDGE}` }}>
           {paths === null && <SkeletonRows rows={4} />}
-          {paths !== null && tree.map(n => {
+          {paths !== null && sections.map(sec => <div key={sec.label} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {sections.length > 1 && <div style={{ padding: '6px 10px 2px', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: MUTED }}>{sec.label}</div>}
+            {sec.nodes.map(n => {
             const on = n.path === current
             return (
               <button key={n.path} type="button" onClick={() => onPick(n.path)} title={n.path}
@@ -1144,6 +1154,7 @@ function FolderPicker({ scope, model, current, onPick, onClose }: { scope: BankS
               </button>
             )
           })}
+          </div>)}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span style={{ fontSize: 12.5, color: INK, fontWeight: 600 }}>Ou un nouveau dossier</span>
@@ -1163,7 +1174,8 @@ function FolderPicker({ scope, model, current, onPick, onClose }: { scope: BankS
           <button type="button" onClick={onClose} style={ghostBtn}>Fermer</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

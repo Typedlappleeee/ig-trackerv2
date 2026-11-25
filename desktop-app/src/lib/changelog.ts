@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25zc',
+    date: '2026-11-25',
+    title: { fr: 'Choix de la modèle et du dossier partout', en: 'Model and folder choice everywhere' },
+    items: {
+      fr: [
+        'Genjutsu › « Changer » le dossier : la fenêtre s’affichait hors de l’écran (fond assombri seul) — corrigé. Les banques des modèles (Kenza FR, Kenza US…) et leurs dossiers sont listées en premier.',
+        'Sélecteur de médias de tous les outils : deux menus « Banque » (Banque principale ou une modèle, groupées par marché) puis « Dossier » de cette banque.',
+        'Téléchargeur Insta : un lien déjà téléchargé ces 30 derniers jours n’est pas retéléchargé (doublon évité, pour toute l’équipe).',
+      ],
+      en: [
+        'Genjutsu › “Change” folder: the window opened off screen (dimmed background only) — fixed. Model banks (Kenza FR, Kenza US…) and their folders are listed first.',
+        'Media picker of every tool: two menus “Bank” (main bank or a model, grouped by market) then “Folder” of that bank.',
+        'Insta downloader: a link already downloaded in the last 30 days is not downloaded again (duplicate avoided, for the whole team).',
+      ],
+    },
+  },
+  {
     id: '2026-11-25zb',
     date: '2026-11-25',
     title: { fr: 'Banque : logo sur chaque dossier et chaque modèle', en: 'Bank: a logo on every folder and model' },

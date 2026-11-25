@@ -7,7 +7,8 @@ import type { Theme } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { Btn, Panel, PanelHead, FIELD, toast } from '@/lib/ui'
 import { openTool } from '@/lib/openTool'
-import { downloadIgPost, igLinksFrom } from '@/lib/igLink'
+import { downloadIgPost, igLinksFrom, igCodeFromLink } from '@/lib/igLink'
+import { supabase } from '@/lib/supabase'
 import { saveOutputToBank } from '@/lib/studioTools'
 import type { StudioResult } from './Results'
 import { listBankFolders } from '@/lib/bankFolders'
@@ -54,6 +55,17 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
     for (let i = 0; i < list.length; i++) {
       set(i, { state: 'run' })
       try {
+        // Anti-doublon : un lien déjà téléchargé dans les 30 derniers jours (fichier « Insta <code> » encore dans la
+        // Banque de l'espace, toute l'équipe confondue) n'est pas retéléchargé
+        const code = igCodeFromLink(list[i].link)
+        if (code) {
+          const since = new Date(Date.now() - 30 * 864e5).toISOString()
+          const like = `Insta ${code.replace(/[\\%_]/g, m => `\\${m}`)}%`
+          let q = supabase.from('content_bank').select('id').ilike('title', like).gte('created_at', since).is('deleted_at', null).limit(1)
+          q = orgId ? q.eq('org_id', orgId) : q.eq('user_id', user.id).is('org_id', null)
+          const { data: dup } = await q
+          if ((dup ?? []).length) { set(i, { state: 'err', msg: 'déjà téléchargé ces 30 derniers jours (doublon évité)' }); continue }
+        }
         const post = await downloadIgPost(list[i].link)
         const base = `Insta ${post.code}`
         let n = 0
