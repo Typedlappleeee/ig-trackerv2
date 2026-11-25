@@ -124,6 +124,8 @@ export async function recalibrateTouch(key: string, deviceId: string, hooks?: Vi
  *  l'IP avant/après (`device_ip`). Si l'action native est refusée, repli sur le Centre de contrôle (vision). */
 /** Mode avion encore actif : aucun texte d'opérateur / réseau dans la barre d'état à gauche (hors heure). Pure. */
 export function stillAirplane(words: { text: string; cx: number; cy: number }[], W: number, H: number): boolean {
+  // type de réseau lu n'importe où dans la barre d'état (« LTE », « 5G »…) = réseau présent, pas en mode avion
+  if (words.some(o => o.cy < H * 0.035 && /^(lte|5g|4g|3g|5ge|lte\+|wi-?fi)$/i.test(o.text))) return false
   const left = words.filter(o => o.cy < H * 0.035 && o.cx < W * 0.42 && /[a-z]{2,}/i.test(o.text) && !/^\d/.test(o.text))
   return left.length === 0
 }
@@ -714,7 +716,7 @@ export async function dismissPopups(key: string, deviceId: string, hooks?: Visio
   const found = await findTapText(
     key, deviceId,
     [/^not now$/i, /^plus tard$/i, /^pas maintenant$/i, /^skip$/i, /^ignorer$/i, /^cancel$/i, /^annuler$/i, /^dismiss$/i],
-    hooks, { label: 'popup', tries: 1 },
+    { shouldStop: hooks?.shouldStop }, { label: 'popup', tries: 1 }, // recherche silencieuse (le journal ne dit que s'il y en avait un)
   )
   if (found) { hooks?.log?.('   (popup fermé)'); await sleep(1200) }
 }
@@ -939,7 +941,8 @@ async function tapButton(
 export function editorToolsY(words: { text: string; cy: number }[], H: number): number | null {
   const tools = words.filter(o => o.cy > H * 0.7 && /^(audio|text|voice|captions|overlay|edit|effects|stickers|filters?|clips?)$/i.test(o.text))
   const kinds = new Set(tools.map(o => o.text.toLowerCase()))
-  if (kinds.size < 3) return null
+  // OCR souvent partiel (« [e¢), A, Captions » vu en vrai) : 2 outils, ou « Captions » / « Overlay » seuls suffisent
+  if (kinds.size < 2 && !kinds.has('captions') && !kinds.has('overlay')) return null
   return Math.max(...tools.map(o => o.cy))
 }
 /** Point de « Next → » dans l'éditeur : bouton bleu cherché SOUS la barre d'outils, sinon 7 % sous ses libellés. */
@@ -1091,7 +1094,19 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   await clearAssistiveTouch(key, deviceId, hooks)
   // 1. Ouvrir le créateur (+ haut-gauche)
   hooks?.log?.('➕ Ouverture du créateur (+)…')
-  const landing = await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
+  let landing = await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
+  if (landing === 'other') {
+    // Écran inattendu après le + (vu en vrai : vidéo en lecture « 0:13 », ni galerie ni barre des modes) → Instagram
+    // remis à zéro sur le fil, puis + à nouveau, au lieu de chercher POST / REEL à l'aveugle.
+    const chk = await readScreenWords(key, deviceId)
+    const knownCreator = !!chk && (chk.words.some(o => o.cy > chk.H * 0.75 && MODE_WORD.test(o.text)) || newPostGallery(chk.words, chk.H))
+    if (!knownCreator) {
+      hooks?.log?.('   écran inattendu après le + → Instagram remis à zéro, nouvel essai')
+      await resetInstagramToHome(key, deviceId, hooks)
+      await dismissIgInfoSheet(key, deviceId, hooks)
+      landing = await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
+    }
+  }
   if (await grantPhotoAccessIfAsked(key, deviceId, hooks)) {
     hooks?.log?.('   Instagram relancé après l’accès aux photos → on rouvre le créateur')
     await dismissPopups(key, deviceId, hooks)
@@ -1467,6 +1482,14 @@ export function locationRow(words: { text: string; cx: number; cy: number }[], l
     if (!(loc.first ?? loc.city).test(line[0].text)) continue // un mot avant la ville (« West », « North »…) : autre lieu
     // « Frankfurt, Germany » (rien après le pays) = la ville ; « Frankfurt Germany Temple » = un lieu (vu en vrai)
     ok.push({ x: c.cx, y: c.cy, plain: ri === line.length - 1 })
+  }
+  // Résultat sur DEUX lignes : nom de la ville seul (titre), pays / État sur la ligne grise juste dessous
+  // (« Berlin » / « Germany » — vu en vrai le 25/11/2026 : « Berlin, Germany absent des résultats »)
+  if (!ok.length) for (const c of cities) {
+    const line = words.filter(o => Math.abs(o.cy - c.cy) < 12)
+    if (line.length > 3 || !(loc.first ?? loc.city).test(line.sort((a, b) => a.cx - b.cx)[0].text)) continue
+    const sub = words.filter(o => o.cy > c.cy + 8 && o.cy < c.cy + 40 && Math.abs(o.cx - c.cx) < 220)
+    if (sub.some(o => loc.region.test(o.text.replace(/[,.]$/, '')))) ok.push({ x: c.cx, y: c.cy, plain: true })
   }
   const best = ok.find(o => o.plain) ?? ok[0]
   return best ? { x: best.x, y: best.y } : null

@@ -55,8 +55,10 @@ export async function runServerPhone(key: string, p: ServerPhone, opts: ServerOp
 
   let stayedIn: string | null = null
   let cleaned = false
+  const unreachable = new Set<string>()
   for (const [ji, job] of p.jobs.entries()) {
     if (h.shouldStop()) { log('⏹ arrêt demandé'); break }
+    if (unreachable.has(job.container)) { log(`⏭ « ${job.container} » sauté (compte non atteint plus tôt dans la session)`); h.tick(false); continue }
     try {
       log(`\n📦 ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
       const sameAcct = stayedIn === job.container
@@ -69,7 +71,7 @@ export async function runServerPhone(key: string, p: ServerPhone, opts: ServerOp
         if (opts.airplaneOn) await airplaneReset(key, p.dev, vh)
         if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, vh)
         const ok = await openTargetByVision(key, p.dev, job.container, vh)
-        if (!ok) { log(`⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); log('🧹 post raté → posting annulé, Instagram fermé (reprise propre)'); await forceCloseForegroundApp(key, p.dev, vh); cleaned = true; h.tick(false); stayedIn = null; continue }
+        if (!ok) { log(`⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); log('🧹 post raté → posting annulé, Instagram fermé (reprise propre)'); await forceCloseForegroundApp(key, p.dev, vh); cleaned = true; unreachable.add(job.container); h.tick(false); stayedIn = null; continue }
         await sleep(1200)
       }
       stayedIn = null

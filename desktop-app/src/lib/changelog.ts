@@ -12,6 +12,29 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25s',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : corrections après les logs du 25/11', en: 'iRemoTech: fixes from the 25/11 logs' },
+    items: {
+      fr: [
+        'Écran inattendu après le + (vidéo en lecture, ni galerie ni barre des modes) : Instagram remis à zéro puis + à nouveau, au lieu de chercher POST / REEL à l’aveugle.',
+        'Compte non atteint (bascule impossible) : ses autres posts de la session sont sautés tout de suite, au lieu de refaire 5 fois mode avion + bascule.',
+        'Mode avion : plus de fausse alerte « toujours en mode avion » quand la barre d’état montre « 5G » / « LTE ».',
+        'Éditeur vidéo reconnu même quand l’OCR ne lit qu’un outil (« Captions ») : « Next → » visé sous la barre d’outils.',
+        'Localisation : résultat sur deux lignes (« Berlin » puis « Germany » dessous) reconnu.',
+        'Journal plus lisible : plus de lignes « recherche popup… introuvable » à chaque post.',
+      ],
+      en: [
+        'Unexpected screen after + (video playing, no gallery nor mode bar): Instagram reset then + again, instead of blindly looking for POST / REEL.',
+        'Account not reached (switch impossible): its other posts in the session are skipped at once, instead of 5 rounds of airplane mode + switch.',
+        'Airplane mode: no more false “still in airplane mode” alert when the status bar shows “5G” / “LTE”.',
+        'Video editor recognised even when OCR reads a single tool (“Captions”): “Next →” aimed below the toolbar.',
+        'Location: two-line result (“Berlin” then “Germany” below) recognised.',
+        'Cleaner log: no more “popup search… not found” lines on every post.',
+      ],
+    },
+  },
+  {
     id: '2026-11-25r',
     date: '2026-11-25',
     title: { fr: 'Story CTA : textes générés par IA', en: 'Story CTA: AI-generated texts' },

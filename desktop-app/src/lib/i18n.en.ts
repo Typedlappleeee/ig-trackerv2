@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "écran inattendu après le + → Instagram remis à zéro, nouvel essai": "unexpected screen after + → Instagram reset, new try",
     "Texte du sticker": "Sticker text",
     "Mes textes": "My texts",
     "✨ IA (prompt CTA du marché)": "✨ AI (market CTA prompt)",
@@ -5141,6 +5142,8 @@ export const EN: Dict = {
     ["accueil pas encore affiché → autre position ({0}/{1})", "home not shown yet → other position ({0}/{1})"],
     ["{0} 🚪 fin du compte précédent → Instagram fermé", "{0} 🚪 previous account done → Instagram closed"],
     ["{0} ❌ erreur inattendue : {1}", "{0} ❌ unexpected error: {1}"],
+    ["⏭ « {0} » sauté (compte non atteint plus tôt dans la session)", "⏭ “{0}” skipped (account not reached earlier in the session)"],
+    ["{0} ⏭ « {1} » sauté (compte non atteint plus tôt dans la session)", "{0} ⏭ “{1}” skipped (account not reached earlier in the session)"],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],

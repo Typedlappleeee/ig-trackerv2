@@ -230,3 +230,19 @@ describe('éditeur vidéo : barre d’outils (Next toujours dessous)', () => {
     expect(editorToolsY([{ text: 'Share', cy: 690 }, { text: 'Audio', cy: 300 }], H)).toBeNull()
   })
 })
+
+import { stillAirplane, locationRow } from './iremotechVision'
+describe('erreurs des logs du 25/11 (STEVIE1-8)', () => {
+  it('mode avion : « 5G » lu dans la barre d’état = réseau présent (plus de fausse alerte)', () => {
+    expect(stillAirplane([{ text: '3:28PM', cx: 200, cy: 10 }, { text: '5G', cx: 60, cy: 10 }], 406, 720)).toBe(false)
+    expect(stillAirplane([{ text: '3:28PM', cx: 200, cy: 10 }], 406, 720)).toBe(true)
+  })
+  it('lieu sur deux lignes (« Berlin » puis « Germany » dessous)', () => {
+    const loc = { city: /^Berlin,?$/i, first: /^Berlin,?$/i, region: /^(germany|deutschland)$/i }
+    const w = [{ text: 'Berlin', cx: 80, cy: 300 }, { text: 'Germany', cx: 90, cy: 322 }, { text: 'Berliner', cx: 85, cy: 360 }, { text: 'Dom', cx: 150, cy: 360 }]
+    expect(locationRow(w, loc, 200)).toEqual({ x: 80, y: 300 })
+  })
+  it('éditeur reconnu même avec un OCR partiel (« Captions » seul)', () => {
+    expect(editorToolsY([{ text: 'Captions', cy: 640 }, { text: '[e¢)', cy: 640 }], 720)).toBe(640)
+  })
+})
