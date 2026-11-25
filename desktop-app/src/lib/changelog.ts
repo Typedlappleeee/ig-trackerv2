@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25z7',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : envoi des vidéos plus fiable', en: 'iRemoTech: more reliable video upload' },
+    items: {
+      fr: ['Les vidéos sont envoyées sur l’iPhone par le « ticket » recommandé par iRemoTech (jusqu’à 300 Mo, l’ancien envoi plafonné à 100 Mo est obsolète), avec de nouveaux essais automatiques si iRemoTech est saturé ou répond une erreur. Testé en vrai.'],
+      en: ['Videos are sent to the iPhone through the “ticket” recommended by iRemoTech (up to 300 MB; the old 100 MB upload is deprecated), with automatic retries when iRemoTech is busy or returns an error. Tested for real.'],
+    },
+  },
+  {
     id: '2026-11-25z6',
     date: '2026-11-25',
     title: { fr: 'Drapeaux visibles sur Windows', en: 'Flags visible on Windows' },

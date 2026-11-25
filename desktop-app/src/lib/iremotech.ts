@@ -206,15 +206,34 @@ export async function getJob(key: string, jobId: string): Promise<IrtJob | null>
 // Upload d'un média (URL signée Supabase) → octets bruts sur l'iPhone.
 export async function uploadMedia(key: string, deviceId: string, mediaUrl: string, filename = 'video.mp4'): Promise<boolean> {
   try {
-    if (IS_WEB) { const j = await irtProxy('media', key, { deviceId, mediaUrl, filename }); return !!j.ok }
-    const dl = await fetch(mediaUrl)
-    if (!dl.ok) return false
-    const bytes = await dl.arrayBuffer()
-    const res = await fetch(`${BASE}/devices/${encodeURIComponent(deviceId)}/media?filename=${encodeURIComponent(filename)}`, {
-      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/octet-stream' },
-      body: bytes,
-    })
-    return res.ok
+    // un 2e essai si le 1er échoue (iRemoTech saturé, coupure) : au pire la vidéo est 2 fois dans la pellicule, la plus
+    // récente est prise de toute façon
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt) await new Promise(r => setTimeout(r, 4000))
+      if (IS_WEB) { const j = await irtProxy('media', key, { deviceId, mediaUrl, filename }); if (j.ok) return true; continue }
+      const dl = await fetch(mediaUrl)
+      if (!dl.ok) continue
+      const bytes = await dl.arrayBuffer()
+      // flux recommandé : ticket d'envoi puis envoi direct ; ancien POST /media en secours
+      let ok = false
+      try {
+        const tk = await fetch(`${BASE}/devices/${encodeURIComponent(deviceId)}/media/ticket`, { method: 'POST', headers: { Authorization: `Bearer ${key}` } })
+        const tj = tk.ok ? await tk.json() as { upload_url?: string; ticket?: string } : null
+        if (tj?.upload_url && tj.ticket) {
+          const r = await fetch(`${tj.upload_url}${tj.upload_url.includes('?') ? '&' : '?'}filename=${encodeURIComponent(filename)}`, { method: 'POST', headers: { Authorization: `Bearer ${tj.ticket}`, 'Content-Type': 'application/octet-stream' }, body: bytes })
+          ok = r.ok
+        }
+      } catch { /* secours ci-dessous */ }
+      if (!ok) {
+        const res = await fetch(`${BASE}/devices/${encodeURIComponent(deviceId)}/media?filename=${encodeURIComponent(filename)}`, {
+          method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/octet-stream' },
+          body: bytes,
+        })
+        ok = res.ok
+      }
+      if (ok) return true
+    }
+    return false
   } catch { return false }
 }
 

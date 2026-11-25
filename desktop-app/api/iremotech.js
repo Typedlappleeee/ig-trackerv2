@@ -111,11 +111,36 @@ export default async (req, res) => {
         if (!dl.ok) return res.status(200).json({ ok: false, error: `fetch média ${dl.status}` })
         bytes = Buffer.from(await dl.arrayBuffer())
       }
-      const r = await fetch(`${BASE}/devices/${dev}/media?filename=${encodeURIComponent(filename || 'video.mp4')}`, {
-        method: 'POST', headers: { ...auth, 'Content-Type': 'application/octet-stream' },
-        body: bytes, signal: AbortSignal.timeout(55000),
-      })
-      return res.status(200).json({ ok: r.ok, status: r.status, data: await jsonOr(r) })
+      // Flux RECOMMANDÉ par iRemoTech (doc du 25/11/2026) : ticket d'envoi (un par fichier, 300 Mo) puis envoi direct ;
+      // l'ancien POST /media (obsolète, 100 Mo) reste en secours. 429 / 5xx → nouvel essai (Retry-After respecté).
+      const name = encodeURIComponent(filename || 'video.mp4')
+      const t0 = Date.now()
+      const left = () => 55000 - (Date.now() - t0)
+      const wait = (ms) => new Promise(r => setTimeout(r, ms))
+      let last = { ok: false, status: 0, data: null }
+      for (let attempt = 0; attempt < 3 && left() > 8000; attempt++) {
+        let r
+        try {
+          const tk = await fetch(`${BASE}/devices/${dev}/media/ticket`, { method: 'POST', headers: auth, signal: AbortSignal.timeout(Math.min(15000, left())) })
+          const tj = tk.ok ? await jsonOr(tk) : null
+          if (tj && tj.upload_url && tj.ticket && (!tj.max_bytes || bytes.length <= tj.max_bytes)) {
+            r = await fetch(`${tj.upload_url}${tj.upload_url.includes('?') ? '&' : '?'}filename=${name}`, {
+              method: 'POST', headers: { Authorization: `Bearer ${tj.ticket}`, 'Content-Type': 'application/octet-stream', 'Content-Length': String(bytes.length) },
+              body: bytes, signal: AbortSignal.timeout(Math.max(5000, left())),
+            })
+          } else {
+            r = await fetch(`${BASE}/devices/${dev}/media?filename=${name}`, {
+              method: 'POST', headers: { ...auth, 'Content-Type': 'application/octet-stream' },
+              body: bytes, signal: AbortSignal.timeout(Math.max(5000, left())),
+            })
+          }
+        } catch (e) { last = { ok: false, status: 0, data: { error: e?.message ?? String(e) } }; await wait(2000); continue }
+        last = { ok: r.ok, status: r.status, data: await jsonOr(r) }
+        if (r.ok || (r.status !== 429 && r.status < 500)) break
+        const ra = Number(r.headers.get('retry-after'))
+        await wait(Math.min(Number.isFinite(ra) && ra > 0 ? ra * 1000 : 3000 * (attempt + 1), Math.max(0, left() - 6000)))
+      }
+      return res.status(200).json(last)
     }
     return res.status(400).json({ ok: false, error: `op inconnu: ${op}` })
   } catch (e) {
