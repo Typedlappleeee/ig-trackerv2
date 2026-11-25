@@ -190,3 +190,13 @@ describe('Reel plein écran ≠ page d’un autre compte', () => {
     expect(otherPageShown(reel, 406, 720)).toBe(false)
   })
 })
+
+import { assistiveTouchIn } from './ocr'
+describe('bouton AssistiveTouch repéré', () => {
+  it('disque blanc entouré de gris → trouvé ; disque blanc sur fond blanc → non', () => {
+    const W = 406, H = 720, cx = 35, cy = 35
+    const at = (x: number, y: number): [number, number, number] => { const d = Math.hypot(x - cx, y - cy); return d < 17 ? [250, 250, 250] : (Math.abs(x - cx) < 32 && Math.abs(y - cy) < 32) ? [150, 150, 152] : [255, 255, 255] }
+    expect(assistiveTouchIn(at, W, H)).toEqual({ cx: 35, cy: 35 })
+    expect(assistiveTouchIn(() => [255, 255, 255], W, H)).toBeNull()
+  })
+})

@@ -3,7 +3,7 @@
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
 import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
-import { ocrWords, findBlueButton, findBlueDots, findWhiteDisks, meanLuma, pixelRgb, type OcrWord } from './ocr'
+import { ocrWords, findBlueButton, findBlueDots, findWhiteDisks, meanLuma, pixelRgb, findAssistiveTouch, type OcrWord } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { parseProfileCounts, saveScreenStats, parseCount } from './irtAccounts'
 import { askBrain, hasVisionBrain } from './visionBrain'
@@ -25,6 +25,25 @@ export function homeFeedShown(words: { text: string; cy: number }[], H: number):
   const top = (re: RegExp) => words.some(o => re.test(o.text) && o.cy < H * 0.3)
   return (top(/^your$/i) && top(/^story$/i)) || (top(/^for$/i) && top(/^you$/i) && words.some(o => /^for$/i.test(o.text) && o.cy < H * 0.1)) || words.some(o => /^following$/i.test(o.text) && o.cy < H * 0.1)
 }
+/** Bouton AssistiveTouch d'iOS sur une zone de taps d'Instagram (haut à gauche : « + », ✕, retour ; ou barre d'onglets) :
+ *  glissé sur le bord droit. Vu en vrai sur STEVIE10 : posé sur le « + », chaque tap ouvrait le sélecteur d'apps
+ *  (l'app Preview passait au premier plan, plus aucun post possible). true si déplacé. */
+export async function clearAssistiveTouch(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  for (let k = 0; k < 2; k++) {
+    const shot = await snapRetry(key, deviceId)
+    if (!shot) return false
+    const { w: W, h: H } = await imgSize(shot)
+    const at = await findAssistiveTouch(shot).catch(() => null)
+    if (!at) return k > 0
+    const inTheWay = (at.cx < W * 0.25 && at.cy < H * 0.16) || at.cy > H * 0.86 || (at.cx > W * 0.75 && at.cy < H * 0.12)
+    if (!inTheWay) return k > 0
+    if (!k) hooks?.log?.('   bouton AssistiveTouch sur une zone d’Instagram → déplacé sur le bord droit')
+    await sendAction(key, deviceId, { type: 'swipe', x1: at.cx, y1: at.cy, x2: W - 30, y2: Math.round(H * 0.42), duration_ms: 700 })
+    await sleep(1800)
+  }
+  return true
+}
+
 /** Remise à zéro SÛRE : Instagram fermé complètement puis rouvert → il repart sur le fil d'accueil (testé sur STEVIE1).
  *  Utilisée quand ScaleFlow ne retrouve plus la barre d'onglets (page d'un autre compte, notifications…). */
 export async function resetInstagramToHome(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
@@ -316,7 +335,7 @@ async function airplaneResetByVision(key: string, deviceId: string, hooks?: Visi
   // Écran connu d'abord.
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1000)
-  const shot = await snapshot(key, deviceId)
+  const shot = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('⚠ écran illisible → mode avion sauté'); return }
   const tapIcon = () => sendAction(key, deviceId, { type: 'tap', x: Math.round(AIRPLANE_ICON.x * W), y: Math.round(AIRPLANE_ICON.y * H) })
@@ -330,7 +349,7 @@ async function airplaneResetByVision(key: string, deviceId: string, hooks?: Visi
     await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H) - 1, x2: Math.round(W * 0.5), y2: Math.round(H * 0.15), duration_ms: 950 })
     await sleep(1700)
     // Vérif : si on lit encore une icône d'accueil connue → le CC ne s'est pas ouvert.
-    const chk = await snapshot(key, deviceId)
+    const chk = await snapRetry(key, deviceId)
     if (!chk) break // pas de snapshot : on tente la suite quand même
     const w1 = await ocrWords(chk, undefined, { threshold: null, scale: 2, psms: ['11'] })
     const homeStill = w1.some(o => isInstagramText(o.text) || /edits|r[ée]glages|settings|app\s?store/i.test(o.text))
@@ -351,7 +370,7 @@ async function airplaneResetByVision(key: string, deviceId: string, hooks?: Visi
   // 5. Laisser le réseau revenir (vérif snapshot).
   for (let i = 0; i < 6; i++) {
     if (hooks?.shouldStop?.()) return
-    const s = await snapshot(key, deviceId)
+    const s = await snapRetry(key, deviceId)
     if (s) { hooks?.log?.('   réseau rétabli ✓'); return }
     await sleep(3000)
   }
@@ -369,7 +388,7 @@ async function hasText(key: string, deviceId: string, patterns: TextPattern[], h
   const tries = opts?.tries ?? 3
   for (let i = 0; i < tries; i++) {
     if (hooks?.shouldStop?.()) return false
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     if (shot) {
       const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'], cropY: opts?.cropY })
       const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'], cropY: opts?.cropY })
@@ -388,7 +407,7 @@ export async function findTapText(
   const label = opts?.label ?? patterns.map(p => p.source).join('|')
   for (let i = 0; i < tries; i++) {
     if (hooks?.shouldStop?.()) return false
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     if (!shot) { await sleep(600); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
@@ -424,7 +443,7 @@ async function findWordPoint(
   const tries = opts?.tries ?? 2
   for (let i = 0; i < tries; i++) {
     if (hooks?.shouldStop?.()) return null
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     if (!shot) { await sleep(500); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(400); continue }
@@ -457,7 +476,7 @@ export async function disableAutoCorrect(key: string, deviceId: string, hooks?: 
   hooks?.log?.('⌨️ Clavier iOS : coupure de la correction et de la majuscule automatiques (une fois par iPhone)…')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1200)
-  const s0 = await snapshot(key, deviceId)
+  const s0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = s0 ? await imgSize(s0) : { w: 0, h: 0 }
   if (!W || !H) return false
   await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(0.42 * H), x2: Math.round(W / 2), y2: Math.round(0.72 * H), duration_ms: 350 })
@@ -678,7 +697,7 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
   let sawSheet = false
   for (let step = 0; step < maxSteps; step++) {
     if (hooks?.shouldStop?.()) return false
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     if (!shot) { hooks?.log?.('⚠ snapshot indisponible'); await sleep(700); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { hooks?.log?.('⚠ image illisible'); await sleep(500); continue }
@@ -699,7 +718,7 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
         else await sendAction(key, deviceId, { type: 'tap', x, y: hit.cy })
         await sleep(1800)
         // feuille encore ouverte sur 2 captures espacées (pas une simple animation de fermeture) → on retape
-        const stillOpen = async () => { const sh = await snapshot(key, deviceId); return !!sh && pickerRows(await ocrWords(sh, whitelist), W, H).length >= 2 }
+        const stillOpen = async () => { const sh = await snapRetry(key, deviceId); return !!sh && pickerRows(await ocrWords(sh, whitelist), W, H).length >= 2 }
         if (!await stillOpen()) return true
         await sleep(1200)
         if (!await stillOpen()) return true
@@ -743,7 +762,7 @@ async function tapAppIcon(
   let dir: 'left' | 'right' = 'left'
   for (let page = 0; page < 7; page++) {
     if (hooks?.shouldStop?.()) return false
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     if (!shot) { await sleep(700); continue }
     const { w: W, h: H } = await imgSize(shot)
     if (!W || !H) { await sleep(500); continue }
@@ -856,7 +875,7 @@ async function tapButton(
   const minX = blueX ? blueX[0] : undefined
   if (await findTapText(key, deviceId, patterns, hooks, { label: lab, tries, cropY, minX })) return true
   // 2. Couleur : le bouton d'action Instagram est BLEU (Next/Share) — les outils sont gris.
-  const shot = await snapshot(key, deviceId)
+  const shot = await snapRetry(key, deviceId)
   if (shot) {
     const blue = await findBlueButton(shot, cropY ? cropY[0] : 0.6, cropY ? cropY[1] : 1, blueX ? blueX[0] : 0, blueX ? blueX[1] : 1)
     if (blue) {
@@ -916,7 +935,7 @@ async function selectMode(key: string, deviceId: string, patterns: RegExp[], lab
   for (let i = 0; i < 6; i++) {
     if (hooks?.shouldStop?.()) return false
     if (await findTapText(key, deviceId, patterns, hooks, { label, minY: 0.72, tries: 2, cropY: [0.78, 1] })) return true
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
     if (!shot || !W || !H) { await sleep(600); continue }
     // On ne balaie QUE sur la barre des modes, à la hauteur de ses mots LUS. Ailleurs (aperçu
@@ -1004,14 +1023,15 @@ export function newPostGallery(words: { text: string; cy: number }[], H: number)
 
 export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; location?: LocTarget; stay?: boolean; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
-  const shot0 = await snapshot(key, deviceId)
+  const shot0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
 
-  // 0. Ferme un éventuel popup avant de commencer (sinon il bloque le tap du +).
+  // 0. Ferme un éventuel popup avant de commencer (sinon il bloque le tap du +) ; bouton AssistiveTouch hors du chemin.
   await dismissPopups(key, deviceId, hooks)
   await dismissIgInfoSheet(key, deviceId, hooks)
+  await clearAssistiveTouch(key, deviceId, hooks)
   // 1. Ouvrir le créateur (+ haut-gauche)
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   const landing = await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
@@ -1107,7 +1127,7 @@ async function postViaPostMode(key: string, deviceId: string, W: number, H: numb
   const rec = await findWordPoint(key, deviceId, [/^recents?$/i, /^r[ée]cents?$/i], hooks, { minY: 0.25, maxY: 0.85, tries: 3 })
   if (!rec) { hooks?.log?.('❌ grille « Recents » introuvable → rien n’est publié'); return false }
   const gridTop = rec.y + Math.round(0.076 * W)
-  const gshot = await snapshot(key, deviceId)
+  const gshot = await snapRetry(key, deviceId)
   const cw = W / GRID_COLS
   const camera = gshot ? (await meanLuma(gshot, 0.03, (gridTop + cw * 0.15) / H, 0.22, (gridTop + cw * 0.85) / H)) < 60 : true
   const cell = camera ? 1 : 0
@@ -1178,7 +1198,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
   let atCaption = false
   for (let step = 0; step < 11 && !atCaption; step++) {
     if (hooks?.shouldStop?.()) return false
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     if (!shot) { await sleep(800); continue }
     const words = withJoined([
       ...await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] }),
@@ -1233,7 +1253,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       hooks?.log?.(`   éditeur vidéo → « Next → » (${nx}, ${ny})`)
       await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny })
       await sleep(3500)
-      const after = await snapshot(key, deviceId)
+      const after = await snapRetry(key, deviceId)
       const still = after ? (await ocrWords(after, undefined, { threshold: null, scale: 2, psms: ['11'], cropY: [0.85, 1] })).some(o => /^edit$/i.test(o.text)) : false
       if (still) { hooks?.log?.('   éditeur toujours affiché → double tap'); await doubleTap(key, deviceId, nx, ny); await sleep(3500) }
       continue
@@ -1481,7 +1501,7 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
     await typeRich(key, deviceId, loc.q)
     await waitTyped()
   }
-  await sleep(2500)
+  await sleep(1300)
   // 3. la bonne ligne (ville + pays/État, commençant par la ville), jamais la 1re au hasard
   let pt: { x: number; y: number } | null = null
   for (let k = 0; k < 3 && !pt; k++) {
@@ -1494,8 +1514,8 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   if (!pt) { hooks?.log?.(`   ⚠ « ${loc.label} » absent des résultats → publication sans localisation`); await cancel(); return false }
   await tap(pt.x, pt.y)
   // 4. « Map preview » → bouton « Add » (bleu, en bas) — la feuille met un peu de temps à monter
-  for (let k = 0; k < 3; k++) {
-    await sleep(1800)
+  for (let k = 0; k < 4; k++) {
+    await sleep(k ? 1200 : 1000)
     const mp = await readScreenWords(key, deviceId)
     if (!mp?.words.some(o => /^preview$/i.test(o.text))) continue
     const addW = mp.words.find(o => /^add$/i.test(o.text) && o.cy > H * 0.85)
@@ -1505,8 +1525,8 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   }
   // 5. vérifié : retour sur la page de partage, la ligne du lieu remplace « Add location » (relu jusqu'à 4 fois)
   let set = false
-  for (let k = 0; k < 4 && !set; k++) {
-    await sleep(1500)
+  for (let k = 0; k < 5 && !set; k++) {
+    await sleep(k ? 1200 : 800)
     const v = await readScreenWords(key, deviceId)
     set = !!v && (locationAlreadySet(v.words, loc, H) || (sharePageShown(v.words, W, H) && v.words.some(o => loc.region.test(o.text.replace(/[,.]$/, '')) || loc.city.test(o.text)) && !v.words.some(o => /^(locations|search)$/i.test(o.text))))
   }
@@ -1729,13 +1749,14 @@ async function selectCarouselPhotos(key: string, deviceId: string, count: number
 export async function postCarouselByVision(key: string, deviceId: string, opts: { count: number; caption?: string; music?: boolean; location?: LocTarget; stay?: boolean; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
   const count = Math.max(1, Math.min(CAROUSEL_MAX, Math.round(opts.count)))
-  const shot0 = await snapshot(key, deviceId)
+  const shot0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
   let landing: Awaited<ReturnType<typeof tapCreatePlus>> = 'other'
   for (let k = 0; k < 2; k++) {
     await dismissPopups(key, deviceId, hooks)
     await dismissIgInfoSheet(key, deviceId, hooks)
+    await clearAssistiveTouch(key, deviceId, hooks)
     hooks?.log?.(`➕ Ouverture du créateur (+) — carrousel de ${count} photo(s)…`)
     landing = await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
     if (!await grantPhotoAccessIfAsked(key, deviceId, hooks)) break
@@ -1781,7 +1802,7 @@ export async function rewindSignup(key: string, deviceId: string, hooks?: Vision
       if (pt) await doubleTap(key, deviceId, Math.round(pt.x + 70), pt.y)
       await sleep(2500); st = await signupStage(key, deviceId, hooks, 2); continue
     }
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
     if (!W || !H) break
     await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.065 * W), y: Math.round(0.069 * H) }) // flèche « < »
@@ -1810,7 +1831,7 @@ export function classifySignup(words: { text: string; cy: number }[], H: number)
 export async function signupStage(key: string, deviceId: string, hooks?: VisionHooks, tries = 4): Promise<SignupStage | null> {
   for (let i = 0; i < tries; i++) {
     if (hooks?.shouldStop?.()) return null
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     if (shot) {
       const { h: H } = await imgSize(shot)
       const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
@@ -1828,7 +1849,7 @@ export async function createInstagramAccountByVision(
 ): Promise<{ ok: boolean; stage: string }> {
   const searchTerm = opts.searchTerm ?? 'United'
   const countryLabel = opts.countryLabel ?? /kingdom/i
-  const shot0 = await snapshot(key, deviceId)
+  const shot0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible'); return { ok: false, stage: 'snapshot' } }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
@@ -1933,7 +1954,7 @@ export async function createInstagramAccountByVision(
 
 // Saisit le code SMS reçu (écran « Enter the confirmation code ») puis valide.
 export async function enterSmsCodeByVision(key: string, deviceId: string, code: string, hooks?: VisionHooks): Promise<boolean> {
-  const shot0 = await snapshot(key, deviceId)
+  const shot0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible (code)'); return false }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
@@ -1960,7 +1981,7 @@ export async function enterSmsCodeByVision(key: string, deviceId: string, code: 
 // code n'arrive sous 60 s → on jette le numéro et on en essaie un autre. true si on est bien
 // repassé sur l'écran de code (numéro re-soumis).
 export async function resubmitNumberByVision(key: string, deviceId: string, phoneNumber: string, hooks?: VisionHooks): Promise<boolean> {
-  const shot0 = await snapshot(key, deviceId)
+  const shot0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible (ré-saisie numéro)'); return false }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
@@ -1999,7 +2020,7 @@ export async function resubmitNumberByVision(key: string, deviceId: string, phon
 // (donc l'API SMS ne reçoit rien). On tape « I didn't get the code » puis, dans la
 // feuille, « Send code via SMS ».
 export async function requestSmsResendByVision(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
-  const shot0 = await snapshot(key, deviceId)
+  const shot0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) return false
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
@@ -2073,7 +2094,7 @@ export async function forceCloseForegroundApp(key: string, deviceId: string, hoo
 
 export interface SignupCreds { username: string; password: string; fullName: string }
 export async function completeSignupByVision(key: string, deviceId: string, hooks?: VisionHooks, opts?: { container?: string }): Promise<{ ok: boolean; creds?: SignupCreds; refused?: boolean; captcha?: boolean; ready?: boolean }> {
-  const shot0 = await snapshot(key, deviceId)
+  const shot0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible (inscription)'); return { ok: false } }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
@@ -2287,7 +2308,7 @@ export async function settleToFeed(key: string, deviceId: string, hooks?: Vision
       // décoche tout ce qui est visible, vérifie, défile une fois, revérifie ; puis le bouton du bas (« Next »)
       let scrolled = false
       for (let k = 0; k < 6; k++) {
-        const sh = await snapshot(key, deviceId)
+        const sh = await snapRetry(key, deviceId)
         const dots = sh ? await findBlueDots(sh, 0.84, 0.97, 0.33, 0.84) : []
         if (dots.length) {
           hooks?.log?.(`   ☐ « Follow 5 » : ${dots.length} compte(s) coché(s) → décoche`)
@@ -2301,7 +2322,7 @@ export async function settleToFeed(key: string, deviceId: string, hooks?: Vision
         }
         break
       }
-      const sh = await snapshot(key, deviceId)
+      const sh = await snapRetry(key, deviceId)
       const btn = sh ? await findBlueButton(sh, 0.84, 0.97, 0.1, 0.8) : null
       const bx = btn ? btn.cx : Math.round(scr.W / 2), by = btn ? btn.cy : Math.round(0.895 * scr.H)
       hooks?.log?.(`   👆 « Follow 5 » : plus rien de coché → bouton du bas (Next) (${bx}, ${by})`)
@@ -2311,7 +2332,7 @@ export async function settleToFeed(key: string, deviceId: string, hooks?: Vision
     if (act?.kind === 'review') {
       hooks?.log?.('   ⚙ « Review the settings » → défilement jusqu’en bas puis « Next »')
       for (let k = 0; k < 2; k++) { await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(0.93 * scr.W), y1: Math.round(0.86 * scr.H), x2: Math.round(0.93 * scr.W), y2: Math.round(0.2 * scr.H), duration_ms: 500 }); await sleep(1200) }
-      const sh = await snapshot(key, deviceId)
+      const sh = await snapRetry(key, deviceId)
       const blue = sh ? await findBlueButton(sh, 0.85, 0.99, 0, 1) : null
       const bx = blue ? blue.cx : Math.round(scr.W / 2), by = blue ? blue.cy : Math.round(0.95 * scr.H)
       hooks?.log?.(`   👆 Next (bas de page) → tap (${bx}, ${by})`)
@@ -2351,7 +2372,7 @@ export async function settleToFeed(key: string, deviceId: string, hooks?: Vision
     }
     // Écran inconnu avec un bouton bleu : 1er passage → « Skip » juste dessous ; si l'écran n'a pas bougé →
     // le bouton bleu lui-même (Next / Continue mal lu). On ne quitte JAMAIS le container ici.
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     const blue = shot ? await findBlueButton(shot, 0.6, 0.97, 0.1, 0.8) : null
     if (blue) {
       if (idle % 2 === 0) {
@@ -2386,7 +2407,7 @@ export function sameUsername(typed: string, read: string): boolean {
 
 /** Valeur lue dans le champ Username (mot type identifiant sur la ligne du champ), null si illisible. */
 async function readUsernameField(key: string, deviceId: string, fieldY: number): Promise<string | null> {
-  const shot = await snapshot(key, deviceId)
+  const shot = await snapRetry(key, deviceId)
   if (!shot) return null
   const { h: H } = await imgSize(shot)
   const words = await ocrWords(shot)
@@ -2441,7 +2462,7 @@ const REELS_TAB = { x: TAB.reels.x, y: TAB.y } // onglet Reels = 2e icône de la
 const rnd = (a: number, b: number) => a + Math.random() * (b - a)
 
 export async function warmupByVision(key: string, deviceId: string, opts: WarmupOpts, hooks?: VisionHooks): Promise<WarmupResult> {
-  const shot0 = await snapshot(key, deviceId)
+  const shot0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible (warm-up)'); return { ok: false, reels: 0, likes: 0, comments: 0 } }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
@@ -2557,13 +2578,14 @@ const STORY_ANCHORS = {
 
 export async function postStoryByVision(key: string, deviceId: string, opts: { caption?: string; link?: string; anchors?: typeof STORY_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? STORY_ANCHORS
-  const shot0 = await snapshot(key, deviceId)
+  const shot0 = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
 
   await dismissPopups(key, deviceId, hooks)
   await dismissIgInfoSheet(key, deviceId, hooks) // « Stories archive », « Introducing… » : bouton OK au milieu
+  await clearAssistiveTouch(key, deviceId, hooks)
   // 1. Ouvrir le créateur (+ haut-gauche) — même point d'entrée que le Reel.
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   const landing = await tapCreatePlus(key, deviceId, W, H, REEL_ANCHORS.createPlus, hooks, 'story')
@@ -2592,14 +2614,14 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   //    vidéo qu'on vient d'envoyer. Repérée à l'image (bordure blanche) ; son aperçu sert
   //    ensuite à retrouver CE média dans la galerie.
   hooks?.log?.('🖼️ Ouverture de la galerie (vignette en bas à gauche)…')
-  const camShot = await snapshot(key, deviceId)
+  const camShot = await snapRetry(key, deviceId)
   const thumb = camShot ? await findGalleryThumb(camShot) : null
   const tx = thumb ? thumb.cx : Math.round(A.galleryThumb.x * W), ty = thumb ? thumb.cy : Math.round(A.galleryThumb.y * H)
   hooks?.log?.(thumb ? `   vignette repérée → tap (${tx}, ${ty})` : `   vignette non repérée → position connue (${tx}, ${ty})`)
   // Galerie ouverte = la vignette a disparu (ou, sans repère, un titre de galerie est lu).
   const galleryOpen = async () => {
     if (!thumb) return hasText(key, deviceId, [/^recents?$/i, /^r[ée]cents?$/i, /^select$/i, /^s[ée]lectionner$/i, /^gallery$/i, /^galerie$/i, /^pellicule$/i], hooks, { cropY: [0, 0.5], tries: 2 })
-    const s = await snapshot(key, deviceId)
+    const s = await snapRetry(key, deviceId)
     const t2 = s ? await findGalleryThumb(s) : null
     return !t2 || Math.abs(t2.cx - thumb.cx) > thumb.size || Math.abs(t2.cy - thumb.cy) > thumb.size
   }
@@ -2635,7 +2657,7 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   let cell: { cx: number; cy: number } | null = null
   for (let i = 0; i < 2 && thumb && !cell; i++) {
     if (i) await sleep(1200) // vignettes de la galerie encore en chargement
-    const g = await snapshot(key, deviceId)
+    const g = await snapRetry(key, deviceId)
     cell = g ? await findMatchingCell(g, thumb.sig) : null
   }
   if (cell) {
@@ -2833,7 +2855,7 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   if (!placed) { const box = await readSticker(); placed = !!box && stickerInCorner(box, W, H) }
   hooks?.log?.(placed ? '📍 Sticker lien en bas à droite.' : '   (position du sticker non confirmée par la lecture — on continue)')
   // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
-  const shot2 = await snapshot(key, deviceId)
+  const shot2 = await snapRetry(key, deviceId)
   let arrowTapped = false
   if (shot2) {
     const blue = await findBlueButton(shot2, 0.85, 1)
@@ -2851,7 +2873,7 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
     await sleep(1800)
   } else {
     // Repli : le « Done » est un gros bouton bleu en bas.
-    const s = await snapshot(key, deviceId)
+    const s = await snapRetry(key, deviceId)
     if (s) { const blue = await findBlueButton(s, 0.82, 1); if (blue) { hooks?.log?.('   « Done » (bouton bleu bas) → tap'); await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: blue.cy }); await sleep(1800) } }
   }
   await dismissPopups(key, deviceId, hooks) // autre popup éventuel
@@ -2867,7 +2889,7 @@ export async function closeInstagram(key: string, deviceId: string, hooks?: Visi
   hooks?.log?.('🚪 Fermeture d’Instagram…')
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
   await sleep(1300)
-  let shot = await snapshot(key, deviceId)
+  let shot = await snapRetry(key, deviceId)
   const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
   if (!W || !H) { return }
   const cx = Math.round(W * 0.5)
@@ -2875,7 +2897,7 @@ export async function closeInstagram(key: string, deviceId: string, hooks?: Visi
   await sendAction(key, deviceId, { type: 'swipe', x1: cx, y1: Math.round(H * 0.995), x2: cx, y2: Math.round(H * 0.45), duration_ms: 1400 })
   await sleep(2000)
   // 2) Repère la carte « Instagram » par son nom (double polarité) → balaie CELLE-LÀ.
-  shot = await snapshot(key, deviceId)
+  shot = await snapRetry(key, deviceId)
   let swx = cx // repli : carte centrale (IG est normalement la plus récente)
   if (shot) {
     const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
@@ -2907,7 +2929,7 @@ export async function warmupEditsByVision(key: string, deviceId: string, target:
     const inContainer = await findAndTapContainer(key, deviceId, target, hooks)
     if (!inContainer) { hooks?.log?.('⚠ conteneur Edits non sélectionné — on passe à Instagram.'); await sendAction(key, deviceId, { type: 'press', name: 'home' }); return false }
     await sleep(3500) // laisse la liste des projets s’afficher
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
     if (W && H) {
       const x = Math.round(W * EDITS_FIRST_PROJECT.x), y = Math.round(H * EDITS_FIRST_PROJECT.y)
@@ -2959,7 +2981,7 @@ export async function detectContainersByVision(key: string, deviceId: string, ho
   let overflow = false
   for (let k = 0; k < 3 && !found.size; k++) {
     if (k) await sleep(1500)
-    const shot = await snapshot(key, deviceId)
+    const shot = await snapRetry(key, deviceId)
     if (!shot) continue
     const { w: W, h: H } = await imgSize(shot)
     const rows = pickerRows(await ocrWords(shot, '0123456789Defaultefaul'), W, H)
@@ -3027,7 +3049,7 @@ async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHoo
   if (!await tapInstagramIcon(key, deviceId, hooks)) { hooks?.log?.('❌ Icône Instagram introuvable sur l’accueil.'); return null }
   await sleep(3500)
   await grantPhotoAccessIfAsked(key, deviceId, hooks) // alerte « accès aux photos » restée d'une tentative précédente
-  const shot = await snapshot(key, deviceId)
+  const shot = await snapRetry(key, deviceId)
   if (!shot) return 'app'
   const { w: W, h: H } = await imgSize(shot)
   // sélecteur Crane = « Default » + au moins un autre container (les compteurs « 0 posts / 0 followers » du profil ne comptent pas)

@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "bouton AssistiveTouch sur une zone d’Instagram → déplacé sur le bord droit": "AssistiveTouch button over an Instagram area → moved to the right edge",
     "En attente du serveur": "Waiting for the server",
     "Terminée": "Done",
     "Interrompue": "Interrupted",

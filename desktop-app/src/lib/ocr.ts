@@ -265,6 +265,57 @@ export function whiteDisksIn(white: (x: number, y: number) => boolean, W: number
   return out
 }
 
+/** Bouton flottant AssistiveTouch d'iOS (carré gris arrondi ~60 px, disque blanc au centre). Il se déplace et peut
+ *  couvrir un bouton d'Instagram (vu en vrai sur STEVIE10 : posé sur le « + », chaque tap ouvrait le sélecteur
+ *  d'apps). Renvoie son centre en pixels, ou null. */
+export async function findAssistiveTouch(image: string): Promise<{ cx: number; cy: number } | null> {
+  const img = await loadImg(image)
+  const W = img.naturalWidth, H = img.naturalHeight
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H
+  const ctx = cv.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+  const data = ctx.getImageData(0, 0, W, H).data
+  return assistiveTouchIn((x, y) => { const i = (y * W + x) * 4; return [data[i], data[i + 1], data[i + 2]] }, W, H)
+}
+
+/** Cœur pur de `findAssistiveTouch` (testé) : disque blanc rond entouré d'un anneau GRIS neutre. */
+export function assistiveTouchIn(rgb: (x: number, y: number) => [number, number, number], W: number, H: number): { cx: number; cy: number } | null {
+  const white = (x: number, y: number) => { const [r, g, b] = rgb(x, y); return r > 232 && g > 232 && b > 232 }
+  // anneau semi-transparent : gris plus ou moins teinté par le fond (photo, barre d'état bleue) → tolérance large
+  const grey = (x: number, y: number) => { const [r, g, b] = rgb(x, y); const l = (r + g + b) / 3, sat = Math.max(r, g, b) - Math.min(r, g, b); return sat < 45 && l > 70 && l < 228 }
+  const seen = new Uint8Array(W * H)
+  const dMin = W * 0.05, dMax = W * 0.13
+  for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) {
+    if (seen[y * W + x] || !white(x, y)) continue
+    let n = 0, minX = x, maxX = x, minY = y, maxY = y, big = false
+    const st = [y * W + x]; seen[y * W + x] = 1
+    while (st.length) {
+      const p = st.pop()!, px = p % W, py = (p - px) / W
+      n++
+      if (px < minX) minX = px; if (px > maxX) maxX = px; if (py < minY) minY = py; if (py > maxY) maxY = py
+      if (maxX - minX > dMax * 1.5 || maxY - minY > dMax * 1.5) { big = true }
+      if (big) continue
+      for (const [qx, qy] of [[px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]]) {
+        if (qx < 0 || qy < 0 || qx >= W || qy >= H) continue
+        const q = qy * W + qx
+        if (!seen[q] && white(qx, qy)) { seen[q] = 1; st.push(q) }
+      }
+    }
+    if (big) continue
+    const w = maxX - minX + 1, h = maxY - minY + 1
+    if (w < dMin || w > dMax || h < dMin || h > dMax || Math.abs(w - h) > 0.25 * Math.max(w, h) || n / (w * h) < 0.6) continue
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, r = Math.max(w, h) / 2
+    let g = 0, tot = 0
+    for (const rr of [r + 6, r + 12]) for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2, sx = Math.round(cx + Math.cos(a) * rr), sy = Math.round(cy + Math.sin(a) * rr)
+      if (sx < 0 || sy < 0 || sx >= W || sy >= H) continue
+      tot++; if (grey(sx, sy)) g++
+    }
+    if (tot >= 16 && g / tot >= 0.55) return { cx: Math.round(cx), cy: Math.round(cy) }
+  }
+  return null
+}
+
 /** Couleur moyenne [r,g,b] d'un petit carré (rayon `r` px) autour d'un point en pixels. */
 export async function pixelRgb(image: string, x: number, y: number, r = 2): Promise<[number, number, number]> {
   const img = await loadImg(image)

@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25f',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : bouton AssistiveTouch et captures refusées gérés', en: 'iRemoTech: AssistiveTouch button and refused captures handled' },
+    items: {
+      fr: [
+        'Le rond gris AssistiveTouch d’iOS posé sur le « + » d’Instagram ouvrait le sélecteur d’apps (plus aucun post possible, vu en vrai sur STEVIE10) : ScaleFlow le repère et le fait glisser sur le bord droit avant de publier.',
+        'Capture d’écran refusée par iRemoTech (beaucoup d’iPhones en même temps) : réessayée partout au lieu d’abandonner le post (« écran illisible »).',
+        'Localisation un peu plus rapide (attentes raccourcies). Testé en vrai sur STEVIE10 jusqu’au bouton Share, sans publier.',
+      ],
+      en: [
+        'iOS’s grey AssistiveTouch button sitting on Instagram’s “+” opened the app switcher (no more posting possible, seen live on STEVIE10): ScaleFlow finds it and drags it to the right edge before posting.',
+        'Screen capture refused by iRemoTech (many iPhones at once): retried everywhere instead of dropping the post (“unreadable screen”).',
+        'Slightly faster location (shorter waits). Tested live on STEVIE10 up to the Share button, without posting.',
+      ],
+    },
+  },
+  {
     id: '2026-11-25d',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : plus de compte « perdu » (STEVIE1)', en: 'iRemoTech: no more “lost” account (STEVIE1)' },
