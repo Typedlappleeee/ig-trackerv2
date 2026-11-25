@@ -22,31 +22,39 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
   theme: Theme; user: User; org: OrgState; onNavigate?: (p: string) => void; addResult: (r: StudioResult) => void
 }) {
   const [text, setText] = useState('')
-  const [folder, setFolder] = useState(() => { try { return localStorage.getItem('sf-igdl-folder') ?? DEFAULT_FOLDER } catch { return DEFAULT_FOLDER } })
+  // Destination choisie SÉPARÉMENT pour les Reels (vidéos) et pour les photos — reprend l'ancien réglage
+  // « dossier + sous-dossiers Reels/Photos » au premier affichage
+  const initDest = (kind: 'Reels' | 'Photos') => {
+    try {
+      const v = localStorage.getItem(kind === 'Reels' ? 'sf-igdl-reels' : 'sf-igdl-photos')
+      if (v != null) return v
+      const old = localStorage.getItem('sf-igdl-folder') ?? DEFAULT_FOLDER
+      return localStorage.getItem('sf-igdl-split') === '0' ? old : (old ? `${old}/${kind}` : kind)
+    } catch { return `${DEFAULT_FOLDER}/${kind}` }
+  }
+  const [reelsDest, setReelsDest] = useState(() => initDest('Reels'))
+  const [photosDest, setPhotosDest] = useState(() => initDest('Photos'))
   const [rows, setRows] = useState<Row[]>([])
   const [busy, setBusy] = useState(false)
   const links = igLinksFrom(text)
   const orgId = org.currentOrg?.id ?? null
-  // dossiers existants de la Banque (sans les sous-dossiers « Reels » / « Photos » créés par l'outil)
+  // dossiers existants de la Banque (sous-dossiers compris)
   const [folders, setFolders] = useState<string[]>([])
-  const [custom, setCustom] = useState(false)
   const bankModels = useBankModels({ orgId, userId: user.id })
-  const [split, setSplit] = useState(() => { try { return localStorage.getItem('sf-igdl-split') !== '0' } catch { return true } })
   useEffect(() => {
     let alive = true
     void listBankFolders({ orgId, userId: user.id }).then(l => {
       if (!alive) return
-      const top = [...new Set(l.map(f => f.replace(/\/(Reels|Photos)$/, '')))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }))
-      setFolders(top)
+      setFolders([...new Set(l)].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true })))
     }, () => undefined)
     return () => { alive = false }
   }, [orgId, user.id])
-  const options = [...new Set([DEFAULT_FOLDER, ...folders, ...(folder.trim() ? [folder.trim()] : [])])]
+  const options = [...new Set([`${DEFAULT_FOLDER}/Reels`, `${DEFAULT_FOLDER}/Photos`, ...folders, ...[reelsDest, photosDest].map(f => f.trim()).filter(Boolean)])]
 
   const run = async () => {
     if (busy || !links.length) return
-    const dest = folder.trim() || null
-    try { localStorage.setItem('sf-igdl-folder', folder.trim()); localStorage.setItem('sf-igdl-split', split ? '1' : '0') } catch { /* noop */ }
+    const rDest = reelsDest.trim() || null, pDest = photosDest.trim() || null
+    try { localStorage.setItem('sf-igdl-reels', reelsDest.trim()); localStorage.setItem('sf-igdl-photos', photosDest.trim()) } catch { /* noop */ }
     setBusy(true)
     const list: Row[] = links.map(link => ({ link, state: 'wait' }))
     setRows(list)
@@ -71,10 +79,8 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
         let n = 0
         for (const f of post.files) {
           const title = post.files.length > 1 ? `${base} (${f.index + 1})` : base
-          // Reels et photos dans des dossiers SÉPARÉS : « <dossier>/Reels » et « <dossier>/Photos »
-          // (option) sinon tout directement dans le dossier choisi
-          const sub = f.ext === 'mp4' ? 'Reels' : 'Photos'
-          const id = await saveOutputToBank(user.id, orgId, f.bytes, title, f.ext, split ? (dest ? `${dest}/${sub}` : sub) : dest)
+          // vidéo → dossier choisi pour les Reels, photo → dossier choisi pour les photos
+          const id = await saveOutputToBank(user.id, orgId, f.bytes, title, f.ext, f.ext === 'mp4' ? rDest : pDest)
           if (!id) throw new Error('enregistrement dans la Banque refusé')
           const url = URL.createObjectURL(new Blob([f.bytes as BlobPart], { type: f.ext === 'mp4' ? 'video/mp4' : 'image/jpeg' }))
           addResult({ id, title, url, ext: f.ext, tool: 'igdl', at: Date.now() })
@@ -87,32 +93,21 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
       }
     }
     setBusy(false)
-    if (saved) { const where = dest ? ` › ${dest}` : ''; toast(split ? `${saved} média(s) rangé(s) dans la Banque${where} (Reels et Photos séparés).` : `${saved} média(s) rangé(s) dans la Banque${where}.`, 'ok'); setText('') }
+    if (saved) { toast(`${saved} média(s) rangé(s) dans la Banque.`, 'ok'); setText('') }
   }
 
-  const openBank = () => { if (onNavigate) openTool(onNavigate, 'bank', { folder: folder.trim() || undefined }) }
+  const openBank = () => { if (onNavigate) openTool(onNavigate, 'bank', { folder: reelsDest.trim() || undefined }) }
 
   return (
     <Panel theme={theme} style={{ marginTop: 16 }}>
-      <PanelHead title="⬇ Téléchargeur Insta" sub="Colle des liens de Reels ou de posts photo (un par ligne) : les vidéos vont dans le sous-dossier « Reels », les photos dans « Photos », directement dans ta Banque." />
+      <PanelHead title="⬇ Téléchargeur Insta" sub="Colle des liens de Reels ou de posts photo (un par ligne) : choisis le dossier de la Banque où vont les Reels et celui où vont les photos." />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <textarea value={text} onChange={e => setText(e.target.value)} disabled={busy} rows={5}
           placeholder={'https://www.instagram.com/reel/…\nhttps://www.instagram.com/p/…'}
           style={{ ...FIELD, height: 'auto', minHeight: 110, padding: '10px 12px', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#A1A1AA' }}>
-            Dossier de la Banque
-            {custom
-              ? <input autoFocus value={folder} onChange={e => setFolder(e.target.value)} onBlur={() => setCustom(false)} disabled={busy} placeholder="Nom du nouveau dossier" style={{ ...FIELD, width: 220 }} />
-              : <select value={folder.trim()} disabled={busy} onChange={e => { if (e.target.value === '__new__') { setFolder(''); setCustom(true) } else setFolder(e.target.value) }} style={{ ...FIELD, width: 240 }}>
-                  <BankFolderOptions folders={options} models={bankModels} />
-                  <option value="__new__">+ Nouveau dossier…</option>
-                </select>}
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#A1A1AA', cursor: 'pointer' }}>
-            <input type="checkbox" checked={split} disabled={busy} onChange={e => setSplit(e.target.checked)} />
-            Sous-dossiers « Reels » / « Photos »
-          </label>
+          <DestSelect label="🎬 Reels →" value={reelsDest} onChange={setReelsDest} options={options} models={bankModels} disabled={busy} />
+          <DestSelect label="🖼 Photos →" value={photosDest} onChange={setPhotosDest} options={options} models={bankModels} disabled={busy} />
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 12.5, color: '#7C7C86' }}>{links.length ? `${links.length} lien(s) reconnu(s)` : 'Aucun lien reconnu'}</span>
             {onNavigate && <Btn theme={theme} label="Voir dans la Banque" onClick={openBank} />}
@@ -132,5 +127,23 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
         )}
       </div>
     </Panel>
+  )
+}
+
+/** Choix d'un dossier de la Banque (dossiers existants, banques des modèles, ou nouveau dossier tapé). */
+function DestSelect({ label, value, onChange, options, models, disabled }: {
+  label: string; value: string; onChange: (v: string) => void; options: string[]; models: ReturnType<typeof useBankModels>; disabled: boolean
+}) {
+  const [custom, setCustom] = useState(false)
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#A1A1AA' }}>
+      {label}
+      {custom
+        ? <input autoFocus value={value} onChange={e => onChange(e.target.value)} onBlur={() => setCustom(false)} disabled={disabled} placeholder="Nom du nouveau dossier" style={{ ...FIELD, width: 220 }} />
+        : <select value={value.trim()} disabled={disabled} onChange={e => { if (e.target.value === '__new__') { onChange(''); setCustom(true) } else onChange(e.target.value) }} style={{ ...FIELD, width: 240 }}>
+            <BankFolderOptions folders={options} models={models} />
+            <option value="__new__">+ Nouveau dossier…</option>
+          </select>}
+    </label>
   )
 }

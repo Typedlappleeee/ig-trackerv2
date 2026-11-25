@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25zh',
+    date: '2026-11-25',
+    title: { fr: 'Téléchargeur Insta : dossier des Reels et dossier des photos', en: 'Insta downloader: Reels folder and photos folder' },
+    items: {
+      fr: ['Téléchargeur Insta : tu choisis séparément le dossier de la Banque où vont les Reels et celui où vont les photos (banque principale ou banque d’une modèle, ou nouveau dossier).'],
+      en: ['Insta downloader: choose separately the Bank folder for Reels and the one for photos (main bank or a model’s bank, or a new folder).'],
+    },
+  },
+  {
     id: '2026-11-25zg',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : corrections du test sur 5 iPhones', en: 'iRemoTech: fixes from the 5-iPhone test' },
