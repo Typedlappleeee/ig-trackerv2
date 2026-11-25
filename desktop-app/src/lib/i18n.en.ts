@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "outil de l’éditeur ouvert par erreur → fermé": "editor tool opened by mistake → closed",
     "❌ galerie non ouverte depuis la caméra REEL → rien n’est publié (Instagram sera relancé)": "❌ gallery not opened from the REEL camera → nothing posted (Instagram will be restarted)",
     "⚠ écran illisible après Share → considéré comme publié (jamais retapé : risque de double post)": "⚠ screen unreadable after Share → counted as posted (never re-tapped: double-post risk)",
     "🧹 post raté → posting annulé, Instagram fermé (reprise propre)": "🧹 post failed → posting cancelled, Instagram closed (clean restart)",
@@ -4984,6 +4985,7 @@ export const EN: Dict = {
     ["🍪 Cookies toujours affichés → redémarrage d’Instagram ({0}/2)", "🍪 Cookies still shown → restarting Instagram ({0}/2)"],
     ["🤖 @{0} : {1} → compte passé (à régler à la main)", "🤖 @{0}: {1} → account skipped (fix it by hand)"],
     ["éditeur vidéo → « Next → » ({0}, {1})", "video editor → “Next →” ({0}, {1})"],
+    ["éditeur vidéo → « Next → » sous la barre d'outils ({0}, {1})", "video editor → “Next →” below the toolbar ({0}, {1})"],
     ["tap « {0} »", "tap “{0}”"],
     ["Lecture des stats sur {0} ({1} compte(s), ~30 s chacun) — ne touche pas l’iPhone", "Reading stats on {0} ({1} account(s), ~30 s each) — don't touch the iPhone"],
     ["{0} : stats relues pour {1}/{2} compte(s)", "{0}: stats re-read for {1}/{2} account(s)"],

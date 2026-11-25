@@ -220,3 +220,13 @@ describe('aperçu plein écran du média (« Done »)', () => {
     expect(mediaPreviewDone([{ text: 'Done', cx: 370, cy: 500 }], W, H)).toBeNull() // « Done » du clavier, à droite
   })
 })
+
+import { editorToolsY } from './iremotechVision'
+describe('éditeur vidéo : barre d’outils (Next toujours dessous)', () => {
+  it('nouvel éditeur sans « Edit video » reconnu ; fil / page de partage → non', () => {
+    const H = 720
+    const w = [{ text: 'Audio', cy: 640 }, { text: 'Text', cy: 640 }, { text: 'Voice', cy: 640 }, { text: 'Captions', cy: 640 }, { text: 'Overlay', cy: 640 }]
+    expect(editorToolsY(w, H)).toBe(640)
+    expect(editorToolsY([{ text: 'Share', cy: 690 }, { text: 'Audio', cy: 300 }], H)).toBeNull()
+  })
+})

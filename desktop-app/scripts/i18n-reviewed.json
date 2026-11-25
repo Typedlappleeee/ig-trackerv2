@@ -1021,5 +1021,6 @@
  "lineTo",
  "moveTo",
  "(Déjà écrites, à ne pas répéter : {0})",
- "[ErrorBoundary]"
+ "[ErrorBoundary]",
+ "Cancel"
 ]

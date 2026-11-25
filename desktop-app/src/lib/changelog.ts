@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25q',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : « Next » de l’éditeur fiable', en: 'iRemoTech: reliable editor “Next”' },
+    items: {
+      fr: ['Nouvel éditeur vidéo d’Instagram (sans « Edit video ») : « Next → » est visé sous la barre d’outils (Audio / Text / Voice / Captions / Overlay), jamais à une hauteur fixe qui pouvait tomber sur « Overlay ». Un outil ouvert par erreur est refermé.'],
+      en: ['New Instagram video editor (no “Edit video”): “Next →” is aimed below the toolbar (Audio / Text / Voice / Captions / Overlay), never at a fixed height that could land on “Overlay”. A tool opened by mistake is closed.'],
+    },
+  },
+  {
     id: '2026-11-25p',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : caméra REEL gérée', en: 'iRemoTech: REEL camera handled' },

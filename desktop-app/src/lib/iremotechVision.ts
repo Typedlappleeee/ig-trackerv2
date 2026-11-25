@@ -933,6 +933,22 @@ async function tapButton(
   return false
 }
 
+/** Éditeur vidéo Instagram : barre d'outils (Audio / Text / Voice / Captions / Overlay / Edit…) en bas. Le bouton
+ *  « Next → » est TOUJOURS sous cette barre ; renvoie la hauteur des libellés (null si pas l'éditeur). Vu en vrai le
+ *  25/11/2026 (STEVIE5) : nouvel éditeur SANS « Edit video » → le tap à hauteur fixe tombait sur « Overlay ». Pure. */
+export function editorToolsY(words: { text: string; cy: number }[], H: number): number | null {
+  const tools = words.filter(o => o.cy > H * 0.7 && /^(audio|text|voice|captions|overlay|edit|effects|stickers|filters?|clips?)$/i.test(o.text))
+  const kinds = new Set(tools.map(o => o.text.toLowerCase()))
+  if (kinds.size < 3) return null
+  return Math.max(...tools.map(o => o.cy))
+}
+/** Point de « Next → » dans l'éditeur : bouton bleu cherché SOUS la barre d'outils, sinon 7 % sous ses libellés. */
+async function editorNextPoint(shot: string | null, toolsY: number, W: number, H: number): Promise<{ x: number; y: number }> {
+  const y0 = (toolsY + 0.025 * H) / H
+  const blue = shot ? await findBlueButton(shot, y0, 1, 0.55, 1) : null
+  return blue ? { x: blue.cx, y: blue.cy } : { x: Math.round(0.84 * W), y: Math.round(Math.min(0.975 * H, toolsY + 0.07 * H)) }
+}
+
 // Tape un bouton d'action bas-droite (Next/Share) PUIS vérifie qu'on a bien changé
 // d'écran : les repères `stillHere` de l'écran courant doivent DISPARAÎTRE. Réessaie
 // en décalant légèrement le tap de secours (couvre un petit décalage de calibration).
@@ -944,7 +960,14 @@ async function tapAdvance(
   for (let t = 0; t < tries; t++) {
     if (hooks?.shouldStop?.()) return false
     const anchor = { x: base.x + dx[t % dx.length], y: base.y + dy[t % dy.length] }
-    await tapButton(key, deviceId, patterns, anchor, W, H, hooks, [0.80, 1], t ? `${label} (essai ${t + 1})` : label, 2, [0.5, 1])
+    // Éditeur vidéo reconnu à sa barre d'outils → « Next » visé SOUS la barre (jamais sur Overlay / Captions…)
+    const ed = await readScreenWords(key, deviceId)
+    const ty = ed ? editorToolsY(ed.words, ed.H) : null
+    if (ed && ty != null) {
+      const pt = await editorNextPoint(ed.shot, ty, ed.W, ed.H)
+      hooks?.log?.(`   éditeur vidéo → « Next → » sous la barre d'outils (${pt.x}, ${pt.y})`)
+      await sendAction(key, deviceId, { type: 'tap', x: pt.x, y: pt.y })
+    } else await tapButton(key, deviceId, patterns, anchor, W, H, hooks, [0.80, 1], t ? `${label} (essai ${t + 1})` : label, 2, [0.5, 1])
     await sleep(2600)
     // Toujours sur le même écran ? (repères encore lisibles → le tap n'a pas fait avancer)
     if (!await hasText(key, deviceId, stillHere, hooks, { cropY: [0.72, 1], tries: 1 })) {
@@ -1286,21 +1309,27 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       await sleep(1500); continue
     }
     // Éditeur vidéo (« Edit video » + Audio / Text / Captions en bas) : bouton « Next → » bleu en bas à droite
-    const inEditor = words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.85) && words.some(o => /^(audio|captions|overlay|voice)$/i.test(o.text) && o.cy > H * 0.75)
+    const toolsY = editorToolsY(words, H)
+    const inEditor = toolsY != null || (words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.85) && words.some(o => /^(audio|captions|overlay|voice)$/i.test(o.text) && o.cy > H * 0.75))
     if (inEditor) {
       // Musique obligatoire (post photo) : ajoutée et vérifiée AVANT de quitter l'éditeur, sinon rien n'est publié
       if (music && !editorHasMusic(words, H)) {
         if (!await addSuggestedMusic(key, deviceId, hooks)) { hooks?.log?.('❌ pas de musique → rien n’est publié (container suivant)'); return false }
         continue
       }
-      const blue = await findBlueButton(shot, 0.86, 0.99, 0.55, 1)
-      const nx = blue ? blue.cx : Math.round(0.82 * W), ny = blue ? blue.cy : Math.round(0.925 * H)
-      hooks?.log?.(`   éditeur vidéo → « Next → » (${nx}, ${ny})`)
-      await sendAction(key, deviceId, { type: 'tap', x: nx, y: ny })
+      // « Next → » TOUJOURS sous la barre d'outils (bouton bleu cherché sous ses libellés), jamais à hauteur fixe
+      const pt = toolsY != null ? await editorNextPoint(shot, toolsY, W, H) : await (async () => { const b = await findBlueButton(shot, 0.86, 0.99, 0.55, 1); return b ? { x: b.cx, y: b.cy } : { x: Math.round(0.82 * W), y: Math.round(0.925 * H) } })()
+      hooks?.log?.(`   éditeur vidéo → « Next → » (${pt.x}, ${pt.y})`)
+      await sendAction(key, deviceId, { type: 'tap', x: pt.x, y: pt.y })
       await sleep(3500)
-      const after = await snapRetry(key, deviceId)
-      const still = after ? (await ocrWords(after, undefined, { threshold: null, scale: 2, psms: ['11'], cropY: [0.85, 1] })).some(o => /^edit$/i.test(o.text)) : false
-      if (still) { hooks?.log?.('   éditeur toujours affiché → double tap'); await doubleTap(key, deviceId, nx, ny); await sleep(3500) }
+      const after = await readScreenWords(key, deviceId)
+      if (after && editorToolsY(after.words, after.H) != null) { hooks?.log?.('   éditeur toujours affiché → double tap'); await doubleTap(key, deviceId, pt.x, pt.y); await sleep(3500) }
+      // un outil ouvert par erreur (Overlay, Captions…) : panneau par-dessus l'éditeur → on le referme (✕ / Cancel / Done)
+      else if (after && after.words.some(o => /^(overlay|captions|voice|text)$/i.test(o.text) && o.cy < after.H * 0.2)) {
+        hooks?.log?.('   outil de l’éditeur ouvert par erreur → fermé')
+        if (!await findTapText(key, deviceId, [/^(cancel|done|close)$/i], hooks, { label: 'Cancel', tries: 1 })) await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.08 * W), y: Math.round(0.07 * H) })
+        await sleep(1800)
+      }
       continue
     }
     let top = await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next (haut)', tries: 2, minX: 0.55, cropY: [0, 0.14] })
