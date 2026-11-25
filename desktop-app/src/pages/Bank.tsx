@@ -19,7 +19,7 @@ import { isHeic, heicToJpeg, sniffHeic } from '@/lib/heic'
 import { niceBase, isUglyTitle, allocTitle, prefixFor } from '@/lib/niceTitle'
 import PoolManager, { POOL_PREFIX } from '@/components/PoolManager'
 import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg, setFolderFav, setFolderTag, ensureBankFolder } from '@/lib/bankFolders'
-import { MODEL_TAG, COMMON_SPACE, stackCopies, proposeModelMoves, MODEL_MARKETS, marketTag, marketsOfTags, parseTemplate, templatePaths, groupModelsByMarket, type ModelMarket } from '@/lib/bankSpaces'
+import { OTHER_TAG, MODEL_TAG, COMMON_SPACE, stackCopies, proposeModelMoves, MODEL_MARKETS, marketTag, marketsOfTags, parseTemplate, templatePaths, groupModelsByMarket, type ModelMarket } from '@/lib/bankSpaces'
 import { loadTeamCache, pullTeam, updateTeam } from '@/lib/irtTeam'
 import { mediaKindOf, kindOfFile, extOfPath, isFav, withFav, AUDIO_MIME, AUDIO_EXT, type MediaKind } from '@/lib/mediaKind'
 
@@ -252,9 +252,10 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [hidePosted, setHidePosted] = useState(() => { try { return localStorage.getItem('sf-bank-hideposted2') === '1' } catch { return false } })
   const [openStacks, setOpenStacks] = useState<Set<string>>(new Set())
   const [arrange, setArrange] = useState<{ src: string; model: string; dest: string; on: boolean }[] | null>(null)
-  const [modelMkts, setModelMkts] = useState<Record<string, ModelMarket[]>>({})   // marchés de chaque modèle (tags partagés)
+  const [modelMkts, setModelMkts] = useState<Record<string, ModelMarket[]>>({})
+  const [otherBanks, setOtherBanks] = useState<Set<string>>(new Set())   // banques « hors modèle » (Telegram…)   // marchés de chaque modèle (tags partagés)
   const [mktF, setMktF] = useState<'all' | ModelMarket>('all')
-  const [modelForm, setModelForm] = useState<{ edit: string | null; name: string; mkts: ModelMarket[] } | null>(null)
+  const [modelForm, setModelForm] = useState<{ edit: string | null; name: string; mkts: ModelMarket[]; other?: boolean } | null>(null)
   const [sendTo, setSendTo] = useState<{ src: string; model: string; dest: string; merge: boolean } | null>(null)   // « Envoyer vers une modèle »
   const [modelMenu, setModelMenu] = useState(false)
   const [tplOpen, setTplOpen] = useState<string | null>(null)   // texte du template en cours d'édition
@@ -319,6 +320,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     const rows = data
     setFolderNames(rows.filter(isSentinel).map(r => r.folder ?? r.title).filter((f): f is string => Boolean(f)))
     setFavFolders(new Set(rows.filter(r => isSentinel(r) && isFav(r) && r.folder).map(r => normPath(r.folder as string))))
+    setOtherBanks(new Set(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(OTHER_TAG) && r.folder).map(r => normPath(r.folder as string))))
     setModelMkts(Object.fromEntries(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(MODEL_TAG) && r.folder).map(r => [normPath(r.folder as string), marketsOfTags(r.tags)])))
     setModels([...new Set(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(MODEL_TAG) && r.folder).map(r => normPath(r.folder as string)))].sort((a, b) => a === COMMON_SPACE ? 1 : b === COMMON_SPACE ? -1 : a.localeCompare(b, 'fr', { sensitivity: 'base' })))
     // Médias en corbeille (deleted_at) exclus de la banque, listés à part (restaurable 7 j).
@@ -1128,13 +1130,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // ── Espaces par modèle (lib/bankSpaces) ─────────────────────────────────────
   const bankScope = { orgId: currentOrg?.id ?? null, userId: user.id }
   // Nouvelle modèle : son dossier + TOUS les dossiers du template (modifiable, partagé) + ses marchés
-  async function createModelSpace(name: string, mkts: ModelMarket[] = []) {
+  async function createModelSpace(name: string, mkts: ModelMarket[] = [], other = false) {
     const p = cleanSeg(name)
     if (!p) return
     await setFolderTag(bankScope, p, MODEL_TAG, true)
+    if (other) await setFolderTag(bankScope, p, OTHER_TAG, true)
     for (const m of mkts) await setFolderTag(bankScope, p, marketTag(m), true)
-    for (const path of templatePaths(p, bankTpl)) await ensureBankFolder(bankScope, path)
-    toast(p === COMMON_SPACE ? 'Espace « Commun » créé : contenu réutilisable par toutes les modèles.' : `Modèle « ${p} » créée avec les dossiers du template.`, 'ok')
+    if (!other) for (const path of templatePaths(p, bankTpl)) await ensureBankFolder(bankScope, path)
+    toast(other ? `Banque « ${p} » créée.` : `Modèle « ${p} » créée avec les dossiers du template.`, 'ok')
     setBankModeState('models'); try { localStorage.setItem('sf-bank-mode', 'models') } catch { /* noop */ }
     await load(); setSpace(p); setFolder('Tous')
   }
@@ -1781,7 +1784,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             const avatar = (m: string, size = 22) => <span style={{ width: size, height: size, flex: 'none', borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.48, fontWeight: 700, color: '#fff', background: `linear-gradient(135deg, hsl(${hue(m)} 70% 62%), hsl(${(hue(m) + 40) % 360} 70% 48%))` }}>{m.slice(0, 1).toUpperCase()}</span>
             const count = (m: string) => items.filter(i => isWithin(i.folder, m)).length
             const real = models.filter(m => m !== COMMON_SPACE)
-            const groups = groupModelsByMarket(real, m => modelMkts[m] ?? [])
+            const groups = groupModelsByMarket(real, m => modelMkts[m] ?? [], m => otherBanks.has(m))
             const cur = spaceOn ? space : null
             const curMkt = null as null | { label: string }
             const row = (on: boolean): CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 36, padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, background: on ? 'rgba(139,124,246,0.16)' : 'transparent', color: on ? '#DDD6FE' : '#E4E4E7' })
@@ -1806,7 +1809,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                       </div>
                     )}
                     {!real.length && <div style={{ padding: '10px', fontSize: 12.5, color: '#8B8B94' }}>Aucune modèle : crée la première ci-dessous.</div>}
-                    {groups.filter(g => mktF === 'all' || g.label === MODEL_MARKETS.find(m => m.k === mktF)?.label).map(g => {
+                    {groups.filter(g => mktF === 'all' || g.label === 'Hors modèle' || g.label === MODEL_MARKETS.find(m => m.k === mktF)?.label).map(g => {
                       return (
                         <div key={g.label} style={{ marginTop: 6 }}>
                           <div style={{ padding: '4px 10px', fontSize: 11.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: '#8B8B94' }}>{g.label}</div>
@@ -1820,6 +1823,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                     })}
                     <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '6px 4px' }} />
                     <button type="button" onClick={() => { setModelMenu(false); setModelForm({ edit: null, name: '', mkts: mktF === 'all' ? [] : [mktF] }) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>＋</span>Nouvelle modèle</button>
+                    <button type="button" onClick={() => { setModelMenu(false); setModelForm({ edit: null, name: '', mkts: [], other: true }) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>📁</span>Nouvelle banque hors modèle (Telegram…)</button>
                     {cur && <button type="button" onClick={() => { setModelMenu(false); setModelForm({ edit: cur, name: cur, mkts: modelMkts[cur] ?? [] }) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>⚙</span>{`Réglages de ${cur}`}</button>}
                     <button type="button" onClick={() => { setModelMenu(false); setTplOpen((bankTpl.length ? bankTpl : templatePaths('', []).map(p => p.slice(1))).join('\n')) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>📐</span>Template des dossiers</button>
                     {real.length > 0 && <button type="button" onClick={() => { setModelMenu(false); openArrange() }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>🧭</span>Ranger les dossiers par modèle</button>}
@@ -1841,11 +1845,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         </div>
       )}
       {modelForm && (
-        <Modal theme={theme} title={modelForm.edit ? `Modèle « ${modelForm.edit} »` : 'Nouvelle modèle'} onClose={() => setModelForm(null)}>
+        <Modal theme={theme} title={modelForm.edit ? `${otherBanks.has(modelForm.edit) ? 'Banque' : 'Modèle'} « ${modelForm.edit} »` : modelForm.other ? 'Nouvelle banque hors modèle' : 'Nouvelle modèle'} onClose={() => setModelForm(null)}>
           {!modelForm.edit && <>
             <div style={{ fontSize: 12.5, color: '#A1A1AA', marginBottom: 6 }}>Nom</div>
-            <input autoFocus value={modelForm.name} onChange={e => setModelForm(f => f && { ...f, name: e.target.value })} placeholder="Kenza" style={{ ...FIELD, width: '100%' }} />
+            <input autoFocus value={modelForm.name} onChange={e => setModelForm(f => f && { ...f, name: e.target.value })} placeholder={modelForm.other ? 'Telegram' : 'Kenza'} style={{ ...FIELD, width: '100%' }} />
           </>}
+          {(() => { const isOther = modelForm.other || (!!modelForm.edit && otherBanks.has(modelForm.edit)); return !isOther && <>
           <div style={{ fontSize: 12.5, color: '#A1A1AA', margin: '12px 0 6px' }}>Marchés (une modèle peut être sur plusieurs)</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {MODEL_MARKETS.map(m => {
@@ -1855,11 +1860,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             })}
           </div>
           {!modelForm.edit && <div style={{ fontSize: 12, color: '#6E6E78', marginTop: 12 }} data-no-tr>{`📁 ${templatePaths(cleanSeg(modelForm.name) || '…', bankTpl).join(' · ')}`}</div>}
+          </> })()}
+          {modelForm.other && !modelForm.edit && <div style={{ fontSize: 12, color: '#6E6E78', marginTop: 10 }}>Une banque à part, sans marché ni dossiers imposés (Telegram, contenu générique…).</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' }}>
-            {modelForm.edit && <Btn theme={theme} sm tone="ghost" label="Ajouter les dossiers du template" onClick={() => { const m = modelForm.edit!; setModelForm(null); void applyTemplate([m]) }} />}
+            {modelForm.edit && !otherBanks.has(modelForm.edit) && <Btn theme={theme} sm tone="ghost" label="Ajouter les dossiers du template" onClick={() => { const m = modelForm.edit!; setModelForm(null); void applyTemplate([m]) }} />}
             {modelForm.edit && <Btn theme={theme} sm tone="danger" label="Retirer des modèles" onClick={() => { const m = modelForm.edit!; setModelForm(null); void removeModelSpace(m) }} />}
-            <Btn theme={theme} sm tone="primary" label={modelForm.edit ? 'Enregistrer' : 'Créer la modèle'} disabled={!modelForm.edit && !cleanSeg(modelForm.name)}
-              onClick={() => { const f = modelForm; setModelForm(null); if (f.edit) void saveModelMarkets(f.edit, f.mkts); else void createModelSpace(f.name, f.mkts) }} />
+            <Btn theme={theme} sm tone="primary" label={modelForm.edit ? 'Enregistrer' : modelForm.other ? 'Créer la banque' : 'Créer la modèle'} disabled={!modelForm.edit && !cleanSeg(modelForm.name)}
+              onClick={() => { const f = modelForm; setModelForm(null); if (f.edit) void saveModelMarkets(f.edit, f.mkts); else void createModelSpace(f.name, f.mkts, !!f.other) }} />
           </div>
         </Modal>
       )}

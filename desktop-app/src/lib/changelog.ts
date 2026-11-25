@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25za',
+    date: '2026-11-25',
+    title: { fr: 'Banque : banques hors modèle (Telegram…)', en: 'Bank: banks outside models (Telegram…)' },
+    items: {
+      fr: ['Dans le menu de l’onglet Modèles : « 📁 Nouvelle banque hors modèle » pour une banque à part (Telegram, contenu générique…), sans marché ni dossiers imposés. Elles apparaissent dans un groupe « Hors modèle », toujours visible quel que soit le marché choisi.'],
+      en: ['In the Models tab menu: “📁 New bank outside models” for a separate bank (Telegram, generic content…), with no market or forced folders. They show in an “Outside models” group, always visible whatever market is picked.'],
+    },
+  },
+  {
     id: '2026-11-25z9',
     date: '2026-11-25',
     title: { fr: 'Outils : ranger directement dans une modèle', en: 'Tools: save straight into a model' },

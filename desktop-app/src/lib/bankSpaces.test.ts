@@ -53,3 +53,10 @@ describe('sélecteur de destination des outils', () => {
     ])
   })
 })
+
+describe('banques hors modèle (Telegram…)', () => {
+  it('groupe « Hors modèle » à part, après les marchés', () => {
+    const g = groupModelsByMarket(['Kenza FR', 'Telegram'], m => (m === 'Kenza FR' ? ['fr'] : []), m => m === 'Telegram')
+    expect(g).toEqual([{ label: '🇫🇷 France', models: ['Kenza FR'] }, { label: 'Hors modèle', models: ['Telegram'] }])
+  })
+})

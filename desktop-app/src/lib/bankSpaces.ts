@@ -77,11 +77,13 @@ export function parseTemplate(text: string): string[] {
 /** Dossiers à créer pour une modèle (template vide → rubriques par défaut). Pure. */
 export const templatePaths = (model: string, tpl: string[]) => (tpl.length ? tpl : [...MODEL_SUBS]).map(p => `${model}/${p}`)
 /** Modèles regroupées par marché pour le menu déroulant (une modèle sur 2 marchés apparaît dans les 2) ; « Commun » à part. Pure. */
-export function groupModelsByMarket(models: string[], marketsOf: (m: string) => ModelMarket[]): { label: string; models: string[] }[] {
-  const real = models.filter(m => m !== COMMON_SPACE)
+export const OTHER_TAG = 'bank:other'   // banque « hors modèle » (Telegram, contenu générique…), sans marché
+export function groupModelsByMarket(models: string[], marketsOf: (m: string) => ModelMarket[], isOther: (m: string) => boolean = () => false): { label: string; models: string[] }[] {
+  const others = models.filter(m => m !== COMMON_SPACE && isOther(m))
+  const real = models.filter(m => m !== COMMON_SPACE && !isOther(m))
   const groups = MODEL_MARKETS.map(mk => ({ label: mk.label, models: real.filter(m => marketsOf(m).includes(mk.k)) }))
   const none = real.filter(m => !marketsOf(m).length)
-  return [...groups, { label: 'Sans marché', models: none }].filter(g => g.models.length)
+  return [...groups, { label: 'Sans marché', models: none }, { label: 'Hors modèle', models: others }].filter(g => g.models.length)
 }
 
 // ── Sélecteur de destination des outils : Banque principale puis chaque modèle ──

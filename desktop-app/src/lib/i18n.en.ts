@@ -7,6 +7,12 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Hors modèle": "Outside models",
+    "Nouvelle banque hors modèle (Telegram…)": "New bank outside models (Telegram…)",
+    "Nouvelle banque hors modèle": "New bank outside models",
+    "Une banque à part, sans marché ni dossiers imposés (Telegram, contenu générique…).": "A separate bank, with no market or forced folders (Telegram, generic content…).",
+    "Créer la banque": "Create the bank",
+    "Telegram": "Telegram",
     "Banque principale": "Main bank",
     "👤 modèle": "👤 model",
     "Choisir une modèle": "Pick a model",
@@ -5229,6 +5235,7 @@ export const EN: Dict = {
     ["« {0} » restauré : {1} média(s) remis à leur place.", "“{0}” restored: {1} media put back."],
     ["Gros dossier ({0} fichiers) : tape son nom pour confirmer.", "Big folder ({0} files): type its name to confirm."],
     ["Réglages de {0}", "{0} settings"],
+    ["Banque « {0} » créée.", "Bank “{0}” created."],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],
