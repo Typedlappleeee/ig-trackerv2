@@ -246,3 +246,11 @@ describe('erreurs des logs du 25/11 (STEVIE1-8)', () => {
     expect(editorToolsY([{ text: 'Captions', cy: 640 }, { text: '[e¢)', cy: 640 }], 720)).toBe(640)
   })
 })
+
+import { newReelGallery } from './iremotechVision'
+describe('galerie « New reel » ouverte directement (open_app instagram_reel)', () => {
+  it('reconnue ; fil d’accueil → non', () => {
+    expect(newReelGallery([{ text: 'New', cy: 57 }, { text: 'reel', cy: 57 }, { text: 'Recents', cy: 174 }], 720)).toBe(true)
+    expect(newReelGallery([{ text: 'For', cy: 50 }, { text: 'you', cy: 50 }, { text: 'Reels', cy: 690 }], 720)).toBe(false)
+  })
+})

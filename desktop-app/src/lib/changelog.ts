@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25x',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : Reels sans le « + »', en: 'iRemoTech: Reels without the “+”' },
+    items: {
+      fr: ['Le posting ouvre maintenant la galerie « New reel » DIRECTEMENT (commande iRemoTech), sans passer par le +, la feuille Create ni la barre POST / REEL : la vidéo la plus récente est ouverte dans l’éditeur. Le + reste en secours.', 'La bascule de compte ouvre l’onglet Profil directement, au lieu de viser l’icône de la barre d’onglets.'],
+      en: ['Posting now opens the “New reel” gallery DIRECTLY (iRemoTech command), without the +, the Create sheet or the POST / REEL bar: the latest video opens in the editor. The + stays as a fallback.', 'Account switching opens the Profile tab directly, instead of aiming at the tab bar icon.'],
+    },
+  },
+  {
     id: '2026-11-25w',
     date: '2026-11-25',
     title: { fr: 'Banque : envoyer un dossier vers une modèle', en: 'Bank: send a folder to a model' },

@@ -7,6 +7,10 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "galerie « New reel » directe non reconnue → passage par le +": "direct “New reel” gallery not recognised → going through the +",
+    "🎞️ Galerie « New reel » ouverte directement": "🎞️ “New reel” gallery opened directly",
+    "sélection multiple active → coupée": "multi-select on → turned off",
+    "onglet Profil ouvert directement": "Profile tab opened directly",
     "Fusionner son contenu (ses fichiers et sous-dossiers vont directement dedans)": "Merge its content (its files and subfolders go straight in)",
     "Envoyer vers une modèle": "Send to a model",
     "Sans marché": "No market",

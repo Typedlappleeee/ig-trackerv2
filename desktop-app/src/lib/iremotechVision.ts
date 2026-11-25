@@ -1092,7 +1092,9 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   await dismissPopups(key, deviceId, hooks)
   await dismissIgInfoSheet(key, deviceId, hooks)
   await clearAssistiveTouch(key, deviceId, hooks)
-  // 1. Ouvrir le créateur (+ haut-gauche)
+  // 1. Galerie « New reel » ouverte directement par iRemoTech (sans le +) ; sinon le créateur par le + (haut-gauche)
+  const direct = await postViaReelGallery(key, deviceId, A, opts.caption, hooks, opts.location, opts.stay)
+  if (direct !== null) return direct
   hooks?.log?.('➕ Ouverture du créateur (+)…')
   let landing = await tapCreatePlus(key, deviceId, W, H, A.createPlus, hooks)
   if (landing === 'other') {
@@ -1199,6 +1201,38 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
 // Next → écran de légende → légende → Share. On n'appuie sur Share QUE si l'écran de légende /
 // partage est reconnu (sinon abandon : jamais de post à moitié).
 const CAPTION_MARK = [/^caption[.…]*$/i, /^l[ée]gende[.…]*$/i]
+/** Galerie « New reel » ouverte DIRECTEMENT par l'action iRemoTech `open_app` cible `instagram_reel` (vérifié en vrai
+ *  le 25/11/2026 sur STEVIE4) : plus de « + », de feuille « Create » ni de barre POST / REEL. 3 colonnes de cases hautes
+ *  sous « Recents », appareil photo en 1re case ; pastille blanche « Cancel » = sélection multiple active → un tap la
+ *  coupe (sinon le tap sur la vidéo la cocherait au lieu de l'ouvrir). Tap sur la vidéo la plus récente = éditeur.
+ *  Renvoie null si la galerie n'est pas reconnue (l'appelant passe alors par le +). */
+async function postViaReelGallery(key: string, deviceId: string, A: typeof REEL_ANCHORS, caption: string | undefined, hooks?: VisionHooks, location?: LocTarget, stay?: boolean): Promise<boolean | null> {
+  if (!await sendAction(key, deviceId, { type: 'open_app', target: 'instagram_reel' })) return null
+  await sleep(4500)
+  let scr = await readScreenWords(key, deviceId)
+  if (scr && !newReelGallery(scr.words, scr.H) && await dismissIgInfoSheet(key, deviceId, hooks)) { await sleep(1500); scr = await readScreenWords(key, deviceId) }
+  if (!scr || !newReelGallery(scr.words, scr.H)) { hooks?.log?.('   galerie « New reel » directe non reconnue → passage par le +'); return null }
+  const { W, H } = scr
+  hooks?.log?.('🎞️ Galerie « New reel » ouverte directement')
+  const rec = scr.words.find(o => /^recents?$/i.test(o.text) && o.cy < H * 0.4)
+  const recY = rec ? rec.cy : Math.round(0.242 * H)
+  // sélection multiple active (pastille BLANCHE à droite de « Recents ») → la couper
+  const pill = await meanLuma(scr.shot, 0.74, (recY - 0.02 * H) / H, 0.94, (recY + 0.02 * H) / H)
+  if (pill > 170) { hooks?.log?.('   sélection multiple active → coupée'); await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.83 * W), y: recY }); await sleep(1500) }
+  const cw = W / 3, gridTop = recY + Math.round(0.04 * H), rowH = cw * 1.75
+  const camera = (await meanLuma(scr.shot, 0.03, (gridTop + rowH * 0.2) / H, 0.3, (gridTop + rowH * 0.8) / H)) < 60
+  const cell = camera ? 1 : 0
+  const pt = { x: Math.round(cw * (cell + 0.5)), y: Math.round(gridTop + rowH / 2) }
+  hooks?.log?.(`🎞️ Vidéo la plus récente (${camera ? 'case après l’appareil photo' : '1re case'}) → tap (${pt.x}, ${pt.y})`)
+  await sendAction(key, deviceId, { type: 'tap', x: pt.x, y: pt.y })
+  await sleep(3500)
+  return finishPostFromGallery(key, deviceId, W, H, A, caption, hooks, 'Vidéo publiée (REEL)', false, location, stay)
+}
+/** Galerie « New reel » (titre en haut + « Recents »). Pure. */
+export function newReelGallery(words: { text: string; cy: number }[], H: number): boolean {
+  return words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.12) && words.some(o => /^reels?$/i.test(o.text) && o.cy < H * 0.12) && words.some(o => /^recents?$/i.test(o.text) && o.cy < H * 0.4)
+}
+
 async function postViaPostMode(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks?: VisionHooks, location?: LocTarget, stay?: boolean): Promise<boolean> {
   await sleep(1800) // la galerie se charge
   // a. Vidéo la plus récente : 1re case de la grille, juste sous « Récents » (x = 1/8 de la largeur :
@@ -3300,6 +3334,12 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
   if (isSheet(scr)) return scr // Instagram rouvert là où on l'avait laissé : la feuille est déjà ouverte
   if (decideEndScreen(scr.words, scr.W, scr.H)?.kind === 'captcha') { hooks?.log?.('🤖 Instagram demande une vérification humaine sur le compte actif : rien n’est tapé'); return null }
   const { W, H } = scr
+  // 0. onglet Profil ouvert DIRECTEMENT par iRemoTech (`open_app` cible `instagram_profile`, vérifié en vrai le 25/11/2026)
+  if (!isProfile(scr) && await sendAction(key, deviceId, { type: 'open_app', target: 'instagram_profile' })) {
+    await sleep(3500); scr = await readScreenWords(key, deviceId)
+    if (isSheet(scr)) return scr
+    if (isProfile(scr)) hooks?.log?.('   onglet Profil ouvert directement')
+  }
   // 1. onglet Profil (vérifié : « followers / following » à l'écran), jusqu'à 3 taps ; d'abord retour à un écran
   //    avec la barre d'onglets (Instagram rouvre là où on l'a laissé : créateur, Reel plein écran, popup…)
   for (let k = 0; k < 3 && !isProfile(scr); k++) {
