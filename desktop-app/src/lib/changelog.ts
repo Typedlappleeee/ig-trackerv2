@@ -25,8 +25,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-25',
     title: { fr: 'Descriptions de Reels beaucoup plus rapides', en: 'Much faster Reel captions' },
     items: {
-      fr: ['Les descriptions sont préparées à l’avance en fond (jusqu’à 60 par marché) : au lancement elles sont prêtes tout de suite.', 'Tous les marchés (FR / US / DE) et tous les modèles Groq travaillent en même temps, par lots de 15.', 'Corrigé : un modèle retiré par Groq (« llama-3.3-70b-versatile does not exist ») bloquait tout pendant 5 min. ScaleFlow lit maintenant la liste des modèles disponibles pour ta clé et n’utilise que ceux-là.'],
-      en: ['Captions are prepared in the background ahead of time (up to 60 per market): they are ready instantly at launch.', 'All markets (FR / US / DE) and all Groq models work at the same time, in batches of 15.', 'Fixed: a model retired by Groq (“llama-3.3-70b-versatile does not exist”) blocked everything for 5 min. ScaleFlow now reads the models available for your key and only uses those.'],
+      fr: ['Les descriptions sont préparées à l’avance en fond (jusqu’à 60, seulement pour le ou les marchés du dernier posting) : au lancement elles sont prêtes tout de suite.', 'Tous les marchés (FR / US / DE) et tous les modèles Groq travaillent en même temps, par lots de 15.', 'Corrigé : un modèle retiré par Groq (« llama-3.3-70b-versatile does not exist ») bloquait tout pendant 5 min. ScaleFlow lit maintenant la liste des modèles disponibles pour ta clé et n’utilise que ceux-là.'],
+      en: ['Captions are prepared in the background ahead of time (up to 60, only for the market(s) of the last posting): they are ready instantly at launch.', 'All markets (FR / US / DE) and all Groq models work at the same time, in batches of 15.', 'Fixed: a model retired by Groq (“llama-3.3-70b-versatile does not exist”) blocked everything for 5 min. ScaleFlow now reads the models available for your key and only uses those.'],
     },
   },
   {

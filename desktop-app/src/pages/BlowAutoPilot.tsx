@@ -282,11 +282,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // Descriptions préparées à l'avance (réserve par marché) dès que l'onglet est ouvert en mode « Description auto »
   useEffect(() => {
     if (capMode !== 'ai' || !conns.groq) return
-    // seulement les marchés utilisés (défaut + marchés des iPhones / comptes) : le quota Groq du jour est limité
-    const used = new Set<Market>([capMarket, ...Object.values(team.markets), ...Object.values(team.acctMarkets)].filter((m): m is Market => m === 'fr' || m === 'us' || m === 'de'))
+    // SEULEMENT le(s) marché(s) du dernier posting (posting allemand → descriptions allemandes uniquement)
+    let used: Market[] = []
+    try { used = (JSON.parse(localStorage.getItem('sf-cap-last-markets') ?? '[]') as string[]).filter((m): m is Market => m === 'fr' || m === 'us' || m === 'de') } catch { /* noop */ }
     const t = setTimeout(() => { for (const m of used) void topUpReserve(conns.groq, m) }, 4000)
     return () => clearTimeout(t)
-  }, [capMode, conns.groq, capMarket, team.markets, team.acctMarkets])
+  }, [capMode, conns.groq])
   const [showEmptyPhones, setShowEmptyPhones] = useState(false)
   const [importText, setImportText] = useState('')
   const [showLog, setShowLog] = useState(false)   // journal détaillé déplié
@@ -639,6 +640,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         push(`⚠ Descriptions ${label} : ${e instanceof Error ? e.message : String(e)} → rien n’est lancé.`); setRunning(false); return
       }
       // la réserve se reremplit en fond pour le prochain lancement
+      try { localStorage.setItem('sf-cap-last-markets', JSON.stringify(todo)) } catch { /* noop */ }
       for (const m of todo) void topUpReserve(conns.groq, m)
     }
     const aiAll: Record<Market, string[]> = { fr: [...aiCaps.fr], us: [...aiCaps.us], de: [...aiCaps.de] }
