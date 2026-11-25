@@ -420,7 +420,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // sinon les modèles du marché choisi, sinon toutes les modèles.
   const spaceOn = bankMode === 'models' && space !== 'all' && models.includes(space)
   const modelRoots = useMemo(() => models.filter(m => m !== COMMON_SPACE), [models])
-  const roots = useMemo(() => spaceOn ? [space] : modelRoots.filter(m => mktF === 'all' || (modelMkts[m] ?? []).includes(mktF)), [spaceOn, space, mktF, modelRoots, modelMkts])
+  // onglet Modèles : UNE modèle à la fois (chaque modèle = sa propre banque), jamais un mélange
+  const roots = useMemo(() => spaceOn ? [space] : [], [spaceOn, space])
+  useEffect(() => {
+    if (bankMode !== 'models' || spaceOn || !modelRoots.length) return
+    let last: string | null = null
+    try { last = localStorage.getItem('sf-bank-model') } catch { /* noop */ }
+    setSpace(last && modelRoots.includes(last) ? last : modelRoots[0]); setFolder('Tous')
+  }, [bankMode, spaceOn, modelRoots])
   const inScope = useCallback((path: string | null | undefined) => bankMode === 'main'
     ? !modelRoots.some(m => isWithin(path, m))
     : roots.some(r => isWithin(path, r)), [bankMode, modelRoots, roots])
@@ -454,7 +461,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       : folderSort === 'recent' ? (a: string, b: string) => lastIn(b).localeCompare(lastIn(a)) : undefined
     const tree = folderTree([...typed.map(i => i.folder), ...spaceFolderNames], cmp)
     return [
-      { n: 'Tous', label: spaceOn ? `Tout ${space}` : bankMode === 'models' ? (mktF !== 'all' ? `Modèles ${MODEL_MARKETS.find(m => m.k === mktF)?.label ?? ''}` : 'Toutes les modèles') : 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
+      { n: 'Tous', label: spaceOn ? `Tout ${space}` : 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
       ...tree.map(t => ({ n: t.path, label: t.name, c: countIn(t.path), special: false, depth: t.depth, hasChildren: t.hasChildren })),
       { n: 'Jamais publiées', label: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true, depth: 0, hasChildren: false },
       ...(bankMode === 'main' ? [{ n: 'Sans dossier', label: 'Sans dossier', c: typed.filter(i => !i.folder).length, special: true, depth: 0, hasChildren: false }] : []),
@@ -1767,11 +1774,60 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
       {tab === 'media' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px' }}>
-          {bankMode === 'models' && <>
-            <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Nouvelle modèle" onClick={() => setModelForm({ edit: null, name: '', mkts: [] })} />
-            <Btn theme={theme} sm tone="quiet" label="📐 Template" onClick={() => setTplOpen((bankTpl.length ? bankTpl : templatePaths('', []).map(p => p.slice(1))).join('\n'))} />
-            {modelRoots.length > 0 && <Btn theme={theme} sm tone="quiet" label="🧭 Ranger" onClick={openArrange} />}
-          </>}
+          {/* Onglet Modèles : menu déroulant marché → modèle ; chaque modèle = sa propre banque */}
+          {bankMode === 'models' && (() => {
+            const hue = (n: string) => [...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)
+            const flag = (k: ModelMarket) => MODEL_MARKETS.find(x => x.k === k)?.label.split(' ')[0] ?? ''
+            const avatar = (m: string, size = 22) => <span style={{ width: size, height: size, flex: 'none', borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.48, fontWeight: 700, color: '#fff', background: `linear-gradient(135deg, hsl(${hue(m)} 70% 62%), hsl(${(hue(m) + 40) % 360} 70% 48%))` }}>{m.slice(0, 1).toUpperCase()}</span>
+            const count = (m: string) => items.filter(i => isWithin(i.folder, m)).length
+            const real = models.filter(m => m !== COMMON_SPACE)
+            const groups = groupModelsByMarket(real, m => modelMkts[m] ?? [])
+            const cur = spaceOn ? space : null
+            const curMkt = null as null | { label: string }
+            const row = (on: boolean): CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 36, padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, background: on ? 'rgba(139,124,246,0.16)' : 'transparent', color: on ? '#DDD6FE' : '#E4E4E7' })
+            const pick = (sp: string) => { setSpace(sp); setFolder('Tous'); setModelMenu(false); try { localStorage.setItem('sf-bank-model', sp) } catch { /* noop */ } }
+            return (
+              <div style={{ position: 'relative' }}>
+                <button type="button" onClick={() => setModelMenu(o => !o)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 10, height: 38, minWidth: 220, padding: '0 12px 0 8px', borderRadius: 10, cursor: 'pointer', background: '#141416', border: `1px solid ${cur || curMkt ? 'rgba(139,124,246,0.55)' : 'rgba(255,255,255,0.1)'}`, color: '#F4F4F5', fontSize: 13.5, fontWeight: 600 }}>
+                  {cur ? avatar(cur, 24) : <span style={{ width: 24, height: 24, borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#1F1F23', fontSize: 13 }}>{curMkt ? curMkt.label.split(' ')[0] : '🗂'}</span>}
+                  <span data-no-tr={cur ? true : undefined} style={{ flex: 1, textAlign: 'left' }}>{cur ?? 'Choisir une modèle'}</span>
+                  {cur && (modelMkts[cur] ?? []).length > 0 && <span style={{ fontSize: 12 }}>{(modelMkts[cur] ?? []).map(flag).join('')}</span>}
+                  <span style={{ color: '#8B8B94', fontSize: 11, transform: modelMenu ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▼</span>
+                </button>
+                {modelMenu && <>
+                  <div onClick={() => setModelMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 70 }} />
+                  <div style={{ position: 'absolute', top: 44, left: 0, zIndex: 71, width: 300, maxHeight: 440, overflowY: 'auto', padding: 6, borderRadius: 12, background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 60px -16px rgba(0,0,0,0.85)' }}>
+                    {MODEL_MARKETS.some(mk => real.some(m => (modelMkts[m] ?? []).includes(mk.k))) && (
+                      <div style={{ display: 'flex', gap: 4, padding: '2px 4px 6px' }}>
+                        {([['all', 'Tous'], ...MODEL_MARKETS.map(m => [m.k, m.label.split(' ')[0]])] as [string, string][]).map(([k, l]) => (
+                          <button key={k} type="button" onClick={() => setMktF(k as 'all' | ModelMarket)} style={{ flex: 1, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, background: mktF === k ? 'rgba(139,124,246,0.18)' : '#1C1C1F', color: mktF === k ? '#DDD6FE' : '#A1A1AA' }}>{l}</button>
+                        ))}
+                      </div>
+                    )}
+                    {!real.length && <div style={{ padding: '10px', fontSize: 12.5, color: '#8B8B94' }}>Aucune modèle : crée la première ci-dessous.</div>}
+                    {groups.filter(g => mktF === 'all' || g.label === MODEL_MARKETS.find(m => m.k === mktF)?.label).map(g => {
+                      return (
+                        <div key={g.label} style={{ marginTop: 6 }}>
+                          <div style={{ padding: '4px 10px', fontSize: 11.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: '#8B8B94' }}>{g.label}</div>
+                          {g.models.map(m => (
+                            <button key={`${g.label}:${m}`} type="button" onClick={() => pick(m)} onContextMenu={e => { e.preventDefault(); setModelMenu(false); setModelForm({ edit: m, name: m, mkts: modelMkts[m] ?? [] }) }} style={row(cur === m)}>
+                              {avatar(m)}<span data-no-tr style={{ flex: 1 }}>{m}</span><span style={{ color: '#6E6E78', fontSize: 12 }}>{count(m)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })}
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '6px 4px' }} />
+                    <button type="button" onClick={() => { setModelMenu(false); setModelForm({ edit: null, name: '', mkts: mktF === 'all' ? [] : [mktF] }) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>＋</span>Nouvelle modèle</button>
+                    {cur && <button type="button" onClick={() => { setModelMenu(false); setModelForm({ edit: cur, name: cur, mkts: modelMkts[cur] ?? [] }) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>⚙</span>{`Réglages de ${cur}`}</button>}
+                    <button type="button" onClick={() => { setModelMenu(false); setTplOpen((bankTpl.length ? bankTpl : templatePaths('', []).map(p => p.slice(1))).join('\n')) }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>📐</span>Template des dossiers</button>
+                    {real.length > 0 && <button type="button" onClick={() => { setModelMenu(false); openArrange() }} style={row(false)}><span style={{ width: 22, textAlign: 'center' }}>🧭</span>Ranger les dossiers par modèle</button>}
+                  </div>
+                </>}
+              </div>
+            )
+          })()}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#A1A1AA', cursor: 'pointer' }}>
               <input type="checkbox" checked={stackOn} onChange={e => { setStackOn(e.target.checked); try { localStorage.setItem('sf-bank-stack', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />

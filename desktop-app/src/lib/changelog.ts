@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25z8',
+    date: '2026-11-25',
+    title: { fr: 'Banque : chaque modèle a sa propre banque', en: 'Bank: each model has her own bank' },
+    items: {
+      fr: ['Onglet « Modèles » : un menu déroulant choisit la modèle (filtre par marché 🇫🇷 / 🇺🇸 / 🇩🇪, modèles groupées), et on ne voit QUE la banque de cette modèle — jamais mélangée aux autres ni à la Banque principale. La dernière modèle ouverte est rouverte. Nouvelle modèle, réglages, template et rangement sont en bas du menu.'],
+      en: ['“Models” tab: a dropdown picks the model (filter by market 🇫🇷 / 🇺🇸 / 🇩🇪, models grouped), and you see ONLY that model’s bank — never mixed with the others or the main Bank. The last opened model is reopened. New model, settings, template and sorting are at the bottom of the menu.'],
+    },
+  },
+  {
     id: '2026-11-25z7',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : envoi des vidéos plus fiable', en: 'iRemoTech: more reliable video upload' },

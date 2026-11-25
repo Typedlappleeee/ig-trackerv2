@@ -7,6 +7,8 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Choisir une modèle": "Pick a model",
+    "Aucune modèle : crée la première ci-dessous.": "No model yet: create the first one below.",
     "Réglages de la modèle": "Model settings",
     "🗂 Banque principale": "🗂 Main bank",
     "👤 Banque modèles": "👤 Models bank",
