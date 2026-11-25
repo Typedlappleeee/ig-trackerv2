@@ -7,6 +7,9 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Nom du nouveau dossier": "New folder name",
+    "+ Nouveau dossier…": "+ New folder…",
+    "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "écran « We removed some content » → fermé (✕)": "“We removed some content” screen → closed (✕)",
     "descriptions déjà reçues": "captions already received",
     "photo(s)": "photo(s)",

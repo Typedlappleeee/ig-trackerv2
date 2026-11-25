@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25k',
+    date: '2026-11-25',
+    title: { fr: 'Téléchargeur Insta : choix du dossier', en: 'Insta downloader: folder choice' },
+    items: {
+      fr: ['Le dossier de la Banque se choisit dans la liste des dossiers existants (ou « + Nouveau dossier… ») ; « Téléchargements Insta » reste le défaut. Option pour tout ranger directement dans le dossier, sans les sous-dossiers Reels / Photos.'],
+      en: ['The Bank folder is picked from the existing folders (or “+ New folder…”); “Téléchargements Insta” stays the default. Option to save everything straight into the folder, without the Reels / Photos subfolders.'],
+    },
+  },
+  {
     id: '2026-11-25j',
     date: '2026-11-25',
     title: { fr: 'Descriptions de Reels beaucoup plus rapides', en: 'Much faster Reel captions' },
