@@ -1326,11 +1326,6 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
   //    avoir disparu. Sinon on retape, et au bout de 3 essais : non publié (plus jamais annoncé à tort).
   // Toujours sur la page de partage = titre « New reel / New post » en haut OU bouton « Share » en bas à droite.
   // (Le petit texte « People you share this content with… » sous la localisation contient aussi « share » : ignoré.)
-  const onSharePage = async () => {
-    const sp = await readScreenWords(key, deviceId)
-    if (!sp) return true // illisible : on ne conclut pas à un succès
-    return sharePageShown(sp.words, sp.W, sp.H)
-  }
   // Éditeur de légende encore ouvert par-dessus (souvent avec la liste des hashtags suggérés après un « #… » final) :
   // on le ferme par la coche bleue en haut à droite avant de taper Share (vu en vrai le 24/11/2026).
   const closeCaptionEditor = async () => {
@@ -1345,12 +1340,34 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       await sleep(1800)
     }
   }
+  // État APRÈS un tap sur Share, lu jusqu'à 3 fois (une capture ratée ne veut PAS dire « pas publié ») :
+  // true = toujours sur la page de partage / éditeur / fenêtre audio ; false = parti (bandeau « Posting… », fil…) ;
+  // null = écran illisible 3 fois.
+  const stillOnShare = async (): Promise<boolean | null> => {
+    for (let t = 0; t < 3; t++) {
+      const sp = await readScreenWords(key, deviceId)
+      if (!sp) { await sleep(1500); continue }
+      if (sp.words.some(o => /^(posting|uploading)[.…]*$/i.test(o.text) && o.cy < sp.H * 0.5)) return false
+      return originalAudioSheet(sp.words) || sharePageShown(sp.words, sp.W, sp.H) || await captionEditorShown(sp)
+    }
+    return null
+  }
   await closeCaptionEditor()
   let shared = false
   for (let k = 0; k < 3 && !shared; k++) {
-    if (k) hooks?.log?.(`   toujours sur la page de partage → nouveau tap sur Share (${k + 1}/3)`)
-    if (k) await closeCaptionEditor()
-    if (!await tapButton(key, deviceId, [/^share$/i, /^partager$/i], A.shareBtn, W, H, hooks, [0.9, 1], 'Share', 3, [0.5, 1])) return false
+    if (k) {
+      // On ne retape Share QUE si on voit vraiment encore la page de partage (sinon risque de double post / faux échec)
+      const st = await stillOnShare()
+      if (st === false) { shared = true; break }
+      if (st === null) { hooks?.log?.('   ⚠ écran illisible après Share → considéré comme publié (jamais retapé : risque de double post)'); shared = true; break }
+      hooks?.log?.(`   toujours sur la page de partage → nouveau tap sur Share (${k + 1}/3)`)
+      await closeCaptionEditor()
+    }
+    if (!await tapButton(key, deviceId, [/^share$/i, /^partager$/i], A.shareBtn, W, H, hooks, [0.9, 1], 'Share', 3, [0.5, 1])) {
+      // Share introuvable : soit on n'est plus sur la page (déjà parti au tap précédent), soit vraiment bloqué
+      if (k && await stillOnShare() === false) { shared = true; break }
+      return false
+    }
     await sleep(4000)
     // Fenêtre « Update on your original audio » (vue en vrai le 22/11/2026) : le Reel attend → bouton bleu « Share »
     // de la fenêtre (choix par défaut d'Instagram).
@@ -1362,8 +1379,9 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       await sendAction(key, deviceId, { type: 'tap', x: blue ? blue.cx : Math.round(W / 2), y: blue ? blue.cy : Math.round(0.886 * H) })
       await sleep(4000)
     }
-    const after = await readScreenWords(key, deviceId)
-    shared = !!after && !originalAudioSheet(after.words) && !await captionEditorShown(after) && !await onSharePage()
+    const st = await stillOnShare()
+    shared = st !== true
+    if (st === null) hooks?.log?.('   ⚠ écran illisible après Share → considéré comme publié (jamais retapé : risque de double post)')
   }
   if (!shared) { hooks?.log?.('❌ Share sans effet (toujours sur la page de partage) → non publié'); return false }
   hooks?.log?.(`📤 ${doneLabel}.`)

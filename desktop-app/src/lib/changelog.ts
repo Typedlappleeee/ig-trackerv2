@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25o',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : moins de faux « échec » après Share', en: 'iRemoTech: fewer false “failed” after Share' },
+    items: {
+      fr: ['Après Share, l’écran est relu jusqu’à 3 fois : une capture ratée ne compte plus comme « pas publié ». Le bandeau « Posting… » vaut publication.', 'Share n’est retapé que si la page de partage est vraiment encore là (plus de faux échec quand le Reel était déjà parti, plus de risque de double post).'],
+      en: ['After Share, the screen is read up to 3 times: a failed screenshot no longer counts as “not posted”. The “Posting…” banner counts as posted.', 'Share is only tapped again if the share page is really still there (no more false failure when the Reel had already gone, no double-post risk).'],
+    },
+  },
+  {
     id: '2026-11-25n',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : reprise propre après un post raté', en: 'iRemoTech: clean restart after a failed post' },
