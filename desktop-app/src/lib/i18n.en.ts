@@ -7,6 +7,10 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Sans dossier": "No folder",
+    "↩ Annuler la suppression": "↩ Undo deletion",
+    "Clic : ses dossiers · clic droit : réglages": "Click: her folders · right-click: settings",
+    "🧭 Ranger": "🧭 Sort",
     " pour toute l’agence": " for the whole agency",
     "pour toute l’agence": "for the whole agency",
     "Vue par modèle pour toute l’agence : ne montre que les dossiers des modèles, sans rien changer aux fichiers": "Model view for the whole agency: shows only the models’ folders, without changing any file",
@@ -5206,6 +5210,9 @@ export const EN: Dict = {
     ["Vue par modèle activée{0}.", "Model view on{0}."],
     ["Vue par modèle désactivée{0}.", "Model view off{0}."],
     ["Modèles {0}", "Models {0}"],
+    ["Toutes les modèles {0}", "All models {0}"],
+    ["Dossier « {0} » supprimé — ses {1} média(s) n’ont pas été effacés.", "Folder “{0}” deleted — its {1} media were not erased."],
+    ["« {0} » restauré : {1} média(s) remis à leur place.", "“{0}” restored: {1} media put back."],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],

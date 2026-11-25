@@ -63,7 +63,7 @@ const inferType = (i: ContentItem): MediaType => mediaKindOf(i)
 // Filtre de type dans la banque unique (une seule liste, on distingue par le filtre + le badge).
 type KindFilter = 'all' | MediaKind
 // Entrées spéciales de la colonne Dossiers (pas de vrais dossiers).
-const SPECIAL_F = new Set(['Tous', 'Jamais publiées', '★ Favoris'])
+const SPECIAL_F = new Set(['Tous', 'Jamais publiées', '★ Favoris', 'Publiés', 'Sans dossier'])
 const KIND_LABEL: Record<MediaKind, string> = { video: 'VIDÉO', image: 'IMAGE', audio: 'SON' }
 
 // Durée d'un son importé (lue par le navigateur, sans rien envoyer). null si illisible.
@@ -244,7 +244,6 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [models, setModels] = useState<string[]>([])
   // La vue « par modèle » est un MODE optionnel : coupé, la Banque est la Banque normale (tous les dossiers, aucun filtre).
   // La modèle / le marché choisis ne sont PAS mémorisés : chaque ouverture de la Banque montre tout.
-  const [byModel, setByModelState] = useState(false)   // réglage de l'AGENCE (irtTeam.bankByModel), relu au chargement
   const [space, setSpace] = useState<string>('all')
   const [stackOn, setStackOn] = useState(() => { try { return localStorage.getItem('sf-bank-stack') !== '0' } catch { return true } })
   const [hidePosted, setHidePosted] = useState(() => { try { return localStorage.getItem('sf-bank-hideposted') !== '0' } catch { return true } })
@@ -252,10 +251,6 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [arrange, setArrange] = useState<{ src: string; model: string; dest: string; on: boolean }[] | null>(null)
   const [modelMkts, setModelMkts] = useState<Record<string, ModelMarket[]>>({})   // marchés de chaque modèle (tags partagés)
   const [mktF, setMktF] = useState<'all' | ModelMarket>('all')
-  const setByModel = (on: boolean) => {
-    setByModelState(on); setSpace('all'); setMktF('all'); setFolder('Tous')
-    void updateTeam(teamScope, t => { t.bankByModel = on }).then(r => toast(on ? `Vue par modèle activée${r.shared ? ' pour toute l’agence' : ''}.` : `Vue par modèle désactivée${r.shared ? ' pour toute l’agence' : ''}.`, r.shared ? 'ok' : 'bad'))
-  }
   const [modelForm, setModelForm] = useState<{ edit: string | null; name: string; mkts: ModelMarket[] } | null>(null)
   const [sendTo, setSendTo] = useState<{ src: string; model: string; dest: string; merge: boolean } | null>(null)   // « Envoyer vers une modèle »
   const [tplOpen, setTplOpen] = useState<string | null>(null)   // texte du template en cours d'édition
@@ -263,8 +258,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [bankTpl, setBankTpl] = useState<string[]>(() => loadTeamCache(teamScope).bankTemplate)
   useEffect(() => {
     let a = true
-    setByModelState(loadTeamCache(teamScope).bankByModel)
-    void pullTeam(teamScope).then(t => { if (t && a) { setBankTpl(t.bankTemplate); setByModelState(t.bankByModel) } })
+    void pullTeam(teamScope).then(t => { if (t && a) setBankTpl(t.bankTemplate) })
     return () => { a = false }
   }, [currentOrg?.id, user.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [favFolders, setFavFolders] = useState<Set<string>>(new Set()) // dossiers épinglés ★ (partagés)
@@ -424,17 +418,18 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     // compteurs de l'espace de la modèle ouverte (sinon toute la Banque)
     // même périmètre que la grille : la modèle choisie, sinon les modèles du marché choisi (+ Commun), sinon tout
     const sp = space !== 'all' && models.includes(space)
-    const rts = !byModel ? null : sp ? [space] : models.filter(m => m !== COMMON_SPACE && (mktF === 'all' || (modelMkts[m] ?? []).includes(mktF)))
+    const rts = sp ? [space] : mktF !== 'all' ? models.filter(m => m !== COMMON_SPACE && (modelMkts[m] ?? []).includes(mktF)) : null
     const inSpace = rts ? items.filter(i => rts.some(r => isWithin(i.folder, r))) : items
     inSpace.forEach(i => { c[inferType(i)]++ })
     return c
-  }, [items, space, models, mktF, modelMkts, byModel])
+  }, [items, space, models, mktF, modelMkts])
 
   // Items du filtre de type actif (banque unique : vidéos, images et sons ensemble).
   const spaceOn = space !== 'all' && models.includes(space)
   // racines visibles : la modèle choisie, sinon toutes les modèles du marché choisi (+ Commun), sinon tout
   // vue par modèle : UNIQUEMENT les dossiers des modèles (la modèle choisie, sinon celles du marché, sinon toutes)
-  const roots = useMemo(() => !byModel ? null : spaceOn ? [space] : models.filter(m => m !== COMMON_SPACE && (mktF === 'all' || (modelMkts[m] ?? []).includes(mktF))), [byModel, spaceOn, space, mktF, models, modelMkts])
+  // aucune modèle choisie = toute la Banque ; une modèle = ses dossiers ; un marché = les dossiers de ses modèles
+  const roots = useMemo(() => spaceOn ? [space] : mktF !== 'all' ? models.filter(m => m !== COMMON_SPACE && (modelMkts[m] ?? []).includes(mktF)) : null, [spaceOn, space, mktF, models, modelMkts])
   const typed = useMemo(() => {
     if (tab !== 'media') return []
     const inSpace = roots ? items.filter(i => roots.some(r => isWithin(i.folder, r))) : items
@@ -454,13 +449,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       : folderSort === 'recent' ? (a: string, b: string) => lastIn(b).localeCompare(lastIn(a)) : undefined
     const tree = folderTree([...typed.map(i => i.folder), ...spaceFolderNames], cmp)
     return [
-      { n: 'Tous', label: spaceOn ? `Tout ${space}` : byModel ? (mktF !== 'all' ? `Modèles ${MODEL_MARKETS.find(m => m.k === mktF)?.label ?? ''}` : 'Toutes les modèles') : 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
+      { n: 'Tous', label: spaceOn ? `Tout ${space}` : mktF !== 'all' ? `Modèles ${MODEL_MARKETS.find(m => m.k === mktF)?.label ?? ''}` : 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
       ...tree.map(t => ({ n: t.path, label: t.name, c: countIn(t.path), special: false, depth: t.depth, hasChildren: t.hasChildren })),
       { n: 'Jamais publiées', label: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true, depth: 0, hasChildren: false },
+      { n: 'Sans dossier', label: 'Sans dossier', c: typed.filter(i => !i.folder).length, special: true, depth: 0, hasChildren: false },
       { n: 'Publiés', label: 'Publiés', c: typed.filter(i => (i.used_count ?? 0) > 0).length, special: true, depth: 0, hasChildren: false },
       { n: '★ Favoris', label: 'Favoris', c: typed.filter(isFav).length, special: true, depth: 0, hasChildren: false },
     ]
-  }, [typed, spaceFolderNames, folderSort, space, spaceOn, mktF, byModel])
+  }, [typed, spaceFolderNames, folderSort, space, spaceOn, mktF])
   // Dossiers repliés (mémorisés dans ce navigateur) : leurs sous-dossiers sont masqués.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('sf-bank-collapsed') || '[]') as string[]) } catch { return new Set() } })
   const toggleCollapsed = (p: string) => setCollapsed(c => {
@@ -1062,6 +1058,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     // Ses médias (et ceux de ses sous-dossiers) remontent dans le dossier parent — ou sans dossier.
     const parent = parentOf(name)
     const raws = rawFoldersWithin(name)
+    // ANNULATION possible : on garde (dans ce navigateur, 7 jours) le dossier d'origine de chaque média déplacé
+    try {
+      const moves = [...items, ...trash].filter(i => i.folder && isWithin(i.folder, name)).map(i => [i.id, i.folder as string])
+      localStorage.setItem('sf-bank-undo-del', JSON.stringify({ name, at: Date.now(), moves, folders: raws }))
+    } catch { /* stockage plein : pas d'annulation */ }
     let upErr: { message: string } | null = null
     for (const raw of raws) {
       const { error } = await scopeQ(supabase.from('content_bank').update({ folder: parent }).eq('folder', raw).or('notes.is.null,notes.not.in.("__sf_folder__","__sf_drive_folder__")'))
@@ -1079,6 +1080,27 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     }
     setFolderMenu(null); if (isWithin(folder, name)) setFolder(parent ?? 'Tous')
     if (upErr) setNotice(`Le dossier n'a pas pu être vidé : ${upErr.message} — ces médias appartiennent peut-être à un autre compte.`)
+    load()
+  }
+
+  // Annuler la dernière suppression de dossier : chaque média retourne dans son dossier d'origine, dossiers recréés
+  const [undoDel, setUndoDel] = useState<{ name: string; at: number; moves: [string, string][]; folders: string[] } | null>(null)
+  useEffect(() => {
+    try { const u = JSON.parse(localStorage.getItem('sf-bank-undo-del') ?? 'null'); if (u && Date.now() - u.at < 7 * 864e5 && Array.isArray(u.moves)) setUndoDel(u) } catch { /* noop */ }
+  }, [folderNames.length, items.length])
+  async function undoDeleteFolder() {
+    const u = undoDel; if (!u) return
+    setUndoDel(null)
+    const byFolder = new Map<string, string[]>()
+    for (const [id, f] of u.moves) { const l = byFolder.get(f); if (l) l.push(id); else byFolder.set(f, [id]) }
+    let n = 0
+    for (const [f, ids] of byFolder) for (let k = 0; k < ids.length; k += 200) {
+      const { error } = await scopeQ(supabase.from('content_bank').update({ folder: f }).in('id', ids.slice(k, k + 200)))
+      if (!error) n += Math.min(200, ids.length - k)
+    }
+    for (const f of u.folders) await ensureBankFolder(bankScope, f)
+    try { localStorage.removeItem('sf-bank-undo-del') } catch { /* noop */ }
+    toast(`« ${leafOf(u.name)} » restauré : ${n} média(s) remis à leur place.`, 'ok')
     load()
   }
 
@@ -1285,6 +1307,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           ? (i.used_count ?? 0) === 0
         : folder === 'Publiés'
           ? (i.used_count ?? 0) > 0
+        : folder === 'Sans dossier'
+          ? !i.folder
           : isWithin(i.folder, folder)
       if (!fMatch) return false
       // médias déjà publiés rangés à part (dossier « Publiés ») sauf si l'option est coupée
@@ -1715,32 +1739,50 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       <UnderlineTabs<TabKey> value={tab} onChange={k => { setTab(k); setFolder('Tous') }}
         items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'media' ? 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' : t.k === 'pool' ? 'M4 6h16|M4 12h16|M4 18h10' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
 
+      {tab === 'media' && undoDel && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 13, color: '#FDE68A' }}>
+          <span>{`Dossier « ${leafOf(undoDel.name)} » supprimé — ses ${undoDel.moves.length} média(s) n’ont pas été effacés.`}</span>
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <Btn theme={theme} sm tone="primary" label="↩ Annuler la suppression" onClick={() => void undoDeleteFolder()} />
+            <Btn theme={theme} sm tone="ghost" label="OK" onClick={() => { setUndoDel(null); try { localStorage.removeItem('sf-bank-undo-del') } catch { /* noop */ } }} />
+          </span>
+        </div>
+      )}
       {tab === 'media' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px' }}>
-          <button type="button" onClick={() => setByModel(!byModel)} title="Vue par modèle pour toute l’agence : ne montre que les dossiers des modèles, sans rien changer aux fichiers"
-            style={{ height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, background: byModel ? 'rgba(139,124,246,0.16)' : '#161618', color: byModel ? '#C4B5FD' : '#D4D4D8', border: `1px solid ${byModel ? 'rgba(139,124,246,0.5)' : 'rgba(255,255,255,0.09)'}` }}>
-            {byModel ? '👤 Vue par modèle : activée (agence)' : '👤 Vue par modèle'}
-          </button>
-          {byModel && <>
-          <select value={mktF} onChange={e => { setMktF(e.target.value as 'all' | ModelMarket); setSpace('all'); setFolder('Tous') }} title="Marché"
-            style={{ height: 32, padding: '0 8px', borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#E4E4E7', fontSize: 12.5, cursor: 'pointer' }}>
-            <option value="all" style={{ background: '#161618' }}>🌍 Tous les marchés</option>
-            {MODEL_MARKETS.map(m => <option key={m.k} value={m.k} style={{ background: '#161618' }}>{m.label}</option>)}
-          </select>
-          <select value={spaceOn ? space : 'all'} onChange={e => { setSpace(e.target.value); setFolder('Tous') }} title="Modèle"
-            style={{ height: 32, minWidth: 190, padding: '0 8px', borderRadius: 8, background: spaceOn ? 'rgba(139,124,246,0.14)' : '#161618', border: `1px solid ${spaceOn ? 'rgba(139,124,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: spaceOn ? '#C4B5FD' : '#E4E4E7', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-            <option value="all" style={{ background: '#161618' }}>{mktF === 'all' ? 'Toutes les modèles' : `Toutes les modèles · ${MODEL_MARKETS.find(m => m.k === mktF)?.label ?? ''}`}</option>
-            {groupModelsByMarket(models, m => modelMkts[m] ?? []).filter(g => mktF === 'all' || g.label === MODEL_MARKETS.find(m => m.k === mktF)?.label).map(g => (
-              <optgroup key={g.label} label={g.label} style={{ background: '#161618' }}>
-                {g.models.map(m => <option key={`${g.label}:${m}`} value={m} style={{ background: '#161618' }} data-no-tr>{m}</option>)}
-              </optgroup>
-            ))}
-          </select>
-          {spaceOn && space !== COMMON_SPACE && <Btn theme={theme} sm tone="quiet" label="⚙ Modèle" onClick={() => setModelForm({ edit: space, name: space, mkts: modelMkts[space] ?? [] })} />}
-          <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Modèle" onClick={() => setModelForm({ edit: null, name: '', mkts: mktF === 'all' ? [] : [mktF] })} />
-          <Btn theme={theme} sm tone="quiet" label="📐 Template" onClick={() => setTplOpen((bankTpl.length ? bankTpl : templatePaths('', []).map(p => p.slice(1))).join('\n'))} />
-          {models.some(m => m !== COMMON_SPACE) && <Btn theme={theme} sm tone="quiet" label="🧭 Ranger par modèle" onClick={openArrange} />}
-          </>}
+          {/* Modèles en pastilles : par défaut « Toute la Banque » ; on clique une modèle seulement si on veut */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: 4, borderRadius: 12, background: '#111113', border: '1px solid rgba(255,255,255,0.06)' }}>
+            {(() => {
+              const shown = models.filter(m => m !== COMMON_SPACE && (mktF === 'all' || (modelMkts[m] ?? []).includes(mktF)))
+              const flag = (k: ModelMarket) => MODEL_MARKETS.find(x => x.k === k)?.label.split(' ')[0] ?? ''
+              const hue = (n: string) => [...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)
+              const chip = (on: boolean): CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 7, height: 32, padding: '0 12px 0 5px', borderRadius: 9, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, border: 'none', background: on ? 'rgba(139,124,246,0.18)' : 'transparent', color: on ? '#DDD6FE' : '#A1A1AA', boxShadow: on ? 'inset 0 0 0 1px rgba(139,124,246,0.55)' : 'none', transition: 'background .15s' })
+              return <>
+                <button type="button" onClick={() => { setSpace('all'); setMktF('all'); setFolder('Tous') }} style={{ ...chip(!spaceOn && mktF === 'all'), paddingLeft: 12 }}>Toute la Banque</button>
+                {MODEL_MARKETS.filter(mk => models.some(m => (modelMkts[m] ?? []).includes(mk.k))).map(mk => (
+                  <button key={mk.k} type="button" title={`Toutes les modèles ${mk.label}`} onClick={() => { setMktF(mktF === mk.k ? 'all' : mk.k); setSpace('all'); setFolder('Tous') }}
+                    style={{ ...chip(!spaceOn && mktF === mk.k), padding: '0 9px' }}>{mk.label.split(' ')[0]}</button>
+                ))}
+                {shown.length > 0 && <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)', margin: '0 2px' }} />}
+                {shown.map(m => {
+                  const on = spaceOn && space === m
+                  return (
+                    <button key={m} type="button" onClick={() => { setSpace(on ? 'all' : m); setFolder('Tous') }} onContextMenu={e => { e.preventDefault(); setModelForm({ edit: m, name: m, mkts: modelMkts[m] ?? [] }) }}
+                      title="Clic : ses dossiers · clic droit : réglages" style={chip(on)}>
+                      <span style={{ width: 22, height: 22, borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', background: `linear-gradient(135deg, hsl(${hue(m)} 70% 62%), hsl(${(hue(m) + 40) % 360} 70% 48%))` }}>{m.slice(0, 1).toUpperCase()}</span>
+                      <span data-no-tr>{m}</span>
+                      {(modelMkts[m] ?? []).length > 0 && <span style={{ fontSize: 11, opacity: 0.85 }}>{(modelMkts[m] ?? []).map(flag).join('')}</span>}
+                    </button>
+                  )
+                })}
+                <button type="button" title="Nouvelle modèle" onClick={() => setModelForm({ edit: null, name: '', mkts: mktF === 'all' ? [] : [mktF] })}
+                  style={{ width: 32, height: 32, borderRadius: 9, border: '1px dashed rgba(255,255,255,0.18)', background: 'transparent', color: '#A1A1AA', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>+</button>
+              </>
+            })()}
+          </div>
+          {spaceOn && <Btn theme={theme} sm tone="quiet" label="⚙" onClick={() => setModelForm({ edit: space, name: space, mkts: modelMkts[space] ?? [] })} />}
+          {models.length > 0 && <Btn theme={theme} sm tone="quiet" label="📐 Template" onClick={() => setTplOpen((bankTpl.length ? bankTpl : templatePaths('', []).map(p => p.slice(1))).join('\n'))} />}
+          {models.some(m => m !== COMMON_SPACE) && <Btn theme={theme} sm tone="quiet" label="🧭 Ranger" onClick={openArrange} />}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#A1A1AA', cursor: 'pointer' }}>
               <input type="checkbox" checked={stackOn} onChange={e => { setStackOn(e.target.checked); try { localStorage.setItem('sf-bank-stack', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />

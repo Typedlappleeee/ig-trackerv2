@@ -12,12 +12,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25z',
+    date: '2026-11-25',
+    title: { fr: 'Banque : annuler la suppression d’un dossier', en: 'Bank: undo a folder deletion' },
+    items: {
+      fr: ['Après la suppression d’un dossier, un bandeau « ↩ Annuler la suppression » remet chaque média dans son dossier d’origine et recrée les dossiers (7 jours, sur le navigateur qui a supprimé). Rappel : supprimer un dossier n’efface jamais ses médias.', 'Nouveau dossier spécial « Sans dossier » pour retrouver d’un coup les médias sortis d’un dossier supprimé.'],
+      en: ['After deleting a folder, a “↩ Undo deletion” bar puts every media back in its original folder and recreates the folders (7 days, on the browser that deleted it). Reminder: deleting a folder never erases its media.', 'New special “No folder” folder to find at once the media taken out of a deleted folder.'],
+    },
+  },
+  {
     id: '2026-11-25y',
     date: '2026-11-25',
-    title: { fr: 'Banque : vue par modèle optionnelle', en: 'Bank: optional model view' },
+    title: { fr: 'Banque : modèles en pastilles', en: 'Bank: models as chips' },
     items: {
-      fr: ['La vue par modèle est maintenant un mode (« 👤 Vue par modèle ») activé pour toute l’agence. Coupée, la Banque redevient la Banque normale ; activée, elle ne montre QUE les dossiers des modèles. Plus d’espace « Commun » imposé, et la modèle choisie n’est plus gardée d’une visite à l’autre. Retirer une modèle ne touche jamais aux fichiers.'],
-      en: ['The model view is now a mode (“👤 Model view”) turned on for the whole agency. Off, the Bank is the normal Bank; on, it shows ONLY the models’ folders. No more forced “Shared” space, and the chosen model is no longer kept between visits. Removing a model never touches files.'],
+      fr: ['En haut de la Banque, les modèles s’affichent en pastilles (initiale colorée + drapeaux de ses marchés), avec « Toute la Banque » par défaut : rien ne change pour ceux qui ne cliquent pas. Clic sur une modèle = ses dossiers seulement ; clic sur un drapeau = toutes les modèles de ce marché ; clic droit = ses réglages ; « + » = nouvelle modèle. Plus d’espace « Commun » imposé, et le choix n’est pas gardé d’une visite à l’autre.'],
+      en: ['At the top of the Bank, models show as chips (coloured initial + her market flags), with “Whole Bank” by default: nothing changes for those who don’t click. Click a model = her folders only; click a flag = all models of that market; right-click = her settings; “+” = new model. No more forced “Shared” space, and the choice isn’t kept between visits.'],
     },
   },
   {
