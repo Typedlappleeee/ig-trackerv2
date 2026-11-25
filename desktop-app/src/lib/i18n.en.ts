@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Vidéo publiée (REEL)": "Video posted (REEL)",
     "galerie « New reel » directe non reconnue → passage par le +": "direct “New reel” gallery not recognised → going through the +",
     "🎞️ Galerie « New reel » ouverte directement": "🎞️ “New reel” gallery opened directly",
     "sélection multiple active → coupée": "multi-select on → turned off",
