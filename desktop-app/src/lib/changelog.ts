@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25z4',
+    date: '2026-11-25',
+    title: { fr: 'Banque : menu déroulant des modèles', en: 'Bank: model dropdown' },
+    items: {
+      fr: ['Un menu déroulant propre remplace les pastilles : « Toute la Banque », puis les modèles groupées par marché (initiale colorée, nombre de fichiers), un clic sur un marché = toutes ses modèles, et en bas : nouvelle modèle, réglages, template, rangement.', 'Corrigé : un import ou un nouveau dossier fait pendant qu’une modèle est choisie va DANS cette modèle (avant, il partait hors de la modèle).'],
+      en: ['A clean dropdown replaces the chips: “Whole Bank”, then models grouped by market (coloured initial, file count), click a market = all its models, and at the bottom: new model, settings, template, sorting.', 'Fixed: an import or a new folder made while a model is selected goes INTO that model (before, it went outside the model).'],
+    },
+  },
+  {
     id: '2026-11-25z3',
     date: '2026-11-25',
     title: { fr: 'Banque : supprimer un dossier garde ses sous-dossiers', en: 'Bank: deleting a folder keeps its subfolders' },

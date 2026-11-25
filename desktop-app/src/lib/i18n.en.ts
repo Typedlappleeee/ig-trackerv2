@@ -7,6 +7,9 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "toutes": "all",
+    "Template des dossiers": "Folder template",
+    "Ranger les dossiers par modèle": "Sort folders by model",
     "aucun fichier n’est supprimé": "no file is deleted",
     ": ses sous-dossiers sont gardés et remontent d’un niveau, ses fichiers vont": ": its subfolders are kept and move up one level, its files go",
     "dans « Sans dossier »": "into “No folder”",
@@ -5218,6 +5221,7 @@ export const EN: Dict = {
     ["Dossier « {0} » supprimé — ses {1} média(s) n’ont pas été effacés.", "Folder “{0}” deleted — its {1} media were not erased."],
     ["« {0} » restauré : {1} média(s) remis à leur place.", "“{0}” restored: {1} media put back."],
     ["Gros dossier ({0} fichiers) : tape son nom pour confirmer.", "Big folder ({0} files): type its name to confirm."],
+    ["Réglages de {0}", "{0} settings"],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],
