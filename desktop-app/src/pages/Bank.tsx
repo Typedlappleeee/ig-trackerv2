@@ -253,7 +253,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [openStacks, setOpenStacks] = useState<Set<string>>(new Set())
   const [arrange, setArrange] = useState<{ src: string; model: string; dest: string; on: boolean }[] | null>(null)
   const [modelMkts, setModelMkts] = useState<Record<string, ModelMarket[]>>({})
-  const [otherBanks, setOtherBanks] = useState<Set<string>>(new Set())   // banques « hors modèle » (Telegram…)   // marchés de chaque modèle (tags partagés)
+  const [otherBanks, setOtherBanks] = useState<Set<string>>(new Set())
+  // Logo (photo de profil) de chaque dossier / modèle / banque : image dans le stockage, chemin sur sa ligne sentinelle
+  const [folderLogos, setFolderLogos] = useState<Record<string, string>>({})
+  const logoInput = useRef<HTMLInputElement>(null)
+  const logoTarget = useRef<string | null>(null)   // banques « hors modèle » (Telegram…)   // marchés de chaque modèle (tags partagés)
   const [mktF, setMktF] = useState<'all' | ModelMarket>('all')
   const [modelForm, setModelForm] = useState<{ edit: string | null; name: string; mkts: ModelMarket[]; other?: boolean } | null>(null)
   const [sendTo, setSendTo] = useState<{ src: string; model: string; dest: string; merge: boolean } | null>(null)   // « Envoyer vers une modèle »
@@ -320,6 +324,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     const rows = data
     setFolderNames(rows.filter(isSentinel).map(r => r.folder ?? r.title).filter((f): f is string => Boolean(f)))
     setFavFolders(new Set(rows.filter(r => isSentinel(r) && isFav(r) && r.folder).map(r => normPath(r.folder as string))))
+    {
+      const lp = rows.filter(r => isSentinel(r) && r.folder && r.thumbnail_path).map(r => [normPath(r.folder as string), r.thumbnail_path as string] as const)
+      if (lp.length) void supabase.storage.from('content').createSignedUrls(lp.map(x => x[1]), 6 * 3600).then(({ data }) => {
+        const byPath = new Map((data ?? []).filter(d => d.path && d.signedUrl).map(d => [d.path as string, d.signedUrl as string]))
+        setFolderLogos(Object.fromEntries(lp.filter(x => byPath.has(x[1])).map(x => [x[0], byPath.get(x[1])!])))
+      })
+      else setFolderLogos({})
+    }
     setOtherBanks(new Set(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(OTHER_TAG) && r.folder).map(r => normPath(r.folder as string))))
     setModelMkts(Object.fromEntries(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(MODEL_TAG) && r.folder).map(r => [normPath(r.folder as string), marketsOfTags(r.tags)])))
     setModels([...new Set(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(MODEL_TAG) && r.folder).map(r => normPath(r.folder as string)))].sort((a, b) => a === COMMON_SPACE ? 1 : b === COMMON_SPACE ? -1 : a.localeCompare(b, 'fr', { sensitivity: 'base' })))
@@ -1106,6 +1118,29 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     load()
   }
 
+  // Logo d'un dossier : image réduite à 256 px (JPEG), rangée dans le stockage de l'espace, liée à la ligne du dossier
+  async function setFolderLogo(folderPath: string, file: File | null) {
+    try {
+      let path: string | null = null
+      if (file) {
+        const bmp = await createImageBitmap(file)
+        const side = Math.min(bmp.width, bmp.height), cv = document.createElement('canvas'); cv.width = 256; cv.height = 256
+        cv.getContext('2d')!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 256, 256)
+        const blob = await new Promise<Blob | null>(res => cv.toBlob(res, 'image/jpeg', 0.88))
+        if (!blob) throw new Error('image illisible')
+        path = `videos/${scopeFolder}/logos/${crypto.randomUUID()}.jpg`
+        const up = await supabase.storage.from('content').upload(path, blob, { contentType: 'image/jpeg', upsert: false })
+        if (up.error) throw new Error(up.error.message)
+      }
+      await ensureBankFolder(bankScope, folderPath)
+      const { error } = await scopeQ(supabase.from('content_bank').update({ thumbnail_path: path }).eq('folder', folderPath).in('notes', ['__sf_folder__']))
+      if (error) throw new Error(error.message)
+      toast(file ? `Logo de « ${leafOf(folderPath)} » enregistré.` : `Logo de « ${leafOf(folderPath)} » retiré.`, 'ok')
+      load()
+    } catch (e) { toast(`Logo : ${e instanceof Error ? e.message : String(e)}`, 'bad') }
+  }
+  const pickLogo = (folderPath: string) => { logoTarget.current = folderPath; logoInput.current?.click() }
+
   // Annuler la dernière suppression de dossier : chaque média retourne dans son dossier d'origine, dossiers recréés
   const [undoDel, setUndoDel] = useState<{ name: string; at: number; moves: [string, string][]; folders: string[] } | null>(null)
   useEffect(() => {
@@ -1766,6 +1801,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         onChange={k => { if (k === 'models' || k === 'media') { setTab('media'); setBankMode(k === 'models' ? 'models' : 'main') } else setTab(k); setFolder('Tous') }}
         items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'models' ? 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M4 21a8 8 0 0 1 16 0' : t.k === 'media' ? 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' : t.k === 'pool' ? 'M4 6h16|M4 12h16|M4 18h10' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
 
+      <input ref={logoInput} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; const t = logoTarget.current; e.target.value = ''; if (f && t) void setFolderLogo(t, f) }} />
       {tab === 'media' && undoDel && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 13, color: '#FDE68A' }}>
           <span>{`Dossier « ${leafOf(undoDel.name)} » supprimé — ses ${undoDel.moves.length} média(s) n’ont pas été effacés.`}</span>
@@ -1781,7 +1817,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           {bankMode === 'models' && (() => {
             const hue = (n: string) => [...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)
             const flag = (k: ModelMarket) => MODEL_MARKETS.find(x => x.k === k)?.label.split(' ')[0] ?? ''
-            const avatar = (m: string, size = 22) => <span style={{ width: size, height: size, flex: 'none', borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.48, fontWeight: 700, color: '#fff', background: `linear-gradient(135deg, hsl(${hue(m)} 70% 62%), hsl(${(hue(m) + 40) % 360} 70% 48%))` }}>{m.slice(0, 1).toUpperCase()}</span>
+            const avatar = (m: string, size = 22) => folderLogos[m] ? <img src={folderLogos[m]} alt="" style={{ width: size, height: size, flex: 'none', borderRadius: 99, objectFit: 'cover' }} /> : <span style={{ width: size, height: size, flex: 'none', borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.48, fontWeight: 700, color: '#fff', background: `linear-gradient(135deg, hsl(${hue(m)} 70% 62%), hsl(${(hue(m) + 40) % 360} 70% 48%))` }}>{m.slice(0, 1).toUpperCase()}</span>
             const count = (m: string) => items.filter(i => isWithin(i.folder, m)).length
             const real = models.filter(m => m !== COMMON_SPACE)
             const groups = groupModelsByMarket(real, m => modelMkts[m] ?? [], m => otherBanks.has(m))
@@ -1863,6 +1899,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           </> })()}
           {modelForm.other && !modelForm.edit && <div style={{ fontSize: 12, color: '#6E6E78', marginTop: 10 }}>Une banque à part, sans marché ni dossiers imposés (Telegram, contenu générique…).</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' }}>
+            {modelForm.edit && <Btn theme={theme} sm tone="ghost" label={folderLogos[modelForm.edit] ? '🖼 Changer le logo' : '🖼 Ajouter un logo'} onClick={() => { const m = modelForm.edit!; setModelForm(null); pickLogo(m) }} />}
             {modelForm.edit && !otherBanks.has(modelForm.edit) && <Btn theme={theme} sm tone="ghost" label="Ajouter les dossiers du template" onClick={() => { const m = modelForm.edit!; setModelForm(null); void applyTemplate([m]) }} />}
             {modelForm.edit && <Btn theme={theme} sm tone="danger" label="Retirer des modèles" onClick={() => { const m = modelForm.edit!; setModelForm(null); void removeModelSpace(m) }} />}
             <Btn theme={theme} sm tone="primary" label={modelForm.edit ? 'Enregistrer' : modelForm.other ? 'Créer la banque' : 'Créer la modèle'} disabled={!modelForm.edit && !cleanSeg(modelForm.name)}
@@ -1979,9 +2016,9 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                     style={{ width: 14, display: 'flex', justifyContent: 'center', color: '#7C7C86', cursor: f.hasChildren ? 'pointer' : 'inherit', transform: f.hasChildren && !collapsed.has(f.n) ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease', flexShrink: 0 }}>
                     {f.hasChildren && <Icon d="M9 6l6 6-6 6" size={11} sw={2.2} />}
                   </span>
-                  <span style={{ display: 'flex', color: f.n === '★ Favoris' ? '#FBBF24' : f.special ? '#4ADE80' : on ? theme.accentText : '#71717A' }}>
+                  {folderLogos[f.n] ? <img src={folderLogos[f.n]} alt="" style={{ width: 18, height: 18, borderRadius: 99, objectFit: 'cover', flex: 'none' }} /> : <span style={{ display: 'flex', color: f.n === '★ Favoris' ? '#FBBF24' : f.special ? '#4ADE80' : on ? theme.accentText : '#71717A' }}>
                     <Icon d={f.n === '★ Favoris' ? 'M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z' : f.special ? 'M12 2v20|M2 12h20' : 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z'} size={13} />
-                  </span>
+                  </span>}
                   <span style={{
                     flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: on ? 650 : 550,
                     color: on ? '#F4F4F5' : '#A1A1AA',
@@ -2238,7 +2275,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {folderCtx && createPortal(
         <>
           <div onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
-          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 230), left: Math.min(folderCtx.x, window.innerWidth - 220), zIndex: 61, width: 210, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
+          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 300), left: Math.min(folderCtx.x, window.innerWidth - 220), zIndex: 61, width: 210, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
             <button onClick={() => { openNewFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginBottom: 4, borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#7C7C86', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z|M12 10v6|M9 13h6" size={14} /></span>Nouveau sous-dossier
@@ -2261,6 +2298,16 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               <button onClick={() => { const m0 = models.find(m => m !== COMMON_SPACE && !isWithin(m, folderCtx.name)) ?? models[0]; setSendTo({ src: folderCtx.name, model: m0, dest: m0, merge: false }); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <span style={{ color: '#A78BFA', display: 'flex', width: 14, justifyContent: 'center' }}>➜</span>Envoyer vers une modèle
+              </button>
+            )}
+            <button onClick={() => { const n = folderCtx.name; setFolderCtx(null); pickLogo(n) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ display: 'flex', width: 14, justifyContent: 'center' }}>🖼</span>{folderLogos[folderCtx.name] ? 'Changer le logo' : 'Ajouter un logo'}
+            </button>
+            {folderLogos[folderCtx.name] && (
+              <button onClick={() => { const n = folderCtx.name; setFolderCtx(null); void setFolderLogo(n, null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span style={{ display: 'flex', width: 14, justifyContent: 'center' }}>✕</span>Retirer le logo
               </button>
             )}
             <button onClick={() => { setConfirmDelFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginTop: 4, borderRadius: 5, border: 'none', boxShadow: '0 -1px 0 rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}

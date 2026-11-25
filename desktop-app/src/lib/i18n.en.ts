@@ -7,6 +7,12 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "image illisible": "unreadable image",
+    "🖼 Changer le logo": "🖼 Change the logo",
+    "🖼 Ajouter un logo": "🖼 Add a logo",
+    "Changer le logo": "Change the logo",
+    "Ajouter un logo": "Add a logo",
+    "Retirer le logo": "Remove the logo",
     "Hors modèle": "Outside models",
     "Nouvelle banque hors modèle (Telegram…)": "New bank outside models (Telegram…)",
     "Nouvelle banque hors modèle": "New bank outside models",
@@ -5236,6 +5242,9 @@ export const EN: Dict = {
     ["Gros dossier ({0} fichiers) : tape son nom pour confirmer.", "Big folder ({0} files): type its name to confirm."],
     ["Réglages de {0}", "{0} settings"],
     ["Banque « {0} » créée.", "Bank “{0}” created."],
+    ["Logo de « {0} » enregistré.", "Logo of “{0}” saved."],
+    ["Logo de « {0} » retiré.", "Logo of “{0}” removed."],
+    ["Logo : {0}", "Logo: {0}"],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],

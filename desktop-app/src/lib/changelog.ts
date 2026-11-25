@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25zb',
+    date: '2026-11-25',
+    title: { fr: 'Banque : logo sur chaque dossier et chaque modèle', en: 'Bank: a logo on every folder and model' },
+    items: {
+      fr: ['Clic droit sur un dossier › « 🖼 Ajouter un logo » (ou dans les réglages d’une modèle) : la photo est recadrée en carré et s’affiche en rond à côté du dossier et dans le menu des modèles. Partagée avec toute l’équipe.'],
+      en: ['Right-click a folder › “🖼 Add a logo” (or in a model’s settings): the picture is cropped square and shown as a circle next to the folder and in the models menu. Shared with the whole team.'],
+    },
+  },
+  {
     id: '2026-11-25za',
     date: '2026-11-25',
     title: { fr: 'Banque : banques hors modèle (Telegram…)', en: 'Bank: banks outside models (Telegram…)' },
