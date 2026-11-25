@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25n',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : reprise propre après un post raté', en: 'iRemoTech: clean restart after a failed post' },
+    items: {
+      fr: ['Post raté : il est abandonné (jamais retenté) et Instagram est fermé tout de suite ; le post suivant repart d’un Instagram propre (réouvert, compte vérifié). Vaut aussi pour les containers.', 'Une erreur inattendue pendant un post n’arrête plus toute la session de l’iPhone.'],
+      en: ['Failed post: it is dropped (never retried) and Instagram is closed at once; the next post starts from a clean Instagram (reopened, account checked). Also for containers.', 'An unexpected error during a post no longer stops the whole iPhone session.'],
+    },
+  },
+  {
     id: '2026-11-25m',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : aperçu plein écran de la vidéo fermé', en: 'iRemoTech: full-screen video preview closed' },

@@ -54,16 +54,18 @@ export async function runServerPhone(key: string, p: ServerPhone, opts: ServerOp
   } catch (e) { log(`⚠ préparation de l’iPhone : ${e instanceof Error ? e.message : String(e)}`) }
 
   let stayedIn: string | null = null
+  let cleaned = false
   for (const [ji, job] of p.jobs.entries()) {
     if (h.shouldStop()) { log('⏹ arrêt demandé'); break }
     try {
       log(`\n📦 ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
       const sameAcct = stayedIn === job.container
       if (!sameAcct) {
-        if (ji > 0 && job.container.startsWith('@')) {
-          log(p.jobs[ji - 1].container === job.container ? '🔄 post précédent raté → Instagram relancé sur le même compte' : '🚪 fin du compte précédent → Instagram fermé')
+        if (ji > 0 && job.container.startsWith('@') && !cleaned) {
+          log('🚪 fin du compte précédent → Instagram fermé')
           await forceCloseForegroundApp(key, p.dev, vh)
         }
+        cleaned = false
         if (opts.airplaneOn) await airplaneReset(key, p.dev, vh)
         if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, vh)
         const ok = await openTargetByVision(key, p.dev, job.container, vh)
@@ -95,10 +97,12 @@ export async function runServerPhone(key: string, p: ServerPhone, opts: ServerOp
       const posted = await postReelByVision(key, p.dev, { caption: job.caption, location: locFromServer(job.location), stay: nextSame }, vh)
       if (posted && nextSame) stayedIn = job.container
       log(posted ? `✅ « ${job.container} » publié` : `⚠ « ${job.container} » interrompu`)
+      if (!posted && !h.shouldStop()) { log('🧹 post raté → posting annulé, Instagram fermé (reprise propre)'); await forceCloseForegroundApp(key, p.dev, vh); stayedIn = null; cleaned = true }
       if (posted) for (const v of job.vids) h.bumpUsed(v.id)
       h.tick(posted)
     } catch (e) {
       log(`❌ erreur inattendue : ${e instanceof Error ? e.message : String(e)} → post suivant`)
+      try { await forceCloseForegroundApp(key, p.dev, vh); cleaned = true } catch { /* noop */ }
       stayedIn = null
       h.tick(false)
     }

@@ -714,6 +714,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       try { acDone = localStorage.getItem(acKey) === '1' } catch { /* ignore */ }
       if (!acDone && await disableAutoCorrect(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })) { try { localStorage.setItem(acKey, '1') } catch { /* ignore */ } }
       let stayedIn: string | null = null // compte resté ouvert dans Instagram après son post (session)
+      let cleaned = false // Instagram vient d'être fermé après un post raté (pas besoin de le refermer)
       for (const [ji, job] of p.jobs.entries()) {
         if (R.isCancelled()) break
         push(`\n${tag} 📦 ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
@@ -721,7 +722,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const sameAcct = stayedIn === job.container
         if (!sameAcct) {
           // Changement de compte : on QUITTE Instagram, puis nouvelle IP (mode avion), puis on rouvre sur le compte suivant
-          if (ji > 0 && job.container.startsWith('@')) { push(p.jobs[ji - 1].container === job.container ? `${tag} 🔄 post précédent raté → Instagram relancé sur le même compte` : `${tag} 🚪 fin du compte précédent → Instagram fermé`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }) }
+          if (ji > 0 && job.container.startsWith('@') && !cleaned) { push(`${tag} 🚪 fin du compte précédent → Instagram fermé`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }) }
+          cleaned = false
           if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
           // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
           if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
@@ -765,13 +767,24 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         push(`${tag} ⏳ 10 s (indexation)…`)
         await sleep(10000)
         const vh = { log: hooks, shouldStop: () => R.isCancelled() }
-        const posted = kind === 'story'
-          ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, vh)
-          : kind === 'carousel'
-            ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic, location: job.location, stay: nextSame }, vh)
-            : await postReelByVision(key, p.dev, { caption: job.caption, location: job.location, stay: nextSame }, vh)
+        // une erreur inattendue pendant le post = post raté (jamais toute la session de l'iPhone arrêtée)
+        let posted = false
+        try {
+          posted = kind === 'story'
+            ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, vh)
+            : kind === 'carousel'
+              ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic, location: job.location, stay: nextSame }, vh)
+              : await postReelByVision(key, p.dev, { caption: job.caption, location: job.location, stay: nextSame }, vh)
+        } catch (e) { push(`${tag} ❌ erreur inattendue : ${e instanceof Error ? e.message : String(e)}`) }
         if (posted && nextSame && kind !== 'story') stayedIn = job.container
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
+        // Post RATÉ : on abandonne ce post (jamais retenté) et on ferme Instagram TOUT DE SUITE → le post suivant repart
+        // d'un Instagram propre (réouvert, compte vérifié), au lieu de continuer depuis un écran inconnu.
+        if (!posted && !R.isCancelled()) {
+          push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`)
+          await forceCloseForegroundApp(key, p.dev, vh)
+          stayedIn = null; cleaned = true
+        }
         if (posted) for (const v of job.vids) void bumpUsed(v.id)
         // Story CTA publiée : date gardée pour toute l'équipe (liste des comptes : « Story CTA en ligne · il y a 2 h »)
         if (posted && kind === 'story') editTeam(t => { t.lastStory[`${p.dev}::${job.container}`] = Date.now() })
