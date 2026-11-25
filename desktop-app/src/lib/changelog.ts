@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25c',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : sessions plus fiables', en: 'iRemoTech: more reliable sessions' },
+    items: {
+      fr: [
+        'Post raté sur un compte : retenté jusqu’à 2 fois avant de passer au compte suivant (un compte réglé sur 5 posts n’en faisait parfois qu’1).',
+        'Bascule de compte : si le profil n’est pas reconnu, essai direct sur le nom du compte en haut.',
+        'Localisation : ligne « Add location » trouvée sous « Tag people » même si son texte n’est pas lu ; lieu déjà posé reconnu même page défilée (plus de 2e essai inutile).',
+      ],
+      en: [
+        'Failed post on an account: retried up to 2 times before moving to the next account (an account set to 5 posts sometimes did only 1).',
+        'Account switch: if the profile isn’t recognised, the account name at the top is tried directly.',
+        'Location: the “Add location” row is found under “Tag people” even when its text isn’t read; a set location is recognised even when the page is scrolled (no more pointless 2nd attempt).',
+      ],
+    },
+  },
+  {
     id: '2026-11-25b',
     date: '2026-11-25',
     title: { fr: 'Comptes iRemoTech : marché, NEW, lien CTA, Story · Spoof : dossier au choix', en: 'iRemoTech accounts: market, NEW, CTA link, Story · Spoof: choose folder' },

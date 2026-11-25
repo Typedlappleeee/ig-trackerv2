@@ -167,3 +167,9 @@ describe('localisation : bonne ligne et lieu déjà posé', () => {
     expect(locationAlreadySet([...base, { text: 'Add', cx: 60, cy: 514 }, { text: 'location', cx: 110, cy: 514 }], { city: /^Leipzig,?$/i, region: /^germany$/i }, 650)).toBe(false)
   })
 })
+describe('lieu déjà posé, page défilée', () => {
+  it('reconnu juste au-dessus de « People you share… » même sans « Tag people »', () => {
+    const w = [{ text: 'Munich,', cx: 80, cy: 300 }, { text: 'Germany', cx: 160, cy: 300 }, { text: 'People', cx: 60, cy: 340 }, { text: 'you', cx: 100, cy: 340 }, { text: 'share', cx: 140, cy: 340 }]
+    expect(locationAlreadySet(w, { city: /^Munich,?$/i, region: /^germany$/i }, 720)).toBe(true)
+  })
+})

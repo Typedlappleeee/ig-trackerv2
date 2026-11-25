@@ -1334,11 +1334,16 @@ export function locationRow(words: { text: string; cx: number; cy: number }[], l
 /** Lieu DÉJÀ posé sur la page de partage : ligne avec la ville ou le pays sous « Tag people », et plus de ligne « Add
  *  location ». Pure. */
 export function locationAlreadySet(words: { text: string; cx: number; cy: number }[], loc: { city: RegExp; region: RegExp }, H: number): boolean {
-  const tag = words.find(o => /^tag$/i.test(o.text) && words.some(p => /^people$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))
-  if (!tag) return false
   const addLoc = words.some(o => /^location$/i.test(o.text) && words.some(a => /^add$/i.test(a.text) && Math.abs(a.cy - o.cy) < 12 && a.cx < o.cx))
   if (addLoc) return false
-  return words.some(o => o.cy > tag.cy && o.cy < tag.cy + H * 0.12 && (loc.city.test(o.text) || loc.region.test(o.text.replace(/[,.]$/, ''))))
+  const isPlace = (o: { text: string }) => loc.city.test(o.text) || loc.region.test(o.text.replace(/[,.]$/, ''))
+  // repère 1 : juste sous « Tag people »
+  const tag = words.find(o => /^tag$/i.test(o.text) && words.some(p => /^people$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))
+  if (tag && words.some(o => o.cy > tag.cy && o.cy < tag.cy + H * 0.12 && isPlace(o))) return true
+  // repère 2 : juste AU-DESSUS du texte « People you share this content with can see the location… » (page défilée :
+  // « Tag people » n'est plus à l'écran — vu en vrai : 2e essai « Add location introuvable » alors que le lieu était posé)
+  const note = words.find(o => /^people$/i.test(o.text) && words.some(p => /^share$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
+  return !!note && words.some(o => o.cy < note.cy && o.cy > note.cy - H * 0.1 && isPlace(o))
 }
 
 /** Alerte iOS « Allow “Instagram” to use your location? » (Allow Once / While Using / Don't Allow) : on refuse
@@ -1365,6 +1370,9 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
     const scr = k || closeTries ? await readScreenWords(key, deviceId) : s0
     const lw = scr?.words.find(o => /^location$/i.test(o.text) && o.cy > H * 0.25 && o.cy < H * 0.9 && scr.words.some(a => /^add$/i.test(a.text) && Math.abs(a.cy - o.cy) < 12 && a.cx < o.cx))
     if (lw) { row = { x: lw.cx, y: lw.cy }; break }
+    // « Add location » pas lu, mais « Tag people » visible : la ligne du lieu est juste en dessous (≈ 7,5 % de la hauteur)
+    const tg = scr?.words.find(o => /^tag$/i.test(o.text) && o.cy > H * 0.25 && o.cy < H * 0.82 && scr.words.some(p => /^people$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))
+    if (tg && scr && !locationAlreadySet(scr.words, loc, H) && !(await captionEditorShown(scr))) { hooks?.log?.('   « Add location » non lu → ligne sous « Tag people »'); row = { x: Math.round(0.35 * W), y: Math.round(tg.cy + 0.075 * H) }; break }
     // éditeur de légende encore ouvert (liste des hashtags suggérés) : JAMAIS de défilement ici → coche ✓ d'abord
     if (scr && await captionEditorShown(scr)) {
       hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
@@ -3103,7 +3111,14 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
     await sleep(2500); scr = await readScreenWords(key, deviceId)
     if (isSheet(scr)) return scr
   }
-  if (!isProfile(scr)) return null
+  if (!isProfile(scr)) {
+    // profil peut-être ouvert mais pas reconnu (bannière, popup, mise en page différente — vu sur STEVIE1/4) :
+    // un dernier essai sur le nom du compte en haut, sans risque (au pire rien ne s'ouvre)
+    hooks?.log?.('   profil non reconnu → essai direct sur le nom du compte en haut')
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.5 * W), y: Math.round(0.068 * H) })
+    await sleep(2200); scr = await readScreenWords(key, deviceId)
+    return isSheet(scr) ? scr : null
+  }
   // 2. nom du compte en haut (avec ⌄) → feuille des comptes, jusqu'à 3 taps
   for (let k = 0; k < 3; k++) {
     if (k) hooks?.log?.('   liste des comptes pas ouverte → nouveau tap')
