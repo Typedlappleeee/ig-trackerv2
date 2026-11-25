@@ -14,10 +14,10 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     id: '2026-11-25zh',
     date: '2026-11-25',
-    title: { fr: 'Téléchargeur Insta : dossier des Reels et dossier des photos', en: 'Insta downloader: Reels folder and photos folder' },
+    title: { fr: 'Genjutsu depuis la Banque, Téléchargeur Insta par type', en: 'Genjutsu from the Bank, Insta downloader by type' },
     items: {
-      fr: ['Téléchargeur Insta : tu choisis séparément le dossier de la Banque où vont les Reels et celui où vont les photos (banque principale ou banque d’une modèle, ou nouveau dossier).'],
-      en: ['Insta downloader: choose separately the Bank folder for Reels and the one for photos (main bank or a model’s bank, or a new folder).'],
+      fr: ['Genjutsu : bouton « Choisir dans la Banque » pour prendre les vidéos dans la banque principale ou celle d’une modèle (ex. Veille).', 'Téléchargeur Insta : tu choisis séparément le dossier de la Banque où vont les Reels et celui où vont les photos (banque principale ou banque d’une modèle, ou nouveau dossier).'],
+      en: ['Genjutsu: “Pick from the Bank” button to take videos from the main bank or a model’s bank (e.g. Veille).', 'Insta downloader: choose separately the Bank folder for Reels and the one for photos (main bank or a model’s bank, or a new folder).'],
     },
   },
   {

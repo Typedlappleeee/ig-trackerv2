@@ -12,6 +12,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import BankPicker, { type PickerResult } from '@/components/BankPicker'
+import { themeFor } from '@/lib/theme'
 import type { OrgState } from '@/lib/data'
 import { Icon, Toggle, Segmented, toast, useNarrow, confirmDialog, promptDialog, SkeletonRows } from '@/lib/ui'
 import { hfBridge, listLocal, addLocal, reconnectLocal, checkLocal, removeLocal, type HfLocalAccount } from '@/lib/hfLocal'
@@ -216,6 +218,27 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
       setFiles(l => [...l, { id, name: f.name }])
       uploadLocalVideo(f)
         .then(url => setFiles(l => l.map(x => x.id === id ? { ...x, url } : x)))
+        .catch(e => setFiles(l => l.map(x => x.id === id ? { ...x, error: e instanceof Error ? e.message : String(e) } : x)))
+    }
+  }
+  // vidéos choisies dans la Banque (banque principale ou banque d'une modèle, ex. « Veille ») : chaque vidéo est
+  // récupérée par son lien signé puis envoyée comme une vidéo importée du PC
+  const [bankPick, setBankPick] = useState(false)
+  async function addFromBank(ids: string[]) {
+    if (!ids.length) return
+    const { data } = await supabase.from('content_bank').select('id,title,storage_path,file_url').in('id', ids)
+    for (const v of (data ?? []) as { id: string; title: string | null; storage_path: string | null; file_url: string | null }[]) {
+      const id = crypto.randomUUID(), name = v.title || 'Banque'
+      setFiles(l => [...l, { id, name }])
+      ;(async () => {
+        let url = v.file_url ?? undefined
+        if (v.storage_path) { const { data: s } = await supabase.storage.from('content').createSignedUrl(v.storage_path, 3600); url = s?.signedUrl ?? url }
+        if (!url) throw new Error('vidéo introuvable dans la Banque')
+        const r = await fetch(url)
+        if (!r.ok) throw new Error(`téléchargement impossible (${r.status})`)
+        return uploadLocalVideo(new File([await r.blob()], `${name}.mp4`, { type: 'video/mp4' }))
+      })()
+        .then(u => setFiles(l => l.map(x => x.id === id ? { ...x, url: u } : x)))
         .catch(e => setFiles(l => l.map(x => x.id === id ? { ...x, error: e instanceof Error ? e.message : String(e) } : x)))
     }
   }
@@ -615,7 +638,7 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
             )}
           </Step>
 
-          <Step n={2} title="Les vidéos" sub="Colle des liens de reels (un par ligne) ou importe des vidéos depuis ton PC.">
+          <Step n={2} title="Les vidéos" sub="Colle des liens de reels (un par ligne), importe des vidéos depuis ton PC ou choisis-les dans la Banque.">
             <textarea value={linksText} onChange={e => setLinksText(e.target.value)} rows={3} spellCheck={false}
               placeholder={'https://www.instagram.com/reel/…\nhttps://www.instagram.com/reel/…'}
               style={{ ...field, height: 'auto', minHeight: 76, padding: '9px 10px', lineHeight: 1.5, resize: 'vertical', fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }} />
@@ -637,6 +660,11 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
               <Icon d="M12 16V4|M7 9l5-5 5 5|M4 20h16" size={13} /> Glisse ou choisis des vidéos depuis ton PC
             </div>
             <input ref={fileInput} type="file" accept="video/*" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
+            <button type="button" onClick={() => setBankPick(true)} style={{ ...ghostBtn, height: 34, justifyContent: 'center' }}>📁 Choisir dans la Banque (banque principale ou modèle)</button>
+            {bankPick && createPortal(
+              <BankPicker theme={themeFor('blowsome')} user={user} org={org} kind="videos" multi title="Vidéos pour Genjutsu"
+                onClose={() => setBankPick(false)}
+                onApply={(r: PickerResult) => { setBankPick(false); if (r.kind === 'videos') void addFromBank(r.ids) }} />, document.body)}
           </Step>
 
           <Step n={3} title="Le rendu">
