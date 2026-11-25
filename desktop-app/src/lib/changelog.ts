@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-25',
     title: { fr: 'iRemoTech : reprise propre après un post raté', en: 'iRemoTech: clean restart after a failed post' },
     items: {
-      fr: ['Post raté : il est abandonné (jamais retenté) et Instagram est fermé tout de suite ; le post suivant repart d’un Instagram propre (réouvert, compte vérifié). Vaut aussi pour les containers.', 'Une erreur inattendue pendant un post n’arrête plus toute la session de l’iPhone.'],
-      en: ['Failed post: it is dropped (never retried) and Instagram is closed at once; the next post starts from a clean Instagram (reopened, account checked). Also for containers.', 'An unexpected error during a post no longer stops the whole iPhone session.'],
+      fr: ['Post raté : il est abandonné (jamais retenté) et Instagram est fermé tout de suite ; le post suivant repart d’un Instagram propre (réouvert, compte vérifié). Vaut pour TOUT échec (compte non atteint, média non injecté, post interrompu) et aussi pour les containers.', 'Une erreur inattendue pendant un post n’arrête plus toute la session de l’iPhone.'],
+      en: ['Failed post: it is dropped (never retried) and Instagram is closed at once; the next post starts from a clean Instagram (reopened, account checked). Applies to EVERY failure (account not reached, media not injected, post interrupted) and also to containers.', 'An unexpected error during a post no longer stops the whole iPhone session.'],
     },
   },
   {

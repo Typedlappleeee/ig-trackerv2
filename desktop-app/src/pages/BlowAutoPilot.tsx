@@ -728,7 +728,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
           if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
           const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
-          if (!ok) { push(`${tag} ⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); R.tick(false); stayedIn = null; continue }
+          if (!ok) { push(`${tag} ⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; R.tick(false); stayedIn = null; continue }
           await sleep(1200)
         }
         stayedIn = null
@@ -763,7 +763,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (!await uploadMedia(key, p.dev, url, mediaFilename(v, kind))) { injected = false; break }
           if (job.vids.length > 1) await sleep(2500) // dates distinctes → ordre de la galerie garanti
         }
-        if (!injected) { push(`${tag} ❌ média introuvable ou injection refusée → suivant`); R.tick(false); continue }
+        if (!injected) { push(`${tag} ❌ média introuvable ou injection refusée → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; R.tick(false); continue }
         push(`${tag} ⏳ 10 s (indexation)…`)
         await sleep(10000)
         const vh = { log: hooks, shouldStop: () => R.isCancelled() }

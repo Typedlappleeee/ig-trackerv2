@@ -69,7 +69,7 @@ export async function runServerPhone(key: string, p: ServerPhone, opts: ServerOp
         if (opts.airplaneOn) await airplaneReset(key, p.dev, vh)
         if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, vh)
         const ok = await openTargetByVision(key, p.dev, job.container, vh)
-        if (!ok) { log(`⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); h.tick(false); stayedIn = null; continue }
+        if (!ok) { log(`⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); log('🧹 post raté → posting annulé, Instagram fermé (reprise propre)'); await forceCloseForegroundApp(key, p.dev, vh); cleaned = true; h.tick(false); stayedIn = null; continue }
         await sleep(1200)
       }
       stayedIn = null
@@ -91,7 +91,7 @@ export async function runServerPhone(key: string, p: ServerPhone, opts: ServerOp
         log('⬆ injection du média…')
         if (!await uploadMedia(key, p.dev, url, v.filename)) { injected = false; break }
       }
-      if (!injected) { log('❌ média introuvable ou injection refusée → suivant'); h.tick(false); continue }
+      if (!injected) { log('❌ média introuvable ou injection refusée → suivant'); log('🧹 post raté → posting annulé, Instagram fermé (reprise propre)'); await forceCloseForegroundApp(key, p.dev, vh); cleaned = true; h.tick(false); continue }
       log('⏳ 10 s (indexation)…')
       await sleep(10000)
       const posted = await postReelByVision(key, p.dev, { caption: job.caption, location: locFromServer(job.location), stay: nextSame }, vh)
