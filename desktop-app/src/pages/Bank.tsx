@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Theme, InfraKey } from '@/lib/theme'
-import { Btn, Empty, Icon, Panel, Modal, confirmDialog, Skeleton, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
+import { Btn, Empty, Icon, Panel, Modal, confirmDialog, promptDialog, Skeleton, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
 import type { OrgState } from '@/lib/data'
 import { fetchAllRows, useBankUsage, quotaIssue, fmtBytes, videoThumb, isDarkImage, PLAN_LABEL } from '@/lib/bankStorage'
@@ -18,7 +18,8 @@ import BankSpoof from '@/components/BankSpoof'
 import { isHeic, heicToJpeg, sniffHeic } from '@/lib/heic'
 import { niceBase, isUglyTitle, allocTitle, prefixFor } from '@/lib/niceTitle'
 import PoolManager, { POOL_PREFIX } from '@/components/PoolManager'
-import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg, setFolderFav } from '@/lib/bankFolders'
+import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg, setFolderFav, setFolderTag, ensureBankFolder } from '@/lib/bankFolders'
+import { MODEL_TAG, COMMON_SPACE, MODEL_SUBS, stackCopies, proposeModelMoves } from '@/lib/bankSpaces'
 import { mediaKindOf, kindOfFile, extOfPath, isFav, withFav, AUDIO_MIME, AUDIO_EXT, type MediaKind } from '@/lib/mediaKind'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -238,6 +239,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [trash, setTrash] = useState<ContentItem[]>([])
   const [showTrash, setShowTrash] = useState(false)
   const [folderNames, setFolderNames] = useState<string[]>([]) // dossiers vides (sentinelles)
+  // ── Banque rangée par MODÈLE (lib/bankSpaces) : espace = dossier principal d'une modèle (ou « Commun »)
+  const [models, setModels] = useState<string[]>([])
+  const [space, setSpaceState] = useState<string>(() => { try { return localStorage.getItem('sf-bank-space') || 'all' } catch { return 'all' } })
+  const setSpace = (v: string) => { setSpaceState(v); try { localStorage.setItem('sf-bank-space', v) } catch { /* noop */ } }
+  const [stackOn, setStackOn] = useState(() => { try { return localStorage.getItem('sf-bank-stack') !== '0' } catch { return true } })
+  const [hidePosted, setHidePosted] = useState(() => { try { return localStorage.getItem('sf-bank-hideposted') !== '0' } catch { return true } })
+  const [openStacks, setOpenStacks] = useState<Set<string>>(new Set())
+  const [arrange, setArrange] = useState<{ src: string; model: string; dest: string; on: boolean }[] | null>(null)
   const [favFolders, setFavFolders] = useState<Set<string>>(new Set()) // dossiers épinglés ★ (partagés)
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -292,6 +301,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     const rows = data
     setFolderNames(rows.filter(isSentinel).map(r => r.folder ?? r.title).filter((f): f is string => Boolean(f)))
     setFavFolders(new Set(rows.filter(r => isSentinel(r) && isFav(r) && r.folder).map(r => normPath(r.folder as string))))
+    setModels([...new Set(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(MODEL_TAG) && r.folder).map(r => normPath(r.folder as string)))].sort((a, b) => a === COMMON_SPACE ? 1 : b === COMMON_SPACE ? -1 : a.localeCompare(b, 'fr', { sensitivity: 'base' })))
     // Médias en corbeille (deleted_at) exclus de la banque, listés à part (restaurable 7 j).
     setItems(rows.filter(r => !isSentinel(r) && !r.deleted_at))
     setTrash(rows.filter(r => !isSentinel(r) && !!r.deleted_at).sort((a, b) => (b.deleted_at ?? '').localeCompare(a.deleted_at ?? '')))
@@ -390,12 +400,20 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // Compteurs par type (réels).
   const counts = useMemo(() => {
     const c = { video: 0, image: 0, audio: 0 }
-    items.forEach(i => { c[inferType(i)]++ })
+    // compteurs de l'espace de la modèle ouverte (sinon toute la Banque)
+    const inSpace = space !== 'all' && models.includes(space) ? items.filter(i => isWithin(i.folder, space)) : items
+    inSpace.forEach(i => { c[inferType(i)]++ })
     return c
-  }, [items])
+  }, [items, space, models])
 
   // Items du filtre de type actif (banque unique : vidéos, images et sons ensemble).
-  const typed = useMemo(() => tab !== 'media' ? [] : kindF === 'all' ? items : items.filter(i => inferType(i) === kindF), [items, tab, kindF])
+  const spaceOn = space !== 'all' && models.includes(space)
+  const typed = useMemo(() => {
+    if (tab !== 'media') return []
+    const inSpace = spaceOn ? items.filter(i => isWithin(i.folder, space)) : items
+    return kindF === 'all' ? inSpace : inSpace.filter(i => inferType(i) === kindF)
+  }, [items, tab, kindF, space, spaceOn])
+  const spaceFolderNames = useMemo(() => spaceOn ? folderNames.filter(n => isWithin(n, space)) : folderNames, [folderNames, space, spaceOn])
 
   // Tri des dossiers (nom, plus remplis, plus récents) — mémorisé dans ce navigateur.
   const [folderSort, setFolderSortState] = useState<'name' | 'count' | 'recent'>(() => { try { return (localStorage.getItem('sf-bank-fsort') as 'name' | 'count' | 'recent') || 'name' } catch { return 'name' } })
@@ -407,14 +425,15 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     const lastIn = (f: string) => typed.reduce((m, i) => isWithin(i.folder, f) && i.created_at > m ? i.created_at : m, '')
     const cmp = folderSort === 'count' ? (a: string, b: string) => countIn(b) - countIn(a)
       : folderSort === 'recent' ? (a: string, b: string) => lastIn(b).localeCompare(lastIn(a)) : undefined
-    const tree = folderTree([...typed.map(i => i.folder), ...folderNames], cmp)
+    const tree = folderTree([...typed.map(i => i.folder), ...spaceFolderNames], cmp)
     return [
-      { n: 'Tous', label: 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
+      { n: 'Tous', label: spaceOn ? `Tout ${space}` : 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
       ...tree.map(t => ({ n: t.path, label: t.name, c: countIn(t.path), special: false, depth: t.depth, hasChildren: t.hasChildren })),
       { n: 'Jamais publiées', label: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true, depth: 0, hasChildren: false },
+      { n: 'Publiés', label: 'Publiés', c: typed.filter(i => (i.used_count ?? 0) > 0).length, special: true, depth: 0, hasChildren: false },
       { n: '★ Favoris', label: 'Favoris', c: typed.filter(isFav).length, special: true, depth: 0, hasChildren: false },
     ]
-  }, [typed, folderNames, folderSort])
+  }, [typed, spaceFolderNames, folderSort, space, spaceOn])
   // Dossiers repliés (mémorisés dans ce navigateur) : leurs sous-dossiers sont masqués.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('sf-bank-collapsed') || '[]') as string[]) } catch { return new Set() } })
   const toggleCollapsed = (p: string) => setCollapsed(c => {
@@ -1036,6 +1055,43 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     load()
   }
 
+  // ── Espaces par modèle (lib/bankSpaces) ─────────────────────────────────────
+  const bankScope = { orgId: currentOrg?.id ?? null, userId: user.id }
+  async function createModelSpace(name: string) {
+    const p = cleanSeg(name)
+    if (!p) return
+    await setFolderTag(bankScope, p, MODEL_TAG, true)
+    // même rubriques pour chaque modèle (Commun aussi : on y range le contenu réutilisable par toutes)
+    for (const sub of MODEL_SUBS) await ensureBankFolder(bankScope, `${p}/${sub}`)
+    toast(p === COMMON_SPACE ? 'Espace « Commun » créé : contenu réutilisable par toutes les modèles.' : `Modèle « ${p} » créée avec ses rubriques Reels / Feed / Stories / Genjutsu.`, 'ok')
+    await load(); setSpace(p); setFolder('Tous')
+  }
+  async function removeModelSpace(name: string) {
+    if (!await confirmDialog({ title: `Retirer « ${name} » des modèles ?`, text: 'Le dossier et ses médias restent dans la Banque : il redevient un dossier ordinaire.', confirmLabel: 'Retirer' })) return
+    await setFolderTag(bankScope, name, MODEL_TAG, false)
+    if (space === name) setSpace('all')
+    load()
+  }
+  // Rangement proposé d'après le nom des dossiers principaux (« kenz 122 » → Kenza/Reels), à valider
+  function openArrange() {
+    const tops = [...new Set([...items.map(i => i.folder), ...folderNames].filter((f): f is string => !!f).map(f => normPath(f).split('/')[0]))]
+    const share = (f: string) => { const l = items.filter(i => isWithin(i.folder, f)); const v = l.filter(i => inferType(i) === 'video').length; return l.length ? v / l.length : 0 }
+    const list = proposeModelMoves(tops, models.filter(m => m !== COMMON_SPACE), share).map(m => ({ ...m, on: true }))
+    if (!list.length) { toast(models.length ? 'Aucun dossier à ranger : leurs noms ne ressemblent à aucune modèle (déplace-les à la main en les glissant).' : 'Crée d’abord tes modèles (« + Modèle »).', 'bad'); return }
+    setArrange(list)
+  }
+  async function applyArrange() {
+    const list = (arrange ?? []).filter(a => a.on)
+    setArrange(null)
+    for (const a of list) {
+      const newRoot = joinPath(a.dest, leafOf(a.src))
+      for (const raw of rawFoldersWithin(a.src))
+        await scopeQ(supabase.from('content_bank').update({ folder: renamedPath(raw, a.src, newRoot) }).eq('folder', raw))
+    }
+    toast(`${list.length} dossier(s) rangé(s) dans leur modèle.`, 'ok')
+    load()
+  }
+
   // ── Lecteur vidéo (double-clic) + menu contextuel (clic droit) ───────────────
   const [player, setPlayer] = useState<{ id?: string; url: string; title: string; type: MediaType; poster?: string | null } | null>(null)
   const [ctx, setCtx] = useState<{ x: number; y: number; item: ContentItem } | null>(null)
@@ -1156,7 +1212,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
   // Filtrage + tri.
   const ql = q.trim().toLowerCase()
-  const shown = useMemo(() => {
+  const shownAll = useMemo(() => {
     let a = typed.filter(i => {
       const fMatch = folder === 'Tous'
         ? true
@@ -1164,8 +1220,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           ? isFav(i)
         : folder === 'Jamais publiées'
           ? (i.used_count ?? 0) === 0
+        : folder === 'Publiés'
+          ? (i.used_count ?? 0) > 0
           : isWithin(i.folder, folder)
       if (!fMatch) return false
+      // médias déjà publiés rangés à part (dossier « Publiés ») sauf si l'option est coupée
+      if (hidePosted && folder !== 'Publiés' && folder !== 'Jamais publiées' && (i.used_count ?? 0) > 0) return false
       if (!ql) return true
       return i.title.toLowerCase().includes(ql)
         || (i.tags ?? []).some(t => t.toLowerCase().includes(ql))
@@ -1176,13 +1236,17 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       return new Date(y.created_at).getTime() - new Date(x.created_at).getTime()
     })
     return a
-  }, [typed, folder, ql, sort])
+  }, [typed, folder, ql, sort, hidePosted])
+  // Copies spoofées EMPILÉES sous leur original (pile dépliable) : la grille ne montre plus 5 fois la même vidéo
+  const stacked = useMemo(() => stackOn && !ql ? stackCopies(shownAll, openStacks) : { list: shownAll, size: new Map<string, number>(), keyOf: new Map<string, string>() }, [shownAll, stackOn, openStacks, ql])
+  const shown = stacked.list
+  const postedHidden = useMemo(() => hidePosted && folder !== 'Publiés' && folder !== 'Jamais publiées' ? typed.filter(i => (i.used_count ?? 0) > 0 && (folder === 'Tous' || folder === '★ Favoris' ? true : isWithin(i.folder, folder))).length : 0, [typed, hidePosted, folder])
 
   // Affichage PROGRESSIF : 60 vignettes, puis les suivantes en arrivant en bas (avant : les
   // 1 600 d'un coup → défilement saccadé). Uniquement l'onglet / le dossier / la recherche en cours.
   const PAGE = 60
   const [limit, setLimit] = useState(PAGE)
-  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort, kindF])
+  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort, kindF, space, hidePosted, stackOn])
   const moreRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = moreRef.current; if (!el) return
@@ -1465,7 +1529,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     else toast(on ? `${targets.length} média(s) ajouté(s) aux favoris.` : `${targets.length} média(s) retiré(s) des favoris.`, 'ok')
   }
   const KIND_FILTERS: { v: KindFilter; l: string }[] = [
-    { v: 'all', l: `Tout · ${items.length}` },
+    { v: 'all', l: `Tout · ${counts.video + counts.image + counts.audio}` },
     { v: 'video', l: `Vidéos · ${counts.video}` },
     { v: 'image', l: `Images · ${counts.image}` },
     { v: 'audio', l: `Sons · ${counts.audio}` },
@@ -1587,6 +1651,53 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
       <UnderlineTabs<TabKey> value={tab} onChange={k => { setTab(k); setFolder('Tous') }}
         items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'media' ? 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' : t.k === 'pool' ? 'M4 6h16|M4 12h16|M4 18h10' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
+
+      {tab === 'media' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '0 0 12px' }}>
+          <span style={{ fontSize: 12, color: '#8B8B94', marginRight: 2 }}>Modèle</span>
+          {[['all', 'Toutes'], ...models.map(m => [m, m === COMMON_SPACE ? '🌐 Commun' : m])].map(([k, l]) => {
+            const on = (k === 'all' && !spaceOn) || space === k && spaceOn
+            return (
+              <button key={k} type="button" onClick={() => { setSpace(k); setFolder('Tous') }}
+                onContextMenu={e => { if (k !== 'all') { e.preventDefault(); void removeModelSpace(k) } }}
+                title={k === 'all' ? 'Toute la Banque' : 'Clic droit : retirer des modèles'}
+                style={{ height: 30, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, background: on ? 'rgba(139,124,246,0.16)' : '#161618', color: on ? '#C4B5FD' : '#D4D4D8', border: `1px solid ${on ? 'rgba(139,124,246,0.5)' : 'rgba(255,255,255,0.09)'}` }}>
+                <span data-no-tr={k !== 'all' && k !== COMMON_SPACE ? true : undefined}>{l}</span>
+              </button>
+            )
+          })}
+          <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Modèle" onClick={() => void promptDialog({ title: 'Nouvelle modèle', text: 'Crée son espace avec les rubriques Reels / Feed / Stories / Genjutsu. Un dossier existant du même nom devient son espace.', placeholder: 'Kenza' }).then(n => { if (n && n.trim()) void createModelSpace(n) })} />
+          {!models.includes(COMMON_SPACE) && <Btn theme={theme} sm tone="quiet" label="🌐 Espace Commun" onClick={() => void createModelSpace(COMMON_SPACE)} />}
+          {models.some(m => m !== COMMON_SPACE) && <Btn theme={theme} sm tone="quiet" label="🧭 Ranger par modèle" onClick={openArrange} />}
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#A1A1AA', cursor: 'pointer' }}>
+              <input type="checkbox" checked={stackOn} onChange={e => { setStackOn(e.target.checked); try { localStorage.setItem('sf-bank-stack', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              Empiler les copies
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#A1A1AA', cursor: 'pointer' }}>
+              <input type="checkbox" checked={hidePosted} onChange={e => { setHidePosted(e.target.checked); try { localStorage.setItem('sf-bank-hideposted', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              Ranger les publiés à part{postedHidden > 0 && <span style={{ color: '#6E6E78' }}>{` (${postedHidden} masqués)`}</span>}
+            </label>
+          </span>
+        </div>
+      )}
+      {arrange && (
+        <Modal theme={theme} title="Ranger par modèle" onClose={() => setArrange(null)}>
+          <p style={{ margin: '0 0 10px', fontSize: 12.5, color: '#A1A1AA' }}>D’après le nom des dossiers. Décoche ce qui ne va pas, puis valide : les dossiers (et leurs médias) sont déplacés, rien n’est supprimé.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' }}>
+            {arrange.map((a, k) => (
+              <label key={a.src} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#E4E4E7', cursor: 'pointer' }}>
+                <input type="checkbox" checked={a.on} onChange={e => setArrange(l => l && l.map((x, j) => j === k ? { ...x, on: e.target.checked } : x))} />
+                <span data-no-tr>{a.src}</span><span style={{ color: '#6E6E78' }}>→</span><span data-no-tr style={{ color: '#C4B5FD' }}>{a.dest.split('/').join(' › ')}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
+            <Btn theme={theme} sm tone="ghost" label="Annuler" onClick={() => setArrange(null)} />
+            <Btn theme={theme} sm tone="primary" label={`Ranger ${arrange.filter(a => a.on).length} dossier(s)`} onClick={() => void applyArrange()} />
+          </div>
+        </Modal>
+      )}
 
       {tab === 'pool' && <PoolManager orgId={currentOrg?.id ?? null} userId={user.id} onChanged={loadCaptions} />}
 
@@ -1755,6 +1866,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               gap: 12, padding: 16, WebkitUserSelect: 'none', userSelect: 'none',
             }}>
               {rendered.map((i, idx) => (
+                <div key={i.id} style={{ position: 'relative', minWidth: 0, display: 'grid' }}>
                 <Tile
                   key={i.id} idx={idx} selecting={selecting} item={i} type={inferType(i)} showKind={kindF === 'all'} onFav={() => void toggleFav(i)} thumb={thumbFor(i)} media={mediaFor(i)} broken={isBroken(i)}
                   on={sel.has(i.id)} theme={theme} onToggle={(e) => toggleAt(idx, i.id, e.shiftKey)}
@@ -1764,6 +1876,17 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   onStale={() => void refreshLinks(i)}
                   suspend={!!player}
                 />
+                {(stacked.size.get(i.id) ?? 0) > 1 && (() => {
+                  const k = stacked.keyOf.get(i.id)!, open = openStacks.has(k), n = stacked.size.get(i.id)!
+                  return (
+                    <button type="button" title={open ? 'Replier les copies' : 'Voir les copies spoofées'}
+                      onClick={e => { e.stopPropagation(); setOpenStacks(o => { const x = new Set(o); if (x.has(k)) x.delete(k); else x.add(k); return x }) }}
+                      style={{ position: 'absolute', left: 8, top: 40, zIndex: 3, height: 22, padding: '0 8px', borderRadius: 99, cursor: 'pointer', fontSize: 11, fontWeight: 600, border: '1px solid rgba(255,255,255,0.18)', background: open ? 'rgba(139,124,246,0.85)' : 'rgba(10,10,11,0.78)', color: '#fff', backdropFilter: 'blur(6px)' }}>
+                      {open ? `▾ ${n} versions` : n > 2 ? `⧉ ${n - 1} copies` : '⧉ 1 copie'}
+                    </button>
+                  )
+                })()}
+                </div>
               ))}
               {limit < shown.length && <div ref={moreRef} style={{ gridColumn: '1 / -1', height: 1 }} />}
             </div>

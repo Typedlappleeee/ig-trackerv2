@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25t',
+    date: '2026-11-25',
+    title: { fr: 'Banque rangée par modèle', en: 'Bank organised by model' },
+    items: {
+      fr: [
+        'Sélecteur « Modèle » en haut de la Banque : chaque modèle a son espace avec les mêmes rubriques (Reels / Feed / Stories / Genjutsu), plus un espace « 🌐 Commun » pour le contenu réutilisable par toutes. Partagé avec toute l’équipe.',
+        'Copies spoofées EMPILÉES sous leur original (« ⧉ 3 copies », clic pour déplier) : la grille ne montre plus 5 fois la même vidéo.',
+        'Médias déjà publiés rangés à part (dossier « Publiés ») : la liste ne montre que ce qui reste à poster.',
+        '« 🧭 Ranger par modèle » : propose de déplacer les dossiers d’après leur nom (« kenz 122 » → Kenza › Reels), à valider avant ; rien n’est supprimé.',
+      ],
+      en: [
+        '“Model” picker at the top of the Bank: each model has her space with the same sections (Reels / Feed / Stories / Genjutsu), plus a “🌐 Shared” space for content every model can use. Shared with the whole team.',
+        'Spoofed copies STACKED under their original (“⧉ 3 copies”, click to expand): the grid no longer shows the same video 5 times.',
+        'Already-posted media kept apart (“Posted” folder): the list only shows what’s left to post.',
+        '“🧭 Sort by model”: suggests moving folders based on their name (“kenz 122” → Kenza › Reels), to confirm first; nothing is deleted.',
+      ],
+    },
+  },
+  {
     id: '2026-11-25s',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : corrections après les logs du 25/11', en: 'iRemoTech: fixes from the 25/11 logs' },

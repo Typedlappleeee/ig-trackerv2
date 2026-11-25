@@ -98,6 +98,18 @@ export async function setFolderFav(s: BankScope, path: string, on: boolean): Pro
   }
 }
 
+/** Ajoute / retire un tag sur la ligne sentinelle d'un dossier (créée au besoin) — ex. « model » = espace d'une modèle. */
+export async function setFolderTag(s: BankScope, path: string, tag: string, on: boolean): Promise<void> {
+  const p = normPath(path)
+  if (!p) return
+  await ensureBankFolder(s, p, on ? [tag] : [])
+  const { data } = await scoped(supabase.from('content_bank').select('id, tags').eq('notes', FOLDER_SENTINEL).eq('folder', p), s)
+  for (const r of (data ?? []) as { id: string; tags: string[] | null }[]) {
+    const t = (r.tags ?? []).filter(x => x !== tag)
+    await supabase.from('content_bank').update({ tags: on ? [...t, tag] : t }).eq('id', r.id)
+  }
+}
+
 /** Sous-dossiers DIRECTS de `parent` (null = racine) parmi des chemins (parents implicites compris). */
 export function childFolders(paths: Iterable<string | null | undefined>, parent: string | null): string[] {
   const out = new Set<string>()
