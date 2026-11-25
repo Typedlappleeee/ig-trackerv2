@@ -7,6 +7,11 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "photo(s)": "photo(s)",
+    "vidéo(s)": "video(s)",
+    "🗑 Supprimer de la Banque une fois publiée": "🗑 Delete from the Bank once posted",
+    "(une vidéo ne sert jamais deux fois de toute façon : seules les vidéos jamais publiées sont prises)": "(a video is never used twice anyway: only never-posted videos are picked)",
+    "Au lancement, seules les vidéos du dossier JAMAIS publiées sont prises (y compris les nouvelles), chacune une seule fois, et jamais deux versions d’une même vidéo sur un compte.": "At launch, only the folder’s NEVER-posted videos are picked (new ones included), each only once, and never two versions of the same video on one account.",
     "bouton AssistiveTouch sur une zone d’Instagram → déplacé sur le bord droit": "AssistiveTouch button over an Instagram area → moved to the right edge",
     "En attente du serveur": "Waiting for the server",
     "Terminée": "Done",
@@ -5132,5 +5137,9 @@ export const EN: Dict = {
     ["⚠ Envoi au serveur impossible : {0}", "⚠ Couldn’t send to the server: {0}"],
     ["{0} serveur{1} en ligne : la session tourne sur le serveur, tu peux fermer ScaleFlow et éteindre ce PC.", "{0} server{1} online: the session runs on the server, you can close ScaleFlow and turn this PC off."],
     ["Envoyer {0} Reel(s) au serveur", "Send {0} Reel(s) to the server"],
+    ["⚠ Il faut {0} {1} différente(s) jamais publiée(s), {2} (jamais deux fois le même média). Ajoute des médias ou réduis le nombre de posts.", "⚠ {0} different never-posted {1} needed, {2} (never the same media twice). Add media or reduce the number of posts."],
+    ["le dossier « {0} » n’en a que {1}", "the folder “{0}” only has {1}"],
+    ["le pool n’en a que {0}", "the pool only has {0}"],
+    ["{0} 🗑 « {1} » supprimé de la Banque (publié)", "{0} 🗑 “{1}” deleted from the Bank (posted)"],
   ],
 }

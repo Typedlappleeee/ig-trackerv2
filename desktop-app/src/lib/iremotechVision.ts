@@ -1075,9 +1075,6 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     await sleep(1400) // laisse l'éditeur de légende s'ouvrir
     await typeRich(key, deviceId, opts.caption.trim())
     await sleep(900)
-    hooks?.log?.('   validation « OK »…')
-    await tapButton(key, deviceId, [/^ok$/i], A.okBtn, W, H, hooks, [0, 0.14], 'OK légende')
-    await sleep(1400)
     for (let k = 0; k < 3; k++) { // OK = coche bleue sans texte : éditeur encore ouvert → ✓ haut-droite, vérifié
       const ce = await readScreenWords(key, deviceId)
       if (!ce || !await captionEditorShown(ce)) break
@@ -1276,7 +1273,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     await sleep(1400)
     await typeRich(key, deviceId, caption.trim())
     await sleep(900)
-    if (await findTapText(key, deviceId, [/^ok$/i, /^done$/i, /^termin[ée]$/i], hooks, { label: 'OK légende', tries: 2, minX: 0.55, cropY: [0, 0.14] })) await sleep(1400)
+    // (plus de recherche du mot « OK » : c'est une coche bleue sans texte, la boucle ci-dessous la tape directement — ~4 s gagnées)
     // Éditeur « Caption » encore ouvert (un hashtag en fin de texte ouvre des suggestions, vu en vrai) → OK, vérifié.
     for (let k = 0; k < 3; k++) {
       const ce = await readScreenWords(key, deviceId)

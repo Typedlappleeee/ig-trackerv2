@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25g',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : jamais deux fois la même vidéo', en: 'iRemoTech: never the same video twice' },
+    items: {
+      fr: [
+        'Reels et carrousels : seules les vidéos jamais publiées sont prises (mode dossier), chacune une seule fois ; un compte ne reçoit jamais deux versions de la même vidéo (« kenz 122 », « kenz 122 · v1 », « · copie 2 »). Pas assez de médias → rien ne part, avec le nombre manquant.',
+        'Nouvelle option « 🗑 Supprimer de la Banque une fois publiée » pour les Reels (décochée par défaut).',
+        'Légende validée plus vite (la coche est tapée directement, plus de recherche du mot « OK »).',
+      ],
+      en: [
+        'Reels and carousels: only never-posted videos are picked (folder mode), each only once; an account never gets two versions of the same video (“kenz 122”, “kenz 122 · v1”, “· copie 2”). Not enough media → nothing starts, with the missing count.',
+        'New “🗑 Delete from the Bank once posted” option for Reels (off by default).',
+        'Caption confirmed faster (the checkmark is tapped directly, no more searching for the word “OK”).',
+      ],
+    },
+  },
+  {
     id: '2026-11-25f',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : bouton AssistiveTouch et captures refusées gérés', en: 'iRemoTech: AssistiveTouch button and refused captures handled' },

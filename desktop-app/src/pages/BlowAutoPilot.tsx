@@ -177,6 +177,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [gapMin, setGapMin] = useState(() => { try { return Math.max(1, Math.min(30, Number(localStorage.getItem('sf-irt-gap-min')) || 3)) } catch { return 3 } }) // 3 min de scroll par défaut
   const [gapScroll, setGapScroll] = useState(() => { try { return localStorage.getItem('sf-irt-gap-scroll') !== '0' } catch { return true } })
   // Story CTA : chaque photo du dossier sert UNE fois (supprimée de la Banque après publication) + métadonnées uniques
+  // Reels / carrousels : média supprimé de la Banque une fois publié (décoché par défaut)
+  const [reelOnce, setReelOnce] = useState(() => { try { return localStorage.getItem('sf-irt-reel-once') === '1' } catch { return false } })
   const [storyOnce, setStoryOnce] = useState(() => { try { return localStorage.getItem('sf-irt-story-once') === '1' } catch { return false } })
   const [storyUnique, setStoryUnique] = useState(() => { try { return localStorage.getItem('sf-irt-story-unique') !== '0' } catch { return true } })
   // Setup compte : photo de profil générée + bio selon le marché du compte
@@ -596,8 +598,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     // Dossier : les MOINS publiées d'abord (au hasard entre égales), sans doublon tant que le
     // dossier n'est pas épuisé. Pool manuel : comme avant (Usage unique ou hasard).
     const byUse = () => shuffle(pool).sort((x, y) => (y.used_count ?? 0) - (x.used_count ?? 0))   // pop() → la moins publiée
-    const queued = src.mode === 'folder' || uniqueUse
-    let vidQueue = src.mode === 'folder' ? byUse() : uniqueUse ? shuffle(pool) : []
+    // Reels / carrousels : JAMAIS deux fois la même vidéo (demande de l'équipe) — dossier : uniquement les médias jamais
+    // publiés ; dans un lancement, aucun média repris. Pas assez de médias → rien n'est lancé.
+    const noRepeat = kind !== 'story'
+    if (noRepeat) {
+      if (src.mode === 'folder') pool = pool.filter(v => (v.used_count ?? 0) === 0)
+      pool = pool.filter((v, i, a) => a.findIndex(x => x.id === v.id) === i)
+      const need = totalJobs * perAcct * perPost
+      if (pool.length < need) {
+        setLogs([`⚠ Il faut ${need} ${isImg ? 'photo(s)' : 'vidéo(s)'} différente(s) jamais publiée(s), ${src.mode === 'folder' ? `le dossier « ${src.folder} » n’en a que ${pool.length}` : `le pool n’en a que ${pool.length}`} (jamais deux fois le même média). Ajoute des médias ou réduis le nombre de posts.`])
+        setRunning(false); return
+      }
+    }
+    const queued = src.mode === 'folder' || uniqueUse || noRepeat
+    let vidQueue = noRepeat ? shuffle(pool) : src.mode === 'folder' ? byUse() : uniqueUse ? shuffle(pool) : []
     let capQueue = uniqueUse ? shuffle(captions) : []
     // Description auto par marché : une description DIFFÉRENTE par publication, générée avant le lancement.
     // Chaque compte a son marché (FR / US / DE) → descriptions générées par marché, puis distribuées compte par compte.
@@ -613,11 +627,25 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       }
     }
     const aiAll: Record<Market, string[]> = { fr: [...aiCaps.fr], us: [...aiCaps.us], de: [...aiCaps.de] }
-    const pickVid = (): VidRef => { if (queued) { if (!vidQueue.length) vidQueue = src.mode === 'folder' ? byUse() : shuffle(pool); return vidQueue.pop()! } return pool[Math.floor(Math.random() * pool.length)] }
+    const pickVid = (): VidRef => { if (queued) { if (!vidQueue.length && !noRepeat) vidQueue = src.mode === 'folder' ? byUse() : shuffle(pool); return vidQueue.pop()! } return pool[Math.floor(Math.random() * pool.length)] }
+    // Même vidéo d'origine = même titre avant « · » (« kenz 122 », « kenz 122 · v1 », « kenz 122 · copie 2 ») :
+    // un compte ne reçoit jamais deux versions de la même vidéo dans un lancement.
+    const baseOf = (v: VidRef) => (v.title || v.id).split(' · ')[0].trim().toLowerCase()
+    const basesBy: Record<string, Set<string>> = {}
     // Carrousel : N photos DIFFÉRENTES par post (dans l'ordre du tirage)
-    const pickSet = (n: number): VidRef[] => {
+    const pickSet = (n: number, owner = ''): VidRef[] => {
       const out: VidRef[] = []
-      for (let guard = 0; out.length < n && guard < n * 20; guard++) { const v = pickVid(); if (!out.some(x => x.id === v.id)) out.push(v) }
+      const used = basesBy[owner] ?? (basesBy[owner] = new Set())
+      for (let guard = 0; out.length < n && guard < n * 20; guard++) {
+        let v: VidRef | undefined
+        if (noRepeat) {
+          let i = vidQueue.length - 1
+          while (i >= 0 && used.has(baseOf(vidQueue[i]))) i--
+          v = i >= 0 ? vidQueue.splice(i, 1)[0] : vidQueue.pop() // plus aucune autre vidéo d'origine : on prend quand même un média jamais publié
+        } else v = pickVid()
+        if (!v) break
+        if (!out.some(x => x.id === v!.id)) { out.push(v); used.add(baseOf(v)) }
+      }
       return out
     }
     const pickCap = (dev: string, c: string): string => {
@@ -631,7 +659,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       dev,
       name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(),
       // Session = N posts PAR COMPTE (chaque compte coché publie N fois d'affilée, scroll entre deux posts)
-      jobs: [...(selConts[dev] ?? [])].flatMap(container => Array.from({ length: perAcct }, () => container)).map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(marketOf(dev, container)) : undefined, link: linkOf(dev, container) || storyLink.trim() } }),
+      jobs: [...(selConts[dev] ?? [])].flatMap(container => Array.from({ length: perAcct }, () => container)).map(container => { const vids = pickSet(perPost, `${dev}::${container}`); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(marketOf(dev, container)) : undefined, link: linkOf(dev, container) || storyLink.trim() } }),
     })).filter(p => p.jobs.length)
 
     // ☁ Sur le serveur : la session part dans la file, un serveur ScaleFlow la fait tourner (ce PC peut être éteint)
@@ -732,6 +760,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         // Story CTA à usage unique : la photo publiée est retirée de la Banque (elle ne resservira jamais)
         if (posted && kind === 'story' && storyOnce && src.mode === 'folder') for (const v of job.vids) {
           try { await supabase.from('content_bank').delete().eq('id', v.id); if (v.storage_path) await supabase.storage.from('content').remove([v.storage_path]); push(`${tag} 🗑 « ${v.title} » supprimée de la Banque (usage unique)`) } catch { /* noop */ }
+        }
+        // Reels / carrousels : média supprimé de la Banque une fois publié (option)
+        if (posted && kind !== 'story' && reelOnce) for (const v of job.vids) {
+          try { await supabase.from('content_bank').delete().eq('id', v.id); if (v.storage_path) await supabase.storage.from('content').remove([v.storage_path]); push(`${tag} 🗑 « ${v.title} » supprimé de la Banque (publié)`) } catch { /* noop */ }
         }
         R.tick(posted)
       }
@@ -1471,7 +1503,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             )}
           </>) : (<>
             {sourceRow('reel')}
-            {reelSrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, toutes les vidéos du dossier sont prises (y compris les nouvelles) : les moins publiées passent en premier, sans doublon.</p>}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer', margin: '0 0 10px' }}>
+              <input type="checkbox" checked={reelOnce} disabled={running} onChange={e => { setReelOnce(e.target.checked); try { localStorage.setItem('sf-irt-reel-once', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              🗑 Supprimer de la Banque une fois publiée <span style={{ color: DIM, fontSize: 11.5 }}>(une vidéo ne sert jamais deux fois de toute façon : seules les vidéos jamais publiées sont prises)</span>
+            </label>
+            {reelSrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, seules les vidéos du dossier JAMAIS publiées sont prises (y compris les nouvelles), chacune une seule fois, et jamais deux versions d’une même vidéo sur un compte.</p>}
             {reelSrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
               <button style={gold} onClick={() => setPicker('reel')}>+ Ajouter des vidéos</button>
               <span style={{ fontSize: 12, color: MUTED }}>{reelPool.length} vidéo(s) dans le pool</span>
