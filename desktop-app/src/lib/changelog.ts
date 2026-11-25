@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25z2',
+    date: '2026-11-25',
+    title: { fr: 'Banque : tous les fichiers affichés par défaut', en: 'Bank: every file shown by default' },
+    items: {
+      fr: ['« Ranger les publiés à part » est maintenant COUPÉ par défaut : les vidéos déjà publiées restent visibles dans leurs dossiers (elles semblaient avoir disparu). À cocher seulement si on veut les cacher.'],
+      en: ['“Keep posted media apart” is now OFF by default: already-posted videos stay visible in their folders (they looked like they had vanished). Tick it only to hide them.'],
+    },
+  },
+  {
     id: '2026-11-25z',
     date: '2026-11-25',
     title: { fr: 'Banque : annuler la suppression d’un dossier', en: 'Bank: undo a folder deletion' },

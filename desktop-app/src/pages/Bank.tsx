@@ -246,7 +246,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // La modèle / le marché choisis ne sont PAS mémorisés : chaque ouverture de la Banque montre tout.
   const [space, setSpace] = useState<string>('all')
   const [stackOn, setStackOn] = useState(() => { try { return localStorage.getItem('sf-bank-stack') !== '0' } catch { return true } })
-  const [hidePosted, setHidePosted] = useState(() => { try { return localStorage.getItem('sf-bank-hideposted') !== '0' } catch { return true } })
+  // COUPÉ par défaut : masquer les publiés faisait croire que des fichiers avaient disparu (vu le 25/11/2026)
+  const [hidePosted, setHidePosted] = useState(() => { try { return localStorage.getItem('sf-bank-hideposted2') === '1' } catch { return false } })
   const [openStacks, setOpenStacks] = useState<Set<string>>(new Set())
   const [arrange, setArrange] = useState<{ src: string; model: string; dest: string; on: boolean }[] | null>(null)
   const [modelMkts, setModelMkts] = useState<Record<string, ModelMarket[]>>({})   // marchés de chaque modèle (tags partagés)
@@ -1789,7 +1790,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               Empiler les copies
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#A1A1AA', cursor: 'pointer' }}>
-              <input type="checkbox" checked={hidePosted} onChange={e => { setHidePosted(e.target.checked); try { localStorage.setItem('sf-bank-hideposted', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              <input type="checkbox" checked={hidePosted} onChange={e => { setHidePosted(e.target.checked); try { localStorage.setItem('sf-bank-hideposted2', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
               Ranger les publiés à part{postedHidden > 0 && <span style={{ color: '#6E6E78' }}>{` (${postedHidden} masqués)`}</span>}
             </label>
           </span>
