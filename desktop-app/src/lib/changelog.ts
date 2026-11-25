@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25u',
+    date: '2026-11-25',
+    title: { fr: 'Banque : modèles par marché et template de dossiers', en: 'Bank: models by market and folder template' },
+    items: {
+      fr: [
+        'Menus déroulants en haut de la Banque : marché (🇫🇷 / 🇺🇸 / 🇩🇪) puis modèle, les modèles groupées par marché (une modèle peut être sur plusieurs marchés). Choisir un marché montre toutes ses modèles + Commun.',
+        '« 📐 Template » : la liste des dossiers créés pour chaque nouvelle modèle (« Reels/Originaux », « Stories/CTA »…), modifiable et partagée avec l’équipe ; « Appliquer aux modèles existantes » ajoute seulement les dossiers manquants.',
+        '« + Modèle » : nom + marchés, tous les dossiers du template créés d’un coup. « ⚙ Modèle » : changer ses marchés, compléter ses dossiers ou la retirer.',
+      ],
+      en: [
+        'Dropdowns at the top of the Bank: market (🇫🇷 / 🇺🇸 / 🇩🇪) then model, models grouped by market (a model can be on several markets). Picking a market shows all its models + Shared.',
+        '“📐 Template”: the list of folders created for every new model (“Reels/Originaux”, “Stories/CTA”…), editable and shared with the team; “Apply to existing models” only adds missing folders.',
+        '“+ Model”: name + markets, every template folder created at once. “⚙ Model”: change her markets, complete her folders or remove her.',
+      ],
+    },
+  },
+  {
     id: '2026-11-25t',
     date: '2026-11-25',
     title: { fr: 'Banque rangée par modèle', en: 'Bank organised by model' },

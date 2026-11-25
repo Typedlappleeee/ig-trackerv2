@@ -19,7 +19,8 @@ import { isHeic, heicToJpeg, sniffHeic } from '@/lib/heic'
 import { niceBase, isUglyTitle, allocTitle, prefixFor } from '@/lib/niceTitle'
 import PoolManager, { POOL_PREFIX } from '@/components/PoolManager'
 import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg, setFolderFav, setFolderTag, ensureBankFolder } from '@/lib/bankFolders'
-import { MODEL_TAG, COMMON_SPACE, MODEL_SUBS, stackCopies, proposeModelMoves } from '@/lib/bankSpaces'
+import { MODEL_TAG, COMMON_SPACE, stackCopies, proposeModelMoves, MODEL_MARKETS, marketTag, marketsOfTags, parseTemplate, templatePaths, groupModelsByMarket, type ModelMarket } from '@/lib/bankSpaces'
+import { loadTeamCache, pullTeam, updateTeam } from '@/lib/irtTeam'
 import { mediaKindOf, kindOfFile, extOfPath, isFav, withFav, AUDIO_MIME, AUDIO_EXT, type MediaKind } from '@/lib/mediaKind'
 
 // File System Access API (Chrome/Edge) — type minimal pour l'écriture streaming du ZIP.
@@ -247,6 +248,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [hidePosted, setHidePosted] = useState(() => { try { return localStorage.getItem('sf-bank-hideposted') !== '0' } catch { return true } })
   const [openStacks, setOpenStacks] = useState<Set<string>>(new Set())
   const [arrange, setArrange] = useState<{ src: string; model: string; dest: string; on: boolean }[] | null>(null)
+  const [modelMkts, setModelMkts] = useState<Record<string, ModelMarket[]>>({})   // marchés de chaque modèle (tags partagés)
+  const [mktF, setMktFState] = useState<'all' | ModelMarket>(() => { try { const v = localStorage.getItem('sf-bank-mkt'); return v === 'fr' || v === 'us' || v === 'de' ? v : 'all' } catch { return 'all' } })
+  const setMktF = (v: 'all' | ModelMarket) => { setMktFState(v); try { localStorage.setItem('sf-bank-mkt', v) } catch { /* noop */ } }
+  const [modelForm, setModelForm] = useState<{ edit: string | null; name: string; mkts: ModelMarket[] } | null>(null)
+  const [tplOpen, setTplOpen] = useState<string | null>(null)   // texte du template en cours d'édition
+  const teamScope = { orgId: currentOrg?.id ?? null, userId: user.id }
+  const [bankTpl, setBankTpl] = useState<string[]>(() => loadTeamCache(teamScope).bankTemplate)
+  useEffect(() => { let a = true; void pullTeam(teamScope).then(t => { if (t && a) setBankTpl(t.bankTemplate) }); return () => { a = false } }, [currentOrg?.id, user.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [favFolders, setFavFolders] = useState<Set<string>>(new Set()) // dossiers épinglés ★ (partagés)
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -301,6 +310,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     const rows = data
     setFolderNames(rows.filter(isSentinel).map(r => r.folder ?? r.title).filter((f): f is string => Boolean(f)))
     setFavFolders(new Set(rows.filter(r => isSentinel(r) && isFav(r) && r.folder).map(r => normPath(r.folder as string))))
+    setModelMkts(Object.fromEntries(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(MODEL_TAG) && r.folder).map(r => [normPath(r.folder as string), marketsOfTags(r.tags)])))
     setModels([...new Set(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(MODEL_TAG) && r.folder).map(r => normPath(r.folder as string)))].sort((a, b) => a === COMMON_SPACE ? 1 : b === COMMON_SPACE ? -1 : a.localeCompare(b, 'fr', { sensitivity: 'base' })))
     // Médias en corbeille (deleted_at) exclus de la banque, listés à part (restaurable 7 j).
     setItems(rows.filter(r => !isSentinel(r) && !r.deleted_at))
@@ -401,19 +411,24 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const counts = useMemo(() => {
     const c = { video: 0, image: 0, audio: 0 }
     // compteurs de l'espace de la modèle ouverte (sinon toute la Banque)
-    const inSpace = space !== 'all' && models.includes(space) ? items.filter(i => isWithin(i.folder, space)) : items
+    // même périmètre que la grille : la modèle choisie, sinon les modèles du marché choisi (+ Commun), sinon tout
+    const sp = space !== 'all' && models.includes(space)
+    const rts = sp ? [space] : mktF !== 'all' ? [...models.filter(m => (modelMkts[m] ?? []).includes(mktF)), ...(models.includes(COMMON_SPACE) ? [COMMON_SPACE] : [])] : null
+    const inSpace = rts ? items.filter(i => rts.some(r => isWithin(i.folder, r))) : items
     inSpace.forEach(i => { c[inferType(i)]++ })
     return c
-  }, [items, space, models])
+  }, [items, space, models, mktF, modelMkts])
 
   // Items du filtre de type actif (banque unique : vidéos, images et sons ensemble).
   const spaceOn = space !== 'all' && models.includes(space)
+  // racines visibles : la modèle choisie, sinon toutes les modèles du marché choisi (+ Commun), sinon tout
+  const roots = useMemo(() => spaceOn ? [space] : mktF !== 'all' ? [...models.filter(m => (modelMkts[m] ?? []).includes(mktF)), ...(models.includes(COMMON_SPACE) ? [COMMON_SPACE] : [])] : null, [spaceOn, space, mktF, models, modelMkts])
   const typed = useMemo(() => {
     if (tab !== 'media') return []
-    const inSpace = spaceOn ? items.filter(i => isWithin(i.folder, space)) : items
+    const inSpace = roots ? items.filter(i => roots.some(r => isWithin(i.folder, r))) : items
     return kindF === 'all' ? inSpace : inSpace.filter(i => inferType(i) === kindF)
-  }, [items, tab, kindF, space, spaceOn])
-  const spaceFolderNames = useMemo(() => spaceOn ? folderNames.filter(n => isWithin(n, space)) : folderNames, [folderNames, space, spaceOn])
+  }, [items, tab, kindF, roots])
+  const spaceFolderNames = useMemo(() => roots ? folderNames.filter(n => roots.some(r => isWithin(n, r))) : folderNames, [folderNames, roots])
 
   // Tri des dossiers (nom, plus remplis, plus récents) — mémorisé dans ce navigateur.
   const [folderSort, setFolderSortState] = useState<'name' | 'count' | 'recent'>(() => { try { return (localStorage.getItem('sf-bank-fsort') as 'name' | 'count' | 'recent') || 'name' } catch { return 'name' } })
@@ -427,13 +442,13 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       : folderSort === 'recent' ? (a: string, b: string) => lastIn(b).localeCompare(lastIn(a)) : undefined
     const tree = folderTree([...typed.map(i => i.folder), ...spaceFolderNames], cmp)
     return [
-      { n: 'Tous', label: spaceOn ? `Tout ${space}` : 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
+      { n: 'Tous', label: spaceOn ? `Tout ${space}` : mktF !== 'all' ? `Tout ${MODEL_MARKETS.find(m => m.k === mktF)?.label ?? ''}` : 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
       ...tree.map(t => ({ n: t.path, label: t.name, c: countIn(t.path), special: false, depth: t.depth, hasChildren: t.hasChildren })),
       { n: 'Jamais publiées', label: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true, depth: 0, hasChildren: false },
       { n: 'Publiés', label: 'Publiés', c: typed.filter(i => (i.used_count ?? 0) > 0).length, special: true, depth: 0, hasChildren: false },
       { n: '★ Favoris', label: 'Favoris', c: typed.filter(isFav).length, special: true, depth: 0, hasChildren: false },
     ]
-  }, [typed, spaceFolderNames, folderSort, space, spaceOn])
+  }, [typed, spaceFolderNames, folderSort, space, spaceOn, mktF])
   // Dossiers repliés (mémorisés dans ce navigateur) : leurs sous-dossiers sont masqués.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('sf-bank-collapsed') || '[]') as string[]) } catch { return new Set() } })
   const toggleCollapsed = (p: string) => setCollapsed(c => {
@@ -1057,14 +1072,32 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
   // ── Espaces par modèle (lib/bankSpaces) ─────────────────────────────────────
   const bankScope = { orgId: currentOrg?.id ?? null, userId: user.id }
-  async function createModelSpace(name: string) {
+  // Nouvelle modèle : son dossier + TOUS les dossiers du template (modifiable, partagé) + ses marchés
+  async function createModelSpace(name: string, mkts: ModelMarket[] = []) {
     const p = cleanSeg(name)
     if (!p) return
     await setFolderTag(bankScope, p, MODEL_TAG, true)
-    // même rubriques pour chaque modèle (Commun aussi : on y range le contenu réutilisable par toutes)
-    for (const sub of MODEL_SUBS) await ensureBankFolder(bankScope, `${p}/${sub}`)
-    toast(p === COMMON_SPACE ? 'Espace « Commun » créé : contenu réutilisable par toutes les modèles.' : `Modèle « ${p} » créée avec ses rubriques Reels / Feed / Stories / Genjutsu.`, 'ok')
+    for (const m of mkts) await setFolderTag(bankScope, p, marketTag(m), true)
+    for (const path of templatePaths(p, bankTpl)) await ensureBankFolder(bankScope, path)
+    toast(p === COMMON_SPACE ? 'Espace « Commun » créé : contenu réutilisable par toutes les modèles.' : `Modèle « ${p} » créée avec les dossiers du template.`, 'ok')
     await load(); setSpace(p); setFolder('Tous')
+  }
+  async function saveModelMarkets(model: string, mkts: ModelMarket[]) {
+    for (const m of MODEL_MARKETS) await setFolderTag(bankScope, model, marketTag(m.k), mkts.includes(m.k))
+    setModelMkts(x => ({ ...x, [model]: mkts }))
+  }
+  // Template appliqué aux modèles existantes : seuls les dossiers MANQUANTS sont créés (rien n'est déplacé ni supprimé)
+  async function applyTemplate(list: string[], tpl = bankTpl) {
+    let n = 0
+    for (const m of list) for (const path of templatePaths(m, tpl)) if (!folderNames.some(f => normPath(f) === path) && !items.some(i => i.folder && normPath(i.folder) === path)) { await ensureBankFolder(bankScope, path); n++ }
+    toast(n ? `${n} dossier(s) ajouté(s) d’après le template.` : 'Toutes les modèles ont déjà les dossiers du template.', 'ok')
+    load()
+  }
+  async function saveTemplate(text: string) {
+    const tpl = parseTemplate(text)
+    setBankTpl(tpl); setTplOpen(null)
+    const r = await updateTeam(teamScope, t => { t.bankTemplate = tpl })
+    toast(r.shared ? 'Template enregistré pour toute l’équipe.' : 'Template enregistré sur ce navigateur seulement.', r.shared ? 'ok' : 'bad')
   }
   async function removeModelSpace(name: string) {
     if (!await confirmDialog({ title: `Retirer « ${name} » des modèles ?`, text: 'Le dossier et ses médias restent dans la Banque : il redevient un dossier ordinaire.', confirmLabel: 'Retirer' })) return
@@ -1246,7 +1279,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // 1 600 d'un coup → défilement saccadé). Uniquement l'onglet / le dossier / la recherche en cours.
   const PAGE = 60
   const [limit, setLimit] = useState(PAGE)
-  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort, kindF, space, hidePosted, stackOn])
+  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort, kindF, space, hidePosted, stackOn, mktF])
   const moreRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = moreRef.current; if (!el) return
@@ -1653,20 +1686,25 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
         items={TABS.map(t => ({ k: t.k, l: t.l, n: loading ? undefined : t.n, icon: t.k === 'media' ? 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z' : t.k === 'pool' ? 'M4 6h16|M4 12h16|M4 18h10' : 'M4 7V4h16v3|M9 20h6|M12 4v16' }))} />
 
       {tab === 'media' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '0 0 12px' }}>
-          <span style={{ fontSize: 12, color: '#8B8B94', marginRight: 2 }}>Modèle</span>
-          {[['all', 'Toutes'], ...models.map(m => [m, m === COMMON_SPACE ? '🌐 Commun' : m])].map(([k, l]) => {
-            const on = (k === 'all' && !spaceOn) || space === k && spaceOn
-            return (
-              <button key={k} type="button" onClick={() => { setSpace(k); setFolder('Tous') }}
-                onContextMenu={e => { if (k !== 'all') { e.preventDefault(); void removeModelSpace(k) } }}
-                title={k === 'all' ? 'Toute la Banque' : 'Clic droit : retirer des modèles'}
-                style={{ height: 30, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, background: on ? 'rgba(139,124,246,0.16)' : '#161618', color: on ? '#C4B5FD' : '#D4D4D8', border: `1px solid ${on ? 'rgba(139,124,246,0.5)' : 'rgba(255,255,255,0.09)'}` }}>
-                <span data-no-tr={k !== 'all' && k !== COMMON_SPACE ? true : undefined}>{l}</span>
-              </button>
-            )
-          })}
-          <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Modèle" onClick={() => void promptDialog({ title: 'Nouvelle modèle', text: 'Crée son espace avec les rubriques Reels / Feed / Stories / Genjutsu. Un dossier existant du même nom devient son espace.', placeholder: 'Kenza' }).then(n => { if (n && n.trim()) void createModelSpace(n) })} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px' }}>
+          <select value={mktF} onChange={e => { setMktF(e.target.value as 'all' | ModelMarket); setSpace('all'); setFolder('Tous') }} title="Marché"
+            style={{ height: 32, padding: '0 8px', borderRadius: 8, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#E4E4E7', fontSize: 12.5, cursor: 'pointer' }}>
+            <option value="all" style={{ background: '#161618' }}>🌍 Tous les marchés</option>
+            {MODEL_MARKETS.map(m => <option key={m.k} value={m.k} style={{ background: '#161618' }}>{m.label}</option>)}
+          </select>
+          <select value={spaceOn ? space : 'all'} onChange={e => { setSpace(e.target.value); setFolder('Tous') }} title="Modèle"
+            style={{ height: 32, minWidth: 190, padding: '0 8px', borderRadius: 8, background: spaceOn ? 'rgba(139,124,246,0.14)' : '#161618', border: `1px solid ${spaceOn ? 'rgba(139,124,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: spaceOn ? '#C4B5FD' : '#E4E4E7', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+            <option value="all" style={{ background: '#161618' }}>{mktF === 'all' ? 'Toutes les modèles' : `Toutes les modèles · ${MODEL_MARKETS.find(m => m.k === mktF)?.label ?? ''}`}</option>
+            {groupModelsByMarket(models, m => modelMkts[m] ?? []).filter(g => mktF === 'all' || g.label === MODEL_MARKETS.find(m => m.k === mktF)?.label).map(g => (
+              <optgroup key={g.label} label={g.label} style={{ background: '#161618' }}>
+                {g.models.map(m => <option key={`${g.label}:${m}`} value={m} style={{ background: '#161618' }} data-no-tr>{m}</option>)}
+              </optgroup>
+            ))}
+            {models.includes(COMMON_SPACE) && <option value={COMMON_SPACE} style={{ background: '#161618' }}>🌐 Commun (toutes les modèles)</option>}
+          </select>
+          {spaceOn && space !== COMMON_SPACE && <Btn theme={theme} sm tone="quiet" label="⚙ Modèle" onClick={() => setModelForm({ edit: space, name: space, mkts: modelMkts[space] ?? [] })} />}
+          <Btn theme={theme} sm tone="quiet" icon="M12 5v14|M5 12h14" label="Modèle" onClick={() => setModelForm({ edit: null, name: '', mkts: mktF === 'all' ? [] : [mktF] })} />
+          <Btn theme={theme} sm tone="quiet" label="📐 Template" onClick={() => setTplOpen((bankTpl.length ? bankTpl : templatePaths('', []).map(p => p.slice(1))).join('\n'))} />
           {!models.includes(COMMON_SPACE) && <Btn theme={theme} sm tone="quiet" label="🌐 Espace Commun" onClick={() => void createModelSpace(COMMON_SPACE)} />}
           {models.some(m => m !== COMMON_SPACE) && <Btn theme={theme} sm tone="quiet" label="🧭 Ranger par modèle" onClick={openArrange} />}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1680,6 +1718,39 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
             </label>
           </span>
         </div>
+      )}
+      {modelForm && (
+        <Modal theme={theme} title={modelForm.edit ? `Modèle « ${modelForm.edit} »` : 'Nouvelle modèle'} onClose={() => setModelForm(null)}>
+          {!modelForm.edit && <>
+            <div style={{ fontSize: 12.5, color: '#A1A1AA', marginBottom: 6 }}>Nom</div>
+            <input autoFocus value={modelForm.name} onChange={e => setModelForm(f => f && { ...f, name: e.target.value })} placeholder="Kenza" style={{ ...FIELD, width: '100%' }} />
+          </>}
+          <div style={{ fontSize: 12.5, color: '#A1A1AA', margin: '12px 0 6px' }}>Marchés (une modèle peut être sur plusieurs)</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {MODEL_MARKETS.map(m => {
+              const on = modelForm.mkts.includes(m.k)
+              return <button key={m.k} type="button" onClick={() => setModelForm(f => f && { ...f, mkts: on ? f.mkts.filter(x => x !== m.k) : [...f.mkts, m.k] })}
+                style={{ height: 32, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, background: on ? 'rgba(139,124,246,0.16)' : '#161618', color: on ? '#C4B5FD' : '#D4D4D8', border: `1px solid ${on ? 'rgba(139,124,246,0.5)' : 'rgba(255,255,255,0.09)'}` }}>{m.label}</button>
+            })}
+          </div>
+          {!modelForm.edit && <div style={{ fontSize: 12, color: '#6E6E78', marginTop: 12 }} data-no-tr>{`📁 ${templatePaths(cleanSeg(modelForm.name) || '…', bankTpl).join(' · ')}`}</div>}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' }}>
+            {modelForm.edit && <Btn theme={theme} sm tone="ghost" label="Ajouter les dossiers du template" onClick={() => { const m = modelForm.edit!; setModelForm(null); void applyTemplate([m]) }} />}
+            {modelForm.edit && <Btn theme={theme} sm tone="danger" label="Retirer des modèles" onClick={() => { const m = modelForm.edit!; setModelForm(null); void removeModelSpace(m) }} />}
+            <Btn theme={theme} sm tone="primary" label={modelForm.edit ? 'Enregistrer' : 'Créer la modèle'} disabled={!modelForm.edit && !cleanSeg(modelForm.name)}
+              onClick={() => { const f = modelForm; setModelForm(null); if (f.edit) void saveModelMarkets(f.edit, f.mkts); else void createModelSpace(f.name, f.mkts) }} />
+          </div>
+        </Modal>
+      )}
+      {tplOpen !== null && (
+        <Modal theme={theme} title="Template des dossiers d’une modèle" onClose={() => setTplOpen(null)}>
+          <p style={{ margin: '0 0 8px', fontSize: 12.5, color: '#A1A1AA' }}>Un dossier par ligne, « / » pour un sous-dossier (ex. « Reels/Originaux »). Créés automatiquement pour chaque nouvelle modèle. Partagé avec toute l’équipe.</p>
+          <textarea data-no-tr value={tplOpen} onChange={e => setTplOpen(e.target.value)} rows={10} style={{ ...TEXTAREA, width: '100%', fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }} />
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, flexWrap: 'wrap' }}>
+            <Btn theme={theme} sm tone="ghost" label="Appliquer aux modèles existantes" onClick={() => { const t = tplOpen; void saveTemplate(t).then(() => applyTemplate(models.filter(m => m !== COMMON_SPACE), parseTemplate(t))) }} />
+            <Btn theme={theme} sm tone="primary" label="Enregistrer" onClick={() => void saveTemplate(tplOpen)} />
+          </div>
+        </Modal>
       )}
       {arrange && (
         <Modal theme={theme} title="Ranger par modèle" onClose={() => setArrange(null)}>

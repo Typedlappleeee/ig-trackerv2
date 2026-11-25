@@ -57,3 +57,29 @@ export function proposeModelMoves(topFolders: string[], models: string[], videoS
   }
   return out
 }
+
+// ── Template de dossiers (modifiable, partagé) et marchés des modèles ──────────────────────────────────────
+export type ModelMarket = 'fr' | 'us' | 'de'
+export const MODEL_MARKETS: { k: ModelMarket; label: string }[] = [{ k: 'fr', label: '🇫🇷 France' }, { k: 'us', label: '🇺🇸 USA' }, { k: 'de', label: '🇩🇪 Allemagne' }]
+export const marketTag = (m: ModelMarket) => `market:${m}`
+/** Marchés d'une modèle d'après les tags de sa ligne sentinelle. Pure. */
+export const marketsOfTags = (tags: string[] | null | undefined): ModelMarket[] =>
+  MODEL_MARKETS.map(m => m.k).filter(k => (tags ?? []).includes(marketTag(k)))
+/** Texte du template (un chemin par ligne, « Reels/Originaux ») → chemins propres, sans doublon, parents inclus. Pure. */
+export function parseTemplate(text: string): string[] {
+  const out: string[] = []
+  for (const line of text.split('\n')) {
+    const p = line.split('/').map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean).join('/')
+    if (p && !out.includes(p)) out.push(p)
+  }
+  return out.slice(0, 60)
+}
+/** Dossiers à créer pour une modèle (template vide → rubriques par défaut). Pure. */
+export const templatePaths = (model: string, tpl: string[]) => (tpl.length ? tpl : [...MODEL_SUBS]).map(p => `${model}/${p}`)
+/** Modèles regroupées par marché pour le menu déroulant (une modèle sur 2 marchés apparaît dans les 2) ; « Commun » à part. Pure. */
+export function groupModelsByMarket(models: string[], marketsOf: (m: string) => ModelMarket[]): { label: string; models: string[] }[] {
+  const real = models.filter(m => m !== COMMON_SPACE)
+  const groups = MODEL_MARKETS.map(mk => ({ label: mk.label, models: real.filter(m => marketsOf(m).includes(mk.k)) }))
+  const none = real.filter(m => !marketsOf(m).length)
+  return [...groups, { label: 'Sans marché', models: none }].filter(g => g.models.length)
+}
