@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25z5',
+    date: '2026-11-25',
+    title: { fr: 'Deux banques séparées : principale et modèles', en: 'Two separate banks: main and models' },
+    items: {
+      fr: ['En haut de la Banque : « 🗂 Banque principale » et « 👤 Banque modèles ». La principale ne montre plus rien des modèles (impossible d’y toucher par erreur) ; la Banque modèles ne montre que les modèles, avec leur menu déroulant. Un dossier passe de l’une à l’autre par clic droit › « Envoyer vers une modèle ».'],
+      en: ['At the top of the Bank: “🗂 Main bank” and “👤 Models bank”. The main one no longer shows anything from the models (no accidental changes); the models bank shows only the models, with their dropdown. A folder moves from one to the other via right-click › “Send to a model”.'],
+    },
+  },
+  {
     id: '2026-11-25z4',
     date: '2026-11-25',
     title: { fr: 'Banque : menu déroulant des modèles', en: 'Bank: model dropdown' },

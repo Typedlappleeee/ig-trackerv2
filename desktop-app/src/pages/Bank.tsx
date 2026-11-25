@@ -245,6 +245,8 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // La vue « par modèle » est un MODE optionnel : coupé, la Banque est la Banque normale (tous les dossiers, aucun filtre).
   // La modèle / le marché choisis ne sont PAS mémorisés : chaque ouverture de la Banque montre tout.
   const [space, setSpace] = useState<string>('all')
+  // DEUX banques distinctes : principale (sans les modèles) / modèles (seulement les modèles)
+  const [bankMode, setBankModeState] = useState<'main' | 'models'>(() => { try { return localStorage.getItem('sf-bank-mode') === 'models' ? 'models' : 'main' } catch { return 'main' } })
   const [stackOn, setStackOn] = useState(() => { try { return localStorage.getItem('sf-bank-stack') !== '0' } catch { return true } })
   // COUPÉ par défaut : masquer les publiés faisait croire que des fichiers avaient disparu (vu le 25/11/2026)
   const [hidePosted, setHidePosted] = useState(() => { try { return localStorage.getItem('sf-bank-hideposted2') === '1' } catch { return false } })
@@ -414,30 +416,31 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     load()
   }
 
-  // Compteurs par type (réels).
+  // Périmètre affiché : banque principale = tout SAUF les dossiers des modèles ; banque modèles = la modèle choisie,
+  // sinon les modèles du marché choisi, sinon toutes les modèles.
+  const spaceOn = bankMode === 'models' && space !== 'all' && models.includes(space)
+  const modelRoots = useMemo(() => models.filter(m => m !== COMMON_SPACE), [models])
+  const roots = useMemo(() => spaceOn ? [space] : modelRoots.filter(m => mktF === 'all' || (modelMkts[m] ?? []).includes(mktF)), [spaceOn, space, mktF, modelRoots, modelMkts])
+  const inScope = useCallback((path: string | null | undefined) => bankMode === 'main'
+    ? !modelRoots.some(m => isWithin(path, m))
+    : roots.some(r => isWithin(path, r)), [bankMode, modelRoots, roots])
+  const setBankMode = (m: 'main' | 'models') => { setBankModeState(m); setSpace('all'); setMktF('all'); setFolder('Tous'); try { localStorage.setItem('sf-bank-mode', m) } catch { /* noop */ } }
+  const mainCount = useMemo(() => items.filter(i => !modelRoots.some(m => isWithin(i.folder, m))).length, [items, modelRoots])
+
+  // Compteurs par type (réels) — même périmètre que la grille.
   const counts = useMemo(() => {
     const c = { video: 0, image: 0, audio: 0 }
-    // compteurs de l'espace de la modèle ouverte (sinon toute la Banque)
-    // même périmètre que la grille : la modèle choisie, sinon les modèles du marché choisi (+ Commun), sinon tout
-    const sp = space !== 'all' && models.includes(space)
-    const rts = sp ? [space] : mktF !== 'all' ? models.filter(m => m !== COMMON_SPACE && (modelMkts[m] ?? []).includes(mktF)) : null
-    const inSpace = rts ? items.filter(i => rts.some(r => isWithin(i.folder, r))) : items
-    inSpace.forEach(i => { c[inferType(i)]++ })
+    items.forEach(i => { if (inScope(i.folder)) c[inferType(i)]++ })
     return c
-  }, [items, space, models, mktF, modelMkts])
+  }, [items, inScope])
 
   // Items du filtre de type actif (banque unique : vidéos, images et sons ensemble).
-  const spaceOn = space !== 'all' && models.includes(space)
-  // racines visibles : la modèle choisie, sinon toutes les modèles du marché choisi (+ Commun), sinon tout
-  // vue par modèle : UNIQUEMENT les dossiers des modèles (la modèle choisie, sinon celles du marché, sinon toutes)
-  // aucune modèle choisie = toute la Banque ; une modèle = ses dossiers ; un marché = les dossiers de ses modèles
-  const roots = useMemo(() => spaceOn ? [space] : mktF !== 'all' ? models.filter(m => m !== COMMON_SPACE && (modelMkts[m] ?? []).includes(mktF)) : null, [spaceOn, space, mktF, models, modelMkts])
   const typed = useMemo(() => {
     if (tab !== 'media') return []
-    const inSpace = roots ? items.filter(i => roots.some(r => isWithin(i.folder, r))) : items
+    const inSpace = items.filter(i => inScope(i.folder))
     return kindF === 'all' ? inSpace : inSpace.filter(i => inferType(i) === kindF)
-  }, [items, tab, kindF, roots])
-  const spaceFolderNames = useMemo(() => roots ? folderNames.filter(n => roots.some(r => isWithin(n, r))) : folderNames, [folderNames, roots])
+  }, [items, tab, kindF, inScope])
+  const spaceFolderNames = useMemo(() => folderNames.filter(n => inScope(n)), [folderNames, inScope])
 
   // Tri des dossiers (nom, plus remplis, plus récents) — mémorisé dans ce navigateur.
   const [folderSort, setFolderSortState] = useState<'name' | 'count' | 'recent'>(() => { try { return (localStorage.getItem('sf-bank-fsort') as 'name' | 'count' | 'recent') || 'name' } catch { return 'name' } })
@@ -451,14 +454,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       : folderSort === 'recent' ? (a: string, b: string) => lastIn(b).localeCompare(lastIn(a)) : undefined
     const tree = folderTree([...typed.map(i => i.folder), ...spaceFolderNames], cmp)
     return [
-      { n: 'Tous', label: spaceOn ? `Tout ${space}` : mktF !== 'all' ? `Modèles ${MODEL_MARKETS.find(m => m.k === mktF)?.label ?? ''}` : 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
+      { n: 'Tous', label: spaceOn ? `Tout ${space}` : bankMode === 'models' ? (mktF !== 'all' ? `Modèles ${MODEL_MARKETS.find(m => m.k === mktF)?.label ?? ''}` : 'Toutes les modèles') : 'Tous', c: typed.length, special: false, depth: 0, hasChildren: false },
       ...tree.map(t => ({ n: t.path, label: t.name, c: countIn(t.path), special: false, depth: t.depth, hasChildren: t.hasChildren })),
       { n: 'Jamais publiées', label: 'Jamais publiées', c: typed.filter(i => (i.used_count ?? 0) === 0).length, special: true, depth: 0, hasChildren: false },
-      { n: 'Sans dossier', label: 'Sans dossier', c: typed.filter(i => !i.folder).length, special: true, depth: 0, hasChildren: false },
+      ...(bankMode === 'main' ? [{ n: 'Sans dossier', label: 'Sans dossier', c: typed.filter(i => !i.folder).length, special: true, depth: 0, hasChildren: false }] : []),
       { n: 'Publiés', label: 'Publiés', c: typed.filter(i => (i.used_count ?? 0) > 0).length, special: true, depth: 0, hasChildren: false },
       { n: '★ Favoris', label: 'Favoris', c: typed.filter(isFav).length, special: true, depth: 0, hasChildren: false },
     ]
-  }, [typed, spaceFolderNames, folderSort, space, spaceOn, mktF])
+  }, [typed, spaceFolderNames, folderSort, space, spaceOn, mktF, bankMode])
   // Dossiers repliés (mémorisés dans ce navigateur) : leurs sous-dossiers sont masqués.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem('sf-bank-collapsed') || '[]') as string[]) } catch { return new Set() } })
   const toggleCollapsed = (p: string) => setCollapsed(c => {
@@ -1125,6 +1128,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     for (const m of mkts) await setFolderTag(bankScope, p, marketTag(m), true)
     for (const path of templatePaths(p, bankTpl)) await ensureBankFolder(bankScope, path)
     toast(p === COMMON_SPACE ? 'Espace « Commun » créé : contenu réutilisable par toutes les modèles.' : `Modèle « ${p} » créée avec les dossiers du template.`, 'ok')
+    setBankModeState('models'); try { localStorage.setItem('sf-bank-mode', 'models') } catch { /* noop */ }
     await load(); setSpace(p); setFolder('Tous')
   }
   async function saveModelMarkets(model: string, mkts: ModelMarket[]) {
@@ -1344,7 +1348,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // 1 600 d'un coup → défilement saccadé). Uniquement l'onglet / le dossier / la recherche en cours.
   const PAGE = 60
   const [limit, setLimit] = useState(PAGE)
-  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort, kindF, space, hidePosted, stackOn, mktF])
+  useEffect(() => { setLimit(PAGE) }, [tab, folder, ql, sort, kindF, space, hidePosted, stackOn, mktF, bankMode])
   const moreRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = moreRef.current; if (!el) return
@@ -1761,8 +1765,17 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
       {tab === 'media' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 12px' }}>
-          {/* Menu déroulant des modèles : « Toute la Banque » par défaut, modèles groupées par marché */}
-          {(() => {
+          {/* Deux banques distinctes : principale (sans les modèles) / modèles */}
+          <div style={{ display: 'inline-flex', padding: 3, borderRadius: 11, background: '#111113', border: '1px solid rgba(255,255,255,0.07)' }}>
+            {([['main', '🗂 Banque principale', mainCount], ['models', '👤 Banque modèles', items.length - mainCount]] as const).map(([k, l, n]) => (
+              <button key={k} type="button" onClick={() => setBankMode(k)}
+                style={{ height: 32, padding: '0 14px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, background: bankMode === k ? 'rgba(139,124,246,0.18)' : 'transparent', color: bankMode === k ? '#DDD6FE' : '#A1A1AA', boxShadow: bankMode === k ? 'inset 0 0 0 1px rgba(139,124,246,0.5)' : 'none' }}>
+                {l} <span style={{ color: '#6E6E78', fontWeight: 500, marginLeft: 4 }}>{n}</span>
+              </button>
+            ))}
+          </div>
+          {/* Menu déroulant des modèles (banque modèles seulement), groupées par marché */}
+          {bankMode === 'models' && (() => {
             const hue = (n: string) => [...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)
             const flag = (k: ModelMarket) => MODEL_MARKETS.find(x => x.k === k)?.label.split(' ')[0] ?? ''
             const avatar = (m: string, size = 22) => <span style={{ width: size, height: size, flex: 'none', borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.48, fontWeight: 700, color: '#fff', background: `linear-gradient(135deg, hsl(${hue(m)} 70% 62%), hsl(${(hue(m) + 40) % 360} 70% 48%))` }}>{m.slice(0, 1).toUpperCase()}</span>
@@ -1778,7 +1791,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                 <button type="button" onClick={() => setModelMenu(o => !o)}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 10, height: 38, minWidth: 220, padding: '0 12px 0 8px', borderRadius: 10, cursor: 'pointer', background: '#141416', border: `1px solid ${cur || curMkt ? 'rgba(139,124,246,0.55)' : 'rgba(255,255,255,0.1)'}`, color: '#F4F4F5', fontSize: 13.5, fontWeight: 600 }}>
                   {cur ? avatar(cur, 24) : <span style={{ width: 24, height: 24, borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#1F1F23', fontSize: 13 }}>{curMkt ? curMkt.label.split(' ')[0] : '🗂'}</span>}
-                  <span data-no-tr={cur ? true : undefined} style={{ flex: 1, textAlign: 'left' }}>{cur ?? (curMkt ? `Modèles ${curMkt.label}` : 'Toute la Banque')}</span>
+                  <span data-no-tr={cur ? true : undefined} style={{ flex: 1, textAlign: 'left' }}>{cur ?? (curMkt ? `Modèles ${curMkt.label}` : 'Toutes les modèles')}</span>
                   {cur && (modelMkts[cur] ?? []).length > 0 && <span style={{ fontSize: 12 }}>{(modelMkts[cur] ?? []).map(flag).join('')}</span>}
                   <span style={{ color: '#8B8B94', fontSize: 11, transform: modelMenu ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▼</span>
                 </button>
@@ -1787,7 +1800,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   <div style={{ position: 'absolute', top: 44, left: 0, zIndex: 71, width: 300, maxHeight: 440, overflowY: 'auto', padding: 6, borderRadius: 12, background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 60px -16px rgba(0,0,0,0.85)' }}>
                     <button type="button" onClick={() => pick('all')} style={row(!cur && !curMkt)}>
                       <span style={{ width: 22, height: 22, borderRadius: 99, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#1F1F23', fontSize: 12 }}>🗂</span>
-                      <span style={{ flex: 1 }}>Toute la Banque</span><span style={{ color: '#6E6E78', fontSize: 12 }}>{items.length}</span>
+                      <span style={{ flex: 1 }}>Toutes les modèles</span><span style={{ color: '#6E6E78', fontSize: 12 }}>{items.length - mainCount}</span>
                     </button>
                     {groups.map(g => {
                       const mk = MODEL_MARKETS.find(m => m.label === g.label)

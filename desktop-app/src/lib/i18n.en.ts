@@ -7,6 +7,8 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "🗂 Banque principale": "🗂 Main bank",
+    "👤 Banque modèles": "👤 Models bank",
     "toutes": "all",
     "Template des dossiers": "Folder template",
     "Ranger les dossiers par modèle": "Sort folders by model",
