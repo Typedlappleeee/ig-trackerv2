@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25z3',
+    date: '2026-11-25',
+    title: { fr: 'Banque : supprimer un dossier garde ses sous-dossiers', en: 'Bank: deleting a folder keeps its subfolders' },
+    items: {
+      fr: ['Supprimer un dossier ne mélange plus tout : ses sous-dossiers sont gardés et remontent d’un niveau (avant, tous les fichiers étaient sortis de leurs dossiers). Aucun fichier n’est jamais supprimé.', 'Gros dossier (plus de 50 fichiers) ou dossier d’une modèle : il faut retaper son nom pour confirmer la suppression.'],
+      en: ['Deleting a folder no longer mixes everything: its subfolders are kept and move up one level (before, every file was taken out of its folders). No file is ever deleted.', 'Big folder (over 50 files) or a model’s folder: you must type its name to confirm the deletion.'],
+    },
+  },
+  {
     id: '2026-11-25z2',
     date: '2026-11-25',
     title: { fr: 'Banque : tous les fichiers affichés par défaut', en: 'Bank: every file shown by default' },

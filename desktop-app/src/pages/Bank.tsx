@@ -1026,6 +1026,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [renameFolderOf, setRenameFolderOf] = useState<string | null>(null)
   const [renameFolderVal, setRenameFolderVal] = useState('')
   const [confirmDelFolder, setConfirmDelFolder] = useState<string | null>(null)
+  const [delTyped, setDelTyped] = useState('')   // gros dossier : il faut retaper son nom pour confirmer
   const scopeQ = (qq: any) => currentOrg ? qq.eq('org_id', currentOrg.id) : qq.eq('user_id', user.id).is('org_id', null)
   // Valeurs brutes de « folder » (tous types, corbeille et dossiers vides compris) dans un dossier ou ses sous-dossiers.
   const rawFoldersWithin = (root: string) => {
@@ -1065,13 +1066,20 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       localStorage.setItem('sf-bank-undo-del', JSON.stringify({ name, at: Date.now(), moves, folders: raws }))
     } catch { /* stockage plein : pas d'annulation */ }
     let upErr: { message: string } | null = null
+    // Les SOUS-DOSSIERS sont gardés (ils remontent d'un niveau : « Kenza/Reels/PAP » → « Reels/PAP ») ; seuls les
+    // médias posés directement dans le dossier vont dans le parent. Avant (25/11/2026) tout était aplati dans le parent
+    // et le rangement de milliers de médias était perdu.
+    const lifted = (raw: string) => { const n = normPath(raw); return n === name ? parent : joinPath(parent, n.slice(name.length + 1)) }
     for (const raw of raws) {
-      const { error } = await scopeQ(supabase.from('content_bank').update({ folder: parent }).eq('folder', raw).or('notes.is.null,notes.not.in.("__sf_folder__","__sf_drive_folder__")'))
+      const sub = normPath(raw) !== name
+      const { error } = sub
+        ? await scopeQ(supabase.from('content_bank').update({ folder: lifted(raw) }).eq('folder', raw))
+        : await scopeQ(supabase.from('content_bank').update({ folder: parent }).eq('folder', raw).or('notes.is.null,notes.not.in.("__sf_folder__","__sf_drive_folder__")'))
       if (error) upErr = error
     }
-    // Supprime la/les ligne(s) sentinelle(s) du dossier et de ses sous-dossiers via la RPC
+    // Supprime la ligne sentinelle du dossier lui-même (celles des sous-dossiers ont suivi leur nouveau chemin) via la RPC
     // fiable (RLS-proof), fallback DELETE direct si la RPC n'est pas déployée.
-    const { data: sentinels } = await scopeQ(supabase.from('content_bank').select('id').in('folder', raws.length ? raws : [name]).in('notes', ['__sf_folder__', '__sf_drive_folder__']))
+    const { data: sentinels } = await scopeQ(supabase.from('content_bank').select('id').eq('folder', name).in('notes', ['__sf_folder__', '__sf_drive_folder__']))
     const sentIds = ((sentinels ?? []) as { id: string }[]).map(r => r.id)
     if (sentIds.length) {
       const { error } = await supabase.rpc('delete_bank_items', { p_ids: sentIds })
@@ -2216,11 +2224,19 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
 
       {confirmDelFolder && (
-        <Modal theme={theme} title="Supprimer ce dossier ?" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClose={() => setConfirmDelFolder(null)}
-          footer={<><Btn theme={theme} tone="quiet" label="Annuler" onClick={() => setConfirmDelFolder(null)} /><Btn theme={theme} tone="danger" label="Supprimer le dossier" onClick={() => { deleteFolder(confirmDelFolder); setConfirmDelFolder(null) }} /></>}>
+        <Modal theme={theme} title="Supprimer ce dossier ?" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClose={() => { setConfirmDelFolder(null); setDelTyped('') }}
+          footer={(() => {
+            const n = items.filter(i => isWithin(i.folder, confirmDelFolder)).length
+            const big = n > 50 || models.includes(confirmDelFolder)
+            return <><Btn theme={theme} tone="quiet" label="Annuler" onClick={() => { setConfirmDelFolder(null); setDelTyped('') }} /><Btn theme={theme} tone="danger" label="Supprimer le dossier" disabled={big && delTyped.trim() !== leafOf(confirmDelFolder)} onClick={() => { deleteFolder(confirmDelFolder); setConfirmDelFolder(null); setDelTyped('') }} /></>
+          })()}>
           <p style={{ margin: 0, fontSize: 13, color: '#A1A1AA', lineHeight: 1.6 }}>
-            Le dossier <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{confirmDelFolder.split('/').join(' › ')}</b>{folders.some(f => f.n.startsWith(`${confirmDelFolder}/`)) ? ' et ses sous-dossiers seront supprimés' : ' sera supprimé'}, mais <b style={{ color: '#4ADE80', fontWeight: 600 }}>tes vidéos ne sont PAS supprimées</b> : {parentOf(confirmDelFolder) ? `elles remontent dans « ${parentOf(confirmDelFolder)!.split('/').join(' › ')} ».` : 'elles sont simplement retirées du dossier et restent dans « Tous ». Tu pourras les regrouper dans un nouveau dossier.'}
+            Le dossier <b style={{ color: '#EDEDEF', fontWeight: 600 }}>{confirmDelFolder.split('/').join(' › ')}</b> sera supprimé, mais <b style={{ color: '#4ADE80', fontWeight: 600 }}>aucun fichier n’est supprimé</b> : ses sous-dossiers sont gardés et remontent d’un niveau, ses fichiers vont {parentOf(confirmDelFolder) ? `dans « ${parentOf(confirmDelFolder)!.split('/').join(' › ')} »` : 'dans « Sans dossier »'}. Un bouton « ↩ Annuler la suppression » apparaîtra ensuite.
           </p>
+          {(items.filter(i => isWithin(i.folder, confirmDelFolder)).length > 50 || models.includes(confirmDelFolder)) && <>
+            <p style={{ margin: '12px 0 6px', fontSize: 13, color: '#FCA5A5' }}>{`Gros dossier (${items.filter(i => isWithin(i.folder, confirmDelFolder)).length} fichiers) : tape son nom pour confirmer.`}</p>
+            <input autoFocus value={delTyped} onChange={e => setDelTyped(e.target.value)} placeholder={leafOf(confirmDelFolder)} style={{ ...FIELD, width: '100%' }} data-no-tr />
+          </>}
         </Modal>
       )}
 
