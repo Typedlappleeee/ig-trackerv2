@@ -1106,7 +1106,7 @@ export function newPostGallery(words: { text: string; cy: number }[], H: number)
  *  (jamais « Save draft ») — jusqu'à revenir à la galerie « New reel ». true si la galerie est affichée. */
 async function discardReelDraft(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
   let unknown = 0
-  for (let k = 0; k < 7; k++) {
+  for (let k = 0; k < 10; k++) {
     const scr = await readScreenWords(key, deviceId)
     if (!scr) { await sleep(1000); continue }
     if (newReelGallery(scr.words, scr.H)) return true
@@ -1115,9 +1115,11 @@ async function discardReelDraft(key: string, deviceId: string, hooks?: VisionHoo
     const choice = scr.words.filter(o => /^(discard|start|delete|abandonner|supprimer)$/i.test(o.text) && o.cy > scr.H * 0.3).sort((a, b) => b.cy - a.cy)[0]
     if (choice) { hooks?.log?.(`   brouillon d’un ancien Reel → « ${choice.text} »`); await sendAction(key, deviceId, { type: 'tap', x: choice.cx, y: choice.cy }); await sleep(2000); continue }
     // retour seulement sur un écran de création Instagram reconnu (jamais sur l'accueil iOS : le coin ouvrirait une app)
-    const creating = editorToolsY(scr.words, scr.H) != null || sharePageShown(scr.words, scr.W, scr.H) || scr.words.some(o => /^(trim|pinch|caption|swipe|edit)$/i.test(o.text))
-    // écran en pleine animation (vu en vrai : 1 lecture « vide » juste après le retour) → on relit avant d'abandonner
-    if (!creating) { if (++unknown >= 2) return false; await sleep(1500); continue }
+    const creating = editorToolsY(scr.words, scr.H) != null || sharePageShown(scr.words, scr.W, scr.H)
+      || scr.words.some(o => /^(trim|pinch|captions?|swipe|edit|overlay|suggested|voice)$/i.test(o.text))
+    // écran en pleine animation ou éditeur sur fond uni mal lu (vu en vrai le 25/11/2026 : 2 lectures ratées de suite
+    // sur l'éditeur vert) → on relit plusieurs fois avant d'abandonner
+    if (!creating) { if (++unknown >= 4) return false; await sleep(1500); continue }
     unknown = 0
     if (k === 0) hooks?.log?.('   un ancien brouillon de Reel s’est rouvert → abandon (jamais publié)')
     await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.085 * scr.W), y: Math.round(0.06 * scr.H) })   // ‹ / ✕ / ⌃ en haut à gauche
