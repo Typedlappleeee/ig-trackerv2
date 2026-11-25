@@ -599,6 +599,14 @@ export function captionEditorOpen(words: { text: string; cy: number }[], H: numb
   return title || (chips && suggest)
 }
 
+/** Écran « What happened / We removed some content or messages » : hauteur de la croix (celle du titre en haut). Pure. */
+export function removedContentScreen(words: { text: string; cy: number }[], H: number): { y: number } | null {
+  const has = (re: RegExp) => words.some(o => re.test(o.text))
+  if (!(has(/^removed$/i) && (has(/^content$/i) || has(/^messages?$/i)) && (has(/^happened$/i) || has(/^we$/i)))) return null
+  const t = words.find(o => /^(what|happened)$/i.test(o.text) && o.cy < H * 0.15)
+  return { y: t ? t.cy : Math.round(0.058 * H) }
+}
+
 /** Feuille « Finish setting up your profile » (ou autre feuille à gros bouton bleu « Continue » + lien « Not now »
  *  dessous) : point du lien « Not now » — JAMAIS « Continue ». Vu en vrai le 24/11/2026 pendant le scroll des Reels
  *  entre deux posts. Pure. */
@@ -617,6 +625,15 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   if (!scr) return false
   const has = (re: RegExp) => scr.words.some(o => re.test(o.text))
   if (cameraSheet(scr.words, scr.H)) return grantPhotoAccessIfAsked(key, deviceId, hooks).then(() => true) // → Continue, puis Allow (caméra / micro)
+  // Écran Instagram « What happened · We removed some content or messages » (contenus retirés) → croix ✕ en haut à
+  // droite, à la hauteur du titre « What happened » (jamais « See all » ni rien d'autre). Vu en vrai le 25/11/2026.
+  const removed = removedContentScreen(scr.words, scr.H)
+  if (removed) {
+    hooks?.log?.('   écran « We removed some content » → fermé (✕)')
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * scr.W), y: removed.y })
+    await sleep(1600)
+    return true
+  }
   // Alerte iOS « Turn On Location Services to Allow … » (autre app, vue en vrai sur STEVIE1) → Cancel (jamais Settings)
   if (has(/^location$/i) && has(/^services$/i) && has(/^cancel$/i) && has(/^settings$/i)) {
     const c = scr.words.find(o => /^cancel$/i.test(o.text))!

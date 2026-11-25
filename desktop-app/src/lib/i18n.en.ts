@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "écran « We removed some content » → fermé (✕)": "“We removed some content” screen → closed (✕)",
     "descriptions déjà reçues": "captions already received",
     "photo(s)": "photo(s)",
     "vidéo(s)": "video(s)",

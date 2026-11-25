@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25i',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : écran « We removed some content » fermé', en: 'iRemoTech: “We removed some content” screen closed' },
+    items: {
+      fr: ['Quand Instagram affiche « What happened · We removed some content or messages », ScaleFlow le ferme par la croix en haut à droite et continue.'],
+      en: ['When Instagram shows “What happened · We removed some content or messages”, ScaleFlow closes it with the top-right ✕ and carries on.'],
+    },
+  },
+  {
     id: '2026-11-25h',
     date: '2026-11-25',
     title: { fr: 'Descriptions IA : en quantité illimitée', en: 'AI captions: unlimited amounts' },

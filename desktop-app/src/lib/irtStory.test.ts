@@ -200,3 +200,12 @@ describe('bouton AssistiveTouch repéré', () => {
     expect(assistiveTouchIn(() => [255, 255, 255], W, H)).toBeNull()
   })
 })
+
+import { removedContentScreen } from './iremotechVision'
+describe('écran « We removed some content »', () => {
+  it('reconnu, croix à la hauteur du titre ; écran ordinaire → non', () => {
+    const w = [{ text: 'What', cy: 40 }, { text: 'happened', cy: 40 }, { text: 'We', cy: 270 }, { text: 'removed', cy: 270 }, { text: 'content', cy: 270 }, { text: 'messages', cy: 300 }]
+    expect(removedContentScreen(w, 720)).toEqual({ y: 40 })
+    expect(removedContentScreen([{ text: 'For', cy: 50 }, { text: 'you', cy: 50 }], 720)).toBeNull()
+  })
+})
