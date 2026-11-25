@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25y',
+    date: '2026-11-25',
+    title: { fr: 'Banque : vue par modèle optionnelle', en: 'Bank: optional model view' },
+    items: {
+      fr: ['La vue par modèle est maintenant un mode (« 👤 Vue par modèle ») activé pour toute l’agence. Coupée, la Banque redevient la Banque normale ; activée, elle ne montre QUE les dossiers des modèles. Plus d’espace « Commun » imposé, et la modèle choisie n’est plus gardée d’une visite à l’autre. Retirer une modèle ne touche jamais aux fichiers.'],
+      en: ['The model view is now a mode (“👤 Model view”) turned on for the whole agency. Off, the Bank is the normal Bank; on, it shows ONLY the models’ folders. No more forced “Shared” space, and the chosen model is no longer kept between visits. Removing a model never touches files.'],
+    },
+  },
+  {
     id: '2026-11-25x',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : Reels sans le « + »', en: 'iRemoTech: Reels without the “+”' },

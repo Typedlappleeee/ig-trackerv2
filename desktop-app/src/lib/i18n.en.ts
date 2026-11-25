@@ -7,6 +7,11 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    " pour toute l’agence": " for the whole agency",
+    "pour toute l’agence": "for the whole agency",
+    "Vue par modèle pour toute l’agence : ne montre que les dossiers des modèles, sans rien changer aux fichiers": "Model view for the whole agency: shows only the models’ folders, without changing any file",
+    "👤 Vue par modèle : activée (agence)": "👤 Model view: on (agency)",
+    "👤 Vue par modèle": "👤 Model view",
     "Vidéo publiée (REEL)": "Video posted (REEL)",
     "galerie « New reel » directe non reconnue → passage par le +": "direct “New reel” gallery not recognised → going through the +",
     "🎞️ Galerie « New reel » ouverte directement": "🎞️ “New reel” gallery opened directly",
@@ -5198,6 +5203,9 @@ export const EN: Dict = {
     ["« {0} » envoyé dans « {1} ».", "“{0}” sent to “{1}”."],
     ["Envoyer « {0} » vers une modèle", "Send “{0}” to a model"],
     ["Garder le dossier « {0} » (il devient un sous-dossier)", "Keep the “{0}” folder (it becomes a subfolder)"],
+    ["Vue par modèle activée{0}.", "Model view on{0}."],
+    ["Vue par modèle désactivée{0}.", "Model view off{0}."],
+    ["Modèles {0}", "Models {0}"],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],
