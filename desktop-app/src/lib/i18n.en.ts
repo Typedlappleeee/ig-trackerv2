@@ -5073,5 +5073,6 @@ export const EN: Dict = {
     ["accueil pas encore affiché → autre position ({0}/{1})", "home not shown yet → other position ({0}/{1})"],
     ["{0} 🚪 fin du compte précédent → Instagram fermé", "{0} 🚪 previous account done → Instagram closed"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
+    ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],
   ],
 }

@@ -1318,13 +1318,27 @@ export type LocTarget = { q: string; city: RegExp; region: RegExp; label: string
  *  COMMENCE par la ville (vu en vrai : « Miami, Florida » donnait d'abord « West Miami, Florida »). Pure. */
 export function locationRow(words: { text: string; cx: number; cy: number }[], loc: { city: RegExp; region: RegExp; first?: RegExp }, belowY: number): { x: number; y: number } | null {
   const cities = words.filter(o => o.cy > belowY && loc.city.test(o.text)).sort((a, b) => a.cy - b.cy)
+  const ok: { x: number; y: number; plain: boolean }[] = []
   for (const c of cities) {
     const line = words.filter(o => Math.abs(o.cy - c.cy) < 12).sort((a, b) => a.cx - b.cx)
-    if (!line.some(o => o !== c && o.cx > c.cx && loc.region.test(o.text.replace(/[,.]$/, '')))) continue
+    const ri = line.findIndex(o => o !== c && o.cx > c.cx && loc.region.test(o.text.replace(/[,.]$/, '')))
+    if (ri < 0) continue
     if (!(loc.first ?? loc.city).test(line[0].text)) continue // un mot avant la ville (« West », « North »…) : autre lieu
-    return { x: c.cx, y: c.cy }
+    // « Frankfurt, Germany » (rien après le pays) = la ville ; « Frankfurt Germany Temple » = un lieu (vu en vrai)
+    ok.push({ x: c.cx, y: c.cy, plain: ri === line.length - 1 })
   }
-  return null
+  const best = ok.find(o => o.plain) ?? ok[0]
+  return best ? { x: best.x, y: best.y } : null
+}
+
+/** Lieu DÉJÀ posé sur la page de partage : ligne avec la ville ou le pays sous « Tag people », et plus de ligne « Add
+ *  location ». Pure. */
+export function locationAlreadySet(words: { text: string; cx: number; cy: number }[], loc: { city: RegExp; region: RegExp }, H: number): boolean {
+  const tag = words.find(o => /^tag$/i.test(o.text) && words.some(p => /^people$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))
+  if (!tag) return false
+  const addLoc = words.some(o => /^location$/i.test(o.text) && words.some(a => /^add$/i.test(a.text) && Math.abs(a.cy - o.cy) < 12 && a.cx < o.cx))
+  if (addLoc) return false
+  return words.some(o => o.cy > tag.cy && o.cy < tag.cy + H * 0.12 && (loc.city.test(o.text) || loc.region.test(o.text.replace(/[,.]$/, ''))))
 }
 
 /** Alerte iOS « Allow “Instagram” to use your location? » (Allow Once / While Using / Don't Allow) : on refuse
@@ -1342,6 +1356,7 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   if (!s0) return false
   const { W, H } = s0
   const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
+  if (locationAlreadySet(s0.words, loc, H)) { hooks?.log?.(`   ✓ localisation déjà posée (${loc.label})`); return true }
   hooks?.log?.(`📍 Localisation : ${loc.label}…`)
   // 1. ligne « Add location » (sous « Tag people », souvent hors écran → on fait défiler la page de partage)
   let row: { x: number; y: number } | null = null
@@ -1371,7 +1386,8 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
       const title = c.words.find(o => /^locations?$/i.test(o.text) && o.cy < H * 0.25)
       const cw = c.words.find(o => /^cancel$/i.test(o.text) && o.cy < H * 0.2)
       const search = c.words.some(o => o.text.replace(/[^a-z]/gi, '').toLowerCase() === 'search' && o.cy < H * 0.45)
-      if (!title && !cw && !search && !c.words.some(o => /^preview$/i.test(o.text))) return // plus de feuille : page de partage
+      const mapPreview = c.words.some(o => /^preview$/i.test(o.text)) && c.words.some(o => /^map$/i.test(o.text))
+      if (!title && !cw && !search && !mapPreview) return // plus de feuille : page de partage (la miniature dit « Preview » : ignorée)
       if (cw) await tap(cw.cx, cw.cy)
       else if (title && k < 2) await tap(0.9 * W, title.cy)          // croix ✕ alignée sur le titre
       else await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(0.2 * H), x2: Math.round(W / 2), y2: Math.round(0.9 * H), duration_ms: 300 })
@@ -1458,7 +1474,7 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   for (let k = 0; k < 4 && !set; k++) {
     await sleep(1500)
     const v = await readScreenWords(key, deviceId)
-    set = !!v && sharePageShown(v.words, W, H) && v.words.some(o => loc.region.test(o.text.replace(/[,.]$/, '')) || loc.city.test(o.text)) && !v.words.some(o => /^(locations|search)$/i.test(o.text))
+    set = !!v && (locationAlreadySet(v.words, loc, H) || (sharePageShown(v.words, W, H) && v.words.some(o => loc.region.test(o.text.replace(/[,.]$/, '')) || loc.city.test(o.text)) && !v.words.some(o => /^(locations|search)$/i.test(o.text))))
   }
   if (set) { hooks?.log?.(`   ✓ localisation : ${loc.label}`); return true }
   hooks?.log?.('   ⚠ localisation non confirmée → publication sans');

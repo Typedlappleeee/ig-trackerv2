@@ -152,3 +152,18 @@ describe('fil d’accueil reconnu (le « + » est là)', () => {
     expect(homeFeedShown([{ text: 'Follow', cy: 553 }, { text: 'lesotwins', cy: 540 }], 720)).toBe(false)
   })
 })
+
+import { locationRow as locRow, locationAlreadySet } from './iremotechVision'
+describe('localisation : bonne ligne et lieu déjà posé', () => {
+  const loc = { city: /^Frankfurt,?$/i, first: /^Frankfurt,?$/i, region: /^(germany|deutschland)$/i }
+  it('« Frankfurt, Germany » préféré à « Frankfurt Germany Temple »', () => {
+    const w = [{ text: 'Frankfurt', cx: 60, cy: 300 }, { text: 'Germany', cx: 140, cy: 300 }, { text: 'Temple', cx: 210, cy: 300 },
+      { text: 'Frankfurt,', cx: 60, cy: 360 }, { text: 'Germany', cx: 140, cy: 360 }]
+    expect(locRow(w, loc, 200)).toEqual({ x: 60, y: 360 })
+  })
+  it('lieu déjà posé sous « Tag people » → reconnu ; « Add location » encore là → non', () => {
+    const base = [{ text: 'Tag', cx: 60, cy: 460 }, { text: 'people', cx: 110, cy: 460 }]
+    expect(locationAlreadySet([...base, { text: 'Leipzig,', cx: 80, cy: 514 }, { text: 'Germany', cx: 160, cy: 514 }], { city: /^Leipzig,?$/i, region: /^germany$/i }, 650)).toBe(true)
+    expect(locationAlreadySet([...base, { text: 'Add', cx: 60, cy: 514 }, { text: 'location', cx: 110, cy: 514 }], { city: /^Leipzig,?$/i, region: /^germany$/i }, 650)).toBe(false)
+  })
+})

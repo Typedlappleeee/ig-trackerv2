@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25a',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : plus d’attente sur la page de partage', en: 'iRemoTech: no more waiting on the share page' },
+    items: {
+      fr: ['Lieu posé reconnu tout de suite (même si le bouton Share est caché par le panneau iRemoTech) : plus de faux « non confirmé », de glissements inutiles ni de 2e essai qui défile pour rien. La ville est choisie avant les lieux qui portent son nom (« Frankfurt, Germany » plutôt que « Frankfurt Germany Temple »).'],
+      en: ['A set location is recognised right away (even when the Share button is hidden by the iRemoTech panel): no more false “not confirmed”, useless swipes or a pointless 2nd attempt. The city is picked before places named after it (“Frankfurt, Germany” rather than “Frankfurt Germany Temple”).'],
+    },
+  },
+  {
     id: '2026-11-24m',
     date: '2026-11-24',
     title: { fr: 'iRemoTech : corrections après la grosse session', en: 'iRemoTech: fixes after the big session' },
