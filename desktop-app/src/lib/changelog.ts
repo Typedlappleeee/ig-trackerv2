@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25v',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : anti-doublon renforcé', en: 'iRemoTech: stronger duplicate protection' },
+    items: {
+      fr: ['Un compte ne reçoit plus jamais une autre copie spoofée d’une vidéo qu’il a déjà postée, même des jours après (historique partagé avec l’équipe).', 'Pool choisi à la main : seules les vidéos jamais publiées sont prises, comme pour un dossier.'],
+      en: ['An account never gets another spoofed copy of a video it already posted, even days later (history shared with the team).', 'Hand-picked pool: only never-posted videos are used, like a folder.'],
+    },
+  },
+  {
     id: '2026-11-25u',
     date: '2026-11-25',
     title: { fr: 'Banque : modèles par marché et template de dossiers', en: 'Bank: models by market and folder template' },

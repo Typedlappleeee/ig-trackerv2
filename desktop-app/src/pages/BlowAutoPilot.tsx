@@ -623,7 +623,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     // publiés ; dans un lancement, aucun média repris. Pas assez de médias → rien n'est lancé.
     const noRepeat = kind !== 'story'
     if (noRepeat) {
-      if (src.mode === 'folder') pool = pool.filter(v => (v.used_count ?? 0) === 0)
+      // dossier OU pool choisi à la main : seulement les médias jamais publiés (le texte de l'écran le promet)
+      pool = pool.filter(v => (v.used_count ?? 0) === 0)
       pool = pool.filter((v, i, a) => a.findIndex(x => x.id === v.id) === i)
       const need = totalJobs * perAcct * perPost
       if (pool.length < need) {
@@ -670,7 +671,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     // Même vidéo d'origine = même titre avant « · » (« kenz 122 », « kenz 122 · v1 », « kenz 122 · copie 2 ») :
     // un compte ne reçoit jamais deux versions de la même vidéo dans un lancement.
     const baseOf = (v: VidRef) => (v.title || v.id).split(' · ')[0].trim().toLowerCase()
-    const basesBy: Record<string, Set<string>> = {}
+    // vidéos d'origine déjà publiées par chaque compte, TOUS lancements confondus (réglages partagés de l'équipe) :
+    // un compte ne reçoit jamais une autre copie spoofée d'une vidéo qu'il a déjà postée
+    const basesBy: Record<string, Set<string>> = Object.fromEntries(Object.entries(team.posted).map(([k, v]) => [k, new Set(v)]))
     // Carrousel : N photos DIFFÉRENTES par post (dans l'ordre du tirage)
     const pickSet = (n: number, owner = ''): VidRef[] => {
       const out: VidRef[] = []
@@ -812,6 +815,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         if (posted) for (const v of job.vids) void bumpUsed(v.id)
         // Story CTA publiée : date gardée pour toute l'équipe (liste des comptes : « Story CTA en ligne · il y a 2 h »)
         if (posted && kind === 'story') editTeam(t => { t.lastStory[`${p.dev}::${job.container}`] = Date.now() })
+        // Reel / carrousel publié : ses vidéos d'origine retenues pour ce compte (jamais une autre copie plus tard)
+        if (posted && kind !== 'story') { const own = `${p.dev}::${job.container}`, b = job.vids.map(baseOf); editTeam(t => { t.posted[own] = [...new Set([...(t.posted[own] ?? []), ...b])].slice(-200) }) }
         // Story CTA à usage unique : la photo publiée est retirée de la Banque (elle ne resservira jamais)
         if (posted && kind === 'story' && storyOnce && src.mode === 'folder') for (const v of job.vids) {
           try { await supabase.from('content_bank').delete().eq('id', v.id); if (v.storage_path) await supabase.storage.from('content').remove([v.storage_path]); push(`${tag} 🗑 « ${v.title} » supprimée de la Banque (usage unique)`) } catch { /* noop */ }

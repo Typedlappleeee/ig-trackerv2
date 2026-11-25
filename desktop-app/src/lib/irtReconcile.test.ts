@@ -73,3 +73,14 @@ describe('éligibilité Trial', () => {
     expect(trialEligible(null)).toBeNull()
   })
 })
+
+import { parseTeam } from './irtTeam'
+describe('vidéos déjà publiées par compte (anti-doublon entre lancements)', () => {
+  it('relu proprement, 200 dernières gardées', () => {
+    const many = Array.from({ length: 250 }, (_, i) => `kenz ${i}`)
+    const t = parseTeam({ posted: { 'dev::@a': many, bad: 'x' } })
+    expect(t.posted['dev::@a']).toHaveLength(200)
+    expect(t.posted['dev::@a'][199]).toBe('kenz 249')
+    expect(t.posted.bad).toBeUndefined()
+  })
+})

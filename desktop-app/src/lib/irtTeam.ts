@@ -14,9 +14,10 @@ export interface IrtTeam {
   links: Record<string, string>         // `${iPhone}::${cible}` → lien CTA du compte
   ctaTexts: string[]                    // pool de textes CTA enregistrés
   lastStory: Record<string, number>     // `${iPhone}::${cible}` → date (ms) de la dernière Story CTA publiée par ScaleFlow
+  posted: Record<string, string[]>      // `${iPhone}::${cible}` → vidéos d'origine déjà publiées par ce compte (200 dernières)
   bankTemplate: string[]                // Banque : dossiers créés pour chaque nouvelle modèle (« Reels/Originaux »…) ; vide = défaut
 }
-export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, bankTemplate: [] })
+export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, posted: {}, bankTemplate: [] })
 
 const isMarket = (v: unknown): v is Market => v === 'fr' || v === 'us' || v === 'de'
 const strMap = (v: unknown): Record<string, string> => {
@@ -33,6 +34,8 @@ export function parseTeam(raw: unknown): IrtTeam {
     groupNames: Array.isArray(o.groupNames) ? [...new Set(o.groupNames.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean))].slice(0, 100) : [],
     markets: mktMap(o.markets), acctMarkets: mktMap(o.acctMarkets), links: strMap(o.links),
     lastStory: Object.fromEntries(Object.entries((o.lastStory && typeof o.lastStory === 'object' && !Array.isArray(o.lastStory) ? o.lastStory : {}) as Record<string, unknown>).filter(([, v]) => typeof v === 'number' && v > 0)) as Record<string, number>,
+    posted: Object.fromEntries(Object.entries((o.posted && typeof o.posted === 'object' && !Array.isArray(o.posted) ? o.posted : {}) as Record<string, unknown>)
+      .filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((x): x is string => typeof x === 'string').slice(-200)])),
     bankTemplate: Array.isArray(o.bankTemplate) ? [...new Set(o.bankTemplate.filter((x): x is string => typeof x === 'string').map(x => x.split('/').map(y => y.trim()).filter(Boolean).join('/')).filter(Boolean))].slice(0, 60) : [],
     ctaTexts: Array.isArray(o.ctaTexts) ? [...new Set(o.ctaTexts.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean))].slice(0, 200) : [],
   }
