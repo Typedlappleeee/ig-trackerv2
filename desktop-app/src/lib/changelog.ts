@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25m',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : aperçu plein écran de la vidéo fermé', en: 'iRemoTech: full-screen video preview closed' },
+    items: {
+      fr: ['Quand Instagram ouvre la vidéo en plein écran avec un bouton « Done » (tap sur la miniature de la page de partage), ScaleFlow tape Done et continue le post au lieu de rester bloqué.'],
+      en: ['When Instagram opens the video full screen with a “Done” button (tap on the share-page thumbnail), ScaleFlow taps Done and carries on with the post instead of getting stuck.'],
+    },
+  },
+  {
     id: '2026-11-25l',
     date: '2026-11-25',
     title: { fr: 'Posting : un seul marché pour tous les comptes', en: 'Posting: one market for all accounts' },

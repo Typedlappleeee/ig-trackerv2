@@ -599,6 +599,16 @@ export function captionEditorOpen(words: { text: string; cy: number }[], H: numb
   return title || (chips && suggest)
 }
 
+/** Aperçu plein écran du média (ouvert par un tap sur la miniature de la page de partage) : seule commande = pastille
+ *  blanche « Done » en bas au centre. Vu en vrai le 25/11/2026 sur STEVIE7 (téléphone resté bloqué dessus). Pure. */
+export function mediaPreviewDone(words: { text: string; cx: number; cy: number }[], W: number, H: number): { x: number; y: number } | null {
+  const d = words.find(o => /^done$/i.test(o.text) && o.cy > H * 0.68 && Math.abs(o.cx - W / 2) < W * 0.2)
+  if (!d) return null
+  // jamais sur un écran Instagram ordinaire (page de partage, éditeur, feuilles)
+  if (words.some(o => /^(share|next|caption|cancel|location|people|audience|edit|save|post|reel)$/i.test(o.text))) return null
+  return { x: d.cx, y: d.cy }
+}
+
 /** Écran « What happened / We removed some content or messages » : hauteur de la croix (celle du titre en haut). Pure. */
 export function removedContentScreen(words: { text: string; cy: number }[], H: number): { y: number } | null {
   const has = (re: RegExp) => words.some(o => re.test(o.text))
@@ -627,6 +637,13 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   if (cameraSheet(scr.words, scr.H)) return grantPhotoAccessIfAsked(key, deviceId, hooks).then(() => true) // → Continue, puis Allow (caméra / micro)
   // Écran Instagram « What happened · We removed some content or messages » (contenus retirés) → croix ✕ en haut à
   // droite, à la hauteur du titre « What happened » (jamais « See all » ni rien d'autre). Vu en vrai le 25/11/2026.
+  const preview = mediaPreviewDone(scr.words, scr.W, scr.H)
+  if (preview) {
+    hooks?.log?.('   aperçu plein écran du média → Done')
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(preview.x), y: Math.round(preview.y) })
+    await sleep(1500)
+    return true
+  }
   const removed = removedContentScreen(scr.words, scr.H)
   if (removed) {
     hooks?.log?.('   écran « We removed some content » → fermé (✕)')
@@ -1319,6 +1336,9 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
   const closeCaptionEditor = async () => {
     for (let j = 0; j < 2; j++) {
       const ce = await readScreenWords(key, deviceId)
+      // aperçu plein écran du média (tap sur la miniature) → Done, sinon Share est introuvable (STEVIE7, 25/11/2026)
+      const pv = ce ? mediaPreviewDone(ce.words, ce.W, ce.H) : null
+      if (pv) { hooks?.log?.('   aperçu plein écran du média → Done'); await sendAction(key, deviceId, { type: 'tap', x: Math.round(pv.x), y: Math.round(pv.y) }); await sleep(1500); continue }
       if (!ce || !await captionEditorShown(ce)) return
       hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
       await tapCaptionCheck(key, deviceId, W, H, ce.shot) // jamais Share ici : la liste des hashtags suggérés est dessous
@@ -1433,6 +1453,9 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
     // « Add location » pas lu, mais « Tag people » visible : la ligne du lieu est juste en dessous (≈ 7,5 % de la hauteur)
     const tg = scr?.words.find(o => /^tag$/i.test(o.text) && o.cy > H * 0.25 && o.cy < H * 0.82 && scr.words.some(p => /^people$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))
     if (tg && scr && !locationAlreadySet(scr.words, loc, H) && !(await captionEditorShown(scr))) { hooks?.log?.('   « Add location » non lu → ligne sous « Tag people »'); row = { x: Math.round(0.35 * W), y: Math.round(tg.cy + 0.075 * H) }; break }
+    // aperçu plein écran du média ouvert par erreur (tap sur la miniature) → Done, puis on relit la page
+    const pv = scr ? mediaPreviewDone(scr.words, W, H) : null
+    if (pv) { hooks?.log?.('   aperçu plein écran du média → Done'); await tap(pv.x, pv.y); await sleep(1500); k--; if (++closeTries > 3) break; continue }
     // éditeur de légende encore ouvert (liste des hashtags suggérés) : JAMAIS de défilement ici → coche ✓ d'abord
     if (scr && await captionEditorShown(scr)) {
       hooks?.log?.('   éditeur de légende encore ouvert → ✓ (haut-droite)')
@@ -1455,6 +1478,8 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
       const cw = c.words.find(o => /^cancel$/i.test(o.text) && o.cy < H * 0.2)
       const search = c.words.some(o => o.text.replace(/[^a-z]/gi, '').toLowerCase() === 'search' && o.cy < H * 0.45)
       const mapPreview = c.words.some(o => /^preview$/i.test(o.text)) && c.words.some(o => /^map$/i.test(o.text))
+      const pv = mediaPreviewDone(c.words, W, H)
+      if (pv) { await tap(pv.x, pv.y); await sleep(1500); continue }
       if (!title && !cw && !search && !mapPreview) return // plus de feuille : page de partage (la miniature dit « Preview » : ignorée)
       if (cw) await tap(cw.cx, cw.cy)
       else if (title && k < 2) await tap(0.9 * W, title.cy)          // croix ✕ alignée sur le titre

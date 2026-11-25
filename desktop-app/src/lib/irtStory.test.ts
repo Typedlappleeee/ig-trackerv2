@@ -209,3 +209,14 @@ describe('écran « We removed some content »', () => {
     expect(removedContentScreen([{ text: 'For', cy: 50 }, { text: 'you', cy: 50 }], 720)).toBeNull()
   })
 })
+
+import { mediaPreviewDone } from './iremotechVision'
+describe('aperçu plein écran du média (« Done »)', () => {
+  it('reconnu (Done en bas au centre, texte de la vidéo autour) ; page de partage / clavier → non', () => {
+    const W = 406, H = 720
+    const v = [{ text: 'Wie', cx: 120, cy: 130 }, { text: 'Lehrer', cx: 200, cy: 130 }, { text: '5', cx: 200, cy: 520 }, { text: 'Done', cx: 203, cy: 610 }]
+    expect(mediaPreviewDone(v, W, H)).toEqual({ x: 203, y: 610 })
+    expect(mediaPreviewDone([...v, { text: 'Share', cx: 300, cy: 690 }], W, H)).toBeNull()
+    expect(mediaPreviewDone([{ text: 'Done', cx: 370, cy: 500 }], W, H)).toBeNull() // « Done » du clavier, à droite
+  })
+})
