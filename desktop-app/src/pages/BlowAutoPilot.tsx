@@ -186,8 +186,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [gapScroll, setGapScroll] = useState(() => { try { return localStorage.getItem('sf-irt-gap-scroll') !== '0' } catch { return true } })
   // Story CTA : chaque photo du dossier sert UNE fois (supprimée de la Banque après publication) + métadonnées uniques
   // Reels / carrousels : média supprimé de la Banque une fois publié (décoché par défaut)
-  const [reelOnce, setReelOnce] = useState(() => { try { return localStorage.getItem('sf-irt-reel-once') === '1' } catch { return false } })
-  const [storyOnce, setStoryOnce] = useState(() => { try { return localStorage.getItem('sf-irt-story-once') === '1' } catch { return false } })
+  // publié = retiré de la Banque (corbeille, 7 j) — ACTIVÉ par défaut (demande de l'équipe, 25/11/2026)
+  const [reelOnce, setReelOnce] = useState(() => { try { return localStorage.getItem('sf-irt-reel-once2') !== '0' } catch { return true } })
+  const [storyOnce, setStoryOnce] = useState(() => { try { return localStorage.getItem('sf-irt-story-once2') !== '0' } catch { return true } })
   const [storyUnique, setStoryUnique] = useState(() => { try { return localStorage.getItem('sf-irt-story-unique') !== '0' } catch { return true } })
   // Setup compte : photo de profil générée + bio selon le marché du compte
   const [setupPfp, setSetupPfp] = useState(true)
@@ -873,11 +874,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           try { await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).eq('id', v.id); consumed.add(v.id); push(`${tag} 🧬 copie « ${v.title} » consommée (corbeille)`); void respoofIfNoCopyLeft(v, marketOf(p.dev, job.container), m => push(`${tag} ${m}`)) } catch { /* noop */ }
         }
         if (posted && kind === 'story' && storyOnce && src.mode === 'folder') for (const v of job.vids.filter(x => !consumed.has(x.id))) {
-          try { await supabase.from('content_bank').delete().eq('id', v.id); if (v.storage_path) await supabase.storage.from('content').remove([v.storage_path]); push(`${tag} 🗑 « ${v.title} » supprimée de la Banque (usage unique)`) } catch { /* noop */ }
+          try { await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).eq('id', v.id); push(`${tag} 🗑 « ${v.title} » publiée → retirée de la Banque (corbeille, 7 j)`) } catch { /* noop */ }
         }
         // Reels / carrousels : média supprimé de la Banque une fois publié (option)
         if (posted && kind !== 'story' && reelOnce) for (const v of job.vids) {
-          try { await supabase.from('content_bank').delete().eq('id', v.id); if (v.storage_path) await supabase.storage.from('content').remove([v.storage_path]); push(`${tag} 🗑 « ${v.title} » supprimé de la Banque (publié)`) } catch { /* noop */ }
+          try { await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).eq('id', v.id); push(`${tag} 🗑 « ${v.title} » publié → retiré de la Banque (corbeille, 7 j)`) } catch { /* noop */ }
         }
         R.tick(posted)
       }
@@ -1618,8 +1619,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           </>) : (<>
             {sourceRow('reel')}
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer', margin: '0 0 10px' }}>
-              <input type="checkbox" checked={reelOnce} disabled={running} onChange={e => { setReelOnce(e.target.checked); try { localStorage.setItem('sf-irt-reel-once', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
-              🗑 Supprimer de la Banque une fois publiée <span style={{ color: DIM, fontSize: 11.5 }}>(une vidéo ne sert jamais deux fois de toute façon : seules les vidéos jamais publiées sont prises)</span>
+              <input type="checkbox" checked={reelOnce} disabled={running} onChange={e => { setReelOnce(e.target.checked); try { localStorage.setItem('sf-irt-reel-once2', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              🗑 Retirer de la Banque une fois publiée <span style={{ color: DIM, fontSize: 11.5 }}>(corbeille, récupérable 7 jours)</span>
             </label>
             {reelSrc.mode === 'folder' && <p style={{ margin: '0 0 12px', fontSize: 12, color: MUTED }}>Au lancement, seules les vidéos du dossier JAMAIS publiées sont prises (y compris les nouvelles), chacune une seule fois, et jamais deux versions d’une même vidéo sur un compte.</p>}
             {reelSrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
@@ -1717,8 +1718,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               🧬 Métadonnées uniques <span style={{ color: DIM, fontSize: 11.5 }}>(chaque photo envoyée est rendue unique : micro-recadrage + EXIF d’iPhone)</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
-              <input type="checkbox" checked={storyOnce} disabled={running} onChange={e => { setStoryOnce(e.target.checked); try { localStorage.setItem('sf-irt-story-once', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
-              🗑 Usage unique <span style={{ color: DIM, fontSize: 11.5 }}>(mode dossier : la photo est supprimée de la Banque une fois publiée)</span>
+              <input type="checkbox" checked={storyOnce} disabled={running} onChange={e => { setStoryOnce(e.target.checked); try { localStorage.setItem('sf-irt-story-once2', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
+              🗑 Retirer de la Banque une fois publiée <span style={{ color: DIM, fontSize: 11.5 }}>(mode dossier · corbeille, récupérable 7 jours)</span>
             </label>
           </div>
           {storySrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>

@@ -7,6 +7,9 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "🗑 Retirer de la Banque une fois publiée": "🗑 Remove from the Bank once posted",
+    "(corbeille, récupérable 7 jours)": "(trash, recoverable for 7 days)",
+    "(mode dossier · corbeille, récupérable 7 jours)": "(folder mode · trash, recoverable for 7 days)",
     "Original spoofé : plus aucune copie — sélectionne-le puis « Spoofer en copies »": "Spoofed original: no copy left — select it then “Spoof into copies”",
     "⚠ 0 copie": "⚠ 0 copies",
     "⚠ Aucune photo publiable : ce sont toutes des originaux spoofés. Les copies sont-elles dans ce dossier ?": "⚠ No postable photo: they are all spoofed originals. Are the copies in this folder?",
@@ -5253,7 +5256,8 @@ export const EN: Dict = {
     ["🧬 {0} photo(s) originale(s) écartée(s) : seules leurs copies spoofées sont publiées", "🧬 {0} original photo(s) set aside: only their spoofed copies are posted"],
     ["{0} 🧬 copie « {1} » consommée (corbeille)", "{0} 🧬 copy “{1}” used up (trash)"],
     ["🧬 plus de copie pour « {0} » → {1} nouvelle(s) copie(s) spoofée(s) créée(s) automatiquement", "🧬 no copy left for “{0}” → {1} new spoofed copy(ies) created automatically"],
-    ["{0} {1}", "{0} {1}"],
+    ["{0} 🗑 « {1} » publiée → retirée de la Banque (corbeille, 7 j)", "{0} 🗑 “{1}” posted → removed from the Bank (trash, 7 d)"],
+    ["{0} 🗑 « {1} » publié → retiré de la Banque (corbeille, 7 j)", "{0} 🗑 “{1}” posted → removed from the Bank (trash, 7 d)"],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],

@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25ze',
+    date: '2026-11-25',
+    title: { fr: 'Publié = retiré de la Banque', en: 'Posted = removed from the Bank' },
+    items: {
+      fr: ['iRemoTech : une vidéo ou une photo publiée (Reel, carrousel, Story CTA) est maintenant retirée de la Banque par défaut. Elle part à la corbeille (récupérable 7 jours) au lieu d’être effacée définitivement. Décochable dans le Posting.'],
+      en: ['iRemoTech: a posted video or photo (Reel, carousel, Story CTA) is now removed from the Bank by default. It goes to the trash (recoverable for 7 days) instead of being erased for good. Can be unticked in Posting.'],
+    },
+  },
+  {
     id: '2026-11-25zd',
     date: '2026-11-25',
     title: { fr: 'Story CTA : jamais l’original d’une photo spoofée', en: 'Story CTA: never the original of a spoofed photo' },
