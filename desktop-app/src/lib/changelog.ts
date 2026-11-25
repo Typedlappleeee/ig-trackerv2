@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25zg',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : corrections du test sur 5 iPhones', en: 'iRemoTech: fixes from the 5-iPhone test' },
+    items: {
+      fr: [
+        'Ancien brouillon de Reel rouvert par Instagram (après un post interrompu) : abandonné automatiquement (« Start new video » / Discard, jamais « Continue » ni « Save draft ») — il ne peut plus être publié à la place de la nouvelle vidéo.',
+        'Bouton gris AssistiveTouch d’iOS rangé contre le bord droit dès qu’il peut gêner : posé à gauche, il recevait le tap sur la ville de la localisation et ouvrait le sélecteur d’apps.',
+        'Localisation : la ville est tapée au milieu de sa ligne, jamais au bord.',
+        'Page de partage reconnue même défilée (« Tag people », « Audience », « Save draft »).',
+      ],
+      en: [
+        'Old Reel draft reopened by Instagram (after an interrupted post): discarded automatically (“Start new video” / Discard, never “Continue” or “Save draft”) — it can no longer be posted instead of the new video.',
+        'iOS grey AssistiveTouch button parked on the right edge as soon as it can get in the way: on the left it received the location city tap and opened the app switcher.',
+        'Location: the city is tapped in the middle of its row, never at the edge.',
+        'Share page recognised even when scrolled (“Tag people”, “Audience”, “Save draft”).',
+      ],
+    },
+  },
+  {
     id: '2026-11-25zf',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : Story CTA sans le « + »', en: 'iRemoTech: Story CTA without the “+”' },

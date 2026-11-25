@@ -254,3 +254,12 @@ describe('galerie « New reel » ouverte directement (open_app instagram_reel)',
     expect(newReelGallery([{ text: 'For', cy: 50 }, { text: 'you', cy: 50 }, { text: 'Reels', cy: 690 }], 720)).toBe(false)
   })
 })
+
+import { sharePageShown } from './iremotechVision'
+describe('page de partage défilée (titre hors écran, Share illisible)', () => {
+  it('reconnue par « Tag people » / « Audience » / « Save draft » ; fil d’accueil → non', () => {
+    expect(sharePageShown([{ text: 'Tag', cx: 60, cy: 300 }, { text: 'people', cx: 110, cy: 300 }], 406, 720)).toBe(true)
+    expect(sharePageShown([{ text: 'Save', cx: 60, cy: 690 }, { text: 'draft', cx: 110, cy: 690 }], 406, 720)).toBe(true)
+    expect(sharePageShown([{ text: 'For', cx: 60, cy: 40 }, { text: 'you', cx: 90, cy: 40 }, { text: 'Your', cx: 40, cy: 200 }, { text: 'story', cx: 80, cy: 200 }], 406, 720)).toBe(false)
+  })
+})

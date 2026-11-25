@@ -35,8 +35,10 @@ export async function clearAssistiveTouch(key: string, deviceId: string, hooks?:
     const { w: W, h: H } = await imgSize(shot)
     const at = await findAssistiveTouch(shot).catch(() => null)
     if (!at) return k > 0
-    const inTheWay = (at.cx < W * 0.25 && at.cy < H * 0.16) || at.cy > H * 0.86 || (at.cx > W * 0.75 && at.cy < H * 0.12)
-    if (!inTheWay) return k > 0
+    // rangé = contre le bord DROIT, vers le milieu de l'écran (zone qu'aucune étape ne tape). Partout ailleurs il gêne :
+    // vu en vrai le 25/11/2026, posé à gauche il recevait le tap sur la ville choisie et ouvrait le sélecteur d'apps.
+    const parked = at.cx > W * 0.82 && at.cy > H * 0.3 && at.cy < H * 0.55
+    if (parked) return k > 0
     if (!k) hooks?.log?.('   bouton AssistiveTouch sur une zone d’Instagram → déplacé sur le bord droit')
     await sendAction(key, deviceId, { type: 'swipe', x1: at.cx, y1: at.cy, x2: W - 30, y2: Math.round(H * 0.42), duration_ms: 700 })
     await sleep(1800)
@@ -189,7 +191,10 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
 export function sharePageShown(words: { text: string; cx: number; cy: number }[], W: number, H: number): boolean {
   const title = words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.08) && words.some(o => /^(reel|post)$/i.test(o.text) && o.cy < H * 0.08)
   const btn = words.some(o => /^(share|partager)$/i.test(o.text) && o.cy > H * 0.9 && o.cx > W * 0.5)
-  return title || btn
+  // page défilée (titre hors écran) et « Share » blanc sur bleu souvent illisible : autres repères propres à la page
+  const sameLine = (a: RegExp, b: RegExp) => words.some(o => a.test(o.text) && words.some(p => b.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
+  const rows = [sameLine(/^tag$/i, /^people$/i), sameLine(/^add$/i, /^location$/i), words.some(o => /^audience$/i.test(o.text)), sameLine(/^save$/i, /^draft$/i)].filter(Boolean).length
+  return title || btn || rows >= 1
 }
 /** Fenêtre « Update on your original audio » affichée après Share (le Reel n'est pas encore parti). Pure. */
 export function originalAudioSheet(words: { text: string }[]): boolean {
@@ -660,6 +665,14 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
     await doubleTap(key, deviceId, c.cx, c.cy); await sleep(1500)
     return true
   }
+  // Instagram propose de reprendre le dernier brouillon (« Continue » / « Start new video ») → TOUJOURS une nouvelle vidéo
+  // (« Continue » rouvrirait un ancien Reel avec une autre vidéo). Vu en vrai le 25/11/2026.
+  if (has(/^start$/i) && has(/^new$/i) && has(/^video$/i)) {
+    const st = scr.words.find(o => /^start$/i.test(o.text))!
+    hooks?.log?.('   « Continuer le brouillon ? » → Start new video')
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(scr.W / 2), y: st.cy }); await sleep(1800)
+    return true
+  }
   // Offre « Meta Verified » (abonnement payant, vue en vrai le 24/11/2026 par-dessus le créateur) → Cancel / Not now,
   // sinon la feuille glissée vers le bas. JAMAIS le bouton d'abonnement.
   if (has(/^verified$/i) && (has(/^meta$/i) || has(/^subscription/i))) {
@@ -1081,6 +1094,26 @@ export function newPostGallery(words: { text: string; cy: number }[], H: number)
   return words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.08) && words.some(o => /^post$/i.test(o.text) && o.cy < H * 0.08)
 }
 
+/** Brouillon de Reel rouvert par Instagram (éditeur / page de partage d'un ANCIEN post, vu en vrai le 25/11/2026 après
+ *  un post interrompu) : on l'ABANDONNE — retour en haut à gauche, puis « Discard » / « Start over » / « Delete »
+ *  (jamais « Save draft ») — jusqu'à revenir à la galerie « New reel ». true si la galerie est affichée. */
+async function discardReelDraft(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  for (let k = 0; k < 5; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) { await sleep(1000); continue }
+    if (newReelGallery(scr.words, scr.H)) return true
+    const choice = scr.words.find(o => /^(discard|start|delete|abandonner|supprimer)$/i.test(o.text) && o.cy > scr.H * 0.3)
+    if (choice) { hooks?.log?.(`   brouillon d’un ancien Reel → « ${choice.text} »`); await sendAction(key, deviceId, { type: 'tap', x: choice.cx, y: choice.cy }); await sleep(2000); continue }
+    // retour seulement sur un écran de création Instagram reconnu (jamais sur l'accueil iOS : le coin ouvrirait une app)
+    const creating = editorToolsY(scr.words, scr.H) != null || sharePageShown(scr.words, scr.W, scr.H) || scr.words.some(o => /^(trim|pinch|caption)$/i.test(o.text))
+    if (!creating) return false
+    if (k === 0) hooks?.log?.('   un ancien brouillon de Reel s’est rouvert → abandon (jamais publié)')
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.085 * scr.W), y: Math.round(0.06 * scr.H) })   // ‹ / ✕ / ⌃ en haut à gauche
+    await sleep(1800)
+  }
+  return false
+}
+
 /** MODE TEST (« dry run ») par iPhone : tout l'enchaînement d'un post tourne (galerie, éditeur, légende, lieu, page de
  *  partage) mais on s'arrête JUSTE AVANT « Share » ; Instagram est alors fermé (brouillon abandonné) → rien n'est publié. */
 export const DRY_RUN = new Set<string>()
@@ -1088,6 +1121,17 @@ async function dryRunStop(key: string, deviceId: string, hooks?: VisionHooks): P
   const sp = await readScreenWords(key, deviceId)
   const onShare = !!sp && sharePageShown(sp.words, sp.W, sp.H)
   hooks?.log?.(onShare ? '🧪 TEST : page de partage atteinte → arrêt AVANT Share (rien n’est publié)' : '🧪 TEST : arrêt avant Share — ⚠ page de partage NON reconnue')
+  // comme après une vraie publication : brouillon abandonné, galerie fermée (✕), retour sur le fil d'accueil
+  if (onShare && await discardReelDraft(key, deviceId, hooks)) {
+    const g = await readScreenWords(key, deviceId)
+    if (g) { await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.09 * g.W), y: Math.round(0.08 * g.H) }); await sleep(2000) }
+    const home = await readScreenWords(key, deviceId)
+    if (home && homeFeedShown(home.words, home.H)) { hooks?.log?.('🏠 TEST : post annulé, retour sur le fil d’accueil'); return true }
+    if (home) await goHomeTab(key, deviceId, home.W, home.H, hooks)
+    const h2 = await readScreenWords(key, deviceId)
+    if (h2 && homeFeedShown(h2.words, h2.H)) { hooks?.log?.('🏠 TEST : post annulé, retour sur le fil d’accueil'); return true }
+  }
+  hooks?.log?.('   TEST : retour au fil impossible → Instagram fermé')
   await forceCloseForegroundApp(key, deviceId, hooks)
   return onShare
 }
@@ -1223,6 +1267,10 @@ async function postViaReelGallery(key: string, deviceId: string, A: typeof REEL_
   await sleep(4500)
   let scr = await readScreenWords(key, deviceId)
   if (scr && !newReelGallery(scr.words, scr.H) && await dismissIgInfoSheet(key, deviceId, hooks)) { await sleep(1500); scr = await readScreenWords(key, deviceId) }
+  // ancien brouillon rouvert (éditeur avec sa barre d'outils, ou page de partage) → abandonné, puis la galerie
+  if (scr && !newReelGallery(scr.words, scr.H) && (editorToolsY(scr.words, scr.H) != null || sharePageShown(scr.words, scr.W, scr.H) || scr.words.some(o => /^(trim|pinch)$/i.test(o.text)))) {
+    if (await discardReelDraft(key, deviceId, hooks)) scr = await readScreenWords(key, deviceId)
+  }
   if (!scr || !newReelGallery(scr.words, scr.H)) { hooks?.log?.('   galerie « New reel » directe non reconnue → passage par le +'); return null }
   const { W, H } = scr
   hooks?.log?.('🎞️ Galerie « New reel » ouverte directement')
@@ -1646,7 +1694,7 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   // feuille « Locations » ouverte mais « Search » mal lu (curseur, bulle Paste/AutoFill) → position connue du champ
   if (!search && sheetOpen) search = { x: 0.3 * W, y: 0.314 * H }
   if (!search) { hooks?.log?.('   ⚠ recherche de lieu introuvable → publication sans localisation'); await cancel(); return false }
-  await tap(search.x, search.y)
+  await tap(Math.max(search.x, Math.round(W * 0.45)), search.y)
   await sleep(1200)
   await typeRich(key, deviceId, loc.q)
   // la saisie se fait lettre par lettre (vu en vrai : « Miami, Fl… » encore en cours) et la liste montre d'abord les
@@ -1667,7 +1715,7 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
   // (Vérifier trop tôt retapait pendant la frappe : « Stuttgart, GermanyStuttgart… » → aucun résultat, vu le 24/11/2026.)
   if (await waitTyped() === 'empty') {
     hooks?.log?.('   champ de recherche resté vide → nouvelle saisie')
-    await tap(search.x, search.y); await sleep(1200)
+    await tap(Math.max(search.x, Math.round(W * 0.45)), search.y); await sleep(1200)
     await typeRich(key, deviceId, loc.q)
     await waitTyped()
   }
@@ -1682,7 +1730,8 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
     if (!pt) await sleep(1500)
   }
   if (!pt) { hooks?.log?.(`   ⚠ « ${loc.label} » absent des résultats → publication sans localisation`); await cancel(); return false }
-  await tap(pt.x, pt.y)
+  await clearAssistiveTouch(key, deviceId, hooks)
+  await tap(Math.round(W * 0.5), pt.y)   // milieu de la ligne (toute la ligne est cliquable), jamais le bord gauche
   // 4. « Map preview » → bouton « Add » (bleu, en bas) — la feuille met un peu de temps à monter
   for (let k = 0; k < 4; k++) {
     await sleep(k ? 1200 : 1000)

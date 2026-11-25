@@ -7,6 +7,10 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "« Continuer le brouillon ? » → Start new video": "“Continue the draft?” → Start new video",
+    "🏠 TEST : post annulé, retour sur le fil d’accueil": "🏠 TEST: post cancelled, back to the home feed",
+    "TEST : retour au fil impossible → Instagram fermé": "TEST: could not get back to the feed → Instagram closed",
+    "un ancien brouillon de Reel s’est rouvert → abandon (jamais publié)": "an old Reel draft reopened → discarded (never posted)",
     "🧪 TEST : page de partage atteinte → arrêt AVANT Share (rien n’est publié)": "🧪 TEST: share page reached → stopped BEFORE Share (nothing is posted)",
     "🧪 TEST : arrêt avant Share — ⚠ page de partage NON reconnue": "🧪 TEST: stopped before Share — ⚠ share page NOT recognised",
     "📷 Caméra Story ouverte directement": "📷 Story camera opened directly",
@@ -5262,6 +5266,7 @@ export const EN: Dict = {
     ["🧬 plus de copie pour « {0} » → {1} nouvelle(s) copie(s) spoofée(s) créée(s) automatiquement", "🧬 no copy left for “{0}” → {1} new spoofed copy(ies) created automatically"],
     ["{0} 🗑 « {1} » publiée → retirée de la Banque (corbeille, 7 j)", "{0} 🗑 “{1}” posted → removed from the Bank (trash, 7 d)"],
     ["{0} 🗑 « {1} » publié → retiré de la Banque (corbeille, 7 j)", "{0} 🗑 “{1}” posted → removed from the Bank (trash, 7 d)"],
+    ["brouillon d’un ancien Reel → « {0} »", "old Reel draft → “{0}”"],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],
