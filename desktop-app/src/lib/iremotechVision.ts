@@ -1102,7 +1102,9 @@ async function discardReelDraft(key: string, deviceId: string, hooks?: VisionHoo
     const scr = await readScreenWords(key, deviceId)
     if (!scr) { await sleep(1000); continue }
     if (newReelGallery(scr.words, scr.H)) return true
-    const choice = scr.words.find(o => /^(discard|start|delete|abandonner|supprimer)$/i.test(o.text) && o.cy > scr.H * 0.3)
+    // le BOUTON (« Start over » rouge, « Discard »…) est sous le titre de la fenêtre (« Start over? ») : la ligne la plus
+    // basse qui correspond, jamais le titre (vu en vrai le 25/11/2026 : le tap sur le titre ne faisait rien)
+    const choice = scr.words.filter(o => /^(discard|start|delete|abandonner|supprimer)$/i.test(o.text) && o.cy > scr.H * 0.3).sort((a, b) => b.cy - a.cy)[0]
     if (choice) { hooks?.log?.(`   brouillon d’un ancien Reel → « ${choice.text} »`); await sendAction(key, deviceId, { type: 'tap', x: choice.cx, y: choice.cy }); await sleep(2000); continue }
     // retour seulement sur un écran de création Instagram reconnu (jamais sur l'accueil iOS : le coin ouvrirait une app)
     const creating = editorToolsY(scr.words, scr.H) != null || sharePageShown(scr.words, scr.W, scr.H) || scr.words.some(o => /^(trim|pinch|caption)$/i.test(o.text))
