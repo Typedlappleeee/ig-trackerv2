@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "feuille « Introducing instants » → Not now": "“Introducing instants” sheet → Not now",
     "« Continuer le brouillon ? » → Start new video": "“Continue the draft?” → Start new video",
     "🏠 TEST : post annulé, retour sur le fil d’accueil": "🏠 TEST: post cancelled, back to the home feed",
     "TEST : retour au fil impossible → Instagram fermé": "TEST: could not get back to the feed → Instagram closed",

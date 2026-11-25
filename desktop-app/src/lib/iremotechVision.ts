@@ -665,6 +665,13 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
     await doubleTap(key, deviceId, c.cx, c.cy); await sleep(1500)
     return true
   }
+  // Feuille « Introducing instants · A new no-edit camera… » (vue en vrai le 25/11/2026 après le mode avion) → Not now
+  if (has(/^introducing$/i) && has(/^instants?$/i)) {
+    const nw = scr.words.filter(o => /^now$/i.test(o.text) && scr.words.some(n => /^not$/i.test(n.text) && Math.abs(n.cy - o.cy) < 12)).sort((a, b) => b.cy - a.cy)[0]
+    hooks?.log?.('   feuille « Introducing instants » → Not now')
+    await sendAction(key, deviceId, { type: 'tap', x: nw ? Math.round(scr.W / 2) : Math.round(scr.W / 2), y: nw ? nw.cy : Math.round(scr.H * 0.9) }); await sleep(1500)
+    return true
+  }
   // Instagram propose de reprendre le dernier brouillon (« Continue » / « Start new video ») → TOUJOURS une nouvelle vidéo
   // (« Continue » rouvrirait un ancien Reel avec une autre vidéo). Vu en vrai le 25/11/2026.
   if (has(/^start$/i) && has(/^new$/i) && has(/^video$/i)) {
@@ -3268,15 +3275,25 @@ async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHoo
   await grantPhotoAccessIfAsked(key, deviceId, hooks) // alertes iOS restées à l'écran (elles bloquent tous les taps)
   await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
   // 1. action iRemoTech « open_app » : ouvre Instagram où que soit son icône (aucun tap sur l'accueil). Vérifiée.
-  if (await sendAction(key, deviceId, { type: 'open_app', target: 'instagram' })) {
+  // réessayé : juste après le mode avion, iRemoTech refuse parfois l'action (limite de débit) alors qu'Instagram s'ouvre
+  const opened = await sendWithRetry(key, deviceId, { type: 'open_app', target: 'instagram' }, 3)
+  {
     await sleep(4000)
+    await dismissIgInfoSheet(key, deviceId, hooks)   // « Introducing instants », « Stories archive »… posées sur le fil
     const scr = await readScreenWords(key, deviceId)
+    // Instagram DÉJÀ à l'écran (même si l'action a été refusée) : jamais de recherche d'icône par-dessus
+    if (scr && (homeFeedShown(scr.words, scr.H) || isProfileScreen(scr.words, scr.H) || scr.words.some(o => /^(instants|reels)$/i.test(o.text)) && scr.words.some(o => /^(for|following)$/i.test(o.text)))) {
+      hooks?.log?.('📲 Instagram ouvert (open_app)')
+      await grantPhotoAccessIfAsked(key, deviceId, hooks)
+      return 'app'
+    }
+    if (!opened) { /* action refusée et Instagram pas à l'écran : icône de l'accueil */ } else
     if (scr && !otherAppOpened(scr.words) && !isAppLibrary(scr.words) && !isTodayView(scr.words) && !scr.words.some(o => /^(weather|stocks|wallet)$/i.test(o.text))) {
       hooks?.log?.('📲 Instagram ouvert (open_app)')
       await grantPhotoAccessIfAsked(key, deviceId, hooks)
       return 'app'
     }
-    hooks?.log?.('   open_app sans effet → icône de l’accueil')
+    if (opened) hooks?.log?.('   open_app sans effet → icône de l’accueil')
     await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
   }
   // 2. secours : icône trouvée à son nom sur les pages d'accueil
