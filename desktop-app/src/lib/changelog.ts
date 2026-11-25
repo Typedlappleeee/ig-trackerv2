@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25zd',
+    date: '2026-11-25',
+    title: { fr: 'Story CTA : jamais l’original d’une photo spoofée', en: 'Story CTA: never the original of a spoofed photo' },
+    items: {
+      fr: ['Quand une photo a été « Spoofée en copies », la Story CTA ne publie que ses copies, jamais l’original — même quand toutes les copies ont été utilisées. L’original reste dans la Banque comme source.'],
+      en: ['When a photo has been “Spoofed into copies”, the Story CTA only posts its copies, never the original — even once every copy has been used. The original stays in the Bank as the source.'],
+    },
+  },
+  {
     id: '2026-11-25zc',
     date: '2026-11-25',
     title: { fr: 'Choix de la modèle et du dossier partout', en: 'Model and folder choice everywhere' },

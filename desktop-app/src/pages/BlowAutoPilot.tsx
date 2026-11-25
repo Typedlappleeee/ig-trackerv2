@@ -622,6 +622,23 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     // Reels / carrousels : JAMAIS deux fois la même vidéo (demande de l'équipe) — dossier : uniquement les médias jamais
     // publiés ; dans un lancement, aucun média repris. Pas assez de médias → rien n'est lancé.
     const noRepeat = kind !== 'story'
+    // Story CTA : JAMAIS l'original d'une photo spoofée en copies (demande de l'équipe) — seulement ses copies.
+    // Original = marqué « spoof-src » par « Spoofer en copies », ou titre sans « · » dont des copies existent.
+    if (kind === 'story') {
+      const base = (v: VidRef) => (v.title || v.id).split(' · ')[0].trim().toLowerCase()
+      const copyBases = new Set(pool.filter(v => / · copie \d+/i.test(v.title)).map(base))
+      let srcIds = new Set<string>()
+      try {
+        let q = supabase.from('content_bank').select('id').contains('tags', ['spoof-src']).is('deleted_at', null)
+        q = bankScope.orgId ? q.eq('org_id', bankScope.orgId) : q.eq('user_id', bankScope.userId).is('org_id', null)
+        const { data } = await q
+        srcIds = new Set(((data ?? []) as { id: string }[]).map(r => r.id))
+      } catch { /* noop */ }
+      const before = pool.length
+      pool = pool.filter(v => !srcIds.has(v.id) && !(!v.title.includes(' · ') && copyBases.has(base(v))))
+      if (pool.length < before) setLogs(l => [...l, `🧬 ${before - pool.length} photo(s) originale(s) écartée(s) : seules leurs copies spoofées sont publiées`])
+      if (!pool.length) { setLogs([`⚠ Aucune photo publiable : ce sont toutes des originaux spoofés. Les copies sont-elles dans ce dossier ?`]); setRunning(false); return }
+    }
     if (noRepeat) {
       // dossier OU pool choisi à la main : seulement les médias jamais publiés (le texte de l'écran le promet)
       pool = pool.filter(v => (v.used_count ?? 0) === 0)

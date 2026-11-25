@@ -47,6 +47,11 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { toast('Session expirée : reconnecte-toi', 'bad'); return }
     const jobs = planSpoofCopies(items, n, device)
+    // l'original est marqué « source de spoof » : la Story CTA ne le publiera jamais (seulement ses copies)
+    try {
+      const { data: cur } = await supabase.from('content_bank').select('id,tags').in('id', items.map(i => i.id))
+      for (const r of (cur ?? []) as { id: string; tags: string[] | null }[]) if (!(r.tags ?? []).includes('spoof-src')) await supabase.from('content_bank').update({ tags: [...(r.tags ?? []), 'spoof-src'] }).eq('id', r.id)
+    } catch { /* best-effort */ }
     let done = 0, failed = 0, next = 0, lastErr = ''
     stop.current = false
     setRun({ done, failed, total: jobs.length })
