@@ -7,6 +7,8 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "🧪 TEST : page de partage atteinte → arrêt AVANT Share (rien n’est publié)": "🧪 TEST: share page reached → stopped BEFORE Share (nothing is posted)",
+    "🧪 TEST : arrêt avant Share — ⚠ page de partage NON reconnue": "🧪 TEST: stopped before Share — ⚠ share page NOT recognised",
     "📷 Caméra Story ouverte directement": "📷 Story camera opened directly",
     "caméra Story directe non reconnue → passage par le +": "direct Story camera not recognised → going through the +",
     "🗑 Retirer de la Banque une fois publiée": "🗑 Remove from the Bank once posted",

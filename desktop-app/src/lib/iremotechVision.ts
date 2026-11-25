@@ -1081,6 +1081,17 @@ export function newPostGallery(words: { text: string; cy: number }[], H: number)
   return words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.08) && words.some(o => /^post$/i.test(o.text) && o.cy < H * 0.08)
 }
 
+/** MODE TEST (« dry run ») par iPhone : tout l'enchaînement d'un post tourne (galerie, éditeur, légende, lieu, page de
+ *  partage) mais on s'arrête JUSTE AVANT « Share » ; Instagram est alors fermé (brouillon abandonné) → rien n'est publié. */
+export const DRY_RUN = new Set<string>()
+async function dryRunStop(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  const sp = await readScreenWords(key, deviceId)
+  const onShare = !!sp && sharePageShown(sp.words, sp.W, sp.H)
+  hooks?.log?.(onShare ? '🧪 TEST : page de partage atteinte → arrêt AVANT Share (rien n’est publié)' : '🧪 TEST : arrêt avant Share — ⚠ page de partage NON reconnue')
+  await forceCloseForegroundApp(key, deviceId, hooks)
+  return onShare
+}
+
 export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; location?: LocTarget; stay?: boolean; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
   const shot0 = await snapRetry(key, deviceId)
@@ -1172,6 +1183,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   }
   // 7. Publier : « Share » direct, sinon un « Next » intermédiaire puis « Share ».
   //    Si Share n'est jamais détecté → on abandonne (container suivant).
+  if (DRY_RUN.has(deviceId)) return dryRunStop(key, deviceId, hooks)
   if (await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 3, cropY: [0.85, 1], minX: 0.5 })) {
     hooks?.log?.('📤 Reel partagé.')
   } else {
@@ -1445,6 +1457,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     return null
   }
   await closeCaptionEditor()
+  if (DRY_RUN.has(deviceId)) return dryRunStop(key, deviceId, hooks)
   let shared = false
   for (let k = 0; k < 3 && !shared; k++) {
     if (k) {
