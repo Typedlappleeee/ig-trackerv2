@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25p',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : caméra REEL gérée', en: 'iRemoTech: REEL camera handled' },
+    items: {
+      fr: ['Quand le + ouvre la caméra REEL avec « POST » coupé à gauche (« OST STORY REEL »), ScaleFlow le sélectionne quand même (galerie « New post », chemin testé) au lieu de taper à l’aveugle.', 'Si la galerie ne s’ouvre pas depuis la caméra, le post s’arrête proprement (Instagram relancé) au lieu d’enchaîner des taps au hasard.'],
+      en: ['When the + opens the REEL camera with “POST” cut off on the left (“OST STORY REEL”), ScaleFlow still selects it (“New post” gallery, tested path) instead of tapping blindly.', 'If the gallery doesn’t open from the camera, the post stops cleanly (Instagram restarted) instead of chaining random taps.'],
+    },
+  },
+  {
     id: '2026-11-25o',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : moins de faux « échec » après Share', en: 'iRemoTech: fewer false “failed” after Share' },

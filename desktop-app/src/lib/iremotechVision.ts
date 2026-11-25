@@ -1077,7 +1077,8 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   }
   // 2. Mode POST : galerie directe, dernière vidéo pré-sélectionnée, pas de caméra (ni effets).
   //    Une vidéo publiée en POST devient un Reel. Si POST est introuvable → caméra REEL.
-  if (landing === 'post-gallery' || await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i], 'POST', hooks)) {
+  // « POST » souvent coupé au bord gauche de la barre (« OST STORY REEL TEMPLATES », vu en vrai sur STEVIE1 le 25/11/2026)
+  if (landing === 'post-gallery' || await selectMode(key, deviceId, [/^post$/i, /^publication$/i, /^publier$/i, /^[|l1i]?ost$/i], 'POST', hooks)) {
     return postViaPostMode(key, deviceId, W, H, A, opts.caption, hooks, opts.location, opts.stay)
   }
   hooks?.log?.('   POST introuvable → passage par la caméra REEL')
@@ -1087,8 +1088,21 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   // 3. Ouvrir la galerie : la caméra Reel affiche une vignette en BAS-GAUCHE — c'est ELLE
   //    qu'on tape (pas le centre de l'écran, qui n'est que l'aperçu caméra).
   hooks?.log?.('🖼 Ouverture de la galerie (bas-gauche)…')
-  await tapFrac(A.galleryThumb.x, A.galleryThumb.y)
-  await sleep(1800)
+  {
+    // la vignette de la galerie est sur la LIGNE de la barre des modes (à gauche de « POST »), pas à une hauteur fixe
+    const cam = await readScreenWords(key, deviceId)
+    const bar = cam?.words.filter(o => o.cy > cam.H * 0.75 && MODE_WORD.test(o.text)) ?? []
+    const by = bar.length ? bar.reduce((n, o) => n + o.cy, 0) / bar.length / H : A.galleryThumb.y
+    await tapFrac(A.galleryThumb.x * 0.75, by)
+  }
+  await sleep(2200)
+  {
+    // VÉRIFIÉ : une galerie doit être ouverte (« Recents » / vignettes) ; sinon on n'enchaîne pas de taps à l'aveugle
+    const g = await readScreenWords(key, deviceId)
+    const inGallery = !!g && (g.words.some(o => /^(recents?|recent|gallery|camera|roll|all|videos?)$/i.test(o.text) && o.cy < g.H * 0.3) || newPostGallery(g.words, g.H))
+    const stillCam = !!g && g.words.some(o => /^(reel|story|templates)$/i.test(o.text) && o.cy > g.H * 0.8)
+    if (!inGallery && stillCam) { hooks?.log?.('❌ galerie non ouverte depuis la caméra REEL → rien n’est publié (Instagram sera relancé)'); return false }
+  }
   // 4. Sélectionner la 1re vignette (= dernière vidéo uploadée)
   hooks?.log?.('🎞️ Sélection de la dernière vidéo…')
   await tapFrac(A.firstThumb.x, A.firstThumb.y)

@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "❌ galerie non ouverte depuis la caméra REEL → rien n’est publié (Instagram sera relancé)": "❌ gallery not opened from the REEL camera → nothing posted (Instagram will be restarted)",
     "⚠ écran illisible après Share → considéré comme publié (jamais retapé : risque de double post)": "⚠ screen unreadable after Share → counted as posted (never re-tapped: double-post risk)",
     "🧹 post raté → posting annulé, Instagram fermé (reprise propre)": "🧹 post failed → posting cancelled, Instagram closed (clean restart)",
     "aperçu plein écran du média → Done": "full-screen media preview → Done",
