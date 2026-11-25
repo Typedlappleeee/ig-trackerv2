@@ -16,7 +16,7 @@ import { Icon, Toggle, Segmented, toast, useNarrow, confirmDialog, promptDialog,
 import { hfBridge, listLocal, addLocal, reconnectLocal, checkLocal, removeLocal, type HfLocalAccount } from '@/lib/hfLocal'
 import { IS_WEB } from '@/lib/platform'
 import { SPOOF_DEVICES, GPS_CITIES } from '@/lib/studioTools'
-import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setModelFolder, type BankScope } from '@/lib/bankFolders'
+import { folderTree, joinPath, normPath, listBankFolders, loadModelFolders, setModelFolder, loadBankModels, type BankScope } from '@/lib/bankFolders'
 import { loadGjLayout, mergeLayout, pushGjLayout, saveGjGroup, hideGjModel } from '@/lib/gjLayout'
 import { listPresets, savePreset, deletePreset, upsertPreset, type PromptPreset } from '@/lib/gjPresets'
 import {
@@ -314,7 +314,11 @@ export default function GenjutsuVip({ user, org, isSuperAdmin }: { user: User; o
     const g0 = manual[m.id] ?? autoGroup(m.name), g = g0.startsWith('__solo:') ? m.name : g0
     return { id: `grp:${g}`, name: g }
   }
-  const folderOf = (m: { id: string; name: string }) => { const g = groupRef(m); return modelFolders[g.id] ?? joinPath('Genjutsu', g.name) }
+  // modèle de la Banque du même nom (onglet « Modèles ») → ses rendus vont dans « <Modèle>/Genjutsu »
+  const [bankModels, setBankModels] = useState<string[]>([])
+  useEffect(() => { if (access === 'ok') void loadBankModels(scope).then(setBankModels).catch(() => undefined) }, [access, scope])
+  const bankModelFor = (name: string) => { const n = name.trim().toLowerCase(); return bankModels.find(b => b.toLowerCase() === n || n.startsWith(b.toLowerCase() + ' ') || b.toLowerCase().startsWith(n + ' ')) ?? null }
+  const folderOf = (m: { id: string; name: string }) => { const g = groupRef(m); const bm = bankModelFor(g.name); return modelFolders[g.id] ?? (bm ? joinPath(bm, 'Genjutsu') : joinPath('Genjutsu', g.name)) }
   async function assignFolder(m0: { id: string; name: string }, path: string) {
     const m = groupRef(m0)
     const p = normPath(path)
@@ -1113,7 +1117,8 @@ function FolderPicker({ scope, model, current, onPick, onClose }: { scope: BankS
   const [paths, setPaths] = useState<string[] | null>(null)
   const [parent, setParent] = useState<string>(() => current.includes('/') ? current.slice(0, current.lastIndexOf('/')) : '')
   const [name, setName] = useState('')
-  useEffect(() => { void listBankFolders(scope).then(setPaths).catch(() => setPaths([])) }, [scope])
+  const [models, setModels] = useState<string[]>([])
+  useEffect(() => { void listBankFolders(scope).then(setPaths).catch(() => setPaths([])); void loadBankModels(scope).then(setModels).catch(() => undefined) }, [scope])
   const tree = useMemo(() => folderTree([...(paths ?? []), current]), [paths, current])
   const suggestion = joinPath('Genjutsu', model.name)
   return (
@@ -1134,6 +1139,7 @@ function FolderPicker({ scope, model, current, onPick, onClose }: { scope: BankS
                 onMouseEnter={e => { if (!on) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }} onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent' }}>
                 <span style={{ display: 'flex', color: on ? ACCENT_TXT : '#71717A' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={13} /></span>
                 <span data-no-tr style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.name}</span>
+                {models.includes(n.path) && <span style={{ fontSize: 10.5, fontWeight: 700, color: ACCENT_TXT, background: 'rgba(168,85,247,.14)', borderRadius: 5, padding: '1px 6px' }}>👤 modèle</span>}
                 {on && <span style={{ marginLeft: 'auto', fontSize: 11 }}>✓</span>}
               </button>
             )

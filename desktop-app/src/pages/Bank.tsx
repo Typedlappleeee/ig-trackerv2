@@ -2162,7 +2162,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       )}
       {spoofIds && <BankSpoof theme={theme} orgId={currentOrg?.id ?? null}
         items={spoofIds.map(id => items.find(x => x.id === id)).filter((x): x is ContentItem => !!x).map(x => ({ id: x.id, title: x.title }))}
-        folders={folders.filter(f => !f.special && f.n !== 'Tous').map(f => f.n)}
+        folders={folderTree([...items.map(i => i.folder), ...folderNames]).map(t => t.path)} models={modelRoots}
         onClose={() => setSpoofIds(null)} onDone={() => void load()} />}
       {moveOpen && (
         <Modal theme={theme} title={moveMode === 'copy' ? `Dupliquer ${sel.size} média(s)` : `Déplacer ${sel.size} média(s)`} sub={moveMode === 'copy' ? 'Une copie va dans le dossier choisi, l’original reste où il est.' : 'Choisis un dossier ou crée-en un.'} icon="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z"

@@ -110,6 +110,12 @@ export async function setFolderTag(s: BankScope, path: string, tag: string, on: 
   }
 }
 
+/** Modèles de la Banque (dossiers principaux marqués « model ») — pour les sélecteurs de destination des outils. */
+export async function loadBankModels(s: BankScope): Promise<string[]> {
+  const { data } = await scoped(supabase.from('content_bank').select('folder').eq('notes', FOLDER_SENTINEL).contains('tags', ['model']).not('folder', 'is', null), s)
+  return [...new Set(((data ?? []) as { folder: string }[]).map(r => normPath(r.folder)))].filter(m => m !== 'Commun').sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'base' }))
+}
+
 /** Sous-dossiers DIRECTS de `parent` (null = racine) parmi des chemins (parents implicites compris). */
 export function childFolders(paths: Iterable<string | null | undefined>, parent: string | null): string[] {
   const out = new Set<string>()

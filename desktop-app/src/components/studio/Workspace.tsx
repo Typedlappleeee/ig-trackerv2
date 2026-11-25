@@ -3,6 +3,7 @@
 // tournent sur l'ordinateur (ffmpeg.wasm) ; chaque sortie est enregistrée dans la Banque.
 import { isHeic, heicToJpeg } from '@/lib/heic'
 import { folderTree, listBankFolders } from '@/lib/bankFolders'
+import { BankFolderOptions, useBankModels } from '@/components/BankFolderOptions'
 import { niceBase } from '@/lib/niceTitle'
 import CaptionPools from '@/components/CaptionPools'
 import { usePartnerSend, PartnerSendSelect } from '@/components/PartnerSendSelect'
@@ -85,6 +86,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
   const [gpsCity, setGpsCity] = useState('none')
   const [device, setDevice] = useState('none')
   const [destFolder, setDestFolder] = useState('')
+  const bankModels = useBankModels({ orgId: currentOrg?.id ?? null, userId: user.id })
   const ps = usePartnerSend(currentOrg?.id ?? null, 'sf-partner-send-studio')   // envoi direct au site partenaire
   const [mMode, setMMode] = useState<'cut' | 'join'>('cut')
   const [trim, setTrim] = useState<{ start: number; end: number | null }>({ start: 0, end: null })
@@ -441,7 +443,7 @@ export function Workspace({ theme, user, org, tool, label, desc, icon, a, b, onN
               <FieldRow label="Enregistrer dans">
                 <select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={SELECT}>
                   <option value="" style={{ background: '#161618' }}>Banque · sans dossier</option>
-                  {folders.map(f => <option key={f} value={f} style={{ background: '#161618' }}>{f}</option>)}
+                  <BankFolderOptions folders={folders} models={bankModels} optStyle={{ background: '#161618' }} />
                 </select>
               </FieldRow>
               {ps.partner && (

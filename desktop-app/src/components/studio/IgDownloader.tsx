@@ -11,6 +11,7 @@ import { downloadIgPost, igLinksFrom } from '@/lib/igLink'
 import { saveOutputToBank } from '@/lib/studioTools'
 import type { StudioResult } from './Results'
 import { listBankFolders } from '@/lib/bankFolders'
+import { BankFolderOptions, useBankModels } from '@/components/BankFolderOptions'
 
 type Row = { link: string; state: 'wait' | 'run' | 'ok' | 'err'; msg?: string; n?: number }
 
@@ -28,6 +29,7 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
   // dossiers existants de la Banque (sans les sous-dossiers « Reels » / « Photos » créés par l'outil)
   const [folders, setFolders] = useState<string[]>([])
   const [custom, setCustom] = useState(false)
+  const bankModels = useBankModels({ orgId, userId: user.id })
   const [split, setSplit] = useState(() => { try { return localStorage.getItem('sf-igdl-split') !== '0' } catch { return true } })
   useEffect(() => {
     let alive = true
@@ -91,7 +93,7 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
             {custom
               ? <input autoFocus value={folder} onChange={e => setFolder(e.target.value)} onBlur={() => setCustom(false)} disabled={busy} placeholder="Nom du nouveau dossier" style={{ ...FIELD, width: 220 }} />
               : <select value={folder.trim()} disabled={busy} onChange={e => { if (e.target.value === '__new__') { setFolder(''); setCustom(true) } else setFolder(e.target.value) }} style={{ ...FIELD, width: 240 }}>
-                  {options.map(f => <option key={f} value={f} data-no-tr>{f}</option>)}
+                  <BankFolderOptions folders={options} models={bankModels} />
                   <option value="__new__">+ Nouveau dossier…</option>
                 </select>}
           </label>

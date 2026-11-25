@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25z9',
+    date: '2026-11-25',
+    title: { fr: 'Outils : ranger directement dans une modèle', en: 'Tools: save straight into a model' },
+    items: {
+      fr: ['Studio, Blowsome, téléchargeur Insta et « Spoofer en copies » : le choix « Enregistrer dans » montre la Banque principale PUIS chaque modèle avec ses dossiers (👤 Kenza › Reels…) : le contenu créé va directement dans la banque de la modèle.', 'Genjutsu : si une modèle de la Banque porte le même nom que la modèle Genjutsu, ses rendus vont automatiquement dans « <Modèle> › Genjutsu » ; dans le choix du dossier, les modèles sont signalées « 👤 modèle ».'],
+      en: ['Studio, Blowsome, Insta downloader and “Spoof into copies”: the “Save to” choice shows the main bank THEN every model with her folders (👤 Kenza › Reels…): created content goes straight into the model’s bank.', 'Genjutsu: if a Bank model has the same name as the Genjutsu model, her renders automatically go to “<Model> › Genjutsu”; in the folder picker, models are marked “👤 model”.'],
+    },
+  },
+  {
     id: '2026-11-25z8',
     date: '2026-11-25',
     title: { fr: 'Banque : chaque modèle a sa propre banque', en: 'Bank: each model has her own bank' },

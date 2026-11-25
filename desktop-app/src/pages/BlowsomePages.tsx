@@ -25,6 +25,7 @@ import { signPaths, cachedSigned } from '@/lib/signedUrls'
 import { uploadThumbFor } from '@/lib/bankStorage'
 import { Video } from '@/components/VideoFrame'
 import { folderTree, listBankFolders } from '@/lib/bankFolders'
+import { BankFolderOptions, useBankModels } from '@/components/BankFolderOptions'
 import { niceBase } from '@/lib/niceTitle'
 import CaptionPools, { loadCaptionPools, poolLines, type Pool } from '@/components/CaptionPools'
 import { detectSpeaker, voiceLabel, type Voice, type VoiceResult } from '@/lib/voiceGender'
@@ -621,6 +622,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
   }, [soundIds.join(','), currentOrg?.id, user.id])
   // Dossier de destination des sorties (banque).
   const [destFolder, setDestFolder] = useState('')
+  const bankModels = useBankModels({ orgId: currentOrg?.id ?? null, userId: user.id })
   const ps = usePartnerSend(currentOrg?.id ?? null, 'sf-partner-send-auto')   // envoi direct au site partenaire
   // Aperçu : lien de chaque vidéo source (+ sa miniature en image d'attente). Liens PARTAGÉS avec
   // la Banque (lib/signedUrls) : une vidéo déjà ouverte est reprise du cache du navigateur.
@@ -979,7 +981,7 @@ export function BlowContent({ user, org, onNavigate }: { user: User; org: OrgSta
             <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{made > 0 ? `${made} générées` : `${count ?? '…'} médias`}</span>
           </div>
           <Fld label="Variantes / vidéo"><input type="number" min={1} max={100} value={variants} onChange={e => setVariants(Number(e.target.value))} style={{ ...numInp, width: 70, textAlign: 'center' }} /></Fld>
-          <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option><FolderOptions folders={folders} favs={favFolders} /></select></Fld>
+          <Fld label="Dossier destination"><select value={destFolder} onChange={e => setDestFolder(e.target.value)} style={selStyle}><option value="" style={optStyle}>Racine (aucun)</option><BankFolderOptions folders={folders} models={bankModels} favs={favFolders} optStyle={optStyle} /></select></Fld>
           {ps.partner && <Fld label="Envoyer direct vers"><PartnerSendSelect ps={ps} style={selStyle} optStyle={optStyle} /></Fld>}
         </Grp>
 

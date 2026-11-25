@@ -2,6 +2,7 @@
 // uniques par le serveur (/api/v1/tools/spoof : léger recadrage, empreinte, métadonnées d'origine
 // effacées, appareil + GPS réécrits). Les copies arrivent dans le dossier de l'original, ou dans un autre dossier choisi
 // (existant ou nouveau). L'original n'est jamais touché.
+import { BankFolderOptions } from '@/components/BankFolderOptions'
 import { useRef, useState } from 'react'
 import type { Theme } from '@/lib/theme'
 import { supabase } from '@/lib/supabase'
@@ -22,10 +23,11 @@ export function planSpoofCopies<T>(items: T[], count: number, device: string, ra
   return items.flatMap(item => Array.from({ length: c }, (_, i) => ({ item, n: i + 1, device: device === 'random' ? DEVICES[Math.floor(rand() * DEVICES.length)].k : device })))
 }
 
-export default function BankSpoof({ theme, items, orgId, onClose, onDone, folders = [] }: {
+export default function BankSpoof({ theme, items, orgId, onClose, onDone, folders = [], models = [] }: {
   theme: Theme; items: { id: string; title: string }[]; orgId: string | null; onClose: () => void; onDone: () => void
   /** dossiers de la Banque (chemins « Parent/Enfant ») proposés comme destination des copies */
   folders?: string[]
+  models?: string[]
 }) {
   // '' = même dossier que l'original ; '+' = nouveau dossier (saisi) ; sinon chemin d'un dossier existant
   const [dest, setDest] = useState(() => read('sf-bank-spoof-dest', ''))
@@ -89,7 +91,7 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
           Dossier des copies
           <select value={dest} disabled={running} onChange={e => setDest(e.target.value)} style={FIELD}>
             <option value="">Même dossier que l’original</option>
-            {folders.map(f => <option key={f} value={f} data-no-tr>{f.replace(/\//g, ' › ')}</option>)}
+            <BankFolderOptions folders={folders} models={models} />
             <option value="+">＋ Nouveau dossier…</option>
           </select>
           {dest === '+' && <input value={newDest} disabled={running} onChange={e => setNewDest(e.target.value)} placeholder="Nom du dossier (ex. Copies/Kenza)" style={FIELD} />}

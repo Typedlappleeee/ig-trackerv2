@@ -83,3 +83,14 @@ export function groupModelsByMarket(models: string[], marketsOf: (m: string) => 
   const none = real.filter(m => !marketsOf(m).length)
   return [...groups, { label: 'Sans marché', models: none }].filter(g => g.models.length)
 }
+
+// ── Sélecteur de destination des outils : Banque principale puis chaque modèle ──
+const inRoot = (p: string, root: string) => p === root || p.startsWith(`${root}/`)
+/** Groupes pour le sélecteur « Enregistrer dans ». Pure. */
+export function groupFolders(folders: string[], models: string[]): { label: string; paths: string[] }[] {
+  const main = folders.filter(f => !models.some(m => inRoot(f, m)))
+  const out = [{ label: 'Banque principale', paths: main }]
+  for (const m of models) out.push({ label: `👤 ${m}`, paths: [m, ...folders.filter(f => f !== m && inRoot(f, m))] })
+  return out.filter(g => g.paths.length)
+}
+

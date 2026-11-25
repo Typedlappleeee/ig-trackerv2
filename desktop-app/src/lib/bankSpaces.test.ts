@@ -42,3 +42,14 @@ describe('template et marchés des modèles', () => {
     expect(marketsOfTags(['model', 'market:us'])).toEqual(['us'])
   })
 })
+
+import { groupFolders } from './bankSpaces'
+describe('sélecteur de destination des outils', () => {
+  it('Banque principale puis chaque modèle avec ses dossiers', () => {
+    expect(groupFolders(['Divers', 'Kenza', 'Kenza/Reels', 'Zoe/Feed'], ['Kenza', 'Zoe'])).toEqual([
+      { label: 'Banque principale', paths: ['Divers'] },
+      { label: '👤 Kenza', paths: ['Kenza', 'Kenza/Reels'] },
+      { label: '👤 Zoe', paths: ['Zoe', 'Zoe/Feed'] },
+    ])
+  })
+})
