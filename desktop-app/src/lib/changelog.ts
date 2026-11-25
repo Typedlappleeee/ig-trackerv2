@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25d',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : plus de compte « perdu » (STEVIE1)', en: 'iRemoTech: no more “lost” account (STEVIE1)' },
+    items: {
+      fr: [
+        'Instagram resté sur le profil d’un autre compte (ouvert par erreur pendant le scroll) : ScaleFlow revient en arrière au lieu de taper sur la grille de vidéos ; la bascule de compte remarche (testé sur STEVIE1 : @kenzliannah, @viktoria.blume, @miyy.asternchen).',
+        'Fermeture complète d’Instagram entre deux comptes plus jamais sautée (capture réessayée) ; si ScaleFlow ne retrouve plus l’accueil ou le profil, Instagram est fermé puis rouvert sur l’accueil.',
+        'Scroll : démarre toujours depuis le fil d’accueil ; alerte iOS « Location Services » fermée (Cancel).',
+      ],
+      en: [
+        'Instagram stuck on another account’s profile (opened by mistake while scrolling): ScaleFlow goes back instead of tapping the video grid; account switching works again (tested on STEVIE1: @kenzliannah, @viktoria.blume, @miyy.asternchen).',
+        'Full Instagram close between accounts is never skipped anymore (capture retried); if ScaleFlow can’t find home or the profile, Instagram is closed and reopened on home.',
+        'Scrolling always starts from the home feed; iOS “Location Services” alert dismissed (Cancel).',
+      ],
+    },
+  },
+  {
     id: '2026-11-25c',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : sessions plus fiables', en: 'iRemoTech: more reliable sessions' },

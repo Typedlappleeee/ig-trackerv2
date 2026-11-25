@@ -25,16 +25,35 @@ export function homeFeedShown(words: { text: string; cy: number }[], H: number):
   const top = (re: RegExp) => words.some(o => re.test(o.text) && o.cy < H * 0.3)
   return (top(/^your$/i) && top(/^story$/i)) || (top(/^for$/i) && top(/^you$/i) && words.some(o => /^for$/i.test(o.text) && o.cy < H * 0.1)) || words.some(o => /^following$/i.test(o.text) && o.cy < H * 0.1)
 }
+/** Remise à zéro SÛRE : Instagram fermé complètement puis rouvert → il repart sur le fil d'accueil (testé sur STEVIE1).
+ *  Utilisée quand ScaleFlow ne retrouve plus la barre d'onglets (page d'un autre compte, notifications…). */
+export async function resetInstagramToHome(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  hooks?.log?.('   ↺ Instagram remis à zéro (fermé puis rouvert sur l’accueil)')
+  await forceCloseForegroundApp(key, deviceId, hooks)
+  await sendAction(key, deviceId, { type: 'open_app', target: 'instagram' })
+  await sleep(6500)
+  await dismissIgInfoSheet(key, deviceId, hooks)
+  const scr = await readScreenWords(key, deviceId)
+  return !!scr && homeFeedShown(scr.words, scr.H)
+}
+
 /** Onglet Accueil, VÉRIFIÉ (après le scroll des Reels, sinon le « + » est introuvable et le post suivant échoue). */
 export async function goHomeTab(key: string, deviceId: string, W: number, H: number, hooks?: VisionHooks): Promise<boolean> {
+  // page sans barre d'onglets (profil d'un autre compte…) : flèche retour d'abord, sinon les taps « Accueil » ouvrent une vidéo
+  for (let b = 0; b < 3; b++) {
+    const sc = await readScreenWords(key, deviceId)
+    if (!sc || !otherPageShown(sc.words, sc.W, sc.H)) break
+    hooks?.log?.('   page d’un autre compte → retour avant l’accueil')
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.09 * W), y: Math.round(0.068 * H) }); await sleep(1800)
+  }
   for (let k = 0; k < HOME_XS.length; k++) {
     await sendAction(key, deviceId, { type: 'tap', x: Math.round(HOME_XS[k] * W), y: Math.round(TAB.y * H) })
     await sleep(1800)
     const scr = await readScreenWords(key, deviceId)
     if (scr && homeFeedShown(scr.words, scr.H)) return true
-    hooks?.log?.(`   accueil pas encore affiché → autre position (${k + 2}/${HOME_XS.length})`)
+    if (k + 1 < HOME_XS.length) hooks?.log?.(`   accueil pas encore affiché → autre position (${k + 2}/${HOME_XS.length})`)
   }
-  return false
+  return resetInstagramToHome(key, deviceId, hooks)
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -579,6 +598,13 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   if (!scr) return false
   const has = (re: RegExp) => scr.words.some(o => re.test(o.text))
   if (cameraSheet(scr.words, scr.H)) return grantPhotoAccessIfAsked(key, deviceId, hooks).then(() => true) // → Continue, puis Allow (caméra / micro)
+  // Alerte iOS « Turn On Location Services to Allow … » (autre app, vue en vrai sur STEVIE1) → Cancel (jamais Settings)
+  if (has(/^location$/i) && has(/^services$/i) && has(/^cancel$/i) && has(/^settings$/i)) {
+    const c = scr.words.find(o => /^cancel$/i.test(o.text))!
+    hooks?.log?.('   alerte iOS « Location Services » → Cancel')
+    await doubleTap(key, deviceId, c.cx, c.cy); await sleep(1500)
+    return true
+  }
   // Offre « Meta Verified » (abonnement payant, vue en vrai le 24/11/2026 par-dessus le créateur) → Cancel / Not now,
   // sinon la feuille glissée vers le bas. JAMAIS le bouton d'abonnement.
   if (has(/^verified$/i) && (has(/^meta$/i) || has(/^subscription/i))) {
@@ -2026,9 +2052,11 @@ function randomUsername(first: string): string {
 // depuis le bas + pause) puis balaie la carte centrale vers le haut pour la quitter, puis accueil.
 // iRemoTech n'a pas d'action « kill app » → on le fait au geste (coordonnées à ajuster si besoin).
 export async function forceCloseForegroundApp(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
-  const shot = await snapshot(key, deviceId)
-  const { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
-  if (!W || !H) { hooks?.log?.('⚠ écran illisible → fermeture app sautée'); return }
+  // capture réessayée (limite de débit d'iRemoTech avec plusieurs iPhones) ; à défaut, taille connue des iPhones
+  // iRemoTech (406 × 720) — avant, l'étape était SAUTÉE et Instagram rouvrait sur l'ancien écran (vu sur STEVIE1)
+  const shot = await snapRetry(key, deviceId)
+  let { w: W, h: H } = shot ? await imgSize(shot) : { w: 0, h: 0 }
+  if (!W || !H) { W = 406; H = 720; hooks?.log?.('   (écran non capturé → fermeture faite à l’aveugle)') }
   const x = Math.round(0.5 * W)
   hooks?.log?.('🛑 Fermeture complète d’Instagram (App Switcher)…')
   // 1. Ouvrir l'App Switcher : swipe TRÈS LENT depuis le tout en bas jusqu'à ~45 %. Sur Face ID,
@@ -2421,6 +2449,8 @@ export async function warmupByVision(key: string, deviceId: string, opts: Warmup
 
   // 0. Fermer un éventuel popup, puis ouvrir l'onglet Reels.
   await dismissPopups(key, deviceId, hooks)
+  // on part du fil d'accueil (barre d'onglets visible) : sinon le tap « Reels » tombe sur autre chose (vu en vrai)
+  { const s0 = await readScreenWords(key, deviceId); if (s0 && !homeFeedShown(s0.words, s0.H) && !isProfileScreen(s0.words, s0.H)) await goHomeTab(key, deviceId, W, H, hooks) }
   hooks?.log?.('🔥 Warm-up : ouverture des Reels…')
   await tapFrac(REELS_TAB.x, REELS_TAB.y)
   await sleep(2800)
@@ -2435,6 +2465,15 @@ export async function warmupByVision(key: string, deviceId: string, opts: Warmup
     // Toutes les 3 vidéos : une feuille Instagram (« Finish setting up your profile »…) a-t-elle recouvert les Reels ?
     // Sinon le double-tap « like » ou le swipe tomberait dedans et la suite (post suivant) serait bloquée.
     if (reels % 3 === 0 && await dismissIgInfoSheet(key, deviceId, hooks)) continue
+    // … ou un tap a ouvert le profil d'un autre compte (vu en vrai sur STEVIE1) → retour aux Reels
+    if (reels % 3 === 1) {
+      const sc = await readScreenWords(key, deviceId)
+      if (sc && otherPageShown(sc.words, sc.W, sc.H)) {
+        hooks?.log?.('   profil d’un autre compte ouvert pendant le scroll → retour')
+        await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.09 * sc.W), y: Math.round(0.068 * sc.H) }); await sleep(1800)
+        reels++; continue
+      }
+    }
     // Regarder le reel : dwell aléatoire (glance court OU visionnage plus long).
     const glance = Math.random() < glanceRate
     await sleep(Math.round(glance ? rnd(800, 2200) : rnd(3500, 9000)))
@@ -3071,8 +3110,25 @@ async function backToTabs(key: string, deviceId: string, hooks?: VisionHooks): P
       hooks?.log?.('   Reel plein écran → retour')
       await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.08 * W), y: Math.round(0.068 * H) }); await sleep(1800); continue
     }
+    // Profil d'un AUTRE compte / sous-page sans barre d'onglets (ouvert par erreur pendant le scroll, vu en vrai sur
+    // STEVIE1 : grille de @saraklavier, chaque tap « Profil » ouvrait une vidéo) → flèche retour en haut à gauche
+    if (otherPageShown(words, W, H)) {
+      hooks?.log?.('   page d’un autre compte (sans barre d’onglets) → retour')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.09 * W), y: Math.round(0.068 * H) }); await sleep(1800); continue
+    }
     return
   }
+}
+
+/** Profil d'un autre compte ou sous-page (flèche « < » en haut à gauche, pas le fil ni mon profil) : boutons
+ *  Follow / Message, ou compteurs de vues « 65.7K » de la grille des Reels, sans « Edit profile ». Pure. */
+export function otherPageShown(words: { text: string; cx: number; cy: number }[], W: number, H: number): boolean {
+  if (homeFeedShown(words, H) || words.some(o => /^edit$/i.test(o.text) && words.some(p => /^profile$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))) return false
+  // SEUL signe retenu (les taps « retour » ailleurs ouvraient d'autres choses) : la GRILLE d'un profil — compteurs de vues
+  // dans la colonne de gauche ET dans celle de droite, et un nom de compte en haut.
+  const nums = words.filter(o => /^\d[\d.,]*[KkMm]?$/.test(o.text) && o.cy > H * 0.2)
+  const left = nums.filter(o => o.cx < W * 0.4).length, right = nums.filter(o => o.cx > W * 0.6).length
+  return left >= 2 && right >= 2 && words.some(o => o.cy < H * 0.1 && /^[a-z0-9._]{4,}$/.test(o.text))
 }
 
 /** Écran sans règle et sans barre d'onglets lisible → le cerveau vision ramène sur l'écran principal d'Instagram. */
@@ -3117,7 +3173,15 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
     hooks?.log?.('   profil non reconnu → essai direct sur le nom du compte en haut')
     await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.5 * W), y: Math.round(0.068 * H) })
     await sleep(2200); scr = await readScreenWords(key, deviceId)
-    return isSheet(scr) ? scr : null
+    if (isSheet(scr)) return scr
+    // dernier recours : Instagram remis à zéro (fil d'accueil), puis onglet Profil
+    await resetInstagramToHome(key, deviceId, hooks)
+    for (let k = 0; k < PROFILE_XS.length && !isProfile(scr); k++) {
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(PROFILE_XS[k] * W), y: Math.round(TAB.y * H) })
+      await sleep(2500); scr = await readScreenWords(key, deviceId)
+      if (isSheet(scr)) return scr
+    }
+    if (!isProfile(scr)) return null
   }
   // 2. nom du compte en haut (avec ⌄) → feuille des comptes, jusqu'à 3 taps
   for (let k = 0; k < 3; k++) {

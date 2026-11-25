@@ -7,6 +7,12 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "↺ Instagram remis à zéro (fermé puis rouvert sur l’accueil)": "↺ Instagram reset (closed then reopened on home)",
+    "(écran non capturé → fermeture faite à l’aveugle)": "(screen not captured → closing blind)",
+    "alerte iOS « Location Services » → Cancel": "iOS “Location Services” alert → Cancel",
+    "page d’un autre compte (sans barre d’onglets) → retour": "another account’s page (no tab bar) → back",
+    "profil d’un autre compte ouvert pendant le scroll → retour": "another account’s profile opened while scrolling → back",
+    "page d’un autre compte → retour avant l’accueil": "another account’s page → back before home",
     "profil non reconnu → essai direct sur le nom du compte en haut": "profile not recognised → trying the account name at the top directly",
     "« Add location » non lu → ligne sous « Tag people »": "“Add location” not read → row under “Tag people”",
     "Donne un nom au nouveau dossier": "Give the new folder a name",

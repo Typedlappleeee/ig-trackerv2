@@ -173,3 +173,20 @@ describe('lieu déjà posé, page défilée', () => {
     expect(locationAlreadySet(w, { city: /^Munich,?$/i, region: /^germany$/i }, 720)).toBe(true)
   })
 })
+
+import { otherPageShown } from './iremotechVision'
+describe('page d’un autre compte (sans barre d’onglets)', () => {
+  it('grille de Reels d’un autre compte → oui ; fil d’accueil et mon profil → non', () => {
+    const other = [{ text: 'saraklavier', cx: 200, cy: 48 }, { text: '65.7K', cx: 60, cy: 210 }, { text: '12.7K', cx: 190, cy: 210 }, { text: '4,353', cx: 320, cy: 210 }, { text: '59.9K', cx: 60, cy: 450 }, { text: '19.1K', cx: 330, cy: 450 }]
+    expect(otherPageShown(other, 406, 720)).toBe(true)
+    expect(otherPageShown([{ text: 'For', cx: 180, cy: 50 }, { text: 'you', cx: 220, cy: 50 }, { text: 'Your', cx: 40, cy: 190 }, { text: 'story', cx: 80, cy: 190 }, { text: 'Follow', cx: 300, cy: 240 }], 406, 720)).toBe(false)
+    expect(otherPageShown([{ text: 'Edit', cx: 100, cy: 360 }, { text: 'profile', cx: 140, cy: 360 }, { text: 'Follow', cx: 120, cy: 620 }], 406, 720)).toBe(false)
+    expect(otherPageShown([{ text: '<', cx: 20, cy: 50 }, { text: 'Follow', cx: 200, cy: 300 }], 406, 720)).toBe(false) // signe faible seul : non
+  })
+})
+describe('Reel plein écran ≠ page d’un autre compte', () => {
+  it('compteurs tous à droite → non', () => {
+    const reel = [{ text: 'Reels', cx: 60, cy: 50 }, { text: '1,234', cx: 375, cy: 300 }, { text: '56', cx: 375, cy: 380 }, { text: '12', cx: 375, cy: 450 }, { text: '3', cx: 375, cy: 520 }, { text: 'Follow', cx: 260, cy: 560 }]
+    expect(otherPageShown(reel, 406, 720)).toBe(false)
+  })
+})
