@@ -252,6 +252,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [mktF, setMktFState] = useState<'all' | ModelMarket>(() => { try { const v = localStorage.getItem('sf-bank-mkt'); return v === 'fr' || v === 'us' || v === 'de' ? v : 'all' } catch { return 'all' } })
   const setMktF = (v: 'all' | ModelMarket) => { setMktFState(v); try { localStorage.setItem('sf-bank-mkt', v) } catch { /* noop */ } }
   const [modelForm, setModelForm] = useState<{ edit: string | null; name: string; mkts: ModelMarket[] } | null>(null)
+  const [sendTo, setSendTo] = useState<{ src: string; model: string; dest: string; merge: boolean } | null>(null)   // « Envoyer vers une modèle »
   const [tplOpen, setTplOpen] = useState<string | null>(null)   // texte du template en cours d'édition
   const teamScope = { orgId: currentOrg?.id ?? null, userId: user.id }
   const [bankTpl, setBankTpl] = useState<string[]>(() => loadTeamCache(teamScope).bankTemplate)
@@ -1113,6 +1114,24 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     if (!list.length) { toast(models.length ? 'Aucun dossier à ranger : leurs noms ne ressemblent à aucune modèle (déplace-les à la main en les glissant).' : 'Crée d’abord tes modèles (« + Modèle »).', 'bad'); return }
     setArrange(list)
   }
+  // Dossiers d'une modèle (elle-même + ses sous-dossiers), pour choisir où envoyer
+  const modelFolders = (m: string) => folderTree([...items.map(i => i.folder), ...folderNames].filter(f => f && isWithin(f, m))).map(t => t.path)
+  // « Envoyer vers une modèle » : le dossier (et ses sous-dossiers) déplacé dans la modèle ; « fusionner » = son
+  // CONTENU va directement dans la destination (ses sous-dossiers deviennent ceux de la destination). Rien n'est supprimé.
+  async function sendFolderToModel(src: string, dest: string, merge: boolean) {
+    if (isWithin(dest, src)) { toast('Impossible : un dossier ne peut pas aller dans son propre sous-dossier.', 'bad'); return }
+    const newRoot = merge ? dest : joinPath(dest, leafOf(src))
+    for (const raw of rawFoldersWithin(src)) {
+      const target = renamedPath(raw, src, newRoot)
+      // la ligne sentinelle du dossier lui-même n'a plus lieu d'être quand on fusionne (la destination existe déjà)
+      if (merge && normPath(raw) === src) await scopeQ(supabase.from('content_bank').update({ folder: target }).eq('folder', raw).or('notes.is.null,notes.not.in.("__sf_folder__","__sf_drive_folder__")'))
+      else await scopeQ(supabase.from('content_bank').update({ folder: target }).eq('folder', raw))
+    }
+    if (merge) { const { data } = await scopeQ(supabase.from('content_bank').select('id').eq('folder', src).in('notes', ['__sf_folder__'])); const ids = ((data ?? []) as { id: string }[]).map(x => x.id); if (ids.length) { const { error } = await supabase.rpc('delete_bank_items', { p_ids: ids }); if (error) await scopeQ(supabase.from('content_bank').delete().in('id', ids)) } }
+    if (isWithin(folder, src)) setFolder(renamedPath(folder, src, newRoot))
+    toast(`« ${leafOf(src)} » envoyé dans « ${dest.split('/').join(' › ')} ».`, 'ok')
+    load()
+  }
   async function applyArrange() {
     const list = (arrange ?? []).filter(a => a.on)
     setArrange(null)
@@ -1742,6 +1761,33 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           </div>
         </Modal>
       )}
+      {sendTo && (
+        <Modal theme={theme} title={`Envoyer « ${leafOf(sendTo.src)} » vers une modèle`} onClose={() => setSendTo(null)}>
+          <div style={{ fontSize: 12.5, color: '#A1A1AA', marginBottom: 6 }}>Modèle</div>
+          <select value={sendTo.model} onChange={e => setSendTo(x => x && { ...x, model: e.target.value, dest: e.target.value })} style={{ ...FIELD, width: '100%' }}>
+            {groupModelsByMarket(models, m => modelMkts[m] ?? []).map(g => (
+              <optgroup key={g.label} label={g.label}>{g.models.map(m => <option key={`${g.label}:${m}`} value={m} data-no-tr>{m}</option>)}</optgroup>
+            ))}
+            {models.includes(COMMON_SPACE) && <option value={COMMON_SPACE}>🌐 Commun</option>}
+          </select>
+          <div style={{ fontSize: 12.5, color: '#A1A1AA', margin: '12px 0 6px' }}>Dans</div>
+          <select value={sendTo.dest} onChange={e => setSendTo(x => x && { ...x, dest: e.target.value })} style={{ ...FIELD, width: '100%' }}>
+            {modelFolders(sendTo.model).filter(f => !isWithin(f, sendTo.src)).map(f => <option key={f} value={f} data-no-tr>{f.split('/').join(' › ')}</option>)}
+          </select>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+            {([[false, `Garder le dossier « ${leafOf(sendTo.src)} » (il devient un sous-dossier)`], [true, 'Fusionner son contenu (ses fichiers et sous-dossiers vont directement dedans)']] as const).map(([v, l]) => (
+              <label key={String(v)} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#E4E4E7', cursor: 'pointer' }}>
+                <input type="radio" checked={sendTo.merge === v} onChange={() => setSendTo(x => x && { ...x, merge: v })} />{l}
+              </label>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: '#6E6E78', marginTop: 10 }} data-no-tr>{`→ ${(sendTo.merge ? sendTo.dest : joinPath(sendTo.dest, leafOf(sendTo.src))).split('/').join(' › ')}`}</div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
+            <Btn theme={theme} sm tone="ghost" label="Annuler" onClick={() => setSendTo(null)} />
+            <Btn theme={theme} sm tone="primary" label="Envoyer" onClick={() => { const x = sendTo; setSendTo(null); void sendFolderToModel(x.src, x.dest, x.merge) }} />
+          </div>
+        </Modal>
+      )}
       {tplOpen !== null && (
         <Modal theme={theme} title="Template des dossiers d’une modèle" onClose={() => setTplOpen(null)}>
           <p style={{ margin: '0 0 8px', fontSize: 12.5, color: '#A1A1AA' }}>Un dossier par ligne, « / » pour un sous-dossier (ex. « Reels/Originaux »). Créés automatiquement pour chaque nouvelle modèle. Partagé avec toute l’équipe.</p>
@@ -2084,7 +2130,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
       {folderCtx && createPortal(
         <>
           <div onClick={() => setFolderCtx(null)} onContextMenu={e => { e.preventDefault(); setFolderCtx(null) }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
-          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 190), left: Math.min(folderCtx.x, window.innerWidth - 180), zIndex: 61, width: 170, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
+          <div style={{ position: 'fixed', top: Math.min(folderCtx.y, window.innerHeight - 230), left: Math.min(folderCtx.x, window.innerWidth - 220), zIndex: 61, width: 210, borderRadius: 8, overflow: 'hidden', padding: 4, boxSizing: 'border-box', background: '#161618', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}>
             <button onClick={() => { openNewFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginBottom: 4, borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#7C7C86', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z|M12 10v6|M9 13h6" size={14} /></span>Nouveau sous-dossier
@@ -2097,6 +2143,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ color: '#FBBF24', display: 'flex', width: 14, justifyContent: 'center' }}>{favFolders.has(folderCtx.name) ? '☆' : '★'}</span>{favFolders.has(folderCtx.name) ? 'Retirer des favoris' : 'Épingler en favori'}
             </button>
+            {models.some(m => !isWithin(folderCtx.name, m) || m !== folderCtx.name) && (
+              <button onClick={() => { const m0 = models.find(m => m !== COMMON_SPACE && !isWithin(m, folderCtx.name)) ?? models[0]; setSendTo({ src: folderCtx.name, model: m0, dest: m0, merge: false }); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', borderRadius: 5, border: 'none', background: 'transparent', color: '#EDEDEF', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <span style={{ color: '#A78BFA', display: 'flex', width: 14, justifyContent: 'center' }}>➜</span>Envoyer vers une modèle
+              </button>
+            )}
             <button onClick={() => { setConfirmDelFolder(folderCtx.name); setFolderCtx(null) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', height: 32, padding: '0 10px', marginTop: 4, borderRadius: 5, border: 'none', boxShadow: '0 -1px 0 rgba(255,255,255,0.06)', background: 'transparent', color: '#F87171', fontSize: 13, fontWeight: 400, cursor: 'pointer', textAlign: 'left' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <span style={{ display: 'flex' }}><Icon d="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" size={14} /></span>Supprimer le dossier

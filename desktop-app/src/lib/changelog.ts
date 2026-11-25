@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25w',
+    date: '2026-11-25',
+    title: { fr: 'Banque : envoyer un dossier vers une modèle', en: 'Bank: send a folder to a model' },
+    items: {
+      fr: ['Clic droit sur un dossier › « Envoyer vers une modèle » : choisis la modèle et la rubrique ; le dossier part avec ses sous-dossiers, ou son contenu est fusionné dedans. Rien n’est supprimé.'],
+      en: ['Right-click a folder › “Send to a model”: pick the model and the section; the folder moves with its subfolders, or its content is merged in. Nothing is deleted.'],
+    },
+  },
+  {
     id: '2026-11-25v',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : anti-doublon renforcé', en: 'iRemoTech: stronger duplicate protection' },

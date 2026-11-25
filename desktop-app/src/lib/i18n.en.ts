@@ -7,6 +7,8 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Fusionner son contenu (ses fichiers et sous-dossiers vont directement dedans)": "Merge its content (its files and subfolders go straight in)",
+    "Envoyer vers une modèle": "Send to a model",
     "Sans marché": "No market",
     "Toutes les modèles ont déjà les dossiers du template.": "Every model already has the template folders.",
     "Template enregistré pour toute l’équipe.": "Template saved for the whole team.",
@@ -5188,6 +5190,9 @@ export const EN: Dict = {
     ["{0} dossier(s) ajouté(s) d’après le template.", "{0} folder(s) added from the template."],
     ["Toutes les modèles · {0}", "All models · {0}"],
     ["Modèle « {0} »", "Model “{0}”"],
+    ["« {0} » envoyé dans « {1} ».", "“{0}” sent to “{1}”."],
+    ["Envoyer « {0} » vers une modèle", "Send “{0}” to a model"],
+    ["Garder le dossier « {0} » (il devient un sous-dossier)", "Keep the “{0}” folder (it becomes a subfolder)"],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],
