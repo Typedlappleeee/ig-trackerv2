@@ -56,3 +56,16 @@ describe('iRemoTech — lignes secondaires prises pour des comptes', () => {
     for (const u of ['lucielr5c0', 'celiaq58c0', 'pommesrouge7', 'thrideamaz', 'dailypost']) expect(isJunkUsername(u)).toBe(false)
   })
 })
+
+import { accountAddedAt, naturalCmp } from './irtAccounts'
+describe('comptes : nouveaux (< 24 h) et ordre des iPhones', () => {
+  const scan = (at: string, accounts: string[]) => ({ job_id: at, type: 'list_accounts', status: 'completed', created_at: at, finished_at: at, account: null, result: { accounts } }) as never
+  it('date d’arrivée = 1re lecture qui le contient, seulement si une lecture plus ancienne ne l’avait pas', () => {
+    const jobs = [scan('2026-11-23T10:00:00Z', ['a']), scan('2026-11-24T10:00:00Z', ['a', 'b'])]
+    expect(accountAddedAt(jobs, 'b')).toBe(Date.parse('2026-11-24T10:00:00Z'))
+    expect(accountAddedAt(jobs, 'a')).toBeNull()
+  })
+  it('STEVIE2 avant STEVIE10', () => {
+    expect(['STEVIE10', 'STEVIE2', 'STEVIE1'].sort(naturalCmp)).toEqual(['STEVIE1', 'STEVIE2', 'STEVIE10'])
+  })
+})

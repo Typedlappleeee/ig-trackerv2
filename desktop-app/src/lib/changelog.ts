@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25b',
+    date: '2026-11-25',
+    title: { fr: 'Comptes iRemoTech : marché, NEW, lien CTA, Story · Spoof : dossier au choix', en: 'iRemoTech accounts: market, NEW, CTA link, Story · Spoof: choose folder' },
+    items: {
+      fr: [
+        'Liste des comptes : iPhones dans l’ordre (1, 2, 3… 10), filtre par marché, badge NEW sur les comptes ajoutés il y a moins de 24 h.',
+        'Lien CTA de chaque compte modifiable directement dans la liste (partagé avec l’équipe et repris par la Story CTA en masse).',
+        'Story CTA : « en ligne · il y a 2 h » si une Story CTA publiée par ScaleFlow a moins de 24 h, sinon la date de la dernière.',
+        'Banque › Spoofer en copies : choix du dossier où ranger les copies (existant ou nouveau).',
+      ],
+      en: [
+        'Accounts list: iPhones in order (1, 2, 3… 10), market filter, NEW badge on accounts added less than 24 h ago.',
+        'Each account’s CTA link editable right in the list (shared with the team and used by mass CTA Stories).',
+        'CTA Story: “live · 2 h ago” if a CTA Story posted by ScaleFlow is under 24 h old, otherwise the date of the last one.',
+        'Bank › Spoof into copies: choose the folder for the copies (existing or new).',
+      ],
+    },
+  },
+  {
     id: '2026-11-25a',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : plus d’attente sur la page de partage', en: 'iRemoTech: no more waiting on the share page' },

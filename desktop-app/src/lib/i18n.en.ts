@@ -7,6 +7,18 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Donne un nom au nouveau dossier": "Give the new folder a name",
+    "Chaque copie est unique (recadrage léger, empreinte, appareil et GPS réécrits). Choisis le dossier où ranger les copies : l’original ne bouge pas.": "Each copy is unique (slight crop, fingerprint, device and GPS rewritten). Pick the folder for the copies: the original stays where it is.",
+    "Dossier des copies": "Copies folder",
+    "Même dossier que l’original": "Same folder as the original",
+    "＋ Nouveau dossier…": "＋ New folder…",
+    "Nom du dossier (ex. Copies/Kenza)": "Folder name (e.g. Copies/Kenza)",
+    "NEW": "NEW",
+    "Lien CTA (https://…)": "CTA link (https://…)",
+    "Aucune Story CTA": "No CTA Story",
+    "Trier les iPhones par marché": "Sort iPhones by market",
+    "Tous les marchés": "All markets",
+    "Lien CTA · Story": "CTA link · Story",
     "offre « Meta Verified » → fermée (aucun abonnement)": "“Meta Verified” offer → closed (no subscription)",
     "champ de recherche resté vide → nouvelle saisie": "search field still empty → typing again",
     "⚠ fil d’accueil non reconnu après le scroll": "⚠ home feed not recognised after scrolling",
@@ -5074,5 +5086,9 @@ export const EN: Dict = {
     ["{0} 🚪 fin du compte précédent → Instagram fermé", "{0} 🚪 previous account done → Instagram closed"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],
+    ["{0} copie(s) créée(s) dans « {1} »", "{0} copy(ies) created in “{1}”"],
+    ["Ajouté {0} : évite d’y poster tout de suite", "Added {0}: avoid posting on it right away"],
+    ["● Story CTA en ligne · {0}", "● CTA Story live · {0}"],
+    ["Dernière Story CTA {0}", "Last CTA Story {0}"],
   ],
 }

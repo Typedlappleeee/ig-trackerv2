@@ -4,7 +4,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { deviceLabel, isDeviceOn, listJobs, launchAutomation, type IrtDevice, type IrtJob } from '@/lib/iremotech'
 import { switchAccountByVision } from '@/lib/iremotechVision'
-import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, type IgProfile, type AccountView } from '@/lib/irtAccounts'
+import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, naturalCmp, type IgProfile, type AccountView } from '@/lib/irtAccounts'
+import type { IrtTeam } from '@/lib/irtTeam'
+import { MARKETS, type Market } from '@/lib/captionMarkets'
 import { toast } from '@/lib/ui'
 import { loadCreatedAccounts } from '@/lib/irtCreatedAccounts'
 
@@ -17,8 +19,12 @@ const keyOf = (dev: string, u: string) => `${dev}|${u}`
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 
-export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
+export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScanned, team, onLink }: {
   apiKey: string
+  /** réglages partagés de l'équipe : marché de chaque iPhone, lien CTA de chaque compte, dernière Story CTA */
+  team?: IrtTeam
+  /** lien CTA d'un compte modifié (enregistré pour toute l'équipe) */
+  onLink?: (dev: string, username: string, url: string) => void
   devices: IrtDevice[]
   /** cibles déjà connues par iPhone (« @nom » détectés par ScaleFlow) */
   known: Record<string, string[]>
@@ -37,6 +43,10 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [showEmpty, setShowEmpty] = useState(false)
   const scannedRef = useRef<Record<string, string | null>>({})
+  // iPhones dans l'ordre naturel (STEVIE1, STEVIE2… STEVIE10) ; filtre par marché de l'iPhone
+  const [mkt, setMkt] = useState<Market | ''>('')
+  const devices = useMemo(() => [...devicesIn].sort((a, b) => naturalCmp(deviceLabel(a), deviceLabel(b))).filter(d => !mkt || team?.markets[d.public_id] === mkt), [devicesIn, mkt, team])
+  const createdAt = useMemo(() => Object.fromEntries(loadCreatedAccounts().filter(a => a.username).map(a => [a.username!.toLowerCase(), a.at])), [])
   const creds = useMemo(() => Object.fromEntries(loadCreatedAccounts().filter(a => a.username && a.password).map(a => [a.username!.toLowerCase(), a])), [])
 
   const refreshDev = async (dev: string) => { const j = await listJobs(apiKey, dev, 100); setJobs(m => ({ ...m, [dev]: j })) }
@@ -129,7 +139,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
   const allChecked = allShownKeys.length > 0 && allShownKeys.every(k => sel.has(k))
 
   // colonne iPhone seulement en vue liste (en vue « Par iPhone », le nom est dans l'en-tête du groupe)
-  const COLS = grouped ? '28px minmax(200px,1.8fr) 78px 78px 88px minmax(130px,1fr) 90px' : '28px minmax(180px,1.6fr) minmax(110px,1fr) 78px 78px 88px minmax(130px,1fr) 90px'
+  const COLS = grouped ? '28px minmax(200px,1.6fr) 70px 70px 80px minmax(200px,1.4fr) minmax(130px,1fr) 90px' : '28px minmax(180px,1.5fr) minmax(110px,1fr) 70px 70px 80px minmax(200px,1.4fr) minmax(130px,1fr) 90px'
   const cell: CSSProperties = { display: 'flex', alignItems: 'center', minWidth: 0 }
   const th: CSSProperties = { fontSize: 11, fontWeight: 500, color: DIM, textTransform: 'uppercase', letterSpacing: '.04em' }
   const Num = ({ n }: { n: number | null | undefined }) => <span style={{ fontSize: 13.5, fontWeight: 600, color: n == null ? DIM : INK, fontVariantNumeric: 'tabular-nums' }}>{compactNum(n ?? null)}</span>
@@ -138,6 +148,13 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
     const id = d.public_id, p = profiles[a.username], k = keyOf(id, a.username), on = sel.has(k)
     const pic = avatarSrc(p?.profile_pic, a.username)
     const cr = creds[a.username]
+    // NOUVEAU = ajouté sur l'iPhone (ou créé par ScaleFlow) il y a moins de 24 h : on évite d'y poster tout de suite
+    const added = Math.max(accountAddedAt(jobs[id] ?? [], a.username) ?? 0, createdAt[a.username] ?? 0)
+    const isNew = added > 0 && Date.now() - added < 24 * 3600_000
+    const tkey = `${id}::@${a.username}`
+    const link = team?.links[tkey] ?? ''
+    const story = team?.lastStory[tkey] ?? null
+    const storyOn = story != null && Date.now() - story < 24 * 3600_000
     return (
       <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '8px 14px', borderTop: `1px solid ${EDGE}`, background: on ? 'rgba(233,196,106,0.05)' : 'transparent' }}>
         <span style={cell}><span onClick={() => toggle(k)} style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, cursor: 'pointer', background: on ? GOLD : 'transparent', border: on ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.2)', color: '#0A0A0B', fontSize: 11, fontWeight: 700 }}>{on ? '✓' : ''}</span></span>
@@ -146,7 +163,10 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
             {pic ? <img src={pic} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : a.username[0]?.toUpperCase()}
           </span>
           <span style={{ minWidth: 0 }}>
-            <a href={`https://www.instagram.com/${a.username}/`} target="_blank" rel="noreferrer" style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: INK, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{a.username}</a>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <a href={`https://www.instagram.com/${a.username}/`} target="_blank" rel="noreferrer" style={{ fontSize: 13.5, fontWeight: 600, color: INK, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{a.username}</a>
+              {isNew && <span title={`Ajouté ${ago(new Date(added).toISOString())} : évite d’y poster tout de suite`} style={{ flex: 'none', height: 18, padding: '0 6px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', background: 'rgba(74,222,128,0.14)', color: '#4ADE80', border: '1px solid rgba(74,222,128,0.35)' }}>NEW</span>}
+            </span>
             {cr?.password
               ? <span onClick={() => { try { navigator.clipboard.writeText(`${a.username}:${cr.password}${cr.twofa ? ':' + cr.twofa : ''}`); toast('Identifiants copiés', 'ok') } catch { /* noop */ } }} title="Copier identifiant:mot de passe" style={{ display: 'block', fontSize: 11, color: DIM, fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🔑 {cr.password}</span>
               : <span style={{ display: 'block', fontSize: 11.5, color: DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p?.full_name ?? ' '}</span>}
@@ -156,6 +176,14 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
         <span style={cell}><Num n={p?.media_count} /></span>
         <span style={cell}><Num n={p?.followers} /></span>
         <span style={cell}><Num n={p?.following} /></span>
+        <span style={{ ...cell, flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+          <input key={`${tkey}|${link}`} defaultValue={link} placeholder="Lien CTA (https://…)" disabled={!onLink}
+            onBlur={e => { const v = e.target.value.trim(); if (v !== link) onLink?.(id, a.username, v) }} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+            style={{ height: 26, padding: '0 8px', borderRadius: 6, border: `1px solid ${FIELD_EDGE}`, background: FIELD_BG, color: INK, fontSize: 12, outline: 'none', minWidth: 0 }} data-no-tr />
+          <span style={{ fontSize: 11, color: storyOn ? '#4ADE80' : DIM, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {storyOn ? `● Story CTA en ligne · ${ago(new Date(story!).toISOString())}` : story ? `Dernière Story CTA ${ago(new Date(story).toISOString())}` : 'Aucune Story CTA'}
+          </span>
+        </span>
         <span style={{ ...cell, fontSize: 11.5, color: DIM, flexDirection: 'column', alignItems: 'flex-start' }}>
           <span>{a.running === 'warm_up' ? '🔥 warm-up en cours…' : a.warmup ? `🔥 ${a.warmup.seconds ? Math.round(a.warmup.seconds / 60) + ' min' : 'warm-up'} ${ago(a.warmup.at)}` : 'aucun warm-up'}</span>
         </span>
@@ -194,6 +222,10 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un compte…" style={{ ...btn, cursor: 'text', flex: '1 1 200px', minWidth: 0, color: INK, outline: 'none' }} />
+        <select value={mkt} onChange={e => setMkt(e.target.value as Market | '')} style={{ ...btn, maxWidth: 170 }} title="Trier les iPhones par marché">
+          <option value="">Tous les marchés</option>
+          {MARKETS.map(m => <option key={m.k} value={m.k}>{m.label}</option>)}
+        </select>
         <select value={devFilter} onChange={e => setDevFilter(e.target.value)} style={{ ...btn, maxWidth: 220 }}>
           <option value="all">Tous les iPhones ({withAccounts.length})</option>
           {withAccounts.map(d => <option key={d.public_id} value={d.public_id}>{deviceLabel(d)} · {view[d.public_id]?.accounts.length ?? 0}</option>)}
@@ -206,7 +238,7 @@ export default function IrtAccounts({ apiKey, devices, known, onScanned }: {
         <div style={{ minWidth: 980 }}>
           <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '10px 14px' }}>
             <span style={cell}><span onClick={() => setSel(s => { const x = new Set(s); if (allChecked) allShownKeys.forEach(k => x.delete(k)); else allShownKeys.forEach(k => x.add(k)); return x })} title="Tout cocher / décocher" style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, borderRadius: 5, cursor: 'pointer', background: allChecked ? GOLD : 'transparent', border: allChecked ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.2)', color: '#0A0A0B', fontSize: 11, fontWeight: 700 }}>{allChecked ? '✓' : ''}</span></span>
-            <span style={th}>Compte</span>{!grouped && <span style={th}>iPhone</span>}<span style={th}>Posts</span><span style={th}>Abonnés</span><span style={th}>Abonnem.</span><span style={th}>Activité</span><span />
+            <span style={th}>Compte</span>{!grouped && <span style={th}>iPhone</span>}<span style={th}>Posts</span><span style={th}>Abonnés</span><span style={th}>Abonnem.</span><span style={th}>Lien CTA · Story</span><span style={th}>Activité</span><span />
           </div>
           {!loaded && !rows.length && <div style={{ padding: 16, fontSize: 13, color: MUTED, borderTop: `1px solid ${EDGE}` }}>Lecture de l’historique iRemoTech…</div>}
           {loaded && !rows.length && <div style={{ padding: 16, fontSize: 13, color: MUTED, borderTop: `1px solid ${EDGE}` }}>{flat.length ? 'Aucun compte ne correspond.' : 'Aucun compte connu : « 🔄 Tout scanner » lit les comptes connectés sur tes iPhones.'}</div>}

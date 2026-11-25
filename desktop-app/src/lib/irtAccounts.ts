@@ -111,6 +111,19 @@ export function scanDue(jobs: IrtJob[], now: number, triedAt: number, maxAgeMs =
   return !da.scanning && old && now - triedAt > maxAgeMs
 }
 
+/** Date (ms) où le compte est APPARU sur l'iPhone d'après les lectures iRemoTech : 1re lecture réussie qui le contient,
+ *  à condition qu'une lecture plus ancienne ne le contienne pas (sinon on ne sait pas : null). Pure. */
+export function accountAddedAt(jobs: IrtJob[], username: string): number | null {
+  const u = username.replace(/^@/, '').toLowerCase()
+  const scans = jobs.filter(j => j.type === 'list_accounts' && j.status === 'completed').sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
+  const has = (j: IrtJob) => ((j.result?.accounts as string[] | undefined) ?? []).some(x => String(x).replace(/^@/, '').toLowerCase() === u)
+  const first = scans.findIndex(has)
+  if (first <= 0) return null
+  return Date.parse(scans[first].finished_at ?? scans[first].created_at)
+}
+/** Tri « naturel » des noms d'iPhones : STEVIE2 avant STEVIE10. */
+export const naturalCmp = (a: string, b: string) => a.localeCompare(b, 'fr', { numeric: true, sensitivity: 'base' })
+
 /** « il y a 5 min » */
 export function ago(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return 'jamais'

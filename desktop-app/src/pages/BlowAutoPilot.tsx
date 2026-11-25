@@ -688,6 +688,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         if (posted && nextSame && kind !== 'story') stayedIn = job.container
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
         if (posted) for (const v of job.vids) void bumpUsed(v.id)
+        // Story CTA publiée : date gardée pour toute l'équipe (liste des comptes : « Story CTA en ligne · il y a 2 h »)
+        if (posted && kind === 'story') editTeam(t => { t.lastStory[`${p.dev}::${job.container}`] = Date.now() })
         // Story CTA à usage unique : la photo publiée est retirée de la Banque (elle ne resservira jamais)
         if (posted && kind === 'story' && storyOnce && src.mode === 'folder') for (const v of job.vids) {
           try { await supabase.from('content_bank').delete().eq('id', v.id); if (v.storage_path) await supabase.storage.from('content').remove([v.storage_path]); push(`${tag} 🗑 « ${v.title} » supprimée de la Banque (usage unique)`) } catch { /* noop */ }
@@ -1376,7 +1378,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         </div>
       )}
       {curTab === 'igaccounts' && irt.key && (
-        <IrtAccounts apiKey={irt.key} devices={devices} known={conts}
+        <IrtAccounts apiKey={irt.key} devices={devices} known={conts} team={team} onLink={(dev, u, url) => setLink(dev, '@' + u, url)}
           onScanned={(dev, accs) => {
             // iPhone normal (ou pas encore détecté) : les comptes trouvés par iRemoTech deviennent ses cibles « @nom »
             if (phoneKind(conts[dev]) === 'jb') return

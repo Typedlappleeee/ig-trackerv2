@@ -1,6 +1,7 @@
 // Banque › « Spoofer en copies » : chaque média choisi (photo ou vidéo) est dupliqué en N versions
 // uniques par le serveur (/api/v1/tools/spoof : léger recadrage, empreinte, métadonnées d'origine
-// effacées, appareil + GPS réécrits). Les copies arrivent dans le même dossier que l'original.
+// effacées, appareil + GPS réécrits). Les copies arrivent dans le dossier de l'original, ou dans un autre dossier choisi
+// (existant ou nouveau). L'original n'est jamais touché.
 import { useRef, useState } from 'react'
 import type { Theme } from '@/lib/theme'
 import { supabase } from '@/lib/supabase'
@@ -21,9 +22,15 @@ export function planSpoofCopies<T>(items: T[], count: number, device: string, ra
   return items.flatMap(item => Array.from({ length: c }, (_, i) => ({ item, n: i + 1, device: device === 'random' ? DEVICES[Math.floor(rand() * DEVICES.length)].k : device })))
 }
 
-export default function BankSpoof({ theme, items, orgId, onClose, onDone }: {
+export default function BankSpoof({ theme, items, orgId, onClose, onDone, folders = [] }: {
   theme: Theme; items: { id: string; title: string }[]; orgId: string | null; onClose: () => void; onDone: () => void
+  /** dossiers de la Banque (chemins « Parent/Enfant ») proposés comme destination des copies */
+  folders?: string[]
 }) {
+  // '' = même dossier que l'original ; '+' = nouveau dossier (saisi) ; sinon chemin d'un dossier existant
+  const [dest, setDest] = useState(() => read('sf-bank-spoof-dest', ''))
+  const [newDest, setNewDest] = useState('')
+  const target = dest === '+' ? newDest.trim() : dest
   const [count, setCount] = useState(() => read('sf-bank-spoof-n', '5'))
   const [device, setDevice] = useState(() => read('sf-bank-spoof-device', 'random'))
   const [gps, setGps] = useState(() => read('sf-bank-spoof-gps', 'france'))
@@ -33,7 +40,8 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone }: {
   const running = !!run && run.done + run.failed < run.total
 
   async function launch() {
-    write('sf-bank-spoof-n', String(n)); write('sf-bank-spoof-device', device); write('sf-bank-spoof-gps', gps)
+    if (dest === '+' && !newDest.trim()) { toast('Donne un nom au nouveau dossier', 'bad'); return }
+    write('sf-bank-spoof-n', String(n)); write('sf-bank-spoof-device', device); write('sf-bank-spoof-gps', gps); write('sf-bank-spoof-dest', dest === '+' ? '' : dest)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { toast('Session expirée : reconnecte-toi', 'bad'); return }
     const jobs = planSpoofCopies(items, n, device)
@@ -48,7 +56,7 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone }: {
           const r = await fetch(`${API_ORIGIN}/api/v1/tools/spoof`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-            body: JSON.stringify({ file_id: j.item.id, org_id: orgId, device: j.device, gps, intensity: 'normal', title: `${j.item.title} · copie ${j.n}` }),
+            body: JSON.stringify({ file_id: j.item.id, org_id: orgId, device: j.device, gps, intensity: 'normal', title: `${j.item.title} · copie ${j.n}`, ...(target ? { folder: target } : {}) }),
           })
           const b = await r.json().catch(() => null) as { ok?: boolean; error?: string } | null
           if (b?.ok) done++; else { failed++; lastErr = b?.error ?? `HTTP ${r.status}` }
@@ -59,13 +67,13 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone }: {
     await Promise.all(Array.from({ length: Math.min(PARALLEL, jobs.length) }, worker))
     setRun({ done, failed, total: jobs.length, error: lastErr || undefined })
     onDone()
-    toast(failed ? `${done} copie(s) créée(s), ${failed} échec(s)` : `${done} copie(s) créée(s) dans la Banque`, failed ? 'bad' : 'ok')
+    toast(failed ? `${done} copie(s) créée(s), ${failed} échec(s)` : target ? `${done} copie(s) créée(s) dans « ${target} »` : `${done} copie(s) créée(s) dans la Banque`, failed ? 'bad' : 'ok')
   }
 
   const total = items.length * n
   return (
     <Modal theme={theme} title={`Spoofer en copies (${items.length} média${items.length > 1 ? 's' : ''})`}
-      sub="Chaque copie est unique (recadrage léger, empreinte, appareil et GPS réécrits). Les copies arrivent dans le même dossier que l’original."
+      sub="Chaque copie est unique (recadrage léger, empreinte, appareil et GPS réécrits). Choisis le dossier où ranger les copies : l’original ne bouge pas."
       icon="M8 8h12v12H8z|M4 16V4h12"
       onClose={() => { stop.current = true; onClose() }}
       footer={<>
@@ -76,6 +84,15 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone }: {
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, color: '#A1A1AA' }}>
           Nombre de copies par média (1 à {MAX_COPIES})
           <input type="number" min={1} max={MAX_COPIES} value={count} disabled={running} onChange={e => setCount(e.target.value)} style={{ ...FIELD, width: 120 }} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, color: '#A1A1AA' }}>
+          Dossier des copies
+          <select value={dest} disabled={running} onChange={e => setDest(e.target.value)} style={FIELD}>
+            <option value="">Même dossier que l’original</option>
+            {folders.map(f => <option key={f} value={f} data-no-tr>{f.replace(/\//g, ' › ')}</option>)}
+            <option value="+">＋ Nouveau dossier…</option>
+          </select>
+          {dest === '+' && <input value={newDest} disabled={running} onChange={e => setNewDest(e.target.value)} placeholder="Nom du dossier (ex. Copies/Kenza)" style={FIELD} />}
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, color: '#A1A1AA' }}>
           Appareil écrit dans les copies
