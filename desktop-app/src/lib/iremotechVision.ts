@@ -1430,7 +1430,9 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       await sleep(1500); continue
     }
     // Éditeur vidéo (« Edit video » + Audio / Text / Captions en bas) : bouton « Next → » bleu en bas à droite
-    const toolsY = editorToolsY(words, H)
+    // éditeur reconnu aussi à sa pastille « Suggested audio » (haut) ou à « Swipe up to edit » quand l'OCR rate les outils
+    const edHint = (words.some(o => /^sug+[ge]?[ae]?sted$/i.test(o.text) && o.cy < H * 0.14) && words.some(o => /^audio$/i.test(o.text) && o.cy < H * 0.14)) || words.some(o => /^swipe$/i.test(o.text) && o.cy > H * 0.7)
+    const toolsY = editorToolsY(words, H) ?? (edHint ? Math.round(H * 0.888) : null)
     const inEditor = toolsY != null || (words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.85) && words.some(o => /^(audio|captions|overlay|voice)$/i.test(o.text) && o.cy > H * 0.75))
     if (inEditor) {
       // Musique obligatoire (post photo) : ajoutée et vérifiée AVANT de quitter l'éditeur, sinon rien n'est publié
