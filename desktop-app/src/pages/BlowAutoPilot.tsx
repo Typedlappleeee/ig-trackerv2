@@ -630,7 +630,6 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       try { acDone = localStorage.getItem(acKey) === '1' } catch { /* ignore */ }
       if (!acDone && await disableAutoCorrect(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })) { try { localStorage.setItem(acKey, '1') } catch { /* ignore */ } }
       let stayedIn: string | null = null // compte resté ouvert dans Instagram après son post (session)
-      const retries: Record<string, number> = {} // essais supplémentaires par compte (post raté)
       for (const [ji, job] of p.jobs.entries()) {
         if (R.isCancelled()) break
         push(`\n${tag} 📦 ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
@@ -688,13 +687,6 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic, location: job.location, stay: nextSame }, vh)
             : await postReelByVision(key, p.dev, { caption: job.caption, location: job.location, stay: nextSame }, vh)
         if (posted && nextSame && kind !== 'story') stayedIn = job.container
-        // Post raté sur ce compte : il est RETENTÉ (jusqu'à 2 fois de plus par compte) au lieu de consommer un des posts
-        // de la session — sinon un compte réglé sur 5 posts pouvait n'en avoir qu'1 (vu en vrai sur @viktoria…).
-        if (!posted && kind !== 'story' && !R.isCancelled()) {
-          const k = `${job.container}`
-          retries[k] = (retries[k] ?? 0) + 1
-          if (retries[k] <= 2) { p.jobs.splice(ji + 1, 0, { ...job, ...(() => { const vids = pickSet(perPost); return { vid: vids[0], vids } })() }); push(`${tag} 🔁 « ${job.container} » : post raté → nouvel essai (${retries[k]}/2) avant de passer au compte suivant`) }
-        }
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
         if (posted) for (const v of job.vids) void bumpUsed(v.id)
         // Story CTA publiée : date gardée pour toute l'équipe (liste des comptes : « Story CTA en ligne · il y a 2 h »)

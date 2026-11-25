@@ -5098,6 +5098,5 @@ export const EN: Dict = {
     ["Ajouté {0} : évite d’y poster tout de suite", "Added {0}: avoid posting on it right away"],
     ["● Story CTA en ligne · {0}", "● CTA Story live · {0}"],
     ["Dernière Story CTA {0}", "Last CTA Story {0}"],
-    ["{0} 🔁 « {1} » : post raté → nouvel essai ({2}/2) avant de passer au compte suivant", "{0} 🔁 “{1}”: post failed → retry ({2}/2) before moving to the next account"],
   ],
 }
