@@ -7,6 +7,8 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "Au lancement, chaque compte reçoit une description de Reel différente, toutes dans la langue du marché choisi ici (même marché pour tous les comptes du posting).": "At launch, each account gets a different Reel caption, all in the language of the market chosen here (same market for every account of the posting).",
+    "(une grande ville du pays du marché, au hasard : Paris, Lyon… · Miami, Los Angeles… · Berlin, Munich…)": "(a big city of the market’s country, at random: Paris, Lyon… · Miami, Los Angeles… · Berlin, Munich…)",
     "Nom du nouveau dossier": "New folder name",
     "+ Nouveau dossier…": "+ New folder…",
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",

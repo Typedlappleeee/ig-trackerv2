@@ -626,7 +626,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     // Chaque compte a son marché (FR / US / DE) → descriptions générées par marché, puis distribuées compte par compte.
     const aiCaps: Record<Market, string[]> = { fr: [], us: [], de: [] }
     if (kind !== 'story' && capMode === 'ai') {
-      const need = countByMarket([...sel].flatMap(dev => [...(selConts[dev] ?? [])].flatMap(c => Array.from({ length: perAcct }, () => marketOf(dev, c)))), capMarket)
+      // Posting : UN seul marché pour tous les comptes = celui choisi (posting allemand → descriptions allemandes)
+      const need = countByMarket([...sel].flatMap(dev => [...(selConts[dev] ?? [])].flatMap(() => Array.from({ length: perAcct }, () => capMarket))), capMarket)
       // tous les marchés EN MÊME TEMPS (réserve préparée en fond d'abord, puis Groq)
       const todo = MARKETS.map(x => x.k).filter(m => need[m])
       const res = await Promise.allSettled(todo.map(m => {
@@ -666,7 +667,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       return out
     }
     const pickCap = (dev: string, c: string): string => {
-      if (kind !== 'story' && capMode === 'ai') { const m = marketOf(dev, c); if (!aiCaps[m].length) aiCaps[m] = shuffle(aiAll[m]); return aiCaps[m].pop() ?? '' }
+      if (kind !== 'story' && capMode === 'ai') { const m = capMarket; if (!aiCaps[m].length) aiCaps[m] = shuffle(aiAll[m]); return aiCaps[m].pop() ?? '' }
       if (!captions.length) return ''
       if (uniqueUse) { if (!capQueue.length) capQueue = shuffle(captions); return capQueue.pop()! }
       return captions[Math.floor(Math.random() * captions.length)]
@@ -676,7 +677,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       dev,
       name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(),
       // Session = N posts PAR COMPTE (chaque compte coché publie N fois d'affilée, scroll entre deux posts)
-      jobs: [...(selConts[dev] ?? [])].flatMap(container => Array.from({ length: perAcct }, () => container)).map(container => { const vids = pickSet(perPost, `${dev}::${container}`); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(marketOf(dev, container)) : undefined, link: linkOf(dev, container) || storyLink.trim() } }),
+      jobs: [...(selConts[dev] ?? [])].flatMap(container => Array.from({ length: perAcct }, () => container)).map(container => { const vids = pickSet(perPost, `${dev}::${container}`); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(capMarket) : undefined, link: linkOf(dev, container) || storyLink.trim() } }),
     })).filter(p => p.jobs.length)
 
     // ☁ Sur le serveur : la session part dans la file, un serveur ScaleFlow la fait tourner (ce PC peut être éteint)
@@ -1407,7 +1408,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           </div>
           {setupBio && (<>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
-              <span style={{ fontSize: 12, color: MUTED }}>Marché par défaut</span>
+              <span style={{ fontSize: 12, color: MUTED }}>Marché</span>
               {MARKETS.map(m => (
                 <button key={m.k} disabled={running} onClick={() => { setCapMarket(m.k); try { localStorage.setItem('sf-irt-cap-market', m.k) } catch { /* noop */ } }}
                   style={{ ...btn, height: 32, background: capMarket === m.k ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: capMarket === m.k ? GOLD : INK, borderColor: capMarket === m.k ? 'rgba(233,196,106,0.45)' : FIELD_EDGE }}>{m.label}</button>
@@ -1567,37 +1568,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               <button style={{ ...btn, height: 32 }} onClick={() => { setPromptDraft(marketPrompt(capMarket)); setPromptOpen(o => !o) }}>✏️ Prompt</button>
             </div>
             <div style={{ fontSize: 11.5, color: conns.groq ? DIM : '#FCD34D', margin: '8px 0 0' }}>
-              {conns.groq ? 'Au lancement, chaque compte reçoit une description de Reel différente, générée avec le prompt de SON marché (sinon le marché par défaut).' : 'Il faut une clé Groq (Réglages › Intégrations) pour générer les descriptions.'}
+              {conns.groq ? 'Au lancement, chaque compte reçoit une description de Reel différente, toutes dans la langue du marché choisi ici (même marché pour tous les comptes du posting).' : 'Il faut une clé Groq (Réglages › Intégrations) pour générer les descriptions.'}
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
               <input type="checkbox" checked={capLocation} disabled={running} onChange={e => { setCapLocation(e.target.checked); try { localStorage.setItem('sf-irt-cap-location', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
-              📍 Localisation selon le marché <span style={{ color: DIM, fontSize: 11.5 }}>(une grande ville du pays du compte, au hasard : Paris, Lyon… · Miami, Los Angeles… · Berlin, Munich…)</span>
+              📍 Localisation selon le marché <span style={{ color: DIM, fontSize: 11.5 }}>(une grande ville du pays du marché, au hasard : Paris, Lyon… · Miami, Los Angeles… · Berlin, Munich…)</span>
             </label>
-            {totalJobs > 0 && (
-              <div style={{ marginTop: 10, borderRadius: 8, border: `1px solid ${EDGE}`, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#111113', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: INK }}>Marché de chaque compte</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 11.5, color: DIM }}>Tous en</span>
-                  {MARKETS.map(m => <button key={m.k} disabled={running} onClick={() => { for (const dev of sel) for (const c of selConts[dev] ?? []) setTargetMarket(dev, c, m.k) }} style={{ ...btn, height: 26, fontSize: 11.5, padding: '0 8px' }}>{m.label.split(' ')[0]}</button>)}
-                </div>
-                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-                  {[...sel].flatMap(dev => [...(selConts[dev] ?? [])].map(c => ({ dev, c }))).map(({ dev, c }) => {
-                    const own = team.acctMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c)
-                    const name = (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })()
-                    return (
-                      <div key={`${dev}::${c}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderTop: `1px solid ${EDGE}` }}>
-                        <span data-no-tr style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}<span style={{ color: DIM }}> · {name}</span></span>
-                        {MARKETS.map(m => {
-                          const on = (own ?? capMarket) === m.k
-                          return <button key={m.k} disabled={running} title={own ? m.label : `${m.label}${on ? ' (défaut)' : ''}`} onClick={() => setTargetMarket(dev, c, own === m.k ? null : m.k)}
-                            style={{ height: 26, width: 34, borderRadius: 6, cursor: 'pointer', fontSize: 14, border: `1px solid ${on ? (own ? 'rgba(233,196,106,0.55)' : 'rgba(255,255,255,0.18)') : 'transparent'}`, background: on ? (own ? 'rgba(233,196,106,0.14)' : 'rgba(255,255,255,0.05)') : 'transparent', opacity: on ? 1 : 0.45 }}>{m.label.split(' ')[0]}</button>
-                        })}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
             {promptOpen && (
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <textarea data-no-tr value={promptDraft} onChange={e => setPromptDraft(e.target.value)} rows={10} style={{ ...inp, width: '100%', height: 'auto', padding: 10, resize: 'vertical', fontFamily: MONO, fontSize: 11.5, lineHeight: 1.5 }} />

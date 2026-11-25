@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25l',
+    date: '2026-11-25',
+    title: { fr: 'Posting : un seul marché pour tous les comptes', en: 'Posting: one market for all accounts' },
+    items: {
+      fr: ['Plus de « Marché de chaque compte » dans le Posting : le marché choisi (ex. 🇩🇪 Allemagne) sert pour toutes les descriptions et localisations du posting.'],
+      en: ['No more “Market of each account” in Posting: the chosen market (e.g. 🇩🇪 Germany) is used for every caption and location of the posting.'],
+    },
+  },
+  {
     id: '2026-11-25k',
     date: '2026-11-25',
     title: { fr: 'Téléchargeur Insta : choix du dossier', en: 'Insta downloader: folder choice' },
