@@ -35,5 +35,7 @@ export default defineConfig({
   // exclu de l'optimizer pour que le plugin worker de Vite le résolve correctement (sinon 404 en dev).
   optimizeDeps: { exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'] },
   worker: { format: 'es' },
+  // 2e page : moteur iRemoTech ouvert par le programme serveur (PC éteint), cf. src/irtWorker.ts
+  build: { rollupOptions: { input: { main: fileURLToPath(new URL('./index.html', import.meta.url)), irtWorker: fileURLToPath(new URL('./irt-worker.html', import.meta.url)) } } },
   server: { port: 5273 },
 })

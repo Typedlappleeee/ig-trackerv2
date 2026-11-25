@@ -20,6 +20,9 @@ import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone }
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import IrtAccounts from '@/components/IrtAccounts'
+import IrtServerRuns from '@/components/IrtServerRuns'
+import { enqueueServerRun, serversOnline } from '@/lib/irtServer'
+import { locToServer, type ServerPlan } from '@/lib/irtServerSession'
 import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp } from '@/lib/irtAccounts'
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
@@ -206,6 +209,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [newGroup, setNewGroup] = useState<string | null>(null)   // champ « Créer un groupe » ouvert
   const pendingGroupPhone = useRef<string | null>(null)            // iPhone à mettre dans le groupe qu'on crée
   const submitNewGroup = (name: string) => { const g = name.trim(); if (g) { createGroup(g); if (pendingGroupPhone.current) setPhoneGroup(pendingGroupPhone.current, g) } pendingGroupPhone.current = null; setNewGroup(null) }
+  // Posting Reels SUR LE SERVEUR (PC éteint) : la session est envoyée dans la file au lieu de tourner dans cette page
+  const [serverMode, setServerModeS] = useState(() => { try { return localStorage.getItem('sf-irt-server-mode') === '1' } catch { return false } })
+  const setServerMode = (v: boolean) => { setServerModeS(v); try { localStorage.setItem('sf-irt-server-mode', v ? '1' : '0') } catch { /* noop */ } }
+  const [serverN, setServerN] = useState<number | null>(0)
+  const [srvRefresh, setSrvRefresh] = useState(0)
   const [grpFilter, setGrpFilter] = useState('')   // '' = tous les groupes
   const [mktFilter, setMktFilter] = useState<Market | ''>('')
   const [storyLink, setStoryLink] = useState('')               // lien CTA par défaut (Story)
@@ -374,6 +382,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       setSelConts(sc => sc[dev] ? { ...sc, [dev]: new Set([...sc[dev]].filter(c => next.includes(c))) } : sc)
     }
   }, [irtJobs]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (curTab !== 'posting') return
+    let alive = true
+    const tick = () => void serversOnline().then(n => { if (alive) setServerN(n) })
+    tick()
+    const t = setInterval(tick, 30_000)
+    return () => { alive = false; clearInterval(t) }
+  }, [curTab])
   // Lecture AUTOMATIQUE des comptes : iRemoTech relit les comptes connectés de chaque iPhone normal (list_accounts,
   // 1 action du quota) dès que la dernière lecture a plus de 12 h — donc au moins 2 fois par jour tant que ScaleFlow
   // est ouvert. Un compte déconnecté disparaît de la liste (reconcileWithIrt). Jamais pendant une automatisation.
@@ -615,6 +631,25 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       jobs: [...(selConts[dev] ?? [])].flatMap(container => Array.from({ length: perAcct }, () => container)).map(container => { const vids = pickSet(perPost); return { container, vid: vids[0], vids, caption: pickCap(dev, container), location: kind !== 'story' && capMode === 'ai' && capLocation ? pickCity(marketOf(dev, container)) : undefined, link: linkOf(dev, container) || storyLink.trim() } }),
     })).filter(p => p.jobs.length)
 
+    // ☁ Sur le serveur : la session part dans la file, un serveur ScaleFlow la fait tourner (ce PC peut être éteint)
+    if (kind === 'reel' && serverMode) {
+      const plan: ServerPlan = {
+        kind: 'reel',
+        opts: { airplaneOn, gapMin, gapScroll, parallel },
+        phones: byPhone.map(p => ({ dev: p.dev, name: p.name, jobs: p.jobs.map(j => ({
+          container: j.container, caption: j.caption, location: locToServer(j.location),
+          vids: j.vids.map(v => ({ id: v.id, title: v.title, filename: mediaFilename(v, 'reel'), storage_path: v.storage_path, file_url: v.file_url })),
+        })) })),
+      }
+      const total = plan.phones.reduce((n, p) => n + p.jobs.length, 0)
+      const title = `Reels · ${plan.phones.length} iPhone(s) · ${total} post(s)`
+      const r = await enqueueServerRun({ orgId: currentOrg?.id ?? null, userId: user.id }, plan, title, (user.user_metadata?.full_name as string | undefined) ?? user.email?.split('@')[0] ?? null)
+      push(r.ok ? `☁ Session envoyée au serveur : ${title}. Tu peux fermer ScaleFlow et éteindre ce PC — le journal s’affiche ci-dessous.` : `⚠ Envoi au serveur impossible : ${r.error}`)
+      if (r.ok && !serverN) push('⚠ Aucun serveur en ligne pour l’instant : la session attendra qu’un serveur démarre.')
+      setSrvRefresh(n => n + 1)
+      setRunning(false)
+      return
+    }
     push(`▶ ${kind === 'story' ? 'Story' : kind === 'carousel' ? `Carrousel (${perPost} photos)` : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
     if (src.mode === 'folder') push(isImg ? `📁 « ${src.folder} » : ${pool.length} photo(s)` : `📁 « ${src.folder} » : ${pool.length} vidéo(s)`)
     const R = startRun('farm', `iRemoTech ${kind} · ${byPhone.length} tel × ${totalJobs * perAcct}`, totalJobs * perAcct)
@@ -1536,8 +1571,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             📱 Scroller pendant la pause <span style={{ color: DIM, fontSize: 11.5 }}>(activité naturelle sur le compte avant son post, évite le flag robot)</span>
           </label>
         </div>
-        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} ${postType === 'carousel' ? `carrousel${totalJobs > 1 ? 's' : ''} de ${carCount} photos` : `Reel${totalJobs > 1 ? 's' : ''}`} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={postType === 'carousel' ? `Lancer ${totalJobs * sessMax} carrousel(s)` : `Lancer ${totalJobs * sessMax} Reel(s)`} disabled={!totalJobs || (postType === 'carousel' ? (photoSrc.mode === 'folder' ? !photoSrc.folder : photoPool.length < carCount) : (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length)) || running} running={running} onClick={() => run(postType === 'carousel' ? 'carousel' : 'reel')} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} ${postType === 'carousel' ? `carrousel${totalJobs > 1 ? 's' : ''} de ${carCount} photos` : `Reel${totalJobs > 1 ? 's' : ''}`} (${targetsSummary([...sel].flatMap(d => [...(selConts[d] ?? [])]))}) sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<>{postType !== 'carousel' && serverN !== null && <div style={{ marginBottom: 10 }}><Toggle on={serverMode} onClick={() => setServerMode(!serverMode)} label="☁ Sur le serveur (PC éteint)" sub={serverN ? `${serverN} serveur${serverN > 1 ? 's' : ''} en ligne : la session tourne sur le serveur, tu peux fermer ScaleFlow et éteindre ce PC.` : 'Aucun serveur en ligne pour l’instant : la session attendra qu’un serveur démarre.'} /></div>}<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} /></>} label={postType === 'carousel' ? `Lancer ${totalJobs * sessMax} carrousel(s)` : serverMode && serverN !== null ? `Envoyer ${totalJobs * sessMax} Reel(s) au serveur` : `Lancer ${totalJobs * sessMax} Reel(s)`} disabled={!totalJobs || (postType === 'carousel' ? (photoSrc.mode === 'folder' ? !photoSrc.folder : photoPool.length < carCount) : (reelSrc.mode === 'folder' ? !reelSrc.folder : !reelPool.length)) || running} running={running} onClick={() => run(postType === 'carousel' ? 'carousel' : 'reel')} />
         <LogPanel />
+        {postType !== 'carousel' && <IrtServerRuns scope={{ orgId: currentOrg?.id ?? null, userId: user.id }} refreshKey={srvRefresh} />}
       </>)}
 
       {/* ─────────────── ONGLET STORY ─────────────── */}
