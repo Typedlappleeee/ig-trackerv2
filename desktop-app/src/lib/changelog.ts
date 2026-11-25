@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25h',
+    date: '2026-11-25',
+    title: { fr: 'Descriptions IA : en quantité illimitée', en: 'AI captions: unlimited amounts' },
+    items: {
+      fr: ['Génération refaite pour tenir 100 descriptions et plus : plusieurs modèles Groq en parallèle (un quota chacun), attente du délai exact quand Groq limite, requêtes plus légères, plus de délai maximum fixe (arrêt seulement si Groq ne répond plus pendant 5 min). Les descriptions en trop sont gardées en réserve pour la prochaine fois, jamais servies deux fois.'],
+      en: ['Generation rebuilt to handle 100+ captions: several Groq models in parallel (one quota each), waits exactly as long as Groq asks when rate-limited, lighter requests, no more fixed time limit (stops only if Groq stops answering for 5 min). Extra captions are kept in reserve for next time, never served twice.'],
+    },
+  },
+  {
     id: '2026-11-25g',
     date: '2026-11-25',
     title: { fr: 'iRemoTech : jamais deux fois la même vidéo', en: 'iRemoTech: never the same video twice' },

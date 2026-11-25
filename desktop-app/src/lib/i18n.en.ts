@@ -7,6 +7,7 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "descriptions déjà reçues": "captions already received",
     "photo(s)": "photo(s)",
     "vidéo(s)": "video(s)",
     "🗑 Supprimer de la Banque une fois publiée": "🗑 Delete from the Bank once posted",
@@ -5141,5 +5142,8 @@ export const EN: Dict = {
     ["le dossier « {0} » n’en a que {1}", "the folder “{0}” only has {1}"],
     ["le pool n’en a que {0}", "the pool only has {0}"],
     ["{0} 🗑 « {1} » supprimé de la Banque (publié)", "{0} 🗑 “{1}” deleted from the Bank (posted)"],
+    ["✍️ {0}/{1} description(s) reprise(s) de la réserve", "✍️ {0}/{1} caption(s) taken from the reserve"],
+    ["⏳ {0} : {1} → nouvel essai dans {2} s ({3}/{4} prêtes)", "⏳ {0}: {1} → retrying in {2} s ({3}/{4} ready)"],
+    ["{0}/{1} description(s) seulement : Groq ne répond plus depuis {2} min ({3}) — relance plus tard, les {4} prêtes sont gardées dans la réserve", "only {0}/{1} caption(s): Groq hasn’t answered for {2} min ({3}) — relaunch later, the {4} ready ones are kept in the reserve"],
   ],
 }

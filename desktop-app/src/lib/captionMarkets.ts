@@ -1,7 +1,7 @@
 // Descriptions automatiques PAR MARCHÉ (prompts fournis par l'équipe, 22/11/2026) : France, USA, Allemagne.
 // Le prompt du marché est le message système ; l'IA (Groq) renvoie N descriptions séparées par « ——— ».
 // Chaque prompt peut être modifié dans l'app (sauvegardé dans le navigateur, `sf-cap-prompt-<marché>`).
-import { groqText } from './ai'
+import { groqChat, stripThinking, isModelUnavailable, groqReason } from './ai'
 
 export type Market = 'fr' | 'us' | 'de'
 export const MARKETS: { k: Market; label: string }[] = [
@@ -220,38 +220,75 @@ export function splitCaptions(raw: string): string[] {
     .filter(c => c.length > 0 && !/^(here are|voici|hier sind)\b/i.test(c))
 }
 
-/** N descriptions pour le marché, TOUTES ou erreur (jamais un posting avec des descriptions réutilisées).
- *  Lots de 10 (5 après un échec, pour des réponses plus rapides que le délai du relais), seul le dernier échange est
- *  renvoyé (limite de jetons par minute de Groq). Échec d'un lot (relais lent, limite de débit, réponse vide…) →
- *  pause croissante (10, 20, 30… s) puis on recommence, jusqu'à 25 essais / 8 min au total. */
-export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; maxTries?: number; maxMs?: number }): Promise<string[]> {
+/** Modèles Groq qui écrivent bien des descriptions, dans l'ordre ; chaque modèle a SON quota (jetons / minute) chez Groq,
+ *  donc plusieurs modèles en parallèle vont plus vite sans dépasser la limite. */
+export const CAPTION_MODELS = ['llama-3.3-70b-versatile', 'meta-llama/llama-4-maverick-17b-128e-instruct', 'moonshotai/kimi-k2-instruct', 'meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.1-8b-instant']
+
+/** « Please try again in 7.3s » / « in 1m2.5s » / « in 820ms » → millisecondes (null si absent). Pure. */
+export function retryAfterMs(msg: string): number | null {
+  const m = /try again in\s+(?:(\d+)m)?\s*(?:([\d.]+)s)?\s*(?:([\d.]+)ms)?/i.exec(msg)
+  if (!m || (!m[1] && !m[2] && !m[3])) return null
+  return Math.round((Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0)) * 1000 + Number(m[3] ?? 0))
+}
+/** Début d'une description (3 premiers mots, sans emojis ni hashtags) : sert à éviter les quasi-doublons. Pure. */
+export const captionKey = (c: string) => c.toLowerCase().replace(/#\S+/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 4).join(' ')
+
+// Réserve par marché : descriptions générées en trop, gardées pour la prochaine fois (jamais servies deux fois).
+const cacheKey = (m: Market) => `sf-cap-cache-${m}`
+function loadCache(m: Market): string[] { try { const a = JSON.parse(localStorage.getItem(cacheKey(m)) ?? '[]'); return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [] } catch { return [] } }
+function saveCache(m: Market, list: string[]): void { try { localStorage.setItem(cacheKey(m), JSON.stringify(list.slice(0, 400))) } catch { /* plein */ } }
+
+/** N descriptions pour le marché, TOUTES ou erreur (jamais un posting avec des descriptions réutilisées), sans limite de
+ *  nombre. Réserve d'abord ; puis jusqu'à 3 modèles Groq EN PARALLÈLE (un quota chacun), lots de 10, requêtes légères
+ *  (prompt du marché + nombre, sans renvoyer les lots précédents : les doublons sont filtrés ici). Limite de débit →
+ *  attente du délai exact donné par Groq ; modèle retiré → modèle suivant. Arrêt seulement après `stallMs` sans aucune
+ *  nouvelle description (5 min). Les descriptions en trop vont dans la réserve. */
+export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; stallMs?: number; workers?: number; useCache?: boolean }): Promise<string[]> {
   if (!groqKey) throw new Error('clé Groq manquante (Réglages › Intégrations)')
   const sleep = opts?.sleep ?? ((ms: number) => new Promise<void>(r => setTimeout(r, ms)))
-  const maxTries = opts?.maxTries ?? 25, deadline = Date.now() + (opts?.maxMs ?? 8 * 60_000)
+  const stallMs = opts?.stallMs ?? 5 * 60_000
   const out: string[] = []
-  const messages: { role: string; content: string }[] = [{ role: 'system', content: marketPrompt(m) }]
-  let fails = 0, lastErr = ''
-  for (let tries = 0; out.length < n && tries < maxTries && Date.now() < deadline; tries++) {
-    const ask = Math.min(fails ? 5 : 10, n - out.length)
-    const req = [messages[0], ...messages.slice(-2).filter(x => x.role === 'assistant'), { role: 'user', content: String(ask) }]
-    let got: string[] = []
-    try {
-      const raw = await groqText(groqKey, req, Math.min(4000, 150 * ask + 600), 1)
-      if (raw) { got = splitCaptions(raw).filter(c => !out.includes(c)); messages.push({ role: 'user', content: String(ask) }, { role: 'assistant', content: raw }) }
-      if (!got.length) lastErr = 'réponse vide'
-    } catch (e) { lastErr = e instanceof Error ? e.message.slice(0, 110) : String(e) }
-    if (got.length) {
-      fails = 0
-      out.push(...got)
-      onLog?.(`✍️ ${Math.min(out.length, n)}/${n} description(s) générée(s)`)
-      continue
-    }
-    fails++
-    const wait = Math.min(60, 10 * fails)
-    onLog?.(`   ⏳ lot raté (${lastErr}) → nouvel essai dans ${wait} s (${out.length}/${n} déjà prêtes)`)
-    await sleep(wait * 1000)
+  const keys = new Set<string>()
+  const add = (c: string) => { const k = captionKey(c); if (!c.trim() || keys.has(k) || out.length >= n) return false; keys.add(k); out.push(c); return true }
+  if (opts?.useCache !== false) {
+    const cache = loadCache(m)
+    const take = cache.splice(0, n)
+    take.forEach(add)
+    saveCache(m, cache)
+    if (out.length) onLog?.(`✍️ ${out.length}/${n} description(s) reprise(s) de la réserve`)
   }
-  if (out.length < n) throw new Error(`${out.length}/${n} description(s) seulement après plusieurs essais (${lastErr || 'Groq indisponible'}) — relance dans quelques minutes`)
+  if (out.length >= n) return out.slice(0, n)
+  const system = { role: 'system', content: marketPrompt(m) }
+  const extra: string[] = []
+  let lastProgress = Date.now(), lastErr = ''
+  const models = [...CAPTION_MODELS]
+  const worker = async (w: number) => {
+    let mi = w % models.length, fails = 0
+    while (out.length < n && Date.now() - lastProgress < stallMs) {
+      const model = models[mi % models.length]
+      const ask = Math.min(10, Math.max(5, n - out.length))
+      try {
+        const raw = await groqChat(groqKey, model, [system, { role: 'user', content: String(ask) }], Math.min(3000, 150 * ask + 400), 1)
+        const got = splitCaptions(stripThinking(raw ?? ''))
+        let added = 0
+        for (const c of got) { if (add(c)) added++; else if (out.length >= n && !keys.has(captionKey(c))) { keys.add(captionKey(c)); extra.push(c) } }
+        if (added) { lastProgress = Date.now(); fails = 0; onLog?.(`✍️ ${Math.min(out.length, n)}/${n} description(s) générée(s)`) }
+        else { fails++; lastErr = got.length ? 'descriptions déjà reçues' : 'réponse vide'; await sleep(3000) }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        lastErr = groqReason(msg).slice(0, 110)
+        if (isModelUnavailable(msg)) { mi++; continue } // modèle retiré chez Groq → suivant
+        fails++
+        const wait = retryAfterMs(msg) ?? Math.min(60_000, 8000 * fails)
+        if (fails === 1 || fails % 3 === 0) onLog?.(`   ⏳ ${model.split('/').pop()} : ${lastErr} → nouvel essai dans ${Math.round(wait / 1000)} s (${out.length}/${n} prêtes)`)
+        await sleep(Math.min(wait + 500, 65_000))
+        if (fails >= 3) mi++ // trop d'échecs sur ce modèle : on essaie le suivant
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.max(1, opts?.workers ?? 3) }, (_, w) => worker(w)))
+  if (extra.length) saveCache(m, [...loadCache(m), ...extra])
+  if (out.length < n) { if (out.length) saveCache(m, [...out, ...loadCache(m)]); throw new Error(`${out.length}/${n} description(s) seulement : Groq ne répond plus depuis ${Math.round(stallMs / 60000)} min (${lastErr || 'indisponible'}) — relance plus tard, les ${out.length} prêtes sont gardées dans la réserve`) }
   return out.slice(0, n)
 }
 

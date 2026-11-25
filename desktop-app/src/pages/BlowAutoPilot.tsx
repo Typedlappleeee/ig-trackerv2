@@ -1544,7 +1544,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               ))}
               <button style={{ ...btn, height: 32, marginLeft: 'auto' }} disabled={capBusy || !conns.groq} onClick={async () => {
                 setCapBusy(true)
-                try { setCapPreview(await generateMarketCaptions(conns.groq, capMarket, 5)) } catch (e) { toast(`Descriptions : ${e instanceof Error ? e.message : String(e)}`, 'bad') }
+                try { setCapPreview(await generateMarketCaptions(conns.groq, capMarket, 5, undefined, { useCache: false })) } catch (e) { toast(`Descriptions : ${e instanceof Error ? e.message : String(e)}`, 'bad') }
                 setCapBusy(false)
               }}>{capBusy ? 'Génération…' : '👀 Aperçu (5)'}</button>
               <button style={{ ...btn, height: 32 }} onClick={() => { setPromptDraft(marketPrompt(capMarket)); setPromptOpen(o => !o) }}>✏️ Prompt</button>
