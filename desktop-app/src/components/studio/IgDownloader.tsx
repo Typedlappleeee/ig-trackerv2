@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { saveOutputToBank } from '@/lib/studioTools'
 import type { StudioResult } from './Results'
 import { listBankFolders } from '@/lib/bankFolders'
+import { loadTeamCache, pullTeam, updateTeam } from '@/lib/irtTeam'
 import { BankFolderOptions, useBankModels } from '@/components/BankFolderOptions'
 
 type Row = { link: string; state: 'wait' | 'run' | 'ok' | 'err'; msg?: string; n?: number }
@@ -32,8 +33,21 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
       return localStorage.getItem('sf-igdl-split') === '0' ? old : (old ? `${old}/${kind}` : kind)
     } catch { return `${DEFAULT_FOLDER}/${kind}` }
   }
-  const [reelsDest, setReelsDest] = useState(() => initDest('Reels'))
-  const [photosDest, setPhotosDest] = useState(() => initDest('Photos'))
+  // réglage PARTAGÉ par toute l'agence (réglages d'équipe), le navigateur sert seulement de repli
+  const teamScope = { orgId: org.currentOrg?.id ?? null, userId: user.id }
+  const [reelsDest, setReelsDest] = useState(() => loadTeamCache(teamScope).igdl.reels ?? initDest('Reels'))
+  const [photosDest, setPhotosDest] = useState(() => loadTeamCache(teamScope).igdl.photos ?? initDest('Photos'))
+  useEffect(() => {
+    let a = true
+    void pullTeam(teamScope).then(t => { if (!a || !t) return; if (t.igdl.reels) setReelsDest(t.igdl.reels); if (t.igdl.photos) setPhotosDest(t.igdl.photos) })
+    return () => { a = false }
+  }, [teamScope.orgId, user.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const saveDest = (kind: 'reels' | 'photos', v: string) => {
+    if (kind === 'reels') setReelsDest(v); else setPhotosDest(v)
+    const val = v.trim()
+    try { localStorage.setItem(kind === 'reels' ? 'sf-igdl-reels' : 'sf-igdl-photos', val) } catch { /* noop */ }
+    if (val) void updateTeam(teamScope, t => { t.igdl = { ...t.igdl, [kind]: val } }).catch(() => undefined)
+  }
   const [rows, setRows] = useState<Row[]>([])
   const [busy, setBusy] = useState(false)
   const links = igLinksFrom(text)
@@ -106,8 +120,8 @@ export function IgDownloader({ theme, user, org, onNavigate, addResult }: {
           placeholder={'https://www.instagram.com/reel/…\nhttps://www.instagram.com/p/…'}
           style={{ ...FIELD, height: 'auto', minHeight: 110, padding: '10px 12px', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }} />
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <DestSelect label="🎬 Reels →" value={reelsDest} onChange={setReelsDest} options={options} models={bankModels} disabled={busy} />
-          <DestSelect label="🖼 Photos →" value={photosDest} onChange={setPhotosDest} options={options} models={bankModels} disabled={busy} />
+          <DestSelect label="🎬 Reels →" value={reelsDest} onChange={v => saveDest('reels', v)} options={options} models={bankModels} disabled={busy} />
+          <DestSelect label="🖼 Photos →" value={photosDest} onChange={v => saveDest('photos', v)} options={options} models={bankModels} disabled={busy} />
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 12.5, color: '#7C7C86' }}>{links.length ? `${links.length} lien(s) reconnu(s)` : 'Aucun lien reconnu'}</span>
             {onNavigate && <Btn theme={theme} label="Voir dans la Banque" onClick={openBank} />}
@@ -135,12 +149,14 @@ function DestSelect({ label, value, onChange, options, models, disabled }: {
   label: string; value: string; onChange: (v: string) => void; options: string[]; models: ReturnType<typeof useBankModels>; disabled: boolean
 }) {
   const [custom, setCustom] = useState(false)
+  const [draft, setDraft] = useState('')
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#A1A1AA' }}>
       {label}
       {custom
-        ? <input autoFocus value={value} onChange={e => onChange(e.target.value)} onBlur={() => setCustom(false)} disabled={disabled} placeholder="Nom du nouveau dossier" style={{ ...FIELD, width: 220 }} />
-        : <select value={value.trim()} disabled={disabled} onChange={e => { if (e.target.value === '__new__') { onChange(''); setCustom(true) } else onChange(e.target.value) }} style={{ ...FIELD, width: 240 }}>
+        ? <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} onBlur={() => { setCustom(false); if (draft.trim()) onChange(draft.trim()) }}
+            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} disabled={disabled} placeholder="Nom du nouveau dossier" style={{ ...FIELD, width: 220 }} />
+        : <select value={value.trim()} disabled={disabled} onChange={e => { if (e.target.value === '__new__') { setDraft(''); setCustom(true) } else onChange(e.target.value) }} style={{ ...FIELD, width: 240 }}>
             <BankFolderOptions folders={options} models={models} />
             <option value="__new__">+ Nouveau dossier…</option>
           </select>}

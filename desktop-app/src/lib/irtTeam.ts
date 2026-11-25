@@ -17,8 +17,9 @@ export interface IrtTeam {
   posted: Record<string, string[]>      // `${iPhone}::${cible}` → vidéos d'origine déjà publiées par ce compte (200 dernières)
   bankByModel: boolean                  // Banque : vue « par modèle » activée pour toute l'agence
   bankTemplate: string[]                // Banque : dossiers créés pour chaque nouvelle modèle (« Reels/Originaux »…) ; vide = défaut
+  igdl: { reels?: string; photos?: string }   // Téléchargeur Insta : dossiers des Reels et des photos (toute l'agence)
 }
-export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, posted: {}, bankByModel: false, bankTemplate: [] })
+export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, posted: {}, bankByModel: false, bankTemplate: [], igdl: {} })
 
 const isMarket = (v: unknown): v is Market => v === 'fr' || v === 'us' || v === 'de'
 const strMap = (v: unknown): Record<string, string> => {
@@ -38,6 +39,7 @@ export function parseTeam(raw: unknown): IrtTeam {
     posted: Object.fromEntries(Object.entries((o.posted && typeof o.posted === 'object' && !Array.isArray(o.posted) ? o.posted : {}) as Record<string, unknown>)
       .filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((x): x is string => typeof x === 'string').slice(-200)])),
     bankByModel: o.bankByModel === true,
+    igdl: (() => { const g = strMap(o.igdl); return { ...(g.reels ? { reels: g.reels } : {}), ...(g.photos ? { photos: g.photos } : {}) } })(),
     bankTemplate: Array.isArray(o.bankTemplate) ? [...new Set(o.bankTemplate.filter((x): x is string => typeof x === 'string').map(x => x.split('/').map(y => y.trim()).filter(Boolean).join('/')).filter(Boolean))].slice(0, 60) : [],
     ctaTexts: Array.isArray(o.ctaTexts) ? [...new Set(o.ctaTexts.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean))].slice(0, 200) : [],
   }
