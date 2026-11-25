@@ -86,6 +86,16 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── Liste des modèles disponibles pour cette clé (les modèles retirés par Groq n'y sont plus) ─────────────
+  if (req.body.list) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(15000) })
+      const j = await r.json().catch(() => null)
+      if (!r.ok) return res.json({ ok: false, error: j?.error?.message || `Groq HTTP ${r.status}` })
+      return res.json({ ok: true, data: (j?.data || []).filter(m => m && m.active !== false).map(m => String(m.id)) })
+    } catch (e) { return res.json({ ok: false, error: e instanceof Error ? e.message : String(e) }) }
+  }
+
   // ── Chat completions ─────────────────────────────────────────────────────────
   const { model, messages, temperature, maxTokens } = req.body
   try {

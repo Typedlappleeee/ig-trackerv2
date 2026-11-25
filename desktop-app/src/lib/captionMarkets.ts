@@ -1,7 +1,7 @@
 // Descriptions automatiques PAR MARCHÉ (prompts fournis par l'équipe, 22/11/2026) : France, USA, Allemagne.
 // Le prompt du marché est le message système ; l'IA (Groq) renvoie N descriptions séparées par « ——— ».
 // Chaque prompt peut être modifié dans l'app (sauvegardé dans le navigateur, `sf-cap-prompt-<marché>`).
-import { groqChat, stripThinking, isModelUnavailable, groqReason } from './ai'
+import { groqChat, stripThinking, isModelUnavailable, groqReason, groqModels, pickChatModels } from './ai'
 
 export type Market = 'fr' | 'us' | 'de'
 export const MARKETS: { k: Market; label: string }[] = [
@@ -222,7 +222,8 @@ export function splitCaptions(raw: string): string[] {
 
 /** Modèles Groq qui écrivent bien des descriptions, dans l'ordre ; chaque modèle a SON quota (jetons / minute) chez Groq,
  *  donc plusieurs modèles en parallèle vont plus vite sans dépasser la limite. */
-export const CAPTION_MODELS = ['llama-3.3-70b-versatile', 'meta-llama/llama-4-maverick-17b-128e-instruct', 'moonshotai/kimi-k2-instruct', 'meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.1-8b-instant']
+export const CAPTION_MODELS = ['meta-llama/llama-4-maverick-17b-128e-instruct', 'moonshotai/kimi-k2-instruct', 'llama-3.3-70b-versatile', 'meta-llama/llama-4-scout-17b-16e-instruct', 'openai/gpt-oss-120b', 'qwen/qwen3-32b', 'openai/gpt-oss-20b', 'llama-3.1-8b-instant']
+const THINKS = (m: string) => /gpt-oss|qwen3/.test(m)
 
 /** « Please try again in 7.3s » / « in 1m2.5s » / « in 820ms » → millisecondes (null si absent). Pure. */
 export function retryAfterMs(msg: string): number | null {
@@ -231,7 +232,7 @@ export function retryAfterMs(msg: string): number | null {
   return Math.round((Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0)) * 1000 + Number(m[3] ?? 0))
 }
 /** Début d'une description (3 premiers mots, sans emojis ni hashtags) : sert à éviter les quasi-doublons. Pure. */
-export const captionKey = (c: string) => c.toLowerCase().replace(/#\S+/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 4).join(' ')
+export const captionKey = (c: string) => c.toLowerCase().replace(/#\S+/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 6).join(' ')
 
 // Réserve par marché : descriptions générées en trop, gardées pour la prochaine fois (jamais servies deux fois).
 const cacheKey = (m: Market) => `sf-cap-cache-${m}`
@@ -243,10 +244,13 @@ function saveCache(m: Market, list: string[]): void { try { localStorage.setItem
  *  (prompt du marché + nombre, sans renvoyer les lots précédents : les doublons sont filtrés ici). Limite de débit →
  *  attente du délai exact donné par Groq ; modèle retiré → modèle suivant. Arrêt seulement après `stallMs` sans aucune
  *  nouvelle description (5 min). Les descriptions en trop vont dans la réserve. */
-export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; stallMs?: number; workers?: number; useCache?: boolean }): Promise<string[]> {
+export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; stallMs?: number; workers?: number; useCache?: boolean; shouldStop?: () => boolean; batch?: number; models?: string[] }): Promise<string[]> {
   if (!groqKey) throw new Error('clé Groq manquante (Réglages › Intégrations)')
   const sleep = opts?.sleep ?? ((ms: number) => new Promise<void>(r => setTimeout(r, ms)))
   const stallMs = opts?.stallMs ?? 5 * 60_000
+  const foreground = !opts?.shouldStop
+  if (foreground) activeGens++
+  try {
   const out: string[] = []
   const keys = new Set<string>()
   const add = (c: string) => { const k = captionKey(c); if (!c.trim() || keys.has(k) || out.length >= n) return false; keys.add(k); out.push(c); return true }
@@ -261,14 +265,19 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
   const system = { role: 'system', content: marketPrompt(m) }
   const extra: string[] = []
   let lastProgress = Date.now(), lastErr = ''
-  const models = [...CAPTION_MODELS]
+  // modèles VRAIMENT proposés par Groq pour cette clé (ceux qu'il retire disparaissent de la liste)
+  const models = opts?.models ?? pickChatModels(CAPTION_MODELS, await groqModels(groqKey))
+  const dead = new Set<string>()
   const worker = async (w: number) => {
     let mi = w % models.length, fails = 0
-    while (out.length < n && Date.now() - lastProgress < stallMs) {
+    while (out.length < n && Date.now() - lastProgress < stallMs && !opts?.shouldStop?.()) {
+      if (dead.size >= models.length) return // plus aucun modèle disponible
+      while (dead.has(models[mi % models.length])) mi++
       const model = models[mi % models.length]
-      const ask = Math.min(10, Math.max(5, n - out.length))
+      // lots de 15 (le long prompt du marché n'est envoyé qu'une fois pour 15 descriptions) ; 6 minimum
+      const ask = Math.min(opts?.batch ?? 15, Math.max(6, n - out.length))
       try {
-        const raw = await groqChat(groqKey, model, [system, { role: 'user', content: String(ask) }], Math.min(3000, 150 * ask + 400), 1)
+        const raw = await groqChat(groqKey, model, [system, { role: 'user', content: String(ask) }], THINKS(model) ? 8000 : Math.min(4000, 160 * ask + 400), 1)
         const got = splitCaptions(stripThinking(raw ?? ''))
         let added = 0
         for (const c of got) { if (add(c)) added++; else if (out.length >= n && !keys.has(captionKey(c))) { keys.add(captionKey(c)); extra.push(c) } }
@@ -277,7 +286,7 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         lastErr = groqReason(msg).slice(0, 110)
-        if (isModelUnavailable(msg)) { mi++; continue } // modèle retiré chez Groq → suivant
+        if (isModelUnavailable(msg)) { dead.add(model); mi++; continue } // modèle retiré chez Groq → plus jamais essayé ici
         fails++
         const wait = retryAfterMs(msg) ?? Math.min(60_000, 8000 * fails)
         if (fails === 1 || fails % 3 === 0) onLog?.(`   ⏳ ${model.split('/').pop()} : ${lastErr} → nouvel essai dans ${Math.round(wait / 1000)} s (${out.length}/${n} prêtes)`)
@@ -286,10 +295,34 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.max(1, opts?.workers ?? 3) }, (_, w) => worker(w)))
+  // un travailleur par modèle (chaque modèle a son propre quota Groq), 6 au plus
+  await Promise.all(Array.from({ length: Math.max(1, opts?.workers ?? Math.min(6, models.length)) }, (_, w) => worker(w)))
+  if (out.length < n && dead.size >= models.length) { if (out.length) saveCache(m, [...out, ...loadCache(m)]); throw new Error(`${out.length}/${n} description(s) : aucun modèle Groq disponible pour cette clé (${lastErr})`) }
   if (extra.length) saveCache(m, [...loadCache(m), ...extra])
   if (out.length < n) { if (out.length) saveCache(m, [...out, ...loadCache(m)]); throw new Error(`${out.length}/${n} description(s) seulement : Groq ne répond plus depuis ${Math.round(stallMs / 60000)} min (${lastErr || 'indisponible'}) — relance plus tard, les ${out.length} prêtes sont gardées dans la réserve`) }
   return out.slice(0, n)
+  } finally { if (foreground) activeGens-- }
+}
+
+// ── Réserve préparée EN FOND : quand l'onglet est ouvert (et juste après un lancement), ScaleFlow génère à l'avance
+// jusqu'à RESERVE_TARGET descriptions par marché → au lancement suivant elles sont prêtes tout de suite. Se met en
+// pause dès qu'une vraie génération démarre (elle a la priorité sur le quota Groq).
+export const RESERVE_TARGET = 60
+let activeGens = 0
+const filling = new Set<Market>()
+export const reserveCount = (m: Market) => loadCache(m).length
+export async function topUpReserve(groqKey: string, m: Market, target = RESERVE_TARGET): Promise<number> {
+  if (!groqKey || filling.has(m) || activeGens > 0) return reserveCount(m)
+  const missing = target - reserveCount(m)
+  if (missing < 10) return reserveCount(m)
+  filling.add(m)
+  try {
+    const got = await generateMarketCaptions(groqKey, m, missing, undefined, { useCache: false, workers: 2, stallMs: 90_000, shouldStop: () => activeGens > 0 })
+    const have = new Set(loadCache(m).map(captionKey))
+    saveCache(m, [...loadCache(m), ...got.filter(c => !have.has(captionKey(c)))])
+  } catch { /* les descriptions reçues sont déjà dans la réserve */ }
+  finally { filling.delete(m) }
+  return reserveCount(m)
 }
 
 // Marché PAR COMPTE (cible « @compte » ou container d'un iPhone) : chaque compte reçoit sa description de Reel dans sa

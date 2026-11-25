@@ -5146,5 +5146,6 @@ export const EN: Dict = {
     ["✍️ {0}/{1} description(s) reprise(s) de la réserve", "✍️ {0}/{1} caption(s) taken from the reserve"],
     ["⏳ {0} : {1} → nouvel essai dans {2} s ({3}/{4} prêtes)", "⏳ {0}: {1} → retrying in {2} s ({3}/{4} ready)"],
     ["{0}/{1} description(s) seulement : Groq ne répond plus depuis {2} min ({3}) — relance plus tard, les {4} prêtes sont gardées dans la réserve", "only {0}/{1} caption(s): Groq hasn’t answered for {2} min ({3}) — relaunch later, the {4} ready ones are kept in the reserve"],
+    ["{0}/{1} description(s) : aucun modèle Groq disponible pour cette clé ({2})", "{0}/{1} caption(s): no Groq model available for this key ({2})"],
   ],
 }

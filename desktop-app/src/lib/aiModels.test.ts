@@ -30,3 +30,13 @@ describe('Groq : limite de débit → modèle suivant, vraie raison affichée', 
     expect(groqReason('{"error":{"message":"Invalid API Key","type":"invalid_request_error"}}')).toBe('Invalid API Key')
   })
 })
+
+import { pickChatModels } from './ai'
+describe('modèles Groq en direct', () => {
+  it('garde les préférés encore proposés, ajoute les autres modèles de chat, jamais audio/modération', () => {
+    const live = ['whisper-large-v3', 'openai/gpt-oss-120b', 'meta-llama/llama-guard-4-12b', 'newco/new-chat-model', 'moonshotai/kimi-k2-instruct']
+    expect(pickChatModels(['llama-3.3-70b-versatile', 'moonshotai/kimi-k2-instruct', 'openai/gpt-oss-120b'], live))
+      .toEqual(['moonshotai/kimi-k2-instruct', 'openai/gpt-oss-120b', 'newco/new-chat-model'])
+    expect(pickChatModels(['a'], null)).toEqual(['a'])
+  })
+})

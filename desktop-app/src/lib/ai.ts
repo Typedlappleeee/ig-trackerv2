@@ -48,6 +48,34 @@ export async function groqChat(groqKey: string, model: string, messages: unknown
 }
 
 
+/** Modèles disponibles pour cette clé Groq (liste en direct, mémorisée 1 h). null = liste illisible. */
+let modelsCache: { key: string; at: number; ids: string[] } | null = null
+export async function groqModels(groqKey: string): Promise<string[] | null> {
+  if (!groqKey) return null
+  if (modelsCache && modelsCache.key === groqKey && Date.now() - modelsCache.at < 3600_000) return modelsCache.ids
+  try {
+    let ids: string[] | null = null
+    if (IS_WEB) {
+      const r = await fetch('/api/groq', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: groqKey, list: true }) })
+      const j = JSON.parse(await r.text()) as { ok: boolean; data?: string[] }
+      ids = j.ok && Array.isArray(j.data) ? j.data : null
+    } else {
+      const r = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${groqKey}` } })
+      if (r.ok) { const j = await r.json(); ids = (j?.data ?? []).filter((m: { active?: boolean }) => m.active !== false).map((m: { id: string }) => String(m.id)) }
+    }
+    if (ids && ids.length) modelsCache = { key: groqKey, at: Date.now(), ids }
+    return ids && ids.length ? ids : null
+  } catch { return null }
+}
+/** Modèles de chat utilisables pour écrire : d'abord `preferred` encore proposés par Groq, puis les autres modèles de
+ *  chat de la liste (jamais audio / modération / TTS). Sans liste : `preferred` tel quel. Pure. */
+export function pickChatModels(preferred: string[], live: string[] | null): string[] {
+  if (!live) return preferred
+  const chat = live.filter(id => !/whisper|guard|tts|playai|orpheus|distil|safeguard|compound|allam|prompt-guard/i.test(id))
+  const kept = preferred.filter(m => chat.includes(m))
+  return [...kept, ...chat.filter(m => !kept.includes(m)).sort()]
+}
+
 // ── Texte (descriptions, légendes) : modèles de secours ─────────────────────────────────────────────────
 // Groq retire régulièrement des modèles (vu le 22/11/2026 : « llama-3.3-70b-versatile does not exist or you do not
 // have access to it »). On essaie la liste dans l'ordre, on passe au suivant si le modèle est refusé, et on retient

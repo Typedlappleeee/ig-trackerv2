@@ -29,7 +29,7 @@ import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
 import { generatePfp } from '@/lib/pfpGenerator'
 import { generateBios } from '@/lib/bioMarkets'
-import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
+import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
 import { listJobs, type IrtJob } from '@/lib/iremotech'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
@@ -279,6 +279,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // Cerveau vision des automatisations = clé Groq de l'espace (Réglages › IA)
   const conns = useConnections(user, org)
   useEffect(() => { setVisionBrain(conns.groq) }, [conns.groq])
+  // Descriptions préparées à l'avance (réserve par marché) dès que l'onglet est ouvert en mode « Description auto »
+  useEffect(() => {
+    if (capMode !== 'ai' || !conns.groq) return
+    // seulement les marchés utilisés (défaut + marchés des iPhones / comptes) : le quota Groq du jour est limité
+    const used = new Set<Market>([capMarket, ...Object.values(team.markets), ...Object.values(team.acctMarkets)].filter((m): m is Market => m === 'fr' || m === 'us' || m === 'de'))
+    const t = setTimeout(() => { for (const m of used) void topUpReserve(conns.groq, m) }, 4000)
+    return () => clearTimeout(t)
+  }, [capMode, conns.groq, capMarket, team.markets, team.acctMarkets])
   const [showEmptyPhones, setShowEmptyPhones] = useState(false)
   const [importText, setImportText] = useState('')
   const [showLog, setShowLog] = useState(false)   // journal détaillé déplié
@@ -618,13 +626,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const aiCaps: Record<Market, string[]> = { fr: [], us: [], de: [] }
     if (kind !== 'story' && capMode === 'ai') {
       const need = countByMarket([...sel].flatMap(dev => [...(selConts[dev] ?? [])].flatMap(c => Array.from({ length: perAcct }, () => marketOf(dev, c)))), capMarket)
-      for (const m of MARKETS.map(x => x.k)) {
-        if (!need[m]) continue
+      // tous les marchés EN MÊME TEMPS (réserve préparée en fond d'abord, puis Groq)
+      const todo = MARKETS.map(x => x.k).filter(m => need[m])
+      const res = await Promise.allSettled(todo.map(m => {
         const label = MARKETS.find(x => x.k === m)?.label ?? m
         push(`✍️ Génération de ${need[m]} description(s) — ${label}…`)
-        try { aiCaps[m] = shuffle(await generateMarketCaptions(conns.groq, m, need[m], msg => push(msg))) }
-        catch (e) { push(`⚠ Descriptions ${label} : ${e instanceof Error ? e.message : String(e)} → rien n’est lancé.`); setRunning(false); return }
+        return generateMarketCaptions(conns.groq, m, need[m], msg => push(`${msg} · ${label}`)).then(c => { aiCaps[m] = shuffle(c) })
+      }))
+      const bad = res.findIndex(x => x.status === 'rejected')
+      if (bad >= 0) {
+        const label = MARKETS.find(x => x.k === todo[bad])?.label ?? todo[bad], e = (res[bad] as PromiseRejectedResult).reason
+        push(`⚠ Descriptions ${label} : ${e instanceof Error ? e.message : String(e)} → rien n’est lancé.`); setRunning(false); return
       }
+      // la réserve se reremplit en fond pour le prochain lancement
+      for (const m of todo) void topUpReserve(conns.groq, m)
     }
     const aiAll: Record<Market, string[]> = { fr: [...aiCaps.fr], us: [...aiCaps.us], de: [...aiCaps.de] }
     const pickVid = (): VidRef => { if (queued) { if (!vidQueue.length && !noRepeat) vidQueue = src.mode === 'folder' ? byUse() : shuffle(pool); return vidQueue.pop()! } return pool[Math.floor(Math.random() * pool.length)] }
