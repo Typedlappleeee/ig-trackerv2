@@ -27,6 +27,7 @@ import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, s
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
+import { API_ORIGIN } from '@/lib/scaleflowLink'
 import { generatePfp } from '@/lib/pfpGenerator'
 import { generateBios } from '@/lib/bioMarkets'
 import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } from '@/lib/ctaMarkets'
@@ -354,6 +355,36 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }, [curTab, storySub, reelSrc.mode, storySrc.mode, photoSrc.mode, postType, currentOrg?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   // Après une publication réussie : +1 au compteur du média (« Jamais publiées » / tri
   // « Moins publiées » de la Banque ; le mode dossier prend ainsi des vidéos fraîches).
+  // Story CTA : quand la DERNIÈRE copie spoofée d'une photo vient d'être publiée, de nouvelles copies sont refaites
+  // automatiquement à partir de l'original (jamais publié lui-même), dans le même dossier — en tâche de fond.
+  async function respoofIfNoCopyLeft(copy: VidRef, market: Market, log: (m: string) => void) {
+    try {
+      const base = copy.title.split(' · ')[0].trim()
+      const esc = (t: string) => t.replace(/[\\%_]/g, m => `\\${m}`)
+      const scoped = <Q extends { eq: (c: string, v: string) => Q; is: (c: string, v: null) => Q }>(q: Q) => bankScope.orgId ? q.eq('org_id', bankScope.orgId) : q.eq('user_id', bankScope.userId).is('org_id', null)
+      const { data: left } = await scoped(supabase.from('content_bank').select('id').ilike('title', `${esc(base)} · copie%`).is('deleted_at', null).limit(1))
+      if ((left ?? []).length) return
+      const { data: orig } = await scoped(supabase.from('content_bank').select('id,title,folder').eq('title', base).is('deleted_at', null).limit(1))
+      const o = ((orig ?? []) as { id: string; title: string; folder: string | null }[])[0]
+      if (!o) return
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      let n = 3
+      try { n = Math.max(1, Math.min(10, Number(localStorage.getItem('sf-bank-spoof-n') ?? '3') || 3)) } catch { /* noop */ }
+      const devices = SPOOF_DEVICES.filter(d => d.k !== 'none')
+      const gps = market === 'us' ? 'usa' : market === 'de' ? 'germany' : 'france'
+      let made = 0
+      for (let k = 1; k <= n; k++) {
+        const r = await fetch(`${API_ORIGIN}/api/v1/tools/spoof`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ file_id: o.id, org_id: bankScope.orgId, device: devices[Math.floor(Math.random() * devices.length)].k, gps, intensity: 'normal', title: `${o.title} · copie ${k}`, ...(o.folder ? { folder: o.folder } : {}) }),
+        }).catch(() => null)
+        const b = r ? await r.json().catch(() => null) as { ok?: boolean } | null : null
+        if (b?.ok) made++
+      }
+      if (made) log(`🧬 plus de copie pour « ${base} » → ${made} nouvelle(s) copie(s) spoofée(s) créée(s) automatiquement`)
+    } catch { /* best-effort */ }
+  }
   async function bumpUsed(id: string) {
     try {
       const { data } = await supabase.from('content_bank').select('used_count').eq('id', id).maybeSingle()
@@ -839,7 +870,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         // de l'original baisse ; quand il n'y en a plus, on re-spoofe l'original (jamais publié lui-même)
         const consumed = new Set<string>()
         if (posted && kind === 'story') for (const v of job.vids) if (/ · copie \d+/i.test(v.title)) {
-          try { await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).eq('id', v.id); consumed.add(v.id); push(`${tag} 🧬 copie « ${v.title} » consommée (corbeille)`) } catch { /* noop */ }
+          try { await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).eq('id', v.id); consumed.add(v.id); push(`${tag} 🧬 copie « ${v.title} » consommée (corbeille)`); void respoofIfNoCopyLeft(v, marketOf(p.dev, job.container), m => push(`${tag} ${m}`)) } catch { /* noop */ }
         }
         if (posted && kind === 'story' && storyOnce && src.mode === 'folder') for (const v of job.vids.filter(x => !consumed.has(x.id))) {
           try { await supabase.from('content_bank').delete().eq('id', v.id); if (v.storage_path) await supabase.storage.from('content').remove([v.storage_path]); push(`${tag} 🗑 « ${v.title} » supprimée de la Banque (usage unique)`) } catch { /* noop */ }

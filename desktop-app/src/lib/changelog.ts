@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-25',
     title: { fr: 'Story CTA : jamais l’original d’une photo spoofée', en: 'Story CTA: never the original of a spoofed photo' },
     items: {
-      fr: ['Quand une photo a été « Spoofée en copies », la Story CTA ne publie que ses copies, jamais l’original — même quand toutes les copies ont été utilisées. L’original reste dans la Banque comme source.', 'Chaque copie publiée en Story CTA est consommée (corbeille, récupérable 7 jours) : le badge « N copies » baisse, et « ⚠ 0 copie » apparaît sur l’original quand il faut le re-spoofer.'],
-      en: ['When a photo has been “Spoofed into copies”, the Story CTA only posts its copies, never the original — even once every copy has been used. The original stays in the Bank as the source.', 'Each copy posted as a Story CTA is used up (trash, recoverable 7 days): the “N copies” badge goes down, and “⚠ 0 copies” shows on the original when it needs re-spoofing.'],
+      fr: ['Quand une photo a été « Spoofée en copies », la Story CTA ne publie que ses copies, jamais l’original — même quand toutes les copies ont été utilisées. L’original reste dans la Banque comme source.', 'Chaque copie publiée en Story CTA est consommée (corbeille, récupérable 7 jours) : le badge « N copies » baisse, et quand la dernière copie d’une photo est publiée, ScaleFlow refait automatiquement de nouvelles copies spoofées à partir de l’original (même dossier, GPS du marché du compte).'],
+      en: ['When a photo has been “Spoofed into copies”, the Story CTA only posts its copies, never the original — even once every copy has been used. The original stays in the Bank as the source.', 'Each copy posted as a Story CTA is used up (trash, recoverable 7 days): the “N copies” badge goes down, and when a photo’s last copy is posted, ScaleFlow automatically makes new spoofed copies from the original (same folder, GPS of the account’s market).'],
     },
   },
   {

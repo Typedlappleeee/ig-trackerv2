@@ -5252,6 +5252,8 @@ export const EN: Dict = {
     ["Logo : {0}", "Logo: {0}"],
     ["🧬 {0} photo(s) originale(s) écartée(s) : seules leurs copies spoofées sont publiées", "🧬 {0} original photo(s) set aside: only their spoofed copies are posted"],
     ["{0} 🧬 copie « {1} » consommée (corbeille)", "{0} 🧬 copy “{1}” used up (trash)"],
+    ["🧬 plus de copie pour « {0} » → {1} nouvelle(s) copie(s) spoofée(s) créée(s) automatiquement", "🧬 no copy left for “{0}” → {1} new spoofed copy(ies) created automatically"],
+    ["{0} {1}", "{0} {1}"],
     ["{0} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)", "{0} 🧹 post failed → posting cancelled, Instagram closed (clean restart)"],
     ["{0} 🔄 post précédent raté → Instagram relancé sur le même compte", "{0} 🔄 previous post failed → Instagram restarted on the same account"],
     ["✓ localisation déjà posée ({0})", "✓ location already set ({0})"],
