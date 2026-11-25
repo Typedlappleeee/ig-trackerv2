@@ -224,6 +224,13 @@ export function splitCaptions(raw: string): string[] {
  *  donc plusieurs modèles en parallèle vont plus vite sans dépasser la limite. */
 export const CAPTION_MODELS = ['meta-llama/llama-4-maverick-17b-128e-instruct', 'moonshotai/kimi-k2-instruct', 'llama-3.3-70b-versatile', 'meta-llama/llama-4-scout-17b-16e-instruct', 'openai/gpt-oss-120b', 'qwen/qwen3-32b', 'openai/gpt-oss-20b', 'llama-3.1-8b-instant']
 const THINKS = (m: string) => /gpt-oss|qwen3/.test(m)
+// Modèles dont le quota du JOUR est épuisé (« tokens per day ») : mis de côté jusqu'à la fin du délai donné par Groq,
+// au lieu d'attendre 30 min sur eux (les autres modèles continuent).
+const EXH_KEY = 'sf-groq-exhausted'
+function loadExhausted(): Record<string, number> { try { const o = JSON.parse(localStorage.getItem(EXH_KEY) ?? '{}'); return o && typeof o === 'object' ? o : {} } catch { return {} } }
+function markExhausted(model: string, ms: number): void { try { const o = loadExhausted(); o[model] = Date.now() + ms; localStorage.setItem(EXH_KEY, JSON.stringify(o)) } catch { /* noop */ } }
+/** Quota du jour (ou délai très long) → le modèle est mis de côté, pas attendu. Pure. */
+export const isDailyLimit = (msg: string, waitMs: number | null) => /per day|\bTPD\b|\bRPD\b/i.test(msg) || (waitMs ?? 0) > 90_000
 
 /** « Please try again in 7.3s » / « in 1m2.5s » / « in 820ms » → millisecondes (null si absent). Pure. */
 export function retryAfterMs(msg: string): number | null {
@@ -266,7 +273,10 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
   const extra: string[] = []
   let lastProgress = Date.now(), lastErr = ''
   // modèles VRAIMENT proposés par Groq pour cette clé (ceux qu'il retire disparaissent de la liste)
-  const models = opts?.models ?? pickChatModels(CAPTION_MODELS, await groqModels(groqKey))
+  const exh = loadExhausted()
+  const all = opts?.models ?? pickChatModels(CAPTION_MODELS, await groqModels(groqKey))
+  const fresh = all.filter(x => !(exh[x] > Date.now()))
+  const models = fresh.length ? fresh : all
   const dead = new Set<string>()
   const worker = async (w: number) => {
     let mi = w % models.length, fails = 0
@@ -287,8 +297,15 @@ export async function generateMarketCaptions(groqKey: string, m: Market, n: numb
         const msg = e instanceof Error ? e.message : String(e)
         lastErr = groqReason(msg).slice(0, 110)
         if (isModelUnavailable(msg)) { dead.add(model); mi++; continue } // modèle retiré chez Groq → plus jamais essayé ici
+        const given = retryAfterMs(msg)
+        if (isDailyLimit(msg, given)) {
+          // quota du jour épuisé sur ce modèle → mis de côté, ce travailleur passe tout de suite à un autre modèle
+          dead.add(model); markExhausted(model, given ?? 3600_000); mi++
+          onLog?.(`   ↪ ${model.split('/').pop()} : quota du jour atteint → autre modèle (${out.length}/${n} prêtes)`)
+          continue
+        }
         fails++
-        const wait = retryAfterMs(msg) ?? Math.min(60_000, 8000 * fails)
+        const wait = given ?? Math.min(60_000, 8000 * fails)
         if (fails === 1 || fails % 3 === 0) onLog?.(`   ⏳ ${model.split('/').pop()} : ${lastErr} → nouvel essai dans ${Math.round(wait / 1000)} s (${out.length}/${n} prêtes)`)
         await sleep(Math.min(wait + 500, 65_000))
         if (fails >= 3) mi++ // trop d'échecs sur ce modèle : on essaie le suivant

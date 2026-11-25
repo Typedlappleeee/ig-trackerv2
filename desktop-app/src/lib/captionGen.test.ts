@@ -17,7 +17,7 @@ vi.mock('./ai', () => ({
     return Array.from({ length: ask }, (_, i) => `mot${calls} texte${i} unique #deutsch`).join('\n———\n')
   }),
 }))
-import { generateMarketCaptions, retryAfterMs } from './captionMarkets'
+import { generateMarketCaptions, retryAfterMs, isDailyLimit } from './captionMarkets'
 
 describe('descriptions illimitées et fiables', () => {
   it('100 descriptions toutes différentes malgré des limites de débit', async () => {
@@ -51,6 +51,10 @@ describe('descriptions illimitées et fiables', () => {
     calls = 0; failAll = false; deadModels.clear(); deadModels.add('x'); deadModels.add('y')
     await expect(generateMarketCaptions('k', 'de', 20, undefined, { sleep: async () => {}, useCache: false, models: ['x', 'y'] })).rejects.toThrow(/aucun modèle/)
     deadModels.clear()
+  })
+  it('quota du jour → modèle mis de côté, pas attendu', () => {
+    expect(isDailyLimit('Rate limit reached ... on tokens per day (TPD): Limit 2000', 766_000)).toBe(true)
+    expect(isDailyLimit('on tokens per minute (TPM)', 8000)).toBe(false)
   })
   it('délai « try again in » lu', () => {
     expect(retryAfterMs('Please try again in 7.3s')).toBe(7300)
