@@ -2743,9 +2743,19 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   await dismissPopups(key, deviceId, hooks)
   await dismissIgInfoSheet(key, deviceId, hooks) // « Stories archive », « Introducing… » : bouton OK au milieu
   await clearAssistiveTouch(key, deviceId, hooks)
-  // 1. Ouvrir le créateur (+ haut-gauche) — même point d'entrée que le Reel.
-  hooks?.log?.('➕ Ouverture du créateur (+)…')
-  const landing = await tapCreatePlus(key, deviceId, W, H, REEL_ANCHORS.createPlus, hooks, 'story')
+  // 1. Caméra Story ouverte DIRECTEMENT par iRemoTech (`open_app` cible `instagram_camera`, vérifiée en vrai le 25/11/2026 :
+  //    caméra en mode STORY, vignette de la galerie en bas à gauche) ; sinon le créateur par le + (haut-gauche).
+  let viaCam = false
+  if (await sendAction(key, deviceId, { type: 'open_app', target: 'instagram_camera' })) {
+    await sleep(4500)
+    await dismissIgInfoSheet(key, deviceId, hooks)
+    await grantPhotoAccessIfAsked(key, deviceId, hooks)
+    const cs = await snapRetry(key, deviceId)
+    if (cs && await findGalleryThumb(cs)) { viaCam = true; hooks?.log?.('📷 Caméra Story ouverte directement') }
+    else hooks?.log?.('   caméra Story directe non reconnue → passage par le +')
+  }
+  if (!viaCam) hooks?.log?.('➕ Ouverture du créateur (+)…')
+  const landing = viaCam ? 'other' : await tapCreatePlus(key, deviceId, W, H, REEL_ANCHORS.createPlus, hooks, 'story')
   await grantPhotoAccessIfAsked(key, deviceId, hooks)
   // 2. Mode STORY (bandeau du bas) — inutile si le + a rouvert directement la galerie « Add to story ». Barre masquée (Instagram a rouvert la caméra Story, une
   //    bulle d'effet la remplace) + vignette de galerie en bas-gauche → déjà sur la caméra.

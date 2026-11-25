@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-25zf',
+    date: '2026-11-25',
+    title: { fr: 'iRemoTech : Story CTA sans le « + »', en: 'iRemoTech: Story CTA without the “+”' },
+    items: {
+      fr: ['La Story CTA ouvre maintenant la caméra Story DIRECTEMENT (commande iRemoTech), puis la galerie « Add to story » par la vignette — plus de passage par le +, la feuille Create ni la barre des modes. Le + reste en secours. Testé en vrai.'],
+      en: ['The Story CTA now opens the Story camera DIRECTLY (iRemoTech command), then the “Add to story” gallery via the thumbnail — no more +, Create sheet or mode bar. The + stays as a fallback. Tested for real.'],
+    },
+  },
+  {
     id: '2026-11-25ze',
     date: '2026-11-25',
     title: { fr: 'Publié = retiré de la Banque', en: 'Posted = removed from the Bank' },

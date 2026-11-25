@@ -7,6 +7,8 @@ import type { Dict } from './i18n'
 
 export const EN: Dict = {
   exact: {
+    "📷 Caméra Story ouverte directement": "📷 Story camera opened directly",
+    "caméra Story directe non reconnue → passage par le +": "direct Story camera not recognised → going through the +",
     "🗑 Retirer de la Banque une fois publiée": "🗑 Remove from the Bank once posted",
     "(corbeille, récupérable 7 jours)": "(trash, recoverable for 7 days)",
     "(mode dossier · corbeille, récupérable 7 jours)": "(folder mode · trash, recoverable for 7 days)",
