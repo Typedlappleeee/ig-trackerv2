@@ -20,7 +20,7 @@ import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone }
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import IrtAccounts from '@/components/IrtAccounts'
-import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue } from '@/lib/irtAccounts'
+import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp } from '@/lib/irtAccounts'
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
@@ -283,6 +283,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     if (!quiet) { setLoading(true); setErr(null) }
     Promise.all([listDevices(irt.key), quiet ? Promise.resolve(undefined) : fetchUsage(irt.key)])
       .then(async ([d, u]) => {
+        d = [...d].sort((a, b) => naturalCmp(deviceLabel(a), deviceLabel(b))) // STEVIE1, STEVIE2… STEVIE10 partout
         setDevices(d); if (u !== undefined) setUsage(u)
         const remote = await pullContainers(d.map(x => x.public_id)).catch(() => null)
         setSyncOff(remote === null)
@@ -1046,7 +1047,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const hit = (d: IrtDevice) => (!qq || deviceLabel(d).toLowerCase().includes(qq) || (conts[d.public_id] ?? []).some(c => c.toLowerCase().replace(/^@/, '').includes(qq)))
           && (!grpFilter || (grpFilter === '∅' ? !team.groups[d.public_id] : team.groups[d.public_id] === grpFilter))
           && (!mktFilter || team.markets[d.public_id] === mktFilter)
-        const byGroup = (a: IrtDevice, b: IrtDevice) => (team.groups[a.public_id] ?? '\uffff').localeCompare(team.groups[b.public_id] ?? '\uffff', 'fr', { numeric: true })
+        // par groupe, puis dans l'ordre naturel des noms (STEVIE1, STEVIE2… STEVIE10)
+        const byGroup = (a: IrtDevice, b: IrtDevice) => (team.groups[a.public_id] ?? '\uffff').localeCompare(team.groups[b.public_id] ?? '\uffff', 'fr', { numeric: true }) || naturalCmp(deviceLabel(a), deviceLabel(b))
         const groups = teamGroups(team)
         const filled = base.filter(d => (conts[d.public_id] ?? []).length > 0 && hit(d))
         const emptyN = base.filter(d => !(conts[d.public_id] ?? []).length).length
