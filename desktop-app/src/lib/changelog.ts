@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-25',
     title: { fr: 'Story CTA : textes générés par IA', en: 'Story CTA: AI-generated texts' },
     items: {
-      fr: ['Onglet Story › Texte du sticker › « ✨ IA » : chaque compte reçoit un texte CTA différent (2 à 6 mots, ❤️ 💕 💗), généré avec le prompt CTA de l’équipe pour le marché choisi (FR / DE / US). Aperçu et prompt modifiable ; « Mes textes » reste disponible.'],
-      en: ['Story tab › Sticker text › “✨ AI”: each account gets a different CTA text (2 to 6 words, ❤️ 💕 💗), generated with the team’s CTA prompt for the chosen market (FR / DE / US). Preview and editable prompt; “My texts” is still available.'],
+      fr: ['Onglet Story › Texte du sticker › « ✨ IA » : chaque compte reçoit un texte CTA différent (2 à 6 mots, ❤️ 💕 💗), généré avec le prompt CTA de l’équipe pour le marché choisi (FR / DE / US). Aperçu et prompt modifiable ; « Mes textes » reste disponible.', 'Le journal de la dernière session iRemoTech est gardé après un rafraîchissement (bouton « 📋 Copier le journal »).'],
+      en: ['Story tab › Sticker text › “✨ AI”: each account gets a different CTA text (2 to 6 words, ❤️ 💕 💗), generated with the team’s CTA prompt for the chosen market (FR / DE / US). Preview and editable prompt; “My texts” is still available.', 'The last iRemoTech session log is kept after a refresh (“📋 Copy log” button).'],
     },
   },
   {

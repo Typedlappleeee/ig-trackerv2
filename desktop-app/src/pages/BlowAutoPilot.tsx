@@ -302,7 +302,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
   const [running, setRunning] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
-  const [logs, setLogs] = useState<string[]>([])
+  // Journal de la dernière session GARDÉ dans le navigateur (relu après un rafraîchissement → « 📋 Copier le journal »)
+  const [logs, setLogs] = useState<string[]>(() => { try { const a = JSON.parse(localStorage.getItem('sf-irt-last-log') ?? '[]'); return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [] } catch { return [] } })
+  useEffect(() => {
+    const t = setTimeout(() => { try { localStorage.setItem('sf-irt-last-log', JSON.stringify(logs.slice(-1500))) } catch { /* plein */ } }, 1500)
+    return () => clearTimeout(t)
+  }, [logs])
 
   // iPhones + containers. `quiet` = actualisation automatique (pas d'écran de chargement).
   // Les containers viennent de Supabase (partagés dans l'agence) ; null = SQL pas passé.
@@ -582,7 +587,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }), [conts])
   const totalJobs = [...sel].reduce((n, d) => n + (selConts[d]?.size ?? 0), 0)
   const captions = captionPool.split('\n').map(s => s.trim()).filter(Boolean)
-  const push = (m: string) => setLogs(l => [...l.slice(-600), m])
+  const push = (m: string) => setLogs(l => [...l.slice(-1500), m])
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
   // ── Posting (Reel) / Story — flow unifié ────────────────────────────────────
