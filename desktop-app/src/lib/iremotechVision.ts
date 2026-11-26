@@ -918,10 +918,17 @@ async function tapInstagramIcon(key: string, deviceId: string, hooks?: VisionHoo
   // Puis VÉRIFIÉ : si une autre app s'est ouverte (vu en vrai : Apple Music), retour à l'accueil et nouvel essai.
   for (let k = 0; k < 2; k++) {
     if (!await tapAppIcon(key, deviceId, isInstagramText, 'Instagram', hooks)) return false
-    await sleep(3200)
-    let scr = await readScreenWords(key, deviceId)
-    if (scr && otherAppOpened(scr.words)) { await sleep(2500); scr = await readScreenWords(key, deviceId) } // Instagram encore en chargement ?
-    if (!scr || !otherAppOpened(scr.words)) return true
+    // surveillé ~10 s : Apple Music met quelques secondes à afficher son contenu (écran blanc d'abord — vu le 26/11/2026
+    // sur SEDRA3 : non détectée à 3 s, puis « What's New in Apple Music »). Instagram reconnu → OK tout de suite.
+    let other = false
+    for (let t = 0; t < 4 && !other; t++) {
+      await sleep(t ? 2500 : 3200)
+      const scr = await readScreenWords(key, deviceId)
+      if (!scr) continue
+      if (homeFeedShown(scr.words, scr.H) || isProfileScreen(scr.words, scr.H) || scr.words.some(o => /^(default|container)$/i.test(o.text))) return true
+      other = otherAppOpened(scr.words)
+    }
+    if (!other) return true
     hooks?.log?.('   ⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai')
     await sendAction(key, deviceId, { type: 'press', name: 'home' })
     await sleep(1800)
