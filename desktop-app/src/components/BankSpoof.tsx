@@ -37,6 +37,8 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
   const [device, setDevice] = useState(() => read('sf-bank-spoof-device', 'random'))
   const [gps, setGps] = useState(() => read('sf-bank-spoof-gps', 'france'))
   const [run, setRun] = useState<{ done: number; failed: number; total: number; error?: string; broken?: string[] } | null>(null)
+  // journal ligne par ligne (une ligne par copie) — copiable
+  const journal = useRef<string[]>([])
   const stop = useRef(false)
   const n = Math.max(1, Math.min(MAX_COPIES, Number(count) || 1))
   const running = !!run && run.done + run.failed < run.total
@@ -54,6 +56,8 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
     } catch { /* best-effort */ }
     let done = 0, failed = 0, next = 0, lastErr = ''
     const broken = new Map<string, string>()   // id de l'original → titre : fichier absent du stockage
+    const now = () => new Date().toLocaleTimeString('fr-FR')
+    journal.current = [`${now()} ▶ Spoofer en copies : ${items.length} média(s) × ${n} copie(s) · appareil ${device} · GPS ${gps}${target ? ` · dossier « ${target} »` : ''}`]
     stop.current = false
     setRun({ done, failed, total: jobs.length })
     const worker = async () => {
@@ -61,7 +65,7 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
         const j = jobs[next++]
         if (!j || stop.current) return
         // original déjà reconnu cassé (fichier absent) : ses autres copies sont sautées, sans nouvel essai
-        if (broken.has(j.item.id)) { failed++; setRun({ done, failed, total: jobs.length, error: lastErr || undefined, broken: [...broken.values()] }); continue }
+        if (broken.has(j.item.id)) { failed++; journal.current.push(`${now()} ⏭ ${j.item.title} · copie ${j.n} : original cassé, sautée`); setRun({ done, failed, total: jobs.length, error: lastErr || undefined, broken: [...broken.values()] }); continue }
         // 504 / 502 / coupure réseau (traitement serveur trop long, serveur saturé) → 2 nouveaux essais espacés
         let ok = false, err = ''
         for (let attempt = 0; attempt < 3 && !ok && !stop.current; attempt++) {
@@ -79,10 +83,12 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
           } catch (e) { err = e instanceof Error ? e.message : String(e) }
         }
         if (ok) done++; else { failed++; lastErr = err }
+        journal.current.push(`${now()} ${ok ? '✓' : '✗'} ${j.item.title} · copie ${j.n}${ok ? '' : ` : ${err}`}`)
         setRun({ done, failed, total: jobs.length, error: lastErr || undefined, broken: [...broken.values()] })
       }
     }
     await Promise.all(Array.from({ length: Math.min(PARALLEL, jobs.length) }, worker))
+    journal.current.push(`${now()} ■ Terminé : ${done} copie(s) créée(s), ${failed} échec(s)${broken.size ? ` · originaux cassés : ${[...broken.values()].join(', ')}` : ''}`)
     setRun({ done, failed, total: jobs.length, error: lastErr || undefined, broken: [...broken.values()] })
     onDone()
     toast(failed ? `${done} copie(s) créée(s), ${failed} échec(s)` : target ? `${done} copie(s) créée(s) dans « ${target} »` : `${done} copie(s) créée(s) dans la Banque`, failed ? 'bad' : 'ok')
@@ -95,6 +101,7 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
       icon="M8 8h12v12H8z|M4 16V4h12"
       onClose={() => { stop.current = true; onClose() }}
       footer={<>
+        {run && <Btn theme={theme} tone="quiet" label="Copier le journal" onClick={() => { try { navigator.clipboard.writeText(journal.current.join('\n')); toast('Journal copié', 'ok') } catch { toast('Copie impossible', 'bad') } }} />}
         <Btn theme={theme} tone="quiet" label={running ? 'Arrêter' : 'Fermer'} onClick={() => { stop.current = true; if (!running) onClose() }} />
         <Btn theme={theme} tone="primary" label={running ? 'En cours…' : `Créer ${total} copie(s)`} disabled={running} onClick={() => void launch()} />
       </>}>
