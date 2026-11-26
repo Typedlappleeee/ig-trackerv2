@@ -23,7 +23,7 @@ import IrtAccounts from '@/components/IrtAccounts'
 import IrtServerRuns from '@/components/IrtServerRuns'
 import { enqueueServerRun, serversOnline } from '@/lib/irtServer'
 import { locToServer, type ServerPlan } from '@/lib/irtServerSession'
-import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, type AgeTier } from '@/lib/irtAccounts'
+import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, accountAddedAt, type AgeTier } from '@/lib/irtAccounts'
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, runVideoMetaSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
@@ -213,7 +213,18 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     setTeam(t => { const n = structuredClone(t); change(n); return n })
     void updateTeam(teamScope, change).then(r => { setTeam(r.team); if (!r.shared) toast('Enregistré sur ce navigateur seulement (synchro équipe indisponible).', 'bad') })
   }
-  const ageOf = (dev: string, c: string): AgeTier | null => c.startsWith('@') ? ageTier(team.added[`${dev}::${c.toLowerCase()}`]) : null
+  // Âge d'un compte / container : la date la plus récente connue parmi 1re apparition suivie par ScaleFlow, lecture
+  // iRemoTech (list_accounts : 1re lecture qui le contient) et création par ScaleFlow (comptes créés, containers compris)
+  const ageOf = (dev: string, c: string): AgeTier | null => {
+    if (c.startsWith('@')) {
+      const u = c.slice(1).toLowerCase()
+      const tracked = team.added[`${dev}::@${u}`] ?? 0
+      const created = createdAccts.find(a => a.ok && a.username?.toLowerCase() === u)?.at ?? 0
+      return ageTier(Math.max(tracked > 1 ? tracked : 0, created, accountAddedAt(irtJobs[dev] ?? [], u) ?? 0))
+    }
+    const made = createdAccts.filter(a => a.ok && a.device === dev && a.container === c).reduce((m, a) => Math.max(m, a.at), 0)
+    return ageTier(made)
+  }
 
   // marché de chaque compte (`${dev}::${cible}`) ; absent = marché de l'iPhone, sinon marché par défaut (capMarket)
   const marketOf = (dev: string, c: string): Market => team.acctMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c) ?? teamMarketOf(team, dev, c, capMarket)
@@ -1288,7 +1299,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           {!opts?.manage && (() => {
             // Âge des comptes : combien ont été ajoutés il y a < 1 j / < 3 j / < 7 j ; un clic coche exactement ceux-là
             // (« + de 7 j » = comptes plus anciens, les plus sûrs pour poster)
-            const accs = filled.flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => ({ id: d.public_id, c, t: ageOf(d.public_id, c) })))
+            const accs = filled.flatMap(d => (conts[d.public_id] ?? []).map(c => ({ id: d.public_id, c, t: ageOf(d.public_id, c) })))
             if (!accs.length) return null
             const groupsAge: { k: string; label: string; f: (t: AgeTier | null) => boolean }[] = [
               { k: '1d', label: '🆕 < 1 j', f: t => t === '1d' }, { k: '3d', label: '< 3 j', f: t => t === '1d' || t === '3d' },
@@ -1301,7 +1312,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             }
             return (
               <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: DIM, marginRight: 2 }} title="Date à laquelle le compte est apparu sur l’iPhone (vu par ScaleFlow)">Comptes ajoutés</span>
+                <span style={{ fontSize: 12, color: DIM, marginRight: 2 }} title="Date de création du compte par ScaleFlow, ou de son apparition sur l’iPhone (lectures iRemoTech / ScaleFlow)">Âge des comptes</span>
                 {groupsAge.map(g => { const n = accs.filter(a => g.f(a.t)).length
                   return <button key={g.k} style={chip(false)} disabled={!n || running} title="Cocher exactement ces comptes" onClick={() => pick(g.f)}>{`${g.label} · ${n}`}</button> })}
               </div>

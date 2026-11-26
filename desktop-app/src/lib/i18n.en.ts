@@ -119,6 +119,8 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "Date de création du compte par ScaleFlow, ou de son apparition sur l’iPhone (lectures iRemoTech / ScaleFlow)": "Date the account was created by ScaleFlow, or appeared on the iPhone (iRemoTech / ScaleFlow scans)",
+    "Âge des comptes": "Account age",
     "📷 Instagram n’a pas accès à la caméra / au micro → Réglages iOS › Camera + Microphone": "📷 Instagram has no camera / microphone access → iOS Settings › Camera + Microphone",
     "✓ Camera + Microphone activés pour Instagram": "✓ Camera + Microphone enabled for Instagram",
     "⚠ interrupteurs Camera / Microphone non confirmés": "⚠ Camera / Microphone switches not confirmed",
