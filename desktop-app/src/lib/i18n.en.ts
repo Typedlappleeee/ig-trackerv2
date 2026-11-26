@@ -621,6 +621,7 @@ export const EN: Dict = {
     "⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai": "⚠ another app opened instead of Instagram → back to home, new try",
     "📲 Instagram ouvert (open_app)": "📲 Instagram opened (open_app)",
     "open_app sans effet → icône de l’accueil": "open_app had no effect → home screen icon",
+    "❌ page de partage toujours là après la fenêtre « original audio » → arrêt sans retaper Share (vérifie le profil)": "❌ share page still there after the “original audio” sheet → stopped without tapping Share again (check the profile)",
     "⚠ open_app a ouvert une autre app (Apple Music…) → icône de l’accueil (le raccourci iRemoTech de cet iPhone est à vérifier)": "⚠ open_app opened another app (Apple Music…) → home screen icon (check this iPhone's iRemoTech shortcut)",
     "Chaque compte reçoit une bio dans la langue de son marché. Ces marchés servent aussi aux descriptions du Posting.": "Each account gets a bio in its market's language. These markets are also used for Posting captions.",
     "Colle des liens de Reels ou de posts photo (un par ligne) : les vidéos vont dans le sous-dossier « Reels », les photos dans « Photos », directement dans ta Banque.": "Paste Reel or photo post links (one per line): videos go to the “Reels” subfolder, photos to “Photos”, straight into your Bank.",

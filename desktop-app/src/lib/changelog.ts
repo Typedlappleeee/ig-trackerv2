@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-26',
     title: { fr: 'iRemoTech : Apple Music ouvert à la place d’Instagram', en: 'iRemoTech: Apple Music opened instead of Instagram' },
     items: {
-      fr: ['Quand le raccourci iRemoTech d’un iPhone ouvre Apple Music au lieu d’Instagram, c’est maintenant détecté (écran surveillé ~10 s au lieu d’un seul contrôle) et Instagram est rouvert par son icône — avant, le compte était déclaré « non atteint » et tous ses posts sautés.'],
-      en: ['When an iPhone’s iRemoTech shortcut opens Apple Music instead of Instagram, it is now detected (screen watched ~10 s instead of a single check) and Instagram is reopened from its icon — before, the account was marked “not reached” and all its posts skipped.'],
+      fr: ['Quand le raccourci iRemoTech d’un iPhone ouvre Apple Music au lieu d’Instagram, c’est maintenant détecté (écran surveillé ~10 s au lieu d’un seul contrôle) et Instagram est rouvert par son icône — avant, le compte était déclaré « non atteint » et tous ses posts sautés.', 'Fenêtre « Update on your original audio » : ScaleFlow tape maintenant le gros bouton bleu « Share » (et plus le lien « Turn off and share » juste dessous, qui ne publiait pas) ; une fois la fenêtre validée, le Share de la page n’est plus jamais retapé (anti double publication).'],
+      en: ['When an iPhone’s iRemoTech shortcut opens Apple Music instead of Instagram, it is now detected (screen watched ~10 s instead of a single check) and Instagram is reopened from its icon — before, the account was marked “not reached” and all its posts skipped.', '“Update on your original audio” sheet: ScaleFlow now taps the big blue “Share” button (no longer the “Turn off and share” link just below, which did not publish); once the sheet is confirmed, the page Share is never tapped again (no double post).'],
     },
   },
   {

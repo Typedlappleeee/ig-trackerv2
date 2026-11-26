@@ -235,6 +235,14 @@ export function originalAudioSheet(words: { text: string }[]): boolean {
   const has = (re: RegExp) => words.some(o => re.test(o.text))
   return has(/^original$/i) && has(/^audio$/i) && has(/^(update|turn)$/i)
 }
+/** Bouton bleu « Share » DE la fenêtre « Update on your original audio » (vue en vrai : bouton plein à ~0,886 H, et
+ *  dessous le lien « Turn off and share » à ~0,96 H, qu'il ne faut PAS taper — il coupe l'audio original et ne
+ *  publiait pas : vu le 26/11/2026 sur SEDRA4/SEDRA5). « share » de la phrase d'explication ignoré (autres mots sur sa
+ *  ligne). Pure. */
+export function audioSheetShareWord<T extends { text: string; cx: number; cy: number }>(words: T[], H: number): T | null {
+  const alone = (o: T) => !words.some(p => p !== o && Math.abs(p.cy - o.cy) < 14 && /[a-z]/i.test(p.text))
+  return words.filter(o => /^share$/i.test(o.text) && o.cy > H * 0.8 && o.cy < H * 0.93 && alone(o)).sort((a, b) => a.cy - b.cy)[0] ?? null
+}
 export function needsPaste(text: string): boolean {
   return /[^\x00-\x7F]/.test(text)
 }
@@ -1657,9 +1665,9 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       const sh = await readScreenWords(key, deviceId)
       if (!sh || !originalAudioSheet(sh.words)) break
       audioSeen = true
-      // le « Share » DE LA FENÊTRE (texte lu, le plus bas de la fenêtre), sinon le bouton bleu de la fenêtre
-      const sw = sh.words.filter(o => /^share$/i.test(o.text) && o.cy > sh.H * 0.55).sort((a, b) => b.cy - a.cy)[0]
-      const blue = sw ? null : await findBlueButton(sh.shot, 0.75, 0.97)
+      // le bouton bleu plein « Share » DE LA FENÊTRE (jamais « Turn off and share » juste dessous)
+      const sw = audioSheetShareWord(sh.words, sh.H)
+      const blue = sw ? null : await findBlueButton(sh.shot, 0.8, 0.93)
       hooks?.log?.(`   fenêtre « Update on your original audio » → Share${j ? ' (2e essai)' : ''}`)
       await sendAction(key, deviceId, { type: 'tap', x: sw ? sw.cx : blue ? blue.cx : Math.round(W / 2), y: sw ? sw.cy : blue ? blue.cy : Math.round(0.886 * H) })
       await sleep(4000)
@@ -1670,9 +1678,15 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       if (still && originalAudioSheet(still.words)) await rescue(key, deviceId, 'Confirm the "Update on your original audio" sheet by tapping ITS blue "Share" button (inside the sheet). Do not tap anything else.',
         async () => { const r = await readScreenWords(key, deviceId); return !!r && !originalAudioSheet(r.words) }, hooks)
     }
-    const st = await stillOnShare()
+    let st = await stillOnShare()
     // fenêtre audio encore à l'écran : on ne retape PAS le Share de la page (elle reviendrait ; double post possible)
     if (st === true) { const r = await readScreenWords(key, deviceId); if (r && originalAudioSheet(r.words)) { hooks?.log?.('❌ fenêtre « original audio » non validée → non publié (Share de la page jamais retapé)'); return false } }
+    // fenêtre audio validée : Instagram a ACCEPTÉ le Share → on attend que la page parte, mais on ne retape JAMAIS
+    // le Share de la page (sinon double publication possible)
+    if (audioSeen && st === true) {
+      for (let t = 0; t < 3 && st === true; t++) { await sleep(4000); st = await stillOnShare() }
+      if (st === true) { hooks?.log?.('❌ page de partage toujours là après la fenêtre « original audio » → arrêt sans retaper Share (vérifie le profil)'); return false }
+    }
     shared = st !== true
     if (st === null) hooks?.log?.('   ⚠ écran illisible après Share → considéré comme publié (jamais retapé : risque de double post)')
   }

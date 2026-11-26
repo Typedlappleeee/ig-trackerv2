@@ -49,7 +49,7 @@ describe('onglet Profil reconnu', () => {
   })
 })
 
-import { needsPaste, originalAudioSheet } from './iremotechVision'
+import { needsPaste, originalAudioSheet, audioSheetShareWord } from './iremotechVision'
 describe('saisie et partage', () => {
   it('accents / emojis → collage ; ASCII (même sur plusieurs lignes) → saisie directe', () => {
     expect(needsPaste('vous êtes là ou pas ? 🙈')).toBe(true)
@@ -121,5 +121,17 @@ describe('profil connecté ≠ écran d’inscription', () => {
   })
   it('vrai écran « Join Instagram / Get started » → join', () => {
     expect(classifySignup([{ text: 'Join', cy: 360 }, { text: 'Get', cy: 470 }, { text: 'started', cy: 470 }], 720)).toBe('join')
+  })
+})
+
+describe('fenêtre « original audio » : bouton Share', () => {
+  it('choisit le bouton bleu, jamais « Turn off and share » ni la phrase', () => {
+    const H = 720
+    const w = (text: string, cx: number, cy: number) => ({ text, cx, cy })
+    const words = [w('Update', 100, 470), w('original', 250, 470), w('audio', 320, 470),
+      w('share', 60, 525), w('on', 110, 525), w('Instagram', 190, 525),
+      w('Share', 203, 638), w('Turn', 160, 690), w('off', 190, 690), w('and', 220, 690), w('share', 260, 690)]
+    expect(audioSheetShareWord(words, H)).toEqual(w('Share', 203, 638))
+    expect(audioSheetShareWord(words.filter(o => o.cy !== 638), H)).toBeNull()
   })
 })
