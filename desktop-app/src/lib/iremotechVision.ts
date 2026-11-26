@@ -3046,8 +3046,14 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   await clearAssistiveTouch(key, deviceId, hooks, 'left')
   hooks?.log?.('🔖 Ouverture des stickers…')
   let tray = false
+  // 1er essai : BALAYAGE VERS LE HAUT au milieu de la Story (geste natif d'Instagram qui ouvre le tiroir des stickers),
+  // loin de la colonne d'outils de droite — le bouton AssistiveTouch, estompé (semi-transparent) donc invisible pour le
+  // détecteur, s'y pose et recevait le tap de l'icône sticker (vu en vrai le 26/11/2026 sur STEVIE3).
+  await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.45), y1: Math.round(H * 0.7), x2: Math.round(W * 0.45), y2: Math.round(H * 0.25), duration_ms: 350 })
+  await sleep(1800)
+  if (await hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.35] })) { tray = true; hooks?.log?.('   tiroir des stickers ouvert (balayage vers le haut)') }
   // (0,22 = icône MUSIQUE juste sous le sticker sur iPhone normal → essayée en dernier)
-  for (const fy of [A.stickerIcon.y, 0.10, 0.28, 0.22]) {
+  if (!tray) for (const fy of [A.stickerIcon.y, 0.10, 0.28, 0.22]) {
     await dismissIgInfoSheet(key, deviceId, hooks) // « Introducing story-to-story sharing » peut arriver en retard
     await tapFrac(A.stickerIcon.x, fy)
     await sleep(1700)
