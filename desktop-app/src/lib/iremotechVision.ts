@@ -1368,8 +1368,11 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     }
   }
   await dismissPopups(key, deviceId, hooks) // ferme une éventuelle fenêtre post-partage (pas toujours là)
-  hooks?.log?.('🏠 Instagram fermé (App Switcher).')
-  await forceCloseForegroundApp(key, deviceId, hooks)
+  // action RÉUSSIE : Instagram n'est pas fermé (enchaînement post → warm-up → post sur le même compte, demande du
+  // propriétaire) ; il n'est fermé qu'après un échec ou avant de changer de compte (mode avion)
+  hooks?.log?.('🏠 Retour à l’accueil.')
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1200)
   return true
 }
 
@@ -1676,8 +1679,11 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     await sleep(1200)
     return true
   }
-  hooks?.log?.('🏠 Instagram fermé (App Switcher).')
-  await forceCloseForegroundApp(key, deviceId, hooks)
+  // action RÉUSSIE : Instagram n'est pas fermé (enchaînement post → warm-up → post sur le même compte, demande du
+  // propriétaire) ; il n'est fermé qu'après un échec ou avant de changer de compte (mode avion)
+  hooks?.log?.('🏠 Retour à l’accueil.')
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })
+  await sleep(1200)
   return true
 }
 
@@ -2993,7 +2999,8 @@ export async function warmupByVision(key: string, deviceId: string, opts: Warmup
     // session de posts : on reste dans Instagram, onglet Accueil VÉRIFIÉ (le « + » du post suivant est sur le fil)
     if (!await goHomeTab(key, deviceId, W, H, hooks)) hooks?.log?.('   ⚠ fil d’accueil non reconnu après le scroll')
   } else {
-    await forceCloseForegroundApp(key, deviceId, hooks)   // fin du warm-up : Instagram fermé, pas laissé en arrière-plan
+    await sendAction(key, deviceId, { type: 'press', name: 'home' })   // warm-up réussi : Instagram pas fermé (enchaînement possible)
+    await sleep(1000)
   }
   return { ok: true, reels, likes, comments }
 }
@@ -3424,7 +3431,8 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
     await sleep(2200)
   }
   await dismissPopups(key, deviceId, hooks) // autre popup éventuel
-  await forceCloseForegroundApp(key, deviceId, hooks)   // Story partagée : Instagram fermé (App Switcher)
+  await sendAction(key, deviceId, { type: 'press', name: 'home' })   // Story partagée : Instagram pas fermé (enchaînement possible)
+  await sleep(1200)
   return true
 }
 
