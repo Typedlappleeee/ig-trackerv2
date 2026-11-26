@@ -23,7 +23,7 @@ import IrtAccounts from '@/components/IrtAccounts'
 import IrtServerRuns from '@/components/IrtServerRuns'
 import { enqueueServerRun, serversOnline } from '@/lib/irtServer'
 import { locToServer, type ServerPlan } from '@/lib/irtServerSession'
-import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, accountAddedAt, type AgeTier } from '@/lib/irtAccounts'
+import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, accountAddedAt, accountFirstSeenAt, connectedFor, type AgeTier } from '@/lib/irtAccounts'
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, runVideoMetaSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
@@ -215,6 +215,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
   // Âge d'un compte / container : la date la plus récente connue parmi 1re apparition suivie par ScaleFlow, lecture
   // iRemoTech (list_accounts : 1re lecture qui le contient) et création par ScaleFlow (comptes créés, containers compris)
+  // Depuis combien de jours le compte est connecté : date exacte (création ScaleFlow / apparition entre deux lectures /
+  // 1re apparition suivie) sinon minimum (plus ancienne lecture iRemoTech qui le contient, gardé pour l'agence)
+  const connOf = (dev: string, c: string) => {
+    if (c.startsWith('@')) {
+      const u = c.slice(1).toLowerCase(), k = `${dev}::@${u}`
+      const tracked = team.added[k] ?? 0
+      const created = createdAccts.find(a => a.ok && a.username?.toLowerCase() === u)?.at ?? 0
+      const exact = Math.max(tracked > 1 ? tracked : 0, created, accountAddedAt(irtJobs[dev] ?? [], u) ?? 0) || null
+      const seen = [team.since[k], accountFirstSeenAt(irtJobs[dev] ?? [], u)].filter((x): x is number => !!x && x > 1)
+      return connectedFor(exact, seen.length ? Math.min(...seen) : null)
+    }
+    const made = createdAccts.filter(a => a.ok && a.device === dev && a.container === c).reduce((m, a) => Math.max(m, a.at), 0)
+    return connectedFor(made || null, null)
+  }
   const ageOf = (dev: string, c: string): AgeTier | null => {
     if (c.startsWith('@')) {
       const u = c.slice(1).toLowerCase()
@@ -309,6 +323,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [importOpen, setImportOpen] = useState(false)
   const [pickQ, setPickQ] = useState('')
   const [irtJobs, setIrtJobs] = useState<Record<string, IrtJob[]>>({})
+  // « connecté au moins depuis » : plus ancienne lecture iRemoTech qui contient le compte, gardée pour toute l'agence
+  // (l'historique iRemoTech ne garde que les derniers jobs)
+  useEffect(() => {
+    const upd: Record<string, number> = {}
+    for (const [dev, list] of Object.entries(conts)) for (const c of list.filter(x => x.startsWith('@'))) {
+      const u = c.slice(1).toLowerCase(), k = `${dev}::@${u}`
+      const t = accountFirstSeenAt(irtJobs[dev] ?? [], u)
+      if (t && (!team.since[k] || t < team.since[k] - 60_000)) upd[k] = t
+    }
+    if (Object.keys(upd).length) editTeam(t => { t.since = { ...t.since, ...upd } })
+  }, [conts, irtJobs]) // eslint-disable-line react-hooks/exhaustive-deps
   // Cerveau vision des automatisations = clé Groq de l'espace (Réglages › IA)
   const conns = useConnections(user, org)
   useEffect(() => { setVisionBrain(conns.groq) }, [conns.groq])
@@ -1387,9 +1412,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                       <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
                         <span onClick={() => toggleCont(id, c)} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
                           {cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}
-                          {(() => { const t = ageOf(id, c); if (!t) return null
-                            const col = t === '1d' ? '#4ADE80' : t === '3d' ? '#60A5FA' : '#A1A1AA'
-                            return <span title={`Compte ajouté sur l’iPhone il y a ${AGE_LABEL[t].replace('< ', 'moins de ')}`} style={{ fontSize: 10.5, fontWeight: 700, color: col }}>{`🆕 ${AGE_LABEL[t]}`}</span> })()}
+                          {(() => { const cf = connOf(id, c); if (!cf) return null
+                            const t = ageOf(id, c)
+                            const col = t === '1d' ? '#4ADE80' : t === '3d' ? '#60A5FA' : t === '7d' ? '#D4D4D8' : DIM
+                            const txt = `${cf.exact ? '' : '≥ '}${cf.days} j`
+                            return <span title={cf.exact ? `Connecté sur l’iPhone depuis ${cf.days} jour(s)` : `Connecté sur l’iPhone depuis au moins ${cf.days} jour(s) (date exacte inconnue)`} style={{ fontSize: 10.5, fontWeight: 700, color: col }}>{`${t === '1d' ? '🆕 ' : ''}${txt}`}</span> })()}
                           {(() => { const cs = contStates[id]?.[c]; if (!cs || c.startsWith('@')) return null
                             return <span title={`Vérifié à l’écran le ${new Date(cs.at).toLocaleString()}`} style={{ fontSize: 11, fontWeight: 500, color: cs.state === 'account' ? '#86EFAC' : cs.state === 'empty' ? DIM : cs.state === 'blocked' ? '#F87171' : DIM }}>
                               {cs.state === 'account' ? `· @${cs.username ?? '?'}` : cs.state === 'empty' ? '· vide' : cs.state === 'blocked' ? '· 🤖' : '· ?'}

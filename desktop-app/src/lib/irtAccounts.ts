@@ -121,6 +121,27 @@ export function accountAddedAt(jobs: IrtJob[], username: string): number | null 
   if (first <= 0) return null
   return Date.parse(scans[first].finished_at ?? scans[first].created_at)
 }
+/** 1re lecture iRemoTech réussie (list_accounts) qui contient le compte : il est connecté AU MOINS depuis cette date. Pure. */
+export function accountFirstSeenAt(jobs: IrtJob[], username: string): number | null {
+  const u = username.replace(/^@/, '').toLowerCase()
+  let best: number | null = null
+  for (const j of jobs) {
+    if (j.type !== 'list_accounts' || j.status !== 'completed') continue
+    if (!((j.result?.accounts as string[] | undefined) ?? []).some(x => String(x).replace(/^@/, '').toLowerCase() === u)) continue
+    const t = Date.parse(j.finished_at ?? j.created_at)
+    if (Number.isFinite(t) && (best == null || t < best)) best = t
+  }
+  return best
+}
+/** Depuis combien de jours le compte est connecté sur l'iPhone : date exacte connue (`exact`), sinon minimum connu
+ *  (`atLeast` : connecté au moins depuis). null si rien n'est connu. Pure. */
+export function connectedFor(exact: number | null, atLeast: number | null, now = Date.now()): { days: number; exact: boolean } | null {
+  const d = (t: number) => Math.max(0, Math.floor((now - t) / 86400_000))
+  if (exact && exact > 1) return { days: d(exact), exact: true }
+  if (atLeast && atLeast > 1) return { days: d(atLeast), exact: false }
+  return null
+}
+
 /** Âge d'un compte sur l'iPhone : ajouté il y a moins d'1 jour, de 3 jours ou de 7 jours ; null au-delà ou inconnu
  *  (1 = déjà là quand le suivi a commencé). Pure. */
 export type AgeTier = '1d' | '3d' | '7d'

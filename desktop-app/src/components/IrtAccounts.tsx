@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { deviceLabel, isDeviceOn, listJobs, launchAutomation, scanAccountsAndWait, queueAccountScan, type IrtDevice, type IrtJob } from '@/lib/iremotech'
 import { switchAccountByVision } from '@/lib/iremotechVision'
-import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, naturalCmp, ageTier, AGE_LABEL, type IgProfile, type AccountView } from '@/lib/irtAccounts'
+import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, accountFirstSeenAt, connectedFor, naturalCmp, ageTier, AGE_LABEL, type IgProfile, type AccountView } from '@/lib/irtAccounts'
 import type { IrtTeam } from '@/lib/irtTeam'
 import { MARKETS, type Market } from '@/lib/captionMarkets'
 import { toast } from '@/lib/ui'
@@ -171,6 +171,9 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     const added = Math.max(accountAddedAt(jobs[id] ?? [], a.username) ?? 0, createdAt[a.username] ?? 0, tracked > 1 ? tracked : 0)
     const tier = ageTier(added)
     const isNew = !!tier
+    // depuis combien de jours le compte est connecté (exact, sinon « au moins » d'après la plus ancienne lecture)
+    const seenMin = [team?.since[`${id}::@${a.username.toLowerCase()}`], accountFirstSeenAt(jobs[id] ?? [], a.username)].filter((x): x is number => !!x && x > 1)
+    const conn = connectedFor(added || null, seenMin.length ? Math.min(...seenMin) : null)
     const tkey = `${id}::@${a.username}`
     const link = team?.links[tkey] ?? ''
     const story = team?.lastStory[tkey] ?? null
@@ -187,6 +190,7 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
               <a href={`https://www.instagram.com/${a.username}/`} target="_blank" rel="noreferrer" style={{ fontSize: 13.5, fontWeight: 600, color: INK, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{a.username}</a>
               {isNew && <span title={`Ajouté ${ago(new Date(added).toISOString())} : évite d’y poster tout de suite`} style={{ flex: 'none', height: 18, padding: '0 6px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', background: tier === '1d' ? 'rgba(74,222,128,0.14)' : tier === '3d' ? 'rgba(96,165,250,0.14)' : 'rgba(161,161,170,0.12)', color: tier === '1d' ? '#4ADE80' : tier === '3d' ? '#60A5FA' : '#A1A1AA', border: `1px solid ${tier === '1d' ? 'rgba(74,222,128,0.35)' : tier === '3d' ? 'rgba(96,165,250,0.35)' : 'rgba(161,161,170,0.3)'}` }}>{tier === '1d' ? 'NEW' : AGE_LABEL[tier!]}</span>}
             </span>
+            {conn && <span title={conn.exact ? `Connecté sur l’iPhone depuis ${conn.days} jour(s)` : `Connecté sur l’iPhone depuis au moins ${conn.days} jour(s) (date exacte inconnue)`} style={{ display: 'block', fontSize: 11, color: DIM, whiteSpace: 'nowrap' }}>{`📅 co depuis ${conn.exact ? '' : '≥ '}${conn.days} j`}</span>}
             {cr?.password
               ? <span onClick={() => { try { navigator.clipboard.writeText(`${a.username}:${cr.password}${cr.twofa ? ':' + cr.twofa : ''}`); toast('Identifiants copiés', 'ok') } catch { /* noop */ } }} title="Copier identifiant:mot de passe" style={{ display: 'block', fontSize: 11, color: DIM, fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🔑 {cr.password}</span>
               : <span style={{ display: 'block', fontSize: 11.5, color: DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p?.full_name ?? ' '}</span>}

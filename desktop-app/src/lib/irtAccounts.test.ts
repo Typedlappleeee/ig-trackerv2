@@ -89,3 +89,21 @@ describe('âge des comptes (ajoutés < 1 j / 3 j / 7 j)', () => {
     expect(newAddedEntries({}, 'd2', ['@x'], now, u => u === '@x' ? now - h : null)).toEqual({ 'd2::@x': now - h })
   })
 })
+
+import { accountFirstSeenAt, connectedFor } from './irtAccounts'
+describe('depuis combien de jours le compte est connecté', () => {
+  const now = Date.parse('2026-11-26T12:00:00Z'), d = 86400_000
+  it('date exacte → nombre de jours ; sinon « au moins » ; rien → null', () => {
+    expect(connectedFor(now - 3.5 * d, null, now)).toEqual({ days: 3, exact: true })
+    expect(connectedFor(null, now - 12.2 * d, now)).toEqual({ days: 12, exact: false })
+    expect(connectedFor(1, null, now)).toBeNull()
+    expect(connectedFor(null, null, now)).toBeNull()
+  })
+  it('plus ancienne lecture iRemoTech qui contient le compte', () => {
+    const scan = (at: string, accounts: string[]) => ({ job_id: at, type: 'list_accounts', status: 'completed', created_at: at, finished_at: at, account: null, result: { accounts } }) as never
+    const jobs = [scan('2026-11-20T10:00:00Z', ['a', 'B']), scan('2026-11-10T10:00:00Z', ['b']), scan('2026-11-25T10:00:00Z', ['a'])]
+    expect(accountFirstSeenAt(jobs, '@b')).toBe(Date.parse('2026-11-10T10:00:00Z'))
+    expect(accountFirstSeenAt(jobs, 'a')).toBe(Date.parse('2026-11-20T10:00:00Z'))
+    expect(accountFirstSeenAt(jobs, 'zzz')).toBeNull()
+  })
+})
