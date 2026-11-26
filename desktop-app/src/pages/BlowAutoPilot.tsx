@@ -134,6 +134,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [sel, setSel] = useState<Set<string>>(new Set())            // téléphones sélectionnés
   const [conts, setConts] = useState<Record<string, string[]>>({})   // containers connus par téléphone
   const [selConts, setSelConts] = useState<Record<string, Set<string>>>({}) // containers cochés par téléphone
+  // Échecs du dernier lancement (compte par iPhone) → bouton « Relancer les échecs » (relance SEULEMENT ceux-là)
+  const [lastFail, setLastFail] = useState<{ kind: 'reel' | 'story' | 'carousel' | 'setup'; map: Record<string, string[]> } | null>(null)
   const [newC, setNewC] = useState<Record<string, string>>({})       // saisie « ajouter container »
 
   const [reelPool, setReelPool] = useState<VidRef[]>([])   // pool vidéos (Posting)
@@ -640,13 +642,23 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     return changed ? n : sc
   }), [conts])
   const totalJobs = [...sel].reduce((n, d) => n + (selConts[d]?.size ?? 0), 0)
+  const selAll = sel, selContsAll = selConts
+  // cibles d'un lancement : la sélection, ou seulement les comptes indiqués (« Relancer les échecs »)
+  const targetsOf = (only?: Record<string, string[]>) => only
+    ? { sel: new Set(Object.keys(only)), selConts: Object.fromEntries(Object.entries(only).map(([d, l]) => [d, new Set(l)])) as Record<string, Set<string>> }
+    : { sel: selAll, selConts: selContsAll }
+  const failMap = (f: Record<string, Set<string>>) => Object.fromEntries(Object.entries(f).filter(([, v]) => v.size).map(([d, v]) => [d, [...v]]))
   const captions = captionPool.split('\n').map(s => s.trim()).filter(Boolean)
   const push = (m: string) => setLogs(l => [...l.slice(-1500), m])
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
   // ── Posting (Reel) / Story — flow unifié ────────────────────────────────────
-  async function run(kind: 'reel' | 'story' | 'carousel') {
+  async function run(kind: 'reel' | 'story' | 'carousel', only?: Record<string, string[]>) {
     if (!irt.key || running) return
+    const { sel, selConts } = targetsOf(only)
+    const totalJobs = [...sel].reduce((n, d) => n + (selConts[d]?.size ?? 0), 0)
+    const failed: Record<string, Set<string>> = {}
+    const fail = (dev: string, c: string) => { (failed[dev] ??= new Set()).add(c) }
     const src = kind === 'story' ? storySrc : kind === 'carousel' ? photoSrc : reelSrc
     let pool: VidRef[] = kind === 'story' ? storyPool : kind === 'carousel' ? photoPool : reelPool
     const isImg = kind !== 'reel'
@@ -815,7 +827,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const unreachable = new Set<string>() // comptes non atteints : leurs autres posts sont sautés (pas 5 essais inutiles)
       for (const [ji, job] of p.jobs.entries()) {
         if (R.isCancelled()) break
-        if (unreachable.has(job.container)) { push(`${tag} ⏭ « ${job.container} » sauté (compte non atteint plus tôt dans la session)`); R.tick(false); continue }
+        if (unreachable.has(job.container)) { push(`${tag} ⏭ « ${job.container} » sauté (compte non atteint plus tôt dans la session)`); fail(p.dev, job.container); R.tick(false); continue }
         push(`\n${tag} 📦 ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
         // Même compte que le post d'avant (session) : on est encore dans Instagram → ni mode avion, ni réouverture
         const sameAcct = stayedIn === job.container
@@ -828,7 +840,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
           if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
           const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
-          if (!ok) { push(`${tag} ⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; unreachable.add(job.container); R.tick(false); stayedIn = null; continue }
+          if (!ok) { push(`${tag} ⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; unreachable.add(job.container); fail(p.dev, job.container); R.tick(false); stayedIn = null; continue }
           await sleep(1200)
         }
         stayedIn = null
@@ -866,7 +878,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (!await uploadMedia(key, p.dev, url, mediaFilename(v, kind))) { injected = false; break }
           if (job.vids.length > 1) await sleep(2500) // dates distinctes → ordre de la galerie garanti
         }
-        if (!injected) { push(`${tag} ❌ média introuvable ou injection refusée → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; R.tick(false); continue }
+        if (!injected) { push(`${tag} ❌ média introuvable ou injection refusée → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; fail(p.dev, job.container); R.tick(false); continue }
         push(`${tag} ⏳ 10 s (indexation)…`)
         await sleep(10000)
         const vh = { log: hooks, shouldStop: () => R.isCancelled() }
@@ -907,12 +919,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         if (posted && kind !== 'story' && reelOnce) for (const v of job.vids) {
           try { await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).eq('id', v.id); push(`${tag} 🗑 « ${v.title} » publié → retiré de la Banque (corbeille, 7 j)`) } catch { /* noop */ }
         }
+        if (!posted) fail(p.dev, job.container)
         R.tick(posted)
       }
     }
 
     if (parallel) await Promise.all(byPhone.map(runPhone))
     else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
+    setLastFail({ kind, map: failMap(failed) })
     R.finish()
     push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé — toutes les publications traitées.')
     setRunning(false); setRunId(null)
@@ -920,9 +934,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
 
   // ── Setup compte : photo de profil générée (unique) + bio selon le marché, compte par compte ──────────────────
-  async function runSetup() {
+  async function runSetup(only?: Record<string, string[]>) {
     const key = irt.key
     if (!key || running) return
+    const { sel, selConts } = targetsOf(only)
+    const failed: Record<string, Set<string>> = {}
+    const fail = (dev: string, c: string) => { (failed[dev] ??= new Set()).add(c) }
     if (!setupPfp && !setupBio) { setLogs(['⚠ Coche au moins « Photo de profil » ou « Bio ».']); return }
     const byPhone = [...sel].map(dev => ({ dev, name: (() => { const x = devices.find(d => d.public_id === dev); return x ? deviceLabel(x) : dev })(), targets: [...(selConts[dev] ?? [])] })).filter(p => p.targets.length)
     const total = byPhone.reduce((n, p) => n + p.targets.length, 0)
@@ -947,11 +964,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       for (const c of p.targets) {
         if (R.isCancelled()) break
         push(`\n${tag} 🪪 ${c}`)
-        if (!await openTargetByVision(key, p.dev, c, hooks)) { push(`${tag} ⏭ ${c} non atteint`); R.tick(false); continue }
+        if (!await openTargetByVision(key, p.dev, c, hooks)) { push(`${tag} ⏭ ${c} non atteint`); fail(p.dev, c); R.tick(false); continue }
         if (setupPfp) {
           const { bytes } = await generatePfp()
           push(`${tag} 🎨 photo de profil générée → envoi sur l’iPhone`)
-          if (!await uploadBytesToPhone(key, p.dev, bytes, imgName())) { push(`${tag} ❌ envoi de la photo refusé`); R.tick(false); continue }
+          if (!await uploadBytesToPhone(key, p.dev, bytes, imgName())) { push(`${tag} ❌ envoi de la photo refusé`); fail(p.dev, c); R.tick(false); continue }
           await sleep(9000)
         }
         const m = marketOf(p.dev, c)
@@ -960,11 +977,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const good = (r.pfp ?? true) && (r.bio ?? true)
         if (good) ok++
         push(`${tag} ${good ? '✅' : '⚠'} ${c} : photo ${r.pfp == null ? '—' : r.pfp ? '✓' : '✗'} · bio ${r.bio == null ? '—' : r.bio ? '✓' : '✗'}`)
+        if (!good) fail(p.dev, c)
         R.tick(good)
       }
     }
     if (parallel) await Promise.all(byPhone.map(runPhone))
     else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
+    setLastFail({ kind: 'setup', map: failMap(failed) })
     R.finish(); push(`\n${R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'} ${ok}/${total} compte(s) mis en place.`); setRunning(false); setRunId(null)
   }
 
@@ -1411,6 +1430,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setShowLog(v => !v)}>{showLog ? 'Masquer le journal' : 'Journal détaillé'}</button>
             {running && runId && <button style={{ ...btn, height: 28, fontSize: 12, background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
             {!running && <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => { try { navigator.clipboard.writeText(logs.join('\n')); toast('Journal copié : colle-le à Claude ou à l’équipe', 'ok') } catch { /* noop */ } }}>📋 Copier le journal</button>}
+            {!running && lastFail && (() => {
+              const n = Object.values(lastFail.map).reduce((k, l) => k + l.length, 0)
+              if (!n) return null
+              const relaunch = () => { const only = lastFail.map; lastFail.kind === 'setup' ? void runSetup(only) : void run(lastFail.kind, only) }
+              return <button style={{ ...btn, height: 28, fontSize: 12, background: 'rgba(233,196,106,0.12)', color: GOLD, borderColor: 'rgba(233,196,106,0.4)' }} title={Object.entries(lastFail.map).map(([d, l]) => `${(() => { const x = devices.find(z => z.public_id === d); return x ? deviceLabel(x) : d })()} : ${l.join(', ')}`).join('\n')} onClick={relaunch}>{`🔁 Relancer les ${n} échec(s)`}</button>
+            })()}
             {!running && <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setLogs([])}>Effacer</button>}
           </span>
         </div>

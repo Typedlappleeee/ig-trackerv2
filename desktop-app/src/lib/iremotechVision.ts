@@ -1868,6 +1868,17 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
   const cw = W / 4
   await tap(cw * 1.5, rec.cy + 0.076 * W + cw * 0.45) // photo la plus récente (case après l'appareil photo)
   await sleep(1500)
+  if (DRY_RUN.has(deviceId)) {
+    // MODE TEST : photo choisie, puis « Cancel » (haut-gauche) au lieu de « Done » → rien n'est changé
+    const lb = await readScreenWords(key, deviceId)
+    const cancel = lb?.words.find(o => /^cancel$/i.test(o.text) && o.cy < H * 0.1)
+    const ok = !!lb?.words.some(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
+    hooks?.log?.(ok ? '🧪 TEST : photo choisie dans la galerie → « Cancel » (rien n’est changé)' : '   ⚠ TEST : bouton « Done » de la galerie introuvable')
+    await tap(cancel ? cancel.cx : 0.1 * W, cancel ? cancel.cy : 0.056 * H); await sleep(2500)
+    const back = await readScreenWords(key, deviceId)
+    if (!back?.words.some(o => /^bio$/i.test(o.text))) { hooks?.log?.('   ⚠ TEST : retour sur « Edit profile » non confirmé'); return false }
+    return ok
+  }
   const done = (await readScreenWords(key, deviceId))?.words.find(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
   await tap(done ? done.cx : 0.9 * W, done ? done.cy : 0.056 * H)
   await sleep(4500)
@@ -1901,6 +1912,17 @@ async function setBioOnEditProfile(key: string, deviceId: string, W: number, H: 
   await sleep(500)
   await typeRich(key, deviceId, bio)
   await sleep(1500)
+  if (DRY_RUN.has(deviceId)) {
+    // MODE TEST : bio tapée et relue dans l'éditeur, puis « ‹ » / Cancel (haut-gauche) sans Done → rien n'est changé
+    const ed = await readScreenWords(key, deviceId)
+    const norm2 = (t: string) => t.toLowerCase().replace(/[^a-z0-9äöüßéèàçùêâîôû]/g, '')
+    const first2 = norm2(bio.split('\n')[0]).slice(0, 6)
+    const typed = !!ed && (!first2 || ed.words.some(o => norm2(o.text).includes(first2)))
+    hooks?.log?.(typed ? '🧪 TEST : bio tapée et relue dans l’éditeur → annulée (rien n’est changé)' : '   ⚠ TEST : bio non relue dans l’éditeur')
+    await tap(0.06 * W, 0.064 * H); await sleep(2000)
+    await discardEditIfAsked(key, deviceId, hooks)
+    return typed
+  }
   const done = (await readScreenWords(key, deviceId))?.words.find(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
   await tap(done ? done.cx : 0.9 * W, done ? done.cy : 0.064 * H)
   await sleep(3000)
@@ -1910,6 +1932,17 @@ async function setBioOnEditProfile(key: string, deviceId: string, W: number, H: 
   const ok = !!v && v.words.some(o => /^bio$/i.test(o.text)) && (!first || v.words.some(o => norm(o.text).includes(first)))
   hooks?.log?.(ok ? '   ✓ bio enregistrée' : '   ⚠ bio non confirmée à l’écran')
   return ok
+}
+
+/** Fenêtre « Discard changes? / Unsaved changes » en quittant un éditeur → « Discard » (mode test : rien n'est gardé). */
+async function discardEditIfAsked(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
+  for (let k = 0; k < 2; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    const d = scr?.words.filter(o => /^(discard|leave)$/i.test(o.text) && o.cy > scr.H * 0.3).sort((a, b) => b.cy - a.cy)[0]
+    if (!d) return
+    hooks?.log?.('   modifications non enregistrées → « Discard »')
+    await sendAction(key, deviceId, { type: 'tap', x: d.cx, y: d.cy }); await sleep(1800)
+  }
 }
 
 /** Mise en place du compte ouvert : photo de profil (la plus récente de la pellicule) et/ou bio. */
@@ -1922,6 +1955,7 @@ export async function setupProfileByVision(key: string, deviceId: string, opts: 
   const bio = opts.bio ? await setBioOnEditProfile(key, deviceId, W, H, opts.bio, hooks) : null
   await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.06 * W), y: Math.round(0.056 * H) }) // retour au profil
   await sleep(1500)
+  if (DRY_RUN.has(deviceId)) await discardEditIfAsked(key, deviceId, hooks)
   return { pfp, bio }
 }
 

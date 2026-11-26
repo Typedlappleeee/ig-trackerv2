@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26c',
+    date: '2026-11-26',
+    title: { fr: 'iRemoTech : relancer les échecs', en: 'iRemoTech: retry failures' },
+    items: {
+      fr: ['Bouton « 🔁 Relancer les N échec(s) » à la fin d’un lancement (Posting Reels, carrousel, Story CTA, Setup compte) : relance SEULEMENT les comptes qui ont échoué, avec les mêmes réglages.'],
+      en: ['“🔁 Retry the N failure(s)” button at the end of a run (Reels posting, carousel, CTA Story, account setup): relaunches ONLY the accounts that failed, with the same settings.'],
+    },
+  },
+  {
     id: '2026-11-26b',
     date: '2026-11-26',
     title: { fr: 'Nouveaux prompts : bios et descriptions', en: 'New prompts: bios and captions' },
