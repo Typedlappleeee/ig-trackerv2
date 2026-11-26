@@ -1195,7 +1195,9 @@ async function storyDryRunStop(key: string, deviceId: string, placed: boolean, h
     const choice = scr.words.filter(o => /^(discard|delete|supprimer|abandonner)$/i.test(o.text) && o.cy > scr.H * 0.3).sort((a, b) => b.cy - a.cy)[0]
     if (choice) { await sendAction(key, deviceId, { type: 'tap', x: choice.cx, y: choice.cy }); await sleep(2000); continue }
     if (k >= 4) { await goHomeTab(key, deviceId, scr.W, scr.H, hooks); await sleep(1500); continue }
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.075 * scr.W), y: Math.round(0.065 * scr.H) })   // ✕ / ‹ en haut à gauche
+    // ✕ en haut à gauche : plus bas sur l'écran « Add link » / le tiroir des stickers (feuille sous la barre d'état)
+    const sheet = addLinkScreen(scr.words) || scr.words.some(o => /^(giphy|stickers)$/i.test(o.text))
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.1 * scr.W), y: Math.round((sheet ? 0.115 : 0.065) * scr.H) })
     await sleep(2000)
   }
   hooks?.log?.('   TEST : retour au fil impossible → Instagram fermé')
@@ -3049,7 +3051,11 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   //    Zone [0,04 ; 0,16] : la barre d'état (souvent bleue) était prise pour le bouton.
   // Éditeur de Story déjà affiché (« Your story » / « Close Friends » / « Add a caption » en bas) → pas de Done à chercher
   const ed0 = await readScreenWords(key, deviceId)
-  const inEditor = !!ed0 && ed0.words.some(o => o.cy > ed0.H * 0.8 && /^(friends|caption|caption\.+)$/i.test(o.text.replace(/[^a-z.]/gi, '')))
+  // repères : « Your story / Close Friends / Add a caption » en bas, OU la flèche bleue de partage en bas à droite
+  // (repérée à l'image, sans lecture : vu en vrai, la lecture ne voyait que « o, =D, 6 » et le repli « bouton bleu Done »
+  // tapait au milieu de la Story → outil Texte ouvert → stickers impossibles)
+  const arrow = ed0 ? await findBlueButton(ed0.shot, 0.85, 1) : null
+  const inEditor = !!ed0 && (ed0.words.some(o => o.cy > ed0.H * 0.8 && /^(friends|caption|caption\.+)$/i.test(o.text.replace(/[^a-z.]/gi, ''))) || (!!arrow && arrow.cx > ed0.W * 0.78))
   if (inEditor) hooks?.log?.('   éditeur de Story déjà ouvert (pas de Done)')
   else if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0.04, 0.16], 'Done', 6)) hooks?.log?.('   (pas de Done → on continue)')
   await sleep(inEditor ? 800 : 2600)
@@ -3058,6 +3064,11 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   //    certaines stories (photo) la colonne est décalée et le tap ouvrait l'outil Texte (« link » écrit en texte).
   if (!opts.link || !opts.link.trim()) { hooks?.log?.('⚠ Aucun lien fourni pour la story.'); return false }
   await clearAssistiveTouch(key, deviceId, hooks, 'left')
+  // outil Texte ouvert par erreur (« Classic / Modern » en bas) → refermé par « Done » (haut-droite), sans rien écrire
+  if (await hasText(key, deviceId, [/^(classic|modern|signature|typewriter)$/i], hooks, { tries: 1, cropY: [0.6, 1] })) {
+    hooks?.log?.('   outil Texte ouvert → fermé sans écrire')
+    await tapFrac(A.doneBtn.x, 0.065); await sleep(1500)
+  }
   hooks?.log?.('🔖 Ouverture des stickers…')
   let tray = false
   // 1er essai : BALAYAGE VERS LE HAUT au milieu de la Story (geste natif d'Instagram qui ouvre le tiroir des stickers),
@@ -3156,6 +3167,17 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   hooks?.log?.('✅ Validation « Done » (haut-droite)…')
   await tapFrac(A.linkDone.x, A.linkDone.y)
   await sleep(2200)
+  // « Add link » toujours affiché = le ✓ n'a pas reçu le tap : le bouton AssistiveTouch ESTOMPÉ (semi-transparent, donc
+  // invisible pour le détecteur) est posé dessus (vu en vrai le 26/11/2026 sur STEVIE3). Glissement depuis le ✓ vers le
+  // bord gauche (déplace le bouton s'il est là, sans effet sinon), puis ✓ à nouveau.
+  for (let k = 0; k < 2 && await onAddLink(); k++) {
+    hooks?.log?.('   « Add link » encore ouvert → bouton AssistiveTouch déplacé du ✓, nouvel essai')
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(A.linkDone.x * W), y1: Math.round(A.linkDone.y * H), x2: 30, y2: Math.round(H * 0.5), duration_ms: 700 })
+    await sleep(1800)
+    await tapFrac(A.linkDone.x, A.linkDone.y)
+    await sleep(2200)
+  }
+  if (await onAddLink()) { hooks?.log?.('❌ écran « Add link » impossible à valider → rien n’est publié'); return false }
   // 12. Glisser le sticker (placé au CENTRE par défaut) dans le coin BAS-DROITE — swipe continu
   //     (doigt qui reste appuyé). On lit où il est (texte du sticker), on vise son bord droit à
   //     ~92 % de la largeur, puis on relit : jusqu'à 3 essais tant qu'il n'est pas dans le coin.
