@@ -2225,12 +2225,21 @@ export async function setupProfileByVision(key: string, deviceId: string, opts: 
   if (!await openEditProfile(key, deviceId, W, H, hooks)) { hooks?.log?.('❌ page « Edit profile » non atteinte'); return { pfp: opts.pfp ? false : null, bio: opts.bio ? false : null } }
   const pfp = opts.pfp ? await setPfpOnEditProfile(key, deviceId, W, H, hooks) : null
   // la photo a pu laisser un autre écran ouvert : retour à « Edit profile » (ligne « Bio » visible) avant la bio
-  if (opts.bio) for (let k = 0; k < 2; k++) {
+  // (SEDRA2, 26/11/2026 : 4 comptes « photo ✓ · bio ✗ » — deux retours ‹ à l'aveugle quittaient « Edit profile ») → UN seul
+  // retour, puis réouverture complète d'« Edit profile » (onglet Profil → bouton) si on n'y est toujours pas
+  if (opts.bio) {
     const cur = await readScreenWords(key, deviceId)
-    if (!cur || cur.words.some(o => /^bio$/i.test(o.text))) break
-    hooks?.log?.('   retour à « Edit profile » avant la bio')
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.08 * W), y: Math.round(0.064 * H) }); await sleep(1800)
-    await discardEditIfAsked(key, deviceId, hooks)
+    if (cur && !editProfileShown(cur.words, H)) {
+      // feuille posée après la photo (partage au fil…) → « Not now / Cancel », sinon un retour ‹
+      const nn = cur.words.find(o => /^(not|cancel|skip)$/i.test(o.text) && o.cy > H * 0.3)
+      hooks?.log?.('   retour à « Edit profile » avant la bio')
+      if (nn) await sendAction(key, deviceId, { type: 'tap', x: nn.cx + 15, y: nn.cy })
+      else await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.08 * W), y: Math.round(0.064 * H) })
+      await sleep(1800)
+      await discardEditIfAsked(key, deviceId, hooks)
+      const again = await readScreenWords(key, deviceId)
+      if (!again || !editProfileShown(again.words, H)) await openEditProfile(key, deviceId, W, H, hooks)
+    }
   }
   const bio = opts.bio ? await setBioOnEditProfile(key, deviceId, W, H, opts.bio, hooks) : null
   await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.06 * W), y: Math.round(0.056 * H) }) // retour au profil
