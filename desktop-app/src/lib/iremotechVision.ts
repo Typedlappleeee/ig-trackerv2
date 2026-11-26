@@ -155,9 +155,9 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
   // de débit : un appel avant, et on ne relit après que si la 1re lecture a marché.
   // JAMAIS avec Instagram à l'écran (une coupure réseau en pleine session peut déclencher une vérification) :
   // on sort sur l'écran d'accueil d'abord ; Instagram ne sera rouvert qu'APRÈS, sur le compte / container suivant.
-  hooks?.log?.('🏠 Sortie d’Instagram (écran d’accueil) avant le mode avion…')
-  await sendAction(key, deviceId, { type: 'press', name: 'home' })
-  await sleep(1800)
+  // Instagram FERMÉ (App Switcher), pas seulement mis en arrière-plan, avant de couper le réseau (demande du propriétaire)
+  hooks?.log?.('🏠 Sortie d’Instagram (fermé par l’App Switcher) avant le mode avion…')
+  await forceCloseForegroundApp(key, deviceId, hooks)
   const before = await deviceIp(key, deviceId)
   if (await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 2)) {
     hooks?.log?.(`✈️ Mode avion ON (natif)${before ? ` · IP actuelle ${before}` : ''}…`)
@@ -1368,9 +1368,8 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
     }
   }
   await dismissPopups(key, deviceId, hooks) // ferme une éventuelle fenêtre post-partage (pas toujours là)
-  hooks?.log?.('🏠 Retour à l’accueil.')
-  await sendAction(key, deviceId, { type: 'press', name: 'home' })
-  await sleep(1200)
+  hooks?.log?.('🏠 Instagram fermé (App Switcher).')
+  await forceCloseForegroundApp(key, deviceId, hooks)
   return true
 }
 
@@ -1677,9 +1676,8 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     await sleep(1200)
     return true
   }
-  hooks?.log?.('🏠 Retour à l’accueil.')
-  await sendAction(key, deviceId, { type: 'press', name: 'home' })
-  await sleep(1200)
+  hooks?.log?.('🏠 Instagram fermé (App Switcher).')
+  await forceCloseForegroundApp(key, deviceId, hooks)
   return true
 }
 
@@ -2531,8 +2529,17 @@ export async function forceCloseForegroundApp(key: string, deviceId: string, hoo
   //    une vitesse lente (longue durée) déclenche le switcher ; une vitesse rapide = retour accueil.
   await sendAction(key, deviceId, { type: 'swipe', x1: x, y1: Math.max(0, H - 2), x2: x, y2: Math.round(0.45 * H), duration_ms: 1800 })
   await sleep(1600)
-  // 2. Balayer la carte (centrée) vers le HAUT pour quitter l'app.
-  await sendAction(key, deviceId, { type: 'swipe', x1: x, y1: Math.round(0.55 * H), x2: x, y2: Math.round(0.05 * H), duration_ms: 500 })
+  // 2. Balayer vers le HAUT la carte d'INSTAGRAM (repérée par son nom au-dessus de la carte) ; nom non lu → carte centrale
+  //    (la plus récente = Instagram quand on vient d'en sortir)
+  let cx = x
+  const sw = await snapRetry(key, deviceId)
+  if (sw) {
+    const wa = await ocrWords(sw, undefined, { threshold: null, scale: 2, psms: ['11'] })
+    const wb = await ocrWords(sw, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
+    const ig = withJoined([...wa, ...wb]).find(o => isInstagramText(o.text) && o.cy < H * 0.3)
+    if (ig) cx = Math.min(Math.max(ig.cx + Math.round(0.15 * W), Math.round(0.15 * W)), Math.round(0.85 * W))   // le nom est à gauche de sa carte
+  }
+  await sendAction(key, deviceId, { type: 'swipe', x1: cx, y1: Math.round(0.55 * H), x2: cx, y2: Math.round(0.05 * H), duration_ms: 500 })
   await sleep(1000)
   // 3. Revenir à l'accueil.
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
@@ -2986,8 +2993,7 @@ export async function warmupByVision(key: string, deviceId: string, opts: Warmup
     // session de posts : on reste dans Instagram, onglet Accueil VÉRIFIÉ (le « + » du post suivant est sur le fil)
     if (!await goHomeTab(key, deviceId, W, H, hooks)) hooks?.log?.('   ⚠ fil d’accueil non reconnu après le scroll')
   } else {
-    await sendAction(key, deviceId, { type: 'press', name: 'home' })
-    await sleep(1000)
+    await forceCloseForegroundApp(key, deviceId, hooks)   // fin du warm-up : Instagram fermé, pas laissé en arrière-plan
   }
   return { ok: true, reels, likes, comments }
 }
@@ -3418,8 +3424,7 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
     await sleep(2200)
   }
   await dismissPopups(key, deviceId, hooks) // autre popup éventuel
-  await sendAction(key, deviceId, { type: 'press', name: 'home' })
-  await sleep(1200)
+  await forceCloseForegroundApp(key, deviceId, hooks)   // Story partagée : Instagram fermé (App Switcher)
   return true
 }
 
