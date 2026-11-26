@@ -52,7 +52,7 @@ export async function clearAssistiveTouch(key: string, deviceId: string, hooks?:
 
 /** Raccourci iRemoTech `open_app` CASSÉ sur un iPhone (il ouvre Apple Music au lieu d'Instagram : vu sur SEDRA3 le
  *  26/11/2026) : mémorisé 24 h par iPhone → Instagram ouvert par son ICÔNE à la place, à chaque fois. */
-const OA_BAD = 'sf-irt-openapp-bad2-' // v2 : SEDRA7 marqué à tort (widget « Music » du Centre de contrôle)
+const OA_BAD = 'sf-irt-openapp-bad3-' // v3 : SEDRA7 / SEDRA9 marqués à tort (widget « Music », libellé de l'icône Music)
 export function openAppBroken(deviceId: string): boolean {
   try { return Date.now() - Number(localStorage.getItem(OA_BAD + deviceId) || 0) < 24 * 3600_000 } catch { return false }
 }
@@ -1067,8 +1067,11 @@ export function otherAppOpened(words: { text: string }[]): boolean {
   const ig = ['instagram', 'following', 'reels', 'followers', 'default', 'container', 'suggested', 'pronouns', 'banners', 'avatar'].some(w => t.has(w))
   if (ig) return false
   if (controlCenterShown(words)) return false   // Centre de contrôle (widget « Music ») ≠ Apple Music
-  // une autre app : Apple Music (« What's New in Apple Music »), Réglages, Photos…
-  return ['music', 'apple', 'listen', 'radio', 'browse', 'songs', 'albums', 'playlists', 'settings', 'general', 'memories', 'wifi', 'automix'].some(w => t.has(w))
+  // écran d'ACCUEIL : l'icône « Music » y a son libellé (SEDRA9 marqué à tort le 26/11/2026 : tap pas encore ouvert)
+  if (homeScreenShown(words)) return false
+  // une autre app : Apple Music (« What's New in Apple Music »), Réglages, Photos… — au moins 2 indices (un seul mot
+  // « music » / « settings » se retrouve ailleurs)
+  return ['music', 'apple', 'listen', 'radio', 'browse', 'songs', 'albums', 'playlists', 'settings', 'general', 'memories', 'wifi', 'automix'].filter(w => t.has(w)).length >= 2
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────
@@ -2023,17 +2026,20 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
 // ligne « Bio » → éditeur « Bio » avec « Done » en haut à droite.
 async function openEditProfile(key: string, deviceId: string, W: number, H: number, hooks?: VisionHooks): Promise<boolean> {
   const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
-  for (let k = 0; k < 4; k++) {
+  for (let k = 0; k < 6; k++) {
     const scr = await readScreenWords(key, deviceId)
-    if (scr?.words.some(o => /^edit$/i.test(o.text) && o.cy < H * 0.08) && scr.words.some(o => /^profile$/i.test(o.text) && o.cy < H * 0.08)) return true
+    if (scr && editProfileShown(scr.words, H)) return true
     // feuille des comptes restée ouverte après la bascule (« Add Instagram » / « Meta Account settings », vu en vrai le
     // 26/11/2026 sur SEDRA1) → fermée par un tap au-dessus de la feuille, sinon « Edit profile » reste caché
     if (scr?.words.some(o => /^(meta|add)$/i.test(o.text) && o.cy > H * 0.6) && scr.words.some(o => /^(instagram|account)$/i.test(o.text) && o.cy > H * 0.6)) {
       hooks?.log?.('   liste des comptes encore ouverte → fermée')
-      await tap(W * 0.5, H * 0.12); await sleep(1800); continue
+      // glissée vers le bas depuis le haut de la feuille (un tap en haut retombait sur le nom du compte et la ROUVRAIT)
+      const top = Math.min(...scr.words.filter(o => o.cy > H * 0.35).map(o => o.cy))
+      await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.max(Math.round(top - 0.04 * H), Math.round(0.4 * H)), x2: Math.round(W / 2), y2: Math.round(0.99 * H), duration_ms: 300 })
+      await sleep(1800); continue
     }
     // page « Complete your profile » (compte récent) = équivalent d'« Edit profile » (photo, Bio…)
-    if (scr?.words.some(o => /^complete$/i.test(o.text) && o.cy < H * 0.25) && scr.words.some(o => /^bio$/i.test(o.text))) return true
+    if (scr?.words.some(o => /^complete$/i.test(o.text) && o.cy < H * 0.25) && scr.words.some(o => /^bio$/i.test(o.text)) && scr.words.some(o => /^(name|username|pronouns|picture|avatar)$/i.test(o.text))) return true
     const e = scr?.words.find(o => /^edit$/i.test(o.text) && o.cy < H * 0.6 && scr.words.some(p => /^profile$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
     if (e) { await tap(e.cx + 20, e.cy); await sleep(3500); continue }
     // COMPTE RÉCENT (vu en vrai le 26/11/2026 sur SEDRA3) : pas de bouton « Edit profile » mais « 0 of 4 steps complete »
@@ -2046,7 +2052,14 @@ async function openEditProfile(key: string, deviceId: string, W: number, H: numb
     await sleep(2500)
   }
   const v = await readScreenWords(key, deviceId)
-  return !!v?.words.some(o => /^bio$/i.test(o.text))
+  return !!v && editProfileShown(v.words, H)
+}
+/** Page « Edit profile » / « Complete your profile » : ligne « Bio » ET champs du profil (Name / Username / Pronouns /
+ *  Edit picture). « Bio » seul ne suffit plus (la bio du profil, ou la feuille des comptes, le faisaient croire). Pure. */
+export function editProfileShown(words: { text: string; cy: number }[], H: number): boolean {
+  const title = words.some(o => /^edit$/i.test(o.text) && o.cy < H * 0.08) && words.some(o => /^profile$/i.test(o.text) && o.cy < H * 0.08)
+  const fields = words.some(o => /^bio$/i.test(o.text)) && words.filter(o => /^(name|username|pronouns|picture|avatar)$/i.test(o.text)).length >= 2
+  return title || fields
 }
 
 /** ✓ bleu rond de la nouvelle galerie « Library » (haut-droite, vu le 26/11/2026) — lu à la couleur. */
@@ -2124,10 +2137,16 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
     if (!x || x.words.some(o => /^bio$/i.test(o.text)) || !nn) break
     await tap(nn.cx + 15, nn.cy); await sleep(2000)
   }
-  // vérifiée : la photo n'est plus l'avatar gris par défaut (rose du générateur)
+  // vérifiée : la photo n'est plus l'avatar gris par défaut (rose du générateur). La photo est à gauche sur « Edit
+  // profile » et CENTRÉE plus bas sur « Complete your profile » (on ne regardait qu'à 0,36 W · 0,2 H → « toujours grise »
+  // à tort sur les comptes récents, vu le 26/11/2026) → plusieurs points, couleur vive sur l'un d'eux = photo posée
   const v = await snapRetry(key, deviceId)
-  const [r, g, b] = v ? await pixelRgb(v, Math.round(0.36 * W), Math.round(0.2 * H), 6) : [128, 128, 128]
-  const grey = Math.abs(r - g) < 12 && Math.abs(g - b) < 12
+  const pts: [number, number][] = [[0.36, 0.2], [0.5, 0.2], [0.5, 0.4], [0.36, 0.4], ...(ep ? [[ep.cx / W, Math.max(0.05, ep.cy / H - 0.09)] as [number, number]] : [])]
+  let grey = true
+  if (v) for (const [fx, fy] of pts) {
+    const [r, g, b] = await pixelRgb(v, Math.round(fx * W), Math.round(fy * H), 6)
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 30) { grey = false; break }
+  }
   hooks?.log?.(grey ? '   ⚠ photo de profil non confirmée (toujours grise)' : '   ✓ photo de profil changée')
   return !grey
 }

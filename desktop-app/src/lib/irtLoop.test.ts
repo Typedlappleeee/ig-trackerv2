@@ -49,7 +49,7 @@ describe('onglet Profil reconnu', () => {
   })
 })
 
-import { needsPaste, originalAudioSheet, audioSheetShareWord, editsPromo, controlCenterShown, otherAppOpened } from './iremotechVision'
+import { needsPaste, originalAudioSheet, audioSheetShareWord, editsPromo, controlCenterShown, otherAppOpened, editProfileShown } from './iremotechVision'
 describe('saisie et partage', () => {
   it('accents / emojis → collage ; ASCII (même sur plusieurs lignes) → saisie directe', () => {
     expect(needsPaste('vous êtes là ou pas ? 🙈')).toBe(true)
@@ -150,5 +150,17 @@ describe('Centre de contrôle', () => {
     expect(controlCenterShown(cc)).toBe(true)
     expect(otherAppOpened(cc)).toBe(false)
     expect(controlCenterShown(['Listen', 'Now', 'Music', 'Search'].map(text => ({ text })))).toBe(false)
+  })
+})
+
+describe('setup : détections', () => {
+  it('écran d’accueil avec l’icône Music ≠ Apple Music', () => {
+    expect(otherAppOpened(['Weather', 'Stocks', 'Music', 'iremotech.'].map(text => ({ text })))).toBe(false)
+    expect(otherAppOpened(['Listen', 'Now', 'Apple', 'Music', 'Browse'].map(text => ({ text })))).toBe(true)
+  })
+  it('« Edit profile » reconnu par ses champs, pas par « Bio » seul', () => {
+    const w = (text: string, cy: number) => ({ text, cy })
+    expect(editProfileShown([w('Name', 300), w('Username', 350), w('Bio', 450)], 720)).toBe(true)
+    expect(editProfileShown([w('Bio', 450), w('Add', 600), w('Instagram', 600)], 720)).toBe(false)
   })
 })
