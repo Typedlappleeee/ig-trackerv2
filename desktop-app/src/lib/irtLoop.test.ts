@@ -49,7 +49,7 @@ describe('onglet Profil reconnu', () => {
   })
 })
 
-import { needsPaste, originalAudioSheet, audioSheetShareWord, editsPromo } from './iremotechVision'
+import { needsPaste, originalAudioSheet, audioSheetShareWord, editsPromo, controlCenterShown, otherAppOpened } from './iremotechVision'
 describe('saisie et partage', () => {
   it('accents / emojis → collage ; ASCII (même sur plusieurs lignes) → saisie directe', () => {
     expect(needsPaste('vous êtes là ou pas ? 🙈')).toBe(true)
@@ -141,5 +141,14 @@ describe('pub « Edits: Video Editor »', () => {
     const w = (text: string, cy: number) => ({ text, cy })
     expect(editsPromo([w('Edits:', 400), w('NWideo', 400), w('Editor', 401), w('Get', 600)])?.text).toBe('Edits:')
     expect(editsPromo([w('Reel', 300), w('Edits', 340), w('Post', 380), w('Story', 420)])).toBeNull()
+  })
+})
+
+describe('Centre de contrôle', () => {
+  it('reconnu et jamais pris pour Apple Music', () => {
+    const cc = ['Camera', 'Controls', '100%', 'Music', 'Do', 'Not', 'Disturb'].map(text => ({ text }))
+    expect(controlCenterShown(cc)).toBe(true)
+    expect(otherAppOpened(cc)).toBe(false)
+    expect(controlCenterShown(['Listen', 'Now', 'Music', 'Search'].map(text => ({ text })))).toBe(false)
   })
 })

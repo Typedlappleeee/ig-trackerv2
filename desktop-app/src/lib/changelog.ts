@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-26',
     title: { fr: 'Posting Reels : pub « Edits » et galerie', en: 'Reels posting: “Edits” ad and gallery' },
     items: {
-      fr: ['La pub « Edits: Video Editor » d’Instagram posée sur l’éditeur est fermée automatiquement (jamais « Get » ni l’App Store) — elle faisait abandonner le post.', 'Revenu sur la galerie « New reel » au lieu de l’éditeur : la vidéo est retapée au lieu de taper « Next » à l’aveugle.', 'Capture d’écran ratée au début d’un Reel (iRemoTech saturé) : nouvelle série d’essais avant d’abandonner le post.'],
-      en: ['Instagram’s “Edits: Video Editor” ad shown over the editor is closed automatically (never “Get” or the App Store) — it made the post fail.', 'Back on the “New reel” gallery instead of the editor: the video is tapped again instead of tapping “Next” blindly.', 'Failed screenshot at the start of a Reel (iRemoTech busy): a new round of attempts before giving up the post.'],
+      fr: ['La pub « Edits: Video Editor » d’Instagram posée sur l’éditeur est fermée automatiquement (jamais « Get » ni l’App Store) — elle faisait abandonner le post.', 'Revenu sur la galerie « New reel » au lieu de l’éditeur : la vidéo est retapée au lieu de taper « Next » à l’aveugle.', 'Capture d’écran ratée au début d’un Reel (iRemoTech saturé) : nouvelle série d’essais avant d’abandonner le post.', 'Centre de contrôle resté ouvert après le mode avion de secours : refermé automatiquement (il bloquait l’ouverture d’Instagram et son widget « Music » était pris pour Apple Music).'],
+      en: ['Instagram’s “Edits: Video Editor” ad shown over the editor is closed automatically (never “Get” or the App Store) — it made the post fail.', 'Back on the “New reel” gallery instead of the editor: the video is tapped again instead of tapping “Next” blindly.', 'Failed screenshot at the start of a Reel (iRemoTech busy): a new round of attempts before giving up the post.', 'Control Center left open after the fallback airplane mode: closed automatically (it blocked opening Instagram and its “Music” widget was mistaken for Apple Music).'],
     },
   },
   {

@@ -52,7 +52,7 @@ export async function clearAssistiveTouch(key: string, deviceId: string, hooks?:
 
 /** Raccourci iRemoTech `open_app` CASSÉ sur un iPhone (il ouvre Apple Music au lieu d'Instagram : vu sur SEDRA3 le
  *  26/11/2026) : mémorisé 24 h par iPhone → Instagram ouvert par son ICÔNE à la place, à chaque fois. */
-const OA_BAD = 'sf-irt-openapp-bad-'
+const OA_BAD = 'sf-irt-openapp-bad2-' // v2 : SEDRA7 marqué à tort (widget « Music » du Centre de contrôle)
 export function openAppBroken(deviceId: string): boolean {
   try { return Date.now() - Number(localStorage.getItem(OA_BAD + deviceId) || 0) < 24 * 3600_000 } catch { return false }
 }
@@ -69,6 +69,7 @@ async function openAppChecked(key: string, deviceId: string, target: string, hoo
     await sleep(t ? 2000 : 3000)
     const scr = await readScreenWords(key, deviceId)
     if (!scr) continue
+    if (controlCenterShown(scr.words)) { await closeControlCenterIfShown(key, deviceId, hooks); await sendAction(key, deviceId, { type: 'open_app', target }); continue }
     if (otherAppOpened(scr.words)) {
       markOpenAppBroken(deviceId, hooks)
       await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
@@ -245,7 +246,8 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
     return
   }
   hooks?.log?.('✈️ Mode avion natif refusé → Centre de contrôle')
-  return airplaneResetByVision(key, deviceId, hooks, holdMs)
+  await airplaneResetByVision(key, deviceId, hooks, holdMs)
+  await closeControlCenterIfShown(key, deviceId, hooks)
 }
 
 /** Texte avec accents / emojis / ß…, ou pas : l'action `text` d'iRemoTech ne tape QUE l'ASCII (vu en vrai : « vous êtes
@@ -260,6 +262,31 @@ export function sharePageShown(words: { text: string; cx: number; cy: number }[]
   const sameLine = (a: RegExp, b: RegExp) => words.some(o => a.test(o.text) && words.some(p => b.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
   const rows = [sameLine(/^tag$/i, /^people$/i), sameLine(/^add$/i, /^location$/i), words.some(o => /^audience$/i.test(o.text)), sameLine(/^save$/i, /^draft$/i)].filter(Boolean).length
   return title || btn || rows >= 1
+}
+/** Centre de contrôle iOS resté ouvert (repli « mode avion » : vu le 26/11/2026 sur SEDRA7, son widget « Music » faisait
+ *  croire à Apple Music et l'icône Instagram était cherchée dedans). Pure. */
+export function controlCenterShown(words: { text: string }[]): boolean {
+  const t = new Set(words.map(o => o.text.toLowerCase().replace(/[^a-z]/g, '')))
+  const dnd = t.has('disturb') && t.has('not')
+  return (t.has('controls') && t.has('camera')) || dnd || (t.has('focus') && t.has('controls'))
+}
+/** Ferme le Centre de contrôle s'il est à l'écran (balayage vers le haut, sinon accueil, sinon tap dans le vide en bas). */
+export async function closeControlCenterIfShown(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  let scr = await readScreenWords(key, deviceId)
+  if (!scr || !controlCenterShown(scr.words)) return false
+  hooks?.log?.('   Centre de contrôle resté ouvert → fermé')
+  const { W, H } = scr
+  const tries: IrtAction[] = [
+    { type: 'swipe', x1: Math.round(W / 2), y1: Math.round(H * 0.99), x2: Math.round(W / 2), y2: Math.round(H * 0.3), duration_ms: 300 },
+    { type: 'press', name: 'home' },
+    { type: 'tap', x: Math.round(W / 2), y: Math.round(H * 0.975) },
+  ]
+  for (const a of tries) {
+    await sendAction(key, deviceId, a); await sleep(1500)
+    scr = await readScreenWords(key, deviceId)
+    if (scr && !controlCenterShown(scr.words)) return true
+  }
+  return true
 }
 /** Pub de l'app « Edits: Video Editor » (Meta) affichée par-dessus l'éditeur Reel : renvoie le titre « Edits ». Pure. */
 export function editsPromo<T extends { text: string; cy: number }>(words: T[]): T | null {
@@ -966,6 +993,7 @@ async function tapAppIcon(
       words.push(...await ocrWords(shot, undefined, { threshold: null, whiteText: true, scale: 4, psms: ['11'], cropY: band }))
       hit = withJoined(words).find(o => matcher(o.text))
     }
+    if (!hit && controlCenterShown(words)) { await closeControlCenterIfShown(key, deviceId, hooks); continue }
     const lus = [...new Set(words.map(w => w.text).filter(Boolean))].slice(0, 28)
     hooks?.log?.(`👁 accueil (${W}×${H}) lu : ${lus.join(', ') || '(rien)'}`)
     if (hit) {
@@ -1029,6 +1057,7 @@ export function otherAppOpened(words: { text: string }[]): boolean {
   // (+ pages d'Instagram où « music » apparaît : « Edit profile » → « Add music, profiles and more », vu le 26/11/2026)
   const ig = ['instagram', 'following', 'reels', 'followers', 'default', 'container', 'suggested', 'pronouns', 'banners', 'avatar'].some(w => t.has(w))
   if (ig) return false
+  if (controlCenterShown(words)) return false   // Centre de contrôle (widget « Music ») ≠ Apple Music
   // une autre app : Apple Music (« What's New in Apple Music »), Réglages, Photos…
   return ['music', 'apple', 'listen', 'radio', 'browse', 'songs', 'albums', 'playlists', 'settings', 'general', 'memories', 'wifi', 'automix'].some(w => t.has(w))
 }
@@ -1573,7 +1602,10 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       if (close || x) await sendAction(key, deviceId, { type: 'tap', x: (close ?? x)!.cx, y: (close ?? x)!.cy })
       else await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.max(Math.round(edits.cy - H * 0.06), Math.round(H * 0.1)), x2: Math.round(W / 2), y2: Math.round(H * 0.98), duration_ms: 300 })
       await sleep(1800)
-      const still = await readScreenWords(key, deviceId)
+      let still = await readScreenWords(key, deviceId)
+      // ✕ de la feuille en haut à gauche, juste au-dessus du titre « Edits » (ce que l'IA a tapé en vrai sur SEDRA7)
+      const e2 = still ? editsPromo(still.words) : null
+      if (still && e2) { await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.07 * still.W), y: Math.max(Math.round(e2.cy - 0.055 * still.H), 10) }); await sleep(1800); still = await readScreenWords(key, deviceId) }
       if (still && editsPromo(still.words)) await rescue(key, deviceId, 'Close the "Edits: Video Editor" app promotion (tap its X / close / "Not now"). NEVER tap "Get", "Open" or anything that opens the App Store.',
         async () => { const r = await readScreenWords(key, deviceId); return !!r && !editsPromo(r.words) }, hooks)
       continue
@@ -3681,6 +3713,7 @@ export function sheetUsernames(words: { text: string; cx: number; cy: number }[]
 async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHooks): Promise<'app' | 'picker' | null> {
   await allowShortcutPrompt(key, deviceId, hooks)
   await grantPhotoAccessIfAsked(key, deviceId, hooks) // alertes iOS restées à l'écran (elles bloquent tous les taps)
+  await closeControlCenterIfShown(key, deviceId, hooks) // Centre de contrôle laissé par le repli « mode avion »
   await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
   // 1. action iRemoTech « open_app » : ouvre Instagram où que soit son icône (aucun tap sur l'accueil). Vérifiée.
   // réessayé : juste après le mode avion, iRemoTech refuse parfois l'action (limite de débit) alors qu'Instagram s'ouvre
