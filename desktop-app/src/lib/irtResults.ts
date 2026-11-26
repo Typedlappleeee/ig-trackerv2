@@ -29,8 +29,12 @@ export function startIrtLog(scope: { userId: string; orgId: string | null }, act
       try {
         if (id) await supabase.from('post_runs').update(row()).eq('id', id)
         else {
-          const { data } = await supabase.from('post_runs').insert({ user_id: scope.userId, org_id: scope.orgId, type: `irt_${action}`, ...row() }).select('id').single()
-          id = (data as { id: string } | null)?.id ?? null
+          // `post_runs.type` a une contrainte CHECK (posting / mass_posting / story) dans certaines bases : « irt_<action> »
+          // y est REFUSÉ (rien ne s'enregistrait — page Résultats vide le 26/11/2026) → repli sur « posting » / « story »,
+          // la ligne reste reconnue comme iRemoTech par ses `details` (champ `action` + `device`)
+          let r = await supabase.from('post_runs').insert({ user_id: scope.userId, org_id: scope.orgId, type: `irt_${action}`, ...row() }).select('id').single()
+          if (r.error) r = await supabase.from('post_runs').insert({ user_id: scope.userId, org_id: scope.orgId, type: action === 'story' ? 'story' : 'posting', ...row() }).select('id').single()
+          id = (r.data as { id: string } | null)?.id ?? null
         }
       } catch { /* réseau : réessayé au prochain enregistrement */ }
     })
@@ -70,8 +74,10 @@ export function aggregateResults(entries: IrtResultEntry[], since = 0): AccountR
 
 /** Entrées iRemoTech de l'espace depuis `since` (ms). */
 export async function loadIrtResults(scope: { userId: string; orgId: string | null }, since: number): Promise<IrtResultEntry[]> {
-  let q = supabase.from('post_runs').select('details,created_at').like('type', 'irt_%').gte('created_at', new Date(since - 864e5).toISOString()).order('created_at', { ascending: false }).limit(2000)
+  let q = supabase.from('post_runs').select('details,created_at').or('type.like.irt_%,type.eq.posting,type.eq.story').gte('created_at', new Date(since - 864e5).toISOString()).order('created_at', { ascending: false }).limit(2000)
   q = scope.orgId ? q.eq('org_id', scope.orgId) : q.eq('user_id', scope.userId).is('org_id', null)
   const { data } = await q
+  // seulement les entrées iRemoTech (les runs GeeLark « posting » / « story » n'ont ni `action` ni `device`)
   return (data ?? []).flatMap(r => (Array.isArray((r as { details?: unknown }).details) ? (r as { details: IrtResultEntry[] }).details : []))
+    .filter(e => e && typeof e === 'object' && IRT_ACTIONS.includes(e.action) && typeof e.device === 'string' && typeof e.at === 'number')
 }

@@ -968,6 +968,7 @@
  "the woman {0}",
  "timestamp_granularities[]",
  "tmp/irt/{0}/{1}.{2}",
+ "type.like.irt_%,type.eq.posting,type.eq.story",
  "téléchargement de la vidéo raté (code {0})",
  "téléchargement de la vidéo sur le téléphone…",
  "téléchargement de la vidéo trop long",
