@@ -3132,9 +3132,14 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
     // si la 1re était passée sans être relue, le lien serait doublé (« …sf-testhttps://… »).
     const dom = normTok(stickerDomain(opts.link).split('.')[0] ?? '')
     if (dom) {
-      const shot = await snapRetry(key, deviceId)
-      const words = shot ? await ocrWords(shot, undefined, { threshold: null, scale: 3, psms: ['6', '11'], cropY: [0.05, 0.45] }) : []
-      const seen = words.some(o => normTok(o.text).includes(dom.slice(0, 6)))
+      // le texte tapé n'apparaît qu'après ~1 à 2 s (vu en vrai : lu « non relu » à 0,9 s alors que l'URL était là)
+      let seen = false
+      for (let k = 0; k < 3 && !seen; k++) {
+        await sleep(1500)
+        const shot = await snapRetry(key, deviceId)
+        const words = shot ? await ocrWords(shot, undefined, { threshold: null, scale: 3, psms: ['6'], cropY: [0.05, 0.45] }) : []
+        seen = words.some(o => normTok(o.text).includes(dom.slice(0, 6)))
+      }
       hooks?.log?.(seen ? '   ✓ URL relue dans le champ' : '   ⚠ URL non relue dans le champ (on continue)')
     }
   }
