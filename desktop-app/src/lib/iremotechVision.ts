@@ -2052,7 +2052,10 @@ async function openEditProfile(key: string, deviceId: string, W: number, H: numb
     await sleep(2500)
   }
   const v = await readScreenWords(key, deviceId)
-  return !!v && editProfileShown(v.words, H)
+  if (v && editProfileShown(v.words, H)) return true
+  // l'IA prend le relais (écran inconnu, feuille, page d'un autre compte…)
+  return rescue(key, deviceId, 'Open the "Edit profile" page of the CURRENT Instagram profile (Profile tab → "Edit profile" button, or "Complete your profile" for a new account). Close any sheet or popup first. Do not change any setting, do not switch account.',
+    async () => { const r = await readScreenWords(key, deviceId); return !!r && editProfileShown(r.words, H) }, hooks)
 }
 /** Page « Edit profile » / « Complete your profile » : ligne « Bio » ET champs du profil (Name / Username / Pronouns /
  *  Edit picture). « Bio » seul ne suffit plus (la bio du profil, ou la feuille des comptes, le faisaient croire). Pure. */
@@ -2105,7 +2108,12 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
       await tap(0.08 * W, 0.064 * H); await sleep(1800); await discardEditIfAsked(key, deviceId, hooks)
     }
   }
-  if (!choose && !gallery) { hooks?.log?.('   ⚠ « Choose from library » introuvable'); return false }
+  if (!choose && !gallery) {
+    const got = await rescue(key, deviceId, 'Open the phone photo library to change the profile picture: on "Edit profile" tap "Edit picture or avatar" (the picture at the top), then "Choose from library" / "New profile picture". NEVER tap "Remove current picture", never create an avatar.',
+      async () => { const r = await readScreenWords(key, deviceId); return !!r && r.words.some(o => /^recents?$/i.test(o.text)) }, hooks)
+    if (!got) { hooks?.log?.('   ⚠ « Choose from library » introuvable'); return false }
+    gallery = true
+  }
   if (choose) { await tap(choose.cx + 30, choose.cy); await sleep(3000) }
   const lib = await readScreenWords(key, deviceId)
   const rec = lib?.words.find(o => /^recents?$/i.test(o.text))
@@ -2155,8 +2163,10 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
 async function setBioOnEditProfile(key: string, deviceId: string, W: number, H: number, bio: string, hooks?: VisionHooks): Promise<boolean> {
   const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
   hooks?.log?.('✏️ Bio…')
-  const scr = await readScreenWords(key, deviceId)
-  const b = scr?.words.find(o => /^bio$/i.test(o.text) && o.cx < W * 0.3 && o.cy > H * 0.3 && o.cy < H * 0.9)
+  const findBio = async () => { const r = await readScreenWords(key, deviceId); return r?.words.find(o => /^bio$/i.test(o.text) && o.cx < W * 0.3 && o.cy > H * 0.3 && o.cy < H * 0.9) }
+  let b = await findBio()
+  if (!b && await rescue(key, deviceId, 'Go to the "Edit profile" page of this Instagram account where the "Bio" line is visible (close any editor or popup without saving changes). Do not change anything else.',
+    async () => !!await findBio(), hooks)) b = await findBio()
   if (!b) { hooks?.log?.('   ⚠ ligne « Bio » introuvable'); return false }
   await tap(W * 0.5, b.cy)
   await sleep(2500)
