@@ -773,7 +773,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       setRunning(false)
       return
     }
-    push(`▶ ${kind === 'story' ? 'Story' : kind === 'carousel' ? `Carrousel (${perPost} photos)` : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
+    push(`▶ ${kind === 'story' ? 'Story' : kind === 'carousel' ? `Carrousel (${perPost} photos)` : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn || kind === 'story' ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
     if (src.mode === 'folder') push(isImg ? `📁 « ${src.folder} » : ${pool.length} photo(s)` : `📁 « ${src.folder} » : ${pool.length} vidéo(s)`)
     const R = startRun('farm', `iRemoTech ${kind} · ${byPhone.length} tel × ${totalJobs * perAcct}`, totalJobs * perAcct)
     setRunId(R.id)
@@ -800,7 +800,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           // Changement de compte : on QUITTE Instagram, puis nouvelle IP (mode avion), puis on rouvre sur le compte suivant
           if (ji > 0 && job.container.startsWith('@') && !cleaned) { push(`${tag} 🚪 fin du compte précédent → Instagram fermé`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }) }
           cleaned = false
-          if (airplaneOn) await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
+          // Story CTA : nouvelle IP avant CHAQUE compte, toujours (demande du propriétaire, non désactivable)
+          if (airplaneOn || kind === 'story') await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
           // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
           if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
           const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
@@ -1826,7 +1827,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           })()}
           </>}
         </div>
-        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Stor${totalJobs > 1 ? 'ies' : 'y'} sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || (storySrc.mode === 'folder' ? !storySrc.folder : !storyPool.length) || running} running={running} onClick={() => run('story')} />
+        <LaunchBar n={3} summary={totalJobs ? `${totalJobs} Stor${totalJobs > 1 ? 'ies' : 'y'} sur ${sel.size} iPhone${sel.size > 1 ? 's' : ''}` : 'Choisis des comptes ou containers à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} storyAirplane />} label={`Lancer ${totalJobs} Story(s)`} disabled={!totalJobs || (storySrc.mode === 'folder' ? !storySrc.folder : !storyPool.length) || running} running={running} onClick={() => run('story')} />
         <LogPanel />
       </>)}
 
@@ -2210,17 +2211,20 @@ export function targetsSummary(targets: string[]): string {
   return parts.join(' · ')
 }
 
-function OptionsCard({ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel, accountMode, forceAirplane }: {
+function OptionsCard({ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel, accountMode, forceAirplane, storyAirplane }: {
   airplaneOn: boolean; setAirplaneOn: (f: (v: boolean) => boolean) => void
   uniqueUse: boolean; setUniqueUse: (f: (v: boolean) => boolean) => void
   parallel: boolean; setParallel: (f: (v: boolean) => boolean) => void
   accountMode?: boolean
   forceAirplane?: boolean
+  storyAirplane?: boolean
 }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 8 }}>
       <Toggle on={parallel} onClick={() => setParallel(v => !v)} label="iPhones en même temps" sub="Beaucoup plus rapide avec plusieurs iPhones" />
-      {forceAirplane
+      {storyAirplane
+        ? <Toggle on onClick={() => {}} label="Nouvelle IP avant chaque compte" sub="Mode avion toujours activé pour les Stories CTA" />
+        : forceAirplane
         ? <Toggle on onClick={() => {}} label="Nouvelle IP avant chaque container" sub="Mode avion toujours activé pour la création" />
         : <Toggle on={airplaneOn} onClick={() => setAirplaneOn(v => !v)} label="Nouvelle IP entre chaque compte" sub="Mode avion entre deux containers" />}
       {!accountMode && <Toggle on={uniqueUse} onClick={() => setUniqueUse(v => !v)} label="Chaque média une seule fois" sub="Pas de doublon tant qu’il en reste" />}

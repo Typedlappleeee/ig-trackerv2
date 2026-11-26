@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26',
+    date: '2026-11-26',
+    title: { fr: 'Story CTA : nouvelle IP à chaque compte et corrections', en: 'CTA Story: new IP for every account and fixes' },
+    items: {
+      fr: [
+        'Story CTA : nouvelle IP (mode avion) avant CHAQUE compte, toujours — plus désactivable.',
+        'Mode avion vérifié à l’écran : s’il ne s’active pas, l’ordre est renvoyé puis passé par le Centre de contrôle.',
+        'Bouton gris AssistiveTouch rangé à gauche dans l’éditeur de Story (il recouvrait l’icône sticker et ouvrait le sélecteur d’apps).',
+        'Lien du sticker jamais tapé deux fois ; sticker avec emoji bien reconnu en bas à droite ; plus d’attente inutile du bouton Done.',
+      ],
+      en: [
+        'CTA Story: new IP (airplane mode) before EVERY account, always — can no longer be turned off.',
+        'Airplane mode checked on screen: if it does not turn on, the command is resent, then done through Control Center.',
+        'Grey AssistiveTouch button moved to the left in the Story editor (it covered the sticker icon and opened the app switcher).',
+        'Sticker link never typed twice; sticker with emoji correctly detected bottom right; no more useless wait for the Done button.',
+      ],
+    },
+  },
+  {
     id: '2026-11-25zh',
     date: '2026-11-25',
     title: { fr: 'Genjutsu depuis la Banque, Téléchargeur Insta par type', en: 'Genjutsu from the Bank, Insta downloader by type' },
