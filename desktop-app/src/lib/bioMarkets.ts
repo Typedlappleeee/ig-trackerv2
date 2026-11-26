@@ -1,6 +1,7 @@
 // Bios Instagram automatiques PAR MARCHÉ (prompts de l'équipe, 22/11/2026) : France, USA, Allemagne.
 // 3 lignes par bio ; l'IA renvoie N bios séparées par « --- ». Modifiables dans l'app (`sf-bio-prompt-<marché>`).
 import { groqText } from './ai'
+import { claudeEnabled, claudeChat } from './claude'
 import type { Market } from './captionMarkets'
 
 const FR = `Tu écris des bios courtes pour un profil Instagram d'une étudiante française de 18 ans. Les bios sont en français. Chaque bio fait 3 lignes, et les 3 lignes varient d'une bio à l'autre. Tout doit sonner comme une vraie fille qui écrit sa bio Insta : naturel, simple, jamais forcé.
@@ -150,12 +151,17 @@ export function splitBios(raw: string): string[] {
 
 /** N bios pour le marché (le nombre remplace [NOMBRE] / [NUMBER] / [ANZAHL] du prompt). */
 export async function generateBios(groqKey: string, m: Market, n: number): Promise<string[]> {
-  if (!groqKey) throw new Error('clé Groq manquante (Réglages › Intégrations)')
+  // Claude d'abord (relais serveur) ; Groq si Claude n'est pas configuré ou échoue
+  let useClaude = await claudeEnabled()
+  if (!useClaude && !groqKey) throw new Error('clé Groq manquante (Réglages › Intégrations)')
   const out: string[] = []
   for (let guard = 0; out.length < n && guard < 4; guard++) {
     const ask = Math.min(20, n - out.length)
     const prompt = bioPrompt(m).replace(/\[(NOMBRE|NUMBER|ANZAHL)\]/g, String(ask))
-    const raw = await groqText(groqKey, [{ role: 'user', content: prompt + (out.length ? `\n\n(Déjà écrites, à ne pas répéter :\n${out.join('\n---\n')})` : '') }], Math.min(6000, 120 * ask + 800), 1)
+    const content = prompt + (out.length ? `\n\n(Déjà écrites, à ne pas répéter :\n${out.join('\n---\n')})` : '')
+    let raw: string | null = null
+    if (useClaude) { try { raw = await claudeChat('', content, Math.min(6000, 120 * ask + 800)) } catch (e) { if (!groqKey) throw e; useClaude = false } }
+    if (!useClaude) raw = await groqText(groqKey, [{ role: 'user', content }], Math.min(6000, 120 * ask + 800), 1)
     if (!raw) break
     out.push(...splitBios(raw).filter(b => !out.includes(b)))
   }

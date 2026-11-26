@@ -9,6 +9,9 @@
     "api/groq.mjs": {
       "maxDuration": 60
     },
+    "api/claude.mjs": {
+      "maxDuration": 60
+    },
     "api/fivesim.mjs": {
       "maxDuration": 30
     },

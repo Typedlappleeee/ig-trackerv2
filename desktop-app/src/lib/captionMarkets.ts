@@ -2,6 +2,7 @@
 // Le prompt du marché est le message système ; l'IA (Groq) renvoie N descriptions séparées par « ——— ».
 // Chaque prompt peut être modifié dans l'app (sauvegardé dans le navigateur, `sf-cap-prompt-<marché>`).
 import { groqChat, stripThinking, isModelUnavailable, groqReason, groqModels, pickChatModels } from './ai'
+import { claudeEnabled, claudeChat, ClaudeError } from './claude'
 
 export type Market = 'fr' | 'us' | 'de'
 export const MARKETS: { k: Market; label: string }[] = [
@@ -290,6 +291,58 @@ const cacheKey = (m: Market, ns = 'cap') => {
 function loadCache(m: Market, ns = 'cap'): string[] { try { const a = JSON.parse(localStorage.getItem(cacheKey(m, ns)) ?? '[]'); return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [] } catch { return [] } }
 function saveCache(m: Market, list: string[], ns = 'cap'): void { try { localStorage.setItem(cacheKey(m, ns), JSON.stringify(list.slice(0, 400))) } catch { /* plein */ } }
 
+/** Même contrat que generateMarketCaptions, mais avec Claude : réserve d'abord, puis lots de 15 en parallèle (4 au
+ *  plus), doublons filtrés, surplus mis en réserve. 429 / 529 / 5xx → attente (délai donné par l'API) puis nouvel essai ;
+ *  erreur définitive (clé refusée, modèle inconnu…) → exception (repli Groq chez l'appelant). */
+async function generateViaClaude(m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; stallMs?: number; workers?: number; useCache?: boolean; shouldStop?: () => boolean; batch?: number; gen?: GenSpec }): Promise<string[]> {
+  const g = opts?.gen, ns = g?.ns ?? 'cap'
+  const sleep = opts?.sleep ?? ((ms: number) => new Promise<void>(r => setTimeout(r, ms)))
+  const stallMs = opts?.stallMs ?? 5 * 60_000
+  const foreground = !opts?.shouldStop
+  if (foreground) activeGens++
+  try {
+    const out: string[] = [], keys = new Set<string>(), extra: string[] = []
+    const add = (c: string) => { const k = captionKey(c); if (!c.trim() || (g?.valid && !g.valid(c)) || keys.has(k) || out.length >= n) return false; keys.add(k); out.push(c); return true }
+    if (opts?.useCache !== false) {
+      const cache = loadCache(m, ns), take = cache.splice(0, n)
+      take.forEach(add); saveCache(m, cache, ns)
+      if (out.length) onLog?.(`✍️ ${out.length}/${n} description(s) reprise(s) de la réserve`)
+    }
+    if (out.length >= n) return out.slice(0, n)
+    const system = g?.system ?? marketPrompt(m)
+    let lastProgress = Date.now(), lastErr = '', fatal: Error | null = null
+    const worker = async () => {
+      let fails = 0
+      while (out.length < n && !fatal && Date.now() - lastProgress < stallMs && !opts?.shouldStop?.()) {
+        const ask = Math.min(opts?.batch ?? 15, Math.max(6, n - out.length))
+        try {
+          const raw = await claudeChat(system, g?.ask ? g.ask(ask, out.slice(-40)) : String(ask), Math.min(8000, (g?.tokPer ?? 160) * ask + 600))
+          const got = (g?.split ?? splitCaptions)(raw)
+          let added = 0
+          for (const c of got) { if (add(c)) added++; else if (out.length >= n && !keys.has(captionKey(c))) { keys.add(captionKey(c)); extra.push(c) } }
+          if (added) { lastProgress = Date.now(); fails = 0; onLog?.(`✍️ ${Math.min(out.length, n)}/${n} description(s) générée(s) (Claude)`) }
+          else { fails++; lastErr = got.length ? 'descriptions déjà reçues' : 'réponse vide'; await sleep(2000) }
+        } catch (e) {
+          const st = e instanceof ClaudeError ? e.status : 0
+          lastErr = (e instanceof Error ? e.message : String(e)).slice(0, 110)
+          if ([400, 401, 403, 404, 503].includes(st)) { fatal = e instanceof Error ? e : new Error(lastErr); return }
+          fails++
+          const wait = (e instanceof ClaudeError && e.retryAfterMs) || Math.min(60_000, 5000 * fails)
+          if (fails === 1 || fails % 3 === 0) onLog?.(`   ⏳ Claude : ${lastErr} → nouvel essai dans ${Math.round(wait / 1000)} s (${out.length}/${n} prêtes)`)
+          await sleep(Math.min(wait + 500, 65_000))
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(4, opts?.workers ?? 4)) }, worker))
+    if (extra.length) saveCache(m, [...loadCache(m, ns), ...extra], ns)
+    if (out.length < n) {
+      if (out.length) saveCache(m, [...out, ...loadCache(m, ns)], ns)
+      throw fatal ?? new Error(`${out.length}/${n} description(s) seulement : Claude ne répond plus (${lastErr || 'indisponible'}) — les ${out.length} prêtes sont gardées dans la réserve`)
+    }
+    return out.slice(0, n)
+  } finally { if (foreground) activeGens-- }
+}
+
 /** Variante du générateur (ex. textes CTA de Story) : prompt, demande, découpage, validation et réserve propres. */
 export interface GenSpec { ns: string; system: string; ask: (k: number, prev: string[]) => string; split: (raw: string) => string[]; valid?: (c: string) => boolean; tokPer?: number }
 
@@ -298,7 +351,15 @@ export interface GenSpec { ns: string; system: string; ask: (k: number, prev: st
  *  (prompt du marché + nombre, sans renvoyer les lots précédents : les doublons sont filtrés ici). Limite de débit →
  *  attente du délai exact donné par Groq ; modèle retiré → modèle suivant. Arrêt seulement après `stallMs` sans aucune
  *  nouvelle description (5 min). Les descriptions en trop vont dans la réserve. */
-export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; stallMs?: number; workers?: number; useCache?: boolean; shouldStop?: () => boolean; batch?: number; models?: string[]; gen?: GenSpec }): Promise<string[]> {
+export async function generateMarketCaptions(groqKey: string, m: Market, n: number, onLog?: (msg: string) => void, opts?: { sleep?: (ms: number) => Promise<void>; stallMs?: number; workers?: number; useCache?: boolean; shouldStop?: () => boolean; batch?: number; models?: string[]; gen?: GenSpec; noClaude?: boolean }): Promise<string[]> {
+  // CLAUDE d'abord (relais serveur, clé sur Vercel) ; Groq seulement si Claude n'est pas configuré ou tombe en panne
+  if (!opts?.noClaude && !opts?.models && await claudeEnabled()) {
+    try { return await generateViaClaude(m, n, onLog, opts) } catch (e) {
+      if (!groqKey) throw e
+      onLog?.(`   ↪ Claude indisponible (${(e instanceof Error ? e.message : String(e)).slice(0, 90)}) → Groq`)
+      return generateMarketCaptions(groqKey, m, n, onLog, { ...opts, noClaude: true })
+    }
+  }
   if (!groqKey) throw new Error('clé Groq manquante (Réglages › Intégrations)')
   const g = opts?.gen, ns = g?.ns ?? 'cap'
   const sleep = opts?.sleep ?? ((ms: number) => new Promise<void>(r => setTimeout(r, ms)))
@@ -377,7 +438,7 @@ let activeGens = 0
 const filling = new Set<Market>()
 export const reserveCount = (m: Market) => loadCache(m).length
 export async function topUpReserve(groqKey: string, m: Market, target = RESERVE_TARGET): Promise<number> {
-  if (!groqKey || filling.has(m) || activeGens > 0) return reserveCount(m)
+  if (filling.has(m) || activeGens > 0 || (!groqKey && !await claudeEnabled())) return reserveCount(m)
   const missing = target - reserveCount(m)
   if (missing < 10) return reserveCount(m)
   filling.add(m)
