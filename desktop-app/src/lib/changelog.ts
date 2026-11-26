@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26g',
+    date: '2026-11-26',
+    title: { fr: 'iRemoTech : raccourci qui ouvre Apple Music', en: 'iRemoTech: shortcut opening Apple Music' },
+    items: {
+      fr: ['Chaque ouverture directe d’Instagram par iRemoTech (accueil, Profil, galerie Reel, caméra Story) est maintenant vérifiée : si le raccourci de l’iPhone ouvre Apple Music, ScaleFlow revient sur Instagram par son icône et utilise l’icône pour cet iPhone pendant 24 h (plus de compte « non atteint » à cause d’Apple Music).'],
+      en: ['Every direct Instagram opening by iRemoTech (home, Profile, Reel gallery, Story camera) is now checked: if the iPhone’s shortcut opens Apple Music, ScaleFlow goes back to Instagram from its icon and uses the icon for that iPhone for 24 h (no more account “not reached” because of Apple Music).'],
+    },
+  },
+  {
     id: '2026-11-26f',
     date: '2026-11-26',
     title: { fr: 'iRemoTech : page Résultats', en: 'iRemoTech: Results page' },

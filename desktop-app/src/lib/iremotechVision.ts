@@ -50,13 +50,44 @@ export async function clearAssistiveTouch(key: string, deviceId: string, hooks?:
   return true
 }
 
+/** Raccourci iRemoTech `open_app` CASSÉ sur un iPhone (il ouvre Apple Music au lieu d'Instagram : vu sur SEDRA3 le
+ *  26/11/2026) : mémorisé 24 h par iPhone → Instagram ouvert par son ICÔNE à la place, à chaque fois. */
+const OA_BAD = 'sf-irt-openapp-bad-'
+export function openAppBroken(deviceId: string): boolean {
+  try { return Date.now() - Number(localStorage.getItem(OA_BAD + deviceId) || 0) < 24 * 3600_000 } catch { return false }
+}
+function markOpenAppBroken(deviceId: string, hooks?: VisionHooks) {
+  if (!openAppBroken(deviceId)) hooks?.log?.('   ⚠ le raccourci iRemoTech de cet iPhone ouvre Apple Music au lieu d’Instagram → Instagram sera ouvert par son icône (24 h)')
+  try { localStorage.setItem(OA_BAD + deviceId, String(Date.now())) } catch { /* noop */ }
+}
+/** `open_app` vers une cible Instagram, VÉRIFIÉ : une autre app ouverte (Apple Music…) → iPhone marqué, retour à
+ *  Instagram par son icône, et false (l'appelant prend son chemin de secours, déjà dans Instagram). */
+async function openAppChecked(key: string, deviceId: string, target: string, hooks?: VisionHooks): Promise<boolean> {
+  if (openAppBroken(deviceId)) return false
+  if (!await sendAction(key, deviceId, { type: 'open_app', target })) return false
+  for (let t = 0; t < 3; t++) {
+    await sleep(t ? 2000 : 3000)
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) continue
+    if (otherAppOpened(scr.words)) {
+      markOpenAppBroken(deviceId, hooks)
+      await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
+      await tapInstagramIcon(key, deviceId, hooks)
+      await sleep(2500)
+      return false
+    }
+    if (scr.words.length >= 8) return true   // écran rempli et pas une autre app (Music met ~5 s à s'afficher : écran blanc)
+  }
+  return true
+}
+
 /** Remise à zéro SÛRE : Instagram fermé complètement puis rouvert → il repart sur le fil d'accueil (testé sur STEVIE1).
  *  Utilisée quand ScaleFlow ne retrouve plus la barre d'onglets (page d'un autre compte, notifications…). */
 export async function resetInstagramToHome(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
   hooks?.log?.('   ↺ Instagram remis à zéro (fermé puis rouvert sur l’accueil)')
   await forceCloseForegroundApp(key, deviceId, hooks)
-  await sendAction(key, deviceId, { type: 'open_app', target: 'instagram' })
-  await sleep(6500)
+  if (await openAppChecked(key, deviceId, 'instagram', hooks)) await sleep(2500)
+  else if (openAppBroken(deviceId)) { await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500); await tapInstagramIcon(key, deviceId, hooks); await sleep(3500) }
   await dismissIgInfoSheet(key, deviceId, hooks)
   const scr = await readScreenWords(key, deviceId)
   return !!scr && homeFeedShown(scr.words, scr.H)
@@ -370,7 +401,7 @@ async function settingsGrantCameraMic(key: string, deviceId: string, hooks?: Vis
     }
   }
   hooks?.log?.('   ⚠ interrupteurs Camera / Microphone non confirmés')
-  await sendAction(key, deviceId, { type: 'open_app', target: 'instagram_camera' })
+  if (!await openAppChecked(key, deviceId, 'instagram_camera', hooks) && openAppBroken(deviceId)) { await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500); await tapInstagramIcon(key, deviceId, hooks) }
   await sleep(3000)
   return false
 }
@@ -1395,8 +1426,8 @@ const CAPTION_MARK = [/^caption[.…]*$/i, /^l[ée]gende[.…]*$/i]
  *  coupe (sinon le tap sur la vidéo la cocherait au lieu de l'ouvrir). Tap sur la vidéo la plus récente = éditeur.
  *  Renvoie null si la galerie n'est pas reconnue (l'appelant passe alors par le +). */
 async function postViaReelGallery(key: string, deviceId: string, A: typeof REEL_ANCHORS, caption: string | undefined, hooks?: VisionHooks, location?: LocTarget, stay?: boolean): Promise<boolean | null> {
-  if (!await sendAction(key, deviceId, { type: 'open_app', target: 'instagram_reel' })) return null
-  await sleep(4500)
+  if (!await openAppChecked(key, deviceId, 'instagram_reel', hooks)) return null
+  await sleep(1500)
   let scr = await readScreenWords(key, deviceId)
   if (scr && !newReelGallery(scr.words, scr.H) && await dismissIgInfoSheet(key, deviceId, hooks)) { await sleep(1500); scr = await readScreenWords(key, deviceId) }
   // ancien brouillon rouvert (éditeur avec sa barre d'outils, ou page de partage) → abandonné, puis la galerie
@@ -3087,8 +3118,8 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
   // 1. Caméra Story ouverte DIRECTEMENT par iRemoTech (`open_app` cible `instagram_camera`, vérifiée en vrai le 25/11/2026 :
   //    caméra en mode STORY, vignette de la galerie en bas à gauche) ; sinon le créateur par le + (haut-gauche).
   let viaCam = false
-  if (await sendAction(key, deviceId, { type: 'open_app', target: 'instagram_camera' })) {
-    await sleep(4500)
+  if (await openAppChecked(key, deviceId, 'instagram_camera', hooks)) {
+    await sleep(1500)
     await dismissIgInfoSheet(key, deviceId, hooks)
     await grantPhotoAccessIfAsked(key, deviceId, hooks)
     const cs = await snapRetry(key, deviceId)
@@ -3622,8 +3653,10 @@ async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHoo
   await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
   // 1. action iRemoTech « open_app » : ouvre Instagram où que soit son icône (aucun tap sur l'accueil). Vérifiée.
   // réessayé : juste après le mode avion, iRemoTech refuse parfois l'action (limite de débit) alors qu'Instagram s'ouvre
-  const opened = await sendWithRetry(key, deviceId, { type: 'open_app', target: 'instagram' }, 3)
-  {
+  const broken = openAppBroken(deviceId)
+  if (broken) hooks?.log?.('   (raccourci iRemoTech de cet iPhone cassé → Instagram ouvert par son icône)')
+  const opened = broken ? false : await sendWithRetry(key, deviceId, { type: 'open_app', target: 'instagram' }, 3)
+  if (!broken) {
     // surveillé ~10 s : quand le raccourci ouvre Apple Music à la place d'Instagram (vu le 26/11/2026 sur SEDRA3, en vrai),
     // Music affiche d'abord un écran blanc → l'ancien contrôle unique à 4 s le prenait pour Instagram (« Instagram ouvert »)
     // puis toute la bascule de compte échouait. Instagram n'est accepté que RECONNU, ou après 10 s sans autre app.
@@ -3643,7 +3676,7 @@ async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHoo
       if (otherAppOpened(scr.words)) { other = true; break }
       if (!opened) break   // action refusée : inutile d'attendre, icône de l'accueil
     }
-    if (other) hooks?.log?.('   ⚠ open_app a ouvert une autre app (Apple Music…) → icône de l’accueil (le raccourci iRemoTech de cet iPhone est à vérifier)')
+    if (other) markOpenAppBroken(deviceId, hooks)
     else if (opened && scr && !isAppLibrary(scr.words) && !isTodayView(scr.words) && !scr.words.some(o => /^(weather|stocks|wallet)$/i.test(o.text))) {
       hooks?.log?.('📲 Instagram ouvert (open_app)')
       await grantPhotoAccessIfAsked(key, deviceId, hooks)
@@ -3807,8 +3840,8 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
   if (decideEndScreen(scr.words, scr.W, scr.H)?.kind === 'captcha') { hooks?.log?.('🤖 Instagram demande une vérification humaine sur le compte actif : rien n’est tapé'); return null }
   const { W, H } = scr
   // 0. onglet Profil ouvert DIRECTEMENT par iRemoTech (`open_app` cible `instagram_profile`, vérifié en vrai le 25/11/2026)
-  if (!isProfile(scr) && await sendAction(key, deviceId, { type: 'open_app', target: 'instagram_profile' })) {
-    await sleep(3500); scr = await readScreenWords(key, deviceId)
+  if (!isProfile(scr) && await openAppChecked(key, deviceId, 'instagram_profile', hooks)) {
+    await sleep(500); scr = await readScreenWords(key, deviceId)
     if (isSheet(scr)) return scr
     if (isProfile(scr)) hooks?.log?.('   onglet Profil ouvert directement')
   }
