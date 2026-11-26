@@ -110,8 +110,8 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
   }
   // Scan d'un iPhone, ATTENDU jusqu'à la fin, dans la file commune (jamais deux scans en même temps)
   // pendant « Tout scanner », le bouton affiche l'avancement global (n/N), pas le nom d'un iPhone
-  const bulk = useRef(false)
-  const label = (v: string | null) => { if (!bulk.current) setScanning(v) }
+  const bulkScan = useRef(false)
+  const label = (v: string | null) => { if (!bulkScan.current) setScanning(v) }
   const scanWait = (d: IrtDevice) => queueAccountScan(async () => {
     label(deviceLabel(d))
     const r = await scanAccountsAndWait(apiKey, d.public_id, { onLaunched: j => setJobs(m => ({ ...m, [d.public_id]: [j, ...(m[d.public_id] ?? [])] })) })
@@ -140,12 +140,12 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     setBusy('scan')
     const list = devices.filter(isDeviceOn)
     // TOUS les iPhones en même temps (un seul scan à la fois par iPhone)
-    bulk.current = true
+    bulkScan.current = true
     let done = 0
     setScanning(`0/${list.length} iPhone(s)`)
     const res = await Promise.all(list.map(d => scanWait(d).catch(() => false).then(ok => { done++; setScanning(`${done}/${list.length} iPhone(s)`); return ok })))
     const n = res.filter(Boolean).length
-    bulk.current = false
+    bulkScan.current = false
     setScanning(null)
     setBusy(null); toast(`${n}/${list.length} iPhone(s) scanné(s)`, n ? 'ok' : 'bad')
   }
