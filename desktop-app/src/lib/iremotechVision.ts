@@ -3394,14 +3394,17 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   if (!await tapButton(key, deviceId, [/^share$|partager/i], A.shareSheet, W, H, hooks, [0.80, 1], 'Share (feuille)')) return false
   hooks?.log?.('📤 Story partagée.')
   await sleep(3500)
-  // Parfois une feuille « Also share to » apparaît après le partage → taper « Done ».
-  if (await findTapText(key, deviceId, [/^done$/i], hooks, { label: 'Done (Also share to)', cropY: [0.82, 1], tries: 3 })) {
-    hooks?.log?.('   feuille « Also share to » → Done')
-    await sleep(1800)
-  } else {
-    // Repli : le « Done » est un gros bouton bleu en bas.
-    const s = await snapRetry(key, deviceId)
-    if (s) { const blue = await findBlueButton(s, 0.82, 1); if (blue) { hooks?.log?.('   « Done » (bouton bleu bas) → tap'); await sendAction(key, deviceId, { type: 'tap', x: blue.cx, y: blue.cy }); await sleep(1800) } }
+  // Feuille « Also share to » après le partage (Highlights / Facebook / Suggested + boutons bleus « Share » et « Send ») →
+  // « Done » = la LARGE barre bleue tout en bas, tapée en son MILIEU. Jamais « Send » (envoi de la Story à quelqu'un) ni
+  // « Share » (Facebook) : avant, le repli « bouton bleu en bas » pouvait tomber sur un « Send » (vu le 26/11/2026).
+  for (let k = 0; k < 3; k++) {
+    const sh = await readScreenWords(key, deviceId)
+    const alsoShare = !!sh && sh.words.some(o => /^also$/i.test(o.text)) && sh.words.some(o => /^share$/i.test(o.text) && o.cy < sh.H * 0.45)
+    if (!sh || !alsoShare) break
+    const dn = sh.words.find(o => /^done$/i.test(o.text) && o.cy > sh.H * 0.85 && Math.abs(o.cx - sh.W / 2) < sh.W * 0.2)
+    hooks?.log?.(`   feuille « Also share to » → Done${k ? ` (essai ${k + 1})` : ''}`)
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(sh.W / 2), y: dn ? dn.cy : Math.round(0.92 * sh.H) })
+    await sleep(2200)
   }
   await dismissPopups(key, deviceId, hooks) // autre popup éventuel
   await sendAction(key, deviceId, { type: 'press', name: 'home' })
