@@ -121,6 +121,7 @@ export async function fetchUsage(key: string): Promise<IrtUsage | null> {
 
 // Capture d'écran → data URL JPEG.
 export async function snapshot(key: string, deviceId: string): Promise<string | null> {
+  if (STOPPED.has(deviceId)) return null
   await slot()
   try {
     if (IS_WEB) { const j = await irtProxy('snapshot', key, { deviceId }); return j.ok && j.dataUrl ? j.dataUrl : null }
@@ -133,8 +134,16 @@ export async function snapshot(key: string, deviceId: string): Promise<string | 
   } catch { return null }
 }
 
+// Arrêt IMMÉDIAT d'un lancement : les iPhones arrêtés ne reçoivent plus aucune action / capture / envoi (chaque appel
+// échoue tout de suite), donc l'automatisation en cours se termine en quelques secondes au lieu de finir son étape.
+const STOPPED = new Set<string>()
+export function stopDevices(ids: string[]) { for (const id of ids) STOPPED.add(id) }
+export function releaseDevices(ids: string[]) { for (const id of ids) STOPPED.delete(id) }
+export const deviceStopped = (id: string) => STOPPED.has(id)
+
 // Envoie UNE action (tap/texte/swipe…).
 export async function sendAction(key: string, deviceId: string, action: IrtAction): Promise<boolean> {
+  if (STOPPED.has(deviceId)) return false
   await slot()
   try {
     if (IS_WEB) { const j = await irtProxy('action', key, { deviceId, body: action }); return !!j.ok }
@@ -148,6 +157,7 @@ export async function sendAction(key: string, deviceId: string, action: IrtActio
 
 // Action avec réponse (device_ip → { ip }, clipboard_get…). null = action refusée / iPhone injoignable.
 export async function actionResult(key: string, deviceId: string, action: IrtAction): Promise<Record<string, unknown> | null> {
+  if (STOPPED.has(deviceId)) return null
   await slot()
   try {
     if (IS_WEB) { const j = await irtProxy('action', key, { deviceId, body: action }); return j.ok ? (j.data ?? {}) : null }
@@ -239,6 +249,7 @@ export function queueAccountScan<T>(task: () => Promise<T>): Promise<T> {
 
 // Upload d'un média (URL signée Supabase) → octets bruts sur l'iPhone.
 export async function uploadMedia(key: string, deviceId: string, mediaUrl: string, filename = 'video.mp4'): Promise<boolean> {
+  if (STOPPED.has(deviceId)) return false
   try {
     // un 2e essai si le 1er échoue (iRemoTech saturé, coupure) : au pire la vidéo est 2 fois dans la pellicule, la plus
     // récente est prise de toute façon

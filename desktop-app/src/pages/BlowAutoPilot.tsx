@@ -33,7 +33,7 @@ import { generateBios } from '@/lib/bioMarkets'
 import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } from '@/lib/ctaMarkets'
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
-import { listJobs, scanAccountsAndWait, queueAccountScan, type IrtJob } from '@/lib/iremotech'
+import { listJobs, scanAccountsAndWait, queueAccountScan, stopDevices, releaseDevices, type IrtJob } from '@/lib/iremotech'
 import { claudeStatus } from '@/lib/claude'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
@@ -993,8 +993,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       }
     }
 
-    if (parallel) await Promise.all(byPhone.map(runPhone))
-    else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
+    // Annuler = arrêt IMMÉDIAT : plus aucune action envoyée aux iPhones de ce lancement (sinon chaque iPhone finissait son
+    // étape en cours, plusieurs minutes d'« Annulation… »)
+    const devs = byPhone.map(p => p.dev)
+    releaseDevices(devs)
+    const watch = setInterval(() => { if (R.isCancelled()) stopDevices(devs) }, 500)
+    try {
+      if (parallel) await Promise.all(byPhone.map(p => runPhone(p).catch(() => undefined)))
+      else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p).catch(() => undefined) }
+    } finally { clearInterval(watch); releaseDevices(devs) }
     setLastFail({ kind, map: failMap(failed) })
     R.finish()
     push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé — toutes les publications traitées.')
@@ -1052,8 +1059,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         R.tick(good)
       }
     }
-    if (parallel) await Promise.all(byPhone.map(runPhone))
-    else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
+    // Annuler = arrêt IMMÉDIAT : plus aucune action envoyée aux iPhones de ce lancement (sinon chaque iPhone finissait son
+    // étape en cours, plusieurs minutes d'« Annulation… »)
+    const devs = byPhone.map(p => p.dev)
+    releaseDevices(devs)
+    const watch = setInterval(() => { if (R.isCancelled()) stopDevices(devs) }, 500)
+    try {
+      if (parallel) await Promise.all(byPhone.map(p => runPhone(p).catch(() => undefined)))
+      else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p).catch(() => undefined) }
+    } finally { clearInterval(watch); releaseDevices(devs) }
     setLastFail({ kind: 'setup', map: failMap(failed) })
     R.finish(); push(`\n${R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'} ${ok}/${total} compte(s) mis en place.`); setRunning(false); setRunId(null)
   }
@@ -1234,8 +1248,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         }
       }
     }
-    if (parallel) await Promise.all(byPhone.map(runPhone))
-    else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
+    // Annuler = arrêt IMMÉDIAT : plus aucune action envoyée aux iPhones de ce lancement (sinon chaque iPhone finissait son
+    // étape en cours, plusieurs minutes d'« Annulation… »)
+    const devs = byPhone.map(p => p.dev)
+    releaseDevices(devs)
+    const watch = setInterval(() => { if (R.isCancelled()) stopDevices(devs) }, 500)
+    try {
+      if (parallel) await Promise.all(byPhone.map(p => runPhone(p).catch(() => undefined)))
+      else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p).catch(() => undefined) }
+    } finally { clearInterval(watch); releaseDevices(devs) }
     push(`\n📊 ${tally.ok} compte(s) créé(s) · ${tally.skip} container(s) déjà connecté(s) · ${tally.fail} échec(s)${loopOn ? ` · ${spent.toFixed(2)}$ de numéros` : ''}`)
     R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'); setRunning(false); setRunId(null)
   }
@@ -1288,8 +1309,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       }
     }
 
-    if (parallel) await Promise.all(byPhone.map(runPhone))
-    else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p) }
+    // Annuler = arrêt IMMÉDIAT : plus aucune action envoyée aux iPhones de ce lancement (sinon chaque iPhone finissait son
+    // étape en cours, plusieurs minutes d'« Annulation… »)
+    const devs = byPhone.map(p => p.dev)
+    releaseDevices(devs)
+    const watch = setInterval(() => { if (R.isCancelled()) stopDevices(devs) }, 500)
+    try {
+      if (parallel) await Promise.all(byPhone.map(p => runPhone(p).catch(() => undefined)))
+      else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p).catch(() => undefined) }
+    } finally { clearInterval(watch); releaseDevices(devs) }
     R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Warm-up terminé.'); setRunning(false); setRunId(null)
   }
 
