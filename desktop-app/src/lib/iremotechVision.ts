@@ -1897,7 +1897,10 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
     await tap(x, y)
     await sleep(2200)
     const sh = await readScreenWords(key, deviceId)
-    choose = sh?.words.find(o => /^choose$/i.test(o.text) && o.cy > H * 0.4)
+    // « Choose from library » : le bouton AssistiveTouch (rangé à gauche) masque parfois le « C » (vu le 26/11/2026 sur
+    // SEDRA3) → aussi « hoose » ou « library », et tap au MILIEU de la ligne (toute la ligne est cliquable)
+    const cw = sh?.words.find(o => /^c?hoose$/i.test(o.text) && o.cy > H * 0.4) ?? sh?.words.find(o => /^library$/i.test(o.text) && o.cy > H * 0.4 && o.cy < H * 0.9)
+    if (cw) choose = { cx: Math.round(W * 0.5) - 30, cy: cw.cy }
     if (choose) break
     if (sh?.words.some(o => /^recents?$/i.test(o.text))) { gallery = true; break }   // galerie ouverte directement
     // un éditeur de champ (« Name », « Username »… avec ✓) ouvert par erreur → ‹ sans rien changer
