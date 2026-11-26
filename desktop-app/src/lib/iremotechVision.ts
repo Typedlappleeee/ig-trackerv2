@@ -3009,9 +3009,10 @@ export function findStickerBox(words: { text: string; x: number; w: number; cx: 
   const cy = best.reduce((a, o) => a + o.cy, 0) / best.length
   return { x0, x1, cx: (x0 + x1) / 2, cy }
 }
-/** Sticker dans le coin bas-droite (bord droit du texte ≥ 86 % de la largeur, hauteur 70–88 %). Pure. */
+/** Sticker dans le coin bas-droite (bord droit du texte LU ≥ 80 % de la largeur, hauteur 70–88 %). L'emoji de fin
+ *  (💗, 💕…) n'est pas lu par l'OCR : un sticker bien calé finit son texte vers 85 % (vu en vrai le 26/11/2026). Pure. */
 export function stickerInCorner(box: { x1: number; cy: number }, W: number, H: number): boolean {
-  return box.x1 >= W * 0.86 && box.cy >= H * 0.7 && box.cy <= H * 0.88
+  return box.x1 >= W * 0.8 && box.cy >= H * 0.7 && box.cy <= H * 0.88
 }
 /** Glissement qui amène le bord droit du texte à 92 % de la largeur et le sticker à 80 % de la hauteur
  *  (au-dessus des boutons « Your story »…, loin de la corbeille centrale). Pure. */
@@ -3028,8 +3029,12 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   await dismissIgInfoSheet(key, deviceId, hooks) // « Introducing story-to-story sharing » (iPhone normal)
   // 5. Done (haut-droite) — si absent, on saute juste l'étape et on continue (des fois il n'y en a pas).
   //    Zone [0,04 ; 0,16] : la barre d'état (souvent bleue) était prise pour le bouton.
-  if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0.04, 0.16], 'Done', 6)) hooks?.log?.('   (pas de Done → on continue)')
-  await sleep(2600)
+  // Éditeur de Story déjà affiché (« Your story » / « Close Friends » / « Add a caption » en bas) → pas de Done à chercher
+  const ed0 = await readScreenWords(key, deviceId)
+  const inEditor = !!ed0 && ed0.words.some(o => o.cy > ed0.H * 0.8 && /^(friends|caption|caption\.+)$/i.test(o.text.replace(/[^a-z.]/gi, '')))
+  if (inEditor) hooks?.log?.('   éditeur de Story déjà ouvert (pas de Done)')
+  else if (!await tapButton(key, deviceId, [/^done$|terminé/i], A.doneBtn, W, H, hooks, [0.04, 0.16], 'Done', 6)) hooks?.log?.('   (pas de Done → on continue)')
+  await sleep(inEditor ? 800 : 2600)
   await dismissIgInfoSheet(key, deviceId, hooks)
   // 6. Icône sticker (colonne de droite) → tiroir des stickers. VÉRIFIÉ avant d'écrire quoi que ce soit : sur
   //    certaines stories (photo) la colonne est décalée et le tap ouvrait l'outil Texte (« link » écrit en texte).
@@ -3098,14 +3103,14 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   await sendAction(key, deviceId, { type: 'text', text: opts.link.trim() })
   await sleep(900)
   {
-    // URL bien arrivée dans le champ ? (domaine relu) — sinon une 2e saisie après avoir vidé le champ
+    // URL bien arrivée dans le champ ? (domaine relu, zoom sur le haut de l'écran). JAMAIS de 2e saisie à l'aveugle :
+    // si la 1re était passée sans être relue, le lien serait doublé (« …sf-testhttps://… »).
     const dom = normTok(stickerDomain(opts.link).split('.')[0] ?? '')
-    const seen = async () => { const r = await readScreenWords(key, deviceId); return !r || !dom || r.words.some(o => normTok(o.text).includes(dom)) }
-    if (!await seen()) {
-      hooks?.log?.('   URL non relue dans le champ → nouvelle saisie')
-      await sendAction(key, deviceId, { type: 'text', text: opts.link.trim() })
-      await sleep(1200)
-      if (!await seen()) hooks?.log?.('   ⚠ URL toujours non relue (on continue)')
+    if (dom) {
+      const shot = await snapRetry(key, deviceId)
+      const words = shot ? await ocrWords(shot, undefined, { threshold: null, scale: 3, psms: ['6', '11'], cropY: [0.05, 0.45] }) : []
+      const seen = words.some(o => normTok(o.text).includes(dom.slice(0, 6)))
+      hooks?.log?.(seen ? '   ✓ URL relue dans le champ' : '   ⚠ URL non relue dans le champ (on continue)')
     }
   }
   // 10. Texte du sticker (facultatif) via « Customize sticker text ».

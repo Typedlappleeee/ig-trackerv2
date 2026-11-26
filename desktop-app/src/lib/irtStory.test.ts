@@ -72,6 +72,10 @@ describe('Story — sticker lien en bas à droite', () => {
     expect(m.y2).toBe(Math.round(H * 0.8))
     expect(stickerInCorner({ x1: b.x1 + (m.x2 - m.x1), cy: m.y2 }, W, H)).toBe(true)
   })
+  it('emoji de fin non lu : sticker calé à droite (texte lu jusqu’à 85 %) = dans le coin (vu en vrai 26/11/2026)', () => {
+    expect(stickerInCorner({ x1: 345, cy: 562 }, 406, 720)).toBe(true)
+    expect(stickerInCorner({ x1: 300, cy: 562 }, 406, 720)).toBe(false)
+  })
 })
 
 describe('+ depuis le profil → feuille « Create »', () => {
