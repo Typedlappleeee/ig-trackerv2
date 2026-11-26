@@ -120,6 +120,16 @@ function iso6709(lat: number, lon: number): string {
   const f = (v: number, w: number) => (v >= 0 ? '+' : '-') + Math.abs(v).toFixed(4).padStart(w + 5, '0')
   return `${f(lat, 2)}${f(lon, 3)}/`
 }
+/** Métadonnées uniques d'une VIDÉO, sans réencodage (flux copiés, quelques secondes) : anciennes métadonnées effacées,
+ *  appareil (iPhone…) et date de création réécrits → chaque envoi est un fichier différent. */
+export async function runVideoMetaSpoof(input: Uint8Array, o: { device?: string | null; seed?: number }): Promise<Uint8Array> {
+  // date de création : maintenant moins 1 à 72 h (au hasard), comme une vidéo filmée récemment
+  const r = o.seed != null ? (Math.sin(o.seed) + 1) / 2 : Math.random()
+  const created = new Date(Date.now() - 3600_000 - Math.floor(r * 71 * 3600_000)).toISOString().replace(/\.\d{3}Z$/, '.000000Z')
+  return runFfmpeg({
+    input, args: ['-map_metadata', '-1', ...deviceMetaArgs(o.device), '-metadata', `creation_time=${created}`, '-c', 'copy', '-fflags', '+bitexact', '-movflags', '+faststart+use_metadata_tags'],   // bitexact : pas de signature « encoder=Lavf… »
+  })
+}
 export async function runSpoof(input: Uint8Array, seed: number, h?: Hooks, opts?: SpoofOpts): Promise<Uint8Array> {
   const intensity = opts?.intensity ?? 'normal'
   // -map_metadata -1 : on efface toutes les métadonnées d'origine (anti-empreinte),

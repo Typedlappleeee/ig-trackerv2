@@ -119,6 +119,7 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "(chaque photo ou vidéo envoyée est rendue unique : photo = micro-recadrage + EXIF d’iPhone, vidéo = métadonnées d’iPhone réécrites)": "(every photo or video sent is made unique: photo = micro-crop + iPhone EXIF, video = iPhone metadata rewritten)",
     "⚠ Le dossier « {0} » ne contient aucune photo ni vidéo.": "⚠ The folder “{0}” contains no photo or video.",
     "📁 « {0} » : {1} média(s)": "📁 “{0}”: {1} media",
     "média(s) dans le pool": "media in the pool",

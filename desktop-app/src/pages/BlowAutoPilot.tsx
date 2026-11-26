@@ -26,7 +26,7 @@ import { locToServer, type ServerPlan } from '@/lib/irtServerSession'
 import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp } from '@/lib/irtAccounts'
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
-import { runImageSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
+import { runImageSpoof, runVideoMetaSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
 import { API_ORIGIN } from '@/lib/scaleflowLink'
 import { generatePfp } from '@/lib/pfpGenerator'
 import { generateBios } from '@/lib/bioMarkets'
@@ -591,8 +591,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
   // Octets → iPhone : dépôt temporaire dans le stockage (lien signé 10 min), envoi iRemoTech, puis suppression.
   async function uploadBytesToPhone(key: string, dev: string, bytes: Uint8Array, filename: string): Promise<boolean> {
-    const path = `tmp/irt/${user.id}/${crypto.randomUUID()}.jpg`
-    const up = await supabase.storage.from('content').upload(path, new Blob([bytes as BlobPart], { type: 'image/jpeg' }), { contentType: 'image/jpeg', upsert: false })
+    const isVid = /\.(mp4|mov)$/i.test(filename), type = isVid ? 'video/mp4' : 'image/jpeg'
+    const path = `tmp/irt/${user.id}/${crypto.randomUUID()}.${isVid ? 'mp4' : 'jpg'}`
+    const up = await supabase.storage.from('content').upload(path, new Blob([bytes as BlobPart], { type }), { contentType: type, upsert: false })
     if (up.error) return false
     try {
       const { data } = await supabase.storage.from('content').createSignedUrl(path, 600)
@@ -828,13 +829,16 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           const url = await signedUrlFor(v)
           if (!url) { injected = false; break }
           push(`${tag} ⬆ injection ${job.vids.length > 1 ? `de la photo ${job.vids.length - i}/${job.vids.length}` : 'du média'}…`)
-          if (kind === 'story' && storyUnique && !/\.(mp4|mov|m4v|webm)$/i.test(v.storage_path ?? v.file_url ?? '')) {
-            // métadonnées uniques : micro-recadrage + EXIF réécrit (appareil iPhone au hasard), comme « Spoof image »
+          if (kind === 'story' && storyUnique) {
+            // métadonnées uniques : photo = micro-recadrage + EXIF réécrit (comme « Spoof image ») ; vidéo = métadonnées
+            // effacées puis appareil + date réécrits, sans réencodage — iPhone au hasard dans les deux cas
+            const isVid = /\.(mp4|mov|m4v|webm)$/i.test(v.storage_path ?? v.file_url ?? '')
             try {
               const src = new Uint8Array(await (await fetch(url)).arrayBuffer())
               const iphones = SPOOF_DEVICES.filter(d => /iphone/i.test(d.k))
-              const spoofed = await runImageSpoof(src, { seed: Math.random() * 1e6, intensity: 'subtle', device: iphones[Math.floor(Math.random() * iphones.length)]?.k ?? null })
-              if (!await uploadBytesToPhone(key, p.dev, spoofed, imgName())) { injected = false; break }
+              const device = iphones[Math.floor(Math.random() * iphones.length)]?.k ?? null
+              const spoofed = isVid ? await runVideoMetaSpoof(src, { device }) : await runImageSpoof(src, { seed: Math.random() * 1e6, intensity: 'subtle', device })
+              if (!await uploadBytesToPhone(key, p.dev, spoofed, isVid ? `IMG_${Math.floor(1000 + Math.random() * 8999)}.mp4` : imgName())) { injected = false; break }
               continue
             } catch { push(`${tag}    (métadonnées uniques impossibles sur ce fichier → original)`) }
           }
@@ -1717,7 +1721,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '0 0 12px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
               <input type="checkbox" checked={storyUnique} disabled={running} onChange={e => { setStoryUnique(e.target.checked); try { localStorage.setItem('sf-irt-story-unique', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
-              🧬 Métadonnées uniques <span style={{ color: DIM, fontSize: 11.5 }}>(chaque photo envoyée est rendue unique : micro-recadrage + EXIF d’iPhone)</span>
+              🧬 Métadonnées uniques <span style={{ color: DIM, fontSize: 11.5 }}>(chaque photo ou vidéo envoyée est rendue unique : photo = micro-recadrage + EXIF d’iPhone, vidéo = métadonnées d’iPhone réécrites)</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
               <input type="checkbox" checked={storyOnce} disabled={running} onChange={e => { setStoryOnce(e.target.checked); try { localStorage.setItem('sf-irt-story-once2', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
