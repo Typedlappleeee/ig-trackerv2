@@ -119,6 +119,8 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "IA utilisée pour écrire les textes": "AI used to write the texts",
+    "🧠 aucune IA": "🧠 no AI",
     "✍️ {0}/{1} description(s) générée(s) (Claude)": "✍️ {0}/{1} caption(s) generated (Claude)",
     "⏳ Claude : {0} → nouvel essai dans {1} s ({2}/{3} prêtes)": "⏳ Claude: {0} → retrying in {1} s ({2}/{3} ready)",
     "{0}/{1} description(s) seulement : Claude ne répond plus ({2}) — les {3} prêtes sont gardées dans la réserve": "only {0}/{1} caption(s): Claude stopped responding ({2}) — the {3} ready ones are kept in the reserve",

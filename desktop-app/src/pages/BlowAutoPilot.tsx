@@ -34,7 +34,7 @@ import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } fro
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
 import { listJobs, scanAccountsAndWait, queueAccountScan, type IrtJob } from '@/lib/iremotech'
-import { claudeEnabled } from '@/lib/claude'
+import { claudeStatus } from '@/lib/claude'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { folderMedia, loadBankSummary, type BankSummary } from '@/lib/flowEngine'
@@ -301,8 +301,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   useEffect(() => { setVisionBrain(conns.groq) }, [conns.groq])
   // Textes générés (descriptions, bios, CTA) : Claude si configuré sur le serveur, sinon la clé Groq
   const [claudeOn, setClaudeOn] = useState(false)
-  useEffect(() => { void claudeEnabled().then(setClaudeOn) }, [])
+  const [claudeModel, setClaudeModel] = useState<string | null>(null)
+  useEffect(() => { void claudeStatus().then(st => { setClaudeOn(st.enabled); setClaudeModel(st.model) }) }, [])
   const aiOn = !!conns.groq || claudeOn
+  // quelle IA écrit les textes (visible sans rien lancer)
+  const aiBadge = <span title="IA utilisée pour écrire les textes" style={{ fontSize: 11.5, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: claudeOn ? 'rgba(217,119,87,0.14)' : 'rgba(255,255,255,0.06)', color: claudeOn ? '#E8A07E' : '#A1A1AA', whiteSpace: 'nowrap' }} data-no-tr>{claudeOn ? `🧠 Claude (${claudeModel ?? '?'})` : conns.groq ? '🧠 Groq' : '🧠 aucune IA'}</span>
   // Descriptions préparées à l'avance (réserve par marché) dès que l'onglet est ouvert en mode « Description auto »
   useEffect(() => {
     if (capMode !== 'ai' || !aiOn) return
@@ -1587,7 +1590,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             )}
           </>)}
           <div style={{ fontSize: 11.5, color: aiOn || !setupBio ? DIM : '#FCD34D', marginTop: 10 }}>
-            {setupBio && !aiOn ? 'Il faut une clé Groq (Réglages › Intégrations) pour générer les bios.' : 'Chaque compte reçoit une bio dans la langue de son marché. Ces marchés servent aussi aux descriptions du Posting.'}
+            {aiBadge} {setupBio && !aiOn ? 'Il faut une clé Groq (Réglages › Intégrations) pour générer les bios.' : 'Chaque compte reçoit une bio dans la langue de son marché. Ces marchés servent aussi aux descriptions du Posting.'}
           </div>
         </div>
         <LaunchBar n={3} summary={totalJobs ? `${totalJobs} compte${totalJobs > 1 ? 's' : ''} à mettre en place` : 'Choisis des comptes à l’étape 1'} options={<OptionsCard {...{ airplaneOn, setAirplaneOn, uniqueUse, setUniqueUse, parallel, setParallel }} />} label={`Mettre en place ${totalJobs} compte(s)`} disabled={!totalJobs || running || (!setupPfp && !setupBio)} running={running} onClick={() => void runSetup()} />
@@ -1714,7 +1717,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               <button style={{ ...btn, height: 32 }} onClick={() => { setPromptDraft(marketPrompt(capMarket)); setPromptOpen(o => !o) }}>✏️ Prompt</button>
             </div>
             <div style={{ fontSize: 11.5, color: aiOn ? DIM : '#FCD34D', margin: '8px 0 0' }}>
-              {aiOn ? 'Au lancement, chaque compte reçoit une description de Reel différente, toutes dans la langue du marché choisi ici (même marché pour tous les comptes du posting).' : 'Il faut une clé Groq (Réglages › Intégrations) pour générer les descriptions.'}
+              {aiBadge} {aiOn ? 'Au lancement, chaque compte reçoit une description de Reel différente, toutes dans la langue du marché choisi ici (même marché pour tous les comptes du posting).' : 'Il faut une clé Groq (Réglages › Intégrations) pour générer les descriptions.'}
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, color: INK, cursor: 'pointer' }}>
               <input type="checkbox" checked={capLocation} disabled={running} onChange={e => { setCapLocation(e.target.checked); try { localStorage.setItem('sf-irt-cap-location', e.target.checked ? '1' : '0') } catch { /* noop */ } }} />
@@ -1826,7 +1829,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 <button style={{ ...btn, height: 30 }} onClick={() => { setCtaDraft(ctaPrompt(capMarket)); setCtaPromptOpen(o => !o) }}>✏️ Prompt</button>
               </div>
               <div style={{ fontSize: 11.5, color: aiOn ? DIM : '#FCD34D', marginTop: 6 }}>
-                {aiOn ? 'Au lancement, chaque compte reçoit un texte CTA différent (2 à 6 mots, ❤️ 💕 💗), généré avec le prompt CTA du marché choisi.' : 'Il faut une clé Groq (Réglages › Intégrations) pour générer les textes CTA.'}
+                {aiBadge} {aiOn ? 'Au lancement, chaque compte reçoit un texte CTA différent (2 à 6 mots, ❤️ 💕 💗), généré avec le prompt CTA du marché choisi.' : 'Il faut une clé Groq (Réglages › Intégrations) pour générer les textes CTA.'}
               </div>
               {ctaPromptOpen && (
                 <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
