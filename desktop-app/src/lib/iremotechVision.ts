@@ -1865,14 +1865,29 @@ async function openEditProfile(key: string, deviceId: string, W: number, H: numb
   return !!v?.words.some(o => /^bio$/i.test(o.text))
 }
 
+/** ✓ bleu rond de la nouvelle galerie « Library » (haut-droite, vu le 26/11/2026) — lu à la couleur. */
+async function blueCheckTopRight(shot: string, W: number, H: number): Promise<boolean> {
+  const [r, g, b] = await pixelRgb(shot, Math.round(0.9 * W), Math.round(0.048 * H), 4)
+  return b > 180 && b - r > 60 && b - g > 40
+}
+/** Bio relue à l'écran : au moins un des 2 premiers mots de la 1re ligne (≥ 2 lettres/chiffres, emojis ignorés). Avant, les
+ *  6 premières lettres SANS espaces (« Team Matcha » → « teamma ») ne correspondaient à aucun mot lu. Pure. */
+export function bioSeen(words: { text: string }[], bio: string): boolean {
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9äöüßéèàçùêâîôûñ]/g, '')
+  const want = bio.split('\n')[0].split(/\s+/).map(norm).filter(w => w.length >= 2).slice(0, 2)
+  if (!want.length) return true
+  const seen = words.map(o => norm(o.text)).filter(Boolean)
+  return want.some(w => seen.some(s => s === w || (w.length >= 4 && (s.includes(w) || w.includes(s) && s.length >= 4))))
+}
+
 /** Photo de profil = la photo la plus récente de la pellicule (injectée juste avant). Depuis « Edit profile ». */
 async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: number, hooks?: VisionHooks): Promise<boolean> {
   const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
   hooks?.log?.('🖼 Photo de profil : Edit picture › Choose from library…')
   // lien « Edit picture (or avatar) » lu à l'écran (sa place change : page « Complete your profile » plus bas), sinon la photo
-  const ep = (await readScreenWords(key, deviceId))?.words.find(o => /^edit$/i.test(o.text) && o.cy < H * 0.6)
-  const epOk = ep && (await readScreenWords(key, deviceId))?.words.some(p => /^picture$/i.test(p.text) && Math.abs(p.cy - ep.cy) < 12)
-  if (ep && epOk) await tap(ep.cx + 30, ep.cy)
+  // (« Edit profile » : y ≈ 0,29 H ; « Complete your profile » : y ≈ 0,49 H — vu en vrai le 26/11/2026)
+  const ep = (await readScreenWords(key, deviceId))?.words.find(o => /^picture$/i.test(o.text) && o.cy < H * 0.6)
+  if (ep) await tap(ep.cx, ep.cy)
   else await tap(0.36 * W, 0.215 * H) // la photo actuelle (en haut à gauche)
   await sleep(2200)
   const sh = await readScreenWords(key, deviceId)
@@ -1891,8 +1906,7 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
     const lb = await readScreenWords(key, deviceId)
     const cancel = lb?.words.find(o => /^cancel$/i.test(o.text) && o.cy < H * 0.1)
     // nouvelle galerie (vue le 26/11/2026) : « ✕ · Library · ✓ bleu » au lieu de « Cancel · Library · Done »
-    const blueDone = lb ? await findBlueButton(lb.shot, 0, 0.1) : null
-    const ok = !!lb?.words.some(o => /^done$/i.test(o.text) && o.cy < H * 0.1) || (!!blueDone && blueDone.cx > W * 0.7)
+    const ok = !!lb?.words.some(o => /^done$/i.test(o.text) && o.cy < H * 0.1) || (!!lb && await blueCheckTopRight(lb.shot, W, H))
     hooks?.log?.(ok ? '🧪 TEST : photo choisie dans la galerie → « Cancel » (rien n’est changé)' : '   ⚠ TEST : bouton « Done » de la galerie introuvable')
     await tap(cancel ? cancel.cx : 0.1 * W, cancel ? cancel.cy : 0.056 * H); await sleep(2500)
     const back = await readScreenWords(key, deviceId)
@@ -1901,8 +1915,8 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
   }
   const lbr = await readScreenWords(key, deviceId)
   const done = lbr?.words.find(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
-  const blueOk = !done && lbr ? await findBlueButton(lbr.shot, 0, 0.1) : null   // ✓ bleu (nouvelle galerie)
-  await tap(done ? done.cx : blueOk && blueOk.cx > W * 0.7 ? blueOk.cx : 0.9 * W, done ? done.cy : blueOk && blueOk.cx > W * 0.7 ? blueOk.cy : 0.056 * H)
+  // nouvelle galerie : ✓ bleu rond en haut à droite (≈ 0,9 W ; 0,048 H)
+  await tap(done ? done.cx : 0.9 * W, done ? done.cy : 0.05 * H)
   await sleep(4500)
   // éventuelle feuille après la photo (partage au fil, etc.) : on ne publie rien → « Not now / Cancel »
   for (let k = 0; k < 2; k++) {
@@ -1937,9 +1951,7 @@ async function setBioOnEditProfile(key: string, deviceId: string, W: number, H: 
   if (DRY_RUN.has(deviceId)) {
     // MODE TEST : bio tapée et relue dans l'éditeur, puis « ‹ » / Cancel (haut-gauche) sans Done → rien n'est changé
     const ed = await readScreenWords(key, deviceId)
-    const norm2 = (t: string) => t.toLowerCase().replace(/[^a-z0-9äöüßéèàçùêâîôû]/g, '')
-    const first2 = norm2(bio.split('\n')[0]).slice(0, 6)
-    const typed = !!ed && (!first2 || ed.words.some(o => norm2(o.text).includes(first2)))
+    const typed = !!ed && bioSeen(ed.words, bio)
     hooks?.log?.(typed ? '🧪 TEST : bio tapée et relue dans l’éditeur → annulée (rien n’est changé)' : '   ⚠ TEST : bio non relue dans l’éditeur')
     await tap(0.06 * W, 0.064 * H); await sleep(2000)
     await discardEditIfAsked(key, deviceId, hooks)
@@ -1949,9 +1961,7 @@ async function setBioOnEditProfile(key: string, deviceId: string, W: number, H: 
   await tap(done ? done.cx : 0.9 * W, done ? done.cy : 0.064 * H)
   await sleep(3000)
   const v = await readScreenWords(key, deviceId)
-  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9äöüßéèàçùêâîôû]/g, '')
-  const first = norm(bio.split('\n')[0]).slice(0, 6)
-  const ok = !!v && v.words.some(o => /^bio$/i.test(o.text)) && (!first || v.words.some(o => norm(o.text).includes(first)))
+  const ok = !!v && v.words.some(o => /^bio$/i.test(o.text)) && bioSeen(v.words, bio)
   hooks?.log?.(ok ? '   ✓ bio enregistrée' : '   ⚠ bio non confirmée à l’écran')
   return ok
 }

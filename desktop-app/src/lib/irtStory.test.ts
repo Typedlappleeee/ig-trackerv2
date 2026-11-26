@@ -267,3 +267,13 @@ describe('page de partage défilée (titre hors écran, Share illisible)', () =>
     expect(sharePageShown([{ text: 'For', cx: 60, cy: 40 }, { text: 'you', cx: 90, cy: 40 }, { text: 'Your', cx: 40, cy: 200 }, { text: 'story', cx: 80, cy: 200 }], 406, 720)).toBe(false)
   })
 })
+
+import { bioSeen } from './iremotechVision'
+describe('bio relue à l’écran (bioSeen)', () => {
+  const w = (...t: string[]) => t.map(text => ({ text }))
+  it('mots séparés par l’OCR : « Team Matcha » reconnu (avant : « teamma » jamais trouvé)', () => {
+    expect(bioSeen(w('Bio', 'Team', 'Matcha', '🇩🇪'), 'Team Matcha 🇩🇪\nsüß aber stur\nmehr in meiner story ✨')).toBe(true)
+  })
+  it('âge seul + drapeau', () => { expect(bioSeen(w('18', 'schüchtern'), '18 🇩🇪\nschüchtern aber lieb')).toBe(true) })
+  it('autre bio à l’écran → non relue', () => { expect(bioSeen(w('iced', 'coffee', 'addict'), 'Studentin\nbrav')).toBe(false) })
+})
