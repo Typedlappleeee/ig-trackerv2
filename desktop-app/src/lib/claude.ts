@@ -21,7 +21,7 @@ export const claudeEnabled = async () => (await claudeStatus()).enabled
 
 export class ClaudeError extends Error { constructor(msg: string, public status: number, public retryAfterMs: number | null) { super(msg) } }
 /** Un message (prompt système + demande) → texte. Erreur ClaudeError (statut + délai conseillé) sinon. */
-export async function claudeChat(system: string, user: string, maxTokens = 4000): Promise<string> {
+export async function claudeChat(system: string, user: string, maxTokens = 4000, image?: string): Promise<string> {
   const { supabase } = await import('@/lib/supabase')   // chargé à la demande (pas au démarrage des tests)
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new ClaudeError('session expirée : reconnecte-toi', 401, null)
@@ -29,7 +29,7 @@ export async function claudeChat(system: string, user: string, maxTokens = 4000)
   try {
     r = await fetch(`${API_ORIGIN}/api/claude`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ op: 'chat', system, user, max_tokens: maxTokens }),
+      body: JSON.stringify({ op: 'chat', system, user, max_tokens: maxTokens, ...(image ? { image } : {}) }),
     })
   } catch (e) { throw new ClaudeError(e instanceof Error ? e.message : String(e), 0, null) }
   const b = await r.json().catch(() => null) as { ok?: boolean; text?: string; error?: string; status?: number; retryAfter?: number | null } | null

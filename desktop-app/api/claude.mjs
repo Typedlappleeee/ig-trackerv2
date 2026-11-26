@@ -2,7 +2,8 @@
 // La clé reste sur le serveur (variable Vercel ANTHROPIC_API_KEY), jamais envoyée au navigateur. Réservé aux
 // utilisateurs connectés (session Supabase). Modèle : variable CLAUDE_MODEL, sinon claude-haiku-5-5 (choix du propriétaire : rapide, peu cher).
 //   POST { op: 'status' }                           → { ok, enabled, model }
-//   POST { op: 'chat', system, user, max_tokens }   → { ok, text } | { ok: false, status, error, retryAfter }
+//   POST { op: 'chat', system, user, max_tokens, image? } → { ok, text } | { ok: false, status, error, retryAfter }
+//   (image = capture d'écran en data URL base64, pour le cerveau des automatisations iRemoTech)
 import Anthropic from '@anthropic-ai/sdk'
 import { db, bodyOf } from './_bank.js'
 
@@ -25,6 +26,8 @@ export default async function handler(req, res) {
     const user = String(b.user ?? '').slice(0, 60_000)
     if (!user.trim()) return send(res, { ok: false, error: 'message vide' })
     const max = Math.max(256, Math.min(16_000, Number(b.max_tokens) || 4000))
+    const im = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(b.image ?? ''))
+    const img = im && im[2].length < 4_000_000 ? { type: im[1], data: im[2] } : null
     const client = new Anthropic({ apiKey: key, maxRetries: 1, timeout: 50_000 })
     try {
       // textes courts et nombreux : effort « low » (réflexion brève, réponse rapide et moins chère) ; marge de tokens
@@ -34,7 +37,8 @@ export default async function handler(req, res) {
         max_tokens: Math.min(32_000, max + 4000),
         output_config: { effort: process.env.CLAUDE_EFFORT || 'low' },
         ...(system ? { system } : {}),
-        messages: [{ role: 'user', content: user }],
+        // capture d'écran facultative (cerveau des automatisations iRemoTech) : data URL JPEG/PNG en base64
+        messages: [{ role: 'user', content: img ? [{ type: 'image', source: { type: 'base64', media_type: img.type, data: img.data } }, { type: 'text', text: user }] : user }],
       })
       const text = msg.content.filter(c => c.type === 'text').map(c => c.text).join('')
       return send(res, { ok: true, text, model: MODEL, stop: msg.stop_reason })

@@ -3,11 +3,16 @@
 // Il choisit UN bouton de la liste (pas de coordonnées inventées) ; des garde-fous codés en dur refusent les
 // actions dangereuses (Allow contacts/notifs, Follow, Delete, Log out, achat…) quoi que dise le modèle.
 import { groqChat } from './ai'
+import { claudeChat } from './claude'
 
 let KEY: string | null = null
+let CLAUDE = false
 /** Clé Groq de l'espace (Réglages › IA). Sans clé : pas de cerveau, le moteur à règles fait seul. */
 export function setVisionBrain(key: string | null | undefined): void { KEY = key?.trim() || null }
-export function hasVisionBrain(): boolean { return !!KEY }
+/** Claude configuré sur le serveur (ANTHROPIC_API_KEY) → c'est LUI le cerveau (capture + boutons lus), Groq en secours. */
+export function setVisionBrainClaude(on: boolean): void { CLAUDE = on }
+export function hasVisionBrain(): boolean { return !!KEY || CLAUDE }
+export function visionBrainName(): string { return CLAUDE ? 'Claude' : KEY ? 'Groq' : '—' }
 
 export interface Btn { id: number; text: string; x: number; y: number }
 export type BrainAction =
@@ -62,7 +67,7 @@ const MODELS = ['meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4
 
 /** Demande au cerveau la prochaine action pour atteindre `goal`. null = pas de cerveau / pas de décision sûre. */
 export async function askBrain(shot: string, words: { text: string; cx: number; cy: number }[], W: number, H: number, goal: string, history: string[] = [], o: { allowPhotos?: boolean } = {}): Promise<BrainAction | null> {
-  if (!KEY) return null
+  if (!KEY && !CLAUDE) return null
   const btns = buttonsFrom(words, H)
   const system = [
     'You drive an iPhone running Instagram, one tap at a time. Look at the screenshot and the numbered list of texts read on screen (with their x,y position in pixels).',
@@ -76,6 +81,15 @@ export async function askBrain(shot: string, words: { text: string; cx: number; 
     { type: 'text', text: `Screen ${W}x${H}. Texts on screen:\n${list}\n\nLast actions: ${history.slice(-5).join(' | ') || 'none'}\nWhat is the next action?` },
     { type: 'image_url', image_url: { url: shot } },
   ]
+  // 1. Claude (vision) d'abord : même consigne, même liste de boutons, mêmes garde-fous (parseBrain)
+  if (CLAUDE) {
+    try {
+      const t = await claudeChat(system, (user[0] as { text: string }).text, 600, shot.startsWith('data:') ? shot : undefined)
+      const act = parseBrain(t, btns, W, H, o)
+      if (act) return act
+    } catch { /* Claude indisponible → Groq */ }
+  }
+  if (!KEY) return null
   for (const model of MODELS) {
     try {
       const t = await groqChat(KEY, model, [{ role: 'system', content: system }, { role: 'user', content: user }], 160, 0)

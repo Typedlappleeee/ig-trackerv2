@@ -25,7 +25,7 @@ import { enqueueServerRun, serversOnline } from '@/lib/irtServer'
 import { locToServer, type ServerPlan } from '@/lib/irtServerSession'
 import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, accountAddedAt, accountFirstSeenAt, connectedFor, loadLiveReads, latestAccounts, saveLiveRead, acceptSeenRead, type AgeTier } from '@/lib/irtAccounts'
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
-import { setVisionBrain } from '@/lib/visionBrain'
+import { setVisionBrain, setVisionBrainClaude } from '@/lib/visionBrain'
 import { runImageSpoof, runVideoMetaSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
 import { API_ORIGIN } from '@/lib/scaleflowLink'
 import { generatePfp } from '@/lib/pfpGenerator'
@@ -346,7 +346,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // Textes générés (descriptions, bios, CTA) : Claude si configuré sur le serveur, sinon la clé Groq
   const [claudeOn, setClaudeOn] = useState(false)
   const [claudeModel, setClaudeModel] = useState<string | null>(null)
-  useEffect(() => { void claudeStatus().then(st => { setClaudeOn(st.enabled); setClaudeModel(st.model) }) }, [])
+  // Claude configuré → c'est aussi LUI le « cerveau » des automatisations (écran inconnu, erreur), Groq en secours
+  useEffect(() => { void claudeStatus().then(st => { setClaudeOn(st.enabled); setClaudeModel(st.model); setVisionBrainClaude(st.enabled) }) }, [])
   const aiOn = !!conns.groq || claudeOn
   // quelle IA écrit les textes (visible sans rien lancer)
   const aiBadge = <span title="IA utilisée pour écrire les textes" style={{ fontSize: 11.5, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: claudeOn ? 'rgba(217,119,87,0.14)' : 'rgba(255,255,255,0.06)', color: claudeOn ? '#E8A07E' : '#A1A1AA', whiteSpace: 'nowrap' }} data-no-tr>{claudeOn ? `🧠 Claude (${claudeModel ?? '?'})` : conns.groq ? '🧠 Groq' : '🧠 aucune IA'}</span>
