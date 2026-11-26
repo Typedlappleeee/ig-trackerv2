@@ -1875,7 +1875,9 @@ async function blueCheckTopRight(shot: string, W: number, H: number): Promise<bo
  *  6 premières lettres SANS espaces (« Team Matcha » → « teamma ») ne correspondaient à aucun mot lu. Pure. */
 export function bioSeen(words: { text: string }[], bio: string): boolean {
   const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9äöüßéèàçùêâîôûñ]/g, '')
-  const want = bio.split('\n')[0].split(/\s+/).map(norm).filter(w => w.length >= 2).slice(0, 2)
+  // vrais mots (≥ 4 lettres) des premières lignes ; « 18 🇩🇪 » seul en 1re ligne n'est pas lu (vu le 26/11/2026)
+  const long = bio.split('\n').slice(0, 3).join(' ').split(/\s+/).map(norm).filter(w => w.length >= 4).slice(0, 3)
+  const want = long.length ? long : bio.split(/\s+/).map(norm).filter(w => w.length >= 2).slice(0, 2)
   if (!want.length) return true
   const seen = words.map(o => norm(o.text)).filter(Boolean)
   return want.some(w => seen.some(s => s === w || (w.length >= 4 && (s.includes(w) || w.includes(s) && s.length >= 4))))
@@ -1963,9 +1965,19 @@ async function setBioOnEditProfile(key: string, deviceId: string, W: number, H: 
     await discardEditIfAsked(key, deviceId, hooks)
     return typed
   }
+  // ✓ / Done en haut à droite : le bouton AssistiveTouch s'y pose parfois (vu le 26/11/2026 sur SEDRA4) → rangé avant,
+  // puis vérifié que l'éditeur est fermé (sinon : bouton écarté du ✓ par glissement, et nouveau tap)
+  await clearAssistiveTouch(key, deviceId, hooks, 'left')
   const done = (await readScreenWords(key, deviceId))?.words.find(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
-  await tap(done ? done.cx : 0.9 * W, done ? done.cy : 0.064 * H)
+  const dx = done ? done.cx : 0.9 * W, dy = done ? done.cy : 0.064 * H
+  await tap(dx, dy)
   await sleep(3000)
+  const inEditor = (r: Awaited<ReturnType<typeof readScreenWords>>) => !!r && r.words.some(o => /^(change|font)$/i.test(o.text)) && r.words.some(o => /^\d+\/150$|^150$/.test(o.text) || /^visible$/i.test(o.text))
+  for (let k = 0; k < 2 && inEditor(await readScreenWords(key, deviceId)); k++) {
+    hooks?.log?.('   éditeur de bio encore ouvert → bouton AssistiveTouch écarté du ✓, nouvel essai')
+    await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(dx), y1: Math.round(dy), x2: 30, y2: Math.round(H * 0.5), duration_ms: 700 })
+    await sleep(1500); await tap(dx, dy); await sleep(2500)
+  }
   const v = await readScreenWords(key, deviceId)
   const ok = !!v && v.words.some(o => /^bio$/i.test(o.text)) && bioSeen(v.words, bio)
   hooks?.log?.(ok ? '   ✓ bio enregistrée' : '   ⚠ bio non confirmée à l’écran')

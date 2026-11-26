@@ -274,6 +274,6 @@ describe('bio relue à l’écran (bioSeen)', () => {
   it('mots séparés par l’OCR : « Team Matcha » reconnu (avant : « teamma » jamais trouvé)', () => {
     expect(bioSeen(w('Bio', 'Team', 'Matcha', '🇩🇪'), 'Team Matcha 🇩🇪\nsüß aber stur\nmehr in meiner story ✨')).toBe(true)
   })
-  it('âge seul + drapeau', () => { expect(bioSeen(w('18', 'schüchtern'), '18 🇩🇪\nschüchtern aber lieb')).toBe(true) })
+  it('âge seul + drapeau en 1re ligne : les mots des lignes suivantes comptent', () => { expect(bioSeen(w('schüchtern', 'aber', 'lieb'), '18 🇩🇪\nschüchtern aber lieb')).toBe(true) })
   it('autre bio à l’écran → non relue', () => { expect(bioSeen(w('iced', 'coffee', 'addict'), 'Studentin\nbrav')).toBe(false) })
 })

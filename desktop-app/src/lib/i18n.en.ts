@@ -119,6 +119,7 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "éditeur de bio encore ouvert → bouton AssistiveTouch écarté du ✓, nouvel essai": "bio editor still open → AssistiveTouch button moved off the ✓, retrying",
     "page « Search or ask Meta AI » → retour": "“Search or ask Meta AI” page → back",
     "compte récent → « Complete your profile »": "recent account → “Complete your profile”",
     "liste des comptes encore ouverte → fermée": "account list still open → closed",
