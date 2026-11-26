@@ -11,7 +11,7 @@ import { SPOOF_DEVICES } from '@/lib/studioTools'
 import { GPS_CITIES } from '@/lib/gps'
 import { API_ORIGIN } from '@/lib/scaleflowLink'
 
-const PARALLEL = 3
+const PARALLEL = 8 // copies traitées en même temps (chaque requête = une instance serveur à part)
 const MAX_COPIES = 20
 const DEVICES = SPOOF_DEVICES.filter(d => d.k !== 'none')
 const read = (k: string, d: string) => { try { return localStorage.getItem(k) ?? d } catch { return d } }
