@@ -138,7 +138,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [reelPool, setReelPool] = useState<VidRef[]>([])   // pool vidéos (Posting)
   const [storyPool, setStoryPool] = useState<VidRef[]>([]) // pool photos (Story)
   const [photoPool, setPhotoPool] = useState<VidRef[]>([]) // pool photos (Posting › Carrousel)
-  const [picker, setPicker] = useState<null | 'reel' | 'story' | 'photo'>(null)
+  const [picker, setPicker] = useState<null | 'reel' | 'story' | 'storyVid' | 'photo'>(null)
   // Posting : Reel (vidéo) ou Carrousel photo (post feed de N photos)
   // Posting = un seul onglet, sous-onglets Reels / Carrousel / Story CTA (comme le Posting GeeLark)
   const [storySub, setStorySub] = useState(false)
@@ -580,7 +580,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const scope = (q: any) => currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data } = await scope(supabase.from('content_bank').select('id,title,storage_path,file_url')).in('id', r.ids)
     const vids = (data ?? []) as VidRef[]
-    const set = which === 'story' ? setStoryPool : which === 'photo' ? setPhotoPool : setReelPool
+    const set = which === 'story' || which === 'storyVid' ? setStoryPool : which === 'photo' ? setPhotoPool : setReelPool
     set(p => { const ex = new Set(p.map(v => v.id)); return [...p, ...vids.filter(v => !ex.has(v.id))] })
   }
   function mediaFilename(v: VidRef, kind: 'reel' | 'story' | 'carousel'): string {
@@ -641,9 +641,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     setRunning(true); setLogs([])
     const key = irt.key
     if (src.mode === 'folder') {
-      try { pool = await folderMedia(bankScope, src.folder, isImg ? 'image' : 'video') }
+      // Story CTA : photos ET vidéos du dossier (même enchaînement sur l'iPhone : galerie, éditeur, sticker lien)
+      try { pool = await folderMedia(bankScope, src.folder, kind === 'story' ? 'any' : isImg ? 'image' : 'video') }
       catch (e) { setLogs([`⚠ Banque : ${e instanceof Error ? e.message : String(e)}`]); setRunning(false); return }
-      if (!pool.length) { setLogs([isImg ? `⚠ Le dossier « ${src.folder} » ne contient aucune photo.` : `⚠ Le dossier « ${src.folder} » ne contient aucune vidéo.`]); setRunning(false); return }
+      if (!pool.length) { setLogs([kind === 'story' ? `⚠ Le dossier « ${src.folder} » ne contient aucune photo ni vidéo.` : isImg ? `⚠ Le dossier « ${src.folder} » ne contient aucune photo.` : `⚠ Le dossier « ${src.folder} » ne contient aucune vidéo.`]); setRunning(false); return }
       if (pool.length < perPost) { setLogs([`⚠ Le dossier « ${src.folder} » n’a que ${pool.length} photo(s) : il en faut ${perPost} par carrousel.`]); setRunning(false); return }
     }
 
@@ -774,7 +775,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       return
     }
     push(`▶ ${kind === 'story' ? 'Story' : kind === 'carousel' ? `Carrousel (${perPost} photos)` : 'Posting'} : ${byPhone.length} iPhone(s) · ${totalJobs} publication(s)${airplaneOn || kind === 'story' ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
-    if (src.mode === 'folder') push(isImg ? `📁 « ${src.folder} » : ${pool.length} photo(s)` : `📁 « ${src.folder} » : ${pool.length} vidéo(s)`)
+    if (src.mode === 'folder') push(kind === 'story' ? `📁 « ${src.folder} » : ${pool.length} média(s)` : isImg ? `📁 « ${src.folder} » : ${pool.length} photo(s)` : `📁 « ${src.folder} » : ${pool.length} vidéo(s)`)
     const R = startRun('farm', `iRemoTech ${kind} · ${byPhone.length} tel × ${totalJobs * perAcct}`, totalJobs * perAcct)
     setRunId(R.id)
 
@@ -827,7 +828,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           const url = await signedUrlFor(v)
           if (!url) { injected = false; break }
           push(`${tag} ⬆ injection ${job.vids.length > 1 ? `de la photo ${job.vids.length - i}/${job.vids.length}` : 'du média'}…`)
-          if (kind === 'story' && storyUnique) {
+          if (kind === 'story' && storyUnique && !/\.(mp4|mov|m4v|webm)$/i.test(v.storage_path ?? v.file_url ?? '')) {
             // métadonnées uniques : micro-recadrage + EXIF réécrit (appareil iPhone au hasard), comme « Spoof image »
             try {
               const src = new Uint8Array(await (await fetch(url)).arrayBuffer())
@@ -1725,7 +1726,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           </div>
           {storySrc.mode === 'pick' && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
             <button style={gold} onClick={() => setPicker('story')}>+ Ajouter des photos</button>
-            <span style={{ fontSize: 12, color: MUTED }}>{storyPool.length} photo(s) dans le pool</span>
+            <button style={gold} onClick={() => setPicker('storyVid')}>+ Ajouter des vidéos</button>
+            <span style={{ fontSize: 12, color: MUTED }}>{storyPool.length} média(s) dans le pool</span>
             {storyPool.length > 0 && <button style={btn} onClick={() => setStoryPool([])}>Vider</button>}
           </div>}
           {storySrc.mode === 'pick' && storyPool.length > 0 && (
@@ -2175,8 +2177,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       })()}
 
       {picker && (
-        <BankPicker theme={BLOW_THEME} user={user} org={org} kind={picker === 'reel' ? 'videos' : 'images'} multi
-          title={picker === 'reel' ? 'Ajouter des vidéos au pool' : 'Ajouter des photos au pool'} onClose={() => setPicker(null)} onApply={applyPicker} />
+        <BankPicker theme={BLOW_THEME} user={user} org={org} kind={picker === 'reel' || picker === 'storyVid' ? 'videos' : 'images'} multi
+          title={picker === 'reel' || picker === 'storyVid' ? 'Ajouter des vidéos au pool' : 'Ajouter des photos au pool'} onClose={() => setPicker(null)} onApply={applyPicker} />
       )}
     </div>
   )

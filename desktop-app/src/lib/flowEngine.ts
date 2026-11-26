@@ -213,10 +213,10 @@ export async function loadBankSummary(scope: Scope): Promise<BankSummary> {
 // Médias d'un dossier, lus AU LANCEMENT (les ajouts récents sont pris) — pour les outils hors
 // Flow Builder (iRemoTech). Sans lignes repères de dossier ni corbeille.
 export interface FolderMedia { id: string; title: string; storage_path: string | null; file_url: string | null; used_count: number }
-export async function folderMedia(scope: Scope, folder: string, kind: 'video' | 'image'): Promise<FolderMedia[]> {
+export async function folderMedia(scope: Scope, folder: string, kind: 'video' | 'image' | 'any'): Promise<FolderMedia[]> {
   const rows = await bankRows(scope)
   return rows
-    .filter(r => isMedia(r) && kindOf(r) === kind && isWithin(r.folder, folder))
+    .filter(r => isMedia(r) && (kind === 'any' ? kindOf(r) === 'video' || kindOf(r) === 'image' : kindOf(r) === kind) && isWithin(r.folder, folder))
     .map(r => ({ id: r.id, title: r.title ?? 'media', storage_path: r.storage_path, file_url: r.file_url, used_count: r.used_count ?? 0 }))
 }
 
