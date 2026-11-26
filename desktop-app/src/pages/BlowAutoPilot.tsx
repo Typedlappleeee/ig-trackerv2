@@ -386,12 +386,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const gps = market === 'us' ? 'usa' : market === 'de' ? 'germany' : 'france'
       let made = 0
       for (let k = 1; k <= n; k++) {
-        const r = await fetch(`${API_ORIGIN}/api/v1/tools/spoof`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({ file_id: o.id, org_id: bankScope.orgId, device: devices[Math.floor(Math.random() * devices.length)].k, gps, intensity: 'normal', title: `${o.title} · copie ${k}`, ...(o.folder ? { folder: o.folder } : {}) }),
-        }).catch(() => null)
-        const b = r ? await r.json().catch(() => null) as { ok?: boolean } | null : null
-        if (b?.ok) made++
+        const body = JSON.stringify({ file_id: o.id, org_id: bankScope.orgId, device: devices[Math.floor(Math.random() * devices.length)].k, gps, intensity: 'normal', title: `${o.title} · copie ${k}`, ...(o.folder ? { folder: o.folder } : {}) })
+        for (let attempt = 0; attempt < 3; attempt++) {   // 504 (traitement long) / réseau → nouvel essai espacé
+          if (attempt) await sleep(4000 * attempt)
+          const r = await fetch(`${API_ORIGIN}/api/v1/tools/spoof`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }, body }).catch(() => null)
+          const b = r ? await r.json().catch(() => null) as { ok?: boolean } | null : null
+          if (b?.ok) { made++; break }
+          if (r && b && ![500, 502, 503, 504].includes(r.status)) break
+        }
       }
       if (made) log(`🧬 plus de copie pour « ${base} » → ${made} nouvelle(s) copie(s) spoofée(s) créée(s) automatiquement`)
     } catch { /* best-effort */ }

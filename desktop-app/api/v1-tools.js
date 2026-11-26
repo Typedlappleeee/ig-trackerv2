@@ -126,13 +126,14 @@ export default async function handler(req, res) {
     const folder = b.folder !== undefined ? cleanFolder(b.folder) : src.folder ?? null
     let file
     if (isImage) {
-      const { out } = await runFfmpeg(src.buf, { inExt, outExt: 'jpg', args: imageSpoofArgs({ seed, intensity }), timeoutMs: 20_000 })
+      const { out } = await runFfmpeg(src.buf, { inExt, outExt: 'jpg', args: imageSpoofArgs({ seed, intensity }), timeoutMs: 60_000 })
       file = await storeBytes(s, scope, { buf: withExif(out, device, gps), ext: 'jpg', contentType: 'image/jpeg', title: b.title ? baseTitle : `${baseTitle} · spoof`, folder })
     } else {
       const args = tool === 'remix'
         ? remixArgs({ seed, intensity, gps, device, toggles: { ...DEFAULT_TOGGLES, ...(b.toggles && typeof b.toggles === 'object' ? b.toggles : {}) } })
         : spoofArgs({ seed, intensity, gps, device, duration: mp4Duration(src.buf) })
-      const { out, thumb } = await runFfmpeg(src.buf, { inExt, outExt: 'mp4', args, timeoutMs: 48_000, extraOut: true })
+      // fonction Vercel à 300 s (vercel.json) : 240 s de traitement max, le reste pour télécharger / ranger le fichier
+      const { out, thumb } = await runFfmpeg(src.buf, { inExt, outExt: 'mp4', args, timeoutMs: 240_000, extraOut: true })
       file = await storeBytes(s, scope, { buf: out, ext: 'mp4', contentType: MIME_OF.mp4, title: b.title ? baseTitle : `${baseTitle} · ${tool}`, folder, thumb })
     }
     return reply(200, { ok: true, tool, file, settings: { seed, intensity, device, gps: gpsLabel, ...(gps ? { coords: gps } : {}) }, ms: Date.now() - t0 })

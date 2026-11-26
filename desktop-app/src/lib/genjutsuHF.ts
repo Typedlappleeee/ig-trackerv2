@@ -950,16 +950,22 @@ async function spoofJob(id: string): Promise<void> {
   const base = await titleOf(id, session.user.id)
   let done = 0, failed = 0, lastErr: string | null = null
   await Promise.all(Array.from({ length: n }, async (_, i) => {
-    try {
-      const r = await fetch(`${GJ_ORIGIN}/api/v1/tools/spoof`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ url: j.resultUrl, org_id: plan.orgId, device: plan.device, gps: plan.gps, intensity: 'normal', folder: plan.folder, title: `${base} · v${i + 1}` }),
-      })
-      const b = await r.json().catch(() => null) as { ok?: boolean; error?: string } | null
-      if (b?.ok) done++
-      else { failed++; lastErr = b?.error ?? `HTTP ${r.status}` }
-    } catch (e) { failed++; lastErr = errMsg(e) }
+    // 504 (traitement serveur trop long) / 5xx / coupure réseau → 2 nouveaux essais espacés avant l'échec
+    let ok = false, err: string | null = null
+    for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+      if (attempt) await new Promise(res => setTimeout(res, 4000 * attempt + i * 500))
+      try {
+        const r = await fetch(`${GJ_ORIGIN}/api/v1/tools/spoof`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ url: j.resultUrl, org_id: plan.orgId, device: plan.device, gps: plan.gps, intensity: 'normal', folder: plan.folder, title: `${base} · v${i + 1}` }),
+        })
+        const b = await r.json().catch(() => null) as { ok?: boolean; error?: string } | null
+        if (b?.ok) ok = true
+        else { err = b?.error ?? (r.status === 504 ? 'HTTP 504 : traitement serveur trop long' : `HTTP ${r.status}`); if (b && ![500, 502, 503, 504].includes(r.status)) break }
+      } catch (e) { err = errMsg(e) }
+    }
+    if (ok) done++; else { failed++; lastErr = err }
     patch(id, { spoofDone: done, spoofFailed: failed })
   }))
   patch(id, { status: 'done', spoofDone: done, spoofFailed: failed, spoofError: [failed ? lastErr : null, origErr].filter(Boolean).join(' · ') || null })

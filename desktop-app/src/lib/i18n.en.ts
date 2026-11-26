@@ -119,6 +119,7 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "HTTP 504 : traitement serveur trop long": "HTTP 504: server processing took too long",
     "{0} : déjà scanné il y a peu — comptes à jour": "{0}: scanned shortly ago — accounts up to date",
     "{0}/{1} iPhone(s) scanné(s){2}": "{0}/{1} iPhone(s) scanned{2}",
     "· {0} déjà à jour (scannés il y a peu)": "· {0} already up to date (scanned shortly ago)",

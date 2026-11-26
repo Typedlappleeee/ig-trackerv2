@@ -59,15 +59,22 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
       for (;;) {
         const j = jobs[next++]
         if (!j || stop.current) return
-        try {
-          const r = await fetch(`${API_ORIGIN}/api/v1/tools/spoof`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-            body: JSON.stringify({ file_id: j.item.id, org_id: orgId, device: j.device, gps, intensity: 'normal', title: `${j.item.title} · copie ${j.n}`, ...(target ? { folder: target } : {}) }),
-          })
-          const b = await r.json().catch(() => null) as { ok?: boolean; error?: string } | null
-          if (b?.ok) done++; else { failed++; lastErr = b?.error ?? `HTTP ${r.status}` }
-        } catch (e) { failed++; lastErr = e instanceof Error ? e.message : String(e) }
+        // 504 / 502 / coupure réseau (traitement serveur trop long, serveur saturé) → 2 nouveaux essais espacés
+        let ok = false, err = ''
+        for (let attempt = 0; attempt < 3 && !ok && !stop.current; attempt++) {
+          if (attempt) await new Promise(res => setTimeout(res, 4000 * attempt))
+          try {
+            const r = await fetch(`${API_ORIGIN}/api/v1/tools/spoof`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+              body: JSON.stringify({ file_id: j.item.id, org_id: orgId, device: j.device, gps, intensity: 'normal', title: `${j.item.title} · copie ${j.n}`, ...(target ? { folder: target } : {}) }),
+            })
+            const b = await r.json().catch(() => null) as { ok?: boolean; error?: string } | null
+            if (b?.ok) ok = true
+            else { err = b?.error ?? (r.status === 504 ? 'HTTP 504 : traitement serveur trop long' : `HTTP ${r.status}`); if (![502, 503, 504, 500].includes(r.status) && b) break }
+          } catch (e) { err = e instanceof Error ? e.message : String(e) }
+        }
+        if (ok) done++; else { failed++; lastErr = err }
         setRun({ done, failed, total: jobs.length, error: lastErr || undefined })
       }
     }
