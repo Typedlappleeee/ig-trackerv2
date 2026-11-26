@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-26',
     title: { fr: 'iRemoTech : relancer les échecs', en: 'iRemoTech: retry failures' },
     items: {
-      fr: ['Bouton « 🔁 Relancer les N échec(s) » à la fin d’un lancement (Posting Reels, carrousel, Story CTA, Setup compte) : relance SEULEMENT les comptes qui ont échoué, avec les mêmes réglages.'],
-      en: ['“🔁 Retry the N failure(s)” button at the end of a run (Reels posting, carousel, CTA Story, account setup): relaunches ONLY the accounts that failed, with the same settings.'],
+      fr: ['Caméra Story bloquée par « Allow Instagram to access your camera and microphone · Open settings » (accès refusé auparavant) : ScaleFlow ouvre les Réglages iOS, active Camera et Microphone pour Instagram, puis revient.', 'Bouton « 🔁 Relancer les N échec(s) » à la fin d’un lancement (Posting Reels, carrousel, Story CTA, Setup compte) : relance SEULEMENT les comptes qui ont échoué, avec les mêmes réglages.'],
+      en: ['Story camera blocked by “Allow Instagram to access your camera and microphone · Open settings” (access denied earlier): ScaleFlow opens iOS Settings, enables Camera and Microphone for Instagram, then comes back.', '“🔁 Retry the N failure(s)” button at the end of a run (Reels posting, carousel, CTA Story, account setup): relaunches ONLY the accounts that failed, with the same settings.'],
     },
   },
   {

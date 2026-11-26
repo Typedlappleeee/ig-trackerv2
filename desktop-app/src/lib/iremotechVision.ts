@@ -292,6 +292,16 @@ export async function grantPhotoAccessIfAsked(key: string, deviceId: string, hoo
       if (await settingsGrantAllPhotos(key, deviceId, hooks)) { relaunched = true; await sleep(6000) }
       continue
     }
+    // Accès caméra / micro REFUSÉ auparavant : « Allow Instagram to access your camera and microphone » + « Open settings »
+    // (vu le 26/11/2026, caméra Story bloquée) → Réglages iOS › Instagram › Camera + Microphone activés → retour Instagram
+    if (has(/^camera$/i) && has(/^microphone$/i) && scr.words.some(o => /^open$/i.test(o.text) && scr.words.some(p => /^settings$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))) {
+      hooks?.log?.('📷 Instagram n’a pas accès à la caméra / au micro → Réglages iOS › Camera + Microphone')
+      const o = scr.words.find(w => /^open$/i.test(w.text))!
+      await sendAction(key, deviceId, { type: 'tap', x: o.cx + 20, y: o.cy })
+      await sleep(3000)
+      if (await settingsGrantCameraMic(key, deviceId, hooks)) { relaunched = true; await sleep(5000) }
+      continue
+    }
     if (cameraSheet(scr.words, scr.H)) {
       hooks?.log?.('📷 « Allow Instagram to access your camera and microphone » → Continue')
       const c = scr.words.find(o => /^continue$/i.test(o.text) && o.cy > 0.7 * scr.H)
@@ -327,6 +337,34 @@ export async function grantPhotoAccessIfAsked(key: string, deviceId: string, hoo
     return relaunched
   }
   return relaunched
+}
+
+/** Réglages iOS › Instagram : interrupteurs « Camera » et « Microphone » activés (vert), puis retour à Instagram par
+ *  « ◀ Instagram » de la barre d'état. true = au moins la page reconnue et les deux interrupteurs verts. */
+async function settingsGrantCameraMic(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  for (let k = 0; k < 3; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) return false
+    const { words, W, H } = scr
+    const rows = ['camera', 'microphone'].map(n => words.find(o => o.text.toLowerCase() === n && o.cx < W * 0.5 && o.cy > H * 0.1))
+    if (!rows.some(Boolean)) { await sleep(1500); continue }
+    let allOn = true
+    for (const row of rows) {
+      if (!row) continue
+      const on = iosToggleOn(await pixelRgb(scr.shot, Math.round(0.86 * W), row.cy, 3))
+      if (!on) { allOn = false; await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.86 * W), y: row.cy }); await sleep(1200) }
+    }
+    if (allOn) {
+      hooks?.log?.('   ✓ Camera + Microphone activés pour Instagram')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.075 * W), y: Math.round(0.016 * H) }) // « ◀ Instagram »
+      await sleep(2500)
+      return true
+    }
+  }
+  hooks?.log?.('   ⚠ interrupteurs Camera / Microphone non confirmés')
+  await sendAction(key, deviceId, { type: 'open_app', target: 'instagram_camera' })
+  await sleep(3000)
+  return false
 }
 
 /** Réglages iOS › Instagram : ligne « Photos » → « All Photos » (iOS 17) / « Full Access » (iOS 18) → retour à
