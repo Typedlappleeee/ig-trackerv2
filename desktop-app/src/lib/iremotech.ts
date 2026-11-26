@@ -173,18 +173,22 @@ export interface IrtJob {
   result: Record<string, any> | null; failure: Record<string, any> | null
 }
 export type IrtAutomation = { type: 'list_accounts' } | { type: 'account_status'; account: string; rotate_ip?: boolean } | { type: 'warm_up'; account: string; session_duration_s: number }
-async function irtCall(key: string, op: string, payload: Record<string, unknown>, method: 'GET' | 'POST', path: string, body?: unknown): Promise<{ ok: boolean; status?: number; data?: any }> {
+async function irtCall(key: string, op: string, payload: Record<string, unknown>, method: 'GET' | 'POST', path: string, body?: unknown): Promise<{ ok: boolean; status?: number; data?: any; retryAfter?: number | null }> {
   try {
     if (IS_WEB) return await irtProxy(op, key, payload)
     const r = await fetch(`${BASE}/${path}`, { method, headers: { Authorization: `Bearer ${key}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
     let data: any = null; try { data = await r.json() } catch { /* vide */ }
-    return { ok: r.ok, status: r.status, data }
+    return { ok: r.ok, status: r.status, data, retryAfter: Number(r.headers.get('retry-after')) || null }
   } catch (e) { return { ok: false, data: { detail: e instanceof Error ? e.message : String(e) } } }
 }
 /** Lance une automation iRemoTech sur un iPhone. Erreur lisible si refusée (jetons, compte inconnu, déjà en cours…). */
-export async function launchAutomation(key: string, deviceId: string, a: IrtAutomation): Promise<{ ok: boolean; job?: IrtJob; error?: string; code?: string }> {
+export async function launchAutomation(key: string, deviceId: string, a: IrtAutomation): Promise<{ ok: boolean; job?: IrtJob; error?: string; code?: string; retryAfter?: number | null }> {
   const r = await irtCall(key, 'automation', { deviceId, body: a }, 'POST', `devices/${encodeURIComponent(deviceId)}/automations`, a)
   if (r.ok && r.data?.job_id) return { ok: true, job: r.data as IrtJob }
+  // « this automation ran too recently on this device or account » (429) : délai minimum entre deux lancements
+  const tooSoon = r.status === 429 || /too recently|rate.?limit/i.test(String(r.data?.detail ?? r.data?.code ?? ''))
+  const retryAfter = r.retryAfter ?? (Number(r.data?.retry_after) || null)
+  if (tooSoon) return { ok: false, code: 'too_recent', retryAfter, error: `lancé trop récemment sur cet iPhone${retryAfter ? ` (réessayer dans ${retryAfter < 120 ? `${retryAfter} s` : `${Math.ceil(retryAfter / 60)} min`})` : ''}` }
   const code = String(r.data?.code ?? r.status ?? '')
   const msg = code === 'insufficient_tokens' ? 'solde de jetons iRemoTech insuffisant pour ce warm-up'
     : code === 'account_not_found' ? 'compte inconnu d’iRemoTech sur cet iPhone (ajoute-le dans le tableau de bord iRemoTech)'
@@ -205,8 +209,13 @@ export async function getJob(key: string, jobId: string): Promise<IrtJob | null>
 
 /** Scan des comptes (list_accounts) d'UN iPhone, ATTENDU jusqu'à la fin : lancé puis relu toutes les 4 s
  *  (≤ `maxMs`, 4 min par défaut). Résultat : le job terminé (completed / failed…), ou null si non lancé / trop long. */
-export async function scanAccountsAndWait(key: string, deviceId: string, opts?: { maxMs?: number; onLaunched?: (j: IrtJob) => void }): Promise<{ job: IrtJob | null; error?: string }> {
-  const r = await launchAutomation(key, deviceId, { type: 'list_accounts' })
+export async function scanAccountsAndWait(key: string, deviceId: string, opts?: { maxMs?: number; onLaunched?: (j: IrtJob) => void }): Promise<{ job: IrtJob | null; error?: string; recent?: boolean }> {
+  let r = await launchAutomation(key, deviceId, { type: 'list_accounts' })
+  // scanné trop récemment : attente courte (≤ 90 s) puis 2e essai ; sinon l'iPhone vient d'être lu → « déjà à jour »
+  if (!r.ok && r.code === 'too_recent') {
+    if (r.retryAfter && r.retryAfter <= 90) { await new Promise(res => setTimeout(res, (r.retryAfter! + 2) * 1000)); r = await launchAutomation(key, deviceId, { type: 'list_accounts' }) }
+    if (!r.ok && r.code === 'too_recent') return { job: null, recent: true, error: r.error }
+  }
   if (!r.ok || !r.job) return { job: null, error: r.error }
   opts?.onLaunched?.(r.job)
   const end = Date.now() + (opts?.maxMs ?? 240_000)

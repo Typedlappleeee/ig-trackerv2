@@ -105,19 +105,22 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     const r = await scanAccountsAndWait(apiKey, d.public_id, { onLaunched: j => setJobs(m => ({ ...m, [d.public_id]: [j, ...(m[d.public_id] ?? [])] })) })
     if (r.job) { const job = r.job; setJobs(m => ({ ...m, [d.public_id]: [job, ...(m[d.public_id] ?? []).filter(x => x.job_id !== job.job_id)] })) }
     setScanning(null)
+    if (r.recent) return 'recent' as const   // scanné il y a peu : déjà à jour, pas une erreur
     return r.job?.status === 'completed' ? true : (toast(`${deviceLabel(d)} : ${r.error ?? `scan ${r.job?.status ?? 'refusé'}`}`, 'bad'), false)
   })
   const scan = async (dev: string) => {
     const d = devices.find(x => x.public_id === dev); if (!d) return
     toast('Scan des comptes lancé : ne touche pas l’iPhone pendant ~30 s', 'info')
-    if (await scanWait(d)) toast(`${deviceLabel(d)} : comptes relus ✓`, 'ok')
+    const ok = await scanWait(d)
+    if (ok === 'recent') toast(`${deviceLabel(d)} : déjà scanné il y a peu — comptes à jour`, 'info')
+    else if (ok) toast(`${deviceLabel(d)} : comptes relus ✓`, 'ok')
   }
   const scanAll = async () => {
     setBusy('scan')
     const list = devices.filter(isDeviceOn)
-    let n = 0
-    for (const d of list) if (await scanWait(d)) n++   // UN iPhone à la fois : le suivant attend la fin du précédent
-    setBusy(null); toast(`${n}/${list.length} iPhone(s) scanné(s)`, n ? 'ok' : 'bad')
+    let n = 0, recent = 0
+    for (const d of list) { const ok = await scanWait(d); if (ok === 'recent') recent++; else if (ok) n++ }   // UN iPhone à la fois
+    setBusy(null); toast(`${n}/${list.length} iPhone(s) scanné(s)${recent ? ` · ${recent} déjà à jour (scannés il y a peu)` : ''}`, n || recent ? 'ok' : 'bad')
   }
   // Chiffres relus sur l'iPhone : bascule sur chaque compte (profil affiché → publications / abonnés / abonnements)
   const readOnPhone = async (d: IrtDevice) => {

@@ -63,7 +63,8 @@ export default async (req, res) => {
         method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
         body: JSON.stringify(body ?? {}), signal: AbortSignal.timeout(20000),
       })
-      return res.status(200).json({ ok: r.ok, status: r.status, data: await jsonOr(r) })
+      // Retry-After (secondes) transmis : « automation ran too recently » (429) → l'appli sait combien attendre
+      return res.status(200).json({ ok: r.ok, status: r.status, retryAfter: Number(r.headers.get('retry-after')) || null, data: await jsonOr(r) })
     }
     if (op === 'jobs') {
       const limit = Math.max(1, Math.min(100, Number(req.body?.limit) || 50))
