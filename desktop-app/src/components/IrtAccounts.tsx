@@ -109,24 +109,27 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     return true
   }
   // Scan d'un iPhone, ATTENDU jusqu'à la fin, dans la file commune (jamais deux scans en même temps)
+  // pendant « Tout scanner », le bouton affiche l'avancement global (n/N), pas le nom d'un iPhone
+  const bulk = useRef(false)
+  const label = (v: string | null) => { if (!bulk.current) setScanning(v) }
   const scanWait = (d: IrtDevice) => queueAccountScan(async () => {
-    setScanning(deviceLabel(d))
+    label(deviceLabel(d))
     const r = await scanAccountsAndWait(apiKey, d.public_id, { onLaunched: j => setJobs(m => ({ ...m, [d.public_id]: [j, ...(m[d.public_id] ?? [])] })) })
     if (r.job) { const job = r.job; setJobs(m => ({ ...m, [d.public_id]: [job, ...(m[d.public_id] ?? []).filter(x => x.job_id !== job.job_id)] })) }
     // iRemoTech refuse (scan trop rapproché) ou échoue → lecture DIRECTE à l'écran de l'iPhone (Profil › liste des comptes)
     if (r.recent || r.job?.status !== 'completed') {
-      setScanning(`${deviceLabel(d)} (lecture à l’écran)`)
+      label(`${deviceLabel(d)} (lecture à l’écran)`)
       const accs = await detectAccountsByVision(apiKey, d.public_id, { log: () => { /* silencieux */ } }).catch(() => null)
       // lecture finie (réussie ou non) : Instagram fermé complètement → l'iPhone n'est pas laissé sur le profil
       await forceCloseForegroundApp(apiKey, d.public_id).catch(() => undefined)
-      setScanning(null)
+      label(null)
       if (accs && accs.length) { saveLive(d.public_id, accs.map(u => u.toLowerCase())); onScanned?.(d.public_id, accs); return true }
       toast(`${deviceLabel(d)} : comptes non lus à l’écran (Instagram ouvert sur l’iPhone ?)`, 'bad')
       return false
     }
-    setScanning(null)
+    label(null)
     return r.job?.status === 'completed' ? true : (toast(`${deviceLabel(d)} : ${r.error ?? `scan ${r.job?.status ?? 'refusé'}`}`, 'bad'), false)
-  })
+  }, d.public_id)
   const scan = async (dev: string) => {
     const d = devices.find(x => x.public_id === dev); if (!d) return
     toast('Scan des comptes lancé : ne touche pas l’iPhone pendant ~30 s', 'info')
@@ -136,8 +139,14 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
   const scanAll = async () => {
     setBusy('scan')
     const list = devices.filter(isDeviceOn)
-    let n = 0
-    for (const d of list) if (await scanWait(d)) n++   // UN iPhone à la fois
+    // TOUS les iPhones en même temps (un seul scan à la fois par iPhone)
+    bulk.current = true
+    let done = 0
+    setScanning(`0/${list.length} iPhone(s)`)
+    const res = await Promise.all(list.map(d => scanWait(d).catch(() => false).then(ok => { done++; setScanning(`${done}/${list.length} iPhone(s)`); return ok })))
+    const n = res.filter(Boolean).length
+    bulk.current = false
+    setScanning(null)
     setBusy(null); toast(`${n}/${list.length} iPhone(s) scanné(s)`, n ? 'ok' : 'bad')
   }
   // Chiffres relus sur l'iPhone : bascule sur chaque compte (profil affiché → publications / abonnés / abonnements)
@@ -277,7 +286,7 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
           {withAccounts.map(d => <option key={d.public_id} value={d.public_id}>{deviceLabel(d)} · {view[d.public_id]?.accounts.length ?? 0}</option>)}
         </select>
         <button style={{ ...btn, background: grouped ? 'rgba(255,255,255,0.08)' : FIELD_BG }} onClick={() => setGrouped(g => !g)} title="Regrouper les comptes par iPhone">{grouped ? '▾ Par iPhone' : '☰ Liste'}</button>
-        <button style={btn} disabled={!!busy || !devices.length} onClick={() => void scanAll()} title="iRemoTech lit les comptes connectés de chaque iPhone en ligne, UN iPhone à la fois (~30 s chacun, ne pas toucher les iPhones)">{busy === 'scan' ? (scanning ? `Scan de ${scanning}…` : 'Scan…') : '🔄 Tout scanner'}</button>
+        <button style={btn} disabled={!!busy || !devices.length} onClick={() => void scanAll()} title="iRemoTech lit les comptes connectés de chaque iPhone en ligne, tous les iPhones EN MÊME TEMPS (~30 s, ne pas toucher les iPhones)">{busy === 'scan' ? (scanning ? `Scan de ${scanning}…` : 'Scan…') : '🔄 Tout scanner'}</button>
       </div>
 
       <div style={{ borderRadius: 12, background: '#0F0F11', border: `1px solid ${EDGE}`, overflowX: 'auto' }}>

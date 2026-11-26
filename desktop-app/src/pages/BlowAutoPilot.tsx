@@ -579,9 +579,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         try { tried = Number(localStorage.getItem(tk)) || 0 } catch { /* noop */ }
         if (!scanDue(jobs, Date.now(), tried)) continue
         try { localStorage.setItem(tk, String(Date.now())) } catch { /* noop */ }
-        // un iPhone à la fois : le scan suivant attend la FIN de celui-ci (file commune à toute l'appli)
-        const r = await queueAccountScan(() => scanAccountsAndWait(key, dev)).catch(() => null)
-        if (r?.job && alive) { const job = r.job; setIrtJobs(m => ({ ...m, [dev]: [job, ...(m[dev] ?? []).filter(x => x.job_id !== job.job_id)] })) }
+        // iPhones en parallèle (un seul scan à la fois par iPhone)
+        void queueAccountScan(() => scanAccountsAndWait(key, dev), dev).then(r => { if (r?.job && alive) { const job = r.job; setIrtJobs(m => ({ ...m, [dev]: [job, ...(m[dev] ?? []).filter(x => x.job_id !== job.job_id)] })) } }).catch(() => null)
       }
     }
     const first = setTimeout(() => void tick(), 45_000)
@@ -626,7 +625,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(e => { push(`[${name}] ⚠ ${e instanceof Error ? e.message : String(e)}`); return null })
     if (!list) push(`[${name}] ✗ ni containers ni comptes détectés`)
     // iPhone normal : iRemoTech relit aussi les comptes, pour que sa liste (qui fait foi) soit à jour tout de suite
-    else if (irt.key && phoneKind(list) === 'normal') { const key = irt.key; void queueAccountScan(() => scanAccountsAndWait(key, dev)).then(r => { if (r.job) { const job = r.job; setIrtJobs(m => ({ ...m, [dev]: [job, ...(m[dev] ?? []).filter(x => x.job_id !== job.job_id)] })) } }).catch(() => null) }
+    else if (irt.key && phoneKind(list) === 'normal') { const key = irt.key; void queueAccountScan(() => scanAccountsAndWait(key, dev), dev).then(r => { if (r.job) { const job = r.job; setIrtJobs(m => ({ ...m, [dev]: [job, ...(m[dev] ?? []).filter(x => x.job_id !== job.job_id)] })) } }).catch(() => null) }
     setDetecting(null)
   }
   // Ouvre chaque container et lit ce qu'il contient VRAIMENT (vide / @compte / bloqué) : la liste « Comptes créés »

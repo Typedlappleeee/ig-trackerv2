@@ -238,12 +238,13 @@ export async function scanAccountsAndWait(key: string, deviceId: string, opts?: 
   }
   return { job: last, error: 'scan trop long (toujours en cours chez iRemoTech)' }
 }
-/** File d'attente UNIQUE des scans de comptes, pour toute l'appli : un iPhone à la fois, jamais deux scans en même
- *  temps (le bouton « Scanner tout », le scan automatique 12 h et « Détecter » passent tous par ici). */
-let scanChain: Promise<unknown> = Promise.resolve()
-export function queueAccountScan<T>(task: () => Promise<T>): Promise<T> {
-  const run = scanChain.then(task, task)
-  scanChain = run.catch(() => undefined)
+/** File d'attente des scans de comptes PAR iPhone : jamais deux scans en même temps sur le MÊME iPhone, mais les
+ *  iPhones différents scannent en parallèle (demande du propriétaire : un par un, c'était trop long). Le bouton
+ *  « Tout scanner », le scan automatique 12 h et « Détecter » passent tous par ici. */
+const scanChains = new Map<string, Promise<unknown>>()
+export function queueAccountScan<T>(task: () => Promise<T>, deviceId = ''): Promise<T> {
+  const run = (scanChains.get(deviceId) ?? Promise.resolve()).then(task, task)
+  scanChains.set(deviceId, run.catch(() => undefined))
   return run
 }
 

@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-26',
     title: { fr: 'iRemoTech : état de chaque compte dans les sélections', en: 'iRemoTech: each account’s status in the selections' },
     items: {
-      fr: ['Sur chaque compte, dans la sélection de TOUS les lancements (Posting, Story CTA, carrousel, setup, warm-up) : 🪪✓ = setup fait, 🔗 CTA = Story CTA publiée ces dernières 24 h, 🎬 N = Reels publiés ces 24 h, 🖼 N = carrousels, 🔥 = warm-up fait, ⚠ = échec récent (détail au survol et dans Résultats).'],
-      en: ['On every account, in the selection of ALL runs (Posting, CTA Story, carousel, setup, warm-up): 🪪✓ = setup done, 🔗 CTA = CTA Story posted in the last 24 h, 🎬 N = Reels posted in the last 24 h, 🖼 N = carousels, 🔥 = warm-up done, ⚠ = recent failure (details on hover and in Results).'],
+      fr: ['Sur chaque compte, dans la sélection de TOUS les lancements (Posting, Story CTA, carrousel, setup, warm-up) : 🪪✓ = setup fait, 🔗 CTA = Story CTA publiée ces dernières 24 h, 🎬 N = Reels publiés ces 24 h, 🖼 N = carrousels, 🔥 = warm-up fait, ⚠ = échec récent (détail au survol et dans Résultats).', 'Scan des comptes : « Tout scanner » et le scan automatique lancent TOUS les iPhones en même temps (un seul scan à la fois par iPhone), au lieu d’un iPhone après l’autre.'],
+      en: ['On every account, in the selection of ALL runs (Posting, CTA Story, carousel, setup, warm-up): 🪪✓ = setup done, 🔗 CTA = CTA Story posted in the last 24 h, 🎬 N = Reels posted in the last 24 h, 🖼 N = carousels, 🔥 = warm-up done, ⚠ = recent failure (details on hover and in Results).', 'Account scan: “Scan all” and the automatic scan run ALL iPhones at the same time (one scan at a time per iPhone), instead of one iPhone after another.'],
     },
   },
   {
