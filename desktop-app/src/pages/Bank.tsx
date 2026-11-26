@@ -18,6 +18,7 @@ import BankSpoof from '@/components/BankSpoof'
 import { isHeic, heicToJpeg, sniffHeic } from '@/lib/heic'
 import { niceBase, isUglyTitle, allocTitle, prefixFor } from '@/lib/niceTitle'
 import PoolManager, { POOL_PREFIX } from '@/components/PoolManager'
+import { BankFolderOptions } from '@/components/BankFolderOptions'
 import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg, setFolderFav, setFolderTag, ensureBankFolder } from '@/lib/bankFolders'
 import { OTHER_TAG, MODEL_TAG, COMMON_SPACE, stackCopies, proposeModelMoves, MODEL_MARKETS, marketTag, marketsOfTags, parseTemplate, templatePaths, groupModelsByMarket, type ModelMarket } from '@/lib/bankSpaces'
 import { loadTeamCache, pullTeam, updateTeam } from '@/lib/irtTeam'
@@ -986,17 +987,21 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   // Par lots de 200 (une seule requête avec des milliers d'ids dépasse la taille d'URL et échoue).
   const [trashBusy, setTrashBusy] = useState<string | null>(null)
   const chunkOf = <T,>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
-  async function restoreMedia(ids: string[]) {
+  // dest : restaurer dans CE dossier (tout le contenu de la corbeille rangé au même endroit) ; sinon dossier d'origine
+  const [trashDest, setTrashDest] = useState('')
+  async function restoreMedia(ids: string[], dest?: string) {
     if (!ids.length) return
     let done = 0; let firstErr: string | null = null
+    const patch: { deleted_at: null; folder?: string } = dest ? { deleted_at: null, folder: dest } : { deleted_at: null }
+    if (dest) await ensureBankFolder(bankScope, dest).catch(() => undefined)
     for (const part of chunkOf(ids, 200)) {
       if (ids.length > 200) setTrashBusy(`Restauration… ${done}/${ids.length}`)
-      const { data, error } = await supabase.from('content_bank').update({ deleted_at: null }).in('id', part).select('id')
+      const { data, error } = await supabase.from('content_bank').update(patch).in('id', part).select('id')
       if (error) { firstErr ??= error.message } else done += data?.length ?? 0
     }
     setTrashBusy(null)
     if (!done) toast(`Restauration impossible${firstErr ? ` : ${firstErr}` : ''}`, 'bad')
-    else if (ids.length > 1) toast(`${done} média(s) restauré(s).`, 'ok')
+    else if (ids.length > 1 || dest) toast(dest ? `${done} média(s) restauré(s) dans « ${dest} ».` : `${done} média(s) restauré(s).`, 'ok')
     load()
   }
   async function purgeMedia(list: ContentItem[]) {
@@ -1726,6 +1731,23 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               <Btn theme={theme} sm tone="primary" label="Tout restaurer" disabled={!!trashBusy || !trash.length} onClick={async () => { await restoreMedia(trash.map(t => t.id)); setShowTrash(false) }} />
               <Btn theme={theme} sm tone="quiet" label="Vider définitivement" disabled={!!trashBusy || !trash.length} onClick={async () => { if (await confirmDialog({ title: `Supprimer DÉFINITIVEMENT les ${trash.length} médias de la corbeille ?`, confirmLabel: 'Vider définitivement', danger: true })) { await purgeMedia(trash); setShowTrash(false) } }} />
               {trashBusy && <span style={{ alignSelf: 'center', fontSize: 12.5, color: '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>{trashBusy}</span>}
+            </div>
+            {/* Tout restaurer dans UN dossier choisi (au lieu du dossier d'origine de chaque média) */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 12.5, color: '#A1A1AA' }}>Tout restaurer dans</span>
+              <select value={trashDest} disabled={!!trashBusy || !trash.length} style={{ ...FIELD_SM, minWidth: 220 }}
+                onChange={async e => {
+                  const v = e.target.value
+                  if (v !== '__new__') { setTrashDest(v); return }
+                  const n = await promptDialog({ title: 'Nouveau dossier', placeholder: 'Nom du dossier', confirmLabel: 'Choisir' })
+                  if (n && n.trim()) setTrashDest(normPath(n.trim()))
+                }}>
+                <option value="">— choisir un dossier —</option>
+                <BankFolderOptions folders={[...new Set([...folderTree([...items.map(i => i.folder), ...folderNames]).map(t => t.path), ...(trashDest ? [trashDest] : [])])]} models={modelRoots} />
+                <option value="__new__">+ Nouveau dossier…</option>
+              </select>
+              <Btn theme={theme} sm tone="primary" label={`Restaurer ${trash.length} ici`} disabled={!!trashBusy || !trash.length || !trashDest}
+                onClick={async () => { await restoreMedia(trash.map(t => t.id), trashDest); setShowTrash(false) }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', minHeight: 0, margin: '0 -6px', padding: '0 6px' }}>
               {trash.slice(0, 200).map(t => {
