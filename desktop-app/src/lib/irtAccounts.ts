@@ -83,6 +83,27 @@ export function deviceAccounts(jobs: IrtJob[], known: string[] = [], live?: { at
   return { accounts, scannedAt: useLive ? new Date(live!.at).toISOString() : lastScan?.finished_at ?? null, scanning: js.some(j => j.type === 'list_accounts' && pending(j)) }
 }
 
+// ── Lectures des comptes faites À L'ÉCRAN de l'iPhone par ScaleFlow (quand iRemoTech refuse un scan trop rapproché) ──
+// Gardées dans ce navigateur et SIGNALÉES à toute l'appli (évènement « sf-irt-live ») : l'onglet Comptes, le Posting, la
+// Story, le warm-up… affichent tous la même liste, celle de la lecture la plus récente.
+const LIVE_KEY = 'sf-irt-live-accounts'
+export type LiveRead = { at: number; accounts: string[] }
+export function loadLiveReads(): Record<string, LiveRead> { try { return JSON.parse(localStorage.getItem(LIVE_KEY) || '{}') } catch { return {} } }
+export function saveLiveRead(dev: string, accounts: string[]): Record<string, LiveRead> {
+  const n = { ...loadLiveReads(), [dev]: { at: Date.now(), accounts: accounts.map(u => u.replace(/^@/, '').toLowerCase()) } }
+  try { localStorage.setItem(LIVE_KEY, JSON.stringify(n)) } catch { /* noop */ }
+  try { window.dispatchEvent(new Event('sf-irt-live')) } catch { /* hors navigateur */ }
+  return n
+}
+/** Comptes de la lecture la PLUS RÉCENTE d'un iPhone (iRemoTech ou écran), en minuscules sans « @ » ; null sans lecture. Pure. */
+export function latestAccounts(jobs: IrtJob[], live?: LiveRead | null): string[] | null {
+  const scans = jobs.filter(j => j.type === 'list_accounts' && j.status === 'completed').sort(newest)
+  const last = scans[0], scanAt = last ? Date.parse(last.finished_at ?? last.created_at) : 0
+  const src = live && live.accounts.length && live.at > scanAt ? live.accounts : last ? ((last.result?.accounts as string[] | undefined) ?? []) : null
+  if (!src) return null
+  return [...new Set(src.map(u => String(u).replace(/^@/, '').toLowerCase()).filter(u => u && !isJunkUsername(u)))].slice(0, MAX_ACCOUNTS_PER_PHONE)
+}
+
 /** Comptes de la dernière lecture iRemoTech réussie (`list_accounts`), en minuscules, sans les lectures parasites. */
 export function irtScannedAccounts(jobs: IrtJob[]): string[] {
   const last = [...jobs].sort(newest).find(j => j.type === 'list_accounts' && j.status === 'completed')

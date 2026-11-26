@@ -107,3 +107,17 @@ describe('depuis combien de jours le compte est connecté', () => {
     expect(accountFirstSeenAt(jobs, 'zzz')).toBeNull()
   })
 })
+
+import { latestAccounts } from './irtAccounts'
+describe('liste des comptes = lecture la plus récente (iRemoTech ou écran)', () => {
+  const scan = (at: string, accounts: string[]) => ({ job_id: at, type: 'list_accounts', status: 'completed', created_at: at, finished_at: at, account: null, result: { accounts } }) as never
+  const jobs = [scan('2026-11-26T10:00:00Z', ['a', 'b', 'c'])]
+  it('scan iRemoTech seul', () => { expect(latestAccounts(jobs, null)).toEqual(['a', 'b', 'c']) })
+  it('lecture à l’écran plus récente → elle fait foi (compte non détecté retiré)', () => {
+    expect(latestAccounts(jobs, { at: Date.parse('2026-11-26T11:00:00Z'), accounts: ['a', 'c'] })).toEqual(['a', 'c'])
+  })
+  it('lecture à l’écran plus ancienne → le scan iRemoTech fait foi', () => {
+    expect(latestAccounts(jobs, { at: Date.parse('2026-11-26T09:00:00Z'), accounts: ['z'] })).toEqual(['a', 'b', 'c'])
+  })
+  it('aucune lecture → null', () => { expect(latestAccounts([], null)).toBeNull() })
+})

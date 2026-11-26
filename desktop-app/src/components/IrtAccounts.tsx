@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { deviceLabel, isDeviceOn, listJobs, launchAutomation, scanAccountsAndWait, queueAccountScan, type IrtDevice, type IrtJob } from '@/lib/iremotech'
 import { switchAccountByVision, detectAccountsByVision, forceCloseForegroundApp } from '@/lib/iremotechVision'
-import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, accountFirstSeenAt, connectedFor, naturalCmp, ageTier, AGE_LABEL, type IgProfile, type AccountView } from '@/lib/irtAccounts'
+import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, accountFirstSeenAt, connectedFor, loadLiveReads, saveLiveRead, naturalCmp, ageTier, AGE_LABEL, type IgProfile, type AccountView } from '@/lib/irtAccounts'
 import type { IrtTeam } from '@/lib/irtTeam'
 import { MARKETS, type Market } from '@/lib/captionMarkets'
 import { toast } from '@/lib/ui'
@@ -40,8 +40,8 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
   const [busy, setBusy] = useState<string | null>(null)
   const [scanning, setScanning] = useState<string | null>(null) // iPhone en cours de scan (file un par un)
   // lectures des comptes faites À L'ÉCRAN de l'iPhone par ScaleFlow (quand iRemoTech refuse un scan trop rapproché)
-  const [live, setLive] = useState<Record<string, { at: number; accounts: string[] }>>(() => { try { return JSON.parse(localStorage.getItem('sf-irt-live-accounts') || '{}') } catch { return {} } })
-  const saveLive = (dev: string, accounts: string[]) => setLive(m => { const n = { ...m, [dev]: { at: Date.now(), accounts } }; try { localStorage.setItem('sf-irt-live-accounts', JSON.stringify(n)) } catch { /* noop */ } return n })
+  const [live, setLive] = useState(() => loadLiveReads())
+  const saveLive = (dev: string, accounts: string[]) => setLive(saveLiveRead(dev, accounts))
   const [devFilter, setDevFilter] = useState('all')
   const [grouped, setGrouped] = useState(true)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())

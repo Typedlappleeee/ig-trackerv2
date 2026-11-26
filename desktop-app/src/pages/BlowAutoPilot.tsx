@@ -23,7 +23,7 @@ import IrtAccounts from '@/components/IrtAccounts'
 import IrtServerRuns from '@/components/IrtServerRuns'
 import { enqueueServerRun, serversOnline } from '@/lib/irtServer'
 import { locToServer, type ServerPlan } from '@/lib/irtServerSession'
-import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, accountAddedAt, accountFirstSeenAt, connectedFor, type AgeTier } from '@/lib/irtAccounts'
+import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, accountAddedAt, accountFirstSeenAt, connectedFor, loadLiveReads, latestAccounts, type AgeTier } from '@/lib/irtAccounts'
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, runVideoMetaSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
@@ -494,14 +494,29 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }, [conts])
   // Comptes déjà lus par iRemoTech (list_accounts) → cibles « @nom » de l'iPhone, sans passer par la vision.
   // Corrige aussi les listes douteuses (faux « Jailbreak ») ; un jailbreak vérifié (« Default ») n'est jamais touché.
+  // UNE SEULE SOURCE pour toute l'appli : la lecture la plus RÉCENTE de chaque iPhone (scan iRemoTech ou lecture à l'écran)
+  // donne EXACTEMENT ses comptes « @… » dans le Posting, la Story, le warm-up, le setup… (un compte non détecté est retiré
+  // de la liste et de la sélection) — comme l'onglet Comptes IG. Containers d'un jailbreak jamais touchés.
+  const [liveTick, setLiveTick] = useState(0)
   useEffect(() => {
-    for (const [dev, jobs] of Object.entries(irtJobs)) {
-      const next = reconcileWithIrt(conts[dev] ?? [], irtScannedAccounts(jobs))
-      if (!next) continue
+    const bump = () => setLiveTick(n => n + 1)
+    window.addEventListener('sf-irt-live', bump); window.addEventListener('storage', bump)
+    return () => { window.removeEventListener('sf-irt-live', bump); window.removeEventListener('storage', bump) }
+  }, [])
+  useEffect(() => {
+    const live = loadLiveReads()
+    for (const dev of new Set([...Object.keys(irtJobs), ...Object.keys(live)])) {
+      if (phoneKind(conts[dev]) === 'jb') continue
+      const read = latestAccounts(irtJobs[dev] ?? [], live[dev])
+      if (!read || !read.length) continue
+      const cur = conts[dev] ?? []
+      const next = [...cur.filter(c => !c.startsWith('@')), ...read.map(u => '@' + u)]
+      const same = next.length === cur.length && next.every(c => cur.includes(c))
+      if (same) continue
       saveDevContainers(dev, next); setConts(c => ({ ...c, [dev]: next }))
       setSelConts(sc => sc[dev] ? { ...sc, [dev]: new Set([...sc[dev]].filter(c => next.includes(c))) } : sc)
     }
-  }, [irtJobs]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [irtJobs, liveTick]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (curTab !== 'posting' || !SERVER_MODE_VISIBLE) return
     let alive = true
