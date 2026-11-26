@@ -6,7 +6,7 @@ import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
 import { ocrWords, findBlueButton, findBlueDots, findWhiteDisks, meanLuma, pixelRgb, findAssistiveTouch, type OcrWord } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { parseProfileCounts, saveScreenStats, parseCount } from './irtAccounts'
-import { askBrain, hasVisionBrain } from './visionBrain'
+import { askBrain, hasVisionBrain, visionBrainName } from './visionBrain'
 import { findGalleryThumb, findMatchingCell } from './screenMatch'
 
 // Barre d'onglets d'Instagram : l'ancienne barre pleine largeur (Accueil 0,1 · Reels 0,3 · … · Profil 0,9 W, à 0,962 H)
@@ -1576,6 +1576,8 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     if (!top && !await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (bas)', 2, [0.5, 1])) return false
     await sleep(step === 0 ? 3000 : 4500) // l'éditeur charge la vidéo
   }
+  if (!atCaption) atCaption = await rescue(key, deviceId, 'Reach the final page of this Instagram post where the caption field ("Write a caption" / "Add a caption") and the Share button are shown: tap Next or the arrow to advance. NEVER tap Share or Post.',
+    async () => { const r = await readScreenWords(key, deviceId); return !!r && r.words.some(o => CAPTION_MARK.some(p => p.test(o.text))) }, hooks)
   if (!atCaption) { hooks?.log?.('❌ écran de légende non atteint → rien n’est publié (container suivant)'); return false }
   // c. Légende : tap sur « Write a caption… » → saisie → OK/Done (haut-droite) s'il apparaît.
   if (caption && caption.trim()) {
@@ -3118,6 +3120,7 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
     opened = await galleryOpen()
     if (!opened) hooks?.log?.(`   galerie pas encore ouverte (essai ${attempt + 1}/3)`)
   }
+  if (!opened) opened = await rescue(key, deviceId, 'Open the photo gallery to add the most recent picture to this Instagram story (gallery thumbnail at the bottom left of the story camera). Do not take a photo, do not change settings.', galleryOpen, hooks)
   if (!opened) { hooks?.log?.('❌ galerie non ouverte → container suivant'); return false }
   // 4. La vidéo la plus récente : la case de la galerie qui montre le même média que la vignette
   //    (repli : 1re case, position connue).
@@ -3274,6 +3277,8 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
       await tapFrac(A.doneBtn.x, 0.06); await sleep(1500)
     } else hooks?.log?.('   tiroir des stickers pas ouvert → icône suivante')
   }
+  if (!tray) tray = await rescue(key, deviceId, 'Open the STICKERS tray of this Instagram story editor (the square smiley sticker icon in the right column, or swipe up on the story). Do not type any text, do not add music.',
+    () => hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.35] }), hooks)
   if (!tray) { hooks?.log?.('❌ tiroir des stickers introuvable → rien n’est publié'); return false }
 
   // 7. Recherche → « link ».
@@ -3310,6 +3315,7 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
     linkOk = await onAddLink()
     if (!linkOk) { await sleep(1200); linkOk = await onAddLink() }
   }
+  if (!linkOk) linkOk = await rescue(key, deviceId, 'Open the "Add link" screen of the LINK sticker: in the stickers tray search "link" and tap the "Link" sticker (screen with a URL field and "Customize sticker text"). Never type in the search a URL.', onAddLink, hooks)
   if (!linkOk) {
     hooks?.log?.('❌ écran « Add link » non atteint → rien n’est publié (container suivant)')
     return false
@@ -3375,6 +3381,7 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
     await tapFrac(A.linkDone.x, A.linkDone.y)
     await sleep(2200)
   }
+  if (await onAddLink()) await rescue(key, deviceId, 'Confirm this "Add link" screen: tap the check mark / Done at the top right. Never tap Cancel or the X.', async () => !(await onAddLink()), hooks)
   if (await onAddLink()) { hooks?.log?.('❌ écran « Add link » impossible à valider → rien n’est publié'); return false }
   // 12. Glisser le sticker (placé au CENTRE par défaut) dans le coin BAS-DROITE — swipe continu
   //     (doigt qui reste appuyé). On lit où il est (texte du sticker), on vise son bord droit à
@@ -3633,6 +3640,18 @@ async function accountBlockedScreen(key: string, deviceId: string): Promise<stri
 }
 
 /** Quelques pas pilotés par le cerveau vision (écran inconnu). 'done' / 'stop' / 'none' (pas de cerveau ou pas sûr). */
+/** L'IA (Claude, sinon Groq) PREND LE RELAIS quand le script échoue à une étape : elle voit l'écran et enchaîne au plus
+ *  4 actions sûres pour atteindre `goal`, puis `check()` vérifie que l'étape est vraiment atteinte (sinon échec normal). */
+async function rescue(key: string, deviceId: string, goal: string, check: () => Promise<boolean>, hooks?: VisionHooks): Promise<boolean> {
+  if (!hasVisionBrain() || hooks?.shouldStop?.()) return false
+  hooks?.log?.(`🧠 ${visionBrainName()} prend le relais : ${goal}`)
+  const r = await brainNavigate(key, deviceId, goal, hooks, 4)
+  if (r === 'stop') { hooks?.log?.('   🧠 l’IA préfère s’arrêter (écran à risque)'); return false }
+  const ok = await check().catch(() => false)
+  hooks?.log?.(ok ? '   🧠 ✓ étape récupérée par l’IA, on continue' : '   🧠 l’IA n’a pas pu récupérer l’étape')
+  return ok
+}
+
 export async function brainNavigate(key: string, deviceId: string, goal: string, hooks?: VisionHooks, maxSteps = 4, o: { allowPhotos?: boolean } = {}): Promise<'done' | 'stop' | 'none'> {
   if (!hasVisionBrain()) return 'none'
   const history: string[] = []
