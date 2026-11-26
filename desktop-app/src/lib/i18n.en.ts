@@ -119,6 +119,7 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "bouton AssistiveTouch sur les outils de la Story → déplacé sur le bord gauche": "AssistiveTouch button over the Story tools → moved to the left edge",
     "éditeur de Story déjà ouvert (pas de Done)": "Story editor already open (no Done)",
     "⚠ mode avion pas activé à l’écran (réseau toujours affiché) → ON renvoyé": "⚠ airplane mode not on screen (network still shown) → ON sent again",
     "⚠ mode avion toujours pas activé → Centre de contrôle": "⚠ airplane mode still off → Control Center",

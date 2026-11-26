@@ -28,7 +28,7 @@ export function homeFeedShown(words: { text: string; cy: number }[], H: number):
 /** Bouton AssistiveTouch d'iOS sur une zone de taps d'Instagram (haut à gauche : « + », ✕, retour ; ou barre d'onglets) :
  *  glissé sur le bord droit. Vu en vrai sur STEVIE10 : posé sur le « + », chaque tap ouvrait le sélecteur d'apps
  *  (l'app Preview passait au premier plan, plus aucun post possible). true si déplacé. */
-export async function clearAssistiveTouch(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+export async function clearAssistiveTouch(key: string, deviceId: string, hooks?: VisionHooks, zone: 'right' | 'left' = 'right'): Promise<boolean> {
   for (let k = 0; k < 2; k++) {
     const shot = await snapRetry(key, deviceId)
     if (!shot) return false
@@ -37,10 +37,14 @@ export async function clearAssistiveTouch(key: string, deviceId: string, hooks?:
     if (!at) return k > 0
     // rangé = contre le bord DROIT, vers le milieu de l'écran (zone qu'aucune étape ne tape). Partout ailleurs il gêne :
     // vu en vrai le 25/11/2026, posé à gauche il recevait le tap sur la ville choisie et ouvrait le sélecteur d'apps.
-    const parked = at.cx > W * 0.82 && at.cy > H * 0.3 && at.cy < H * 0.55
+    // Éditeur de STORY : la colonne d'outils (Aa, sticker, musique, @…) occupe le bord droit → rangé à GAUCHE
+    // (vu en vrai le 26/11/2026 : posé sur l'icône sticker, il ouvrait le sélecteur d'apps à la place du tiroir).
+    const parked = zone === 'left'
+      ? at.cx < W * 0.18 && at.cy > H * 0.4 && at.cy < H * 0.62
+      : at.cx > W * 0.82 && at.cy > H * 0.3 && at.cy < H * 0.55
     if (parked) return k > 0
-    if (!k) hooks?.log?.('   bouton AssistiveTouch sur une zone d’Instagram → déplacé sur le bord droit')
-    await sendAction(key, deviceId, { type: 'swipe', x1: at.cx, y1: at.cy, x2: W - 30, y2: Math.round(H * 0.42), duration_ms: 700 })
+    if (!k) hooks?.log?.(zone === 'left' ? '   bouton AssistiveTouch sur les outils de la Story → déplacé sur le bord gauche' : '   bouton AssistiveTouch sur une zone d’Instagram → déplacé sur le bord droit')
+    await sendAction(key, deviceId, { type: 'swipe', x1: at.cx, y1: at.cy, x2: zone === 'left' ? 30 : W - 30, y2: Math.round(H * (zone === 'left' ? 0.5 : 0.42)), duration_ms: 700 })
     await sleep(1800)
   }
   return true
@@ -3039,6 +3043,7 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   // 6. Icône sticker (colonne de droite) → tiroir des stickers. VÉRIFIÉ avant d'écrire quoi que ce soit : sur
   //    certaines stories (photo) la colonne est décalée et le tap ouvrait l'outil Texte (« link » écrit en texte).
   if (!opts.link || !opts.link.trim()) { hooks?.log?.('⚠ Aucun lien fourni pour la story.'); return false }
+  await clearAssistiveTouch(key, deviceId, hooks, 'left')
   hooks?.log?.('🔖 Ouverture des stickers…')
   let tray = false
   // (0,22 = icône MUSIQUE juste sous le sticker sur iPhone normal → essayée en dernier)
