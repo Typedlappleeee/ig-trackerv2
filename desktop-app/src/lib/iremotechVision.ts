@@ -132,8 +132,22 @@ export async function recalibrateTouch(key: string, deviceId: string, hooks?: Vi
 export function stillAirplane(words: { text: string; cx: number; cy: number }[], W: number, H: number): boolean {
   // type de réseau lu n'importe où dans la barre d'état (« LTE », « 5G »…) = réseau présent, pas en mode avion
   if (words.some(o => o.cy < H * 0.035 && /^(lte|5g|4g|3g|5ge|lte\+|wi-?fi)$/i.test(o.text))) return false
-  const left = words.filter(o => o.cy < H * 0.035 && o.cx < W * 0.42 && /[a-z]{2,}/i.test(o.text) && !/^\d/.test(o.text))
+  // nom d'opérateur : un vrai mot (lettres seulement), à droite des barres de signal (lues « tl) », « etl) »…, x < 7 %)
+  const left = words.filter(o => o.cy < H * 0.035 && o.cx > W * 0.07 && o.cx < W * 0.42 && /^\p{L}{2,}$/u.test(o.text))
   return left.length === 0
+}
+
+/** Barre d'état lue de près (zoom ×3, texte blanc ET noir) : la lecture plein écran rate souvent l'opérateur en blanc
+ *  sur un fond d'écran clair (vu en vrai le 26/11/2026 : « EZ Telecom 5G » non lu → faux « toujours en mode avion »).
+ *  true = mode avion (aucun opérateur / réseau lu), false = réseau présent, null = capture impossible. */
+async function airplaneOnScreen(key: string, deviceId: string): Promise<boolean | null> {
+  const shot = await snapRetry(key, deviceId)
+  if (!shot) return null
+  const { w: W, h: H } = await imgSize(shot)
+  const words: OcrWord[] = []
+  for (const invert of [false, true]) words.push(...await ocrWords(shot, undefined, { threshold: null, invert, scale: 3, psms: ['11'], cropY: [0, 0.045] }))
+  // repères ramenés à la hauteur d'origine : la barre d'état fait ~3,5 % de l'écran
+  return stillAirplane(words.map(o => ({ ...o, cy: Math.min(o.cy, H * 0.03) })), W, H)
 }
 
 export async function airplaneReset(key: string, deviceId: string, hooks?: VisionHooks, holdMs = 8000): Promise<void> {
@@ -153,8 +167,8 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
     await sleep(3500)
     let onOk = false
     for (let k = 0; k < 2 && !onOk; k++) {
-      const scr = await readScreenWords(key, deviceId)
-      onOk = !scr || stillAirplane(scr.words, scr.W, scr.H)
+      const st = await airplaneOnScreen(key, deviceId)
+      onOk = st !== false
       if (!onOk && k === 0) { hooks?.log?.('   ⚠ mode avion pas activé à l’écran (réseau toujours affiché) → ON renvoyé'); await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 2); await sleep(4000) }
     }
     if (!onOk) {
@@ -176,8 +190,8 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
     // iPhone resté en mode avion → publications en échec). En mode avion, la barre d'état n'affiche AUCUN texte
     // d'opérateur à gauche (seulement ✈) ; on renvoie OFF jusqu'à 3 fois tant que c'est le cas.
     for (let k = 0; k < 3; k++) {
-      const scr = await readScreenWords(key, deviceId)
-      if (!scr || !stillAirplane(scr.words, scr.W, scr.H)) break
+      const st = await airplaneOnScreen(key, deviceId)
+      if (st !== true) break
       hooks?.log?.(`   ⚠ toujours en mode avion (barre d’état vide) → OFF renvoyé (${k + 1}/3)`)
       await sendWithRetry(key, deviceId, { type: 'airplane', on: false }, 3)
       await sleep(9000)
