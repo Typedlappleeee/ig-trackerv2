@@ -206,6 +206,12 @@ describe('bouton AssistiveTouch repéré', () => {
 })
 
 import { removedContentScreen } from './iremotechVision'
+describe('écran « We removed your story »', () => {
+  it('reconnu (Story supprimée par Instagram, vu le 26/11/2026) → ✕', () => {
+    const w = [{ text: 'What', cy: 40 }, { text: 'happened', cy: 40 }, { text: 'We', cy: 300 }, { text: 'removed', cy: 300 }, { text: 'your', cy: 300 }, { text: 'story', cy: 300 }]
+    expect(removedContentScreen(w, 720)).toEqual({ y: 40 })
+  })
+})
 describe('écran « We removed some content »', () => {
   it('reconnu, croix à la hauteur du titre ; écran ordinaire → non', () => {
     const w = [{ text: 'What', cy: 40 }, { text: 'happened', cy: 40 }, { text: 'We', cy: 270 }, { text: 'removed', cy: 270 }, { text: 'content', cy: 270 }, { text: 'messages', cy: 300 }]

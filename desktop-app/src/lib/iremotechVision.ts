@@ -691,7 +691,8 @@ export function mediaPreviewDone(words: { text: string; cx: number; cy: number }
 /** Écran « What happened / We removed some content or messages » : hauteur de la croix (celle du titre en haut). Pure. */
 export function removedContentScreen(words: { text: string; cy: number }[], H: number): { y: number } | null {
   const has = (re: RegExp) => words.some(o => re.test(o.text))
-  if (!(has(/^removed$/i) && (has(/^content$/i) || has(/^messages?$/i)) && (has(/^happened$/i) || has(/^we$/i)))) return null
+  // « We removed your content / messages / story / post / reel / comment » (« We removed your story », vu le 26/11/2026)
+  if (!(has(/^removed$/i) && has(/^(content|messages?|story|storys|stories|post|posts|reels?|comments?)$/i) && (has(/^happened$/i) || has(/^we$/i)))) return null
   const t = words.find(o => /^(what|happened)$/i.test(o.text) && o.cy < H * 0.15)
   return { y: t ? t.cy : Math.round(0.058 * H) }
 }
@@ -725,7 +726,7 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   }
   const removed = removedContentScreen(scr.words, scr.H)
   if (removed) {
-    hooks?.log?.('   écran « We removed some content » → fermé (✕)')
+    hooks?.log?.(scr.words.some(o => /^(story|storys|stories)$/i.test(o.text)) ? '   ⚠ Instagram a SUPPRIMÉ une Story de ce compte (« We removed your story ») → écran fermé (✕)' : '   écran « We removed some content » → fermé (✕)')
     await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * scr.W), y: removed.y })
     await sleep(1600)
     return true
