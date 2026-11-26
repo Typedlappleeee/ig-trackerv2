@@ -119,6 +119,7 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "⚠ {0} original(aux) cassé(s) — fichier absent du stockage, copies impossibles (à supprimer ou remplacer) : ": "⚠ {0} broken original(s) — file missing from storage, copies impossible (delete or replace): ",
     "Clic : ce compte était déjà là avant → retirer NEW": "Click: this account was already there → remove NEW",
     "Marqué « déjà là avant » par l’équipe": "Marked “already there before” by the team",
     "ancien": "old",

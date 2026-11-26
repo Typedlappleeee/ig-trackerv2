@@ -290,6 +290,8 @@ export async function bytesOfFile(s, scope, id, maxBytes = MAX_BYTES) {
   if (!r || r.deleted_at || !(r.storage_path || r.file_url)) throw httpError(404, 'file_not_found', 'média introuvable dans ta banque')
   if (!r.storage_path) { const got = await fetchPublic(r.file_url, { maxBytes }); return { ...got, title: r.title, folder: r.folder, ext: extOf(r.file_url) } }
   const { data, error } = await s.storage.from('content').download(r.storage_path)
+  // fichier absent du stockage (ligne de la banque sans son fichier : supprimé, restauré sans fichier…) ≠ panne passagère
+  if (error && /not.?found|404|does not exist/i.test(String(error.message ?? error) + ' ' + String(error.statusCode ?? error.status ?? ''))) throw httpError(404, 'file_missing', 'fichier absent du stockage (média cassé : supprimé ou restauré sans son fichier)')
   if (error || !data) throw httpError(502, 'fetch_failed', 'lecture du média impossible')
   if (data.size > maxBytes) throw httpError(413, 'too_large', `fichier trop lourd (max ${Math.round(maxBytes / 1048576)} Mo)`)
   return { buf: Buffer.from(await data.arrayBuffer()), contentType: data.type || '', title: r.title, folder: r.folder, ext: extOf(r.storage_path) }

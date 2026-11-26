@@ -36,7 +36,7 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
   const [count, setCount] = useState(() => read('sf-bank-spoof-n', '5'))
   const [device, setDevice] = useState(() => read('sf-bank-spoof-device', 'random'))
   const [gps, setGps] = useState(() => read('sf-bank-spoof-gps', 'france'))
-  const [run, setRun] = useState<{ done: number; failed: number; total: number; error?: string } | null>(null)
+  const [run, setRun] = useState<{ done: number; failed: number; total: number; error?: string; broken?: string[] } | null>(null)
   const stop = useRef(false)
   const n = Math.max(1, Math.min(MAX_COPIES, Number(count) || 1))
   const running = !!run && run.done + run.failed < run.total
@@ -53,12 +53,15 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
       for (const r of (cur ?? []) as { id: string; tags: string[] | null }[]) if (!(r.tags ?? []).includes('spoof-src')) await supabase.from('content_bank').update({ tags: [...(r.tags ?? []), 'spoof-src'] }).eq('id', r.id)
     } catch { /* best-effort */ }
     let done = 0, failed = 0, next = 0, lastErr = ''
+    const broken = new Map<string, string>()   // id de l'original → titre : fichier absent du stockage
     stop.current = false
     setRun({ done, failed, total: jobs.length })
     const worker = async () => {
       for (;;) {
         const j = jobs[next++]
         if (!j || stop.current) return
+        // original déjà reconnu cassé (fichier absent) : ses autres copies sont sautées, sans nouvel essai
+        if (broken.has(j.item.id)) { failed++; setRun({ done, failed, total: jobs.length, error: lastErr || undefined, broken: [...broken.values()] }); continue }
         // 504 / 502 / coupure réseau (traitement serveur trop long, serveur saturé) → 2 nouveaux essais espacés
         let ok = false, err = ''
         for (let attempt = 0; attempt < 3 && !ok && !stop.current; attempt++) {
@@ -69,17 +72,18 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
               body: JSON.stringify({ file_id: j.item.id, org_id: orgId, device: j.device, gps, intensity: 'normal', title: `${j.item.title} · copie ${j.n}`, ...(target ? { folder: target } : {}) }),
             })
-            const b = await r.json().catch(() => null) as { ok?: boolean; error?: string } | null
+            const b = await r.json().catch(() => null) as { ok?: boolean; error?: string; code?: string } | null
             if (b?.ok) ok = true
+            else if (b?.code === 'file_missing' || b?.code === 'file_not_found') { broken.set(j.item.id, j.item.title); err = b.error ?? 'fichier absent'; break }
             else { err = b?.error ?? (r.status === 504 ? 'HTTP 504 : traitement serveur trop long' : `HTTP ${r.status}`); if (![502, 503, 504, 500].includes(r.status) && b) break }
           } catch (e) { err = e instanceof Error ? e.message : String(e) }
         }
         if (ok) done++; else { failed++; lastErr = err }
-        setRun({ done, failed, total: jobs.length, error: lastErr || undefined })
+        setRun({ done, failed, total: jobs.length, error: lastErr || undefined, broken: [...broken.values()] })
       }
     }
     await Promise.all(Array.from({ length: Math.min(PARALLEL, jobs.length) }, worker))
-    setRun({ done, failed, total: jobs.length, error: lastErr || undefined })
+    setRun({ done, failed, total: jobs.length, error: lastErr || undefined, broken: [...broken.values()] })
     onDone()
     toast(failed ? `${done} copie(s) créée(s), ${failed} échec(s)` : target ? `${done} copie(s) créée(s) dans « ${target} »` : `${done} copie(s) créée(s) dans la Banque`, failed ? 'bad' : 'ok')
   }
@@ -128,6 +132,7 @@ export default function BankSpoof({ theme, items, orgId, onClose, onDone, folder
             </div>
             <span style={{ fontSize: 12.5, color: '#A1A1AA', fontVariantNumeric: 'tabular-nums' }}>{run.done} / {run.total} copie(s) créée(s){run.failed ? ` · ${run.failed} échec(s)` : ''}</span>
             {run.error && <span data-no-tr style={{ fontSize: 12, color: '#F87171' }}>{run.error}</span>}
+            {!!run.broken?.length && <span style={{ fontSize: 12, color: '#FCA5A5' }}>{`⚠ ${run.broken.length} original(aux) cassé(s) — fichier absent du stockage, copies impossibles (à supprimer ou remplacer) : `}<span data-no-tr>{run.broken.join(' · ')}</span></span>}
           </div>
         )}
       </div>
