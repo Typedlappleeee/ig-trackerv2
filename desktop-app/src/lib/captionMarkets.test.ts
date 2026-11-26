@@ -23,7 +23,7 @@ describe('descriptions par marché', () => {
 })
 
 import { MARKET_CITIES, pickCity } from './captionMarkets'
-import { locationRow } from './iremotechVision'
+import { locationRow, homeScreenShown } from './iremotechVision'
 vi.mock('./iremotech', () => ({ snapshot: vi.fn(), sendAction: vi.fn(), deviceIp: vi.fn() }))
 describe('localisation selon le marché', () => {
   const w = (text: string, cx: number, cy: number) => ({ text, cx, cy })
@@ -39,6 +39,15 @@ describe('localisation selon le marché', () => {
   it('Allemagne : « München, Germany » accepté pour Munich', () => {
     const mu = MARKET_CITIES.de.find(c => c.label === 'Munich, Germany')!
     expect(locationRow([w('München,', 50, 320), w('Germany', 120, 320)], mu, 230)).toEqual({ x: 50, y: 320 })
+  })
+  it('« New York, NY » (État en abréviation) et « New York, New York »', () => {
+    const ny = MARKET_CITIES.us.find(c => c.label === 'New York, New York')!
+    expect(locationRow([w('New', 20, 300), w('York,', 60, 300), w('NY', 100, 300)], ny, 230)).toEqual({ x: 60, y: 300 })
+    expect(locationRow([w('New', 20, 300), w('York,', 60, 300), w('New', 110, 300), w('York', 150, 300)], ny, 230)).toEqual({ x: 60, y: 300 })
+  })
+  it('écran d’accueil reconnu (Instagram fermé tout seul)', () => {
+    expect(homeScreenShown(['iremotech.', 'Weather', 'Books'].map(text => ({ text })))).toBe(true)
+    expect(homeScreenShown(['Allow', 'iRemotech', 'to', 'connect'].map(text => ({ text })))).toBe(false)
   })
   it('ville du bon pays tirée au hasard', () => {
     expect(pickCity('de', () => 0).label).toBe('Berlin, Germany')

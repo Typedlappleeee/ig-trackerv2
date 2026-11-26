@@ -953,6 +953,12 @@ export async function findAndTapContainer(key: string, deviceId: string, target:
 // Cherche sur jusqu'à 3 pages d'accueil (swipe). true si tapé.
 /** Bibliothèque d'apps iOS (au-delà de la dernière page d'accueil) : titres de ses dossiers. Pure. */
 /** Page des widgets iOS (« Today view », tout à gauche) : widgets Screen Time / Photos / batterie. Pure. */
+/** Écran d'ACCUEIL iOS (Instagram s'est fermé tout seul en plein post — vu le 26/11/2026 sur SEDRA10 : « Next » tapé à
+ *  l'aveugle sur les icônes) : au moins 2 libellés d'apps connus. Pure. */
+export function homeScreenShown(words: { text: string }[]): boolean {
+  const t = new Set(words.map(o => o.text.toLowerCase().replace(/[^a-z]/g, '')))
+  return ['iremotech', 'weather', 'stocks', 'wallet', 'books', 'clock', 'calendar', 'maps', 'shortcuts', 'appstore', 'facetime', 'notes', 'reminders', 'calculator'].filter(w => t.has(w)).length >= 2
+}
 export function isTodayView(words: { text: string }[]): boolean {
   const t = new Set(words.map(o => o.text.toLowerCase().replace(/[^a-z]/g, '')))
   return (t.has('screen') && t.has('time')) || (t.has('photos') && t.has('appear')) || (t.has('activity') && t.has('website'))
@@ -1584,6 +1590,8 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       ...await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] }),
       ...await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] }),
     ])
+    // Instagram fermé tout seul (écran d'accueil) : on arrête ce post, JAMAIS de tap à l'aveugle sur les icônes
+    if (homeScreenShown(words)) { hooks?.log?.('❌ Instagram s’est fermé tout seul (écran d’accueil) → post abandonné, rien de publié'); return false }
     // Feuille « Sharing posts » (1re publication : compte public, réutilisation) → gros bouton bleu OK
     if (words.some(o => /^sharing$/i.test(o.text)) && words.some(o => /^posts?$/i.test(o.text) && o.cy > H * 0.3)) {
       hooks?.log?.('   feuille « Sharing posts » → OK')
