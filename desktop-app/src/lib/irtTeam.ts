@@ -20,8 +20,9 @@ export interface IrtTeam {
   igdl: { reels?: string; photos?: string }   // Téléchargeur Insta : dossiers des Reels et des photos (toute l'agence)
   added: Record<string, number>         // `${iPhone}::@compte` → 1re fois vu sur l'iPhone (ms) ; 1 = déjà là avant le suivi
   since: Record<string, number>         // `${iPhone}::@compte` → connecté AU MOINS depuis (ms, plus ancienne lecture qui le contient)
+  oldAccs: string[]                     // `${iPhone}::@compte` marqués « déjà là avant » par l'équipe → jamais « NEW »
 }
-export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, posted: {}, bankByModel: false, bankTemplate: [], igdl: {}, added: {}, since: {} })
+export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, posted: {}, bankByModel: false, bankTemplate: [], igdl: {}, added: {}, since: {}, oldAccs: [] })
 
 const isMarket = (v: unknown): v is Market => v === 'fr' || v === 'us' || v === 'de'
 const strMap = (v: unknown): Record<string, string> => {
@@ -41,6 +42,7 @@ export function parseTeam(raw: unknown): IrtTeam {
     posted: Object.fromEntries(Object.entries((o.posted && typeof o.posted === 'object' && !Array.isArray(o.posted) ? o.posted : {}) as Record<string, unknown>)
       .filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((x): x is string => typeof x === 'string').slice(-200)])),
     bankByModel: o.bankByModel === true,
+    oldAccs: Array.isArray(o.oldAccs) ? [...new Set(o.oldAccs.filter((x): x is string => typeof x === 'string'))].slice(-2000) : [],
     since: Object.fromEntries(Object.entries((o.since && typeof o.since === 'object' && !Array.isArray(o.since) ? o.since : {}) as Record<string, unknown>).filter(([, v]) => typeof v === 'number' && v > 1)) as Record<string, number>,
     added: Object.fromEntries(Object.entries((o.added && typeof o.added === 'object' && !Array.isArray(o.added) ? o.added : {}) as Record<string, unknown>).filter(([, v]) => typeof v === 'number' && v > 0)) as Record<string, number>,
     igdl: (() => { const g = strMap(o.igdl); return { ...(g.reels ? { reels: g.reels } : {}), ...(g.photos ? { photos: g.photos } : {}) } })(),

@@ -195,6 +195,7 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     const conn = connectedFor(added || null, seenMin.length ? Math.min(...seenMin) : null)
     // badge NEW / < 3 j / < 7 j : aussi d'après la 1re fois vu sur le téléphone (demande du propriétaire)
     if (!tier && conn) { tier = ageTier(Date.now() - conn.days * 86400_000 - 3600_000); isNew = !!tier }
+    if (team?.oldAccs.includes(`${id}::@${a.username.toLowerCase()}`) && !added) { tier = null; isNew = false }
     const tkey = `${id}::@${a.username}`
     const link = team?.links[tkey] ?? ''
     const story = team?.lastStory[tkey] ?? null

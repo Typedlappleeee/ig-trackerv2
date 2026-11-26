@@ -232,7 +232,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
   const ageOf = (dev: string, c: string): AgeTier | null => {
     if (c.startsWith('@')) {
-      // badge d'âge (🆕 < 1 j…) : d'après le nombre de jours affiché (date exacte, sinon 1re fois vu sur le téléphone)
+      // badge d'âge (🆕 < 1 j…) : d'après le nombre de jours affiché (date exacte, sinon 1re fois vu sur le téléphone) ;
+      // jamais pour un compte marqué « déjà là avant » par l'équipe
+      if (team.oldAccs.includes(`${dev}::${c.toLowerCase()}`)) return null
       const cf = connOf(dev, c)
       return cf ? ageTier(Date.now() - cf.days * 86400_000 - 3600_000) : null
     }
@@ -1370,6 +1372,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                 <span style={{ fontSize: 12, color: DIM, marginRight: 2 }} title="Date de création du compte par ScaleFlow, ou de son apparition sur l’iPhone (lectures iRemoTech / ScaleFlow)">Âge des comptes</span>
                 {groupsAge.map(g => { const n = accs.filter(a => g.f(a.t)).length
                   return <button key={g.k} style={chip(false)} disabled={!n || running} title="Cocher exactement ces comptes" onClick={() => pick(g.f)}>{`${g.label} · ${n}`}</button> })}
+                {(() => {
+                  // comptes cochés marqués « déjà là avant » → plus jamais « NEW » (réglage partagé de l'équipe)
+                  const ks = [...sel].flatMap(d => [...(selConts[d] ?? [])].filter(c => c.startsWith('@')).map(c => `${d}::${c.toLowerCase()}`)).filter(k => !team.oldAccs.includes(k))
+                  return <button style={{ ...chip(false), marginLeft: 6 }} disabled={!ks.length || running} title="Les comptes cochés étaient déjà sur l’iPhone : retirer leur badge NEW"
+                    onClick={() => editTeam(t => { t.oldAccs = [...new Set([...t.oldAccs, ...ks])] })}>{`Pas nouveaux (cochés) · ${ks.length}`}</button>
+                })()}
               </div>
             )
           })()}
@@ -1442,11 +1450,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                       <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
                         <span onClick={() => toggleCont(id, c)} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
                           {cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}
-                          {(() => { const cf = connOf(id, c); if (!cf) return null
+                          {(() => { const cf = connOf(id, c)
+                            const isOld = team.oldAccs.includes(`${id}::${c.toLowerCase()}`)
+                            if (isOld && !cf?.exact) return <span title="Marqué « déjà là avant » par l’équipe" style={{ fontSize: 10.5, fontWeight: 600, color: DIM }}>ancien</span>
+                            if (!cf) return null
                             const t = ageOf(id, c)
                             const col = t === '1d' ? '#4ADE80' : t === '3d' ? '#60A5FA' : t === '7d' ? '#D4D4D8' : DIM
                             const txt = `${cf.exact ? '' : '≥ '}${cf.days} j`
-                            return <span title={cf.exact ? `Connecté sur l’iPhone depuis ${cf.days} jour(s)` : `Connecté sur l’iPhone depuis au moins ${cf.days} jour(s) (date exacte inconnue)`} style={{ fontSize: 10.5, fontWeight: 700, color: col }}>{`${t === '1d' || t === '3d' ? '🆕 NEW · ' : ''}${txt}`}</span> })()}
+                            const isNewB = t === '1d' || t === '3d'
+                            return <span title={isNewB ? 'Clic : ce compte était déjà là avant → retirer NEW' : cf.exact ? `Connecté sur l’iPhone depuis ${cf.days} jour(s)` : `Connecté sur l’iPhone depuis au moins ${cf.days} jour(s) (date exacte inconnue)`}
+                              onClick={isNewB ? (e => { e.stopPropagation(); const k = `${id}::${c.toLowerCase()}`; editTeam(tm => { tm.oldAccs = [...new Set([...tm.oldAccs, k])] }) }) : undefined}
+                              style={{ fontSize: 10.5, fontWeight: 700, color: col, cursor: isNewB ? 'pointer' : undefined }}>{`${t === '1d' || t === '3d' ? '🆕 NEW · ' : ''}${txt}`}</span> })()}
                           {(() => { const cs = contStates[id]?.[c]; if (!cs || c.startsWith('@')) return null
                             return <span title={`Vérifié à l’écran le ${new Date(cs.at).toLocaleString()}`} style={{ fontSize: 11, fontWeight: 500, color: cs.state === 'account' ? '#86EFAC' : cs.state === 'empty' ? DIM : cs.state === 'blocked' ? '#F87171' : DIM }}>
                               {cs.state === 'account' ? `· @${cs.username ?? '?'}` : cs.state === 'empty' ? '· vide' : cs.state === 'blocked' ? '· 🤖' : '· ?'}
