@@ -23,7 +23,7 @@ import IrtAccounts from '@/components/IrtAccounts'
 import IrtServerRuns from '@/components/IrtServerRuns'
 import { enqueueServerRun, serversOnline } from '@/lib/irtServer'
 import { locToServer, type ServerPlan } from '@/lib/irtServerSession'
-import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp } from '@/lib/irtAccounts'
+import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, type AgeTier } from '@/lib/irtAccounts'
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, runVideoMetaSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
@@ -210,6 +210,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     setTeam(t => { const n = structuredClone(t); change(n); return n })
     void updateTeam(teamScope, change).then(r => { setTeam(r.team); if (!r.shared) toast('Enregistré sur ce navigateur seulement (synchro équipe indisponible).', 'bad') })
   }
+  const ageOf = (dev: string, c: string): AgeTier | null => c.startsWith('@') ? ageTier(team.added[`${dev}::${c.toLowerCase()}`]) : null
+
   // marché de chaque compte (`${dev}::${cible}`) ; absent = marché de l'iPhone, sinon marché par défaut (capMarket)
   const marketOf = (dev: string, c: string): Market => team.acctMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c) ?? teamMarketOf(team, dev, c, capMarket)
   const setTargetMarket = (dev: string, c: string, m: Market | null) => { saveTargetMarket(dev, c, m); editTeam(t => { if (m) t.acctMarkets[`${dev}::${c}`] = m; else delete t.acctMarkets[`${dev}::${c}`] }) }
@@ -277,6 +279,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [wCommentPct, setWCommentPct] = useState(0)
   const [wComments, setWComments] = useState('')
   const [createdAccts, setCreatedAccts] = useState<CreatedAccount[]>(() => loadCreatedAccounts())
+  // Date d'ajout de chaque compte « @… » sur son iPhone (partagée dans l'agence) : 1re fois vu par ScaleFlow, ou date connue
+  // (compte créé par ScaleFlow) ; au 1er suivi d'un iPhone, ses comptes déjà là sont marqués « anciens »
+  useEffect(() => {
+    const created = Object.fromEntries(createdAccts.filter(a => a.username).map(a => [a.username!.toLowerCase(), a.at]))
+    const add: Record<string, number> = {}
+    for (const [dev, list] of Object.entries(conts)) Object.assign(add, newAddedEntries(team.added, dev, list.filter(c => c.startsWith('@')), Date.now(), u => created[u.replace(/^@/, '').toLowerCase()] ?? null))
+    if (Object.keys(add).length) editTeam(t => { t.added = { ...t.added, ...add } })
+  }, [conts, createdAccts]) // eslint-disable-line react-hooks/exhaustive-deps
   const [contStates, setContStates] = useState<ContStateMap>(() => loadContStates()) // ce qu'il y a VRAIMENT dans chaque container (lu à l'écran)
   const [checking, setChecking] = useState(false)
   const [acctSearch, setAcctSearch] = useState('')
@@ -1243,6 +1253,28 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             <input value={pickQ} onChange={e => setPickQ(e.target.value)} placeholder="Rechercher un iPhone ou un compte…" style={{ ...inp, flex: '1 1 220px', minWidth: 0 }} />
             {!opts?.manage && emptyN > 0 && <button style={{ ...btn, height: 32, fontSize: 12 }} onClick={() => setShowEmptyPhones(v => !v)}>{showEmptyPhones ? 'Masquer' : 'Afficher'} les iPhones pas encore détectés ({emptyN})</button>}
           </div>
+          {!opts?.manage && (() => {
+            // Âge des comptes : combien ont été ajoutés il y a < 1 j / < 3 j / < 7 j ; un clic coche exactement ceux-là
+            // (« + de 7 j » = comptes plus anciens, les plus sûrs pour poster)
+            const accs = filled.flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => ({ id: d.public_id, c, t: ageOf(d.public_id, c) })))
+            if (!accs.length) return null
+            const groupsAge: { k: string; label: string; f: (t: AgeTier | null) => boolean }[] = [
+              { k: '1d', label: '🆕 < 1 j', f: t => t === '1d' }, { k: '3d', label: '< 3 j', f: t => t === '1d' || t === '3d' },
+              { k: '7d', label: '< 7 j', f: t => !!t }, { k: 'old', label: '+ de 7 j', f: t => !t },
+            ]
+            const pick = (f: (t: AgeTier | null) => boolean) => {
+              const by: Record<string, Set<string>> = {}
+              for (const a of accs) if (f(a.t)) (by[a.id] ??= new Set()).add(a.c)
+              setSel(new Set(Object.keys(by))); setSelConts(sc => { const n = { ...sc }; for (const id of Object.keys(n)) n[id] = new Set(); return { ...n, ...by } })
+            }
+            return (
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: DIM, marginRight: 2 }} title="Date à laquelle le compte est apparu sur l’iPhone (vu par ScaleFlow)">Comptes ajoutés</span>
+                {groupsAge.map(g => { const n = accs.filter(a => g.f(a.t)).length
+                  return <button key={g.k} style={chip(false)} disabled={!n || running} title="Cocher exactement ces comptes" onClick={() => pick(g.f)}>{`${g.label} · ${n}`}</button> })}
+              </div>
+            )
+          })()}
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: DIM, marginRight: 2 }}>Groupe</span>
             <button style={chip(!grpFilter)} onClick={() => setGrpFilter('')}>Tous</button>
@@ -1312,6 +1344,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                       <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
                         <span onClick={() => toggleCont(id, c)} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
                           {cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}
+                          {(() => { const t = ageOf(id, c); if (!t) return null
+                            const col = t === '1d' ? '#4ADE80' : t === '3d' ? '#60A5FA' : '#A1A1AA'
+                            return <span title={`Compte ajouté sur l’iPhone il y a ${AGE_LABEL[t].replace('< ', 'moins de ')}`} style={{ fontSize: 10.5, fontWeight: 700, color: col }}>{`🆕 ${AGE_LABEL[t]}`}</span> })()}
                           {(() => { const cs = contStates[id]?.[c]; if (!cs || c.startsWith('@')) return null
                             return <span title={`Vérifié à l’écran le ${new Date(cs.at).toLocaleString()}`} style={{ fontSize: 11, fontWeight: 500, color: cs.state === 'account' ? '#86EFAC' : cs.state === 'empty' ? DIM : cs.state === 'blocked' ? '#F87171' : DIM }}>
                               {cs.state === 'account' ? `· @${cs.username ?? '?'}` : cs.state === 'empty' ? '· vide' : cs.state === 'blocked' ? '· 🤖' : '· ?'}

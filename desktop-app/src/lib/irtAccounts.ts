@@ -121,6 +121,24 @@ export function accountAddedAt(jobs: IrtJob[], username: string): number | null 
   if (first <= 0) return null
   return Date.parse(scans[first].finished_at ?? scans[first].created_at)
 }
+/** Âge d'un compte sur l'iPhone : ajouté il y a moins d'1 jour, de 3 jours ou de 7 jours ; null au-delà ou inconnu
+ *  (1 = déjà là quand le suivi a commencé). Pure. */
+export type AgeTier = '1d' | '3d' | '7d'
+export function ageTier(addedMs: number | null | undefined, now = Date.now()): AgeTier | null {
+  if (!addedMs || addedMs <= 1) return null
+  const d = (now - addedMs) / 86400_000
+  return d < 1 ? '1d' : d < 3 ? '3d' : d < 7 ? '7d' : null
+}
+export const AGE_LABEL: Record<AgeTier, string> = { '1d': '< 1 j', '3d': '< 3 j', '7d': '< 7 j' }
+/** Comptes d'un iPhone pas encore datés → date à enregistrer : date connue (lecture iRemoTech / création ScaleFlow) sinon
+ *  « maintenant » ; mais au tout 1er suivi de l'iPhone (aucun compte daté), les comptes déjà là sont marqués 1 (anciens). Pure. */
+export function newAddedEntries(added: Record<string, number>, dev: string, accounts: string[], now: number, knownAt: (u: string) => number | null): Record<string, number> {
+  const k = (u: string) => `${dev}::@${u.replace(/^@/, '').toLowerCase()}`
+  const tracked = Object.keys(added).some(x => x.startsWith(`${dev}::`))
+  const out: Record<string, number> = {}
+  for (const a of accounts) { if (added[k(a)]) continue; out[k(a)] = knownAt(a) ?? (tracked ? now : 1) }
+  return out
+}
 /** Tri « naturel » des noms d'iPhones : STEVIE2 avant STEVIE10. */
 export const naturalCmp = (a: string, b: string) => a.localeCompare(b, 'fr', { numeric: true, sensitivity: 'base' })
 

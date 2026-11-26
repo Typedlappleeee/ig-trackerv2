@@ -69,3 +69,23 @@ describe('comptes : nouveaux (< 24 h) et ordre des iPhones', () => {
     expect(['STEVIE10', 'STEVIE2', 'STEVIE1'].sort(naturalCmp)).toEqual(['STEVIE1', 'STEVIE2', 'STEVIE10'])
   })
 })
+
+import { ageTier, newAddedEntries } from './irtAccounts'
+describe('âge des comptes (ajoutés < 1 j / 3 j / 7 j)', () => {
+  const now = Date.parse('2026-11-26T12:00:00Z'), h = 3600_000
+  it('paliers', () => {
+    expect(ageTier(now - 5 * h, now)).toBe('1d')
+    expect(ageTier(now - 30 * h, now)).toBe('3d')
+    expect(ageTier(now - 5 * 24 * h, now)).toBe('7d')
+    expect(ageTier(now - 8 * 24 * h, now)).toBeNull()
+    expect(ageTier(1, now)).toBeNull()
+    expect(ageTier(null, now)).toBeNull()
+  })
+  it('1er suivi d’un iPhone : comptes déjà là = anciens ; ensuite les nouveaux sont datés maintenant', () => {
+    const first = newAddedEntries({}, 'd1', ['@a', '@b'], now, () => null)
+    expect(first).toEqual({ 'd1::@a': 1, 'd1::@b': 1 })
+    const next = newAddedEntries(first, 'd1', ['@a', '@b', '@C'], now, () => null)
+    expect(next).toEqual({ 'd1::@c': now })
+    expect(newAddedEntries({}, 'd2', ['@x'], now, u => u === '@x' ? now - h : null)).toEqual({ 'd2::@x': now - h })
+  })
+})

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { deviceLabel, isDeviceOn, listJobs, launchAutomation, type IrtDevice, type IrtJob } from '@/lib/iremotech'
 import { switchAccountByVision } from '@/lib/iremotechVision'
-import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, naturalCmp, type IgProfile, type AccountView } from '@/lib/irtAccounts'
+import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, naturalCmp, ageTier, AGE_LABEL, type IgProfile, type AccountView } from '@/lib/irtAccounts'
 import type { IrtTeam } from '@/lib/irtTeam'
 import { MARKETS, type Market } from '@/lib/captionMarkets'
 import { toast } from '@/lib/ui'
@@ -149,8 +149,11 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     const pic = avatarSrc(p?.profile_pic, a.username)
     const cr = creds[a.username]
     // NOUVEAU = ajouté sur l'iPhone (ou créé par ScaleFlow) il y a moins de 24 h : on évite d'y poster tout de suite
-    const added = Math.max(accountAddedAt(jobs[id] ?? [], a.username) ?? 0, createdAt[a.username] ?? 0)
-    const isNew = added > 0 && Date.now() - added < 24 * 3600_000
+    // âge : 1re apparition sur l'iPhone (suivi partagé de l'équipe), lecture iRemoTech ou création par ScaleFlow
+    const tracked = team?.added[`${id}::@${a.username.toLowerCase()}`] ?? 0
+    const added = Math.max(accountAddedAt(jobs[id] ?? [], a.username) ?? 0, createdAt[a.username] ?? 0, tracked > 1 ? tracked : 0)
+    const tier = ageTier(added)
+    const isNew = !!tier
     const tkey = `${id}::@${a.username}`
     const link = team?.links[tkey] ?? ''
     const story = team?.lastStory[tkey] ?? null
@@ -165,7 +168,7 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
           <span style={{ minWidth: 0 }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
               <a href={`https://www.instagram.com/${a.username}/`} target="_blank" rel="noreferrer" style={{ fontSize: 13.5, fontWeight: 600, color: INK, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{a.username}</a>
-              {isNew && <span title={`Ajouté ${ago(new Date(added).toISOString())} : évite d’y poster tout de suite`} style={{ flex: 'none', height: 18, padding: '0 6px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', background: 'rgba(74,222,128,0.14)', color: '#4ADE80', border: '1px solid rgba(74,222,128,0.35)' }}>NEW</span>}
+              {isNew && <span title={`Ajouté ${ago(new Date(added).toISOString())} : évite d’y poster tout de suite`} style={{ flex: 'none', height: 18, padding: '0 6px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', background: tier === '1d' ? 'rgba(74,222,128,0.14)' : tier === '3d' ? 'rgba(96,165,250,0.14)' : 'rgba(161,161,170,0.12)', color: tier === '1d' ? '#4ADE80' : tier === '3d' ? '#60A5FA' : '#A1A1AA', border: `1px solid ${tier === '1d' ? 'rgba(74,222,128,0.35)' : tier === '3d' ? 'rgba(96,165,250,0.35)' : 'rgba(161,161,170,0.3)'}` }}>{tier === '1d' ? 'NEW' : AGE_LABEL[tier!]}</span>}
             </span>
             {cr?.password
               ? <span onClick={() => { try { navigator.clipboard.writeText(`${a.username}:${cr.password}${cr.twofa ? ':' + cr.twofa : ''}`); toast('Identifiants copiés', 'ok') } catch { /* noop */ } }} title="Copier identifiant:mot de passe" style={{ display: 'block', fontSize: 11, color: DIM, fontFamily: "'JetBrains Mono',monospace", cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🔑 {cr.password}</span>
