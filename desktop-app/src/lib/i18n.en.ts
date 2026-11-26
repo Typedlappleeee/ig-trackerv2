@@ -119,6 +119,8 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "{0} (lecture à l’écran)": "{0} (on-screen reading)",
+    "{0} : comptes non lus à l’écran (Instagram ouvert sur l’iPhone ?)": "{0}: accounts not read on screen (is Instagram open on the iPhone?)",
     "📅 co depuis {0}{1} j": "📅 logged in for {0}{1} d",
     "Connecté sur l’iPhone depuis {0} jour(s)": "Logged in on the iPhone for {0} day(s)",
     "Connecté sur l’iPhone depuis au moins {0} jour(s) (date exacte inconnue)": "Logged in on the iPhone for at least {0} day(s) (exact date unknown)",

@@ -3,7 +3,7 @@
 // Actions : scanner un iPhone, vérifier le statut, lancer un warm-up iRemoTech — à l'unité ou en lot.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { deviceLabel, isDeviceOn, listJobs, launchAutomation, scanAccountsAndWait, queueAccountScan, type IrtDevice, type IrtJob } from '@/lib/iremotech'
-import { switchAccountByVision } from '@/lib/iremotechVision'
+import { switchAccountByVision, detectAccountsByVision } from '@/lib/iremotechVision'
 import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, accountFirstSeenAt, connectedFor, naturalCmp, ageTier, AGE_LABEL, type IgProfile, type AccountView } from '@/lib/irtAccounts'
 import type { IrtTeam } from '@/lib/irtTeam'
 import { MARKETS, type Market } from '@/lib/captionMarkets'
@@ -39,6 +39,9 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
   const [wuMin, setWuMin] = useState(7)
   const [busy, setBusy] = useState<string | null>(null)
   const [scanning, setScanning] = useState<string | null>(null) // iPhone en cours de scan (file un par un)
+  // lectures des comptes faites À L'ÉCRAN de l'iPhone par ScaleFlow (quand iRemoTech refuse un scan trop rapproché)
+  const [live, setLive] = useState<Record<string, { at: number; accounts: string[] }>>(() => { try { return JSON.parse(localStorage.getItem('sf-irt-live-accounts') || '{}') } catch { return {} } })
+  const saveLive = (dev: string, accounts: string[]) => setLive(m => { const n = { ...m, [dev]: { at: Date.now(), accounts } }; try { localStorage.setItem('sf-irt-live-accounts', JSON.stringify(n)) } catch { /* noop */ } return n })
   const [devFilter, setDevFilter] = useState('all')
   const [grouped, setGrouped] = useState(true)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -62,7 +65,7 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     return () => { alive = false }
   }, [apiKey, devices.map(d => d.public_id).join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const view = useMemo(() => Object.fromEntries(devices.map(d => [d.public_id, deviceAccounts(jobs[d.public_id] ?? [], (known[d.public_id] ?? []).filter(c => c.startsWith('@')))])), [devices, jobs, known])
+  const view = useMemo(() => Object.fromEntries(devices.map(d => [d.public_id, deviceAccounts(jobs[d.public_id] ?? [], (known[d.public_id] ?? []).filter(c => c.startsWith('@')), live[d.public_id])])), [devices, jobs, known, live])
 
   // 2. Suivi des jobs en cours (toutes les 20 s)
   useEffect(() => {
@@ -104,23 +107,30 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     setScanning(deviceLabel(d))
     const r = await scanAccountsAndWait(apiKey, d.public_id, { onLaunched: j => setJobs(m => ({ ...m, [d.public_id]: [j, ...(m[d.public_id] ?? [])] })) })
     if (r.job) { const job = r.job; setJobs(m => ({ ...m, [d.public_id]: [job, ...(m[d.public_id] ?? []).filter(x => x.job_id !== job.job_id)] })) }
+    // iRemoTech refuse (scan trop rapproché) ou échoue → lecture DIRECTE à l'écran de l'iPhone (Profil › liste des comptes)
+    if (r.recent || r.job?.status !== 'completed') {
+      setScanning(`${deviceLabel(d)} (lecture à l’écran)`)
+      const accs = await detectAccountsByVision(apiKey, d.public_id, { log: () => { /* silencieux */ } }).catch(() => null)
+      setScanning(null)
+      if (accs && accs.length) { saveLive(d.public_id, accs.map(u => u.toLowerCase())); onScanned?.(d.public_id, accs); return true }
+      toast(`${deviceLabel(d)} : comptes non lus à l’écran (Instagram ouvert sur l’iPhone ?)`, 'bad')
+      return false
+    }
     setScanning(null)
-    if (r.recent) return 'recent' as const   // scanné il y a peu : déjà à jour, pas une erreur
     return r.job?.status === 'completed' ? true : (toast(`${deviceLabel(d)} : ${r.error ?? `scan ${r.job?.status ?? 'refusé'}`}`, 'bad'), false)
   })
   const scan = async (dev: string) => {
     const d = devices.find(x => x.public_id === dev); if (!d) return
     toast('Scan des comptes lancé : ne touche pas l’iPhone pendant ~30 s', 'info')
     const ok = await scanWait(d)
-    if (ok === 'recent') toast(`${deviceLabel(d)} : déjà scanné il y a peu — comptes à jour`, 'info')
-    else if (ok) toast(`${deviceLabel(d)} : comptes relus ✓`, 'ok')
+    if (ok) toast(`${deviceLabel(d)} : comptes relus ✓`, 'ok')
   }
   const scanAll = async () => {
     setBusy('scan')
     const list = devices.filter(isDeviceOn)
-    let n = 0, recent = 0
-    for (const d of list) { const ok = await scanWait(d); if (ok === 'recent') recent++; else if (ok) n++ }   // UN iPhone à la fois
-    setBusy(null); toast(`${n}/${list.length} iPhone(s) scanné(s)${recent ? ` · ${recent} déjà à jour (scannés il y a peu)` : ''}`, n || recent ? 'ok' : 'bad')
+    let n = 0
+    for (const d of list) if (await scanWait(d)) n++   // UN iPhone à la fois
+    setBusy(null); toast(`${n}/${list.length} iPhone(s) scanné(s)`, n ? 'ok' : 'bad')
   }
   // Chiffres relus sur l'iPhone : bascule sur chaque compte (profil affiché → publications / abonnés / abonnements)
   const readOnPhone = async (d: IrtDevice) => {

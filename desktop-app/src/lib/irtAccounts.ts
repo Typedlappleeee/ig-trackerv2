@@ -56,12 +56,15 @@ export interface AccountView {
 export interface DeviceAccounts { accounts: AccountView[]; scannedAt: string | null; scanning: boolean }
 
 /** Comptes d'un iPhone : dernier scan terminé (list_accounts), sinon les comptes déjà connus (`known`, cibles « @nom »). Statut et warm-up = derniers jobs terminés de chaque compte. */
-export function deviceAccounts(jobs: IrtJob[], known: string[] = []): DeviceAccounts {
+export function deviceAccounts(jobs: IrtJob[], known: string[] = [], live?: { at: number; accounts: string[] } | null): DeviceAccounts {
   const js = [...jobs].sort(newest)
   const lastScan = js.find(j => j.type === 'list_accounts' && j.status === 'completed')
-  // La dernière lecture iRemoTech fait foi : un compte déconnecté de l'iPhone disparaît (plus d'union avec les
-  // anciens jobs). Sans lecture : les cibles connues. 5 comptes max par iPhone.
-  const src = lastScan ? ((lastScan.result?.accounts as string[] | undefined) ?? []) : known
+  // La lecture la plus RÉCENTE fait foi : iRemoTech (list_accounts) ou lecture à l'écran de l'iPhone par ScaleFlow (`live`,
+  // quand iRemoTech refuse un nouveau scan trop tôt) ; un compte déconnecté de l'iPhone disparaît. Sans lecture : les
+  // cibles connues. 5 comptes max par iPhone.
+  const scanAt = lastScan ? Date.parse(lastScan.finished_at ?? lastScan.created_at) : 0
+  const useLive = !!live && live.accounts.length > 0 && live.at > scanAt
+  const src = useLive ? live!.accounts : lastScan ? ((lastScan.result?.accounts as string[] | undefined) ?? []) : known
   const names = [...new Set(src.map(u => String(u).replace(/^@/, '').toLowerCase()).filter(u => u && !isJunkUsername(u)))].slice(0, MAX_ACCOUNTS_PER_PHONE)
   const accounts: AccountView[] = names.sort().map(u => {
     const mine = js.filter(j => (j.account ?? '').toLowerCase() === u)
@@ -77,7 +80,7 @@ export function deviceAccounts(jobs: IrtJob[], known: string[] = []): DeviceAcco
       running: run ? (run.type as 'account_status' | 'warm_up') : null,
     }
   })
-  return { accounts, scannedAt: lastScan?.finished_at ?? null, scanning: js.some(j => j.type === 'list_accounts' && pending(j)) }
+  return { accounts, scannedAt: useLive ? new Date(live!.at).toISOString() : lastScan?.finished_at ?? null, scanning: js.some(j => j.type === 'list_accounts' && pending(j)) }
 }
 
 /** Comptes de la dernière lecture iRemoTech réussie (`list_accounts`), en minuscules, sans les lectures parasites. */
