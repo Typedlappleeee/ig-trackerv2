@@ -1,12 +1,12 @@
 // Relais Claude (API Anthropic) pour les textes générés par ScaleFlow : descriptions de Reels, bios, textes CTA.
 // La clé reste sur le serveur (variable Vercel ANTHROPIC_API_KEY), jamais envoyée au navigateur. Réservé aux
-// utilisateurs connectés (session Supabase). Modèle : variable CLAUDE_MODEL, sinon claude-opus-5-5.
+// utilisateurs connectés (session Supabase). Modèle : variable CLAUDE_MODEL, sinon claude-haiku-5-5 (choix du propriétaire : rapide, peu cher).
 //   POST { op: 'status' }                           → { ok, enabled, model }
 //   POST { op: 'chat', system, user, max_tokens }   → { ok, text } | { ok: false, status, error, retryAfter }
 import Anthropic from '@anthropic-ai/sdk'
 import { db, bodyOf } from './_bank.js'
 
-const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-5-5'
+const MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-5-5'
 const send = (res, body) => res.status(200).json(body)
 
 export default async function handler(req, res) {
