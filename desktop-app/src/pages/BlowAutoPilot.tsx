@@ -1378,6 +1378,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                   return <button style={{ ...chip(false), marginLeft: 6 }} disabled={!ks.length || running} title="Les comptes cochés étaient déjà sur l’iPhone : retirer leur badge NEW"
                     onClick={() => editTeam(t => { t.oldAccs = [...new Set([...t.oldAccs, ...ks])] })}>{`Pas nouveaux (cochés) · ${ks.length}`}</button>
                 })()}
+                {(() => {
+                  // annuler : les comptes cochés marqués « ancien » retrouvent leur badge NEW
+                  const back = [...sel].flatMap(d => [...(selConts[d] ?? [])].filter(c => c.startsWith('@')).map(c => `${d}::${c.toLowerCase()}`)).filter(k => team.oldAccs.includes(k))
+                  return back.length > 0 && <button style={chip(false)} disabled={running} title="Les comptes cochés marqués « ancien » retrouvent leur badge NEW"
+                    onClick={() => editTeam(t => { t.oldAccs = t.oldAccs.filter(k => !back.includes(k)) })}>{`Remettre NEW (cochés) · ${back.length}`}</button>
+                })()}
               </div>
             )
           })()}
@@ -1458,9 +1464,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                             const col = t === '1d' ? '#4ADE80' : t === '3d' ? '#60A5FA' : t === '7d' ? '#D4D4D8' : DIM
                             const txt = `${cf.exact ? '' : '≥ '}${cf.days} j`
                             const isNewB = t === '1d' || t === '3d'
-                            return <span title={isNewB ? 'Clic : ce compte était déjà là avant → retirer NEW' : cf.exact ? `Connecté sur l’iPhone depuis ${cf.days} jour(s)` : `Connecté sur l’iPhone depuis au moins ${cf.days} jour(s) (date exacte inconnue)`}
-                              onClick={isNewB ? (e => { e.stopPropagation(); const k = `${id}::${c.toLowerCase()}`; editTeam(tm => { tm.oldAccs = [...new Set([...tm.oldAccs, k])] }) }) : undefined}
-                              style={{ fontSize: 10.5, fontWeight: 700, color: col, cursor: isNewB ? 'pointer' : undefined }}>{`${t === '1d' || t === '3d' ? '🆕 NEW · ' : ''}${txt}`}</span> })()}
+                            void isNewB
+                            return <span title={cf.exact ? `Connecté sur l’iPhone depuis ${cf.days} jour(s)` : `Connecté sur l’iPhone depuis au moins ${cf.days} jour(s) (date exacte inconnue)`}
+                              style={{ fontSize: 10.5, fontWeight: 700, color: col }}>{`${t === '1d' || t === '3d' ? '🆕 NEW · ' : ''}${txt}`}</span> })()}
                           {(() => { const cs = contStates[id]?.[c]; if (!cs || c.startsWith('@')) return null
                             return <span title={`Vérifié à l’écran le ${new Date(cs.at).toLocaleString()}`} style={{ fontSize: 11, fontWeight: 500, color: cs.state === 'account' ? '#86EFAC' : cs.state === 'empty' ? DIM : cs.state === 'blocked' ? '#F87171' : DIM }}>
                               {cs.state === 'account' ? `· @${cs.username ?? '?'}` : cs.state === 'empty' ? '· vide' : cs.state === 'blocked' ? '· 🤖' : '· ?'}

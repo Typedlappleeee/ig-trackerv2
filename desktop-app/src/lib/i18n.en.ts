@@ -119,6 +119,8 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "Les comptes cochés marqués « ancien » retrouvent leur badge NEW": "Selected accounts marked “old” get their NEW badge back",
+    "Remettre NEW (cochés) · {0}": "Restore NEW (selected) · {0}",
     "🏠 Sortie d’Instagram (fermé par l’App Switcher) avant le mode avion…": "🏠 Leaving Instagram (closed via the App Switcher) before airplane mode…",
     "🏠 Instagram fermé (App Switcher).": "🏠 Instagram closed (App Switcher).",
     "bannière « steps complete » ouverte par erreur → fermée": "“steps complete” banner opened by mistake → closed",
