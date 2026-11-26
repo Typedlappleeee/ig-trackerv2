@@ -2,7 +2,7 @@
 // container Crane dans le sélecteur « Select Container » et taper dessus, en scrollant
 // tout seul si besoin. Bien plus fiable que des coordonnées devinées : on VÉRIFIE
 // ce qu'on voit avant de taper, et ça s'adapte au scroll.
-import { snapshot, sendAction, deviceIp, type IrtAction } from './iremotech'
+import { snapshot, sendAction, deviceIp, deviceStopped, type IrtAction } from './iremotech'
 import { ocrWords, findBlueButton, findBlueDots, findWhiteDisks, meanLuma, pixelRgb, findAssistiveTouch, type OcrWord } from './ocr'
 import { isInstagramText, withJoined } from './ocrMatch'
 import { parseProfileCounts, saveScreenStats, parseCount } from './irtAccounts'
@@ -191,7 +191,9 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
   hooks?.log?.('🏠 Sortie d’Instagram (fermé par l’App Switcher) avant le mode avion…')
   await forceCloseForegroundApp(key, deviceId, hooks)
   const before = await deviceIp(key, deviceId)
-  if (await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 2)) {
+  // refus d'iRemoTech (limite de débit ~20 s, raccourci pas encore prêt) : on RÉESSAIE (~1 min) avant tout repli
+  // sur le Centre de contrôle (demande du propriétaire : « si ça refuse, réessaie »)
+  if (await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 6, n => hooks?.log?.(`   mode avion refusé par iRemoTech → nouvel essai (${n + 1}/6)`))) {
     hooks?.log?.(`✈️ Mode avion ON (natif)${before ? ` · IP actuelle ${before}` : ''}…`)
     // VÉRIFIÉ à l'écran : iRemoTech accepte l'ordre mais le raccourci iOS ne tourne pas toujours → l'IP ne change pas
     // (l'IP elle-même est rarement lisible). Opérateur / « 5G » encore affichés = mode avion PAS activé → ON renvoyé,
@@ -201,7 +203,7 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
     for (let k = 0; k < 2 && !onOk; k++) {
       const st = await airplaneOnScreen(key, deviceId)
       onOk = st !== false
-      if (!onOk && k === 0) { hooks?.log?.('   ⚠ mode avion pas activé à l’écran (réseau toujours affiché) → ON renvoyé'); await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 2); await sleep(4000) }
+      if (!onOk && k === 0) { hooks?.log?.('   ⚠ mode avion pas activé à l’écran (réseau toujours affiché) → ON renvoyé'); await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 4); await sleep(4000) }
     }
     if (!onOk) {
       hooks?.log?.('   ⚠ mode avion toujours pas activé → Centre de contrôle')
@@ -474,10 +476,11 @@ export function firstTimeOkTap(words: { text: string; cx: number; cy: number }[]
 }
 
 /** Action renvoyée jusqu'à acceptation (attente croissante : la limite de débit iRemoTech demande ~20 s). */
-async function sendWithRetry(key: string, deviceId: string, action: IrtAction, tries: number): Promise<boolean> {
+async function sendWithRetry(key: string, deviceId: string, action: IrtAction, tries: number, onRetry?: (n: number) => void): Promise<boolean> {
   for (let i = 0; i < tries; i++) {
     if (await sendAction(key, deviceId, action)) return true
-    if (i < tries - 1) await sleep(Math.min(20000, 4000 * (i + 1)))
+    if (deviceStopped(deviceId)) return false   // lancement arrêté : pas d'attente inutile
+    if (i < tries - 1) { onRetry?.(i + 1); await sleep(Math.min(20000, 4000 * (i + 1))) }
   }
   return false
 }

@@ -621,6 +621,7 @@ export const EN: Dict = {
     "⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai": "⚠ another app opened instead of Instagram → back to home, new try",
     "📲 Instagram ouvert (open_app)": "📲 Instagram opened (open_app)",
     "open_app sans effet → icône de l’accueil": "open_app had no effect → home screen icon",
+    "mode avion refusé par iRemoTech → nouvel essai ({0}/6)": "airplane mode refused by iRemoTech → new attempt ({0}/6)",
     "Centre de contrôle resté ouvert → fermé": "Control Center left open → closed",
     "pub « Edits: Video Editor » → fermée": "“Edits: Video Editor” ad → closed",
     "revenu sur la galerie « New reel » → vidéo la plus récente retapée": "back on the “New reel” gallery → most recent video tapped again",
