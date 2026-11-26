@@ -3610,22 +3610,31 @@ async function openInstagramApp(key: string, deviceId: string, hooks?: VisionHoo
   // réessayé : juste après le mode avion, iRemoTech refuse parfois l'action (limite de débit) alors qu'Instagram s'ouvre
   const opened = await sendWithRetry(key, deviceId, { type: 'open_app', target: 'instagram' }, 3)
   {
-    await sleep(4000)
-    await dismissIgInfoSheet(key, deviceId, hooks)   // « Introducing instants », « Stories archive »… posées sur le fil
-    const scr = await readScreenWords(key, deviceId)
-    // Instagram DÉJÀ à l'écran (même si l'action a été refusée) : jamais de recherche d'icône par-dessus
-    if (scr && (homeFeedShown(scr.words, scr.H) || isProfileScreen(scr.words, scr.H) || scr.words.some(o => /^(instants|reels)$/i.test(o.text)) && scr.words.some(o => /^(for|following)$/i.test(o.text)))) {
+    // surveillé ~10 s : quand le raccourci ouvre Apple Music à la place d'Instagram (vu le 26/11/2026 sur SEDRA3, en vrai),
+    // Music affiche d'abord un écran blanc → l'ancien contrôle unique à 4 s le prenait pour Instagram (« Instagram ouvert »)
+    // puis toute la bascule de compte échouait. Instagram n'est accepté que RECONNU, ou après 10 s sans autre app.
+    let scr: Awaited<ReturnType<typeof readScreenWords>> = null
+    let other = false
+    for (let t = 0; t < 4; t++) {
+      await sleep(t ? 2200 : 4000)
+      await dismissIgInfoSheet(key, deviceId, hooks)   // « Introducing instants », « Stories archive »… posées sur le fil
+      scr = await readScreenWords(key, deviceId)
+      if (!scr) continue
+      // Instagram DÉJÀ à l'écran (même si l'action a été refusée) : jamais de recherche d'icône par-dessus
+      if (homeFeedShown(scr.words, scr.H) || isProfileScreen(scr.words, scr.H) || scr.words.some(o => /^(instants|reels)$/i.test(o.text)) && scr.words.some(o => /^(for|following)$/i.test(o.text))) {
+        hooks?.log?.('📲 Instagram ouvert (open_app)')
+        await grantPhotoAccessIfAsked(key, deviceId, hooks)
+        return 'app'
+      }
+      if (otherAppOpened(scr.words)) { other = true; break }
+      if (!opened) break   // action refusée : inutile d'attendre, icône de l'accueil
+    }
+    if (other) hooks?.log?.('   ⚠ open_app a ouvert une autre app (Apple Music…) → icône de l’accueil (le raccourci iRemoTech de cet iPhone est à vérifier)')
+    else if (opened && scr && !isAppLibrary(scr.words) && !isTodayView(scr.words) && !scr.words.some(o => /^(weather|stocks|wallet)$/i.test(o.text))) {
       hooks?.log?.('📲 Instagram ouvert (open_app)')
       await grantPhotoAccessIfAsked(key, deviceId, hooks)
       return 'app'
-    }
-    if (!opened) { /* action refusée et Instagram pas à l'écran : icône de l'accueil */ } else
-    if (scr && !otherAppOpened(scr.words) && !isAppLibrary(scr.words) && !isTodayView(scr.words) && !scr.words.some(o => /^(weather|stocks|wallet)$/i.test(o.text))) {
-      hooks?.log?.('📲 Instagram ouvert (open_app)')
-      await grantPhotoAccessIfAsked(key, deviceId, hooks)
-      return 'app'
-    }
-    if (opened) hooks?.log?.('   open_app sans effet → icône de l’accueil')
+    } else if (opened) hooks?.log?.('   open_app sans effet → icône de l’accueil')
     await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
   }
   // 2. secours : icône trouvée à son nom sur les pages d'accueil

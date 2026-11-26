@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26e',
+    date: '2026-11-26',
+    title: { fr: 'iRemoTech : Apple Music ouvert à la place d’Instagram', en: 'iRemoTech: Apple Music opened instead of Instagram' },
+    items: {
+      fr: ['Quand le raccourci iRemoTech d’un iPhone ouvre Apple Music au lieu d’Instagram, c’est maintenant détecté (écran surveillé ~10 s au lieu d’un seul contrôle) et Instagram est rouvert par son icône — avant, le compte était déclaré « non atteint » et tous ses posts sautés.'],
+      en: ['When an iPhone’s iRemoTech shortcut opens Apple Music instead of Instagram, it is now detected (screen watched ~10 s instead of a single check) and Instagram is reopened from its icon — before, the account was marked “not reached” and all its posts skipped.'],
+    },
+  },
+  {
     id: '2026-11-26d',
     date: '2026-11-26',
     title: { fr: 'Posting : fenêtre « original audio » fiabilisée', en: 'Posting: “original audio” sheet made reliable' },
