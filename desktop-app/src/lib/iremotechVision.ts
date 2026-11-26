@@ -143,7 +143,23 @@ export async function airplaneReset(key: string, deviceId: string, hooks?: Visio
   const before = await deviceIp(key, deviceId)
   if (await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 2)) {
     hooks?.log?.(`✈️ Mode avion ON (natif)${before ? ` · IP actuelle ${before}` : ''}…`)
-    await sleep(holdMs)
+    // VÉRIFIÉ à l'écran : iRemoTech accepte l'ordre mais le raccourci iOS ne tourne pas toujours → l'IP ne change pas
+    // (l'IP elle-même est rarement lisible). Opérateur / « 5G » encore affichés = mode avion PAS activé → ON renvoyé,
+    // puis Centre de contrôle en dernier recours.
+    await sleep(3500)
+    let onOk = false
+    for (let k = 0; k < 2 && !onOk; k++) {
+      const scr = await readScreenWords(key, deviceId)
+      onOk = !scr || stillAirplane(scr.words, scr.W, scr.H)
+      if (!onOk && k === 0) { hooks?.log?.('   ⚠ mode avion pas activé à l’écran (réseau toujours affiché) → ON renvoyé'); await sendWithRetry(key, deviceId, { type: 'airplane', on: true }, 2); await sleep(4000) }
+    }
+    if (!onOk) {
+      hooks?.log?.('   ⚠ mode avion toujours pas activé → Centre de contrôle')
+      await sendWithRetry(key, deviceId, { type: 'airplane', on: false }, 2)
+      return airplaneResetByVision(key, deviceId, hooks, holdMs)
+    }
+    hooks?.log?.('   ✓ mode avion activé (vérifié à l’écran)')
+    await sleep(Math.max(0, holdMs - 3500))
     // OFF OBLIGATOIRE : vu en direct, un « off » refusé (429 rate_limited) laissait l'iPhone en mode avion.
     if (!await sendWithRetry(key, deviceId, { type: 'airplane', on: false }, 6)) {
       await sleep(30000)
