@@ -2,7 +2,7 @@
 // Visible par toute l'agence (chacun voit les sessions de l'espace, qui les a lancées et où elles en sont).
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { listServerRuns, fetchServerLogs, cancelServerRun, type ServerRun, type ServerLog } from '@/lib/irtServer'
-import { confirmDialog } from '@/lib/ui'
+import { confirmDialog, toast } from '@/lib/ui'
 
 const INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#6E6E78', EDGE = 'rgba(255,255,255,0.07)'
 const btn: CSSProperties = { height: 28, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: '#161618', border: '1px solid rgba(255,255,255,0.09)', color: '#E4E4E7' }
@@ -61,6 +61,7 @@ export default function IrtServerRuns({ scope, refreshKey }: { scope: { orgId: s
               <span style={{ fontSize: 11.5, color: DIM }} data-no-tr>{[r.created_by_name, new Date(r.created_at).toLocaleString()].filter(Boolean).join(' · ')}</span>
               <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                 <button type="button" style={btn} onClick={() => setOpen(open === r.id ? null : r.id)}>{open === r.id ? 'Masquer le journal' : 'Journal'}</button>
+                {open === r.id && logs.length > 0 && <button type="button" style={btn} onClick={() => { try { navigator.clipboard.writeText(logs.map(l => l.line).join('\n')); toast('Journal copié : colle-le à Claude ou à l’équipe', 'ok') } catch { toast('Copie impossible', 'bad') } }}>📋 Copier le journal</button>}
                 {live && !r.cancel_requested && <button type="button" style={{ ...btn, color: '#F87171' }} onClick={() => void confirmDialog({ title: 'Arrêter cette session ?', text: 'Le post en cours se termine, puis le serveur s’arrête.', confirmLabel: 'Arrêter', danger: true }).then(ok => { if (ok) void cancelServerRun(r) })}>Arrêter</button>}
               </span>
             </div>

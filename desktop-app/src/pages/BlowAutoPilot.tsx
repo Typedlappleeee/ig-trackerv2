@@ -1513,7 +1513,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => setShowLog(v => !v)}>{showLog ? 'Masquer le journal' : 'Journal détaillé'}</button>
             {running && runId && <button style={{ ...btn, height: 28, fontSize: 12, background: 'rgba(239,68,68,0.08)', color: '#F87171', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => cancelRun(runId)}>■ Arrêter</button>}
-            {!running && <button style={{ ...btn, height: 28, fontSize: 12 }} onClick={() => { try { navigator.clipboard.writeText(logs.join('\n')); toast('Journal copié : colle-le à Claude ou à l’équipe', 'ok') } catch { /* noop */ } }}>📋 Copier le journal</button>}
+            {/* copiable À TOUT MOMENT, même pendant un lancement */}
+            <button style={{ ...btn, height: 28, fontSize: 12 }} disabled={!logs.length} onClick={() => { try { navigator.clipboard.writeText(logs.join('\n')); toast('Journal copié : colle-le à Claude ou à l’équipe', 'ok') } catch { toast('Copie impossible', 'bad') } }}>📋 Copier le journal</button>
             {!running && lastFail && (() => {
               const n = Object.values(lastFail.map).reduce((k, l) => k + l.length, 0)
               if (!n) return null
