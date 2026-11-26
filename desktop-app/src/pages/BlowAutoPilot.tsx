@@ -964,7 +964,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       for (const c of p.targets) {
         if (R.isCancelled()) break
         push(`\n${tag} 🪪 ${c}`)
-        if (!await openTargetByVision(key, p.dev, c, hooks)) { push(`${tag} ⏭ ${c} non atteint`); fail(p.dev, c); R.tick(false); continue }
+        if (!await openTargetByVision(key, p.dev, c, hooks)) { push(`${tag} ⏭ ${c} non atteint`); fail(p.dev, c); await forceCloseForegroundApp(key, p.dev, hooks); R.tick(false); continue }
         if (setupPfp) {
           const { bytes } = await generatePfp()
           push(`${tag} 🎨 photo de profil générée → envoi sur l’iPhone`)
@@ -978,6 +978,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         if (good) ok++
         push(`${tag} ${good ? '✅' : '⚠'} ${c} : photo ${r.pfp == null ? '—' : r.pfp ? '✓' : '✗'} · bio ${r.bio == null ? '—' : r.bio ? '✓' : '✗'}`)
         if (!good) fail(p.dev, c)
+        // setup raté : Instagram fermé → le compte suivant repart d'un écran propre (comme le posting)
+        if (!good && !R.isCancelled()) { push(`${tag} 🧹 setup raté → Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, hooks) }
         R.tick(good)
       }
     }
