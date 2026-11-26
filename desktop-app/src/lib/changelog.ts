@@ -23,6 +23,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Lien du sticker jamais tapé deux fois ; sticker avec emoji bien reconnu en bas à droite ; plus d’attente inutile du bouton Done.',
         'Banque › Corbeille : « Tout restaurer dans » un dossier au choix (ou un nouveau dossier) au lieu du dossier d’origine.',
         'Banque : les compteurs Tout / Vidéos / Images / Sons affichent ceux du dossier ouvert (plus ceux de toute la banque).',
+        'Corbeille : filtres « Supprimés le » / « Ajoutés le » (par jour) — les boutons restaurer / vider n’agissent que sur ce qui est filtré.',
       ],
       en: [
         'CTA Story: new IP (airplane mode) before EVERY account, always — can no longer be turned off.',
@@ -31,6 +32,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Sticker link never typed twice; sticker with emoji correctly detected bottom right; no more useless wait for the Done button.',
         'Bank › Trash: “Restore everything into” a folder of your choice (or a new folder) instead of the original folder.',
         'Bank: the All / Videos / Images / Sounds counters show the open folder’s numbers (not the whole bank’s).',
+        'Trash: “Deleted on” / “Added on” day filters — restore / empty buttons only act on what is filtered.',
       ],
     },
   },

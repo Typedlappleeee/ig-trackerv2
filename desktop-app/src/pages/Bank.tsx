@@ -989,6 +989,17 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const chunkOf = <T,>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
   // dest : restaurer dans CE dossier (tout le contenu de la corbeille rangé au même endroit) ; sinon dossier d'origine
   const [trashDest, setTrashDest] = useState('')
+  // Filtres de la corbeille par jour (date locale AAAA-MM-JJ) : supprimés tel jour, ajoutés tel jour
+  const [trashDelDay, setTrashDelDay] = useState('')
+  const [trashAddDay, setTrashAddDay] = useState('')
+  const dayOf = (iso?: string | null) => { if (!iso) return ''; const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+  const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+  const tv = trash.filter(t => (!trashDelDay || dayOf(t.deleted_at) === trashDelDay) && (!trashAddDay || dayOf(t.created_at) === trashAddDay))
+  const trashDays = (k: 'deleted_at' | 'created_at'): [string, number][] => {
+    const m = new Map<string, number>()
+    for (const t of trash) { const d = dayOf(t[k]); if (d) m.set(d, (m.get(d) ?? 0) + 1) }
+    return [...m.entries()].sort((x, y) => y[0].localeCompare(x[0]))
+  }
   async function restoreMedia(ids: string[], dest?: string) {
     if (!ids.length) return
     let done = 0; let firstErr: string | null = null
@@ -1740,19 +1751,32 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(680px,96vw)', maxHeight: '84vh', display: 'flex', flexDirection: 'column', borderRadius: 20, background: '#101012', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 100px -24px rgba(0,0,0,0.85)', padding: 20, boxSizing: 'border-box', animation: 'aIn .2s cubic-bezier(0.16,1,0.3,1) both' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 11, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)', color: '#FCA5A5' }}><Icon d="M3 6h18|M8 6V4h8v2|M6 6l1 14h10l1-14" size={16} /></span>
-              <span style={{ fontSize: 16.5, fontWeight: 750, color: '#F4F4F5', letterSpacing: '-0.025em' }}>Corbeille <span style={{ color: '#7C7C86', fontWeight: 600 }}>{trash.length}</span></span>
+              <span style={{ fontSize: 16.5, fontWeight: 750, color: '#F4F4F5', letterSpacing: '-0.025em' }}>Corbeille <span style={{ color: '#7C7C86', fontWeight: 600 }}>{tv.length !== trash.length ? `${tv.length} / ${trash.length}` : trash.length}</span></span>
               <button onClick={() => setShowTrash(false)} aria-label="Fermer" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 99, background: 'rgba(255,255,255,0.04)', border: 'none', color: '#A1A1AA', cursor: 'pointer' }}><Icon d="M18 6L6 18|M6 6l12 12" size={14} /></button>
             </div>
             <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#8B8B94' }}>Médias supprimés — restaurables 7 jours puis purgés définitivement.</p>
+            {/* Filtres par JOUR : supprimés tel jour / ajoutés tel jour → les boutons n'agissent que sur ce qui est filtré */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 12.5, color: '#A1A1AA' }}>Supprimés le</span>
+              <select value={trashDelDay} onChange={e => setTrashDelDay(e.target.value)} disabled={!!trashBusy} style={{ ...FIELD_SM, minWidth: 150 }}>
+                <option value="">Tous les jours</option>
+                {trashDays('deleted_at').map(([d, n]) => <option key={d} value={d}>{`${dayLabel(d)} (${n})`}</option>)}
+              </select>
+              <span style={{ fontSize: 12.5, color: '#A1A1AA' }}>Ajoutés le</span>
+              <select value={trashAddDay} onChange={e => setTrashAddDay(e.target.value)} disabled={!!trashBusy} style={{ ...FIELD_SM, minWidth: 150 }}>
+                <option value="">Tous les jours</option>
+                {trashDays('created_at').map(([d, n]) => <option key={d} value={d}>{`${dayLabel(d)} (${n})`}</option>)}
+              </select>
+            </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              <Btn theme={theme} sm tone="primary" label="Tout restaurer" disabled={!!trashBusy || !trash.length} onClick={async () => { await restoreMedia(trash.map(t => t.id)); setShowTrash(false) }} />
-              <Btn theme={theme} sm tone="quiet" label="Vider définitivement" disabled={!!trashBusy || !trash.length} onClick={async () => { if (await confirmDialog({ title: `Supprimer DÉFINITIVEMENT les ${trash.length} médias de la corbeille ?`, confirmLabel: 'Vider définitivement', danger: true })) { await purgeMedia(trash); setShowTrash(false) } }} />
+              <Btn theme={theme} sm tone="primary" label="Tout restaurer" disabled={!!trashBusy || !tv.length} onClick={async () => { await restoreMedia(tv.map(t => t.id)); setShowTrash(false) }} />
+              <Btn theme={theme} sm tone="quiet" label="Vider définitivement" disabled={!!trashBusy || !tv.length} onClick={async () => { if (await confirmDialog({ title: `Supprimer DÉFINITIVEMENT les ${tv.length} médias de la corbeille ?`, confirmLabel: 'Vider définitivement', danger: true })) { await purgeMedia(tv); setShowTrash(false) } }} />
               {trashBusy && <span style={{ alignSelf: 'center', fontSize: 12.5, color: '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>{trashBusy}</span>}
             </div>
             {/* Tout restaurer dans UN dossier choisi (au lieu du dossier d'origine de chaque média) */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 12.5, color: '#A1A1AA' }}>Tout restaurer dans</span>
-              <select value={trashDest} disabled={!!trashBusy || !trash.length} style={{ ...FIELD_SM, minWidth: 220 }}
+              <select value={trashDest} disabled={!!trashBusy || !tv.length} style={{ ...FIELD_SM, minWidth: 220 }}
                 onChange={async e => {
                   const v = e.target.value
                   if (v !== '__new__') { setTrashDest(v); return }
@@ -1763,11 +1787,11 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                 <BankFolderOptions folders={[...new Set([...folderTree([...items.map(i => i.folder), ...folderNames]).map(t => t.path), ...(trashDest ? [trashDest] : [])])]} models={modelRoots} />
                 <option value="__new__">+ Nouveau dossier…</option>
               </select>
-              <Btn theme={theme} sm tone="primary" label={`Restaurer ${trash.length} ici`} disabled={!!trashBusy || !trash.length || !trashDest}
-                onClick={async () => { await restoreMedia(trash.map(t => t.id), trashDest); setShowTrash(false) }} />
+              <Btn theme={theme} sm tone="primary" label={`Restaurer ${tv.length} ici`} disabled={!!trashBusy || !tv.length || !trashDest}
+                onClick={async () => { await restoreMedia(tv.map(t => t.id), trashDest); setShowTrash(false) }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', minHeight: 0, margin: '0 -6px', padding: '0 6px' }}>
-              {trash.slice(0, 200).map(t => {
+              {tv.slice(0, 200).map(t => {
                 const days = t.deleted_at ? Math.max(0, 7 - Math.floor((Date.now() - new Date(t.deleted_at).getTime()) / 86400000)) : 7
                 return (
                   <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px 7px 14px', borderRadius: 12, background: '#151517', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -1778,7 +1802,7 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
                   </div>
                 )
               })}
-              {trash.length > 200 && <span style={{ padding: '8px 4px', fontSize: 12.5, color: '#7C7C86' }}>{`+ ${trash.length - 200} autre(s) — utilise « Tout restaurer » ou « Vider définitivement ».`}</span>}
+              {tv.length > 200 && <span style={{ padding: '8px 4px', fontSize: 12.5, color: '#7C7C86' }}>{`+ ${tv.length - 200} autre(s) — utilise « Tout restaurer » ou « Vider définitivement ».`}</span>}
             </div>
           </div>
         </div>,
