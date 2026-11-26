@@ -124,7 +124,7 @@ export const EN: Dict = {
     "— choisir un dossier —": "— choose a folder —",
     "Restaurer {0} ici": "Restore {0} here",
     "sticker repéré à l’image dans le coin bas-droite": "sticker spotted in the image, bottom-right corner",
-    "✓ intercepté (sélecteur d’apps ouvert ?) → retour sur Instagram": "✓ intercepted (app switcher open?) → back to Instagram",
+    "✓ intercepté (sélecteur d’apps ouvert) → retour sur Instagram": "✓ intercepted (app switcher open) → back to Instagram",
     "outil Texte ouvert → fermé sans écrire": "Text tool open → closed without typing",
     "« Add link » encore ouvert → bouton AssistiveTouch déplacé du ✓, nouvel essai": "“Add link” still open → AssistiveTouch button moved off the ✓, trying again",
     "❌ écran « Add link » impossible à valider → rien n’est publié": "❌ “Add link” screen could not be confirmed → nothing is posted",

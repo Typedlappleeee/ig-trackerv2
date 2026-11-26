@@ -3172,11 +3172,21 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   // bord gauche (déplace le bouton s'il est là, sans effet sinon), puis ✓ à nouveau.
   // Le tap sur le bouton AssistiveTouch peut aussi ouvrir le SÉLECTEUR D'APPS (vu en vrai sur STEVIE3 : cartes Gmail /
   // Téléphone, Instagram à droite) → ni « Add link » ni éditeur : on rouvre Instagram par sa carte (à droite).
-  const editorBack = async () => { const r = await readScreenWords(key, deviceId); if (!r) return true; const a = await findBlueButton(r.shot, 0.85, 1); return !!a && a.cx > r.W * 0.78 }
-  if (!await onAddLink() && !await editorBack()) {
-    hooks?.log?.('   ✓ intercepté (sélecteur d’apps ouvert ?) → retour sur Instagram')
+  // Sélecteur d'apps reconnu POSITIVEMENT (noms d'apps au-dessus des cartes) — sinon AUCUN tap : vu en vrai, un faux
+  // positif (éditeur pas encore reconnu juste après le ✓) tapait sur la Story et ouvrait l'outil Texte.
+  const switcherShown = async () => {
+    const r = await readScreenWords(key, deviceId)
+    return !!r && r.words.some(o => o.cy < r.H * 0.15 && o.cy > r.H * 0.04 && /^(gmail|settings|réglages|phone|téléphone|messages|safari|photos|mail|notes|music|musique|telegram|calendar|calendrier|weather|météo|clock|horloge|files|fichiers)$/i.test(o.text))
+  }
+  if (!await onAddLink() && await switcherShown()) {
+    hooks?.log?.('   ✓ intercepté (sélecteur d’apps ouvert) → retour sur Instagram')
     await tapFrac(0.9, 0.5)
     await sleep(2000)
+  }
+  // outil Texte ouvert par un tap égaré (« Classic / Modern » en bas) → refermé par « Done » (haut-droite), sans écrire
+  if (await hasText(key, deviceId, [/^(classic|modern|signature|typewriter)$/i], hooks, { tries: 1, cropY: [0.6, 1] })) {
+    hooks?.log?.('   outil Texte ouvert → fermé sans écrire')
+    await tapFrac(A.doneBtn.x, 0.065); await sleep(1500)
   }
   for (let k = 0; k < 2 && await onAddLink(); k++) {
     hooks?.log?.('   « Add link » encore ouvert → bouton AssistiveTouch déplacé du ✓, nouvel essai')
