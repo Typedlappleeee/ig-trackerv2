@@ -89,6 +89,8 @@ import { otherAppOpened } from './iremotechVision'
 describe('ouverture d’Instagram vérifiée', () => {
   it('Apple Music ouverte par erreur → détectée', () => {
     expect(otherAppOpened(['Listen', 'Now', 'Browse', 'Radio', 'Library'].map(text => ({ text })))).toBe(true)
+    // « Edit profile » d'Instagram (« Add music, profiles and more ») n'est PAS Apple Music (vu le 26/11/2026)
+    expect(otherAppOpened(['Edit', 'profile', 'Pronouns', 'Bio', 'Banners', 'Add', 'music,', 'profiles'].map(text => ({ text })))).toBe(false)
   })
   it('Instagram ou sélecteur Crane → OK', () => {
     expect(otherAppOpened(['For', 'you', 'Your', 'story'].map(text => ({ text })))).toBe(false)

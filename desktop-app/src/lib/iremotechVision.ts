@@ -935,7 +935,8 @@ export function otherAppOpened(words: { text: string }[]): boolean {
   const t = new Set(words.map(o => o.text.toLowerCase().replace(/[^a-z]/g, '')))
   // indices d'Instagram (fil, profil, inscription, connexion) ou du sélecteur de containers Crane
   // mots propres à Instagram / Crane uniquement (« you », « story »… existent aussi dans Apple Music : piège vu en vrai)
-  const ig = ['instagram', 'following', 'reels', 'followers', 'default', 'container', 'suggested'].some(w => t.has(w))
+  // (+ pages d'Instagram où « music » apparaît : « Edit profile » → « Add music, profiles and more », vu le 26/11/2026)
+  const ig = ['instagram', 'following', 'reels', 'followers', 'default', 'container', 'suggested', 'pronouns', 'banners', 'avatar'].some(w => t.has(w))
   if (ig) return false
   // une autre app : Apple Music (« What's New in Apple Music »), Réglages, Photos…
   return ['music', 'apple', 'listen', 'radio', 'browse', 'songs', 'albums', 'playlists', 'settings', 'general', 'memories', 'wifi', 'automix'].some(w => t.has(w))
