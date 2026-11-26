@@ -621,6 +621,8 @@ export const EN: Dict = {
     "⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai": "⚠ another app opened instead of Instagram → back to home, new try",
     "📲 Instagram ouvert (open_app)": "📲 Instagram opened (open_app)",
     "open_app sans effet → icône de l’accueil": "open_app had no effect → home screen icon",
+    "pub « Edits: Video Editor » → fermée": "“Edits: Video Editor” ad → closed",
+    "revenu sur la galerie « New reel » → vidéo la plus récente retapée": "back on the “New reel” gallery → most recent video tapped again",
     "0/{0} iPhone(s)": "0/{0} iPhone(s)",
     "{0}/{1} iPhone(s)": "{0}/{1} iPhone(s)",
     "iRemoTech lit les comptes connectés de chaque iPhone en ligne, tous les iPhones EN MÊME TEMPS (~30 s, ne pas toucher les iPhones)": "iRemoTech reads the logged-in accounts of every online iPhone, ALL iPhones AT THE SAME TIME (~30 s, don't touch the iPhones)",

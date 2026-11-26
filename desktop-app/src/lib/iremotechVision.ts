@@ -261,6 +261,12 @@ export function sharePageShown(words: { text: string; cx: number; cy: number }[]
   const rows = [sameLine(/^tag$/i, /^people$/i), sameLine(/^add$/i, /^location$/i), words.some(o => /^audience$/i.test(o.text)), sameLine(/^save$/i, /^draft$/i)].filter(Boolean).length
   return title || btn || rows >= 1
 }
+/** Pub de l'app « Edits: Video Editor » (Meta) affichée par-dessus l'éditeur Reel : renvoie le titre « Edits ». Pure. */
+export function editsPromo<T extends { text: string; cy: number }>(words: T[]): T | null {
+  const t = words.find(o => /^edits:?$/i.test(o.text))
+  if (!t) return null
+  return words.some(o => /^(editor|video)$/i.test(o.text) && Math.abs(o.cy - t.cy) < 30) ? t : null
+}
 /** Fenêtre « Update on your original audio » affichée après Share (le Reel n'est pas encore parti). Pure. */
 export function originalAudioSheet(words: { text: string }[]): boolean {
   const has = (re: RegExp) => words.some(o => re.test(o.text))
@@ -1299,7 +1305,8 @@ async function storyDryRunStop(key: string, deviceId: string, placed: boolean, h
 
 export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; location?: LocTarget; stay?: boolean; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
-  const shot0 = await snapRetry(key, deviceId)
+  // capture ratée (limite de débit d'iRemoTech avec 5 iPhones) : 2e série d'essais avant d'abandonner le post
+  const shot0 = await snapRetry(key, deviceId) ?? (await sleep(6000), await snapRetry(key, deviceId))
   const { w: W, h: H } = shot0 ? await imgSize(shot0) : { w: 0, h: 0 }
   if (!W || !H) { hooks?.log?.('❌ écran illisible'); return false }
   const tapFrac = (fx: number, fy: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(fx * W), y: Math.round(fy * H) })
@@ -1536,6 +1543,7 @@ async function addSuggestedMusic(key: string, deviceId: string, hooks?: VisionHo
 async function finishPostFromGallery(key: string, deviceId: string, W: number, H: number, A: typeof REEL_ANCHORS, caption: string | undefined, hooks: VisionHooks | undefined, doneLabel: string, music = false, location?: LocTarget, stay = false): Promise<boolean> {
   // b. Avancer jusqu'à l'écran de légende : Next en haut-droite (texte) ou en bas-droite (bouton bleu).
   let atCaption = false
+  let regalleried = 0
   for (let step = 0; step < 11 && !atCaption; step++) {
     if (hooks?.shouldStop?.()) return false
     const shot = await snapRetry(key, deviceId)
@@ -1554,6 +1562,29 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       const y = ok ? ok.cy : manage ? manage.cy - Math.round(0.067 * H) : blue ? blue.cy : Math.round(0.85 * H)
       await sendAction(key, deviceId, { type: 'tap', x: ok ? ok.cx : Math.round(W / 2), y })
       await sleep(1800); continue
+    }
+    // Pub « Edits: Video Editor » (app Edits de Meta, « Get » / App Store) posée sur l'éditeur (vu le 26/11/2026 sur
+    // SEDRA6/7/9 : Next introuvable, post abandonné) → fermée (✕ / « Not now »), JAMAIS « Get » ni l'App Store
+    const edits = editsPromo(words)
+    if (edits) {
+      hooks?.log?.('   pub « Edits: Video Editor » → fermée')
+      const close = words.find(o => /^(not|cancel|close|dismiss)$/i.test(o.text) && o.cy > edits.cy - H * 0.3)
+      const x = words.find(o => /^[x×✕]$/i.test(o.text) && o.cy < edits.cy && o.cy > edits.cy - H * 0.25 && o.cx < W * 0.3)
+      if (close || x) await sendAction(key, deviceId, { type: 'tap', x: (close ?? x)!.cx, y: (close ?? x)!.cy })
+      else await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W / 2), y1: Math.max(Math.round(edits.cy - H * 0.06), Math.round(H * 0.1)), x2: Math.round(W / 2), y2: Math.round(H * 0.98), duration_ms: 300 })
+      await sleep(1800)
+      const still = await readScreenWords(key, deviceId)
+      if (still && editsPromo(still.words)) await rescue(key, deviceId, 'Close the "Edits: Video Editor" app promotion (tap its X / close / "Not now"). NEVER tap "Get", "Open" or anything that opens the App Store.',
+        async () => { const r = await readScreenWords(key, deviceId); return !!r && !editsPromo(r.words) }, hooks)
+      continue
+    }
+    // Revenu sur la galerie « New reel » (onglets STORY / REEL en bas) : la vidéo n'est pas ouverte → on la retape
+    // (avant : « Next » tapé à l'aveugle en boucle dans la galerie, post abandonné — SEDRA9 le 26/11/2026)
+    if (words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.08) && words.some(o => /^reel$/i.test(o.text) && o.cy < H * 0.08) && words.some(o => /^(story|instants|live)$/i.test(o.text) && o.cy > H * 0.85) && regalleried < 2) {
+      regalleried++
+      hooks?.log?.('   revenu sur la galerie « New reel » → vidéo la plus récente retapée')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(W / 2), y: Math.round(0.446 * H) })
+      await sleep(3500); continue
     }
     // Page « Reels and Remix controls » ouverte par erreur (lien « Manage settings ») → croix en haut à gauche
     if (words.some(o => /^remix$/i.test(o.text) && o.cy < H * 0.1) && words.some(o => /^controls$/i.test(o.text) && o.cy < H * 0.1)) {

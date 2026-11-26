@@ -49,7 +49,7 @@ describe('onglet Profil reconnu', () => {
   })
 })
 
-import { needsPaste, originalAudioSheet, audioSheetShareWord } from './iremotechVision'
+import { needsPaste, originalAudioSheet, audioSheetShareWord, editsPromo } from './iremotechVision'
 describe('saisie et partage', () => {
   it('accents / emojis → collage ; ASCII (même sur plusieurs lignes) → saisie directe', () => {
     expect(needsPaste('vous êtes là ou pas ? 🙈')).toBe(true)
@@ -133,5 +133,13 @@ describe('fenêtre « original audio » : bouton Share', () => {
       w('Share', 203, 638), w('Turn', 160, 690), w('off', 190, 690), w('and', 220, 690), w('share', 260, 690)]
     expect(audioSheetShareWord(words, H)).toEqual(w('Share', 203, 638))
     expect(audioSheetShareWord(words.filter(o => o.cy !== 638), H)).toBeNull()
+  })
+})
+
+describe('pub « Edits: Video Editor »', () => {
+  it('reconnue, mais pas la feuille Create', () => {
+    const w = (text: string, cy: number) => ({ text, cy })
+    expect(editsPromo([w('Edits:', 400), w('NWideo', 400), w('Editor', 401), w('Get', 600)])?.text).toBe('Edits:')
+    expect(editsPromo([w('Reel', 300), w('Edits', 340), w('Post', 380), w('Story', 420)])).toBeNull()
   })
 })
