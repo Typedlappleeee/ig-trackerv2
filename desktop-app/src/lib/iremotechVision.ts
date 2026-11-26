@@ -3774,9 +3774,21 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
     if (!isProfile(scr)) return null
   }
   // 2. nom du compte en haut (avec ⌄) → feuille des comptes, jusqu'à 3 taps
+  // Le NOM est repéré à l'écran (ligne du haut, centrée, pas « steps complete ») : sur les comptes avec la bannière
+  // « 0 of 8 steps complete » juste dessous, le tap à position fixe tombait sur la bannière (vu le 26/11/2026).
   for (let k = 0; k < 3; k++) {
     if (k) hooks?.log?.('   liste des comptes pas ouverte → nouveau tap')
-    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.5 * W), y: Math.round(0.068 * H) })
+    // page « Set up your professional account » ouverte par erreur (tap sur la bannière) → ✕ puis nouvel essai
+    if (scr && scr.words.some(o => /^professional$/i.test(o.text) && o.cy < H * 0.3) && scr.words.some(o => /^steps$/i.test(o.text))) {
+      hooks?.log?.('   bannière « steps complete » ouverte par erreur → fermée')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.063 * H) }); await sleep(1800)
+      scr = await readScreenWords(key, deviceId)
+    }
+    const steps = scr?.words.find(o => /^steps$/i.test(o.text) && o.cy < H * 0.25)
+    const name = scr?.words.filter(o => o.cy > H * 0.035 && o.cy < (steps ? steps.cy - 8 : H * 0.11) && Math.abs(o.cx - W / 2) < W * 0.3 && /[a-z0-9]{3,}/i.test(o.text) && !/^(steps|complete|of)$/i.test(o.text))
+      .sort((a, b) => b.text.length - a.text.length)[0]
+    const y = name ? name.cy : steps ? Math.round(Math.min(0.068 * H, steps.cy - 0.04 * H)) : Math.round(0.068 * H)
+    await sendAction(key, deviceId, { type: 'tap', x: name ? name.cx : Math.round(0.5 * W), y })
     await sleep(2200); scr = await readScreenWords(key, deviceId)
     if (isSheet(scr)) return scr
   }

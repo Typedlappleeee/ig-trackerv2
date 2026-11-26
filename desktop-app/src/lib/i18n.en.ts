@@ -119,6 +119,7 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "bannière « steps complete » ouverte par erreur → fermée": "“steps complete” banner opened by mistake → closed",
     "⚠ Instagram a SUPPRIMÉ une Story de ce compte (« We removed your story ») → écran fermé (✕)": "⚠ Instagram REMOVED a Story from this account (“We removed your story”) → screen closed (✕)",
     "Copier le journal": "Copy log",
     "Journal copié": "Log copied",
