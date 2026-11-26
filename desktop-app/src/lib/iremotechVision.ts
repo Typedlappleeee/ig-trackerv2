@@ -1437,6 +1437,7 @@ export async function postReelByVision(key: string, deviceId: string, opts: { ca
   // 7. Publier : « Share » direct, sinon un « Next » intermédiaire puis « Share ».
   //    Si Share n'est jamais détecté → on abandonne (container suivant).
   if (DRY_RUN.has(deviceId)) return dryRunStop(key, deviceId, hooks)
+  PUBLISH_TAPPED.add(deviceId)
   if (await findTapText(key, deviceId, [/share|partager/i], hooks, { label: 'Share', tries: 3, cropY: [0.85, 1], minX: 0.5 })) {
     hooks?.log?.('📤 Reel partagé.')
   } else {
@@ -1750,6 +1751,7 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
   }
   await closeCaptionEditor()
   if (DRY_RUN.has(deviceId)) return dryRunStop(key, deviceId, hooks)
+  PUBLISH_TAPPED.add(deviceId)
   let shared = false
   for (let k = 0; k < 3 && !shared; k++) {
     if (k) {
@@ -3572,6 +3574,7 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   if (!placed) { const box = await readSticker(); placed = box ? stickerInCorner(box, W, H) : await pillInCorner() }
   hooks?.log?.(placed ? '📍 Sticker lien en bas à droite.' : '   (position du sticker non confirmée par la lecture — on continue)')
   if (DRY_RUN.has(deviceId)) return storyDryRunStop(key, deviceId, placed, hooks)
+  PUBLISH_TAPPED.add(deviceId)
   // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
   const shot2 = await snapRetry(key, deviceId)
   let arrowTapped = false
@@ -3814,6 +3817,22 @@ async function accountBlockedScreen(key: string, deviceId: string): Promise<stri
 /** Quelques pas pilotés par le cerveau vision (écran inconnu). 'done' / 'stop' / 'none' (pas de cerveau ou pas sûr). */
 /** L'IA (Claude, sinon Groq) PREND LE RELAIS quand le script échoue à une étape : elle voit l'écran et enchaîne au plus
  *  4 actions sûres pour atteindre `goal`, puis `check()` vérifie que l'étape est vraiment atteinte (sinon échec normal). */
+/** Bouton de PUBLICATION (Share / flèche de la Story) déjà touché pendant cette action : un échec après ce point n'est
+ *  JAMAIS retenté (double publication possible). Remis à zéro avant chaque post par l'appelant. */
+const PUBLISH_TAPPED = new Set<string>()
+export const resetPublishFlag = (deviceId: string) => { PUBLISH_TAPPED.delete(deviceId) }
+export const publishTapped = (deviceId: string) => PUBLISH_TAPPED.has(deviceId)
+
+/** Après un échec : Claude (ou Groq) remet l'écran au propre SANS rien publier, puis Instagram est fermé — l'appelant
+ *  peut retenter l'action une fois. false si aucune IA n'est disponible (pas de 2e essai). */
+export async function claudeCleanup(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  if (!hasVisionBrain() || hooks?.shouldStop?.()) return false
+  hooks?.log?.(`🧠 ${visionBrainName()} : remise au propre de l’écran avant un 2e essai…`)
+  await brainNavigate(key, deviceId, 'Leave whatever is on screen WITHOUT publishing anything: discard drafts (Discard / Cancel / X, never Delete), close sheets and popups, and go back to the Instagram home feed of the CURRENT account. NEVER tap Share, Post, Send or anything that publishes.', hooks, 5)
+  await forceCloseForegroundApp(key, deviceId, hooks)
+  return true
+}
+
 async function rescue(key: string, deviceId: string, goal: string, check: () => Promise<boolean>, hooks?: VisionHooks): Promise<boolean> {
   if (!hasVisionBrain() || hooks?.shouldStop?.()) return false
   hooks?.log?.(`🧠 ${visionBrainName()} prend le relais : ${goal}`)

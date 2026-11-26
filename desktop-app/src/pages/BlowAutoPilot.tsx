@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, lastUploadError, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { onAccountsSeen, selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision, setupProfileByVision } from '@/lib/iremotechVision'
+import { onAccountsSeen, selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision, setupProfileByVision, claudeCleanup, resetPublishFlag, publishTapped } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { loadContStates, setContState, containersToFill, type ContStateMap } from '@/lib/irtContState'
@@ -922,7 +922,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (airplaneOn || kind === 'story') await airplaneReset(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
           // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
           if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
-          const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
+          let ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
+          // compte non atteint : l'IA remet l'écran au propre, puis 2e essai
+          if (!ok && !R.isCancelled() && await claudeCleanup(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })) ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
           if (!ok) { push(`${tag} ⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; unreachable.add(job.container); fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, 'compte non atteint'); stayedIn = null; continue }
           await sleep(1200)
         }
@@ -973,13 +975,23 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const vh = { log: hooks, shouldStop: () => R.isCancelled() }
         // une erreur inattendue pendant le post = post raté (jamais toute la session de l'iPhone arrêtée)
         let posted = false
-        try {
-          posted = kind === 'story'
-            ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, vh)
-            : kind === 'carousel'
-              ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic, location: job.location, stay: nextSame }, vh)
-              : await postReelByVision(key, p.dev, { caption: job.caption, location: job.location, stay: nextSame }, vh)
-        } catch (e) { push(`${tag} ❌ erreur inattendue : ${e instanceof Error ? e.message : String(e)}`) }
+        const doPost = async () => {
+          resetPublishFlag(p.dev)
+          try {
+            return kind === 'story'
+              ? await postStoryByVision(key, p.dev, { link: job.link, caption: job.caption }, vh)
+              : kind === 'carousel'
+                ? await postCarouselByVision(key, p.dev, { count: job.vids.length, caption: job.caption, music: carMusic, location: job.location, stay: nextSame }, vh)
+                : await postReelByVision(key, p.dev, { caption: job.caption, location: job.location, stay: nextSame }, vh)
+          } catch (e) { push(`${tag} ❌ erreur inattendue : ${e instanceof Error ? e.message : String(e)}`); return false }
+        }
+        posted = await doPost()
+        // ÉCHEC AVANT le bouton de publication (Share / flèche jamais touchés) : l'IA remet l'écran au propre, on rouvre le
+        // compte et on retente UNE fois (la vidéo injectée est toujours la plus récente). Après Share : jamais (double post).
+        if (!posted && !R.isCancelled() && !publishTapped(p.dev) && await claudeCleanup(key, p.dev, vh)) {
+          push(`${tag} 🔁 2e essai du post (rien n’avait été publié)`)
+          if (await openTargetByVision(key, p.dev, job.container, vh)) { await sleep(1200); posted = await doPost() }
+        }
         if (posted && nextSame && kind !== 'story') stayedIn = job.container
         push(posted ? `${tag} ✅ « ${job.container} » publié` : `${tag} ⚠ « ${job.container} » interrompu`)
         // Post RATÉ : on abandonne ce post (jamais retenté) et on ferme Instagram TOUT DE SUITE → le post suivant repart
@@ -1063,7 +1075,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       for (const c of p.targets) {
         if (R.isCancelled()) break
         push(`\n${tag} 🪪 ${c}`)
-        if (!await openTargetByVision(key, p.dev, c, hooks)) { push(`${tag} ⏭ ${c} non atteint`); fail(p.dev, c); await forceCloseForegroundApp(key, p.dev, hooks); R.tick(false); L.rec(p.dev, p.name, c, false, 'compte non atteint'); continue }
+        let reached = await openTargetByVision(key, p.dev, c, hooks)
+        if (!reached && !R.isCancelled() && await claudeCleanup(key, p.dev, hooks)) reached = await openTargetByVision(key, p.dev, c, hooks)
+        if (!reached) { push(`${tag} ⏭ ${c} non atteint`); fail(p.dev, c); await forceCloseForegroundApp(key, p.dev, hooks); R.tick(false); L.rec(p.dev, p.name, c, false, 'compte non atteint'); continue }
         if (setupPfp) {
           const { bytes } = await generatePfp()
           push(`${tag} 🎨 photo de profil générée → envoi sur l’iPhone`)
@@ -1073,6 +1087,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const m = marketOf(p.dev, c)
         const bio = setupBio ? bios[m].shift() : undefined
         const r = await setupProfileByVision(key, p.dev, { pfp: setupPfp, bio }, hooks)
+        // partie ratée (photo et/ou bio) : l'IA remet l'écran au propre, on rouvre le compte et on refait SEULEMENT ce qui manque
+        if (((setupPfp && r.pfp === false) || (bio && r.bio === false)) && !R.isCancelled() && await claudeCleanup(key, p.dev, hooks)) {
+          push(`${tag} 🔁 2e essai du setup (${[setupPfp && r.pfp === false ? 'photo' : '', bio && r.bio === false ? 'bio' : ''].filter(Boolean).join(' + ')})`)
+          if (await openTargetByVision(key, p.dev, c, hooks)) {
+            const r2 = await setupProfileByVision(key, p.dev, { pfp: setupPfp && r.pfp === false, bio: r.bio === false ? bio : undefined }, hooks)
+            if (r.pfp === false && r2.pfp) r.pfp = true
+            if (r.bio === false && r2.bio) r.bio = true
+          }
+        }
         const good = (r.pfp ?? true) && (r.bio ?? true)
         if (good) ok++
         push(`${tag} ${good ? '✅' : '⚠'} ${c} : photo ${r.pfp == null ? '—' : r.pfp ? '✓' : '✗'} · bio ${r.bio == null ? '—' : r.bio ? '✓' : '✗'}`)
@@ -1322,7 +1345,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         if (R.isCancelled()) break
         push(`\n${tag} 🔥 conteneur « ${c} »`)
         if (airplaneOn) await airplaneReset(key, p.dev, hooks)
-        const opened = await openTargetByVision(key, p.dev, c, hooks)
+        let opened = await openTargetByVision(key, p.dev, c, hooks)
+        if (!opened && !R.isCancelled() && await claudeCleanup(key, p.dev, hooks)) opened = await openTargetByVision(key, p.dev, c, hooks)
         if (!opened) { push(`${tag} ⏭ conteneur non atteint`); R.tick(false); L.rec(p.dev, p.name, c, false, 'compte non atteint'); continue }
         await sleep(1200)
         const started = Date.now()

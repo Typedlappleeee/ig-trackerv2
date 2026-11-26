@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26k',
+    date: '2026-11-26',
+    title: { fr: 'iRemoTech : Claude + 2e essai après chaque échec', en: 'iRemoTech: Claude + 2nd attempt after every failure' },
+    items: {
+      fr: ['Dès qu’une automatisation échoue (compte non atteint, post / Story / carrousel raté, setup photo ou bio raté, warm-up), Claude remet l’écran au propre sans rien publier, Instagram est rouvert sur le compte et l’action est retentée une fois.', 'Sécurité : un post n’est JAMAIS retenté si le bouton Share (ou la flèche de la Story) a déjà été touché — pas de double publication.', 'Setup : au 2e essai, seule la partie ratée (photo ou bio) est refaite.'],
+      en: ['As soon as an automation fails (account not reached, failed post / Story / carousel, failed setup picture or bio, warm-up), Claude cleans up the screen without publishing anything, Instagram is reopened on the account and the action is retried once.', 'Safety: a post is NEVER retried if the Share button (or the Story arrow) was already tapped — no double post.', 'Setup: on the 2nd attempt, only the failed part (picture or bio) is redone.'],
+    },
+  },
+  {
     id: '2026-11-26j',
     date: '2026-11-26',
     title: { fr: 'Setup compte fiabilisé', en: 'Account setup made reliable' },
