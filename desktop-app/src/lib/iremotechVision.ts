@@ -3604,6 +3604,12 @@ async function backToTabs(key: string, deviceId: string, hooks?: VisionHooks): P
     }
     const discard = words.find(o => /^discard$/i.test(o.text) && o.cy > H * 0.3)
     if (discard) { hooks?.log?.('   « Discard » (brouillon abandonné)'); await sendAction(key, deviceId, { type: 'tap', x: discard.cx, y: discard.cy }); await sleep(1800); continue }
+    // page « Meta Account / Your account » (ouverte depuis la liste des comptes, Instagram s'y rouvre — vu le 26/11/2026
+    // sur SEDRA3) → ✕ en haut à gauche
+    if (top(/^meta$/i) && top(/^account$/i)) {
+      hooks?.log?.('   page « Meta Account » → fermée (✕)')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.075 * W), y: Math.round(0.116 * H) }); await sleep(1800); continue
+    }
     // page de recherche « Search or ask Meta AI » (onglet Recherche ouvert par erreur, vu le 26/11/2026 sur SEDRA5) → ‹ retour
     if (top(/^(search|ask)$/i) && words.some(o => /^meta$/i.test(o.text) && o.cy < H * 0.3) && words.some(o => /^(ai|suggestions)$/i.test(o.text))) {
       hooks?.log?.('   page « Search or ask Meta AI » → retour')

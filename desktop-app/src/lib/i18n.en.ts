@@ -119,6 +119,7 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "page « Meta Account » → fermée (✕)": "“Meta Account” page → closed (✕)",
     "{0} 🧹 setup raté → Instagram fermé (reprise propre)": "{0} 🧹 setup failed → Instagram closed (clean restart)",
     "retour à « Edit profile » avant la bio": "back to “Edit profile” before the bio",
     "éditeur ouvert par erreur → retour sans rien changer": "editor opened by mistake → back without changing anything",
