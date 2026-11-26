@@ -6,7 +6,7 @@
 //   • Story      : pool de photos + lien CTA par container → Story (vision)
 //   • Compte     : création de compte IG (pays UK/USA + numéro/SMS 5sim)
 // La sélection téléphones/containers est PARTAGÉE entre les onglets.
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -34,7 +34,7 @@ import { generateBios } from '@/lib/bioMarkets'
 import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } from '@/lib/ctaMarkets'
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
-import { startIrtLog } from '@/lib/irtResults'
+import { startIrtLog, loadIrtResults, aggregateResults, type IrtResultEntry } from '@/lib/irtResults'
 import { listJobs, scanAccountsAndWait, queueAccountScan, stopDevices, releaseDevices, type IrtJob } from '@/lib/iremotech'
 import { claudeStatus } from '@/lib/claude'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
@@ -368,6 +368,18 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const [keyOpen, setKeyOpen] = useState(false)   // formulaire de la clé iRemoTech
 
   const [running, setRunning] = useState(false)
+  // Résultats des automatisations (page « Résultats ») affichés sur chaque compte de TOUTES les sélections :
+  // setup fait, Story CTA / Reels / carrousels / warm-up des dernières 24 h. Relus chaque minute et après un lancement.
+  const [resEntries, setResEntries] = useState<IrtResultEntry[]>([])
+  useEffect(() => {
+    let alive = true
+    const load = () => void loadIrtResults(teamScope, Date.now() - 90 * 864e5).then(e => { if (alive) setResEntries(e) }, () => undefined)
+    load(); const t = setInterval(load, 60_000)
+    return () => { alive = false; clearInterval(t) }
+  }, [teamScope.orgId, user.id, running]) // eslint-disable-line react-hooks/exhaustive-deps
+  const res90 = useMemo(() => new Map(aggregateResults(resEntries).map(a => [a.key, a])), [resEntries])
+  const res24 = useMemo(() => new Map(aggregateResults(resEntries, Date.now() - 864e5).map(a => [a.key, a])), [resEntries])
+  const resOf = (dev: string, c: string) => ({ all: res90.get(`${dev}::${c.toLowerCase()}`), day: res24.get(`${dev}::${c.toLowerCase()}`) })
   const [runId, setRunId] = useState<string | null>(null)
   // Journal de la dernière session GARDÉ dans le navigateur (relu après un rafraîchissement → « 📋 Copier le journal »)
   const [logs, setLogs] = useState<string[]>(() => { try { const a = JSON.parse(localStorage.getItem('sf-irt-last-log') ?? '[]'); return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [] } catch { return [] } })
@@ -1507,6 +1519,19 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                             void isNewB
                             return <span title={cf.exact ? `Connecté sur l’iPhone depuis ${cf.days} jour(s)` : `Connecté sur l’iPhone depuis au moins ${cf.days} jour(s) (date exacte inconnue)`}
                               style={{ fontSize: 10.5, fontWeight: 700, color: col }}>{`${t === '1d' || t === '3d' ? '🆕 NEW · ' : ''}${txt}`}</span> })()}
+                          {(() => { const { all, day } = resOf(id, c)
+                            const story = Math.max(day?.by.story.lastOk ?? 0, (team.lastStory[`${id}::${c}`] ?? 0) > Date.now() - 864e5 ? team.lastStory[`${id}::${c}`] : 0)
+                            const b: [string, string, string][] = []
+                            if (all?.by.setup.lastOk) b.push(['🪪✓', `Setup fait le ${new Date(all.by.setup.lastOk).toLocaleString()}`, '#86EFAC'])
+                            if (story) b.push(['🔗 CTA', `Story CTA publiée ces dernières 24 h (${new Date(story).toLocaleTimeString()})`, '#4ADE80'])
+                            if (day?.by.reel.ok) b.push([`🎬 ${day.by.reel.ok}`, `${day.by.reel.ok} Reel(s) publié(s) ces dernières 24 h`, '#4ADE80'])
+                            if (day?.by.carousel.ok) b.push([`🖼 ${day.by.carousel.ok}`, `${day.by.carousel.ok} carrousel(s) publié(s) ces dernières 24 h`, '#4ADE80'])
+                            if (day?.by.warmup.ok) b.push(['🔥', `Warm-up fait ces dernières 24 h (${day.by.warmup.ok})`, '#FDBA74'])
+                            // échec récent = raté ces 24 h et pas réussi depuis
+                            const errs = day ? (['reel', 'story', 'carousel', 'setup', 'warmup'] as const).filter(k => day.by[k].err > 0 && (day.by[k].lastErr ?? 0) > (day.by[k].lastOk ?? 0)).length : 0
+                            if (errs) b.push(['⚠', 'Échec ces dernières 24 h (détail dans Résultats)', '#F87171'])
+                            return b.map(([t, title, col]) => <span key={t} title={title} style={{ fontSize: 10.5, fontWeight: 700, color: col }}>{t}</span>)
+                          })()}
                           {(() => { const cs = contStates[id]?.[c]; if (!cs || c.startsWith('@')) return null
                             return <span title={`Vérifié à l’écran le ${new Date(cs.at).toLocaleString()}`} style={{ fontSize: 11, fontWeight: 500, color: cs.state === 'account' ? '#86EFAC' : cs.state === 'empty' ? DIM : cs.state === 'blocked' ? '#F87171' : DIM }}>
                               {cs.state === 'account' ? `· @${cs.username ?? '?'}` : cs.state === 'empty' ? '· vide' : cs.state === 'blocked' ? '· 🤖' : '· ?'}

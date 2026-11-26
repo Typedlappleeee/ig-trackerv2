@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26h',
+    date: '2026-11-26',
+    title: { fr: 'iRemoTech : état de chaque compte dans les sélections', en: 'iRemoTech: each account’s status in the selections' },
+    items: {
+      fr: ['Sur chaque compte, dans la sélection de TOUS les lancements (Posting, Story CTA, carrousel, setup, warm-up) : 🪪✓ = setup fait, 🔗 CTA = Story CTA publiée ces dernières 24 h, 🎬 N = Reels publiés ces 24 h, 🖼 N = carrousels, 🔥 = warm-up fait, ⚠ = échec récent (détail au survol et dans Résultats).'],
+      en: ['On every account, in the selection of ALL runs (Posting, CTA Story, carousel, setup, warm-up): 🪪✓ = setup done, 🔗 CTA = CTA Story posted in the last 24 h, 🎬 N = Reels posted in the last 24 h, 🖼 N = carousels, 🔥 = warm-up done, ⚠ = recent failure (details on hover and in Results).'],
+    },
+  },
+  {
     id: '2026-11-26g',
     date: '2026-11-26',
     title: { fr: 'iRemoTech : raccourci qui ouvre Apple Music', en: 'iRemoTech: shortcut opening Apple Music' },
