@@ -182,11 +182,13 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     // EXACT : apparu entre deux lectures iRemoTech, ou créé par ScaleFlow. La 1re fois vu par ScaleFlow = minimum seulement.
     const tracked = team?.added[`${id}::@${a.username.toLowerCase()}`] ?? 0
     const added = Math.max(accountAddedAt(jobs[id] ?? [], a.username) ?? 0, createdAt[a.username] ?? 0)
-    const tier = ageTier(added)
-    const isNew = !!tier
+    let tier = ageTier(added)
+    let isNew = !!tier
     // depuis combien de jours le compte est connecté (exact, sinon « au moins » d'après la plus ancienne lecture)
     const seenMin = [team?.since[`${id}::@${a.username.toLowerCase()}`], tracked, accountFirstSeenAt(jobs[id] ?? [], a.username)].filter((x): x is number => !!x && x > 1)
     const conn = connectedFor(added || null, seenMin.length ? Math.min(...seenMin) : null)
+    // badge NEW / < 3 j / < 7 j : aussi d'après la 1re fois vu sur le téléphone (demande du propriétaire)
+    if (!tier && conn) { tier = ageTier(Date.now() - conn.days * 86400_000 - 3600_000); isNew = !!tier }
     const tkey = `${id}::@${a.username}`
     const link = team?.links[tkey] ?? ''
     const story = team?.lastStory[tkey] ?? null

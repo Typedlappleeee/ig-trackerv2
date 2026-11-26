@@ -232,9 +232,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
   const ageOf = (dev: string, c: string): AgeTier | null => {
     if (c.startsWith('@')) {
-      const u = c.slice(1).toLowerCase()
-      const created = createdAccts.find(a => a.ok && a.username?.toLowerCase() === u)?.at ?? 0
-      return ageTier(Math.max(created, accountAddedAt(irtJobs[dev] ?? [], u) ?? 0))   // « nouveau » = date EXACTE seulement
+      // badge d'âge (🆕 < 1 j…) : d'après le nombre de jours affiché (date exacte, sinon 1re fois vu sur le téléphone)
+      const cf = connOf(dev, c)
+      return cf ? ageTier(Date.now() - cf.days * 86400_000 - 3600_000) : null
     }
     const made = createdAccts.filter(a => a.ok && a.device === dev && a.container === c).reduce((m, a) => Math.max(m, a.at), 0)
     return ageTier(made)
