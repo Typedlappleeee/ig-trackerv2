@@ -119,6 +119,7 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "✓ intercepté (sélecteur d’apps ouvert ?) → retour sur Instagram": "✓ intercepted (app switcher open?) → back to Instagram",
     "outil Texte ouvert → fermé sans écrire": "Text tool open → closed without typing",
     "« Add link » encore ouvert → bouton AssistiveTouch déplacé du ✓, nouvel essai": "“Add link” still open → AssistiveTouch button moved off the ✓, trying again",
     "❌ écran « Add link » impossible à valider → rien n’est publié": "❌ “Add link” screen could not be confirmed → nothing is posted",

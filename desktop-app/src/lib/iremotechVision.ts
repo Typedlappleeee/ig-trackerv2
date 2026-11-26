@@ -3170,6 +3170,14 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   // « Add link » toujours affiché = le ✓ n'a pas reçu le tap : le bouton AssistiveTouch ESTOMPÉ (semi-transparent, donc
   // invisible pour le détecteur) est posé dessus (vu en vrai le 26/11/2026 sur STEVIE3). Glissement depuis le ✓ vers le
   // bord gauche (déplace le bouton s'il est là, sans effet sinon), puis ✓ à nouveau.
+  // Le tap sur le bouton AssistiveTouch peut aussi ouvrir le SÉLECTEUR D'APPS (vu en vrai sur STEVIE3 : cartes Gmail /
+  // Téléphone, Instagram à droite) → ni « Add link » ni éditeur : on rouvre Instagram par sa carte (à droite).
+  const editorBack = async () => { const r = await readScreenWords(key, deviceId); if (!r) return true; const a = await findBlueButton(r.shot, 0.85, 1); return !!a && a.cx > r.W * 0.78 }
+  if (!await onAddLink() && !await editorBack()) {
+    hooks?.log?.('   ✓ intercepté (sélecteur d’apps ouvert ?) → retour sur Instagram')
+    await tapFrac(0.9, 0.5)
+    await sleep(2000)
+  }
   for (let k = 0; k < 2 && await onAddLink(); k++) {
     hooks?.log?.('   « Add link » encore ouvert → bouton AssistiveTouch déplacé du ✓, nouvel essai')
     await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(A.linkDone.x * W), y1: Math.round(A.linkDone.y * H), x2: 30, y2: Math.round(H * 0.5), duration_ms: 700 })
