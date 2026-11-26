@@ -1362,6 +1362,23 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
 
   // Filtrage + tri.
   const ql = q.trim().toLowerCase()
+  // Compteurs des onglets Tout / Vidéos / Images / Sons : ceux du DOSSIER ouvert (pas de toute la banque / modèle)
+  const folderCounts = useMemo(() => {
+    const c = { video: 0, image: 0, audio: 0 }
+    for (const i of items) {
+      if (!inScope(i.folder)) continue
+      const ok = folder === 'Tous' ? true
+        : folder === '★ Favoris' ? isFav(i)
+        : folder === 'Jamais publiées' ? (i.used_count ?? 0) === 0
+        : folder === 'Publiés' ? (i.used_count ?? 0) > 0
+        : folder === 'Sans dossier' ? !i.folder
+        : isWithin(i.folder, folder)
+      if (!ok) continue
+      if (hidePosted && folder !== 'Publiés' && folder !== 'Jamais publiées' && (i.used_count ?? 0) > 0) continue
+      c[inferType(i)]++
+    }
+    return c
+  }, [items, inScope, folder, hidePosted]) // eslint-disable-line react-hooks/exhaustive-deps
   const shownAll = useMemo(() => {
     let a = typed.filter(i => {
       const fMatch = folder === 'Tous'
@@ -1681,10 +1698,10 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     else toast(on ? `${targets.length} média(s) ajouté(s) aux favoris.` : `${targets.length} média(s) retiré(s) des favoris.`, 'ok')
   }
   const KIND_FILTERS: { v: KindFilter; l: string }[] = [
-    { v: 'all', l: `Tout · ${counts.video + counts.image + counts.audio}` },
-    { v: 'video', l: `Vidéos · ${counts.video}` },
-    { v: 'image', l: `Images · ${counts.image}` },
-    { v: 'audio', l: `Sons · ${counts.audio}` },
+    { v: 'all', l: `Tout · ${folderCounts.video + folderCounts.image + folderCounts.audio}` },
+    { v: 'video', l: `Vidéos · ${folderCounts.video}` },
+    { v: 'image', l: `Images · ${folderCounts.image}` },
+    { v: 'audio', l: `Sons · ${folderCounts.audio}` },
   ]
 
   const isCloud = infra === 'cloud'

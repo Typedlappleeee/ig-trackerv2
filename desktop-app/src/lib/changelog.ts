@@ -22,6 +22,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Bouton gris AssistiveTouch rangé à gauche dans l’éditeur de Story (il recouvrait l’icône sticker et ouvrait le sélecteur d’apps).',
         'Lien du sticker jamais tapé deux fois ; sticker avec emoji bien reconnu en bas à droite ; plus d’attente inutile du bouton Done.',
         'Banque › Corbeille : « Tout restaurer dans » un dossier au choix (ou un nouveau dossier) au lieu du dossier d’origine.',
+        'Banque : les compteurs Tout / Vidéos / Images / Sons affichent ceux du dossier ouvert (plus ceux de toute la banque).',
       ],
       en: [
         'CTA Story: new IP (airplane mode) before EVERY account, always — can no longer be turned off.',
@@ -29,6 +30,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Grey AssistiveTouch button moved to the left in the Story editor (it covered the sticker icon and opened the app switcher).',
         'Sticker link never typed twice; sticker with emoji correctly detected bottom right; no more useless wait for the Done button.',
         'Bank › Trash: “Restore everything into” a folder of your choice (or a new folder) instead of the original folder.',
+        'Bank: the All / Videos / Images / Sounds counters show the open folder’s numbers (not the whole bank’s).',
       ],
     },
   },
