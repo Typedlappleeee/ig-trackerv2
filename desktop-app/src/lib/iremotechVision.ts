@@ -1887,13 +1887,18 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
   hooks?.log?.('🖼 Photo de profil : Edit picture › Choose from library…')
   // lien « Edit picture (or avatar) » lu à l'écran (sa place change : page « Complete your profile » plus bas), sinon la photo
   // (« Edit profile » : y ≈ 0,29 H ; « Complete your profile » : y ≈ 0,49 H — vu en vrai le 26/11/2026)
-  const ep = (await readScreenWords(key, deviceId))?.words.find(o => /^picture$/i.test(o.text) && o.cy < H * 0.6)
-  if (ep) await tap(ep.cx, ep.cy)
-  else await tap(0.36 * W, 0.215 * H) // la photo actuelle (en haut à gauche)
-  await sleep(2200)
-  const sh = await readScreenWords(key, deviceId)
-  const choose = sh?.words.find(o => /^choose$/i.test(o.text) && o.cy > H * 0.4)
-  if (!choose) { hooks?.log?.('   ⚠ « Choose from library » introuvable'); await tap(0.5 * W, 0.12 * H); await sleep(1200); return false }
+  // texte bleu parfois illisible → positions connues de la photo : « Edit profile » (0,2 H) puis « Complete your profile » (0,4 H)
+  const ep = (await readScreenWords(key, deviceId))?.words.find(o => /^(picture|avatar)$/i.test(o.text) && o.cy < H * 0.6)
+  const spots: [number, number][] = [...(ep ? [[ep.cx, ep.cy] as [number, number]] : []), [0.36 * W, 0.2 * H], [0.36 * W, 0.4 * H], [0.5 * W, 0.49 * H]]
+  let choose: { cx: number; cy: number } | undefined
+  for (const [x, y] of spots) {
+    await tap(x, y)
+    await sleep(2200)
+    const sh = await readScreenWords(key, deviceId)
+    choose = sh?.words.find(o => /^choose$/i.test(o.text) && o.cy > H * 0.4)
+    if (choose) break
+  }
+  if (!choose) { hooks?.log?.('   ⚠ « Choose from library » introuvable'); return false }
   await tap(choose.cx + 30, choose.cy)
   await sleep(3000)
   const lib = await readScreenWords(key, deviceId)
