@@ -220,10 +220,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const connOf = (dev: string, c: string) => {
     if (c.startsWith('@')) {
       const u = c.slice(1).toLowerCase(), k = `${dev}::@${u}`
-      const tracked = team.added[k] ?? 0
+      // EXACT seulement : créé par ScaleFlow, ou apparu entre deux lectures iRemoTech. La 1re fois que ScaleFlow le voit
+      // n'est qu'un MINIMUM (un vieux compte vu pour la 1re fois aujourd'hui n'est pas « nouveau » — vu le 26/11/2026)
       const created = createdAccts.find(a => a.ok && a.username?.toLowerCase() === u)?.at ?? 0
-      const exact = Math.max(tracked > 1 ? tracked : 0, created, accountAddedAt(irtJobs[dev] ?? [], u) ?? 0) || null
-      const seen = [team.since[k], accountFirstSeenAt(irtJobs[dev] ?? [], u)].filter((x): x is number => !!x && x > 1)
+      const exact = Math.max(created, accountAddedAt(irtJobs[dev] ?? [], u) ?? 0) || null
+      const seen = [team.since[k], team.added[k], accountFirstSeenAt(irtJobs[dev] ?? [], u)].filter((x): x is number => !!x && x > 1)
       return connectedFor(exact, seen.length ? Math.min(...seen) : null)
     }
     const made = createdAccts.filter(a => a.ok && a.device === dev && a.container === c).reduce((m, a) => Math.max(m, a.at), 0)
@@ -232,9 +233,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const ageOf = (dev: string, c: string): AgeTier | null => {
     if (c.startsWith('@')) {
       const u = c.slice(1).toLowerCase()
-      const tracked = team.added[`${dev}::@${u}`] ?? 0
       const created = createdAccts.find(a => a.ok && a.username?.toLowerCase() === u)?.at ?? 0
-      return ageTier(Math.max(tracked > 1 ? tracked : 0, created, accountAddedAt(irtJobs[dev] ?? [], u) ?? 0))
+      return ageTier(Math.max(created, accountAddedAt(irtJobs[dev] ?? [], u) ?? 0))   // « nouveau » = date EXACTE seulement
     }
     const made = createdAccts.filter(a => a.ok && a.device === dev && a.container === c).reduce((m, a) => Math.max(m, a.at), 0)
     return ageTier(made)
@@ -312,7 +312,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   useEffect(() => {
     const created = Object.fromEntries(createdAccts.filter(a => a.username).map(a => [a.username!.toLowerCase(), a.at]))
     const add: Record<string, number> = {}
-    for (const [dev, list] of Object.entries(conts)) Object.assign(add, newAddedEntries(team.added, dev, list.filter(c => c.startsWith('@')), Date.now(), u => created[u.replace(/^@/, '').toLowerCase()] ?? null))
+    // 1re fois vu par ScaleFlow (minimum « connecté au moins depuis ») : maintenant, ou la date de création si connue
+    for (const [dev, list] of Object.entries(conts)) for (const c of list.filter(x => x.startsWith('@'))) {
+      const k = `${dev}::${c.toLowerCase()}`
+      if (!team.added[k] || team.added[k] <= 1) add[k] = created[c.slice(1).toLowerCase()] ?? Date.now()
+    }
     if (Object.keys(add).length) editTeam(t => { t.added = { ...t.added, ...add } })
   }, [conts, createdAccts]) // eslint-disable-line react-hooks/exhaustive-deps
   const [contStates, setContStates] = useState<ContStateMap>(() => loadContStates()) // ce qu'il y a VRAIMENT dans chaque container (lu à l'écran)
@@ -1686,8 +1690,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           onScanned={(dev, accs) => {
             // iPhone normal (ou pas encore détecté) : les comptes trouvés par iRemoTech deviennent ses cibles « @nom »
             if (phoneKind(conts[dev]) === 'jb') return
-            const list = reconcileWithIrt(conts[dev] ?? [], accs.filter(u => !isJunkUsername(u)).map(u => u.toLowerCase()))
-            if (list) { saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list })) }
+            // la lecture fait foi : EXACTEMENT les comptes détectés (un compte non détecté est retiré de la liste et de la
+            // sélection), les containers éventuels gardés
+            const read = [...new Set(accs.filter(u => !isJunkUsername(u)).map(u => '@' + u.replace(/^@/, '').toLowerCase()))]
+            if (!read.length) return
+            const list = [...(conts[dev] ?? []).filter(c => !c.startsWith('@')), ...read]
+            saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list }))
+            setSelConts(sc => sc[dev] ? { ...sc, [dev]: new Set([...sc[dev]].filter(c => list.includes(c))) } : sc)
           }} />
       )}
       {(curTab === 'posting' || curTab === 'story') && (

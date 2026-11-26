@@ -179,12 +179,13 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     const cr = creds[a.username]
     // NOUVEAU = ajouté sur l'iPhone (ou créé par ScaleFlow) il y a moins de 24 h : on évite d'y poster tout de suite
     // âge : 1re apparition sur l'iPhone (suivi partagé de l'équipe), lecture iRemoTech ou création par ScaleFlow
+    // EXACT : apparu entre deux lectures iRemoTech, ou créé par ScaleFlow. La 1re fois vu par ScaleFlow = minimum seulement.
     const tracked = team?.added[`${id}::@${a.username.toLowerCase()}`] ?? 0
-    const added = Math.max(accountAddedAt(jobs[id] ?? [], a.username) ?? 0, createdAt[a.username] ?? 0, tracked > 1 ? tracked : 0)
+    const added = Math.max(accountAddedAt(jobs[id] ?? [], a.username) ?? 0, createdAt[a.username] ?? 0)
     const tier = ageTier(added)
     const isNew = !!tier
     // depuis combien de jours le compte est connecté (exact, sinon « au moins » d'après la plus ancienne lecture)
-    const seenMin = [team?.since[`${id}::@${a.username.toLowerCase()}`], accountFirstSeenAt(jobs[id] ?? [], a.username)].filter((x): x is number => !!x && x > 1)
+    const seenMin = [team?.since[`${id}::@${a.username.toLowerCase()}`], tracked, accountFirstSeenAt(jobs[id] ?? [], a.username)].filter((x): x is number => !!x && x > 1)
     const conn = connectedFor(added || null, seenMin.length ? Math.min(...seenMin) : null)
     const tkey = `${id}::@${a.username}`
     const link = team?.links[tkey] ?? ''
