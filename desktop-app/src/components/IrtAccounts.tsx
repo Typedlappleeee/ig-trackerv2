@@ -3,7 +3,7 @@
 // Actions : scanner un iPhone, vérifier le statut, lancer un warm-up iRemoTech — à l'unité ou en lot.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { deviceLabel, isDeviceOn, listJobs, launchAutomation, scanAccountsAndWait, queueAccountScan, type IrtDevice, type IrtJob } from '@/lib/iremotech'
-import { switchAccountByVision, detectAccountsByVision } from '@/lib/iremotechVision'
+import { switchAccountByVision, detectAccountsByVision, forceCloseForegroundApp } from '@/lib/iremotechVision'
 import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, accountFirstSeenAt, connectedFor, naturalCmp, ageTier, AGE_LABEL, type IgProfile, type AccountView } from '@/lib/irtAccounts'
 import type { IrtTeam } from '@/lib/irtTeam'
 import { MARKETS, type Market } from '@/lib/captionMarkets'
@@ -111,6 +111,8 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     if (r.recent || r.job?.status !== 'completed') {
       setScanning(`${deviceLabel(d)} (lecture à l’écran)`)
       const accs = await detectAccountsByVision(apiKey, d.public_id, { log: () => { /* silencieux */ } }).catch(() => null)
+      // lecture finie (réussie ou non) : Instagram fermé complètement → l'iPhone n'est pas laissé sur le profil
+      await forceCloseForegroundApp(apiKey, d.public_id).catch(() => undefined)
       setScanning(null)
       if (accs && accs.length) { saveLive(d.public_id, accs.map(u => u.toLowerCase())); onScanned?.(d.public_id, accs); return true }
       toast(`${deviceLabel(d)} : comptes non lus à l’écran (Instagram ouvert sur l’iPhone ?)`, 'bad')
