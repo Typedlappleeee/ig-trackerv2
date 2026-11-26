@@ -1839,11 +1839,25 @@ export async function addLocationByVision(key: string, deviceId: string, loc: Lo
 // ligne « Bio » → éditeur « Bio » avec « Done » en haut à droite.
 async function openEditProfile(key: string, deviceId: string, W: number, H: number, hooks?: VisionHooks): Promise<boolean> {
   const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0; k < 4; k++) {
     const scr = await readScreenWords(key, deviceId)
     if (scr?.words.some(o => /^edit$/i.test(o.text) && o.cy < H * 0.08) && scr.words.some(o => /^profile$/i.test(o.text) && o.cy < H * 0.08)) return true
+    // feuille des comptes restée ouverte après la bascule (« Add Instagram » / « Meta Account settings », vu en vrai le
+    // 26/11/2026 sur SEDRA1) → fermée par un tap au-dessus de la feuille, sinon « Edit profile » reste caché
+    if (scr?.words.some(o => /^(meta|add)$/i.test(o.text) && o.cy > H * 0.6) && scr.words.some(o => /^(instagram|account)$/i.test(o.text) && o.cy > H * 0.6)) {
+      hooks?.log?.('   liste des comptes encore ouverte → fermée')
+      await tap(W * 0.5, H * 0.12); await sleep(1800); continue
+    }
+    // page « Complete your profile » (compte récent) = équivalent d'« Edit profile » (photo, Bio…)
+    if (scr?.words.some(o => /^complete$/i.test(o.text) && o.cy < H * 0.25) && scr.words.some(o => /^bio$/i.test(o.text))) return true
     const e = scr?.words.find(o => /^edit$/i.test(o.text) && o.cy < H * 0.6 && scr.words.some(p => /^profile$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx))
     if (e) { await tap(e.cx + 20, e.cy); await sleep(3500); continue }
+    // COMPTE RÉCENT (vu en vrai le 26/11/2026 sur SEDRA3) : pas de bouton « Edit profile » mais « 0 of 4 steps complete »
+    // → page « Set up your professional account » → ligne « Complete your profile »
+    const cyp = scr?.words.find(o => /^complete$/i.test(o.text) && o.cy > H * 0.3 && scr.words.some(p => /^your$/i.test(p.text) && Math.abs(p.cy - o.cy) < 12))
+    if (cyp) { hooks?.log?.('   compte récent → « Complete your profile »'); await tap(W * 0.5, cyp.cy); await sleep(3000); continue }
+    const steps = scr?.words.find(o => /^steps$/i.test(o.text) && o.cy < H * 0.25)
+    if (steps) { await tap(steps.cx, steps.cy); await sleep(2500); continue }
     await tap(PROFILE_XS[k % PROFILE_XS.length] * W, TAB.y * H) // onglet Profil (plusieurs positions : barre flottante ou pleine)
     await sleep(2500)
   }
@@ -1855,7 +1869,11 @@ async function openEditProfile(key: string, deviceId: string, W: number, H: numb
 async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: number, hooks?: VisionHooks): Promise<boolean> {
   const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
   hooks?.log?.('🖼 Photo de profil : Edit picture › Choose from library…')
-  await tap(0.36 * W, 0.215 * H) // la photo actuelle (en haut à gauche)
+  // lien « Edit picture (or avatar) » lu à l'écran (sa place change : page « Complete your profile » plus bas), sinon la photo
+  const ep = (await readScreenWords(key, deviceId))?.words.find(o => /^edit$/i.test(o.text) && o.cy < H * 0.6)
+  const epOk = ep && (await readScreenWords(key, deviceId))?.words.some(p => /^picture$/i.test(p.text) && Math.abs(p.cy - ep.cy) < 12)
+  if (ep && epOk) await tap(ep.cx + 30, ep.cy)
+  else await tap(0.36 * W, 0.215 * H) // la photo actuelle (en haut à gauche)
   await sleep(2200)
   const sh = await readScreenWords(key, deviceId)
   const choose = sh?.words.find(o => /^choose$/i.test(o.text) && o.cy > H * 0.4)
@@ -1872,15 +1890,19 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
     // MODE TEST : photo choisie, puis « Cancel » (haut-gauche) au lieu de « Done » → rien n'est changé
     const lb = await readScreenWords(key, deviceId)
     const cancel = lb?.words.find(o => /^cancel$/i.test(o.text) && o.cy < H * 0.1)
-    const ok = !!lb?.words.some(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
+    // nouvelle galerie (vue le 26/11/2026) : « ✕ · Library · ✓ bleu » au lieu de « Cancel · Library · Done »
+    const blueDone = lb ? await findBlueButton(lb.shot, 0, 0.1) : null
+    const ok = !!lb?.words.some(o => /^done$/i.test(o.text) && o.cy < H * 0.1) || (!!blueDone && blueDone.cx > W * 0.7)
     hooks?.log?.(ok ? '🧪 TEST : photo choisie dans la galerie → « Cancel » (rien n’est changé)' : '   ⚠ TEST : bouton « Done » de la galerie introuvable')
     await tap(cancel ? cancel.cx : 0.1 * W, cancel ? cancel.cy : 0.056 * H); await sleep(2500)
     const back = await readScreenWords(key, deviceId)
     if (!back?.words.some(o => /^bio$/i.test(o.text))) { hooks?.log?.('   ⚠ TEST : retour sur « Edit profile » non confirmé'); return false }
     return ok
   }
-  const done = (await readScreenWords(key, deviceId))?.words.find(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
-  await tap(done ? done.cx : 0.9 * W, done ? done.cy : 0.056 * H)
+  const lbr = await readScreenWords(key, deviceId)
+  const done = lbr?.words.find(o => /^done$/i.test(o.text) && o.cy < H * 0.1)
+  const blueOk = !done && lbr ? await findBlueButton(lbr.shot, 0, 0.1) : null   // ✓ bleu (nouvelle galerie)
+  await tap(done ? done.cx : blueOk && blueOk.cx > W * 0.7 ? blueOk.cx : 0.9 * W, done ? done.cy : blueOk && blueOk.cx > W * 0.7 ? blueOk.cy : 0.056 * H)
   await sleep(4500)
   // éventuelle feuille après la photo (partage au fil, etc.) : on ne publie rien → « Not now / Cancel »
   for (let k = 0; k < 2; k++) {
@@ -1902,7 +1924,7 @@ async function setBioOnEditProfile(key: string, deviceId: string, W: number, H: 
   const tap = (x: number, y: number) => sendAction(key, deviceId, { type: 'tap', x: Math.round(x), y: Math.round(y) })
   hooks?.log?.('✏️ Bio…')
   const scr = await readScreenWords(key, deviceId)
-  const b = scr?.words.find(o => /^bio$/i.test(o.text) && o.cx < W * 0.3 && o.cy > H * 0.3 && o.cy < H * 0.8)
+  const b = scr?.words.find(o => /^bio$/i.test(o.text) && o.cx < W * 0.3 && o.cy > H * 0.3 && o.cy < H * 0.9)
   if (!b) { hooks?.log?.('   ⚠ ligne « Bio » introuvable'); return false }
   await tap(W * 0.5, b.cy)
   await sleep(2500)
@@ -1956,6 +1978,11 @@ export async function setupProfileByVision(key: string, deviceId: string, opts: 
   await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.06 * W), y: Math.round(0.056 * H) }) // retour au profil
   await sleep(1500)
   if (DRY_RUN.has(deviceId)) await discardEditIfAsked(key, deviceId, hooks)
+  // compte récent : on revient sur « Set up your professional account » → ✕ en haut à droite
+  const after = await readScreenWords(key, deviceId)
+  if (after?.words.some(o => /^professional$/i.test(o.text) && o.cy < H * 0.3) && after.words.some(o => /^steps$/i.test(o.text))) {
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.063 * H) }); await sleep(1500)
+  }
   return { pfp, bio }
 }
 
@@ -3526,6 +3553,11 @@ async function backToTabs(key: string, deviceId: string, hooks?: VisionHooks): P
     }
     const discard = words.find(o => /^discard$/i.test(o.text) && o.cy > H * 0.3)
     if (discard) { hooks?.log?.('   « Discard » (brouillon abandonné)'); await sendAction(key, deviceId, { type: 'tap', x: discard.cx, y: discard.cy }); await sleep(1800); continue }
+    // page de recherche « Search or ask Meta AI » (onglet Recherche ouvert par erreur, vu le 26/11/2026 sur SEDRA5) → ‹ retour
+    if (top(/^(search|ask)$/i) && words.some(o => /^meta$/i.test(o.text) && o.cy < H * 0.3) && words.some(o => /^(ai|suggestions)$/i.test(o.text))) {
+      hooks?.log?.('   page « Search or ask Meta AI » → retour')
+      await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.09 * W), y: Math.round(0.075 * H) }); await sleep(1500); continue
+    }
     const editor = (words.some(o => /^edit$/i.test(o.text) && o.cy > H * 0.9) && words.some(o => /^video$/i.test(o.text) && o.cy > H * 0.9))
       || (top(/^suggested$/i) && top(/^audio$/i)) // éditeur de Reel / Story (« Suggested audio » en haut)
     if (await dismissIgInfoSheet(key, deviceId, hooks)) continue
