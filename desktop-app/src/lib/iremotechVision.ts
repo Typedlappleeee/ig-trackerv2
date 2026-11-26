@@ -2725,14 +2725,24 @@ async function snapRetry(key: string, deviceId: string): Promise<string | null> 
   return shot
 }
 
-async function readScreenWords(key: string, deviceId: string): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number; shot: string } | null> {
+async function readScreenWords(key: string, deviceId: string, _guard = 0): Promise<{ words: Awaited<ReturnType<typeof ocrWords>>; W: number; H: number; shot: string } | null> {
   const shot = await snapRetry(key, deviceId)
   if (!shot) return null
   const { w: W, h: H } = await imgSize(shot)
   if (!W || !H) return null
   const wa = await ocrWords(shot, undefined, { threshold: null, scale: 2, psms: ['11'] })
   const wb = await ocrWords(shot, undefined, { threshold: null, invert: true, scale: 2, psms: ['11'] })
-  return { words: [...wa, ...wb], W, H, shot }
+  const words = [...wa, ...wb]
+  // GARDE GLOBALE : la feuille « Introducing instants » arrive quelques secondes APRÈS l'ouverture d'Instagram, sur n'importe
+  // quel écran (fil, messages… vu le 26/11/2026), et bloque tous les taps → fermée dès qu'elle est lue, où qu'on soit,
+  // par « Not now » (jamais « Try it »), puis l'écran est relu
+  if (_guard < 2 && words.some(o => /^introducing$/i.test(o.text)) && words.some(o => /^instants?$/i.test(o.text))) {
+    const nw = words.filter(o => /^now$/i.test(o.text) && words.some(n => /^not$/i.test(n.text) && Math.abs(n.cy - o.cy) < 12)).sort((a, b) => b.cy - a.cy)[0]
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(W / 2), y: nw ? nw.cy : Math.round(H * 0.9) })
+    await sleep(1500)
+    return readScreenWords(key, deviceId, _guard + 1)
+  }
+  return { words, W, H, shot }
 }
 
 /** Fait défiler les écrans de fin jusqu'au fil Instagram. 'feed' = prêt à poster, 'refused' = refus, 'unknown'. */
