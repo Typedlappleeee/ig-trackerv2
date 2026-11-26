@@ -717,9 +717,15 @@ export async function dismissIgInfoSheet(key: string, deviceId: string, hooks?: 
   // Offre « Meta Verified » (abonnement payant, vue en vrai le 24/11/2026 par-dessus le créateur) → Cancel / Not now,
   // sinon la feuille glissée vers le bas. JAMAIS le bouton d'abonnement.
   if (has(/^verified$/i) && (has(/^meta$/i) || has(/^subscription/i))) {
-    const no = scr.words.find(o => /^(cancel|cance!|not|close|dismiss)$/i.test(o.text) && o.cy > scr.H * 0.3)
+    // « Cancel anytime. » sous « Try for $0.00 » n'est qu'un texte (vu en vrai le 26/11/2026 : tapé 4 fois, rien ne se
+    // fermait) → jamais ce « Cancel »-là ; page plein écran → ✕ en haut à gauche
+    const sameLine = (o: { cx: number; cy: number }, re: RegExp) => scr.words.some(p => re.test(p.text) && Math.abs(p.cy - o.cy) < 12 && p.cx > o.cx)
+    const no = scr.words.find(o => /^(cancel|cance!|not|close|dismiss)$/i.test(o.text) && o.cy > scr.H * 0.3 && !sameLine(o, /^anytime/i))
+    const x = scr.words.find(o => /^[x×✕]$/i.test(o.text) && o.cx < scr.W * 0.2 && o.cy < scr.H * 0.25)
+    const fullPage = has(/^try$/i) || has(/^plans?$/i) || has(/^benefits$/i)
     hooks?.log?.('   offre « Meta Verified » → fermée (aucun abonnement)')
     if (no) await sendAction(key, deviceId, { type: 'tap', x: no.cx + (/^not$/i.test(no.text) ? 18 : 0), y: no.cy })
+    else if (x || fullPage) await sendAction(key, deviceId, { type: 'tap', x: x ? x.cx : Math.round(scr.W * 0.09), y: x ? x.cy : Math.round(scr.H * 0.135) })
     else await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(scr.W / 2), y1: Math.round(scr.H * 0.35), x2: Math.round(scr.W / 2), y2: Math.round(scr.H * 0.95), duration_ms: 300 })
     await sleep(1500)
     return true
