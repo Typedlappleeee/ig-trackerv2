@@ -8,6 +8,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { db, bodyOf } from './_bank.js'
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-5-5'
+// cerveau des automatisations (capture d'écran, quand le script échoue) : modèle plus fort, appelé rarement
+const BRAIN_MODEL = process.env.CLAUDE_BRAIN_MODEL || 'claude-sonnet-5-5'
 const send = (res, body) => res.status(200).json(body)
 
 export default async function handler(req, res) {
@@ -15,7 +17,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return send(res, { ok: false, error: 'POST attendu' })
     const b = bodyOf(req)
     const key = process.env.ANTHROPIC_API_KEY
-    if (b.op === 'status') return send(res, { ok: true, enabled: !!key, model: key ? MODEL : null })
+    if (b.op === 'status') return send(res, { ok: true, enabled: !!key, model: key ? MODEL : null, brain: key ? BRAIN_MODEL : null })
     if (!key) return send(res, { ok: false, status: 503, error: 'Claude non configuré (variable ANTHROPIC_API_KEY absente sur Vercel)' })
     // session ScaleFlow obligatoire (sinon n'importe qui consommerait la clé)
     const jwt = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '')
@@ -32,8 +34,9 @@ export default async function handler(req, res) {
     try {
       // textes courts et nombreux : effort « low » (réflexion brève, réponse rapide et moins chère) ; marge de tokens
       // pour la réflexion en plus du texte demandé
+      const model = img ? BRAIN_MODEL : MODEL
       const msg = await client.messages.create({
-        model: MODEL,
+        model,
         max_tokens: Math.min(32_000, max + 4000),
         output_config: { effort: process.env.CLAUDE_EFFORT || 'low' },
         ...(system ? { system } : {}),
@@ -41,7 +44,7 @@ export default async function handler(req, res) {
         messages: [{ role: 'user', content: img ? [{ type: 'image', source: { type: 'base64', media_type: img.type, data: img.data } }, { type: 'text', text: user }] : user }],
       })
       const text = msg.content.filter(c => c.type === 'text').map(c => c.text).join('')
-      return send(res, { ok: true, text, model: MODEL, stop: msg.stop_reason })
+      return send(res, { ok: true, text, model, stop: msg.stop_reason })
     } catch (e) {
       // 429 (débit) / 529 (surcharge) / 5xx : l'appli réessaie après le délai donné
       const status = Number(e?.status) || 500
