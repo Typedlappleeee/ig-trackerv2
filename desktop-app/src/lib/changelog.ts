@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26f',
+    date: '2026-11-26',
+    title: { fr: 'iRemoTech : page Résultats', en: 'iRemoTech: Results page' },
+    items: {
+      fr: ['Nouvelle page iRemoTech › Résultats : pour chaque compte, le nombre de Reels publiés, de Story CTA, de carrousels, de setups et de warm-ups réussis (✓) ou ratés (✗, raison au survol), avec la date du dernier succès et un badge « Story aujourd’hui ». Filtres par période (aujourd’hui, 7, 30, 90 jours), par iPhone et par compte. Partagée avec toute l’agence ; les résultats s’enregistrent à partir de maintenant.'],
+      en: ['New iRemoTech › Results page: for each account, the number of Reels posted, CTA Stories, carousels, setups and warm-ups that succeeded (✓) or failed (✗, reason on hover), with the date of the last success and a “Story today” badge. Filters by period (today, 7, 30, 90 days), iPhone and account. Shared with the whole agency; results are recorded from now on.'],
+    },
+  },
+  {
     id: '2026-11-26e',
     date: '2026-11-26',
     title: { fr: 'iRemoTech : Apple Music ouvert à la place d’Instagram', en: 'iRemoTech: Apple Music opened instead of Instagram' },

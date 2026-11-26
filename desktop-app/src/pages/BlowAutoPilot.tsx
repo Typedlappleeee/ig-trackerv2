@@ -20,6 +20,7 @@ import { fivesimBuy, fivesimWaitCode, fivesimFinish, fivesimCancel, localPhone }
 import { herosmsBuy, herosmsWaitCode, herosmsFinish, herosmsCancel, herosmsPing, herosmsProbe, herosmsOffers } from '@/lib/herosms'
 import { smspoolBuy, smspoolWaitCode, smspoolFinish, smspoolCancel, smspoolPing, smspoolPrice } from '@/lib/smspool'
 import IrtAccounts from '@/components/IrtAccounts'
+import IrtResults from '@/components/IrtResults'
 import IrtServerRuns from '@/components/IrtServerRuns'
 import { enqueueServerRun, serversOnline } from '@/lib/irtServer'
 import { locToServer, type ServerPlan } from '@/lib/irtServerSession'
@@ -33,6 +34,7 @@ import { generateBios } from '@/lib/bioMarkets'
 import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } from '@/lib/ctaMarkets'
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
+import { startIrtLog } from '@/lib/irtResults'
 import { listJobs, scanAccountsAndWait, queueAccountScan, stopDevices, releaseDevices, type IrtJob } from '@/lib/iremotech'
 import { claudeStatus } from '@/lib/claude'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
@@ -53,7 +55,7 @@ const EDGE = 'rgba(255,255,255,0.07)', FIELD_EDGE = 'rgba(255,255,255,0.09)', FI
 const MONO = "'JetBrains Mono',monospace"
 const SEL_BG = 'rgba(255,255,255,0.07)', SEL_EDGE = 'rgba(233,196,106,0.45)'
 type VidRef = { id: string; title: string; storage_path: string | null; file_url: string | null; used_count?: number }
-export type IrtTab = 'home' | 'setup' | 'phones' | 'igaccounts' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes'
+export type IrtTab = 'home' | 'setup' | 'phones' | 'igaccounts' | 'posting' | 'story' | 'warmup' | 'account' | 'comptes' | 'resultats'
 
 const card: CSSProperties = { background: '#111113', border: `1px solid ${EDGE}`, borderRadius: 8, padding: 16, marginBottom: 12 }
 // Boutons alignés sur <Btn> (lib/ui) : ghost = bordé neutre, `gold` = primaire clair.
@@ -881,6 +883,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     if (src.mode === 'folder') push(kind === 'story' ? `📁 « ${src.folder} » : ${pool.length} média(s)` : isImg ? `📁 « ${src.folder} » : ${pool.length} photo(s)` : `📁 « ${src.folder} » : ${pool.length} vidéo(s)`)
     const R = startRun('farm', `iRemoTech ${kind} · ${byPhone.length} tel × ${totalJobs * perAcct}`, totalJobs * perAcct)
     setRunId(R.id)
+    const L = startIrtLog(teamScope, kind === 'story' ? 'story' : kind === 'carousel' ? 'carousel' : 'reel') // page « Résultats »
 
     const runPhone = async (p: typeof byPhone[number]) => {
       const tag = `[${p.name}]`
@@ -896,7 +899,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const unreachable = new Set<string>() // comptes non atteints : leurs autres posts sont sautés (pas 5 essais inutiles)
       for (const [ji, job] of p.jobs.entries()) {
         if (R.isCancelled()) break
-        if (unreachable.has(job.container)) { push(`${tag} ⏭ « ${job.container} » sauté (compte non atteint plus tôt dans la session)`); fail(p.dev, job.container); R.tick(false); continue }
+        if (unreachable.has(job.container)) { push(`${tag} ⏭ « ${job.container} » sauté (compte non atteint plus tôt dans la session)`); fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, 'compte non atteint (sauté)'); continue }
         push(`\n${tag} 📦 ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
         // Même compte que le post d'avant (session) : on est encore dans Instagram → ni mode avion, ni réouverture
         const sameAcct = stayedIn === job.container
@@ -909,7 +912,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           // « @nom » = compte d'un iPhone non jailbreaké (bascule de compte) ; sinon container Crane (+ échauffement Edits)
           if (!job.container.startsWith('@')) await warmupEditsByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
           const ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
-          if (!ok) { push(`${tag} ⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; unreachable.add(job.container); fail(p.dev, job.container); R.tick(false); stayedIn = null; continue }
+          if (!ok) { push(`${tag} ⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; unreachable.add(job.container); fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, 'compte non atteint'); stayedIn = null; continue }
           await sleep(1200)
         }
         stayedIn = null
@@ -947,7 +950,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (!await uploadMedia(key, p.dev, url, mediaFilename(v, kind))) { injected = false; break }
           if (job.vids.length > 1) await sleep(2500) // dates distinctes → ordre de la galerie garanti
         }
-        if (!injected) { push(`${tag} ❌ média introuvable ou injection refusée → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; fail(p.dev, job.container); R.tick(false); continue }
+        if (!injected) { push(`${tag} ❌ média introuvable ou injection refusée → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, 'média introuvable / injection refusée'); continue }
         push(`${tag} ⏳ 10 s (indexation)…`)
         await sleep(10000)
         const vh = { log: hooks, shouldStop: () => R.isCancelled() }
@@ -990,6 +993,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         }
         if (!posted) fail(p.dev, job.container)
         R.tick(posted)
+        if (!R.isCancelled() || posted) L.rec(p.dev, p.name, job.container, posted, posted ? undefined : 'publication interrompue')
       }
     }
 
@@ -1003,6 +1007,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p).catch(() => undefined) }
     } finally { clearInterval(watch); releaseDevices(devs) }
     setLastFail({ kind, map: failMap(failed) })
+    void L.finish()
     R.finish()
     push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé — toutes les publications traitées.')
     setRunning(false); setRunId(null)
@@ -1022,6 +1027,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     if (!total) { setLogs(['⚠ Choisis au moins un compte (étape 1).']); return }
     setRunning(true); setLogs([])
     const R = startRun('farm', `Setup compte · ${total}`, total); setRunId(R.id)
+    const L = startIrtLog(teamScope, 'setup')
     // bios générées d'avance, par marché (une différente par compte)
     const bios: Record<Market, string[]> = { fr: [], us: [], de: [] }
     if (setupBio) {
@@ -1040,11 +1046,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       for (const c of p.targets) {
         if (R.isCancelled()) break
         push(`\n${tag} 🪪 ${c}`)
-        if (!await openTargetByVision(key, p.dev, c, hooks)) { push(`${tag} ⏭ ${c} non atteint`); fail(p.dev, c); await forceCloseForegroundApp(key, p.dev, hooks); R.tick(false); continue }
+        if (!await openTargetByVision(key, p.dev, c, hooks)) { push(`${tag} ⏭ ${c} non atteint`); fail(p.dev, c); await forceCloseForegroundApp(key, p.dev, hooks); R.tick(false); L.rec(p.dev, p.name, c, false, 'compte non atteint'); continue }
         if (setupPfp) {
           const { bytes } = await generatePfp()
           push(`${tag} 🎨 photo de profil générée → envoi sur l’iPhone`)
-          if (!await uploadBytesToPhone(key, p.dev, bytes, imgName())) { push(`${tag} ❌ envoi de la photo refusé`); fail(p.dev, c); R.tick(false); continue }
+          if (!await uploadBytesToPhone(key, p.dev, bytes, imgName())) { push(`${tag} ❌ envoi de la photo refusé`); fail(p.dev, c); R.tick(false); L.rec(p.dev, p.name, c, false, 'envoi de la photo refusé'); continue }
           await sleep(9000)
         }
         const m = marketOf(p.dev, c)
@@ -1057,6 +1063,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         // setup raté : Instagram fermé → le compte suivant repart d'un écran propre (comme le posting)
         if (!good && !R.isCancelled()) { push(`${tag} 🧹 setup raté → Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, hooks) }
         R.tick(good)
+        L.rec(p.dev, p.name, c, good, good ? undefined : `photo ${r.pfp === false ? '✗' : '✓'} · bio ${r.bio === false ? '✗' : '✓'}`)
       }
     }
     // Annuler = arrêt IMMÉDIAT : plus aucune action envoyée aux iPhones de ce lancement (sinon chaque iPhone finissait son
@@ -1069,6 +1076,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p).catch(() => undefined) }
     } finally { clearInterval(watch); releaseDevices(devs) }
     setLastFail({ kind: 'setup', map: failMap(failed) })
+    void L.finish()
     R.finish(); push(`\n${R.isCancelled() ? '⏹ Arrêté.' : '✔ Terminé.'} ${ok}/${total} compte(s) mis en place.`); setRunning(false); setRunId(null)
   }
 
@@ -1286,6 +1294,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     setRunning(true); setLogs([])
     const total = byPhone.reduce((n, p) => n + p.conts.length, 0)
     const R = startRun('farm', `Warm-up iRemoTech · ${total} compte(s)`, total); setRunId(R.id)
+    const L = startIrtLog(teamScope, 'warmup')
     push(`▶ Warm-up (${wPreset}) : ${byPhone.length} iPhone(s) · ${total} compte(s)${airplaneOn ? ' · rotation avion' : ''}${parallel ? ' · parallèle' : ' · série'}`)
 
     const runPhone = async (p: typeof byPhone[number]) => {
@@ -1297,7 +1306,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         push(`\n${tag} 🔥 conteneur « ${c} »`)
         if (airplaneOn) await airplaneReset(key, p.dev, hooks)
         const opened = await openTargetByVision(key, p.dev, c, hooks)
-        if (!opened) { push(`${tag} ⏭ conteneur non atteint`); R.tick(false); continue }
+        if (!opened) { push(`${tag} ⏭ conteneur non atteint`); R.tick(false); L.rec(p.dev, p.name, c, false, 'compte non atteint'); continue }
         await sleep(1200)
         const started = Date.now()
         let res
@@ -1306,6 +1315,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         const result: 'completed' | 'stopped' | 'failed' = res?.ok ? (R.isCancelled() ? 'stopped' : 'completed') : 'failed'
         addWarmupSession({ at: Date.now(), device: p.dev, deviceName: p.name, container: c, durationSec, reels: res?.reels ?? 0, likes: res?.likes ?? 0, comments: res?.comments ?? 0, result })
         R.tick(!!res?.ok)
+        L.rec(p.dev, p.name, c, !!res?.ok, res?.ok ? undefined : 'warm-up interrompu')
       }
     }
 
@@ -1318,6 +1328,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       if (parallel) await Promise.all(byPhone.map(p => runPhone(p).catch(() => undefined)))
       else for (const p of byPhone) { if (R.isCancelled()) break; await runPhone(p).catch(() => undefined) }
     } finally { clearInterval(watch); releaseDevices(devs) }
+    void L.finish()
     R.finish(); push(R.isCancelled() ? '⏹ Arrêté.' : '✔ Warm-up terminé.'); setRunning(false); setRunId(null)
   }
 
@@ -1584,12 +1595,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     warmup: { title: 'Warm-up', sub: 'Fais vivre tes comptes comme un humain, container par container.' },
     account: { title: 'Créer des comptes', sub: 'Un compte Instagram dans chaque container vide, numéro et code SMS automatiques.' },
     igaccounts: { title: 'Comptes Instagram', sub: 'Tous les comptes de tes iPhones, relus depuis iRemoTech : statut, publications, abonnés, warm-ups. Vérifie et chauffe en un clic.' },
+    resultats: { title: 'Résultats', sub: 'Compte par compte : Reels publiés, Story CTA, carrousels, setup et warm-up réussis ou ratés.' },
     comptes: { title: 'Comptes créés', sub: 'Identifiants, numéros et historique des comptes créés depuis ScaleFlow.' },
   }
   // Bannière photo de chaque onglet (images générées, public/site/irt-*.webp)
   const TAB_IMAGE: Record<IrtTab, string> = {
     home: 'site/irt-home.webp', phones: 'site/irt-phones.webp', igaccounts: 'site/irt-phones.webp', posting: 'site/irt-posting.webp',
-    story: 'site/irt-story.webp', warmup: 'site/irt-warmup.webp', account: 'site/irt-account.webp', comptes: 'site/irt-account.webp', setup: 'site/irt-setup.webp',
+    story: 'site/irt-story.webp', warmup: 'site/irt-warmup.webp', account: 'site/irt-account.webp', comptes: 'site/irt-account.webp', resultats: 'site/irt-posting.webp', setup: 'site/irt-setup.webp',
   }
   const TABS: { k: IrtTab; label: string; icon: string }[] = [
     { k: 'home', label: 'Accueil', icon: '🏠' },
@@ -1600,6 +1612,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     { k: 'warmup', label: 'Warm-up', icon: '🔥' },
     { k: 'account', label: 'Création de compte', icon: '🆕' },
     { k: 'comptes', label: 'Comptes créés', icon: '🆕' },
+    { k: 'resultats', label: 'Résultats', icon: '📊' },
   ]
 
   return (
@@ -1755,6 +1768,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       </>)}
 
       {/* ─────────────── ONGLET POSTING ─────────────── */}
+      {curTab === 'resultats' && <IrtResults scope={teamScope} />}
       {curTab === 'igaccounts' && irt.key && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10, border: `1px solid ${EDGE}`, background: '#0E0E10' }}>
           <Toggle on={autoStatus} onClick={() => { const v = !autoStatus; setAutoStatus(v); try { localStorage.setItem('sf-irt-autoscan', v ? '1' : '0') } catch { /* noop */ } }}
