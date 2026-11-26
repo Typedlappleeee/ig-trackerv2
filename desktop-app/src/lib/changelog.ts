@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26l',
+    date: '2026-11-26',
+    title: { fr: 'Story CTA fiabilisée', en: 'CTA Story made reliable' },
+    items: {
+      fr: ['Story CTA : le tiroir des stickers est reconnu même quand il s’ouvre à mi-hauteur, et les résultats de la recherche « link » sont attendus jusqu’à ~10 s (réseau lent juste après le mode avion).', 'Story CTA : alertes iOS caméra / micro acceptées pendant l’ouverture de la galerie (l’IA les refusait), et plus de tap à l’aveugle quand la galerie n’est pas affichée.', 'Alerte iOS « iMessage / FaceTime » refusée automatiquement ; l’app Téléphone ouverte à la place d’Instagram est reconnue (retour par l’icône).'],
+      en: ['CTA Story: the stickers tray is recognised even when it opens half-height, and the “link” search results are awaited up to ~10 s (slow network right after airplane mode).', 'CTA Story: iOS camera / microphone alerts accepted while opening the gallery (the AI declined them), and no more blind tap when the gallery is not shown.', 'iOS “iMessage / FaceTime” alert declined automatically; the Phone app opened instead of Instagram is recognised (back through the icon).'],
+    },
+  },
+  {
     id: '2026-11-26k',
     date: '2026-11-26',
     title: { fr: 'iRemoTech : Claude + 2e essai après chaque échec', en: 'iRemoTech: Claude + 2nd attempt after every failure' },

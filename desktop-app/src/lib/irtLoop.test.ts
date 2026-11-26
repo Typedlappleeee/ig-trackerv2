@@ -164,3 +164,9 @@ describe('setup : détections', () => {
     expect(editProfileShown([w('Bio', 450), w('Add', 600), w('Instagram', 600)], 720)).toBe(false)
   })
 })
+
+describe('autre app : téléphone', () => {
+  it('app Téléphone reconnue', () => {
+    expect(otherAppOpened(['Calls', 'Contacts', 'Keypad'].map(text => ({ text })))).toBe(true)
+  })
+})

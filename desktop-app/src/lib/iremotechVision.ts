@@ -376,6 +376,14 @@ export async function grantPhotoAccessIfAsked(key: string, deviceId: string, hoo
       if (await settingsGrantCameraMic(key, deviceId, hooks)) { relaunched = true; await sleep(5000) }
       continue
     }
+    // alerte iOS « iMessage / FaceTime » (vue le 26/11/2026 sur SEDRA3 : bloquait la liste des comptes, et l'IA ne
+    // pouvait pas taper « Don't Use », illisible) → refusée (« Don't Use / Not Now / Cancel »)
+    if (has(/^imessage$/i) && has(/^facetime$/i)) {
+      const b = scr.words.find(o => /^(don['’]?t|not|cancel|later)$/i.test(o.text) && o.cy > scr.H * 0.4)
+      hooks?.log?.('   alerte iOS « iMessage / FaceTime » → refusée')
+      await doubleTap(key, deviceId, b ? b.cx + 15 : Math.round(scr.W * 0.305), b ? b.cy : Math.round(0.6 * scr.H))
+      await sleep(1800); continue
+    }
     if (cameraSheet(scr.words, scr.H)) {
       hooks?.log?.('📷 « Allow Instagram to access your camera and microphone » → Continue')
       const c = scr.words.find(o => /^continue$/i.test(o.text) && o.cy > 0.7 * scr.H)
@@ -1071,7 +1079,8 @@ export function otherAppOpened(words: { text: string }[]): boolean {
   if (homeScreenShown(words)) return false
   // une autre app : Apple Music (« What's New in Apple Music »), Réglages, Photos… — au moins 2 indices (un seul mot
   // « music » / « settings » se retrouve ailleurs)
-  return ['music', 'apple', 'listen', 'radio', 'browse', 'songs', 'albums', 'playlists', 'settings', 'general', 'memories', 'wifi', 'automix'].filter(w => t.has(w)).length >= 2
+  // (+ app Téléphone « Calls / Contacts / Keypad », ouverte à la place d'Instagram sur SEDRA7 le 26/11/2026)
+  return ['music', 'apple', 'listen', 'radio', 'browse', 'songs', 'albums', 'playlists', 'settings', 'general', 'memories', 'wifi', 'automix', 'keypad', 'voicemail', 'calls', 'contacts'].filter(w => t.has(w)).length >= 2
 }
 
 // ── Publication d'un Reel entièrement pilotée à la VISION ────────────────────
@@ -3288,6 +3297,8 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
       await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.5), y1: Math.round(H * 0.6), x2: Math.round(W * 0.5), y2: Math.round(H * 0.2), duration_ms: 400 })
     }
     await sleep(1800)
+    // alertes iOS (caméra / micro → Allow, photos → accès complet) : sinon l'IA les refusait (« Don't Allow », SEDRA4)
+    await grantPhotoAccessIfAsked(key, deviceId, hooks)
     opened = await galleryOpen()
     if (!opened) hooks?.log?.(`   galerie pas encore ouverte (essai ${attempt + 1}/3)`)
   }
@@ -3318,6 +3329,11 @@ export async function postStoryByVision(key: string, deviceId: string, opts: { c
     hooks?.log?.(`🎞️ vidéo la plus récente repérée (case ${cell.cx}, ${cell.cy}) → tap`)
     await sendAction(key, deviceId, { type: 'tap', x: cell.cx, y: cell.cy })
   } else {
+    // tap à l'aveugle SEULEMENT si une galerie est vraiment à l'écran (SEDRA9, 26/11/2026 : profil affiché → un Reel ouvert)
+    const isGallery = () => hasText(key, deviceId, [/^recents?$/i, /^r[ée]cents?$/i, /^gallery$/i, /^story$/i, /^select$/i], hooks, { cropY: [0, 0.3], tries: 1 })
+    if (!await isGallery() && !await rescue(key, deviceId, 'Open the "Add to story" photo gallery (story camera → gallery thumbnail at the bottom left). Do not take a photo.', isGallery, hooks)) {
+      hooks?.log?.('❌ galerie de la Story non affichée → rien n’est publié'); return false
+    }
     hooks?.log?.('   vidéo non reconnue dans la galerie → 1re case (position connue)')
     await tapFrac(A.firstThumb.x, A.firstThumb.y)
   }
@@ -3430,13 +3446,13 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   // détecteur, s'y pose et recevait le tap de l'icône sticker (vu en vrai le 26/11/2026 sur STEVIE3).
   await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(W * 0.45), y1: Math.round(H * 0.7), x2: Math.round(W * 0.45), y2: Math.round(H * 0.25), duration_ms: 350 })
   await sleep(1800)
-  if (await hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.35] })) { tray = true; hooks?.log?.('   tiroir des stickers ouvert (balayage vers le haut)') }
+  if (await hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.6] })) { tray = true; hooks?.log?.('   tiroir des stickers ouvert (balayage vers le haut)') }
   // (0,22 = icône MUSIQUE juste sous le sticker sur iPhone normal → essayée en dernier)
   if (!tray) for (const fy of [A.stickerIcon.y, 0.10, 0.28, 0.22]) {
     await dismissIgInfoSheet(key, deviceId, hooks) // « Introducing story-to-story sharing » peut arriver en retard
     await tapFrac(A.stickerIcon.x, fy)
     await sleep(1700)
-    if (await hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.35] })) { tray = true; break }
+    if (await hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.6] })) { tray = true; break }
     // feuille MUSIQUE ouverte par erreur (« For you / Trending ») → tap sur l'aperçu en haut pour la fermer
     if (await hasText(key, deviceId, [/^trending$/i, /^saved$/i], hooks, { tries: 1, cropY: [0.4, 0.75] })) {
       hooks?.log?.('   feuille Musique ouverte par erreur → fermée, icône suivante')
@@ -3449,16 +3465,23 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
     } else hooks?.log?.('   tiroir des stickers pas ouvert → icône suivante')
   }
   if (!tray) tray = await rescue(key, deviceId, 'Open the STICKERS tray of this Instagram story editor (the square smiley sticker icon in the right column, or swipe up on the story). Do not type any text, do not add music.',
-    () => hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.35] }), hooks)
+    () => hasText(key, deviceId, [/^search$/i, /^rechercher$/i, /^giphy$/i], hooks, { tries: 2, cropY: [0, 0.6] }), hooks)
   if (!tray) { hooks?.log?.('❌ tiroir des stickers introuvable → rien n’est publié'); return false }
 
   // 7. Recherche → « link ».
-  if (!await findTapText(key, deviceId, [/search|rechercher/i], hooks, { label: 'Search', maxY: 0.3, tries: 3 })) {
+  if (!await findTapText(key, deviceId, [/search|rechercher/i], hooks, { label: 'Search', maxY: 0.6, tries: 3 })) {
     await tapFrac(A.searchBar.x, A.searchBar.y) // repli : tap la barre de recherche
   }
   await sleep(1000)
   await sendAction(key, deviceId, { type: 'text', text: 'link' })
   await sleep(1400)
+  // résultats de la recherche lents (réseau qui revient après le mode avion : SEDRA7 / SEDRA10 le 26/11/2026) → jusqu'à ~10 s
+  for (let w = 0; w < 5; w++) {
+    const r = await readScreenWords(key, deviceId)
+    if (r && linkStickerPoint(r.words, r.W, r.H)) break
+    if (w === 0) hooks?.log?.('   résultats « link » pas encore chargés → attente…')
+    await sleep(2000)
+  }
   // 8. Sticker « Link » : OCR recadré serré sur la ligne « Stickers » (exclut GIPHY),
   //    sinon POSITION connue (après recherche « link » le bouton est toujours au même
   //    endroit) → ne bloque plus.
