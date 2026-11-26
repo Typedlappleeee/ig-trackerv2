@@ -1652,15 +1652,27 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
     await sleep(4000)
     // Fenêtre « Update on your original audio » (vue en vrai le 22/11/2026) : le Reel attend → bouton bleu « Share »
     // de la fenêtre (choix par défaut d'Instagram).
+    let audioSeen = false
     for (let j = 0; j < 2; j++) {
       const sh = await readScreenWords(key, deviceId)
       if (!sh || !originalAudioSheet(sh.words)) break
-      const blue = await findBlueButton(sh.shot, 0.75, 0.97)
-      hooks?.log?.('   fenêtre « Update on your original audio » → Share')
-      await sendAction(key, deviceId, { type: 'tap', x: blue ? blue.cx : Math.round(W / 2), y: blue ? blue.cy : Math.round(0.886 * H) })
+      audioSeen = true
+      // le « Share » DE LA FENÊTRE (texte lu, le plus bas de la fenêtre), sinon le bouton bleu de la fenêtre
+      const sw = sh.words.filter(o => /^share$/i.test(o.text) && o.cy > sh.H * 0.55).sort((a, b) => b.cy - a.cy)[0]
+      const blue = sw ? null : await findBlueButton(sh.shot, 0.75, 0.97)
+      hooks?.log?.(`   fenêtre « Update on your original audio » → Share${j ? ' (2e essai)' : ''}`)
+      await sendAction(key, deviceId, { type: 'tap', x: sw ? sw.cx : blue ? blue.cx : Math.round(W / 2), y: sw ? sw.cy : blue ? blue.cy : Math.round(0.886 * H) })
       await sleep(4000)
     }
+    // fenêtre toujours là → l'IA confirme la fenêtre (jamais le Share de la page : risque de double post)
+    if (audioSeen) {
+      const still = await readScreenWords(key, deviceId)
+      if (still && originalAudioSheet(still.words)) await rescue(key, deviceId, 'Confirm the "Update on your original audio" sheet by tapping ITS blue "Share" button (inside the sheet). Do not tap anything else.',
+        async () => { const r = await readScreenWords(key, deviceId); return !!r && !originalAudioSheet(r.words) }, hooks)
+    }
     const st = await stillOnShare()
+    // fenêtre audio encore à l'écran : on ne retape PAS le Share de la page (elle reviendrait ; double post possible)
+    if (st === true) { const r = await readScreenWords(key, deviceId); if (r && originalAudioSheet(r.words)) { hooks?.log?.('❌ fenêtre « original audio » non validée → non publié (Share de la page jamais retapé)'); return false } }
     shared = st !== true
     if (st === null) hooks?.log?.('   ⚠ écran illisible après Share → considéré comme publié (jamais retapé : risque de double post)')
   }

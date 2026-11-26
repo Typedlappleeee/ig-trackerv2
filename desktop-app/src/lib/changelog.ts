@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26d',
+    date: '2026-11-26',
+    title: { fr: 'Posting : fenêtre « original audio » fiabilisée', en: 'Posting: “original audio” sheet made reliable' },
+    items: {
+      fr: ['Fenêtre « Update on your original audio » après Share : son bouton Share est trouvé par son texte, l’IA prend le relais s’il le faut, et le Share de la page n’est JAMAIS retapé tant que la fenêtre est là (plus de risque de double publication).'],
+      en: ['“Update on your original audio” sheet after Share: its Share button is found by its text, the AI takes over if needed, and the page Share is NEVER tapped again while the sheet is shown (no more double-post risk).'],
+    },
+  },
+  {
     id: '2026-11-26c',
     date: '2026-11-26',
     title: { fr: 'iRemoTech : relancer les échecs', en: 'iRemoTech: retry failures' },

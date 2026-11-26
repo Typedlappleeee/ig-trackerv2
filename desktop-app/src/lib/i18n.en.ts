@@ -119,6 +119,8 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "fenêtre « Update on your original audio » → Share{0}": "“Update on your original audio” sheet → Share{0}",
+    "❌ fenêtre « original audio » non validée → non publié (Share de la page jamais retapé)": "❌ “original audio” sheet not confirmed → not posted (page Share never tapped again)",
     "🧠 {0} prend le relais : {1}": "🧠 {0} takes over: {1}",
     "🧠 l’IA préfère s’arrêter (écran à risque)": "🧠 the AI prefers to stop (risky screen)",
     "🧠 ✓ étape récupérée par l’IA, on continue": "🧠 ✓ step recovered by the AI, continuing",
