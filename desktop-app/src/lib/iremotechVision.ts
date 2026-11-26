@@ -1150,6 +1150,25 @@ async function dryRunStop(key: string, deviceId: string, hooks?: VisionHooks): P
   return onShare
 }
 
+/** MODE TEST de la Story CTA : tout est prêt (photo, sticker lien avec texte, placé en bas à droite) → on s'arrête AVANT
+ *  la flèche de partage, puis on abandonne la Story (✕ → Discard) jusqu'au fil d'accueil. Rien n'est publié. */
+async function storyDryRunStop(key: string, deviceId: string, placed: boolean, hooks?: VisionHooks): Promise<boolean> {
+  hooks?.log?.(`🧪 TEST : Story prête (sticker lien ${placed ? 'en bas à droite ✓' : '⚠ position NON confirmée'}) → arrêt AVANT le partage (rien n’est publié)`)
+  for (let k = 0; k < 8; k++) {
+    const scr = await readScreenWords(key, deviceId)
+    if (!scr) { await sleep(1000); continue }
+    if (homeFeedShown(scr.words, scr.H)) { hooks?.log?.('🏠 TEST : Story annulée, retour sur le fil d’accueil'); return true }
+    const choice = scr.words.filter(o => /^(discard|delete|supprimer|abandonner)$/i.test(o.text) && o.cy > scr.H * 0.3).sort((a, b) => b.cy - a.cy)[0]
+    if (choice) { await sendAction(key, deviceId, { type: 'tap', x: choice.cx, y: choice.cy }); await sleep(2000); continue }
+    if (k >= 4) { await goHomeTab(key, deviceId, scr.W, scr.H, hooks); await sleep(1500); continue }
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.075 * scr.W), y: Math.round(0.065 * scr.H) })   // ✕ / ‹ en haut à gauche
+    await sleep(2000)
+  }
+  hooks?.log?.('   TEST : retour au fil impossible → Instagram fermé')
+  await forceCloseForegroundApp(key, deviceId, hooks)
+  return true
+}
+
 export async function postReelByVision(key: string, deviceId: string, opts: { caption?: string; location?: LocTarget; stay?: boolean; anchors?: typeof REEL_ANCHORS }, hooks?: VisionHooks): Promise<boolean> {
   const A = opts.anchors ?? REEL_ANCHORS
   const shot0 = await snapRetry(key, deviceId)
@@ -3062,6 +3081,17 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   hooks?.log?.('🔗 Saisie de l’URL…')
   await sendAction(key, deviceId, { type: 'text', text: opts.link.trim() })
   await sleep(900)
+  {
+    // URL bien arrivée dans le champ ? (domaine relu) — sinon une 2e saisie après avoir vidé le champ
+    const dom = normTok(stickerDomain(opts.link).split('.')[0] ?? '')
+    const seen = async () => { const r = await readScreenWords(key, deviceId); return !r || !dom || r.words.some(o => normTok(o.text).includes(dom)) }
+    if (!await seen()) {
+      hooks?.log?.('   URL non relue dans le champ → nouvelle saisie')
+      await sendAction(key, deviceId, { type: 'text', text: opts.link.trim() })
+      await sleep(1200)
+      if (!await seen()) hooks?.log?.('   ⚠ URL toujours non relue (on continue)')
+    }
+  }
   // 10. Texte du sticker (facultatif) via « Customize sticker text ».
   if (opts.caption && opts.caption.trim()) {
     if (await findTapText(key, deviceId, [/customize|sticker text/i], hooks, { label: 'Customize sticker text', tries: 3 })) {
@@ -3099,6 +3129,7 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
   }
   if (!placed) { const box = await readSticker(); placed = !!box && stickerInCorner(box, W, H) }
   hooks?.log?.(placed ? '📍 Sticker lien en bas à droite.' : '   (position du sticker non confirmée par la lecture — on continue)')
+  if (DRY_RUN.has(deviceId)) return storyDryRunStop(key, deviceId, placed, hooks)
   // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
   const shot2 = await snapRetry(key, deviceId)
   let arrowTapped = false
