@@ -119,6 +119,7 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "Autres banques": "Other banks",
     "Supprimés le": "Deleted on",
     "Tous les jours": "All days",
     "Ajoutés le": "Added on",

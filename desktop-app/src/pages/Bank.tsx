@@ -1326,6 +1326,14 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
   const [notice, setNotice] = useState<string | null>(null)
   const narrow = useNarrow()
   const moveFolders = useMemo(() => folders.filter(f => f.n !== 'Tous' && !f.special), [folders])
+  // Destinations HORS de la banque ouverte : depuis « Médias » → les banques des modèles (chaque modèle et ses dossiers) ;
+  // depuis une modèle → la banque principale et les autres modèles. Déplacer = changer le chemin du dossier, rien d'autre.
+  const otherMoveFolders = useMemo(() => {
+    const all = folderTree([...items.map(i => i.folder), ...folderNames])
+    const isModelPath = (p: string) => modelRoots.some(m => isWithin(p, m))
+    return all.filter(t => bankMode === 'main' ? isModelPath(t.path) : !inScope(t.path))
+      .map(t => ({ n: t.path, label: t.name, depth: t.depth, model: isModelPath(t.path) }))
+  }, [items, folderNames, modelRoots, bankMode, inScope])
 
   // « Dupliquer » : copie (fichier + miniature + nouvelle ligne) dans le dossier ; l'original reste.
   const [moveMode, setMoveMode] = useState<'move' | 'copy'>('move')
@@ -2287,6 +2295,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
               {moveFolders.map(f => (
                 <button key={f.n} title={f.n} onClick={() => doMove(f.n)} disabled={moving} style={{ display: 'flex', alignItems: 'center', gap: 10, width: `calc(100% - ${f.depth * 18}px)`, marginLeft: f.depth * 18, height: 36, padding: '0 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#161618', color: '#EDEDEF', fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'left', flexShrink: 0, boxSizing: 'border-box' }}>
                   <span style={{ color: '#8B8B94', display: 'flex' }}><Icon d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z" size={14} /></span>{f.label}
+                </button>
+              ))}
+              {otherMoveFolders.length > 0 && <div style={{ margin: '10px 0 2px', fontSize: 11.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#8B8B94' }}>{bankMode === 'main' ? '👤 Banques des modèles' : 'Autres banques'}</div>}
+              {otherMoveFolders.map(f => (
+                <button key={`o-${f.n}`} title={f.n} onClick={() => doMove(f.n)} disabled={moving} style={{ display: 'flex', alignItems: 'center', gap: 10, width: `calc(100% - ${f.depth * 18}px)`, marginLeft: f.depth * 18, height: 36, padding: '0 12px', borderRadius: 6, border: `1px solid ${f.depth === 0 && f.model ? 'rgba(167,139,250,0.35)' : 'rgba(255,255,255,0.08)'}`, background: '#161618', color: '#EDEDEF', fontSize: 13, fontWeight: f.depth === 0 ? 650 : 500, cursor: 'pointer', textAlign: 'left', flexShrink: 0, boxSizing: 'border-box' }}>
+                  <span style={{ color: f.model ? '#A78BFA' : '#8B8B94', display: 'flex' }}><Icon d={f.depth === 0 && f.model ? 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' : 'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z'} size={14} /></span><span data-no-tr>{f.label}</span>
                 </button>
               ))}
             </div>

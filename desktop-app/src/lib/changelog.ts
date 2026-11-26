@@ -41,6 +41,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Banque › Corbeille : « Tout restaurer dans » un dossier au choix (ou un nouveau dossier) au lieu du dossier d’origine.',
         'Banque : les compteurs Tout / Vidéos / Images / Sons affichent ceux du dossier ouvert (plus ceux de toute la banque).',
         'Corbeille : filtres « Supprimés le » / « Ajoutés le » (par jour) — les boutons restaurer / vider n’agissent que sur ce qui est filtré.',
+        'Banque › Déplacer / Dupliquer : depuis « Médias », les dossiers des banques des modèles sont proposés directement (et la banque principale depuis une modèle).',
       ],
       en: [
         'CTA Story: new IP (airplane mode) before EVERY account, always — can no longer be turned off.',
@@ -50,6 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         'Bank › Trash: “Restore everything into” a folder of your choice (or a new folder) instead of the original folder.',
         'Bank: the All / Videos / Images / Sounds counters show the open folder’s numbers (not the whole bank’s).',
         'Trash: “Deleted on” / “Added on” day filters — restore / empty buttons only act on what is filtered.',
+        'Bank › Move / Duplicate: from “Media”, the models’ bank folders are offered directly (and the main bank from a model).',
       ],
     },
   },
