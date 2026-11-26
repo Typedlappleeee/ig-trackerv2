@@ -12,6 +12,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-26b',
+    date: '2026-11-26',
+    title: { fr: 'Nouveaux prompts : bios et descriptions', en: 'New prompts: bios and captions' },
+    items: {
+      fr: [
+        'Bios (FR / US / DE) : identité toujours féminine, « first-year student » au lieu de « freshman » (US).',
+        'Descriptions de Reels (FR / US / DE) : écrites directement pour chaque marché, hashtags limités à la liste du marché (US : + #viral #explore #fyp autorisés).',
+        'La réserve de descriptions déjà générées est renouvelée dès qu’un prompt change (plus d’anciens hashtags).',
+      ],
+      en: [
+        'Bios (FR / US / DE): always a female identity, “first-year student” instead of “freshman” (US).',
+        'Reel captions (FR / US / DE): written directly for each market, hashtags limited to the market’s list (US: #viral #explore #fyp also allowed).',
+        'The reserve of already generated captions is renewed as soon as a prompt changes (no more old hashtags).',
+      ],
+    },
+  },
+  {
     id: '2026-11-26',
     date: '2026-11-26',
     title: { fr: 'Story CTA : nouvelle IP à chaque compte et corrections', en: 'CTA Story: new IP for every account and fixes' },

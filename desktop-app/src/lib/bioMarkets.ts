@@ -5,6 +5,12 @@ import type { Market } from './captionMarkets'
 
 const FR = `Tu écris des bios courtes pour un profil Instagram d'une étudiante française de 18 ans. Les bios sont en français. Chaque bio fait 3 lignes, et les 3 lignes varient d'une bio à l'autre. Tout doit sonner comme une vraie fille qui écrit sa bio Insta : naturel, simple, jamais forcé.
 
+IDENTITÉ TOUJOURS FÉMININE :
+- Chaque bio présente exclusivement une jeune femme. Tous les adjectifs, participes, pronoms et noms de rôle qui désignent la créatrice doivent être au féminin quand la langue marque le genre : « étudiante », « attachante », « réservée », « future infirmière ».
+- Aucun terme désignant une personne masculine dans les bios, même pour interpeller le public : jamais « boy », « boys », « man », « men », « male », « guy », « guys », « dude », « bro », « king », « homme », « garçon », « mec », « gars », ni équivalent dans une autre langue.
+- Les expressions sans marque de genre comme « team matcha » restent possibles. N'ajoute pas « fille » à chaque ligne pour forcer le féminin.
+- Avant de sortir le lot, relis chaque bio : corrige tout accord masculin désignant la créatrice et remplace toute expression interdite. Ne montre pas cette vérification.
+
 CODES FRANÇAIS :
 - bios courtes et un peu nonchalantes, pas trop d'emojis
 - slang avec parcimonie, jamais plus d'un mot par bio : « en vrai », « la flemme », « tkt », « jsp », « grave »
@@ -40,7 +46,13 @@ UNICITÉ :
 
 Donne-moi [NOMBRE] bios, séparées par « --- », sans numéros ni commentaires.`
 
-const US = `You write short Instagram bios for an 18-year-old American college freshman. Bios are in American English. Each bio is 3 lines, and all 3 lines change from one bio to the next. Everything must sound like a real American girl writing her own bio: natural, simple, never forced.
+const US = `You write short Instagram bios for an 18-year-old American woman in her first year of college. Bios are in American English. Each bio is 3 lines, and all 3 lines change from one bio to the next. Everything must sound like a real American girl writing her own bio: natural, simple, never forced.
+
+ALWAYS A FEMALE PROFILE:
+- Every bio represents a young woman. Any gendered identity label or pronoun referring to the creator must be female. Never switch to a male persona.
+- Never use male identity terms anywhere in a bio, including when addressing the audience: no "boy", "boys", "man", "men", "male", "guy", "guys", "dude", "bro", "king", "gentleman", "boyfriend", or equivalents in other languages.
+- Naturally gender-neutral phrases such as "college student", "psych major" and "shy but sweet" are allowed. Do not force "girl" into every line. Use "first-year student" rather than "freshman".
+- Before outputting the batch, check every bio for a consistent female identity and remove any forbidden term or male self-reference. Do not display this check.
 
 US CODES:
 - mostly all lowercase, a bit more emojis than in Europe, confident tone
@@ -49,7 +61,7 @@ US CODES:
 
 LINE 1: a very short tag (1 to 4 words), different every time. Mix these themes:
 - age, always 18, written in different ways: "18", "18yo", "18y", "1️⃣8️⃣", "⓵⓼"
-- school: "college student", "freshman", "psych major", "nursing student", "pre-law", "finals week 😩"
+- school: "college student", "first-year student", "psych major", "nursing student", "pre-law", "finals week 😩"
 - a simple taste or habit: "iced coffee addict", "matcha girl", "sushi lover", "pilates", "skincare"
 The 🇺🇸 flag appears in about 1 out of 2 bios. No cities or states.
 
@@ -77,6 +89,12 @@ UNIQUENESS:
 Give me [NUMBER] bios, separated by "---", no numbers, no comments.`
 
 const DE = `Du schreibst kurze Instagram-Bios für eine 18-jährige deutsche Studentin. Die Bios sind auf Deutsch. Jede Bio hat 3 Zeilen, und alle 3 Zeilen ändern sich von Bio zu Bio. Alles muss klingen wie ein echtes deutsches Mädchen, das seine eigene Bio schreibt: natürlich, einfach, nie gezwungen.
+
+IMMER EIN WEIBLICHES PROFIL:
+- Jede Bio beschreibt ausschließlich eine junge Frau. Verwende bei personenbezogenen Rollen und Bezeichnungen für die Creatorin die weibliche Form: "Studentin", "Psychologie-Studentin", "angehende Lehrerin". Keine männliche Selbstbeschreibung.
+- Keine männlichen Personenbezeichnungen in den Bios, auch nicht zur Ansprache des Publikums: kein "boy", "boys", "man", "men", "male", "guy", "guys", "dude", "bro", "king", "Mann", "Junge", "Typ", "Kerl" oder entsprechende Begriffe in anderen Sprachen.
+- Neutrale Formulierungen wie "Team Matcha", "1. Semester" und "schüchtern aber lieb" bleiben erlaubt. Füge nicht künstlich in jeder Zeile "Mädchen" oder "Frau" hinzu.
+- Prüfe vor der Ausgabe jede Bio auf eine durchgehend weibliche Identität. Korrigiere männliche Selbstbezeichnungen und ersetze verbotene Begriffe. Gib diese Prüfung nicht mit aus.
 
 DEUTSCHE CODES:
 - schlichter als in den USA, wenige Emojis, oft kleingeschrieben
