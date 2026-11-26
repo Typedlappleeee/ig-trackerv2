@@ -3199,16 +3199,20 @@ async function finishStoryFromEditor(key: string, deviceId: string, W: number, H
     for (const band of [[0.12, 0.4], [0.3, 0.62], [0.55, 0.92]] as [number, number][]) words.push(...await ocrWords(shot, undefined, { threshold: null, scale: 3, psms: ['6'], cropY: band }))
     return findStickerBox(words, stickerLabel, W, H)
   }
+  // repli SANS lecture : la pastille BLANCHE du sticker occupe le coin bas-droite (luminosité moyenne ~210 quand il y est,
+  // 55–115 sinon, mesuré sur captures réelles le 26/11/2026) — l'OCR ne lit pas toujours le texte (« viens me voir 💕 »)
+  const pillInCorner = async () => { const sh = await snapRetry(key, deviceId); return !!sh && (await meanLuma(sh, 0.62, 0.765, 0.9, 0.805)) > 185 }
   let placed = false
   for (let attempt = 0; attempt < 3 && !placed; attempt++) {
     const box = await readSticker()
     if (box && stickerInCorner(box, W, H)) { placed = true; break }
+    if (!box && await pillInCorner()) { placed = true; hooks?.log?.('   sticker repéré à l’image dans le coin bas-droite'); break }
     const mv = box ? stickerDrag(box, W, H) : { x1: Math.round(0.5 * W), y1: Math.round(0.45 * H), x2: Math.round(A.stickerTo.x * W), y2: Math.round(A.stickerTo.y * H) }
     hooks?.log?.(box ? `✋ Sticker lu en (${Math.round(box.cx)}, ${Math.round(box.cy)}) → coin bas-droite${attempt ? ` (essai ${attempt + 1}/3)` : ''}…` : '✋ Sticker non lu → glissement depuis le centre vers le bas-droite…')
     await sendAction(key, deviceId, { type: 'swipe', ...mv, duration_ms: 1400 })
     await sleep(1800)
   }
-  if (!placed) { const box = await readSticker(); placed = !!box && stickerInCorner(box, W, H) }
+  if (!placed) { const box = await readSticker(); placed = box ? stickerInCorner(box, W, H) : await pillInCorner() }
   hooks?.log?.(placed ? '📍 Sticker lien en bas à droite.' : '   (position du sticker non confirmée par la lecture — on continue)')
   if (DRY_RUN.has(deviceId)) return storyDryRunStop(key, deviceId, placed, hooks)
   // 13. Flèche bleue (bas-droite) → ouvre la feuille de partage.
