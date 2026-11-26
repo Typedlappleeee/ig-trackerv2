@@ -81,7 +81,7 @@ export async function runServerPhone(key: string, p: ServerPhone, opts: ServerOp
         const ms = Math.max(60_000, opts.gapMin * 60_000 * (0.8 + Math.random()))
         if (opts.gapScroll) {
           log(`📱 ${Math.round(ms / 6000) / 10} min de scroll avant le post…`)
-          try { await warmupByVision(key, p.dev, { minMs: ms, maxMs: ms, likeRate: 0.03, commentRate: 0, keepApp: true }, { log: () => { /* silencieux */ }, shouldStop: h.shouldStop }) } catch { /* noop */ }
+          try { const w = await warmupByVision(key, p.dev, { minMs: ms, maxMs: ms, likeRate: 0.03, commentRate: 0, keepApp: true }, { log: () => { /* silencieux */ }, shouldStop: h.shouldStop }); if (w) log(`   ✓ scroll fini (Instagram resté ouvert) : ${w.reels ?? 0} reel(s) vu(s), ${w.likes ?? 0} like(s)`) } catch { /* noop */ }
         } else { log(`⏳ pause ${Math.round(ms / 6000) / 10} min avant le post…`); const end = Date.now() + ms; while (Date.now() < end && !h.shouldStop()) await sleep(1000) }
         if (h.shouldStop()) { log('⏹ arrêt demandé'); break }
       }

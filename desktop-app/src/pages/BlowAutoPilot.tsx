@@ -935,7 +935,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           const ms = Math.max(60_000, gapMin * 60_000 * (0.8 + Math.random()))
           if (gapScroll) {
             push(`${tag} 📱 ${Math.round(ms / 6000) / 10} min de scroll avant le post…`)
-            try { await warmupByVision(key, p.dev, { minMs: ms, maxMs: ms, likeRate: 0.03, commentRate: 0, keepApp: true }, { log: () => { /* silencieux */ }, shouldStop: () => R.isCancelled() }) } catch { /* noop */ }
+            try { const w = await warmupByVision(key, p.dev, { minMs: ms, maxMs: ms, likeRate: 0.03, commentRate: 0, keepApp: true }, { log: () => { /* silencieux */ }, shouldStop: () => R.isCancelled() }); if (w) push(`${tag}    ✓ scroll fini (Instagram resté ouvert) : ${w.reels ?? 0} reel(s) vu(s), ${w.likes ?? 0} like(s)`) } catch { /* noop */ }
           } else { push(`${tag} ⏳ pause ${Math.round(ms / 6000) / 10} min avant le post…`); const end = Date.now() + ms; while (Date.now() < end && !R.isCancelled()) await sleep(1000) }
           if (R.isCancelled()) break
         }
