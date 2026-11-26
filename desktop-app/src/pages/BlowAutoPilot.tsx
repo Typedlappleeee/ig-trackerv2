@@ -1331,7 +1331,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             const accs = filled.flatMap(d => (conts[d.public_id] ?? []).map(c => ({ id: d.public_id, c, t: ageOf(d.public_id, c) })))
             if (!accs.length) return null
             const groupsAge: { k: string; label: string; f: (t: AgeTier | null) => boolean }[] = [
-              { k: '1d', label: '🆕 < 1 j', f: t => t === '1d' }, { k: '3d', label: '< 3 j', f: t => t === '1d' || t === '3d' },
+              { k: '1d', label: '< 1 j', f: t => t === '1d' }, { k: '3d', label: '🆕 NEW (< 3 j)', f: t => t === '1d' || t === '3d' },
               { k: '7d', label: '< 7 j', f: t => !!t }, { k: 'old', label: '+ de 7 j', f: t => !t },
             ]
             const pick = (f: (t: AgeTier | null) => boolean) => {
@@ -1420,7 +1420,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                             const t = ageOf(id, c)
                             const col = t === '1d' ? '#4ADE80' : t === '3d' ? '#60A5FA' : t === '7d' ? '#D4D4D8' : DIM
                             const txt = `${cf.exact ? '' : '≥ '}${cf.days} j`
-                            return <span title={cf.exact ? `Connecté sur l’iPhone depuis ${cf.days} jour(s)` : `Connecté sur l’iPhone depuis au moins ${cf.days} jour(s) (date exacte inconnue)`} style={{ fontSize: 10.5, fontWeight: 700, color: col }}>{`${t === '1d' ? '🆕 ' : ''}${txt}`}</span> })()}
+                            return <span title={cf.exact ? `Connecté sur l’iPhone depuis ${cf.days} jour(s)` : `Connecté sur l’iPhone depuis au moins ${cf.days} jour(s) (date exacte inconnue)`} style={{ fontSize: 10.5, fontWeight: 700, color: col }}>{`${t === '1d' || t === '3d' ? '🆕 NEW · ' : ''}${txt}`}</span> })()}
                           {(() => { const cs = contStates[id]?.[c]; if (!cs || c.startsWith('@')) return null
                             return <span title={`Vérifié à l’écran le ${new Date(cs.at).toLocaleString()}`} style={{ fontSize: 11, fontWeight: 500, color: cs.state === 'account' ? '#86EFAC' : cs.state === 'empty' ? DIM : cs.state === 'blocked' ? '#F87171' : DIM }}>
                               {cs.state === 'account' ? `· @${cs.username ?? '?'}` : cs.state === 'empty' ? '· vide' : cs.state === 'blocked' ? '· 🤖' : '· ?'}
