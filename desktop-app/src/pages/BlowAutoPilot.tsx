@@ -11,7 +11,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
-import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
+import { useIremotech, listDevices, fetchUsage, uploadMedia, lastUploadError, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { onAccountsSeen, selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision, setupProfileByVision } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
@@ -941,9 +941,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         }
         // Carrousel : photos injectées dans l'ordre INVERSE (la 1re du carrousel = la plus récente, pré-cochée n°1)
         let injected = true
+        let injectWhy = ''
         for (const [i, v] of [...job.vids].reverse().entries()) {
           const url = await signedUrlFor(v)
-          if (!url) { injected = false; break }
+          if (!url) { injected = false; injectWhy = `fichier « ${v.title} » absent du stockage de la Banque`; break }
           push(`${tag} ⬆ injection ${job.vids.length > 1 ? `de la photo ${job.vids.length - i}/${job.vids.length}` : 'du média'}…`)
           if (kind === 'story' && storyUnique) {
             // métadonnées uniques : photo = micro-recadrage + EXIF réécrit (comme « Spoof image ») ; vidéo = métadonnées
@@ -958,10 +959,15 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
               continue
             } catch { push(`${tag}    (métadonnées uniques impossibles sur ce fichier → original)`) }
           }
-          if (!await uploadMedia(key, p.dev, url, mediaFilename(v, kind))) { injected = false; break }
+          if (!await uploadMedia(key, p.dev, url, mediaFilename(v, kind))) {
+            injected = false
+            const e = lastUploadError(p.dev) ?? ''
+            injectWhy = /fetch média 4\d\d/.test(e) ? `fichier « ${v.title} » introuvable dans la Banque (supprimé ?)` : `envoi refusé par iRemoTech${e ? ` (${e})` : ''}`
+            break
+          }
           if (job.vids.length > 1) await sleep(2500) // dates distinctes → ordre de la galerie garanti
         }
-        if (!injected) { push(`${tag} ❌ média introuvable ou injection refusée → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, 'média introuvable / injection refusée'); continue }
+        if (!injected) { push(`${tag} ❌ ${injectWhy || 'média introuvable ou injection refusée'} → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, injectWhy || 'média introuvable / injection refusée'); continue }
         push(`${tag} ⏳ 10 s (indexation)…`)
         await sleep(10000)
         const vh = { log: hooks, shouldStop: () => R.isCancelled() }

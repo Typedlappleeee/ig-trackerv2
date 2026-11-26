@@ -248,17 +248,29 @@ export function queueAccountScan<T>(task: () => Promise<T>, deviceId = ''): Prom
   return run
 }
 
+// Raison du dernier envoi de média raté par iPhone (affichée dans le journal au lieu d'un « refusé » sans détail)
+const UPLOAD_ERR = new Map<string, string>()
+export const lastUploadError = (deviceId: string) => UPLOAD_ERR.get(deviceId) ?? null
 // Upload d'un média (URL signée Supabase) → octets bruts sur l'iPhone.
 export async function uploadMedia(key: string, deviceId: string, mediaUrl: string, filename = 'video.mp4'): Promise<boolean> {
   if (STOPPED.has(deviceId)) return false
   try {
     // un 2e essai si le 1er échoue (iRemoTech saturé, coupure) : au pire la vidéo est 2 fois dans la pellicule, la plus
     // récente est prise de toute façon
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt) await new Promise(r => setTimeout(r, 4000))
-      if (IS_WEB) { const j = await irtProxy('media', key, { deviceId, mediaUrl, filename }); if (j.ok) return true; continue }
+    UPLOAD_ERR.delete(deviceId)
+    // 3 essais espacés (4 s puis 10 s) : iRemoTech saturé avec plusieurs iPhones en même temps
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await new Promise(r => setTimeout(r, attempt === 1 ? 4000 : 10000))
+      if (STOPPED.has(deviceId)) return false
+      if (IS_WEB) {
+        const j = await irtProxy('media', key, { deviceId, mediaUrl, filename }) as { ok?: boolean; error?: string; status?: number }
+        if (j.ok) return true
+        UPLOAD_ERR.set(deviceId, String(j.error ?? (j.status ? `erreur ${j.status}` : 'refusé')))
+        if (/fetch média 4\d\d/.test(String(j.error ?? ''))) return false   // fichier absent du stockage : inutile de réessayer
+        continue
+      }
       const dl = await fetch(mediaUrl)
-      if (!dl.ok) continue
+      if (!dl.ok) { UPLOAD_ERR.set(deviceId, `fetch média ${dl.status}`); if (dl.status >= 400 && dl.status < 500) return false; continue }
       const bytes = await dl.arrayBuffer()
       // flux recommandé : ticket d'envoi puis envoi direct ; ancien POST /media en secours
       let ok = false
@@ -276,11 +288,12 @@ export async function uploadMedia(key: string, deviceId: string, mediaUrl: strin
           body: bytes,
         })
         ok = res.ok
+        if (!ok) UPLOAD_ERR.set(deviceId, `iRemoTech ${res.status}`)
       }
       if (ok) return true
     }
     return false
-  } catch { return false }
+  } catch (e) { UPLOAD_ERR.set(deviceId, e instanceof Error ? e.message : String(e)); return false }
 }
 
 // Flux vidéo temps réel (WebSocket, frames JPEG Blob).
