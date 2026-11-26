@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision, setupProfileByVision } from '@/lib/iremotechVision'
+import { onAccountsSeen, selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision, setupProfileByVision } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { loadContStates, setContState, containersToFill, type ContStateMap } from '@/lib/irtContState'
@@ -23,7 +23,7 @@ import IrtAccounts from '@/components/IrtAccounts'
 import IrtServerRuns from '@/components/IrtServerRuns'
 import { enqueueServerRun, serversOnline } from '@/lib/irtServer'
 import { locToServer, type ServerPlan } from '@/lib/irtServerSession'
-import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, accountAddedAt, accountFirstSeenAt, connectedFor, loadLiveReads, latestAccounts, type AgeTier } from '@/lib/irtAccounts'
+import { isJunkUsername, deviceAccounts, irtScannedAccounts, reconcileWithIrt, scanDue, naturalCmp, ageTier, AGE_LABEL, newAddedEntries, accountAddedAt, accountFirstSeenAt, connectedFor, loadLiveReads, latestAccounts, saveLiveRead, acceptSeenRead, type AgeTier } from '@/lib/irtAccounts'
 import { loadTeamCache, pullTeam, updateTeam, teamMarketOf, teamGroups, type IrtTeam } from '@/lib/irtTeam'
 import { setVisionBrain } from '@/lib/visionBrain'
 import { runImageSpoof, runVideoMetaSpoof, SPOOF_DEVICES } from '@/lib/studioTools'
@@ -498,6 +498,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // donne EXACTEMENT ses comptes « @… » dans le Posting, la Story, le warm-up, le setup… (un compte non détecté est retiré
   // de la liste et de la sélection) — comme l'onglet Comptes IG. Containers d'un jailbreak jamais touchés.
   const [liveTick, setLiveTick] = useState(0)
+  // Pendant chaque automatisation (posting, Story CTA, setup, warm-up…), la liste des comptes ouverte pour basculer est
+  // lue au passage → comptes mis à jour partout sans scan (retrait d'un compte confirmé par 2 lectures identiques)
+  const contsRef2 = useRef(conts); contsRef2.current = conts
+  const seenPending = useRef<Record<string, string[] | null>>({})
+  useEffect(() => onAccountsSeen((dev, seen) => {
+    const cur = (contsRef2.current[dev] ?? []).filter(c => c.startsWith('@'))
+    if (phoneKind(contsRef2.current[dev]) === 'jb') return
+    const r = acceptSeenRead(cur, seen, seenPending.current[dev] ?? null)
+    seenPending.current[dev] = r.pending
+    if (r.apply) saveLiveRead(dev, r.apply)   // → évènement « sf-irt-live » : Comptes IG, Posting, Story… mis à jour
+  }), [])
   useEffect(() => {
     const bump = () => setLiveTick(n => n + 1)
     window.addEventListener('sf-irt-live', bump); window.addEventListener('storage', bump)

@@ -3796,6 +3796,10 @@ export async function detectAccountsByVision(key: string, deviceId: string, hook
 
 /** Bascule sur @username (iPhone non jailbreaké) et vérifie que c'est bien lui qui est actif : dans la feuille des
  *  comptes, le compte actif porte la coche bleue (le gros nom en haut, grisé, n'est pas lisible par l'OCR). */
+/** Écouteurs : comptes lus dans la liste des comptes d'un iPhone pendant une bascule (posting, Story, setup…). */
+const accountsSeenListeners = new Set<(deviceId: string, usernames: string[]) => void>()
+export function onAccountsSeen(fn: (deviceId: string, usernames: string[]) => void): () => void { accountsSeenListeners.add(fn); return () => { accountsSeenListeners.delete(fn) } }
+
 export async function switchAccountByVision(key: string, deviceId: string, username: string, hooks?: VisionHooks): Promise<boolean> {
   const u = username.replace(/^@/, '').toLowerCase()
   hooks?.log?.(`👤 Bascule sur @${u}…`)
@@ -3807,6 +3811,8 @@ export async function switchAccountByVision(key: string, deviceId: string, usern
     const exact = shot ? await ocrWords(shot, 'abcdefghijklmnopqrstuvwxyz0123456789._', { threshold: null, scale: 2, psms: ['11'] }) : []
     const all = [...exact, ...scr.words]
     const top = addAccountRowY(all) ?? scr.H
+    // la liste des comptes est à l'écran : elle est signalée (gratuitement, sans scan) → mise à jour des comptes partout
+    if (k === 0) { const seen = sheetUsernames(all, scr.W, scr.H); if (seen.length) for (const fn of accountsSeenListeners) try { fn(deviceId, seen) } catch { /* noop */ } }
     const row = all.find(o => o.cy > scr.H * 0.25 && o.cy < top && sameUsername(u, o.text.toLowerCase().replace(/[^a-z0-9._]/g, '')))
     if (!row) { hooks?.log?.(`❌ @${u} n’est pas dans la liste des comptes de cet iPhone (lu : ${sheetUsernames(all, scr.W, scr.H).map(x => '@' + x).join(', ') || 'rien'})`); await closeAccountSheet(key, deviceId, scr.W, scr.H); return false }
     const dots = shot ? await findBlueDots(shot, 0.8, 0.95, 0.25, 0.95) : []

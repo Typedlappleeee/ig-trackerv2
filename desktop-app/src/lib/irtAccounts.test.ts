@@ -121,3 +121,16 @@ describe('liste des comptes = lecture la plus récente (iRemoTech ou écran)', (
   })
   it('aucune lecture → null', () => { expect(latestAccounts([], null)).toBeNull() })
 })
+
+import { acceptSeenRead } from './irtAccounts'
+describe('liste lue pendant une automatisation (acceptSeenRead)', () => {
+  it('nouveau compte → ajouté tout de suite', () => {
+    expect(acceptSeenRead(['@a', '@b'], ['a', 'b', 'c'], null)).toEqual({ apply: ['a', 'b', 'c'], pending: null })
+  })
+  it('compte disparu → retiré seulement après 2 lectures identiques', () => {
+    const r1 = acceptSeenRead(['@a', '@b', '@c'], ['a', 'c'], null)
+    expect(r1.apply).toBeNull()
+    expect(acceptSeenRead(['@a', '@b', '@c'], ['a', 'c'], r1.pending)).toEqual({ apply: ['a', 'c'], pending: null })
+  })
+  it('même liste → rien à faire', () => { expect(acceptSeenRead(['@a'], ['A'], null)).toEqual({ apply: null, pending: null }) })
+})

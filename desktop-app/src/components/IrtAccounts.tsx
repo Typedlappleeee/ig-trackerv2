@@ -42,6 +42,12 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
   // lectures des comptes faites À L'ÉCRAN de l'iPhone par ScaleFlow (quand iRemoTech refuse un scan trop rapproché)
   const [live, setLive] = useState(() => loadLiveReads())
   const saveLive = (dev: string, accounts: string[]) => setLive(saveLiveRead(dev, accounts))
+  // lectures faites ailleurs (pendant un posting, une Story…) → liste mise à jour ici aussi
+  useEffect(() => {
+    const re = () => setLive(loadLiveReads())
+    window.addEventListener('sf-irt-live', re); window.addEventListener('storage', re)
+    return () => { window.removeEventListener('sf-irt-live', re); window.removeEventListener('storage', re) }
+  }, [])
   const [devFilter, setDevFilter] = useState('all')
   const [grouped, setGrouped] = useState(true)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())

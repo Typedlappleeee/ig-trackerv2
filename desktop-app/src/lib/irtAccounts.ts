@@ -95,6 +95,20 @@ export function saveLiveRead(dev: string, accounts: string[]): Record<string, Li
   try { window.dispatchEvent(new Event('sf-irt-live')) } catch { /* hors navigateur */ }
   return n
 }
+/** Lecture prise PENDANT une automatisation (liste des comptes ouverte pour une bascule) : acceptée tout de suite si elle
+ *  contient au moins tous les comptes actuels ; un compte qui DISPARAÎT n'est retiré qu'après 2 lectures identiques de
+ *  suite (une lecture OCR incomplète ne supprime jamais un compte). Renvoie la liste à enregistrer, ou null. Pure. */
+export function acceptSeenRead(current: string[], seen: string[], pending: string[] | null): { apply: string[] | null; pending: string[] | null } {
+  const norm = (l: string[]) => [...new Set(l.map(u => u.replace(/^@/, '').toLowerCase()).filter(u => u && !isJunkUsername(u)))].sort()
+  const cur = norm(current), now = norm(seen)
+  if (!now.length) return { apply: null, pending }
+  const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i])
+  if (same(cur, now)) return { apply: null, pending: null }
+  if (cur.every(x => now.includes(x))) return { apply: now, pending: null }        // que des ajouts
+  if (pending && same(norm(pending), now)) return { apply: now, pending: null }   // 2e lecture identique → retrait confirmé
+  return { apply: null, pending: now }
+}
+
 /** Comptes de la lecture la PLUS RÉCENTE d'un iPhone (iRemoTech ou écran), en minuscules sans « @ » ; null sans lecture. Pure. */
 export function latestAccounts(jobs: IrtJob[], live?: LiveRead | null): string[] | null {
   const scans = jobs.filter(j => j.type === 'list_accounts' && j.status === 'completed').sort(newest)
