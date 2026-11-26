@@ -203,6 +203,31 @@ export async function getJob(key: string, jobId: string): Promise<IrtJob | null>
   return r.ok && r.data?.job_id ? r.data as IrtJob : null
 }
 
+/** Scan des comptes (list_accounts) d'UN iPhone, ATTENDU jusqu'à la fin : lancé puis relu toutes les 4 s
+ *  (≤ `maxMs`, 4 min par défaut). Résultat : le job terminé (completed / failed…), ou null si non lancé / trop long. */
+export async function scanAccountsAndWait(key: string, deviceId: string, opts?: { maxMs?: number; onLaunched?: (j: IrtJob) => void }): Promise<{ job: IrtJob | null; error?: string }> {
+  const r = await launchAutomation(key, deviceId, { type: 'list_accounts' })
+  if (!r.ok || !r.job) return { job: null, error: r.error }
+  opts?.onLaunched?.(r.job)
+  const end = Date.now() + (opts?.maxMs ?? 240_000)
+  let last: IrtJob = r.job
+  while (Date.now() < end) {
+    await new Promise(res => setTimeout(res, 4000))
+    const j = await getJob(key, r.job.job_id)
+    if (j) last = j
+    if (j && !['queued', 'dispatched'].includes(j.status)) return { job: j }
+  }
+  return { job: last, error: 'scan trop long (toujours en cours chez iRemoTech)' }
+}
+/** File d'attente UNIQUE des scans de comptes, pour toute l'appli : un iPhone à la fois, jamais deux scans en même
+ *  temps (le bouton « Scanner tout », le scan automatique 12 h et « Détecter » passent tous par ici). */
+let scanChain: Promise<unknown> = Promise.resolve()
+export function queueAccountScan<T>(task: () => Promise<T>): Promise<T> {
+  const run = scanChain.then(task, task)
+  scanChain = run.catch(() => undefined)
+  return run
+}
+
 // Upload d'un média (URL signée Supabase) → octets bruts sur l'iPhone.
 export async function uploadMedia(key: string, deviceId: string, mediaUrl: string, filename = 'video.mp4'): Promise<boolean> {
   try {

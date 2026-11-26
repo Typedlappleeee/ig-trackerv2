@@ -2,7 +2,7 @@
 // (scan des comptes, statut à 6 indicateurs, warm-ups) + profil Instagram (photo, publications, abonnés, abonnements).
 // Actions : scanner un iPhone, vérifier le statut, lancer un warm-up iRemoTech — à l'unité ou en lot.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { deviceLabel, isDeviceOn, listJobs, launchAutomation, type IrtDevice, type IrtJob } from '@/lib/iremotech'
+import { deviceLabel, isDeviceOn, listJobs, launchAutomation, scanAccountsAndWait, queueAccountScan, type IrtDevice, type IrtJob } from '@/lib/iremotech'
 import { switchAccountByVision } from '@/lib/iremotechVision'
 import { deviceAccounts, ago, compactNum, fetchProfiles, loadProfileCache, avatarSrc, accountAddedAt, naturalCmp, ageTier, AGE_LABEL, type IgProfile, type AccountView } from '@/lib/irtAccounts'
 import type { IrtTeam } from '@/lib/irtTeam'
@@ -38,6 +38,7 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [wuMin, setWuMin] = useState(7)
   const [busy, setBusy] = useState<string | null>(null)
+  const [scanning, setScanning] = useState<string | null>(null) // iPhone en cours de scan (file un par un)
   const [devFilter, setDevFilter] = useState('all')
   const [grouped, setGrouped] = useState(true)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -98,12 +99,25 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
     setJobs(m => ({ ...m, [dev]: [r.job!, ...(m[dev] ?? [])] }))
     return true
   }
-  const scan = async (dev: string) => { if (await launch(dev, { type: 'list_accounts' }, 'Scan')) toast('Scan des comptes lancé : ne touche pas l’iPhone pendant ~30 s', 'info') }
+  // Scan d'un iPhone, ATTENDU jusqu'à la fin, dans la file commune (jamais deux scans en même temps)
+  const scanWait = (d: IrtDevice) => queueAccountScan(async () => {
+    setScanning(deviceLabel(d))
+    const r = await scanAccountsAndWait(apiKey, d.public_id, { onLaunched: j => setJobs(m => ({ ...m, [d.public_id]: [j, ...(m[d.public_id] ?? [])] })) })
+    if (r.job) { const job = r.job; setJobs(m => ({ ...m, [d.public_id]: [job, ...(m[d.public_id] ?? []).filter(x => x.job_id !== job.job_id)] })) }
+    setScanning(null)
+    return r.job?.status === 'completed' ? true : (toast(`${deviceLabel(d)} : ${r.error ?? `scan ${r.job?.status ?? 'refusé'}`}`, 'bad'), false)
+  })
+  const scan = async (dev: string) => {
+    const d = devices.find(x => x.public_id === dev); if (!d) return
+    toast('Scan des comptes lancé : ne touche pas l’iPhone pendant ~30 s', 'info')
+    if (await scanWait(d)) toast(`${deviceLabel(d)} : comptes relus ✓`, 'ok')
+  }
   const scanAll = async () => {
     setBusy('scan')
+    const list = devices.filter(isDeviceOn)
     let n = 0
-    for (const d of devices.filter(isDeviceOn)) { if (await launch(d.public_id, { type: 'list_accounts' }, deviceLabel(d))) n++; await sleep(400) }
-    setBusy(null); toast(`${n} scan(s) lancé(s)`, n ? 'ok' : 'bad')
+    for (const d of list) if (await scanWait(d)) n++   // UN iPhone à la fois : le suivant attend la fin du précédent
+    setBusy(null); toast(`${n}/${list.length} iPhone(s) scanné(s)`, n ? 'ok' : 'bad')
   }
   // Chiffres relus sur l'iPhone : bascule sur chaque compte (profil affiché → publications / abonnés / abonnements)
   const readOnPhone = async (d: IrtDevice) => {
@@ -234,7 +248,7 @@ export default function IrtAccounts({ apiKey, devices: devicesIn, known, onScann
           {withAccounts.map(d => <option key={d.public_id} value={d.public_id}>{deviceLabel(d)} · {view[d.public_id]?.accounts.length ?? 0}</option>)}
         </select>
         <button style={{ ...btn, background: grouped ? 'rgba(255,255,255,0.08)' : FIELD_BG }} onClick={() => setGrouped(g => !g)} title="Regrouper les comptes par iPhone">{grouped ? '▾ Par iPhone' : '☰ Liste'}</button>
-        <button style={btn} disabled={!!busy || !devices.length} onClick={() => void scanAll()} title="iRemoTech lit les comptes connectés sur chaque iPhone en ligne (~30 s, ne pas toucher les iPhones)">{busy === 'scan' ? 'Lancement…' : '🔄 Tout scanner'}</button>
+        <button style={btn} disabled={!!busy || !devices.length} onClick={() => void scanAll()} title="iRemoTech lit les comptes connectés de chaque iPhone en ligne, UN iPhone à la fois (~30 s chacun, ne pas toucher les iPhones)">{busy === 'scan' ? (scanning ? `Scan de ${scanning}…` : 'Scan…') : '🔄 Tout scanner'}</button>
       </div>
 
       <div style={{ borderRadius: 12, background: '#0F0F11', border: `1px solid ${EDGE}`, overflowX: 'auto' }}>

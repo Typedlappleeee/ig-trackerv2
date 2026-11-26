@@ -11,7 +11,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
-import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, launchAutomation, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
+import { useIremotech, listDevices, fetchUsage, uploadMedia, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
 import { selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision, setupProfileByVision } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
@@ -33,7 +33,7 @@ import { generateBios } from '@/lib/bioMarkets'
 import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } from '@/lib/ctaMarkets'
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
-import { listJobs, type IrtJob } from '@/lib/iremotech'
+import { listJobs, scanAccountsAndWait, queueAccountScan, type IrtJob } from '@/lib/iremotech'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
 import { startRun, cancelRun } from '@/lib/runStore'
 import { folderMedia, loadBankSummary, type BankSummary } from '@/lib/flowEngine'
@@ -483,9 +483,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         let tried = 0
         try { tried = Number(localStorage.getItem(tk)) || 0 } catch { /* noop */ }
         if (!scanDue(jobs, Date.now(), tried)) continue
-        await launchAutomation(key, dev, { type: 'list_accounts' }).catch(() => null)
         try { localStorage.setItem(tk, String(Date.now())) } catch { /* noop */ }
-        await sleep(7000)
+        // un iPhone à la fois : le scan suivant attend la FIN de celui-ci (file commune à toute l'appli)
+        const r = await queueAccountScan(() => scanAccountsAndWait(key, dev)).catch(() => null)
+        if (r?.job && alive) { const job = r.job; setIrtJobs(m => ({ ...m, [dev]: [job, ...(m[dev] ?? []).filter(x => x.job_id !== job.job_id)] })) }
       }
     }
     const first = setTimeout(() => void tick(), 45_000)
@@ -530,7 +531,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(e => { push(`[${name}] ⚠ ${e instanceof Error ? e.message : String(e)}`); return null })
     if (!list) push(`[${name}] ✗ ni containers ni comptes détectés`)
     // iPhone normal : iRemoTech relit aussi les comptes, pour que sa liste (qui fait foi) soit à jour tout de suite
-    else if (irt.key && phoneKind(list) === 'normal') void launchAutomation(irt.key, dev, { type: 'list_accounts' }).catch(() => null)
+    else if (irt.key && phoneKind(list) === 'normal') { const key = irt.key; void queueAccountScan(() => scanAccountsAndWait(key, dev)).then(r => { if (r.job) { const job = r.job; setIrtJobs(m => ({ ...m, [dev]: [job, ...(m[dev] ?? []).filter(x => x.job_id !== job.job_id)] })) } }).catch(() => null) }
     setDetecting(null)
   }
   // Ouvre chaque container et lit ce qu'il contient VRAIMENT (vide / @compte / bloqué) : la liste « Comptes créés »
