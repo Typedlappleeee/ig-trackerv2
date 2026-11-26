@@ -1891,18 +1891,23 @@ async function setPfpOnEditProfile(key: string, deviceId: string, W: number, H: 
   // (« Edit profile » : y ≈ 0,29 H ; « Complete your profile » : y ≈ 0,49 H — vu en vrai le 26/11/2026)
   // texte bleu parfois illisible → positions connues de la photo : « Edit profile » (0,2 H) puis « Complete your profile » (0,4 H)
   const ep = (await readScreenWords(key, deviceId))?.words.find(o => /^(picture|avatar)$/i.test(o.text) && o.cy < H * 0.6)
-  const spots: [number, number][] = [...(ep ? [[ep.cx, ep.cy] as [number, number]] : []), [0.36 * W, 0.2 * H], [0.36 * W, 0.4 * H], [0.5 * W, 0.49 * H]]
-  let choose: { cx: number; cy: number } | undefined
+  const spots: [number, number][] = [...(ep ? [[ep.cx, ep.cy] as [number, number]] : []), [0.36 * W, 0.2 * H], [0.36 * W, 0.4 * H]]
+  let choose: { cx: number; cy: number } | undefined, gallery = false
   for (const [x, y] of spots) {
     await tap(x, y)
     await sleep(2200)
     const sh = await readScreenWords(key, deviceId)
     choose = sh?.words.find(o => /^choose$/i.test(o.text) && o.cy > H * 0.4)
     if (choose) break
+    if (sh?.words.some(o => /^recents?$/i.test(o.text))) { gallery = true; break }   // galerie ouverte directement
+    // un éditeur de champ (« Name », « Username »… avec ✓) ouvert par erreur → ‹ sans rien changer
+    if (sh && !sh.words.some(o => /^bio$/i.test(o.text)) && sh.words.some(o => /^(name|username|pronouns)$/i.test(o.text) && o.cy < H * 0.12)) {
+      hooks?.log?.('   éditeur ouvert par erreur → retour sans rien changer')
+      await tap(0.08 * W, 0.064 * H); await sleep(1800); await discardEditIfAsked(key, deviceId, hooks)
+    }
   }
-  if (!choose) { hooks?.log?.('   ⚠ « Choose from library » introuvable'); return false }
-  await tap(choose.cx + 30, choose.cy)
-  await sleep(3000)
+  if (!choose && !gallery) { hooks?.log?.('   ⚠ « Choose from library » introuvable'); return false }
+  if (choose) { await tap(choose.cx + 30, choose.cy); await sleep(3000) }
   const lib = await readScreenWords(key, deviceId)
   const rec = lib?.words.find(o => /^recents?$/i.test(o.text))
   if (!lib || !rec) { hooks?.log?.('   ⚠ galerie « Library » non reconnue'); return false }
@@ -2002,6 +2007,14 @@ export async function setupProfileByVision(key: string, deviceId: string, opts: 
   const { W, H } = s0
   if (!await openEditProfile(key, deviceId, W, H, hooks)) { hooks?.log?.('❌ page « Edit profile » non atteinte'); return { pfp: opts.pfp ? false : null, bio: opts.bio ? false : null } }
   const pfp = opts.pfp ? await setPfpOnEditProfile(key, deviceId, W, H, hooks) : null
+  // la photo a pu laisser un autre écran ouvert : retour à « Edit profile » (ligne « Bio » visible) avant la bio
+  if (opts.bio) for (let k = 0; k < 2; k++) {
+    const cur = await readScreenWords(key, deviceId)
+    if (!cur || cur.words.some(o => /^bio$/i.test(o.text))) break
+    hooks?.log?.('   retour à « Edit profile » avant la bio')
+    await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.08 * W), y: Math.round(0.064 * H) }); await sleep(1800)
+    await discardEditIfAsked(key, deviceId, hooks)
+  }
   const bio = opts.bio ? await setBioOnEditProfile(key, deviceId, W, H, opts.bio, hooks) : null
   await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.06 * W), y: Math.round(0.056 * H) }) // retour au profil
   await sleep(1500)

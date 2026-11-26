@@ -119,6 +119,8 @@ export const EN: Dict = {
     "Sous-dossiers « Reels » / « Photos »": "“Reels” / “Photos” subfolders",
     "{0} média(s) rangé(s) dans la Banque.": "{0} media saved to the Bank.",
     "🎬 Reels →": "🎬 Reels →",
+    "retour à « Edit profile » avant la bio": "back to “Edit profile” before the bio",
+    "éditeur ouvert par erreur → retour sans rien changer": "editor opened by mistake → back without changing anything",
     "éditeur de bio encore ouvert → bouton AssistiveTouch écarté du ✓, nouvel essai": "bio editor still open → AssistiveTouch button moved off the ✓, retrying",
     "page « Search or ask Meta AI » → retour": "“Search or ask Meta AI” page → back",
     "compte récent → « Complete your profile »": "recent account → “Complete your profile”",
