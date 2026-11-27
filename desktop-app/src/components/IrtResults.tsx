@@ -74,6 +74,7 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
 
       <IgStatsTable igstats={igstats} accounts={accounts.filter(a => (!phone || a.phone === phone) && (!q.trim() || a.name.toLowerCase().includes(q.trim().toLowerCase())))}
         ctaDone={new Set(aggregateResults(entries ?? [], Date.now() - 864e5).filter(a => a.by.story.ok > 0).map(a => `${a.device}::${a.name.toLowerCase()}`))}
+        sfLast={new Map(aggregateResults(entries ?? []).map(a => [`${a.device}::${a.name.toLowerCase()}`, Math.max(a.by.reel.lastOk ?? 0, a.by.carousel.lastOk ?? 0)] as [string, number]).filter(e => e[1] > 0))}
         sfReels={new Map(aggregateResults(entries ?? [], Date.now() - 864e5).map(a => [`${a.device}::${a.name.toLowerCase()}`, a.by.reel.ok + a.by.carousel.ok] as [string, number]))}
         busy={statsBusy} error={statsErr} onRefresh={onRefreshStats ? async () => { setStatsBusy(true); setStatsErr(null); try { await onRefreshStats(); setStatsErr(lastStatsError) } finally { setStatsBusy(false) } } : undefined} />
 
@@ -126,21 +127,21 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
 }
 
 /** Stats Instagram du jour (HikerAPI) de tous les comptes iRemoTech : Reels > 5 000 vues en 48 h EN HAUT et surlignés. */
-type StatFilter = 'nocta' | 'cta' | 'nolink' | 'noreel' | 'reel' | 'viral' | 'stale' | 'flag' | 'new'
-type StatSort = 'viral' | 'views24' | 'followers' | 'reels24' | 'phone' | 'name'
+type StatFilter = 'nocta' | 'cta' | 'nolink' | 'noreel' | 'reel' | 'viral' | 'stale' | 'flag' | 'new' | 'idle'
+type StatSort = 'viral' | 'views24' | 'followers' | 'reels24' | 'phone' | 'name' | 'last'
 const FILTERS: { k: StatFilter; l: string }[] = [
   { k: 'nocta', l: '❌ Story CTA pas faite' }, { k: 'cta', l: '🔗 Story CTA faite' }, { k: 'nolink', l: '📷 Story sans lien' }, { k: 'new', l: '🆕 Nouveaux comptes (< 3 j)' },
-  { k: 'noreel', l: '⏳ 0 Reel aujourd’hui' }, { k: 'reel', l: '🎬 Reels postés aujourd’hui' },
+  { k: 'noreel', l: '⏳ 0 Reel aujourd’hui' }, { k: 'idle', l: '⏰ Pas de post depuis 48 h' }, { k: 'reel', l: '🎬 Reels postés aujourd’hui' },
   { k: 'viral', l: '🚀 ≥ 5 000 vues (48 h)' }, { k: 'flag', l: '⚠ Compte à surveiller (flag possible)' }, { k: 'stale', l: '❔ Pas relus / introuvables' },
 ]
 const SORTS: { k: StatSort; l: string }[] = [
   { k: 'viral', l: 'Tri : 🚀 viraux d’abord' }, { k: 'views24', l: 'Tri : vues 24 h' }, { k: 'followers', l: 'Tri : abonnés' },
-  { k: 'reels24', l: 'Tri : Reels 24 h' }, { k: 'phone', l: 'Tri : iPhone' }, { k: 'name', l: 'Tri : compte' },
+  { k: 'reels24', l: 'Tri : Reels 24 h' }, { k: 'last', l: 'Tri : dernier post (le plus ancien d’abord)' }, { k: 'phone', l: 'Tri : iPhone' }, { k: 'name', l: 'Tri : compte' },
 ]
 const lsGet = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : d } catch { return d } }
 const lsSet = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* noop */ } }
 
-function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfReels }: { igstats: Record<string, IgStat>; accounts: { name: string; device: string; phone: string; days?: number | null; exact?: boolean; isNew?: boolean }[]; busy: boolean; error?: string | null; onRefresh?: () => void; ctaDone?: Set<string>; sfReels?: Map<string, number> }) {
+function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfReels, sfLast }: { igstats: Record<string, IgStat>; accounts: { name: string; device: string; phone: string; days?: number | null; exact?: boolean; isNew?: boolean }[]; busy: boolean; error?: string | null; onRefresh?: () => void; ctaDone?: Set<string>; sfReels?: Map<string, number>; sfLast?: Map<string, number> }) {
   const [filters, setFilters] = useState<StatFilter[]>(() => lsGet('sf-irt-stat-filters', []))
   const [sort, setSort] = useState<StatSort>(() => lsGet('sf-irt-stat-sort', 'viral'))
   const toggle = (k: StatFilter) => setFilters(f => { const n = f.includes(k) ? f.filter(x => x !== k) : [...f, k]; lsSet('sf-irt-stat-filters', n); return n })
@@ -154,15 +155,18 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
     // compte NOUVEAU (< 3 j) : une portée faible est normale (pas encore dans l'algo) → jamais « à surveiller » pour ça
     const h0 = accountHealth(s)
     const health = a.isNew && (h0 === 'low' || h0 === 'drop') ? 'ok' : h0
-    return { ...a, s, cta, reels, health }
+    // dernier post = Reel le plus récent vu sur Instagram (HikerAPI) ou publication réussie par ScaleFlow
+    const last = Math.max(s?.recent?.[0]?.at ?? 0, sfLast?.get(k) ?? 0) || null
+    return { ...a, s, cta, reels, health, last }
   })
   const pass = (r: typeof all[number], k: StatFilter) =>
-    k === 'nocta' ? !r.cta : k === 'cta' ? r.cta : k === 'nolink' ? !!r.s?.story && !r.s.storyLink : k === 'new' ? !!r.isNew : k === 'noreel' ? !r.s?.missing && !r.reels : k === 'reel' ? r.reels > 0
+    k === 'nocta' ? !r.cta : k === 'cta' ? r.cta : k === 'nolink' ? !!r.s?.story && !r.s.storyLink : k === 'new' ? !!r.isNew : k === 'idle' ? !!r.s && !r.s.missing && (!r.last || Date.now() - r.last > 48 * 3600_000) : k === 'noreel' ? !r.s?.missing && !r.reels : k === 'reel' ? r.reels > 0
       : k === 'viral' ? !!r.s?.viral48?.length : k === 'flag' ? ['banned', 'private', 'drop', 'low'].includes(r.health) : !r.s || !!r.s.missing
   const cmp = (x: typeof all[number], y: typeof all[number]) =>
     sort === 'views24' ? (y.s?.views24 ?? -1) - (x.s?.views24 ?? -1)
       : sort === 'followers' ? (y.s?.followers ?? -1) - (x.s?.followers ?? -1)
       : sort === 'reels24' ? y.reels - x.reels
+      : sort === 'last' ? (x.last ?? 0) - (y.last ?? 0)
       : sort === 'name' ? x.name.localeCompare(y.name, 'fr')
       : sort === 'phone' ? x.phone.localeCompare(y.phone, 'fr', { numeric: true }) || x.name.localeCompare(y.name, 'fr')
       : (y.s?.viral48?.[0]?.views ?? 0) - (x.s?.viral48?.[0]?.views ?? 0) || (y.s?.views24 ?? 0) - (x.s?.views24 ?? 0) || x.phone.localeCompare(y.phone, 'fr', { numeric: true })
@@ -197,7 +201,7 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
         <div style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${EDGE}` }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, color: INK }}>
             <thead><tr style={{ background: '#111113', color: MUTED, textAlign: 'left' }}>
-              <th style={th}>Compte</th><th style={th}>iPhone</th><th style={th} title="Indicatif : Instagram ne publie pas l’état « flag » d’un compte. Introuvable = suspendu / banni / renommé ; portée en chute = derniers Reels à moins d’un quart des précédents.">État</th><th style={th}>Abonnés</th><th style={th} title="Abonnements">Abonn.</th><th style={th} title="Reels publiés ces 24 h">Reels</th><th style={th} title="Vues des Reels publiés ces 24 h">Vues</th><th style={th}>CTA</th><th style={th} title="Reel à 5 000 vues ou plus publié ces 48 h">🚀 48 h</th><th style={th}>Relu</th>
+              <th style={th}>Compte</th><th style={th}>iPhone</th><th style={th} title="Indicatif : Instagram ne publie pas l’état « flag » d’un compte. Introuvable = suspendu / banni / renommé ; portée en chute = derniers Reels à moins d’un quart des précédents.">État</th><th style={th}>Abonnés</th><th style={th} title="Abonnements">Abonn.</th><th style={th} title="Reels publiés ces 24 h">Reels</th><th style={th} title="Vues des Reels publiés ces 24 h">Vues</th><th style={th}>CTA</th><th style={th} title="Reel à 5 000 vues ou plus publié ces 48 h">🚀 48 h</th><th style={th} title="Dernier Reel publié (Instagram ou ScaleFlow)">Dernier post</th><th style={th}>Relu</th>
             </tr></thead>
             <tbody>
               {rows.map(r => {
@@ -215,6 +219,7 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
                     <td style={td}>{s ? fmt(s.views24) : '—'}</td>
                     <td style={td}>{s?.storyLink ? <span title="Story avec sticker lien en ligne" style={{ color: OK }}>🔗 en ligne</span> : r.cta ? <span title="Story CTA publiée par ScaleFlow ces 24 h" style={{ color: OK }}>✓ ScaleFlow</span> : s?.story ? <span title="Une Story est en ligne, sans sticker lien" style={{ color: GOLD }}>📷 sans lien</span> : s ? <span style={{ color: BAD }}>✗ pas faite</span> : <span style={{ color: DIM }}>—</span>}</td>
                     <td style={td}>{v ? <a href={`https://www.instagram.com/reel/${v.code}/`} target="_blank" rel="noreferrer" style={{ color: '#F472B6', fontWeight: 700, textDecoration: 'none' }}>🚀 {fmt(v.views)}{(s?.viral48?.length ?? 0) > 1 ? ` (+${(s?.viral48?.length ?? 1) - 1})` : ''}</a> : <span style={{ color: DIM }}>—</span>}</td>
+                    <td title={r.last ? new Date(r.last).toLocaleString() : undefined} style={{ ...td, color: !r.last ? DIM : Date.now() - r.last > 48 * 3600_000 ? BAD : Date.now() - r.last > 24 * 3600_000 ? GOLD : OK }}>{r.last ? ago(new Date(r.last).toISOString()).replace(/^il y a /, '') : s ? 'aucun' : '—'}</td>
                     <td style={{ ...td, color: DIM }}>{s ? ago(s.at).replace(/^il y a /, '') : 'jamais'}</td>
                   </tr>
                 )

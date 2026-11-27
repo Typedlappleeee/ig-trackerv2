@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-27c',
+    date: '2026-11-27',
+    title: { fr: 'Stats Instagram : date du dernier post', en: 'Instagram stats: date of the last post' },
+    items: {
+      fr: ['Colonne « Dernier post » pour chaque compte (Reel le plus récent vu sur Instagram ou publié par ScaleFlow) : vert < 24 h, jaune < 48 h, rouge au-delà ; filtre « ⏰ Pas de post depuis 48 h » et tri « dernier post (le plus ancien d’abord) ».'],
+      en: ['“Last post” column for each account (most recent Reel seen on Instagram or posted by ScaleFlow): green < 24 h, yellow < 48 h, red beyond; “⏰ No post for 48 h” filter and “last post (oldest first)” sort.'],
+    },
+  },
+  {
     id: '2026-11-27b',
     date: '2026-11-27',
     title: { fr: 'iRemoTech : iPhone dont l’écran ne répond plus', en: 'iRemoTech: iPhone whose screen no longer responds' },
