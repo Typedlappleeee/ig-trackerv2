@@ -983,9 +983,14 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         // Carrousel : photos injectées dans l'ordre INVERSE (la 1re du carrousel = la plus récente, pré-cochée n°1)
         let injected = true
         let injectWhy = ''
+        // fichier absent de la Banque (supprimé du stockage) : la vidéo est REMPLACÉE par une autre du pool (2 fois max)
+        // au lieu de rater le post (vu le 27/11/2026 : « kenz 120 · v1 » introuvable → post perdu)
+        for (let swap = 0; swap < 3; swap++) {
+        injected = true; injectWhy = ''
+        let missing = false
         for (const [i, v] of [...job.vids].reverse().entries()) {
           const url = await signedUrlFor(v)
-          if (!url) { injected = false; injectWhy = `fichier « ${v.title} » absent du stockage de la Banque`; break }
+          if (!url) { injected = false; missing = true; injectWhy = `fichier « ${v.title} » absent du stockage de la Banque`; break }
           push(`${tag} ⬆ injection ${job.vids.length > 1 ? `de la photo ${job.vids.length - i}/${job.vids.length}` : 'du média'}…`)
           if (kind === 'story' && storyUnique) {
             // métadonnées uniques : photo = micro-recadrage + EXIF réécrit (comme « Spoof image ») ; vidéo = métadonnées
@@ -1003,10 +1008,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           if (!await uploadMedia(key, p.dev, url, mediaFilename(v, kind))) {
             injected = false
             const e = lastUploadError(p.dev) ?? ''
-            injectWhy = /fetch média 4\d\d/.test(e) ? `fichier « ${v.title} » introuvable dans la Banque (supprimé ?)` : `envoi refusé par iRemoTech${e ? ` (${e})` : ''}`
+            missing = /fetch média 4\d\d/.test(e)
+            injectWhy = missing ? `fichier « ${v.title} » introuvable dans la Banque (supprimé ?)` : `envoi refusé par iRemoTech${e ? ` (${e})` : ''}`
             break
           }
           if (job.vids.length > 1) await sleep(2500) // dates distinctes → ordre de la galerie garanti
+        }
+        if (injected || !missing || job.vids.length !== 1) break
+        const alt = pickSet(1, `${p.dev}::${job.container}`)[0]
+        if (!alt) break
+        push(`${tag} 🔁 ${injectWhy} → remplacé par « ${alt.title} »`)
+        job.vids = [alt]; job.vid = alt
         }
         if (!injected) { push(`${tag} ❌ ${injectWhy || 'média introuvable ou injection refusée'} → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, injectWhy || 'média introuvable / injection refusée'); continue }
         push(`${tag} ⏳ 10 s (indexation)…`)
