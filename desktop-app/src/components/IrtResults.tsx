@@ -73,6 +73,8 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
       </div>
 
       <IgStatsTable igstats={igstats} accounts={accounts.filter(a => (!phone || a.phone === phone) && (!q.trim() || a.name.toLowerCase().includes(q.trim().toLowerCase())))}
+        ctaDone={new Set(aggregateResults(entries ?? [], Date.now() - 864e5).filter(a => a.by.story.ok > 0).map(a => `${a.device}::${a.name.toLowerCase()}`))}
+        sfReels={new Map(aggregateResults(entries ?? [], Date.now() - 864e5).map(a => [`${a.device}::${a.name.toLowerCase()}`, a.by.reel.ok + a.by.carousel.ok] as [string, number]))}
         busy={statsBusy} error={statsErr} onRefresh={onRefreshStats ? async () => { setStatsBusy(true); setStatsErr(null); try { await onRefreshStats(); setStatsErr(lastStatsError) } finally { setStatsBusy(false) } } : undefined} />
 
       <div style={{ fontSize: 14, fontWeight: 600, color: INK, margin: '18px 0 10px' }}>🤖 Automatisations ScaleFlow</div>
@@ -124,10 +126,45 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
 }
 
 /** Stats Instagram du jour (HikerAPI) de tous les comptes iRemoTech : Reels > 5 000 vues en 48 h EN HAUT et surlignés. */
-function IgStatsTable({ igstats, accounts, busy, error, onRefresh }: { igstats: Record<string, IgStat>; accounts: { name: string; device: string; phone: string }[]; busy: boolean; error?: string | null; onRefresh?: () => void }) {
-  const rows = accounts.map(a => ({ ...a, s: igstats[a.name.replace(/^@/, '').toLowerCase()] as IgStat | undefined }))
-    .sort((x, y) => (y.s?.viral48?.[0]?.views ?? 0) - (x.s?.viral48?.[0]?.views ?? 0) || (y.s?.views24 ?? 0) - (x.s?.views24 ?? 0) || x.phone.localeCompare(y.phone, 'fr', { numeric: true }))
-  const viral = rows.filter(r => r.s?.viral48?.length).length
+type StatFilter = 'nocta' | 'cta' | 'noreel' | 'reel' | 'viral' | 'stale'
+type StatSort = 'viral' | 'views24' | 'followers' | 'reels24' | 'phone' | 'name'
+const FILTERS: { k: StatFilter; l: string }[] = [
+  { k: 'nocta', l: '❌ Story CTA pas faite' }, { k: 'cta', l: '🔗 Story CTA faite' },
+  { k: 'noreel', l: '⏳ 0 Reel aujourd’hui' }, { k: 'reel', l: '🎬 Reels postés aujourd’hui' },
+  { k: 'viral', l: '🚀 ≥ 5 000 vues (48 h)' }, { k: 'stale', l: '❔ Pas relus / introuvables' },
+]
+const SORTS: { k: StatSort; l: string }[] = [
+  { k: 'viral', l: 'Tri : 🚀 viraux d’abord' }, { k: 'views24', l: 'Tri : vues 24 h' }, { k: 'followers', l: 'Tri : abonnés' },
+  { k: 'reels24', l: 'Tri : Reels 24 h' }, { k: 'phone', l: 'Tri : iPhone' }, { k: 'name', l: 'Tri : compte' },
+]
+const lsGet = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : d } catch { return d } }
+const lsSet = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* noop */ } }
+
+function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfReels }: { igstats: Record<string, IgStat>; accounts: { name: string; device: string; phone: string }[]; busy: boolean; error?: string | null; onRefresh?: () => void; ctaDone?: Set<string>; sfReels?: Map<string, number> }) {
+  const [filters, setFilters] = useState<StatFilter[]>(() => lsGet('sf-irt-stat-filters', []))
+  const [sort, setSort] = useState<StatSort>(() => lsGet('sf-irt-stat-sort', 'viral'))
+  const toggle = (k: StatFilter) => setFilters(f => { const n = f.includes(k) ? f.filter(x => x !== k) : [...f, k]; lsSet('sf-irt-stat-filters', n); return n })
+  // CTA faite ces 24 h = Story avec lien vue par HikerAPI OU Story CTA publiée par ScaleFlow ces 24 h
+  const all = accounts.map(a => {
+    const s = igstats[a.name.replace(/^@/, '').toLowerCase()] as IgStat | undefined
+    const k = `${a.device}::${a.name.toLowerCase()}`
+    const cta = !!s?.storyLink || !!ctaDone?.has(k)
+    // Reels du jour = le plus grand de HikerAPI (vu sur Instagram) et des publications réussies par ScaleFlow ces 24 h
+    const reels = Math.max(s?.reels24 ?? 0, sfReels?.get(k) ?? 0)
+    return { ...a, s, cta, reels }
+  })
+  const pass = (r: typeof all[number], k: StatFilter) =>
+    k === 'nocta' ? !r.cta : k === 'cta' ? r.cta : k === 'noreel' ? !r.s?.missing && !r.reels : k === 'reel' ? r.reels > 0
+      : k === 'viral' ? !!r.s?.viral48?.length : !r.s || !!r.s.missing
+  const cmp = (x: typeof all[number], y: typeof all[number]) =>
+    sort === 'views24' ? (y.s?.views24 ?? -1) - (x.s?.views24 ?? -1)
+      : sort === 'followers' ? (y.s?.followers ?? -1) - (x.s?.followers ?? -1)
+      : sort === 'reels24' ? y.reels - x.reels
+      : sort === 'name' ? x.name.localeCompare(y.name, 'fr')
+      : sort === 'phone' ? x.phone.localeCompare(y.phone, 'fr', { numeric: true }) || x.name.localeCompare(y.name, 'fr')
+      : (y.s?.viral48?.[0]?.views ?? 0) - (x.s?.viral48?.[0]?.views ?? 0) || (y.s?.views24 ?? 0) - (x.s?.views24 ?? 0) || x.phone.localeCompare(y.phone, 'fr', { numeric: true })
+  const rows = all.filter(r => filters.every(k => pass(r, k))).sort(cmp)
+  const viral = all.filter(r => r.s?.viral48?.length).length
   const last = Object.values(igstats).reduce((m, s) => Math.max(m, Date.parse(s.at) || 0), 0)
   const th: CSSProperties = { padding: '9px 12px', fontWeight: 500 }
   const td: CSSProperties = { padding: '9px 12px', whiteSpace: 'nowrap' }
@@ -139,8 +176,19 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh }: { igstats: 
         <span style={{ fontSize: 12, color: DIM }}>{last ? `relues ${ago(new Date(last).toISOString())} · automatiquement chaque jour et à chaque détection des comptes` : 'pas encore relues'}</span>
         {onRefresh && <button onClick={onRefresh} disabled={busy} style={{ marginLeft: 'auto', height: 30, padding: '0 12px', borderRadius: 8, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 12.5, cursor: busy ? 'default' : 'pointer' }}>{busy ? 'Lecture…' : '↻ Relire les stats maintenant'}</button>}
       </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', margin: '0 0 10px' }}>
+        {FILTERS.map(f => {
+          const on = filters.includes(f.k), n = all.filter(r => pass(r, f.k)).length
+          return <button key={f.k} onClick={() => toggle(f.k)} style={{ height: 28, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, background: on ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: on ? GOLD : MUTED, border: `1px solid ${on ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}` }}>{f.l} <span style={{ opacity: 0.7 }}>{n}</span></button>
+        })}
+        {filters.length > 0 && <button onClick={() => { setFilters([]); lsSet('sf-irt-stat-filters', []) }} style={{ height: 28, padding: '0 10px', borderRadius: 7, cursor: 'pointer', fontSize: 12.5, background: 'transparent', color: DIM, border: 'none' }}>✕ Effacer les filtres</button>}
+        <select value={sort} onChange={e => { const v = e.target.value as StatSort; setSort(v); lsSet('sf-irt-stat-sort', v) }} style={{ marginLeft: 'auto', height: 28, padding: '0 8px', borderRadius: 7, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 12.5 }}>
+          {SORTS.map(o => <option key={o.k} value={o.k}>{o.l}</option>)}
+        </select>
+        <span style={{ fontSize: 12, color: DIM }}>{rows.length}/{all.length} compte(s)</span>
+      </div>
       {error && <div style={{ margin: '0 0 10px', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', color: BAD, fontSize: 12.5 }}>⚠ Stats non relues : <span data-no-tr>{error}</span>{/HIKERAPI_KEY/.test(error) ? ' — ajoute la clé HikerAPI (HIKERAPI_KEY) dans les variables d’environnement Vercel, puis redéploie.' : ''}</div>}
-      {!rows.length ? <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${EDGE}`, color: MUTED, fontSize: 13 }}>Aucun compte iRemoTech détecté.</div> : (
+      {!rows.length ? <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${EDGE}`, color: MUTED, fontSize: 13 }}>{all.length ? 'Aucun compte ne correspond à ces filtres.' : 'Aucun compte iRemoTech détecté.'}</div> : (
         <div style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${EDGE}` }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, color: INK }}>
             <thead><tr style={{ background: '#111113', color: MUTED, textAlign: 'left' }}>
@@ -155,9 +203,9 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh }: { igstats: 
                     <td data-no-tr style={{ ...td, color: MUTED }}>{r.phone}</td>
                     <td style={td}>{fmt(s?.followers)}</td>
                     <td style={td}>{fmt(s?.following)}</td>
-                    <td style={td}>{s ? <b style={{ color: s.reels24 ? OK : DIM }}>{s.reels24 ?? 0}</b> : '—'}</td>
+                    <td style={td}><b style={{ color: r.reels ? OK : DIM }}>{r.reels}</b></td>
                     <td style={td}>{s ? fmt(s.views24) : '—'}</td>
-                    <td style={td}>{!s ? '—' : s.storyLink ? <span style={{ color: OK }}>🔗 en ligne</span> : s.story ? <span style={{ color: GOLD }}>Story sans lien</span> : <span style={{ color: DIM }}>aucune</span>}</td>
+                    <td style={td}>{s?.storyLink ? <span style={{ color: OK }}>🔗 en ligne</span> : r.cta ? <span style={{ color: OK }}>✓ publiée (ScaleFlow)</span> : s?.story ? <span style={{ color: GOLD }}>Story sans lien</span> : s ? <span style={{ color: BAD }}>✗ pas faite</span> : <span style={{ color: DIM }}>—</span>}</td>
                     <td style={td}>{v ? <a href={`https://www.instagram.com/reel/${v.code}/`} target="_blank" rel="noreferrer" style={{ color: '#F472B6', fontWeight: 700, textDecoration: 'none' }}>🚀 {fmt(v.views)}{(s?.viral48?.length ?? 0) > 1 ? ` (+${(s?.viral48?.length ?? 1) - 1})` : ''}</a> : <span style={{ color: DIM }}>—</span>}</td>
                     <td style={{ ...td, color: DIM }}>{s ? ago(s.at) : 'jamais'}</td>
                   </tr>
