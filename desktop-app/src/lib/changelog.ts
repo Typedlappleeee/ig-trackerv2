@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-27b',
+    date: '2026-11-27',
+    title: { fr: 'iRemoTech : iPhone dont l’écran ne répond plus', en: 'iRemoTech: iPhone whose screen no longer responds' },
+    items: {
+      fr: ['Au début de chaque lancement, ScaleFlow vérifie que l’écran de chaque iPhone répond aux touches (un glissement sur l’accueil doit changer de page). Sinon : nouveau recalibrage, puis l’iPhone est sauté avec un message clair (« à faire vérifier par iRemoTech ») au lieu de rater chaque compte un par un.'],
+      en: ['At the start of every run, ScaleFlow checks that each iPhone’s screen responds to touches (a swipe on the home screen must change page). Otherwise: new calibration, then the iPhone is skipped with a clear message (“have iRemoTech check it”) instead of failing every account one by one.'],
+    },
+  },
+  {
     id: '2026-11-27',
     date: '2026-11-27',
     title: { fr: 'iRemoTech : stats Instagram de chaque compte', en: 'iRemoTech: Instagram stats of every account' },

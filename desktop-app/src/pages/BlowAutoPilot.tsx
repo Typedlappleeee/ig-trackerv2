@@ -12,7 +12,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { OrgState } from '@/lib/data'
 import { useIremotech, listDevices, fetchUsage, uploadMedia, lastUploadError, isDeviceOn, deviceLabel, type IrtDevice, type IrtUsage } from '@/lib/iremotech'
-import { onAccountsSeen, selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision, setupProfileByVision, claudeCleanup, resetPublishFlag, publishTapped } from '@/lib/iremotechVision'
+import { onAccountsSeen, selectContainerByVision, openTargetByVision, detectAccountsByVision, sameUsername, postReelByVision, postStoryByVision, postCarouselByVision, CAROUSEL_MAX, disableAutoCorrect, airplaneReset, warmupEditsByVision, recalibrateTouch, createInstagramAccountByVision, isSignupScreen, detectContainersByVision, enterSmsCodeByVision, warmupByVision, completeSignupByVision, requestSmsIfWhatsApp, forceCloseForegroundApp, logoutToSignupByVision, containerAccountByVision, setupProfileByVision, touchBroken, claudeCleanup, resetPublishFlag, publishTapped } from '@/lib/iremotechVision'
 import { addCreatedAccount, loadCreatedAccounts, removeCreatedAccount, clearCreatedAccounts, type CreatedAccount } from '@/lib/irtCreatedAccounts'
 import { addWarmupSession } from '@/lib/irtWarmupHistory'
 import { loadContStates, setContState, containersToFill, type ContStateMap } from '@/lib/irtContState'
@@ -921,6 +921,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const tag = `[${p.name}]`
       const hooks = (m: string) => push(`${tag} ${m}`)
       await recalibrateTouch(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })
+      // écran mort (touches non reçues) : iPhone sauté tout de suite au lieu de rater chaque compte un par un
+      if (await touchBroken(key, p.dev, { log: hooks })) { for (const job of p.jobs) { fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, 'écran de l’iPhone ne répond pas aux touches') } return }
       // Correction automatique du clavier iOS coupée une fois par iPhone (sinon légendes / textes français déformés)
       const acKey = `sf-irt-kbclean2-${p.dev}` // v2 : correction + majuscule automatiques
       let acDone = false
@@ -1093,6 +1095,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const tag = `[${p.name}]`
       const hooks = { log: (m: string) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() }
       await recalibrateTouch(key, p.dev, hooks)
+      if (await touchBroken(key, p.dev, hooks)) { for (const c of p.targets) { fail(p.dev, c); R.tick(false); L.rec(p.dev, p.name, c, false, 'écran de l’iPhone ne répond pas aux touches') } return }
       for (const c of p.targets) {
         if (R.isCancelled()) break
         push(`\n${tag} 🪪 ${c}`)
@@ -1362,6 +1365,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       const tag = `[${p.name}]`
       const hooks = { log: (m: string) => push(`${tag} ${m}`), shouldStop: () => R.isCancelled() }
       await recalibrateTouch(key, p.dev, hooks)
+      if (await touchBroken(key, p.dev, hooks)) { for (const c of p.conts) { R.tick(false); L.rec(p.dev, p.name, c, false, 'écran de l’iPhone ne répond pas aux touches') } return }
       for (const c of p.conts) {
         if (R.isCancelled()) break
         push(`\n${tag} 🔥 conteneur « ${c} »`)

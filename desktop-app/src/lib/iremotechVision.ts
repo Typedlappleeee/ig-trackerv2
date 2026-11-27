@@ -138,6 +138,34 @@ const AIRPLANE_ICON = { x: 0.155, y: 0.30 } // icône avion dans le Centre de co
 // Recalibrage du clic (bouton « Calibrate » de la section SYSTEM d'iRemoTech). À lancer
 // au début de chaque automatisation pour que les taps tombent au bon endroit. Best-effort :
 // si l'action n'est pas acceptée (nom différent côté API), on log et on continue.
+/** L'écran répond-il aux TOUCHES ? (iPhone dont les taps / glissements n'arrivent plus — AssistiveTouch / injection
+ *  iRemoTech en panne, vu sur TL-3131) : sur l'accueil, un glissement doit changer de page. true / false / null (illisible). */
+export async function touchWorks(key: string, deviceId: string): Promise<boolean | null> {
+  await sendAction(key, deviceId, { type: 'press', name: 'home' }); await sleep(1500)
+  const sig = (r: { words: { text: string }[] }) => r.words.map(o => o.text.toLowerCase()).filter(t => /^[a-z]{3,}$/.test(t)).sort().join(',')
+  const a = await readScreenWords(key, deviceId)
+  if (!a) return null
+  // alerte / Centre de contrôle à l'écran : un glissement n'y change rien → pas de conclusion (jamais d'iPhone sauté à tort)
+  if (controlCenterShown(a.words) || a.words.some(o => /^(allow|cancel|ok|dismiss|continue)$/i.test(o.text) && o.cy > a.H * 0.3 && o.cy < a.H * 0.8)) return null
+  await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(a.W * 0.85), y1: Math.round(a.H * 0.5), x2: Math.round(a.W * 0.15), y2: Math.round(a.H * 0.5), duration_ms: 350 })
+  await sleep(1500)
+  const b = await readScreenWords(key, deviceId)
+  if (!b) return null
+  const moved = sig(a) !== sig(b)
+  // retour à la page précédente (glissement inverse, jamais un 2e « home » d'affilée = sélecteur d'apps)
+  if (moved) { await sendAction(key, deviceId, { type: 'swipe', x1: Math.round(a.W * 0.15), y1: Math.round(a.H * 0.5), x2: Math.round(a.W * 0.85), y2: Math.round(a.H * 0.5), duration_ms: 350 }); await sleep(1000) }
+  return moved
+}
+/** Avant une session : écran qui ne répond pas → recalibrage puis 2e test ; toujours mort → true (iPhone à sauter). */
+export async function touchBroken(key: string, deviceId: string, hooks?: VisionHooks): Promise<boolean> {
+  if (await touchWorks(key, deviceId) !== false) return false
+  hooks?.log?.('   ⚠ l’écran ne répond pas aux touches → nouveau recalibrage')
+  await recalibrateTouch(key, deviceId, hooks)
+  if (await touchWorks(key, deviceId) !== false) return false
+  hooks?.log?.('❌ L’écran de cet iPhone ne répond plus aux touches (AssistiveTouch / iRemoTech) → iPhone sauté. À faire vérifier par iRemoTech.')
+  return true
+}
+
 export async function recalibrateTouch(key: string, deviceId: string, hooks?: VisionHooks): Promise<void> {
   hooks?.log?.('🎯 Recalibrage du clic (Calibrate)…')
   // On ne connaît pas le nom exact de l'action côté API iRemoTech → on essaie plusieurs
