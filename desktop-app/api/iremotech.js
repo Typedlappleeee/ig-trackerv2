@@ -133,14 +133,14 @@ export default async (req, res) => {
           const reels = items.map(m => ({ code: String(m.code ?? ''), at: ts(m.taken_at ?? m.taken_at_ts), views: num(m.play_count, m.view_count, m.ig_play_count) ?? 0, thumb: m.thumbnail_url ?? m?.image_versions2?.candidates?.[0]?.url ?? null })).filter(r => r.code && r.at)
           const d24 = reels.filter(r => now - r.at <= 24 * 3600_000), d48 = reels.filter(r => now - r.at <= 48 * 3600_000)
           const st = Array.isArray(stories) ? stories : Array.isArray(stories?.items) ? stories.items : []
-          const hasLink = st.some(s => (Array.isArray(s.links) && s.links.length) || (Array.isArray(s.story_link_stickers) && s.story_link_stickers.length) || (Array.isArray(s.stickers) && s.stickers.some(k => /link/i.test(String(k?.type ?? k?.extra?.type ?? '')))))
+          // sticker lien = stickers[].story_link.url (vu en vrai le 27/11/2026 : type « gif », lien dans story_link)
+          const hasLink = st.some(s => (Array.isArray(s.links) && s.links.length) || (Array.isArray(s.story_link_stickers) && s.story_link_stickers.length) || (Array.isArray(s.stickers) && s.stickers.some(k => k?.story_link?.url || /link/i.test(String(k?.type ?? k?.extra?.type ?? '')))))
           stats[u] = {
             username: u, followers: num(x.follower_count), following: num(x.following_count), media: num(x.media_count),
             reels24: d24.length, views24: d24.reduce((n, r) => n + r.views, 0),
             viral48: d48.filter(r => r.views >= 5000).sort((a, b) => b.views - a.views).slice(0, 3),
             topReel: reels.slice().sort((a, b) => b.views - a.views)[0] ?? null,
             story: st.length > 0, storyLink: hasLink, storyAt: st.length ? Math.max(...st.map(s => ts(s.taken_at))) : null,
-            ...(req.body?.debug ? { storyDebug: st.slice(0, 2).map(z => JSON.stringify(z).slice(0, 4000)) } : {}),
             private: !!x.is_private, recent: reels.slice().sort((p, q) => q.at - p.at).slice(0, 12).map(r => ({ at: r.at, views: r.views })),
             at: new Date().toISOString(),
           }

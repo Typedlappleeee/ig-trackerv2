@@ -1846,7 +1846,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
       {/* ─────────────── ONGLET POSTING ─────────────── */}
       {curTab === 'resultats' && <IrtResults scope={teamScope} igstats={team.igstats}
-        accounts={devices.flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => ({ name: c, device: d.public_id, phone: deviceLabel(d) })))}
+        accounts={devices.flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => { const cf = connOf(d.public_id, c); const t = ageOf(d.public_id, c); return { name: c, device: d.public_id, phone: deviceLabel(d), days: cf?.days ?? null, exact: !!cf?.exact, isNew: t === '1d' || t === '3d' } }))}
         onRefreshStats={() => refreshIgStats(true)} />}
       {curTab === 'igaccounts' && irt.key && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10, border: `1px solid ${EDGE}`, background: '#0E0E10' }}>

@@ -18,7 +18,7 @@ const fmt = (n: number | null | undefined) => n == null ? '—' : n >= 10_000 ? 
 export default function IrtResults({ scope, igstats = {}, accounts = [], onRefreshStats }: {
   scope: { userId: string; orgId: string | null }
   igstats?: Record<string, IgStat>
-  accounts?: { name: string; device: string; phone: string }[]
+  accounts?: { name: string; device: string; phone: string; days?: number | null; exact?: boolean; isNew?: boolean }[]
   onRefreshStats?: () => Promise<number>
 }) {
   const [statsBusy, setStatsBusy] = useState(false)
@@ -126,10 +126,10 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
 }
 
 /** Stats Instagram du jour (HikerAPI) de tous les comptes iRemoTech : Reels > 5 000 vues en 48 h EN HAUT et surlignés. */
-type StatFilter = 'nocta' | 'cta' | 'noreel' | 'reel' | 'viral' | 'stale' | 'flag'
+type StatFilter = 'nocta' | 'cta' | 'nolink' | 'noreel' | 'reel' | 'viral' | 'stale' | 'flag' | 'new'
 type StatSort = 'viral' | 'views24' | 'followers' | 'reels24' | 'phone' | 'name'
 const FILTERS: { k: StatFilter; l: string }[] = [
-  { k: 'nocta', l: '❌ Story CTA pas faite' }, { k: 'cta', l: '🔗 Story CTA faite' },
+  { k: 'nocta', l: '❌ Story CTA pas faite' }, { k: 'cta', l: '🔗 Story CTA faite' }, { k: 'nolink', l: '📷 Story sans lien' }, { k: 'new', l: '🆕 Nouveaux comptes (< 3 j)' },
   { k: 'noreel', l: '⏳ 0 Reel aujourd’hui' }, { k: 'reel', l: '🎬 Reels postés aujourd’hui' },
   { k: 'viral', l: '🚀 ≥ 5 000 vues (48 h)' }, { k: 'flag', l: '⚠ Compte à surveiller (flag possible)' }, { k: 'stale', l: '❔ Pas relus / introuvables' },
 ]
@@ -140,7 +140,7 @@ const SORTS: { k: StatSort; l: string }[] = [
 const lsGet = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : d } catch { return d } }
 const lsSet = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* noop */ } }
 
-function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfReels }: { igstats: Record<string, IgStat>; accounts: { name: string; device: string; phone: string }[]; busy: boolean; error?: string | null; onRefresh?: () => void; ctaDone?: Set<string>; sfReels?: Map<string, number> }) {
+function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfReels }: { igstats: Record<string, IgStat>; accounts: { name: string; device: string; phone: string; days?: number | null; exact?: boolean; isNew?: boolean }[]; busy: boolean; error?: string | null; onRefresh?: () => void; ctaDone?: Set<string>; sfReels?: Map<string, number> }) {
   const [filters, setFilters] = useState<StatFilter[]>(() => lsGet('sf-irt-stat-filters', []))
   const [sort, setSort] = useState<StatSort>(() => lsGet('sf-irt-stat-sort', 'viral'))
   const toggle = (k: StatFilter) => setFilters(f => { const n = f.includes(k) ? f.filter(x => x !== k) : [...f, k]; lsSet('sf-irt-stat-filters', n); return n })
@@ -151,11 +151,13 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
     const cta = !!s?.storyLink || !!ctaDone?.has(k)
     // Reels du jour = le plus grand de HikerAPI (vu sur Instagram) et des publications réussies par ScaleFlow ces 24 h
     const reels = Math.max(s?.reels24 ?? 0, sfReels?.get(k) ?? 0)
-    const health = accountHealth(s)
+    // compte NOUVEAU (< 3 j) : une portée faible est normale (pas encore dans l'algo) → jamais « à surveiller » pour ça
+    const h0 = accountHealth(s)
+    const health = a.isNew && (h0 === 'low' || h0 === 'drop') ? 'ok' : h0
     return { ...a, s, cta, reels, health }
   })
   const pass = (r: typeof all[number], k: StatFilter) =>
-    k === 'nocta' ? !r.cta : k === 'cta' ? r.cta : k === 'noreel' ? !r.s?.missing && !r.reels : k === 'reel' ? r.reels > 0
+    k === 'nocta' ? !r.cta : k === 'cta' ? r.cta : k === 'nolink' ? !!r.s?.story && !r.s.storyLink : k === 'new' ? !!r.isNew : k === 'noreel' ? !r.s?.missing && !r.reels : k === 'reel' ? r.reels > 0
       : k === 'viral' ? !!r.s?.viral48?.length : k === 'flag' ? ['banned', 'private', 'drop', 'low'].includes(r.health) : !r.s || !!r.s.missing
   const cmp = (x: typeof all[number], y: typeof all[number]) =>
     sort === 'views24' ? (y.s?.views24 ?? -1) - (x.s?.views24 ?? -1)
@@ -200,9 +202,11 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
                 const s = r.s, v = s?.viral48?.[0]
                 return (
                   <tr key={r.device + r.name} style={{ borderTop: `1px solid ${EDGE}`, background: v ? 'rgba(244,114,182,0.07)' : undefined }}>
-                    <td style={td}><a data-no-tr href={`https://www.instagram.com/${r.name.replace(/^@/, '')}/`} target="_blank" rel="noreferrer" style={{ color: INK, fontWeight: 500, textDecoration: 'none' }}>{r.name}</a>{s?.missing && <span style={{ marginLeft: 6, fontSize: 11, color: BAD }}>introuvable</span>}</td>
+                    <td style={td}><a data-no-tr href={`https://www.instagram.com/${r.name.replace(/^@/, '')}/`} target="_blank" rel="noreferrer" style={{ color: INK, fontWeight: 500, textDecoration: 'none' }}>{r.name}</a>{s?.missing && <span style={{ marginLeft: 6, fontSize: 11, color: BAD }}>introuvable</span>}
+                      {r.isNew ? <span title="Compte de moins de 3 jours : portée faible normale" style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, color: '#4ADE80' }}>🆕 NEW{r.days != null ? ` · ${r.exact ? '' : '≥ '}${r.days} j` : ''}</span>
+                        : r.days != null ? <span style={{ marginLeft: 8, fontSize: 10.5, color: DIM }}>{r.exact ? '' : '≥ '}{r.days} j</span> : null}</td>
                     <td data-no-tr style={{ ...td, color: MUTED }}>{r.phone}</td>
-                    <td style={{ ...td, color: r.health === 'banned' ? BAD : r.health === 'drop' || r.health === 'private' ? '#FB923C' : r.health === 'low' ? GOLD : r.health === 'ok' ? OK : DIM }}>{HEALTH_LABEL[r.health]}</td>
+                    <td style={{ ...td, color: r.health === 'banned' ? BAD : r.health === 'drop' || r.health === 'private' ? '#FB923C' : r.health === 'low' ? GOLD : r.health === 'ok' ? OK : DIM }}>{r.isNew && r.health === 'ok' && s && !s.missing ? '🆕 Nouveau compte' : HEALTH_LABEL[r.health]}</td>
                     <td style={td}>{fmt(s?.followers)}</td>
                     <td style={td}>{fmt(s?.following)}</td>
                     <td style={td}><b style={{ color: r.reels ? OK : DIM }}>{r.reels}</b></td>

@@ -24,7 +24,7 @@ export async function irtStats(usernames: unknown[]): Promise<Record<string, any
       const st: any[] = Array.isArray(stories) ? stories : Array.isArray(stories?.items) ? stories.items : []
       const hasLink = st.some(s => (Array.isArray(s.links) && s.links.length) || (Array.isArray(s.story_link_stickers) && s.story_link_stickers.length)
         // deno-lint-ignore no-explicit-any
-        || (Array.isArray(s.stickers) && s.stickers.some((k: any) => /link/i.test(String(k?.type ?? k?.extra?.type ?? '')))))
+        || (Array.isArray(s.stickers) && s.stickers.some((k: any) => k?.story_link?.url || /link/i.test(String(k?.type ?? k?.extra?.type ?? '')))))
       out[u] = {
         username: u, followers: num(x.follower_count), following: num(x.following_count), media: num(x.media_count),
         reels24: d24.length, views24: d24.reduce((n, r) => n + r.views, 0),
