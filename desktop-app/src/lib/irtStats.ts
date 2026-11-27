@@ -1,6 +1,10 @@
 // Stats Instagram (HikerAPI) des comptes iRemoTech, relues au plus une fois par 24 h et par compte (et à la demande) :
 // abonnés / abonnements, Reels publiés ces 24 h et leurs vues, Reels > 5 000 vues en 48 h (mis en avant), Story en ligne
 // avec ou sans lien. Partagées dans l'agence via les réglages d'équipe (`irtTeam.igstats`).
+import { supabase } from './supabase'
+
+const FN_URL = 'https://fvmkmkspfksscgqyvysl.supabase.co/functions/v1/run-scheduled-posts'
+
 export interface IgStat {
   username: string
   missing?: boolean                 // compte introuvable (supprimé / suspendu / renommé)
@@ -45,8 +49,18 @@ export async function fetchIgStats(apiKey: string, usernames: string[], onBatch?
   const out: Record<string, IgStat> = {}
   for (let i = 0; i < usernames.length; i += 8) {
     try {
-      const r = await fetch('/api/iremotech', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'stats', apiKey, usernames: usernames.slice(i, i + 8) }) })
-      const j = await r.json() as { ok?: boolean; stats?: Record<string, unknown> }
+      const part = usernames.slice(i, i + 8)
+      // 1) fonction Supabase (clé HikerAPI = secret Supabase), 2) repli : relais Vercel (si HIKERAPI_KEY y est aussi)
+      let j: { ok?: boolean; stats?: Record<string, unknown> } = {}
+      try {
+        const { data: s } = await supabase.auth.getSession()
+        const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token ?? ''}` }, body: JSON.stringify({ irt: 'stats', usernames: part }) })
+        j = await r.json()
+      } catch { /* repli */ }
+      if (!j.ok) {
+        const r = await fetch('/api/iremotech', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'stats', apiKey, usernames: part }) })
+        j = await r.json()
+      }
       const batch: Record<string, IgStat> = {}
       for (const v of Object.values(j.stats ?? {})) { const c = compactStat(v); if (c) batch[c.username] = c }
       Object.assign(out, batch)

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+vi.mock('./supabase', () => ({ supabase: {} }))
 import { compactStat, staleAccounts } from './irtStats'
 
 describe('stats Instagram', () => {
