@@ -23,6 +23,7 @@ export interface RunHandle {
   isCancelled: () => boolean
   setTotal: (n: number) => void
   tick: (ok: boolean) => void      // +1 done, +1 failed si !ok
+  skip: () => void                 // tâche retirée du total (ni réussie ni ratée : ex. compte introuvable)
   detail: (s: string) => void
   finish: (status?: RunState['status']) => void
 }
@@ -42,6 +43,7 @@ export function startRun(kind: RunKind, label: string, total: number): RunHandle
     isCancelled: () => runs.get(id)?.cancelled ?? false,
     setTotal: (n) => upd(s => { s.total = n }),
     tick: (ok) => upd(s => { s.done += 1; if (!ok) s.failed += 1 }),
+    skip: () => upd(s => { s.total = Math.max(s.done, s.total - 1) }),
     detail: (d) => upd(s => { s.detail = d }),
     finish: (status) => {
       upd(s => { s.status = status ?? (s.cancelled ? 'cancelled' : 'done') })

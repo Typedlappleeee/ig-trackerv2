@@ -953,8 +953,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       let stayedIn: string | null = null // compte resté ouvert dans Instagram après son post (session)
       let cleaned = false // Instagram vient d'être fermé après un post raté (pas besoin de le refermer)
       const unreachable = new Set<string>() // comptes non atteints : leurs autres posts sont sautés (pas 5 essais inutiles)
+      const notFound = new Set<string>()    // comptes ABSENTS de la liste de l'iPhone (déconnectés / bannis) : « introuvable », pas un échec
       for (const [ji, job] of p.jobs.entries()) {
         if (R.isCancelled()) break
+        if (notFound.has(job.container)) { R.skip(); continue }
         if (unreachable.has(job.container)) { push(`${tag} ⏭ « ${job.container} » sauté (compte non atteint plus tôt dans la session)`); fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, 'compte non atteint (sauté)'); continue }
         push(`\n${tag} 📦 ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » · ${job.vids.map(v => v.title).join(' + ')}`)
         // Même compte que le post d'avant (session) : on est encore dans Instagram → ni mode avion, ni réouverture
@@ -970,6 +972,11 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           let ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
           // compte non atteint : l'IA remet l'écran au propre, puis 2e essai
           if (!ok && !R.isCancelled() && !targetNotInList(p.dev) && await claudeCleanup(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() })) ok = await openTargetByVision(key, p.dev, job.container, { log: hooks, shouldStop: () => R.isCancelled() })
+          if (!ok && targetNotInList(p.dev) && !R.isCancelled()) {
+            const left = p.jobs.slice(ji).filter(j => j.container === job.container).length
+            push(`${tag} 🔎 compte « ${job.container} » introuvable sur cet iPhone → ${left} post(s) ignoré(s), pas compté(s) comme échec`)
+            notFound.add(job.container); R.skip(); stayedIn = null; continue
+          }
           if (!ok) { push(`${tag} ⏭ ${job.container.startsWith('@') ? 'compte' : 'container'} « ${job.container} » non atteint → suivant`); push(`${tag} 🧹 post raté → posting annulé, Instagram fermé (reprise propre)`); await forceCloseForegroundApp(key, p.dev, { log: hooks, shouldStop: () => R.isCancelled() }); cleaned = true; unreachable.add(job.container); fail(p.dev, job.container); R.tick(false); L.rec(p.dev, p.name, job.container, false, 'compte non atteint'); stayedIn = null; continue }
           await sleep(1200)
         }
@@ -1135,6 +1142,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         push(`\n${tag} 🪪 ${c}`)
         let reached = await openTargetByVision(key, p.dev, c, hooks)
         if (!reached && !R.isCancelled() && !targetNotInList(p.dev) && await claudeCleanup(key, p.dev, hooks)) reached = await openTargetByVision(key, p.dev, c, hooks)
+        if (!reached && targetNotInList(p.dev) && !R.isCancelled()) { push(`${tag} 🔎 compte « ${c} » introuvable sur cet iPhone → ignoré, pas compté comme échec`); await forceCloseForegroundApp(key, p.dev, hooks); R.skip(); continue }
         if (!reached) { push(`${tag} ⏭ ${c} non atteint`); fail(p.dev, c); await forceCloseForegroundApp(key, p.dev, hooks); R.tick(false); L.rec(p.dev, p.name, c, false, 'compte non atteint'); continue }
         if (setupPfp) {
           const { bytes } = await generatePfp()
@@ -1406,6 +1414,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         if (airplaneOn) await airplaneReset(key, p.dev, hooks)
         let opened = await openTargetByVision(key, p.dev, c, hooks)
         if (!opened && !R.isCancelled() && !targetNotInList(p.dev) && await claudeCleanup(key, p.dev, hooks)) opened = await openTargetByVision(key, p.dev, c, hooks)
+        if (!opened && targetNotInList(p.dev) && !R.isCancelled()) { push(`${tag} 🔎 compte « ${c} » introuvable sur cet iPhone → ignoré, pas compté comme échec`); R.skip(); continue }
         if (!opened) { push(`${tag} ⏭ conteneur non atteint`); R.tick(false); L.rec(p.dev, p.name, c, false, 'compte non atteint'); continue }
         await sleep(1200)
         const started = Date.now()

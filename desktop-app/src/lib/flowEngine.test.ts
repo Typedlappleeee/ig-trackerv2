@@ -112,7 +112,7 @@ vi.mock('@/lib/credits', () => ({
 }))
 vi.mock('@/lib/runStore', () => ({
   startRun: () => ({
-    id: 'h', isCancelled: () => H.S.cancelled, setTotal: () => {}, tick: () => {}, detail: () => {}, finish: () => {},
+    id: 'h', isCancelled: () => H.S.cancelled, setTotal: () => {}, tick: () => {}, skip: () => {}, detail: () => {}, finish: () => {},
   }),
 }))
 vi.mock('@/lib/phoneWatch', () => ({ heartbeatPhone: () => {} }))
