@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { dropBroken } from '@/lib/bankIntegrity'
 import type { Theme, InfraKey } from '@/lib/theme'
 import { Btn, Empty, Icon, Panel, Modal, confirmDialog, promptDialog, Skeleton, FIELD, FIELD_SM, TEXTAREA, Segmented, useNarrow, toast } from '@/lib/ui'
 import { PageHeader, UnderlineTabs } from '@/components/Kit'
@@ -338,6 +339,10 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
     setModels([...new Set(rows.filter(r => isSentinel(r) && (r.tags ?? []).includes(MODEL_TAG) && r.folder).map(r => normPath(r.folder as string)))].sort((a, b) => a === COMMON_SPACE ? 1 : b === COMMON_SPACE ? -1 : a.localeCompare(b, 'fr', { sensitivity: 'base' })))
     // Médias en corbeille (deleted_at) exclus de la banque, listés à part (restaurable 7 j).
     setItems(rows.filter(r => !isSentinel(r) && !r.deleted_at))
+    // médias « fantômes » (ligne sans fichier dans le stockage : supprimés, ou restaurés depuis une sauvegarde sans leur
+    // fichier) → retirés de la grille et mis à la corbeille, vérifiés en fond
+    void dropBroken(rows.filter(r => !isSentinel(r) && !r.deleted_at), n => toast(`${n} média(s) fantôme(s) (fichier absent du stockage) retiré(s) de la Banque → corbeille.`, 'info'))
+      .then(ok => { if (seq !== loadSeq.current) return; const keep = new Set(ok.map(r => r.id)); setItems(list => list.filter(x => keep.has(x.id) || !x.storage_path)) }, () => undefined)
     setTrash(rows.filter(r => !isSentinel(r) && !!r.deleted_at).sort((a, b) => (b.deleted_at ?? '').localeCompare(a.deleted_at ?? '')))
     loadedFor.current = scopeKey
     setLoading(false)

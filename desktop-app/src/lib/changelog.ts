@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-27e',
+    date: '2026-11-27',
+    title: { fr: 'Banque : plus de médias fantômes', en: 'Bank: no more ghost media' },
+    items: {
+      fr: ['Les médias « fantômes » (la ligne existe mais le fichier n’est plus dans le stockage — supprimés, ou restaurés depuis une sauvegarde sans leur fichier) sont détectés automatiquement : retirés de la Banque et des lancements (Posting, Story, flows), et mis à la corbeille. Ils ne peuvent plus faire rater un post.'],
+      en: ['“Ghost” media (the row exists but the file is no longer in storage — deleted, or restored from a backup without their file) are detected automatically: removed from the Bank and from runs (Posting, Story, flows), and moved to the trash. They can no longer make a post fail.'],
+    },
+  },
+  {
     id: '2026-11-27d',
     date: '2026-11-27',
     title: { fr: 'Posting : correctif important (Reel publié sans légende)', en: 'Posting: important fix (Reel posted without caption)' },

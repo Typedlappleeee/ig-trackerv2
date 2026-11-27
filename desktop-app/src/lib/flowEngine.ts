@@ -17,6 +17,7 @@ import { startRunHistory, type RunHistory } from './runHistory'
 import { expandUsername, usernameListIssues } from './igRules'
 import { useSyncExternalStore } from 'react'
 import { supabase } from '@/lib/supabase'
+import { dropBroken } from './bankIntegrity'
 import {
   ensurePhoneRunning, setPhoneManaged, stopPhoneSurely, sleep,
   abortPhone, clearPhoneAbort, cancelPhoneTask,
@@ -178,14 +179,14 @@ function pick<T>(arr: T[], i: number, mode: PoolMode | undefined): T | undefined
 // dossiers vides et ne sont pas des médias.
 export interface Scope { orgId: string | null; userId: string }
 const SENTINELS = ['__sf_folder__', '__sf_drive_folder__']
-interface BankRow { id: string; folder: string | null; title: string | null; storage_path: string | null; file_url: string | null; notes: string | null; deleted_at?: string | null; used_count?: number | null }
+interface BankRow { id: string; folder: string | null; title: string | null; storage_path: string | null; file_url: string | null; notes: string | null; deleted_at?: string | null; used_count?: number | null; tags?: string[] | null }
 // Son (.mp3…) = 'audio' : jamais proposé à un bloc Reels / photo / story.
 const kindOf = (r: BankRow) => kindOfExt(extOfPath(r.storage_path ?? r.file_url ?? r.title ?? ''))
 const isMedia = (r: BankRow) => !SENTINELS.includes(r.notes ?? '') && !r.deleted_at && !!(r.storage_path || r.file_url)
 
 async function bankRows(scope: Scope): Promise<BankRow[]> {
   const make = () => {
-    const q = supabase.from('content_bank').select('id,folder,title,storage_path,file_url,notes,deleted_at,used_count').order('created_at', { ascending: false }).order('id')
+    const q = supabase.from('content_bank').select('id,folder,title,storage_path,file_url,notes,deleted_at,used_count,tags').order('created_at', { ascending: false }).order('id')
     return scope.orgId ? q.eq('org_id', scope.orgId) : q.eq('user_id', scope.userId).is('org_id', null)
   }
   const { data, error } = await fetchAllRows<BankRow>(make)
@@ -215,9 +216,11 @@ export async function loadBankSummary(scope: Scope): Promise<BankSummary> {
 export interface FolderMedia { id: string; title: string; storage_path: string | null; file_url: string | null; used_count: number }
 export async function folderMedia(scope: Scope, folder: string, kind: 'video' | 'image' | 'any'): Promise<FolderMedia[]> {
   const rows = await bankRows(scope)
-  return rows
+  const list = rows
     .filter(r => isMedia(r) && (kind === 'any' ? kindOf(r) === 'video' || kindOf(r) === 'image' : kindOf(r) === kind) && isWithin(r.folder, folder))
-    .map(r => ({ id: r.id, title: r.title ?? 'media', storage_path: r.storage_path, file_url: r.file_url, used_count: r.used_count ?? 0 }))
+    .map(r => ({ id: r.id, title: r.title ?? 'media', storage_path: r.storage_path, file_url: r.file_url, used_count: r.used_count ?? 0, tags: r.tags ?? null }))
+  // jamais un média dont le fichier n'existe plus (il ferait rater le post) : retiré et mis à la corbeille
+  return dropBroken(list).catch(() => list)
 }
 
 // Médias (ids) d'un bloc selon sa source, résolus au lancement.

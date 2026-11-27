@@ -621,6 +621,7 @@ export const EN: Dict = {
     "⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai": "⚠ another app opened instead of Instagram → back to home, new try",
     "📲 Instagram ouvert (open_app)": "📲 Instagram opened (open_app)",
     "open_app sans effet → icône de l’accueil": "open_app had no effect → home screen icon",
+    "{0} média(s) fantôme(s) (fichier absent du stockage) retiré(s) de la Banque → corbeille.": "{0} ghost media (file missing from storage) removed from the Bank → trash.",
     "{0} 🔁 {1} → remplacé par « {2} »": "{0} 🔁 {1} → replaced with “{2}”",
     "page de partage atteinte (légende non lue à l’écran) → saisie de la légende": "share page reached (caption not read on screen) → typing the caption",
     "⏰ Pas de post depuis 48 h": "⏰ No post for 48 h",
