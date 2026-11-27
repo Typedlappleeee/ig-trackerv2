@@ -31,6 +31,7 @@ export async function irtStats(usernames: unknown[]): Promise<Record<string, any
         viral48: d48.filter(r => r.views >= 5000).sort((a, b) => b.views - a.views).slice(0, 3),
         topReel: reels.slice().sort((a, b) => b.views - a.views)[0] ?? null,
         story: st.length > 0, storyLink: hasLink, at: new Date().toISOString(),
+        private: !!x.is_private, recent: reels.slice().sort((p, q) => q.at - p.at).slice(0, 12).map(r => ({ at: r.at, views: r.views })),
       }
     } catch { out[u] = null }
   }))

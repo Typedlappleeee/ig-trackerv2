@@ -17,7 +17,31 @@ export interface IgStat {
   top?: { code: string; views: number } | null              // Reel le plus vu (parmi les derniers)
   story?: boolean                   // Story en ligne
   storyLink?: boolean               // … avec un sticker lien (CTA)
+  private?: boolean                 // compte passé en privé
+  recent?: { at: number; views: number }[]   // 12 derniers Reels (date, vues) → santé du compte
   at: string                        // date de la lecture
+}
+
+export type Health = 'banned' | 'private' | 'drop' | 'low' | 'ok' | 'unknown'
+export const HEALTH_LABEL: Record<Health, string> = {
+  banned: '🔴 Introuvable (suspendu, banni ou renommé)', private: '🟠 Compte privé', drop: '🟠 Portée en chute (shadowban possible)',
+  low: '🟡 Portée très faible', ok: '🟢 OK', unknown: '—',
+}
+/** État d'un compte d'après ses stats : introuvable = suspendu / banni / renommé ; Reels récents (≥ 24 h, vues stabilisées)
+ *  à moins d'un quart des précédents = portée en chute (shadowban possible) ; tous les Reels sous 30 vues = portée très
+ *  faible. Indicatif : Instagram ne publie pas l'état « flag » d'un compte. Pure. */
+export function accountHealth(s: IgStat | undefined, now = Date.now()): Health {
+  if (!s) return 'unknown'
+  if (s.missing) return 'banned'
+  if (s.private) return 'private'
+  const mature = (s.recent ?? []).filter(r => now - r.at >= 24 * 3600_000).sort((a, b) => b.at - a.at)
+  const med = (v: number[]) => { const x = [...v].sort((a, b) => a - b); return x.length ? x[Math.floor(x.length / 2)] : 0 }
+  if (mature.length >= 5) {
+    const newest = med(mature.slice(0, 3).map(r => r.views)), older = med(mature.slice(3).map(r => r.views))
+    if (older >= 200 && newest < older * 0.25) return 'drop'
+  }
+  if (mature.length >= 6 && mature.every(r => r.views < 30)) return 'low'
+  return 'ok'
 }
 export const STATS_TTL = 24 * 3600_000
 /** Raison du dernier échec de lecture (affichée sous le bouton « Relire les stats »), null si tout va bien. */
@@ -37,7 +61,9 @@ export function compactStat(raw: unknown): IgStat | null {
   return {
     username: u, followers: n(r.followers), following: n(r.following), media: n(r.media),
     reels24: Number(r.reels24) || 0, views24: Number(r.views24) || 0, viral48: viral.slice(0, 3), top: top?.code ? top : null,
-    story: !!r.story, storyLink: !!r.storyLink, at: String(r.at ?? new Date().toISOString()),
+    story: !!r.story, storyLink: !!r.storyLink, private: !!r.private,
+    recent: Array.isArray(r.recent) ? (r.recent as Record<string, unknown>[]).map(v => ({ at: Number(v.at) || 0, views: Number(v.views) || 0 })).filter(v => v.at).slice(0, 12) : undefined,
+    at: String(r.at ?? new Date().toISOString()),
   }
 }
 /** Comptes à relire : jamais lus ou lus il y a plus de 24 h (ou tous si `force`). Pure. */

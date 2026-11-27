@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { aggregateResults, loadIrtResults, IRT_ACTIONS, type IrtAction, type IrtResultEntry, type ActionStat } from '@/lib/irtResults'
 import { ago } from '@/lib/irtAccounts'
-import { lastStatsError, type IgStat } from '@/lib/irtStats'
+import { lastStatsError, accountHealth, HEALTH_LABEL, type IgStat } from '@/lib/irtStats'
 
 const GOLD = '#E9C46A', INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#6E6E78', OK = '#4ADE80', BAD = '#F87171'
 const EDGE = 'rgba(255,255,255,0.07)', FIELD_BG = '#161618', FIELD_EDGE = 'rgba(255,255,255,0.09)'
@@ -126,12 +126,12 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
 }
 
 /** Stats Instagram du jour (HikerAPI) de tous les comptes iRemoTech : Reels > 5 000 vues en 48 h EN HAUT et surlignés. */
-type StatFilter = 'nocta' | 'cta' | 'noreel' | 'reel' | 'viral' | 'stale'
+type StatFilter = 'nocta' | 'cta' | 'noreel' | 'reel' | 'viral' | 'stale' | 'flag'
 type StatSort = 'viral' | 'views24' | 'followers' | 'reels24' | 'phone' | 'name'
 const FILTERS: { k: StatFilter; l: string }[] = [
   { k: 'nocta', l: '❌ Story CTA pas faite' }, { k: 'cta', l: '🔗 Story CTA faite' },
   { k: 'noreel', l: '⏳ 0 Reel aujourd’hui' }, { k: 'reel', l: '🎬 Reels postés aujourd’hui' },
-  { k: 'viral', l: '🚀 ≥ 5 000 vues (48 h)' }, { k: 'stale', l: '❔ Pas relus / introuvables' },
+  { k: 'viral', l: '🚀 ≥ 5 000 vues (48 h)' }, { k: 'flag', l: '⚠ Compte à surveiller (flag possible)' }, { k: 'stale', l: '❔ Pas relus / introuvables' },
 ]
 const SORTS: { k: StatSort; l: string }[] = [
   { k: 'viral', l: 'Tri : 🚀 viraux d’abord' }, { k: 'views24', l: 'Tri : vues 24 h' }, { k: 'followers', l: 'Tri : abonnés' },
@@ -151,11 +151,12 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
     const cta = !!s?.storyLink || !!ctaDone?.has(k)
     // Reels du jour = le plus grand de HikerAPI (vu sur Instagram) et des publications réussies par ScaleFlow ces 24 h
     const reels = Math.max(s?.reels24 ?? 0, sfReels?.get(k) ?? 0)
-    return { ...a, s, cta, reels }
+    const health = accountHealth(s)
+    return { ...a, s, cta, reels, health }
   })
   const pass = (r: typeof all[number], k: StatFilter) =>
     k === 'nocta' ? !r.cta : k === 'cta' ? r.cta : k === 'noreel' ? !r.s?.missing && !r.reels : k === 'reel' ? r.reels > 0
-      : k === 'viral' ? !!r.s?.viral48?.length : !r.s || !!r.s.missing
+      : k === 'viral' ? !!r.s?.viral48?.length : k === 'flag' ? ['banned', 'private', 'drop', 'low'].includes(r.health) : !r.s || !!r.s.missing
   const cmp = (x: typeof all[number], y: typeof all[number]) =>
     sort === 'views24' ? (y.s?.views24 ?? -1) - (x.s?.views24 ?? -1)
       : sort === 'followers' ? (y.s?.followers ?? -1) - (x.s?.followers ?? -1)
@@ -192,7 +193,7 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
         <div style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${EDGE}` }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, color: INK }}>
             <thead><tr style={{ background: '#111113', color: MUTED, textAlign: 'left' }}>
-              <th style={th}>Compte</th><th style={th}>iPhone</th><th style={th}>Abonnés</th><th style={th}>Abonnements</th><th style={th}>Reels 24 h</th><th style={th}>Vues 24 h</th><th style={th}>Story CTA</th><th style={th}>🚀 ≥ 5 000 vues (48 h)</th><th style={th}>Relu</th>
+              <th style={th}>Compte</th><th style={th}>iPhone</th><th style={th} title="Indicatif : Instagram ne publie pas l’état « flag » d’un compte. Introuvable = suspendu / banni / renommé ; portée en chute = derniers Reels à moins d’un quart des précédents.">État</th><th style={th}>Abonnés</th><th style={th}>Abonnements</th><th style={th}>Reels 24 h</th><th style={th}>Vues 24 h</th><th style={th}>Story CTA</th><th style={th}>🚀 ≥ 5 000 vues (48 h)</th><th style={th}>Relu</th>
             </tr></thead>
             <tbody>
               {rows.map(r => {
@@ -201,6 +202,7 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
                   <tr key={r.device + r.name} style={{ borderTop: `1px solid ${EDGE}`, background: v ? 'rgba(244,114,182,0.07)' : undefined }}>
                     <td style={td}><a data-no-tr href={`https://www.instagram.com/${r.name.replace(/^@/, '')}/`} target="_blank" rel="noreferrer" style={{ color: INK, fontWeight: 500, textDecoration: 'none' }}>{r.name}</a>{s?.missing && <span style={{ marginLeft: 6, fontSize: 11, color: BAD }}>introuvable</span>}</td>
                     <td data-no-tr style={{ ...td, color: MUTED }}>{r.phone}</td>
+                    <td style={{ ...td, color: r.health === 'banned' ? BAD : r.health === 'drop' || r.health === 'private' ? '#FB923C' : r.health === 'low' ? GOLD : r.health === 'ok' ? OK : DIM }}>{HEALTH_LABEL[r.health]}</td>
                     <td style={td}>{fmt(s?.followers)}</td>
                     <td style={td}>{fmt(s?.following)}</td>
                     <td style={td}><b style={{ color: r.reels ? OK : DIM }}>{r.reels}</b></td>

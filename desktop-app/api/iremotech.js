@@ -140,6 +140,7 @@ export default async (req, res) => {
             viral48: d48.filter(r => r.views >= 5000).sort((a, b) => b.views - a.views).slice(0, 3),
             topReel: reels.slice().sort((a, b) => b.views - a.views)[0] ?? null,
             story: st.length > 0, storyLink: hasLink, storyAt: st.length ? Math.max(...st.map(s => ts(s.taken_at))) : null,
+            private: !!x.is_private, recent: reels.slice().sort((p, q) => q.at - p.at).slice(0, 12).map(r => ({ at: r.at, views: r.views })),
             at: new Date().toISOString(),
           }
         } catch { stats[u] = null }
