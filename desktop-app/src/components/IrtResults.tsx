@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { aggregateResults, loadIrtResults, IRT_ACTIONS, type IrtAction, type IrtResultEntry, type ActionStat } from '@/lib/irtResults'
 import { ago } from '@/lib/irtAccounts'
-import type { IgStat } from '@/lib/irtStats'
+import { lastStatsError, type IgStat } from '@/lib/irtStats'
 
 const GOLD = '#E9C46A', INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#6E6E78', OK = '#4ADE80', BAD = '#F87171'
 const EDGE = 'rgba(255,255,255,0.07)', FIELD_BG = '#161618', FIELD_EDGE = 'rgba(255,255,255,0.09)'
@@ -22,6 +22,7 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
   onRefreshStats?: () => Promise<number>
 }) {
   const [statsBusy, setStatsBusy] = useState(false)
+  const [statsErr, setStatsErr] = useState<string | null>(null)
   const [period, setPeriod] = useState(() => { try { return localStorage.getItem('sf-irt-res-period') ?? '7' } catch { return '7' } })
   const [phone, setPhone] = useState('')
   const [q, setQ] = useState('')
@@ -72,7 +73,7 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
       </div>
 
       <IgStatsTable igstats={igstats} accounts={accounts.filter(a => (!phone || a.phone === phone) && (!q.trim() || a.name.toLowerCase().includes(q.trim().toLowerCase())))}
-        busy={statsBusy} onRefresh={onRefreshStats ? async () => { setStatsBusy(true); try { await onRefreshStats() } finally { setStatsBusy(false) } } : undefined} />
+        busy={statsBusy} error={statsErr} onRefresh={onRefreshStats ? async () => { setStatsBusy(true); setStatsErr(null); try { await onRefreshStats(); setStatsErr(lastStatsError) } finally { setStatsBusy(false) } } : undefined} />
 
       <div style={{ fontSize: 14, fontWeight: 600, color: INK, margin: '18px 0 10px' }}>🤖 Automatisations ScaleFlow</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -123,7 +124,7 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
 }
 
 /** Stats Instagram du jour (HikerAPI) de tous les comptes iRemoTech : Reels > 5 000 vues en 48 h EN HAUT et surlignés. */
-function IgStatsTable({ igstats, accounts, busy, onRefresh }: { igstats: Record<string, IgStat>; accounts: { name: string; device: string; phone: string }[]; busy: boolean; onRefresh?: () => void }) {
+function IgStatsTable({ igstats, accounts, busy, error, onRefresh }: { igstats: Record<string, IgStat>; accounts: { name: string; device: string; phone: string }[]; busy: boolean; error?: string | null; onRefresh?: () => void }) {
   const rows = accounts.map(a => ({ ...a, s: igstats[a.name.replace(/^@/, '').toLowerCase()] as IgStat | undefined }))
     .sort((x, y) => (y.s?.viral48?.[0]?.views ?? 0) - (x.s?.viral48?.[0]?.views ?? 0) || (y.s?.views24 ?? 0) - (x.s?.views24 ?? 0) || x.phone.localeCompare(y.phone, 'fr', { numeric: true }))
   const viral = rows.filter(r => r.s?.viral48?.length).length
@@ -138,6 +139,7 @@ function IgStatsTable({ igstats, accounts, busy, onRefresh }: { igstats: Record<
         <span style={{ fontSize: 12, color: DIM }}>{last ? `relues ${ago(new Date(last).toISOString())} · automatiquement chaque jour et à chaque détection des comptes` : 'pas encore relues'}</span>
         {onRefresh && <button onClick={onRefresh} disabled={busy} style={{ marginLeft: 'auto', height: 30, padding: '0 12px', borderRadius: 8, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 12.5, cursor: busy ? 'default' : 'pointer' }}>{busy ? 'Lecture…' : '↻ Relire les stats maintenant'}</button>}
       </div>
+      {error && <div style={{ margin: '0 0 10px', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', color: BAD, fontSize: 12.5 }}>⚠ Stats non relues : <span data-no-tr>{error}</span>{/HIKERAPI_KEY/.test(error) ? ' — ajoute la clé HikerAPI (HIKERAPI_KEY) dans les variables d’environnement Vercel, puis redéploie.' : ''}</div>}
       {!rows.length ? <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${EDGE}`, color: MUTED, fontSize: 13 }}>Aucun compte iRemoTech détecté.</div> : (
         <div style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${EDGE}` }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, color: INK }}>

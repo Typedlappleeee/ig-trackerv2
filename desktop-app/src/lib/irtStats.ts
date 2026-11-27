@@ -20,6 +20,8 @@ export interface IgStat {
   at: string                        // date de la lecture
 }
 export const STATS_TTL = 24 * 3600_000
+/** Raison du dernier échec de lecture (affichée sous le bouton « Relire les stats »), null si tout va bien. */
+export let lastStatsError: string | null = null
 
 /** Réponse brute du relais → stat compacte (sans miniatures, pour rester légère dans les réglages d'équipe). Pure. */
 export function compactStat(raw: unknown): IgStat | null {
@@ -47,6 +49,7 @@ export function staleAccounts(usernames: string[], stats: Record<string, IgStat>
 /** Lit les stats par paquets de 8 (relais Vercel /api/iremotech op `stats`). */
 export async function fetchIgStats(apiKey: string, usernames: string[], onBatch?: (s: Record<string, IgStat>) => void): Promise<Record<string, IgStat>> {
   const out: Record<string, IgStat> = {}
+  lastStatsError = null
   for (let i = 0; i < usernames.length; i += 8) {
     try {
       const part = usernames.slice(i, i + 8)
@@ -61,6 +64,7 @@ export async function fetchIgStats(apiKey: string, usernames: string[], onBatch?
         const r = await fetch('/api/iremotech', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'stats', apiKey, usernames: part }) })
         j = await r.json()
       }
+      lastStatsError = j.ok ? null : String((j as { error?: string }).error ?? 'lecture impossible')
       const batch: Record<string, IgStat> = {}
       for (const v of Object.values(j.stats ?? {})) { const c = compactStat(v); if (c) batch[c.username] = c }
       Object.assign(out, batch)
