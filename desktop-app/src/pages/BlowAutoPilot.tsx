@@ -35,7 +35,7 @@ import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } fro
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
 import { startIrtLog, loadIrtResults, aggregateResults, type IrtResultEntry } from '@/lib/irtResults'
-import { fetchIgStats, staleAccounts, mergeStats, loadStatsCache, pullIgStats, saveIgStats, type IgStat } from '@/lib/irtStats'
+import { fetchIgStats, staleAccounts, recentlyTried, mergeStats, loadStatsCache, pullIgStats, saveIgStats, type IgStat } from '@/lib/irtStats'
 import { listJobs, scanAccountsAndWait, queueAccountScan, stopDevices, releaseDevices, type IrtJob } from '@/lib/iremotech'
 import { claudeStatus } from '@/lib/claude'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
@@ -239,7 +239,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const refreshIgStats = async (force = false, only?: string[]): Promise<number> => {
     if (!irt.key || statsBusy.current) return 0
     const all = only ?? Object.values(conts).flat().filter(c => c.startsWith('@'))
-    const todo = staleAccounts(all, igRef.current, Date.now(), force)
+    // relit d'abord les stats PARTAGÉES : un compte déjà lu par un collègue (autre PC) aujourd'hui n'est pas relu
+    if (!force) { const st = await pullIgStats(teamScope).catch(() => null); if (st) { igRef.current = mergeStats(igRef.current, st); setIgstats(cur => mergeStats(cur, st)) } }
+    const todo = staleAccounts(all, igRef.current, Date.now(), force).filter(u => force || !recentlyTried(u))
     if (!todo.length) return 0
     statsBusy.current = true
     try { await fetchIgStats(irt.key, todo, batch => { setIgstats(cur => mergeStats(cur, batch)); void saveIgStats(teamScope, batch).then(st => setIgstats(cur => mergeStats(cur, st))) }) } finally { statsBusy.current = false }

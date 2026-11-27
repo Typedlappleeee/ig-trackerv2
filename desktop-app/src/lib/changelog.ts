@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-27g',
+    date: '2026-11-27',
+    title: { fr: 'Stats Instagram : beaucoup moins de requêtes HikerAPI', en: 'Instagram stats: far fewer HikerAPI requests' },
+    items: {
+      fr: ['Un compte dont la lecture des stats échouait était relu à chaque ouverture de page, toutes les 3 h et à chaque détection, sur chaque PC. Il n’est plus retenté qu’une fois toutes les 12 h, et les comptes déjà lus par un collègue aujourd’hui ne sont plus relus (le bouton « Relire les stats » force toujours tout).'],
+      en: ['An account whose stats read failed was re-read on every page load, every 3 h and on every detection, on every PC. It is now retried only once every 12 h, and accounts a teammate already read today are no longer re-read (the “Re-read stats” button still forces everything).'],
+    },
+  },
+  {
     id: '2026-11-27f',
     date: '2026-11-27',
     title: { fr: 'Posting un peu plus rapide', en: 'Slightly faster posting' },

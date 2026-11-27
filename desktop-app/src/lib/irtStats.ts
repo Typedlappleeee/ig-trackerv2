@@ -72,10 +72,25 @@ export function staleAccounts(usernames: string[], stats: Record<string, IgStat>
     .filter(u => force || !stats[u] || now - Date.parse(stats[u].at) > STATS_TTL)
 }
 
+// Comptes déjà DEMANDÉS récemment (même si la lecture a échoué) : sans ce mémo, un compte dont la lecture rate n'était
+// jamais enregistré → relu à chaque ouverture de page, toutes les 3 h et à chaque détection, sur chaque PC → requêtes
+// HikerAPI qui s'envolaient. Une seule tentative par compte toutes les 12 h (navigateur), sauf « Relire les stats ».
+const TRIED_KEY = 'sf-irt-igstats-tried'
+const TRIED_TTL = 12 * 3600_000
+function loadTried(): Record<string, number> { try { return JSON.parse(localStorage.getItem(TRIED_KEY) ?? '{}') } catch { return {} } }
+export function recentlyTried(u: string, now = Date.now()): boolean { const t = loadTried()[u]; return !!t && now - t < TRIED_TTL }
+function markTried(us: string[]) {
+  const now = Date.now(), t = loadTried()
+  for (const [k, v] of Object.entries(t)) if (now - v > TRIED_TTL) delete t[k]
+  for (const u of us) t[u] = now
+  try { localStorage.setItem(TRIED_KEY, JSON.stringify(t)) } catch { /* plein */ }
+}
+
 /** Lit les stats par paquets de 8 (relais Vercel /api/iremotech op `stats`). */
 export async function fetchIgStats(apiKey: string, usernames: string[], onBatch?: (s: Record<string, IgStat>) => void): Promise<Record<string, IgStat>> {
   const out: Record<string, IgStat> = {}
   lastStatsError = null
+  markTried(usernames)
   for (let i = 0; i < usernames.length; i += 8) {
     try {
       const part = usernames.slice(i, i + 8)
