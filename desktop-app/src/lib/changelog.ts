@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-27',
     title: { fr: 'Résultats : iPhones jailbreak retirés', en: 'Results: jailbreak iPhones removed' },
     items: {
-      fr: ['Les iPhones jailbreak n’apparaissent plus dans la page Résultats (automatisations et stats Instagram), et leurs comptes ne sont plus lus par HikerAPI.'],
-      en: ['Jailbreak iPhones no longer appear on the Results page (automations and Instagram stats), and their accounts are no longer read by HikerAPI.'],
+      fr: ['Les iPhones jailbreak n’apparaissent plus dans la page Résultats (automatisations et stats Instagram), et leurs comptes ne sont plus lus par HikerAPI.', 'Nouveau menu « Type » dans Téléphones › gérer : marque un iPhone « 🔓 Jailbreak » à la main (partagé avec l’équipe) quand la détection auto s’est trompée.'],
+      en: ['Jailbreak iPhones no longer appear on the Results page (automations and Instagram stats), and their accounts are no longer read by HikerAPI.', 'New “Type” menu in Phones › manage: mark an iPhone “🔓 Jailbreak” by hand (shared with the team) when auto-detection got it wrong.'],
     },
   },
   {

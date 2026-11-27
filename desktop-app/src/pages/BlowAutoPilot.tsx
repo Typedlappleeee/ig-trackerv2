@@ -204,6 +204,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // Réglages PARTAGÉS dans l'espace (groupes, marché par iPhone / compte, liens CTA, pool de textes CTA) : lib/irtTeam
   const teamScope = { orgId: currentOrg?.id ?? null, userId: user.id }
   const [team, setTeam] = useState<IrtTeam>(() => loadTeamCache(teamScope))
+  // type de l'iPhone : marqué « Jailbreak » à la main par l'équipe (prioritaire), sinon déduit de sa liste
+  const kindOf = (dev: string): 'normal' | 'jb' | null => team.jb.includes(dev) ? 'jb' : phoneKind(conts[dev])
   useEffect(() => {
     let alive = true
     setTeam(loadTeamCache(teamScope))
@@ -239,7 +241,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const refreshIgStats = async (force = false, only?: string[]): Promise<number> => {
     if (!irt.key || statsBusy.current) return 0
     // iPhones jailbreak exclus des stats (demande du 27/11/2026)
-    const all = (only ?? Object.entries(conts).filter(([d]) => phoneKind(conts[d]) !== 'jb').flatMap(([, l]) => l)).filter(c => c.startsWith('@'))
+    const all = (only ?? Object.entries(conts).filter(([d]) => kindOf(d) !== 'jb').flatMap(([, l]) => l)).filter(c => c.startsWith('@'))
     // relit d'abord les stats PARTAGÉES : un compte déjà lu par un collègue (autre PC) aujourd'hui n'est pas relu
     if (!force) { const st = await pullIgStats(teamScope).catch(() => null); if (st) { igRef.current = mergeStats(igRef.current, st); setIgstats(cur => mergeStats(cur, st)) } }
     const todo = staleAccounts(all, igRef.current, Date.now(), force).filter(u => force || !recentlyTried(u))
@@ -288,6 +290,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const marketOf = (dev: string, c: string): Market => team.acctMarkets[`${dev}::${c}`] ?? loadTargetMarket(dev, c) ?? teamMarketOf(team, dev, c, capMarket)
   const setTargetMarket = (dev: string, c: string, m: Market | null) => { saveTargetMarket(dev, c, m); editTeam(t => { if (m) t.acctMarkets[`${dev}::${c}`] = m; else delete t.acctMarkets[`${dev}::${c}`] }) }
   const setPhoneMarket = (dev: string, m: Market | null) => editTeam(t => { if (m) t.markets[dev] = m; else delete t.markets[dev] })
+  const setPhoneJb = (dev: string, on: boolean) => editTeam(t => { t.jb = on ? [...new Set([...t.jb, dev])] : t.jb.filter(x => x !== dev) })
   const setPhoneGroup = (dev: string, g: string) => editTeam(t => { if (g.trim()) t.groups[dev] = g.trim(); else delete t.groups[dev] })
   const createGroup = (name: string) => { const g = name.trim(); if (g) editTeam(t => { if (!t.groupNames.includes(g)) t.groupNames.push(g) }) }
   const deleteGroup = (g: string) => editTeam(t => { t.groupNames = t.groupNames.filter(x => x !== g); for (const [d, x] of Object.entries(t.groups)) if (x === g) delete t.groups[d] })
@@ -561,7 +564,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const seenPending = useRef<Record<string, string[] | null>>({})
   useEffect(() => onAccountsSeen((dev, seen) => {
     const cur = (contsRef2.current[dev] ?? []).filter(c => c.startsWith('@'))
-    if (phoneKind(contsRef2.current[dev]) === 'jb') return
+    if (kindOf(dev) === 'jb') return
     const r = acceptSeenRead(cur, seen, seenPending.current[dev] ?? null)
     seenPending.current[dev] = r.pending
     if (r.apply) saveLiveRead(dev, r.apply)   // → évènement « sf-irt-live » : Comptes IG, Posting, Story… mis à jour
@@ -574,7 +577,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   useEffect(() => {
     const live = loadLiveReads()
     for (const dev of new Set([...Object.keys(irtJobs), ...Object.keys(live)])) {
-      if (phoneKind(conts[dev]) === 'jb') continue
+      if (kindOf(dev) === 'jb') continue
       const read = latestAccounts(irtJobs[dev] ?? [], live[dev])
       if (!read || !read.length) continue
       const cur = conts[dev] ?? []
@@ -611,7 +614,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       for (const d of devices) {
         if (!alive || runningRef.current) return
         const dev = d.public_id
-        if (!isDeviceOn(d) || phoneKind(contsRef.current[dev]) === 'jb') continue // jailbreak : iRemoTech ne voit que le container ouvert
+        if (!isDeviceOn(d) || kindOf(dev) === 'jb') continue // jailbreak : iRemoTech ne voit que le container ouvert
         const jobs = jobsRef.current[dev]
         if (!jobs) continue
         const tk = `sf-irt-autoscan:${dev}`
@@ -648,7 +651,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       return accts ? accts.map(u => '@' + (known.find(k => sameUsername(k, u)) ?? u)) : null
     }
     // Type déjà connu → directement la bonne méthode ; sinon (1re détection) containers Crane puis comptes.
-    const kind = phoneKind(conts[dev])
+    const kind = kindOf(dev)
     let list: string[] | null
     if (kind === 'normal') { log('📱 iPhone normal : lecture des comptes Instagram connectés…'); list = await readAccounts() }
     else {
@@ -665,7 +668,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const list = await detectConts(dev, m => push(`[${name}] ${m}`)).catch(e => { push(`[${name}] ⚠ ${e instanceof Error ? e.message : String(e)}`); return null })
     if (!list) push(`[${name}] ✗ ni containers ni comptes détectés`)
     // iPhone normal : iRemoTech relit aussi les comptes, pour que sa liste (qui fait foi) soit à jour tout de suite
-    else if (irt.key && phoneKind(list) === 'normal') { const key = irt.key; void queueAccountScan(() => scanAccountsAndWait(key, dev), dev).then(r => { if (r.job) { const job = r.job; setIrtJobs(m => ({ ...m, [dev]: [job, ...(m[dev] ?? []).filter(x => x.job_id !== job.job_id)] })) } }).catch(() => null) }
+    else if (irt.key && phoneKind(list) === 'normal' && !team.jb.includes(dev)) { const key = irt.key; void queueAccountScan(() => scanAccountsAndWait(key, dev), dev).then(r => { if (r.job) { const job = r.job; setIrtJobs(m => ({ ...m, [dev]: [job, ...(m[dev] ?? []).filter(x => x.job_id !== job.job_id)] })) } }).catch(() => null) }
     setDetecting(null)
   }
   // Ouvre chaque container et lit ce qu'il contient VRAIMENT (vide / @compte / bloqué) : la liste « Comptes créés »
@@ -687,7 +690,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
   const checkPhones = async () => {
     if (running || detecting || checking) return
-    const devs = [...sel].filter(d => phoneKind(conts[d]) !== 'normal' && (conts[d] ?? []).length)
+    const devs = [...sel].filter(d => kindOf(d) !== 'normal' && (conts[d] ?? []).length)
     if (!devs.length) { setLogs(['⚠ Choisis au moins un iPhone jailbreaké dont les containers sont détectés.']); return }
     setChecking(true); setLogs([])
     for (const dev of devs) {
@@ -1472,7 +1475,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         </div>
       )}
       {(() => {
-        const base = devices.filter(d => !opts?.jbOnly || phoneKind(conts[d.public_id]) !== 'normal')
+        const base = devices.filter(d => !opts?.jbOnly || kindOf(d.public_id) !== 'normal')
         const qq = pickQ.trim().toLowerCase().replace(/^@/, '')
         const hit = (d: IrtDevice) => (!qq || deviceLabel(d).toLowerCase().includes(qq) || (conts[d.public_id] ?? []).some(c => c.toLowerCase().replace(/^@/, '').includes(qq)))
           && (!grpFilter || (grpFilter === '∅' ? !team.groups[d.public_id] : team.groups[d.public_id] === grpFilter))
@@ -1555,7 +1558,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         {list.map(d => {
           const id = d.public_id, on = sel.has(id), live = isDeviceOn(d)
           const list = conts[id] ?? [], picked = selConts[id] ?? new Set<string>()
-          const kind = phoneKind(list), unit = kind === 'normal' ? 'compte' : 'container'
+          const kind = kindOf(id), unit = kind === 'normal' ? 'compte' : 'container'
           return (
             <div key={id} style={{ borderTop: `1px solid ${EDGE}`, background: on ? 'rgba(233,196,106,0.04)' : '#0E0E10', padding: '10px 12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 14, rowGap: 8, opacity: live || on ? 1 : 0.6 }}>
               <div onClick={() => togglePhone(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: '0 1 440px', minWidth: 240, flexWrap: 'wrap', rowGap: 6 }}>
@@ -1578,6 +1581,10 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     <option value="" style={{ background: FIELD_BG }}>📁 Sans groupe</option>
                     {teamGroups(team).map(g => <option key={g} value={g} style={{ background: FIELD_BG }}>📁 {g}</option>)}
                     <option value="＋" style={{ background: FIELD_BG }}>＋ Nouveau groupe…</option>
+                  </select>
+                  <select value={team.jb.includes(id) ? 'jb' : ''} onChange={e => setPhoneJb(id, e.target.value === 'jb')} title="Type de l’iPhone : la détection auto peut se tromper sur un jailbreak (iRemoTech ne voit que le compte du container ouvert)" style={{ ...inp, height: 28, fontSize: 12, cursor: 'pointer' }}>
+                    <option value="" style={{ background: FIELD_BG }}>Type : auto</option>
+                    <option value="jb" style={{ background: FIELD_BG }}>🔓 Jailbreak</option>
                   </select>
                   <select value={team.markets[id] ?? ''} onChange={e => setPhoneMarket(id, (e.target.value || null) as Market | null)} style={{ ...inp, height: 28, fontSize: 12, cursor: 'pointer' }}>
                     <option value="" style={{ background: FIELD_BG }}>Marché…</option>
@@ -1881,8 +1888,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
       {/* ─────────────── ONGLET POSTING ─────────────── */}
       {curTab === 'resultats' && <IrtResults scope={teamScope} igstats={igstats}
-        hideDevices={new Set(devices.filter(d => phoneKind(conts[d.public_id]) === 'jb').map(d => d.public_id))}
-        accounts={devices.filter(d => phoneKind(conts[d.public_id]) !== 'jb').flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => { const cf = connOf(d.public_id, c); const t = ageOf(d.public_id, c); return { name: c, device: d.public_id, phone: deviceLabel(d), days: cf?.days ?? null, exact: !!cf?.exact, isNew: t === '1d' || t === '3d' } }))}
+        hideDevices={new Set(devices.filter(d => kindOf(d.public_id) === 'jb').map(d => d.public_id))}
+        accounts={devices.filter(d => kindOf(d.public_id) !== 'jb').flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => { const cf = connOf(d.public_id, c); const t = ageOf(d.public_id, c); return { name: c, device: d.public_id, phone: deviceLabel(d), days: cf?.days ?? null, exact: !!cf?.exact, isNew: t === '1d' || t === '3d' } }))}
         onRefreshStats={() => refreshIgStats(true)} />}
       {curTab === 'igaccounts' && irt.key && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10, border: `1px solid ${EDGE}`, background: '#0E0E10' }}>
@@ -1894,7 +1901,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         <IrtAccounts apiKey={irt.key} devices={devices} known={conts} team={team} onLink={(dev, u, url) => setLink(dev, '@' + u, url)}
           onScanned={(dev, accs) => {
             // iPhone normal (ou pas encore détecté) : les comptes trouvés par iRemoTech deviennent ses cibles « @nom »
-            if (phoneKind(conts[dev]) === 'jb') return
+            if (kindOf(dev) === 'jb') return
             // la lecture fait foi : EXACTEMENT les comptes détectés (un compte non détecté est retiré de la liste et de la
             // sélection), les containers éventuels gardés
             const read = [...new Set(accs.filter(u => !isJunkUsername(u)).map(u => '@' + u.replace(/^@/, '').toLowerCase()))]

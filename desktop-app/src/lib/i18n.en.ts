@@ -5343,6 +5343,8 @@ export const EN: Dict = {
     ["🔔 Alerte iOS ({0})", "🔔 iOS alert ({0})"],
     ["🎞️ Dernière vidéo (1re vignette avec durée {0}) → tap ({1}, {2})", "🎞️ Latest video (1st thumbnail with duration {0}) → tap ({1}, {2})"],
     ["écran « New post » → Next en haut à droite ({0}, {1})", "“New post” screen → Next at the top right ({0}, {1})"],
+    ["Type de l’iPhone : la détection auto peut se tromper sur un jailbreak (iRemoTech ne voit que le compte du container ouvert)", "iPhone type: auto-detection can be wrong for a jailbreak (iRemoTech only sees the account of the open container)"],
+    ["Type : auto", "Type: auto"],
     ["« Next » lu → tap ({0}, {1})", "“Next” read → tap ({0}, {1})"],
     ["[{0}] ⏭ iPhone non jailbreaké (comptes, pas de containers) : pas de création ici", "[{0}] ⏭ Non-jailbroken iPhone (accounts, no containers): no creation here"],
     ["👤 Bascule sur @{0}…", "👤 Switching to @{0}…"],

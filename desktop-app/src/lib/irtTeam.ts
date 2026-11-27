@@ -23,8 +23,9 @@ export interface IrtTeam {
   since: Record<string, number>         // `${iPhone}::@compte` → connecté AU MOINS depuis (ms, plus ancienne lecture qui le contient)
   oldAccs: string[]                     // `${iPhone}::@compte` marqués « déjà là avant » par l'équipe → jamais « NEW »
   igstats: Record<string, IgStat>       // compte (sans @) → stats Instagram du jour (HikerAPI, irtStats.ts)
+  jb: string[]                          // iPhones marqués jailbreak à la main (la détection auto se trompe quand iRemoTech ne lit que le compte du container ouvert)
 }
-export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, posted: {}, bankByModel: false, bankTemplate: [], igdl: {}, added: {}, since: {}, oldAccs: [], igstats: {} })
+export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, posted: {}, bankByModel: false, bankTemplate: [], igdl: {}, added: {}, since: {}, oldAccs: [], igstats: {}, jb: [] })
 
 const isMarket = (v: unknown): v is Market => v === 'fr' || v === 'us' || v === 'de'
 const strMap = (v: unknown): Record<string, string> => {
@@ -51,6 +52,7 @@ export function parseTeam(raw: unknown): IrtTeam {
     bankTemplate: Array.isArray(o.bankTemplate) ? [...new Set(o.bankTemplate.filter((x): x is string => typeof x === 'string').map(x => x.split('/').map(y => y.trim()).filter(Boolean).join('/')).filter(Boolean))].slice(0, 60) : [],
     igstats: Object.fromEntries(Object.entries((o.igstats && typeof o.igstats === 'object' && !Array.isArray(o.igstats) ? o.igstats : {}) as Record<string, unknown>)
       .map(([k, v]) => [k, compactStat(v)] as const).filter((e): e is [string, IgStat] => !!e[1]).slice(-600)),
+    jb: Array.isArray(o.jb) ? [...new Set(o.jb.filter((x): x is string => typeof x === 'string' && !!x))].slice(0, 500) : [],
     ctaTexts: Array.isArray(o.ctaTexts) ? [...new Set(o.ctaTexts.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean))].slice(0, 200) : [],
   }
 }
