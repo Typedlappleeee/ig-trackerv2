@@ -35,7 +35,7 @@ import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } fro
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
 import { startIrtLog, loadIrtResults, aggregateResults, type IrtResultEntry } from '@/lib/irtResults'
-import { fetchIgStats, staleAccounts } from '@/lib/irtStats'
+import { fetchIgStats, staleAccounts, mergeStats, loadStatsCache, pullIgStats, saveIgStats, type IgStat } from '@/lib/irtStats'
 import { listJobs, scanAccountsAndWait, queueAccountScan, stopDevices, releaseDevices, type IrtJob } from '@/lib/iremotech'
 import { claudeStatus } from '@/lib/claude'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
@@ -219,14 +219,30 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   // Stats Instagram (HikerAPI) de chaque compte « @… » : relues au plus 1 fois / 24 h (au chargement, après chaque détection
   // des comptes) et à la demande ; partagées dans l'agence (team.igstats)
   const statsBusy = useRef(false)
+  // stats partagées dans une ligne À PART (les anciennes versions de ScaleFlow ne peuvent plus les effacer)
+  const [igstats, setIgstats] = useState<Record<string, IgStat>>(() => mergeStats(team.igstats, loadStatsCache(teamScope)))
+  const igRef = useRef(igstats); igRef.current = igstats
+  useEffect(() => {
+    let alive = true
+    const pull = () => void pullIgStats(teamScope).then(st => {
+      if (!alive || !st) return
+      // reprise des stats encore rangées dans les réglages d'équipe (ancien emplacement), une fois
+      const old = teamRef.current.igstats
+      const missing = Object.fromEntries(Object.entries(old).filter(([k, v]) => !st[k] || Date.parse(v.at) > Date.parse(st[k].at)))
+      if (Object.keys(missing).length) void saveIgStats(teamScope, missing).then(m => { if (alive) setIgstats(m) })
+      else setIgstats(st)
+    }, () => undefined)
+    pull(); const t = setInterval(pull, 2 * 60_000)
+    return () => { alive = false; clearInterval(t) }
+  }, [currentOrg?.id, user.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const teamRef = useRef(team); teamRef.current = team
   const refreshIgStats = async (force = false, only?: string[]): Promise<number> => {
     if (!irt.key || statsBusy.current) return 0
     const all = only ?? Object.values(conts).flat().filter(c => c.startsWith('@'))
-    const todo = staleAccounts(all, teamRef.current.igstats, Date.now(), force)
+    const todo = staleAccounts(all, igRef.current, Date.now(), force)
     if (!todo.length) return 0
     statsBusy.current = true
-    try { await fetchIgStats(irt.key, todo, batch => editTeam(t => { t.igstats = { ...t.igstats, ...batch } })) } finally { statsBusy.current = false }
+    try { await fetchIgStats(irt.key, todo, batch => { setIgstats(cur => mergeStats(cur, batch)); void saveIgStats(teamScope, batch).then(st => setIgstats(cur => mergeStats(cur, st))) }) } finally { statsBusy.current = false }
     return todo.length
   }
   const contsCount = Object.values(conts).flat().filter(c => c.startsWith('@')).length
@@ -1581,7 +1597,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                             if (day?.by.reel.ok) b.push([`🎬 ${day.by.reel.ok}`, `${day.by.reel.ok} Reel(s) publié(s) ces dernières 24 h`, '#4ADE80'])
                             if (day?.by.carousel.ok) b.push([`🖼 ${day.by.carousel.ok}`, `${day.by.carousel.ok} carrousel(s) publié(s) ces dernières 24 h`, '#4ADE80'])
                             if (day?.by.warmup.ok) b.push(['🔥', `Warm-up fait ces dernières 24 h (${day.by.warmup.ok})`, '#FDBA74'])
-                            const ig = c.startsWith('@') ? team.igstats[c.slice(1).toLowerCase()] : undefined
+                            const ig = c.startsWith('@') ? igstats[c.slice(1).toLowerCase()] : undefined
                             if (ig?.viral48?.length) b.push([`🚀 ${Math.round(ig.viral48[0].views / 1000)}k`, `Reel à ${ig.viral48[0].views.toLocaleString('fr-FR')} vues publié ces 48 h`, '#F472B6'])
                             // échec récent = raté ces 24 h et pas réussi depuis
                             const errs = day ? (['reel', 'story', 'carousel', 'setup', 'warmup'] as const).filter(k => day.by[k].err > 0 && (day.by[k].lastErr ?? 0) > (day.by[k].lastOk ?? 0)).length : 0
@@ -1849,7 +1865,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       </>)}
 
       {/* ─────────────── ONGLET POSTING ─────────────── */}
-      {curTab === 'resultats' && <IrtResults scope={teamScope} igstats={team.igstats}
+      {curTab === 'resultats' && <IrtResults scope={teamScope} igstats={igstats}
         accounts={devices.flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => { const cf = connOf(d.public_id, c); const t = ageOf(d.public_id, c); return { name: c, device: d.public_id, phone: deviceLabel(d), days: cf?.days ?? null, exact: !!cf?.exact, isNew: t === '1d' || t === '3d' } }))}
         onRefreshStats={() => refreshIgStats(true)} />}
       {curTab === 'igaccounts' && irt.key && (

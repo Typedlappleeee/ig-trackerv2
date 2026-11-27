@@ -99,3 +99,46 @@ export async function fetchIgStats(apiKey: string, usernames: string[], onBatch?
   }
   return out
 }
+
+// ── Stockage PARTAGÉ dans l'agence, à part des réglages d'équipe ─────────────────────────────────────────────────
+// Ligne sentinelle `__sf_igstats__` de `iremotech_device_meta` (colonne `accounts`, aucun SQL). Avant, les stats étaient
+// dans `irtTeam` : un ScaleFlow resté sur une ANCIENNE version (autre PC / onglet) réécrivait ces réglages sans elles et
+// les effaçait pour tout le monde (vu le 27/11/2026). Ici, seule la version actuelle écrit, en FUSIONNANT (jamais d'écrasement).
+const STATS_ROW = '__sf_igstats__'
+type Scope = { orgId: string | null; userId: string }
+const statsRow = (s: Scope) => s.orgId ? { scope_id: s.orgId, is_org: true } : { scope_id: s.userId, is_org: false }
+const statsCacheKey = (s: Scope) => `sf-irt-igstats:${statsRow(s).scope_id}`
+/** Lecture brute → stats propres (600 comptes max). Pure. */
+export function parseStats(raw: unknown): Record<string, IgStat> {
+  const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
+  return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, compactStat(v)] as const).filter((e): e is [string, IgStat] => !!e[1]).slice(-600))
+}
+/** Fusion : pour chaque compte, la lecture la plus récente gagne. Pure. */
+export function mergeStats(a: Record<string, IgStat>, b: Record<string, IgStat>): Record<string, IgStat> {
+  const out = { ...a }
+  for (const [k, v] of Object.entries(b)) if (!out[k] || Date.parse(v.at) >= Date.parse(out[k].at)) out[k] = v
+  return out
+}
+export function loadStatsCache(s: Scope): Record<string, IgStat> {
+  try { return parseStats(JSON.parse(localStorage.getItem(statsCacheKey(s)) ?? '{}')) } catch { return {} }
+}
+export async function pullIgStats(s: Scope): Promise<Record<string, IgStat> | null> {
+  const { data, error } = await supabase.from('iremotech_device_meta').select('accounts').eq('scope_id', statsRow(s).scope_id).eq('device_id', STATS_ROW).maybeSingle()
+  if (error) return null
+  const st = mergeStats(loadStatsCache(s), parseStats(data?.accounts))
+  try { localStorage.setItem(statsCacheKey(s), JSON.stringify(st)) } catch { /* plein */ }
+  return st
+}
+/** Ajoute des stats : relit la version partagée, fusionne, enregistre (les écritures sont mises en file : pas de course). */
+let saveChain: Promise<unknown> = Promise.resolve()
+export function saveIgStats(s: Scope, batch: Record<string, IgStat>): Promise<Record<string, IgStat>> {
+  const run = saveChain.then(async () => {
+    const fresh = (await pullIgStats(s).catch(() => null)) ?? loadStatsCache(s)
+    const st = mergeStats(fresh, batch)
+    try { localStorage.setItem(statsCacheKey(s), JSON.stringify(st)) } catch { /* plein */ }
+    await supabase.from('iremotech_device_meta').upsert({ ...statsRow(s), device_id: STATS_ROW, accounts: st, updated_at: new Date().toISOString() }, { onConflict: 'scope_id,device_id' })
+    return st
+  })
+  saveChain = run.catch(() => undefined)
+  return run
+}

@@ -30,3 +30,15 @@ describe('état des comptes', () => {
     expect(accountHealth(st([400, 500, 300, 600, 700, 450]), now)).toBe('ok')
   })
 })
+
+import { mergeStats } from './irtStats'
+describe('fusion des stats partagées', () => {
+  it('garde la lecture la plus récente de chaque compte, sans rien effacer', () => {
+    const a = { x: { username: 'x', at: '2026-11-27T10:00:00Z', followers: 1 }, y: { username: 'y', at: '2026-11-27T10:00:00Z' } }
+    const b = { x: { username: 'x', at: '2026-11-27T12:00:00Z', followers: 2 }, z: { username: 'z', at: '2026-11-27T12:00:00Z' } }
+    const m = mergeStats(a, b)
+    expect(Object.keys(m).sort()).toEqual(['x', 'y', 'z'])
+    expect(m.x.followers).toBe(2)
+    expect(mergeStats(b, a).x.followers).toBe(2)
+  })
+})
