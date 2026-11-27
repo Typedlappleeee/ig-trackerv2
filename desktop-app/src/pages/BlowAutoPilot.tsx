@@ -238,7 +238,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   const teamRef = useRef(team); teamRef.current = team
   const refreshIgStats = async (force = false, only?: string[]): Promise<number> => {
     if (!irt.key || statsBusy.current) return 0
-    const all = only ?? Object.values(conts).flat().filter(c => c.startsWith('@'))
+    // iPhones jailbreak exclus des stats (demande du 27/11/2026)
+    const all = (only ?? Object.entries(conts).filter(([d]) => phoneKind(conts[d]) !== 'jb').flatMap(([, l]) => l)).filter(c => c.startsWith('@'))
     // relit d'abord les stats PARTAGÉES : un compte déjà lu par un collègue (autre PC) aujourd'hui n'est pas relu
     if (!force) { const st = await pullIgStats(teamScope).catch(() => null); if (st) { igRef.current = mergeStats(igRef.current, st); setIgstats(cur => mergeStats(cur, st)) } }
     const todo = staleAccounts(all, igRef.current, Date.now(), force).filter(u => force || !recentlyTried(u))
@@ -1880,7 +1881,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
 
       {/* ─────────────── ONGLET POSTING ─────────────── */}
       {curTab === 'resultats' && <IrtResults scope={teamScope} igstats={igstats}
-        accounts={devices.flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => { const cf = connOf(d.public_id, c); const t = ageOf(d.public_id, c); return { name: c, device: d.public_id, phone: deviceLabel(d), days: cf?.days ?? null, exact: !!cf?.exact, isNew: t === '1d' || t === '3d' } }))}
+        hideDevices={new Set(devices.filter(d => phoneKind(conts[d.public_id]) === 'jb').map(d => d.public_id))}
+        accounts={devices.filter(d => phoneKind(conts[d.public_id]) !== 'jb').flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => { const cf = connOf(d.public_id, c); const t = ageOf(d.public_id, c); return { name: c, device: d.public_id, phone: deviceLabel(d), days: cf?.days ?? null, exact: !!cf?.exact, isNew: t === '1d' || t === '3d' } }))}
         onRefreshStats={() => refreshIgStats(true)} />}
       {curTab === 'igaccounts' && irt.key && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10, border: `1px solid ${EDGE}`, background: '#0E0E10' }}>

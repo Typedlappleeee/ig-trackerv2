@@ -15,8 +15,9 @@ const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); retur
 
 const fmt = (n: number | null | undefined) => n == null ? '—' : n >= 10_000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : n.toLocaleString('fr-FR')
 
-export default function IrtResults({ scope, igstats = {}, accounts = [], onRefreshStats }: {
+export default function IrtResults({ scope, igstats = {}, accounts = [], onRefreshStats, hideDevices }: {
   scope: { userId: string; orgId: string | null }
+  hideDevices?: Set<string>     // iPhones jailbreak : jamais affichés dans les résultats ni les stats
   igstats?: Record<string, IgStat>
   accounts?: { name: string; device: string; phone: string; days?: number | null; exact?: boolean; isNew?: boolean }[]
   onRefreshStats?: () => Promise<number>
@@ -31,7 +32,7 @@ export default function IrtResults({ scope, igstats = {}, accounts = [], onRefre
   const since = period === '1' ? startOfToday() : Date.now() - (PERIODS.find(p => p.k === period)?.ms ?? 7 * 864e5)
   useEffect(() => {
     let alive = true
-    void loadIrtResults(scope, since).then(e => { if (alive) setEntries(e) }, () => { if (alive) setEntries([]) })
+    void loadIrtResults(scope, since).then(e => { if (alive) setEntries(hideDevices?.size ? e.filter(x => !hideDevices.has(x.device)) : e) }, () => { if (alive) setEntries([]) })
     const t = setInterval(() => setTick(n => n + 1), 30_000) // relu toutes les 30 s (lancements en cours)
     return () => { alive = false; clearInterval(t) }
   }, [scope.orgId, scope.userId, period, tick]) // eslint-disable-line react-hooks/exhaustive-deps

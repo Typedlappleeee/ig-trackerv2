@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-27h',
+    date: '2026-11-27',
+    title: { fr: 'Résultats : iPhones jailbreak retirés', en: 'Results: jailbreak iPhones removed' },
+    items: {
+      fr: ['Les iPhones jailbreak n’apparaissent plus dans la page Résultats (automatisations et stats Instagram), et leurs comptes ne sont plus lus par HikerAPI.'],
+      en: ['Jailbreak iPhones no longer appear on the Results page (automations and Instagram stats), and their accounts are no longer read by HikerAPI.'],
+    },
+  },
+  {
     id: '2026-11-27g',
     date: '2026-11-27',
     title: { fr: 'Stats Instagram : beaucoup moins de requêtes HikerAPI', en: 'Instagram stats: far fewer HikerAPI requests' },
