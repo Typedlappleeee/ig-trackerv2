@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-27i',
+    date: '2026-11-27',
+    title: { fr: 'Posting : compte déconnecté reconnu tout de suite', en: 'Posting: logged-out account recognised right away' },
+    items: {
+      fr: ['Quand le compte à publier n’est plus dans la liste des comptes de l’iPhone (déconnecté ou banni), ScaleFlow le dit clairement et passe au suivant sans remise au propre par l’IA ni 2e essai (environ 1 min gagnée). Il est retiré de la liste ScaleFlow dès la lecture suivante qui le confirme.', 'Journal : « bouton introuvable » remplacé par « non lu à l’écran » quand un autre moyen trouve le bouton (ex. Share par sa couleur bleue) : ce n’était pas une erreur.'],
+      en: ['When the account to post with is no longer in the iPhone’s account list (logged out or banned), ScaleFlow says so clearly and moves on without AI cleanup or a 2nd attempt (about 1 min saved). It is removed from the ScaleFlow list at the next read that confirms it.', 'Log: “button not found” replaced with “not read on screen” when another method finds the button (e.g. Share by its blue colour): it was not an error.'],
+    },
+  },
+  {
     id: '2026-11-27h',
     date: '2026-11-27',
     title: { fr: 'Résultats : iPhones jailbreak retirés', en: 'Results: jailbreak iPhones removed' },

@@ -5343,6 +5343,8 @@ export const EN: Dict = {
     ["🔔 Alerte iOS ({0})", "🔔 iOS alert ({0})"],
     ["🎞️ Dernière vidéo (1re vignette avec durée {0}) → tap ({1}, {2})", "🎞️ Latest video (1st thumbnail with duration {0}) → tap ({1}, {2})"],
     ["écran « New post » → Next en haut à droite ({0}, {1})", "“New post” screen → Next at the top right ({0}, {1})"],
+    ["« {0} » non lu à l’écran", "“{0}” not read on screen"],
+    ["→ compte déconnecté de cet iPhone (ou banni) : reconnecte-le dans Instagram (retiré de la liste ScaleFlow à la lecture suivante)", "→ account logged out of this iPhone (or banned): log it back in on Instagram (removed from the ScaleFlow list at the next read)"],
     ["Type de l’iPhone : la détection auto peut se tromper sur un jailbreak (iRemoTech ne voit que le compte du container ouvert)", "iPhone type: auto-detection can be wrong for a jailbreak (iRemoTech only sees the account of the open container)"],
     ["Type : auto", "Type: auto"],
     ["« Next » lu → tap ({0}, {1})", "“Next” read → tap ({0}, {1})"],

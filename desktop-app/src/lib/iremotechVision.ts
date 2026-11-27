@@ -620,7 +620,7 @@ export async function findTapText(
     if (i === 0) hooks?.log?.(`🔎 recherche « ${label} »… (lu : ${words.map(w => w.text).filter(Boolean).slice(0, 12).join(', ') || 'rien'})`)
     await sleep(800)
   }
-  hooks?.log?.(`❌ bouton « ${label} » introuvable`)
+  hooks?.log?.(`   « ${label} » non lu à l’écran`)
   return false
 }
 
@@ -4120,8 +4120,13 @@ export async function detectAccountsByVision(key: string, deviceId: string, hook
 const accountsSeenListeners = new Set<(deviceId: string, usernames: string[]) => void>()
 export function onAccountsSeen(fn: (deviceId: string, usernames: string[]) => void): () => void { accountsSeenListeners.add(fn); return () => { accountsSeenListeners.delete(fn) } }
 
+// iPhones dont la dernière bascule a échoué parce que le compte N'EST PAS dans la liste lue (déconnecté / banni) : échec
+// certain → pas de remise au propre par l'IA ni de 2e essai (ils relisaient la même liste pour rien, ~1 min perdue)
+const NOT_IN_LIST = new Set<string>()
+export function targetNotInList(deviceId: string): boolean { return NOT_IN_LIST.has(deviceId) }
 export async function switchAccountByVision(key: string, deviceId: string, username: string, hooks?: VisionHooks): Promise<boolean> {
   const u = username.replace(/^@/, '').toLowerCase()
+  NOT_IN_LIST.delete(deviceId)
   hooks?.log?.(`👤 Bascule sur @${u}…`)
   if (await openInstagramApp(key, deviceId, hooks) !== 'app') { hooks?.log?.('❌ Instagram ne s’ouvre pas directement (iPhone jailbreaké ?)'); return false }
   for (let k = 0; k < 3; k++) {
@@ -4134,7 +4139,7 @@ export async function switchAccountByVision(key: string, deviceId: string, usern
     // la liste des comptes est à l'écran : elle est signalée (gratuitement, sans scan) → mise à jour des comptes partout
     if (k === 0) { const seen = sheetUsernames(all, scr.W, scr.H); if (seen.length) for (const fn of accountsSeenListeners) try { fn(deviceId, seen) } catch { /* noop */ } }
     const row = all.find(o => o.cy > scr.H * 0.25 && o.cy < top && sameUsername(u, o.text.toLowerCase().replace(/[^a-z0-9._]/g, '')))
-    if (!row) { hooks?.log?.(`❌ @${u} n’est pas dans la liste des comptes de cet iPhone (lu : ${sheetUsernames(all, scr.W, scr.H).map(x => '@' + x).join(', ') || 'rien'})`); await closeAccountSheet(key, deviceId, scr.W, scr.H); return false }
+    if (!row) { const lu = sheetUsernames(all, scr.W, scr.H); if (lu.length >= 2) NOT_IN_LIST.add(deviceId); hooks?.log?.(`❌ @${u} n’est pas dans la liste des comptes de cet iPhone (lu : ${lu.map(x => '@' + x).join(', ') || 'rien'})`); if (lu.length >= 2) hooks?.log?.('   → compte déconnecté de cet iPhone (ou banni) : reconnecte-le dans Instagram (retiré de la liste ScaleFlow à la lecture suivante)'); await closeAccountSheet(key, deviceId, scr.W, scr.H); return false }
     const dots = shot ? await findBlueDots(shot, 0.8, 0.95, 0.25, 0.95) : []
     if (dots.some(d => Math.abs(d.cy - row.cy) < 20)) {
       hooks?.log?.(`   ✓ compte actif : @${u}`)
