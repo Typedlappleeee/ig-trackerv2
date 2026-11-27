@@ -169,8 +169,10 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
   const rows = all.filter(r => filters.every(k => pass(r, k))).sort(cmp)
   const viral = all.filter(r => r.s?.viral48?.length).length
   const last = Object.values(igstats).reduce((m, s) => Math.max(m, Date.parse(s.at) || 0), 0)
-  const th: CSSProperties = { padding: '9px 12px', fontWeight: 500 }
-  const td: CSSProperties = { padding: '9px 12px', whiteSpace: 'nowrap' }
+  // tableau COMPACT : toutes les colonnes visibles sans défiler (libellés courts, détail au survol)
+  const th: CSSProperties = { padding: '7px 8px', fontWeight: 500, whiteSpace: 'nowrap' }
+  const td: CSSProperties = { padding: '6px 8px', whiteSpace: 'nowrap' }
+  const SHORT: Record<string, string> = { banned: '🔴 Introuvable', private: '🟠 Privé', drop: '🟠 Portée ↓', low: '🟡 Faible', ok: '🟢 OK', unknown: '—' }
   return (
     <div style={{ marginBottom: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '4px 0 10px' }}>
@@ -193,9 +195,9 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
       {error && <div style={{ margin: '0 0 10px', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', color: BAD, fontSize: 12.5 }}>⚠ Stats non relues : <span data-no-tr>{error}</span>{/HIKERAPI_KEY/.test(error) ? ' — ajoute la clé HikerAPI (HIKERAPI_KEY) dans les variables d’environnement Vercel, puis redéploie.' : ''}</div>}
       {!rows.length ? <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${EDGE}`, color: MUTED, fontSize: 13 }}>{all.length ? 'Aucun compte ne correspond à ces filtres.' : 'Aucun compte iRemoTech détecté.'}</div> : (
         <div style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${EDGE}` }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, color: INK }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, color: INK }}>
             <thead><tr style={{ background: '#111113', color: MUTED, textAlign: 'left' }}>
-              <th style={th}>Compte</th><th style={th}>iPhone</th><th style={th} title="Indicatif : Instagram ne publie pas l’état « flag » d’un compte. Introuvable = suspendu / banni / renommé ; portée en chute = derniers Reels à moins d’un quart des précédents.">État</th><th style={th}>Abonnés</th><th style={th}>Abonnements</th><th style={th}>Reels 24 h</th><th style={th}>Vues 24 h</th><th style={th}>Story CTA</th><th style={th}>🚀 ≥ 5 000 vues (48 h)</th><th style={th}>Relu</th>
+              <th style={th}>Compte</th><th style={th}>iPhone</th><th style={th} title="Indicatif : Instagram ne publie pas l’état « flag » d’un compte. Introuvable = suspendu / banni / renommé ; portée en chute = derniers Reels à moins d’un quart des précédents.">État</th><th style={th}>Abonnés</th><th style={th} title="Abonnements">Abonn.</th><th style={th} title="Reels publiés ces 24 h">Reels</th><th style={th} title="Vues des Reels publiés ces 24 h">Vues</th><th style={th}>CTA</th><th style={th} title="Reel à 5 000 vues ou plus publié ces 48 h">🚀 48 h</th><th style={th}>Relu</th>
             </tr></thead>
             <tbody>
               {rows.map(r => {
@@ -206,14 +208,14 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
                       {r.isNew ? <span title="Compte de moins de 3 jours : portée faible normale" style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, color: '#4ADE80' }}>🆕 NEW{r.days != null ? ` · ${r.exact ? '' : '≥ '}${r.days} j` : ''}</span>
                         : r.days != null ? <span style={{ marginLeft: 8, fontSize: 10.5, color: DIM }}>{r.exact ? '' : '≥ '}{r.days} j</span> : null}</td>
                     <td data-no-tr style={{ ...td, color: MUTED }}>{r.phone}</td>
-                    <td style={{ ...td, color: r.health === 'banned' ? BAD : r.health === 'drop' || r.health === 'private' ? '#FB923C' : r.health === 'low' ? GOLD : r.health === 'ok' ? OK : DIM }}>{r.isNew && r.health === 'ok' && s && !s.missing ? '🆕 Nouveau compte' : HEALTH_LABEL[r.health]}</td>
+                    <td style={{ ...td, color: r.health === 'banned' ? BAD : r.health === 'drop' || r.health === 'private' ? '#FB923C' : r.health === 'low' ? GOLD : r.health === 'ok' ? OK : DIM }}><span title={HEALTH_LABEL[r.health]}>{r.isNew && r.health === 'ok' && s && !s.missing ? '🆕 Nouveau' : SHORT[r.health]}</span></td>
                     <td style={td}>{fmt(s?.followers)}</td>
                     <td style={td}>{fmt(s?.following)}</td>
                     <td style={td}><b style={{ color: r.reels ? OK : DIM }}>{r.reels}</b></td>
                     <td style={td}>{s ? fmt(s.views24) : '—'}</td>
-                    <td style={td}>{s?.storyLink ? <span style={{ color: OK }}>🔗 en ligne</span> : r.cta ? <span style={{ color: OK }}>✓ publiée (ScaleFlow)</span> : s?.story ? <span style={{ color: GOLD }}>Story sans lien</span> : s ? <span style={{ color: BAD }}>✗ pas faite</span> : <span style={{ color: DIM }}>—</span>}</td>
+                    <td style={td}>{s?.storyLink ? <span title="Story avec sticker lien en ligne" style={{ color: OK }}>🔗 en ligne</span> : r.cta ? <span title="Story CTA publiée par ScaleFlow ces 24 h" style={{ color: OK }}>✓ ScaleFlow</span> : s?.story ? <span title="Une Story est en ligne, sans sticker lien" style={{ color: GOLD }}>📷 sans lien</span> : s ? <span style={{ color: BAD }}>✗ pas faite</span> : <span style={{ color: DIM }}>—</span>}</td>
                     <td style={td}>{v ? <a href={`https://www.instagram.com/reel/${v.code}/`} target="_blank" rel="noreferrer" style={{ color: '#F472B6', fontWeight: 700, textDecoration: 'none' }}>🚀 {fmt(v.views)}{(s?.viral48?.length ?? 0) > 1 ? ` (+${(s?.viral48?.length ?? 1) - 1})` : ''}</a> : <span style={{ color: DIM }}>—</span>}</td>
-                    <td style={{ ...td, color: DIM }}>{s ? ago(s.at) : 'jamais'}</td>
+                    <td style={{ ...td, color: DIM }}>{s ? ago(s.at).replace(/^il y a /, '') : 'jamais'}</td>
                   </tr>
                 )
               })}
