@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-27f',
+    date: '2026-11-27',
+    title: { fr: 'Posting un peu plus rapide', en: 'Slightly faster posting' },
+    items: {
+      fr: ['Le bouton « Next » est maintenant tapé dès la première lecture de l’écran, au lieu de relire deux fois le même écran : quelques secondes gagnées par post, sans rien changer à la sécurité (la page de partage est toujours reconnue avant).'],
+      en: ['The “Next” button is now tapped from the first screen read, instead of reading the same screen twice more: a few seconds saved per post, with no change to safety (the share page is still recognised first).'],
+    },
+  },
+  {
     id: '2026-11-27e',
     date: '2026-11-27',
     title: { fr: 'Banque : plus de médias fantômes', en: 'Bank: no more ghost media' },

@@ -1725,13 +1725,21 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       }
       continue
     }
-    let top = await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next (haut)', tries: 2, minX: 0.55, cropY: [0, 0.14] })
+    // Écran DÉJÀ lu ci-dessus : si « Next » y est (haut ou bas à droite), on le tape tout de suite — avant, deux nouvelles
+    // captures + OCR relisaient exactement le même écran (~6-10 s perdues par post). Sinon, recherche ciblée (1 essai).
+    const seen = words.find(o => /^(next|suivant)$/i.test(o.text) && ((o.cy < H * 0.14 && o.cx > W * 0.55) || (o.cy > H * 0.8 && o.cx > W * 0.5)))
+    if (seen) {
+      hooks?.log?.(`   « Next » lu → tap (${seen.cx}, ${seen.cy})`)
+      await sendAction(key, deviceId, { type: 'tap', x: seen.cx, y: seen.cy })
+      await sleep(step === 0 ? 3000 : 4500); continue
+    }
+    let top = await findTapText(key, deviceId, [/^next$/i, /^suivant$/i], hooks, { label: 'Next (haut)', tries: 1, minX: 0.55, cropY: [0, 0.14] })
     // écran « New post » (iPhone normal) : « Next » violet sur noir en haut à droite, souvent illisible → position connue
     if (!top && words.some(o => /^new$/i.test(o.text) && o.cy < H * 0.07) && words.some(o => /^post$/i.test(o.text) && o.cy < H * 0.07)) {
       hooks?.log?.(`   écran « New post » → Next en haut à droite (${Math.round(0.9 * W)}, ${Math.round(0.034 * H)})`)
       await sendAction(key, deviceId, { type: 'tap', x: Math.round(0.9 * W), y: Math.round(0.034 * H) }); top = true
     }
-    if (!top && !await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (bas)', 2, [0.5, 1])) return false
+    if (!top && !await tapButton(key, deviceId, [/^next$/i, /^suivant$/i], A.nextBtn, W, H, hooks, [0.80, 1], 'Next (bas)', 1, [0.5, 1])) return false
     await sleep(step === 0 ? 3000 : 4500) // l'éditeur charge la vidéo
   }
   if (!atCaption) atCaption = await rescue(key, deviceId, 'Reach the final page of this Instagram post where the caption field ("Write a caption" / "Add a caption") and the Share button are shown: tap Next or the arrow to advance. NEVER tap Share or Post.',

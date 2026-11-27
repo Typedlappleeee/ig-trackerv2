@@ -5343,6 +5343,7 @@ export const EN: Dict = {
     ["🔔 Alerte iOS ({0})", "🔔 iOS alert ({0})"],
     ["🎞️ Dernière vidéo (1re vignette avec durée {0}) → tap ({1}, {2})", "🎞️ Latest video (1st thumbnail with duration {0}) → tap ({1}, {2})"],
     ["écran « New post » → Next en haut à droite ({0}, {1})", "“New post” screen → Next at the top right ({0}, {1})"],
+    ["« Next » lu → tap ({0}, {1})", "“Next” read → tap ({0}, {1})"],
     ["[{0}] ⏭ iPhone non jailbreaké (comptes, pas de containers) : pas de création ici", "[{0}] ⏭ Non-jailbroken iPhone (accounts, no containers): no creation here"],
     ["👤 Bascule sur @{0}…", "👤 Switching to @{0}…"],
     ["✓ compte actif : @{0}", "✓ active account: @{0}"],
