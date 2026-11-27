@@ -99,6 +99,28 @@ export default async (req, res) => {
       }))
       return res.status(200).json({ ok: true, profiles })
     }
+    // Compte (@) qui a publié chaque Reel / post, à partir de son code (lien instagram.com/reel/<code>) — HikerAPI, passe
+    // les Reels restreints (âge / pays) que l'oEmbed public refuse. 1 requête par lien, 25 liens max par appel.
+    if (op === 'owners') {
+      const hk = process.env.HIKERAPI_KEY
+      if (!hk) return res.status(200).json({ ok: false, error: 'HIKERAPI_KEY absente sur Vercel' })
+      const chk = await fetch(`${BASE}/devices`, { headers: auth, signal: AbortSignal.timeout(15000) })
+      if (!chk.ok) return res.status(200).json({ ok: false, error: 'clé iRemoTech refusée' })
+      const codes = [...new Set((Array.isArray(req.body?.codes) ? req.body.codes : []).map(c => String(c ?? '').trim()).filter(c => /^[A-Za-z0-9_-]{5,40}$/.test(c)))].slice(0, 25)
+      const owners = {}
+      await Promise.all(codes.map(async code => {
+        for (let a = 0; a < 2; a++) {
+          try {
+            const r = await fetch(`https://api.hikerapi.com/v1/media/by/code?${new URLSearchParams({ code })}`, { headers: { 'x-access-key': hk, accept: 'application/json' }, signal: AbortSignal.timeout(15000) })
+            if (r.ok) { const j = await r.json().catch(() => null); owners[code] = j?.user?.username ?? j?.owner?.username ?? null; return }
+            if (r.status !== 429 && r.status < 500) { owners[code] = null; return }
+          } catch { /* relance */ }
+          await new Promise(r => setTimeout(r, 1200))
+        }
+        owners[code] = null
+      }))
+      return res.status(200).json({ ok: true, owners })
+    }
     // Stats Instagram (HikerAPI) des comptes iRemoTech : abonnés, Reels publiés ces 24 h et leurs vues, Reels > 5 000 vues
     // en 48 h, Story active (et lien) — 3 requêtes HikerAPI par compte, 8 comptes max par appel (temps Vercel).
     if (op === 'stats') {
