@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-27d',
+    date: '2026-11-27',
+    title: { fr: 'Posting : correctif important (Reel publié sans légende)', en: 'Posting: important fix (Reel posted without caption)' },
+    items: {
+      fr: ['Quand la page de partage s’ouvrait sans que le mot « caption » soit lu, le script cherchait encore « Next » et touchait le bouton bleu du bas, qui est « Share » : le Reel partait sans légende, puis était retenté. La page de partage est maintenant reconnue à ses lignes (Tag people, Add location, Save draft) : la légende est tapée, et à partir de cette page un échec n’est plus jamais retenté.'],
+      en: ['When the share page opened without the word “caption” being read, the script still looked for “Next” and tapped the blue bottom button, which is “Share”: the Reel went out without a caption, then was retried. The share page is now recognised by its rows (Tag people, Add location, Save draft): the caption is typed, and from this page a failure is never retried.'],
+    },
+  },
+  {
     id: '2026-11-27c',
     date: '2026-11-27',
     title: { fr: 'Stats Instagram : date du dernier post', en: 'Instagram stats: date of the last post' },

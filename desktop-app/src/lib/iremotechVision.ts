@@ -1677,6 +1677,10 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
       await sleep(1800); continue
     }
     if (words.some(o => CAPTION_MARK.some(p => p.test(o.text)))) { atCaption = true; break }
+    // PAGE DE PARTAGE déjà atteinte (« Tag people / Add location / Save draft ») même si « caption » n'est pas lu : on s'arrête
+    // là. Avant, le script y cherchait encore « Next » et tapait le bouton BLEU du bas… qui est Share → Reel publié SANS
+    // légende, puis retenté (vu le 27/11/2026 sur STEVIE4 @haann.arose).
+    if (sharePageShown(words, W, H)) { hooks?.log?.('   page de partage atteinte (légende non lue à l’écran) → saisie de la légende'); atCaption = true; break }
     // Fenêtre « première fois » à un seul OK (« Find your vibe »…) qui masque l'éditeur
     const first = !words.some(o => /^reels?[.!]?$/i.test(o.text)) ? firstTimeOkTap(words, W, H) : null
     if (first) {
@@ -1733,6 +1737,8 @@ async function finishPostFromGallery(key: string, deviceId: string, W: number, H
   if (!atCaption) atCaption = await rescue(key, deviceId, 'Reach the final page of this Instagram post where the caption field ("Write a caption" / "Add a caption") and the Share button are shown: tap Next or the arrow to advance. NEVER tap Share or Post.',
     async () => { const r = await readScreenWords(key, deviceId); return !!r && r.words.some(o => CAPTION_MARK.some(p => p.test(o.text))) }, hooks)
   if (!atCaption) { hooks?.log?.('❌ écran de légende non atteint → rien n’est publié (container suivant)'); return false }
+  // page de partage atteinte = zone à risque : un échec à partir d'ici n'est JAMAIS retenté (double publication possible)
+  PUBLISH_TAPPED.add(deviceId)
   // c. Légende : tap sur « Write a caption… » → saisie → OK/Done (haut-droite) s'il apparaît.
   if (caption && caption.trim()) {
     hooks?.log?.('✏️ Saisie de la légende…')

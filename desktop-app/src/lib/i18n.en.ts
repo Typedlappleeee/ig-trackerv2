@@ -621,6 +621,7 @@ export const EN: Dict = {
     "⚠ une autre app s’est ouverte à la place d’Instagram → retour à l’accueil, nouvel essai": "⚠ another app opened instead of Instagram → back to home, new try",
     "📲 Instagram ouvert (open_app)": "📲 Instagram opened (open_app)",
     "open_app sans effet → icône de l’accueil": "open_app had no effect → home screen icon",
+    "page de partage atteinte (légende non lue à l’écran) → saisie de la légende": "share page reached (caption not read on screen) → typing the caption",
     "⏰ Pas de post depuis 48 h": "⏰ No post for 48 h",
     "Tri : dernier post (le plus ancien d’abord)": "Sort: last post (oldest first)",
     "Dernier Reel publié (Instagram ou ScaleFlow)": "Last Reel posted (Instagram or ScaleFlow)",
