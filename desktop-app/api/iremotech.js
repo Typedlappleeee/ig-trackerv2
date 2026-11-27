@@ -99,6 +99,53 @@ export default async (req, res) => {
       }))
       return res.status(200).json({ ok: true, profiles })
     }
+    // Stats Instagram (HikerAPI) des comptes iRemoTech : abonnés, Reels publiés ces 24 h et leurs vues, Reels > 5 000 vues
+    // en 48 h, Story active (et lien) — 3 requêtes HikerAPI par compte, 8 comptes max par appel (temps Vercel).
+    if (op === 'stats') {
+      const hk = process.env.HIKERAPI_KEY
+      if (!hk) return res.status(200).json({ ok: false, error: 'HIKERAPI_KEY absente sur Vercel' })
+      const chk = await fetch(`${BASE}/devices`, { headers: auth, signal: AbortSignal.timeout(15000) })
+      if (!chk.ok) return res.status(200).json({ ok: false, error: 'clé iRemoTech refusée' })
+      const list = [...new Set((Array.isArray(req.body?.usernames) ? req.body.usernames : []).map(u => String(u ?? '').toLowerCase().replace(/^@/, '').trim()).filter(u => /^[a-z0-9._]{1,30}$/.test(u)))].slice(0, 8)
+      const hget = async (path, params) => {
+        for (let a = 0; a < 2; a++) {
+          try {
+            const r = await fetch(`https://api.hikerapi.com${path}?${new URLSearchParams(params)}`, { headers: { 'x-access-key': hk, accept: 'application/json' }, signal: AbortSignal.timeout(15000) })
+            if (r.ok) return await r.json().catch(() => null)
+            if (r.status !== 429 && r.status < 500) return null
+          } catch { /* relance */ }
+          await new Promise(r => setTimeout(r, 1200))
+        }
+        return null
+      }
+      const num = (...v) => { for (const x of v) { const k = Number(x); if (Number.isFinite(k) && k >= 0 && x !== null && x !== '') return k } return null }
+      const ts = v => { if (v == null) return 0; const n = Number(v); if (Number.isFinite(n)) return n > 1e12 ? n : n * 1000; const d = Date.parse(String(v)); return Number.isFinite(d) ? d : 0 }
+      const now = Date.now()
+      const stats = {}
+      await Promise.all(list.map(async u => {
+        try {
+          const p = await hget('/v1/user/by/username', { username: u })
+          const x = p?.user ?? p
+          if (!x || !(x.pk || x.username)) { stats[u] = { username: u, missing: true, at: new Date().toISOString() }; return }
+          const pk = String(x.pk ?? x.id ?? '')
+          const [clips, stories] = await Promise.all([pk ? hget('/v1/user/clips/chunk', { user_id: pk }) : null, pk ? hget('/v1/user/stories', { user_id: pk }) : null])
+          const items = Array.isArray(clips) ? (Array.isArray(clips[0]) ? clips[0] : clips.filter(i => i && typeof i === 'object' && !Array.isArray(i))) : Array.isArray(clips?.items) ? clips.items : []
+          const reels = items.map(m => ({ code: String(m.code ?? ''), at: ts(m.taken_at ?? m.taken_at_ts), views: num(m.play_count, m.view_count, m.ig_play_count) ?? 0, thumb: m.thumbnail_url ?? m?.image_versions2?.candidates?.[0]?.url ?? null })).filter(r => r.code && r.at)
+          const d24 = reels.filter(r => now - r.at <= 24 * 3600_000), d48 = reels.filter(r => now - r.at <= 48 * 3600_000)
+          const st = Array.isArray(stories) ? stories : Array.isArray(stories?.items) ? stories.items : []
+          const hasLink = st.some(s => (Array.isArray(s.links) && s.links.length) || (Array.isArray(s.story_link_stickers) && s.story_link_stickers.length) || (Array.isArray(s.stickers) && s.stickers.some(k => /link/i.test(String(k?.type ?? k?.extra?.type ?? '')))))
+          stats[u] = {
+            username: u, followers: num(x.follower_count), following: num(x.following_count), media: num(x.media_count),
+            reels24: d24.length, views24: d24.reduce((n, r) => n + r.views, 0),
+            viral48: d48.filter(r => r.views >= 5000).sort((a, b) => b.views - a.views).slice(0, 3),
+            topReel: reels.slice().sort((a, b) => b.views - a.views)[0] ?? null,
+            story: st.length > 0, storyLink: hasLink, storyAt: st.length ? Math.max(...st.map(s => ts(s.taken_at))) : null,
+            at: new Date().toISOString(),
+          }
+        } catch { stats[u] = null }
+      }))
+      return res.status(200).json({ ok: true, stats })
+    }
     if (op === 'media') {
       // Deux sources : fileData (base64, fichier PC ≤ ~4 Mo) OU mediaUrl (banque Supabase).
       let bytes

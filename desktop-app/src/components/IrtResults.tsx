@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { aggregateResults, loadIrtResults, IRT_ACTIONS, type IrtAction, type IrtResultEntry, type ActionStat } from '@/lib/irtResults'
 import { ago } from '@/lib/irtAccounts'
+import type { IgStat } from '@/lib/irtStats'
 
 const GOLD = '#E9C46A', INK = '#EDEDEF', MUTED = '#8B8B94', DIM = '#6E6E78', OK = '#4ADE80', BAD = '#F87171'
 const EDGE = 'rgba(255,255,255,0.07)', FIELD_BG = '#161618', FIELD_EDGE = 'rgba(255,255,255,0.09)'
@@ -12,7 +13,15 @@ const PERIODS: { k: string; l: string; ms: number }[] = [
 ]
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() }
 
-export default function IrtResults({ scope }: { scope: { userId: string; orgId: string | null } }) {
+const fmt = (n: number | null | undefined) => n == null ? '—' : n >= 10_000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : n.toLocaleString('fr-FR')
+
+export default function IrtResults({ scope, igstats = {}, accounts = [], onRefreshStats }: {
+  scope: { userId: string; orgId: string | null }
+  igstats?: Record<string, IgStat>
+  accounts?: { name: string; device: string; phone: string }[]
+  onRefreshStats?: () => Promise<number>
+}) {
+  const [statsBusy, setStatsBusy] = useState(false)
   const [period, setPeriod] = useState(() => { try { return localStorage.getItem('sf-irt-res-period') ?? '7' } catch { return '7' } })
   const [phone, setPhone] = useState('')
   const [q, setQ] = useState('')
@@ -62,6 +71,10 @@ export default function IrtResults({ scope }: { scope: { userId: string; orgId: 
         <button onClick={() => setTick(n => n + 1)} style={{ ...field, cursor: 'pointer' }}>↻ Actualiser</button>
       </div>
 
+      <IgStatsTable igstats={igstats} accounts={accounts.filter(a => (!phone || a.phone === phone) && (!q.trim() || a.name.toLowerCase().includes(q.trim().toLowerCase())))}
+        busy={statsBusy} onRefresh={onRefreshStats ? async () => { setStatsBusy(true); try { await onRefreshStats() } finally { setStatsBusy(false) } } : undefined} />
+
+      <div style={{ fontSize: 14, fontWeight: 600, color: INK, margin: '18px 0 10px' }}>🤖 Automatisations ScaleFlow</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <div style={card}><div style={{ fontSize: 22, fontWeight: 600, color: INK }}>{rows.length}</div><div style={{ fontSize: 12, color: MUTED }}>compte(s) actifs</div></div>
         {cols.map(k => (
@@ -105,6 +118,53 @@ export default function IrtResults({ scope }: { scope: { userId: string; orgId: 
           </div>
         )}
       <div style={{ marginTop: 10, fontSize: 12, color: DIM }}>✓ = réussi · ✗ = raté (survole pour la raison) · <span style={{ color: GOLD }}>partagé avec toute l’agence</span></div>
+    </div>
+  )
+}
+
+/** Stats Instagram du jour (HikerAPI) de tous les comptes iRemoTech : Reels > 5 000 vues en 48 h EN HAUT et surlignés. */
+function IgStatsTable({ igstats, accounts, busy, onRefresh }: { igstats: Record<string, IgStat>; accounts: { name: string; device: string; phone: string }[]; busy: boolean; onRefresh?: () => void }) {
+  const rows = accounts.map(a => ({ ...a, s: igstats[a.name.replace(/^@/, '').toLowerCase()] as IgStat | undefined }))
+    .sort((x, y) => (y.s?.viral48?.[0]?.views ?? 0) - (x.s?.viral48?.[0]?.views ?? 0) || (y.s?.views24 ?? 0) - (x.s?.views24 ?? 0) || x.phone.localeCompare(y.phone, 'fr', { numeric: true }))
+  const viral = rows.filter(r => r.s?.viral48?.length).length
+  const last = Object.values(igstats).reduce((m, s) => Math.max(m, Date.parse(s.at) || 0), 0)
+  const th: CSSProperties = { padding: '9px 12px', fontWeight: 500 }
+  const td: CSSProperties = { padding: '9px 12px', whiteSpace: 'nowrap' }
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '4px 0 10px' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>📈 Stats Instagram (24 h)</div>
+        {viral > 0 && <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, background: 'rgba(244,114,182,0.12)', color: '#F472B6' }}>🚀 {viral} compte(s) avec un Reel ≥ 5 000 vues en 48 h</span>}
+        <span style={{ fontSize: 12, color: DIM }}>{last ? `relues ${ago(new Date(last).toISOString())} · automatiquement chaque jour et à chaque détection des comptes` : 'pas encore relues'}</span>
+        {onRefresh && <button onClick={onRefresh} disabled={busy} style={{ marginLeft: 'auto', height: 30, padding: '0 12px', borderRadius: 8, background: FIELD_BG, border: `1px solid ${FIELD_EDGE}`, color: INK, fontSize: 12.5, cursor: busy ? 'default' : 'pointer' }}>{busy ? 'Lecture…' : '↻ Relire les stats maintenant'}</button>}
+      </div>
+      {!rows.length ? <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${EDGE}`, color: MUTED, fontSize: 13 }}>Aucun compte iRemoTech détecté.</div> : (
+        <div style={{ overflowX: 'auto', borderRadius: 10, border: `1px solid ${EDGE}` }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, color: INK }}>
+            <thead><tr style={{ background: '#111113', color: MUTED, textAlign: 'left' }}>
+              <th style={th}>Compte</th><th style={th}>iPhone</th><th style={th}>Abonnés</th><th style={th}>Abonnements</th><th style={th}>Reels 24 h</th><th style={th}>Vues 24 h</th><th style={th}>Story CTA</th><th style={th}>🚀 ≥ 5 000 vues (48 h)</th><th style={th}>Relu</th>
+            </tr></thead>
+            <tbody>
+              {rows.map(r => {
+                const s = r.s, v = s?.viral48?.[0]
+                return (
+                  <tr key={r.device + r.name} style={{ borderTop: `1px solid ${EDGE}`, background: v ? 'rgba(244,114,182,0.07)' : undefined }}>
+                    <td style={td}><a data-no-tr href={`https://www.instagram.com/${r.name.replace(/^@/, '')}/`} target="_blank" rel="noreferrer" style={{ color: INK, fontWeight: 500, textDecoration: 'none' }}>{r.name}</a>{s?.missing && <span style={{ marginLeft: 6, fontSize: 11, color: BAD }}>introuvable</span>}</td>
+                    <td data-no-tr style={{ ...td, color: MUTED }}>{r.phone}</td>
+                    <td style={td}>{fmt(s?.followers)}</td>
+                    <td style={td}>{fmt(s?.following)}</td>
+                    <td style={td}>{s ? <b style={{ color: s.reels24 ? OK : DIM }}>{s.reels24 ?? 0}</b> : '—'}</td>
+                    <td style={td}>{s ? fmt(s.views24) : '—'}</td>
+                    <td style={td}>{!s ? '—' : s.storyLink ? <span style={{ color: OK }}>🔗 en ligne</span> : s.story ? <span style={{ color: GOLD }}>Story sans lien</span> : <span style={{ color: DIM }}>aucune</span>}</td>
+                    <td style={td}>{v ? <a href={`https://www.instagram.com/reel/${v.code}/`} target="_blank" rel="noreferrer" style={{ color: '#F472B6', fontWeight: 700, textDecoration: 'none' }}>🚀 {fmt(v.views)}{(s?.viral48?.length ?? 0) > 1 ? ` (+${(s?.viral48?.length ?? 1) - 1})` : ''}</a> : <span style={{ color: DIM }}>—</span>}</td>
+                    <td style={{ ...td, color: DIM }}>{s ? ago(s.at) : 'jamais'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@
 // Stockés dans une ligne sentinelle de `iremotech_device_meta` (device_id `__sf_team__`, colonne jsonb
 // `accounts`) : aucun SQL à passer. Le localStorage sert de cache immédiat et de repli hors ligne.
 import { supabase } from './supabase'
+import { compactStat, type IgStat } from './irtStats'
 import type { Market } from './captionMarkets'
 
 export const TEAM_ROW = '__sf_team__'
@@ -21,8 +22,9 @@ export interface IrtTeam {
   added: Record<string, number>         // `${iPhone}::@compte` → 1re fois vu sur l'iPhone (ms) ; 1 = déjà là avant le suivi
   since: Record<string, number>         // `${iPhone}::@compte` → connecté AU MOINS depuis (ms, plus ancienne lecture qui le contient)
   oldAccs: string[]                     // `${iPhone}::@compte` marqués « déjà là avant » par l'équipe → jamais « NEW »
+  igstats: Record<string, IgStat>       // compte (sans @) → stats Instagram du jour (HikerAPI, irtStats.ts)
 }
-export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, posted: {}, bankByModel: false, bankTemplate: [], igdl: {}, added: {}, since: {}, oldAccs: [] })
+export const emptyTeam = (): IrtTeam => ({ groups: {}, groupNames: [], markets: {}, acctMarkets: {}, links: {}, ctaTexts: [], lastStory: {}, posted: {}, bankByModel: false, bankTemplate: [], igdl: {}, added: {}, since: {}, oldAccs: [], igstats: {} })
 
 const isMarket = (v: unknown): v is Market => v === 'fr' || v === 'us' || v === 'de'
 const strMap = (v: unknown): Record<string, string> => {
@@ -47,6 +49,8 @@ export function parseTeam(raw: unknown): IrtTeam {
     added: Object.fromEntries(Object.entries((o.added && typeof o.added === 'object' && !Array.isArray(o.added) ? o.added : {}) as Record<string, unknown>).filter(([, v]) => typeof v === 'number' && v > 0)) as Record<string, number>,
     igdl: (() => { const g = strMap(o.igdl); return { ...(g.reels ? { reels: g.reels } : {}), ...(g.photos ? { photos: g.photos } : {}) } })(),
     bankTemplate: Array.isArray(o.bankTemplate) ? [...new Set(o.bankTemplate.filter((x): x is string => typeof x === 'string').map(x => x.split('/').map(y => y.trim()).filter(Boolean).join('/')).filter(Boolean))].slice(0, 60) : [],
+    igstats: Object.fromEntries(Object.entries((o.igstats && typeof o.igstats === 'object' && !Array.isArray(o.igstats) ? o.igstats : {}) as Record<string, unknown>)
+      .map(([k, v]) => [k, compactStat(v)] as const).filter((e): e is [string, IgStat] => !!e[1]).slice(-600)),
     ctaTexts: Array.isArray(o.ctaTexts) ? [...new Set(o.ctaTexts.filter((x): x is string => typeof x === 'string').map(x => x.trim()).filter(Boolean))].slice(0, 200) : [],
   }
 }

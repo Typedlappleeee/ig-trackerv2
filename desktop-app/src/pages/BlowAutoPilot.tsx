@@ -35,6 +35,7 @@ import { generateMarketCtas, ctaPrompt, saveCtaPrompt, DEFAULT_CTA_PROMPTS } fro
 import { MARKETS, DEFAULT_PROMPTS, marketPrompt, saveMarketPrompt, generateMarketCaptions, topUpReserve, loadTargetMarket, saveTargetMarket, countByMarket, pickCity, type Market } from '@/lib/captionMarkets'
 import { useConnections } from '@/lib/connections'
 import { startIrtLog, loadIrtResults, aggregateResults, type IrtResultEntry } from '@/lib/irtResults'
+import { fetchIgStats, staleAccounts } from '@/lib/irtStats'
 import { listJobs, scanAccountsAndWait, queueAccountScan, stopDevices, releaseDevices, type IrtJob } from '@/lib/iremotech'
 import { claudeStatus } from '@/lib/claude'
 import { loadDevContainers, saveDevContainers, addDevContainer, removeDevContainer, loadStoryLink, saveStoryLink, setContainerScope, pullContainers, subscribeContainers } from '@/lib/irtContainers'
@@ -215,6 +216,26 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     setTeam(t => { const n = structuredClone(t); change(n); return n })
     void updateTeam(teamScope, change).then(r => { setTeam(r.team); if (!r.shared) toast('Enregistré sur ce navigateur seulement (synchro équipe indisponible).', 'bad') })
   }
+  // Stats Instagram (HikerAPI) de chaque compte « @… » : relues au plus 1 fois / 24 h (au chargement, après chaque détection
+  // des comptes) et à la demande ; partagées dans l'agence (team.igstats)
+  const statsBusy = useRef(false)
+  const teamRef = useRef(team); teamRef.current = team
+  const refreshIgStats = async (force = false, only?: string[]): Promise<number> => {
+    if (!irt.key || statsBusy.current) return 0
+    const all = only ?? Object.values(conts).flat().filter(c => c.startsWith('@'))
+    const todo = staleAccounts(all, teamRef.current.igstats, Date.now(), force)
+    if (!todo.length) return 0
+    statsBusy.current = true
+    try { await fetchIgStats(irt.key, todo, batch => editTeam(t => { t.igstats = { ...t.igstats, ...batch } })) } finally { statsBusy.current = false }
+    return todo.length
+  }
+  const contsCount = Object.values(conts).flat().filter(c => c.startsWith('@')).length
+  useEffect(() => {
+    if (!irt.key || !contsCount) return
+    const t = setTimeout(() => void refreshIgStats(false), 15_000)
+    const h = setInterval(() => void refreshIgStats(false), 3 * 3600_000)
+    return () => { clearTimeout(t); clearInterval(h) }
+  }, [irt.key, contsCount]) // eslint-disable-line react-hooks/exhaustive-deps
   // Âge d'un compte / container : la date la plus récente connue parmi 1re apparition suivie par ScaleFlow, lecture
   // iRemoTech (list_accounts : 1re lecture qui le contient) et création par ScaleFlow (comptes créés, containers compris)
   // Depuis combien de jours le compte est connecté : date exacte (création ScaleFlow / apparition entre deux lectures /
@@ -1556,6 +1577,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                             if (day?.by.reel.ok) b.push([`🎬 ${day.by.reel.ok}`, `${day.by.reel.ok} Reel(s) publié(s) ces dernières 24 h`, '#4ADE80'])
                             if (day?.by.carousel.ok) b.push([`🖼 ${day.by.carousel.ok}`, `${day.by.carousel.ok} carrousel(s) publié(s) ces dernières 24 h`, '#4ADE80'])
                             if (day?.by.warmup.ok) b.push(['🔥', `Warm-up fait ces dernières 24 h (${day.by.warmup.ok})`, '#FDBA74'])
+                            const ig = c.startsWith('@') ? team.igstats[c.slice(1).toLowerCase()] : undefined
+                            if (ig?.viral48?.length) b.push([`🚀 ${Math.round(ig.viral48[0].views / 1000)}k`, `Reel à ${ig.viral48[0].views.toLocaleString('fr-FR')} vues publié ces 48 h`, '#F472B6'])
                             // échec récent = raté ces 24 h et pas réussi depuis
                             const errs = day ? (['reel', 'story', 'carousel', 'setup', 'warmup'] as const).filter(k => day.by[k].err > 0 && (day.by[k].lastErr ?? 0) > (day.by[k].lastOk ?? 0)).length : 0
                             if (errs) b.push(['⚠', 'Échec ces dernières 24 h (détail dans Résultats)', '#F87171'])
@@ -1822,7 +1845,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       </>)}
 
       {/* ─────────────── ONGLET POSTING ─────────────── */}
-      {curTab === 'resultats' && <IrtResults scope={teamScope} />}
+      {curTab === 'resultats' && <IrtResults scope={teamScope} igstats={team.igstats}
+        accounts={devices.flatMap(d => (conts[d.public_id] ?? []).filter(c => c.startsWith('@')).map(c => ({ name: c, device: d.public_id, phone: deviceLabel(d) })))}
+        onRefreshStats={() => refreshIgStats(true)} />}
       {curTab === 'igaccounts' && irt.key && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10, border: `1px solid ${EDGE}`, background: '#0E0E10' }}>
           <Toggle on={autoStatus} onClick={() => { const v = !autoStatus; setAutoStatus(v); try { localStorage.setItem('sf-irt-autoscan', v ? '1' : '0') } catch { /* noop */ } }}
@@ -1841,6 +1866,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
             const list = [...(conts[dev] ?? []).filter(c => !c.startsWith('@')), ...read]
             saveDevContainers(dev, list); setConts(c => ({ ...c, [dev]: list }))
             setSelConts(sc => sc[dev] ? { ...sc, [dev]: new Set([...sc[dev]].filter(c => list.includes(c))) } : sc)
+            void refreshIgStats(false, read)   // stats Instagram des comptes détectés (si > 24 h)
           }} />
       )}
       {(curTab === 'posting' || curTab === 'story') && (

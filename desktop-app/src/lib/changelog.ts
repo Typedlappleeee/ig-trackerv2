@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-27',
+    date: '2026-11-27',
+    title: { fr: 'iRemoTech : stats Instagram de chaque compte', en: 'iRemoTech: Instagram stats of every account' },
+    items: {
+      fr: ['Résultats › 📈 Stats Instagram : pour chaque compte iRemoTech, abonnés / abonnements, Reels publiés ces 24 h et leurs vues, Story CTA en ligne (avec ou sans lien), lien vers le profil.', '🚀 Les comptes avec un Reel à 5 000 vues ou plus publié ces 48 h passent en haut, surlignés, avec le lien du Reel (badge « 🚀 Nk » aussi dans la sélection des lancements).', 'Relues automatiquement une fois par jour et après chaque détection des comptes sur les iPhones (bouton « Relire les stats maintenant » pour forcer), partagées avec toute l’agence.'],
+      en: ['Results › 📈 Instagram stats: for every iRemoTech account, followers / following, Reels posted in the last 24 h and their views, live CTA Story (with or without link), link to the profile.', '🚀 Accounts with a Reel at 5,000 views or more posted in the last 48 h go to the top, highlighted, with the Reel link (“🚀 Nk” badge also in the run selection).', 'Read automatically once a day and after every account detection on the iPhones (“Read the stats now” button to force), shared with the whole agency.'],
+    },
+  },
+  {
     id: '2026-11-26l',
     date: '2026-11-26',
     title: { fr: 'Story CTA fiabilisée', en: 'CTA Story made reliable' },
