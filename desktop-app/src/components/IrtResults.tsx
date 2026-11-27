@@ -207,7 +207,7 @@ function IgStatsTable({ igstats, accounts, busy, error, onRefresh, ctaDone, sfRe
               {rows.map(r => {
                 const s = r.s, v = s?.viral48?.[0]
                 return (
-                  <tr key={r.device + r.name} style={{ borderTop: `1px solid ${EDGE}`, background: v ? 'rgba(244,114,182,0.07)' : undefined }}>
+                  <tr key={r.device + r.name} style={{ borderTop: `1px solid ${EDGE}`, background: v ? 'rgba(244,114,182,0.07)' : r.isNew ? 'rgba(96,165,250,0.09)' : undefined, boxShadow: r.isNew && !v ? 'inset 3px 0 0 #60A5FA' : undefined }}>
                     <td style={td}><a data-no-tr href={`https://www.instagram.com/${r.name.replace(/^@/, '')}/`} target="_blank" rel="noreferrer" style={{ color: INK, fontWeight: 500, textDecoration: 'none' }}>{r.name}</a>{s?.missing && <span style={{ marginLeft: 6, fontSize: 11, color: BAD }}>introuvable</span>}
                       {r.isNew ? <span title="Compte de moins de 3 jours : portée faible normale" style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 700, color: '#4ADE80' }}>🆕 NEW{r.days != null ? ` · ${r.exact ? '' : '≥ '}${r.days} j` : ''}</span>
                         : r.days != null ? <span style={{ marginLeft: 8, fontSize: 10.5, color: DIM }}>{r.exact ? '' : '≥ '}{r.days} j</span> : null}</td>

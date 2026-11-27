@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-27',
     title: { fr: 'Stats Instagram : date du dernier post', en: 'Instagram stats: date of the last post' },
     items: {
-      fr: ['Colonne « Dernier post » pour chaque compte (Reel le plus récent vu sur Instagram ou publié par ScaleFlow) : vert < 24 h, jaune < 48 h, rouge au-delà ; filtre « ⏰ Pas de post depuis 48 h » et tri « dernier post (le plus ancien d’abord) ».'],
-      en: ['“Last post” column for each account (most recent Reel seen on Instagram or posted by ScaleFlow): green < 24 h, yellow < 48 h, red beyond; “⏰ No post for 48 h” filter and “last post (oldest first)” sort.'],
+      fr: ['Colonne « Dernier post » pour chaque compte (Reel le plus récent vu sur Instagram ou publié par ScaleFlow) : vert < 24 h, jaune < 48 h, rouge au-delà ; filtre « ⏰ Pas de post depuis 48 h » et tri « dernier post (le plus ancien d’abord) ».', 'Les lignes des nouveaux comptes (< 3 j) sont teintées en bleu avec un trait bleu à gauche, pour les repérer d’un coup d’œil.'],
+      en: ['“Last post” column for each account (most recent Reel seen on Instagram or posted by ScaleFlow): green < 24 h, yellow < 48 h, red beyond; “⏰ No post for 48 h” filter and “last post (oldest first)” sort.', 'Rows of new accounts (< 3 d) are tinted blue with a blue bar on the left, to spot them at a glance.'],
     },
   },
   {
