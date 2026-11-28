@@ -845,12 +845,23 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
       if (!pool.length) { setLogs([`⚠ Aucune photo publiable : ce sont toutes des originaux spoofés. Les copies sont-elles dans ce dossier ?`]); setRunning(false); return }
     }
     if (noRepeat) {
+      // pool choisi à la main : compteurs RELUS en base (le pool gardé dans le navigateur avait de vieux compteurs, et des
+      // vidéos depuis publiées / mises à la corbeille)
+      if (src.mode === 'pick') {
+        const ids = [...new Set(pool.map(v => v.id))], fresh = new Map<string, VidRef & { deleted_at?: string | null }>()
+        for (let i = 0; i < ids.length; i += 300) {
+          const { data } = await supabase.from('content_bank').select('id,title,storage_path,file_url,used_count,deleted_at').in('id', ids.slice(i, i + 300))
+          for (const r of (data ?? []) as (VidRef & { deleted_at?: string | null })[]) fresh.set(r.id, r)
+        }
+        if (fresh.size) pool = pool.map(v => fresh.get(v.id) ?? v).filter(v => !(v as { deleted_at?: string | null }).deleted_at)
+      }
+      const totalPicked = pool.length, usedPicked = pool.filter(v => (v.used_count ?? 0) > 0).length
       // dossier OU pool choisi à la main : seulement les médias jamais publiés (le texte de l'écran le promet)
       pool = pool.filter(v => (v.used_count ?? 0) === 0)
       pool = pool.filter((v, i, a) => a.findIndex(x => x.id === v.id) === i)
       const need = totalJobs * perAcct * perPost
       if (pool.length < need) {
-        setLogs([`⚠ Il faut ${need} ${isImg ? 'photo(s)' : 'vidéo(s)'} différente(s) jamais publiée(s), ${src.mode === 'folder' ? `le dossier « ${src.folder} » n’en a que ${pool.length}` : `le pool n’en a que ${pool.length}`} (jamais deux fois le même média). Ajoute des médias ou réduis le nombre de posts.`])
+        setLogs([`⚠ Il faut ${need} ${isImg ? 'photo(s)' : 'vidéo(s)'} différente(s) jamais publiée(s), ${src.mode === 'folder' ? `le dossier « ${src.folder} » n’en a que ${pool.length}` : `le pool n’en a que ${pool.length}`} (jamais deux fois le même média). Ajoute des médias ou réduis le nombre de posts.`, `   ${totalPicked} ${isImg ? 'photo(s)' : 'vidéo(s)'} dans ${src.mode === 'folder' ? 'le dossier' : 'le pool'}, dont ${usedPicked} déjà publiée(s) — astuce : « Spoofer en copies » sur les vidéos déjà publiées crée de nouvelles copies jamais publiées.`])
         setRunning(false); return
       }
     }

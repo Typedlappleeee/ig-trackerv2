@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-28b',
+    date: '2026-11-28',
+    title: { fr: 'Banque : supprimer toutes les copies d’un coup', en: 'Bank: delete all copies at once' },
+    items: {
+      fr: ['Quand tu sélectionnes une pile de copies spoofées, un bouton « Supprimer toutes les copies (N) » supprime toutes ses copies d’un coup (l’original reste).', 'Posting : le pool choisi à la main est relu en base au lancement (les vidéos publiées entre-temps ou mises à la corbeille ne faussent plus le compte), et le message dit combien de vidéos du pool sont déjà publiées.'],
+      en: ['When you select a stack of spoofed copies, a “Delete all copies (N)” button deletes all its copies at once (the original stays).', 'Posting: the hand-picked pool is re-read from the database at launch (videos posted meanwhile or trashed no longer skew the count), and the message says how many pool videos are already posted.'],
+    },
+  },
+  {
     id: '2026-11-28',
     date: '2026-11-28',
     title: { fr: 'Choix des vidéos : sélection en glissant', en: 'Video picker: drag to select' },

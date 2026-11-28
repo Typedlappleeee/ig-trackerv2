@@ -21,7 +21,7 @@ import { niceBase, isUglyTitle, allocTitle, prefixFor } from '@/lib/niceTitle'
 import PoolManager, { POOL_PREFIX } from '@/components/PoolManager'
 import { BankFolderOptions } from '@/components/BankFolderOptions'
 import { folderTree, isWithin, parentOf, leafOf, joinPath, normPath, renamedPath, cleanSeg, setFolderFav, setFolderTag, ensureBankFolder } from '@/lib/bankFolders'
-import { OTHER_TAG, MODEL_TAG, COMMON_SPACE, stackCopies, proposeModelMoves, MODEL_MARKETS, marketTag, marketsOfTags, parseTemplate, templatePaths, groupModelsByMarket, type ModelMarket } from '@/lib/bankSpaces'
+import { OTHER_TAG, MODEL_TAG, COMMON_SPACE, stackCopies, baseTitle, proposeModelMoves, MODEL_MARKETS, marketTag, marketsOfTags, parseTemplate, templatePaths, groupModelsByMarket, type ModelMarket } from '@/lib/bankSpaces'
 import { loadTeamCache, pullTeam, updateTeam } from '@/lib/irtTeam'
 import { mediaKindOf, kindOfFile, extOfPath, isFav, withFav, AUDIO_MIME, AUDIO_EXT, type MediaKind } from '@/lib/mediaKind'
 
@@ -2260,6 +2260,12 @@ export default function Bank({ theme, infra, user, org, onNavigate }: {
           <Btn label="Télécharger" theme={theme} sm icon="M12 3v12|M7 10l5 5 5-5|M4 21h16" onClick={() => downloadMedia([...sel])} />
           {partner && <Btn label={`Envoyer vers ${partner.name}`} theme={theme} sm icon="M22 2L11 13|M22 2l-7 20-4-9-9-4 20-7z" onClick={() => setSendIds([...sel])} />}
           <Btn label="Supprimer" theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel([...sel])} />
+          {(() => {
+            // copies empilées : supprime d'un coup TOUTES les copies (« · copie N ») des piles sélectionnées — l'original reste
+            const keys = new Set(shownAll.filter(m => sel.has(m.id)).map(m => `${m.folder ?? ''}|${baseTitle(m.title)}`))
+            const copies = shownAll.filter(m => keys.has(`${m.folder ?? ''}|${baseTitle(m.title)}`) && / · copie \d+/i.test(m.title ?? '')).map(m => m.id)
+            return copies.length > 0 && copies.some(id => !sel.has(id)) ? <Btn label={`Supprimer toutes les copies (${copies.length})`} theme={theme} sm tone="danger" icon="M3 6h18|M8 6V4h8v2|M19 6l-1 14H6L5 6" onClick={() => setConfirmDel(copies)} /> : null
+          })()}
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             {sel.size < shown.length && <Btn label={`Tout sélectionner (${shown.length})`} theme={theme} sm tone="ghost" onClick={() => setSel(new Set(shown.map(m => m.id)))} />}
             <Btn label="Désélectionner" theme={theme} sm tone="quiet" onClick={() => setSel(new Set())} />
