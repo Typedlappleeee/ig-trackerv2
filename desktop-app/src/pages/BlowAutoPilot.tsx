@@ -702,6 +702,17 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     }
     setChecking(false)
   }
+  // sélection « au pinceau » des comptes : appui maintenu sur un compte puis glisser → même action sur chaque compte survolé
+  const contPaint = useRef<boolean | null>(null)
+  useEffect(() => { const up = () => { contPaint.current = null }; window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up) }, [])
+  const setCont = (dev: string, name: string, on: boolean) => {
+    setSelConts(sc => {
+      const cur = new Set(sc[dev] ?? [])
+      if (on) cur.add(name); else cur.delete(name)
+      setSel(s => { const n = new Set(s); if (cur.size) n.add(dev); else n.delete(dev); return n })
+      return { ...sc, [dev]: cur }
+    })
+  }
   const toggleCont = (dev: string, name: string) => {
     const cur = new Set(sel.has(dev) ? (selConts[dev] ?? []) : [])
     if (cur.has(name)) cur.delete(name); else cur.add(name)
@@ -1607,7 +1618,9 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     const cp = on && picked.has(c)
                     return (
                       <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
-                        <span onClick={() => toggleCont(id, c)} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
+                        <span onMouseDown={e => { if (e.button !== 0) return; e.preventDefault(); const v = !(on && picked.has(c)); contPaint.current = v; if (!on) setSelConts(sc => ({ ...sc, [id]: new Set() })); setCont(id, c, v) }}
+                          onMouseEnter={() => { if (contPaint.current === null) return; if (!on && contPaint.current) setSelConts(sc => ({ ...sc, [id]: new Set() })); if (on || contPaint.current) setCont(id, c, contPaint.current) }}
+                          onClick={e => { if (e.detail === 0) toggleCont(id, c) }} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
                           {cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}
                           {(() => { const cf = connOf(id, c)
                             const isOld = team.oldAccs.includes(`${id}::${c.toLowerCase()}`)
