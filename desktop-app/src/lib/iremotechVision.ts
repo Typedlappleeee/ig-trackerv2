@@ -16,7 +16,8 @@ import { findGalleryThumb, findMatchingCell } from './screenMatch'
 // étroite (icône à 0,78 W, vue en vrai sur STEVIE10 le 24/11/2026 : à 0,86 le tap tombait au bord et le Profil ne
 // s'ouvrait jamais → bascule de compte ratée). Les boucles essaient aussi 0,78 puis 0,86.
 export const TAB = { y: 0.945, home: { x: 0.15 }, reels: { x: 0.33 }, profile: { x: 0.82 } }
-export const PROFILE_XS = [0.82, 0.78, 0.86]
+// 0,9 : nouvelle barre à 5 onglets « Home, Reels, Messages, Search, Profile » (vue le 28/11/2026 sur LINAGER7/9)
+export const PROFILE_XS = [0.82, 0.9, 0.78, 0.86]
 export const HOME_XS = [0.17, 0.22, 0.12]   // Accueil : barre pleine (≈0,1) ou flottante étroite (≈0,22)
 
 /** Fil d'accueil d'Instagram à l'écran (le « + » du créateur est en haut à gauche) : « Your story » ou l'en-tête
@@ -4082,10 +4083,15 @@ async function openAccountSheet(key: string, deviceId: string, hooks?: VisionHoo
       scr = await readScreenWords(key, deviceId)
     }
     const steps = scr?.words.find(o => /^steps$/i.test(o.text) && o.cy < H * 0.25)
-    const name = scr?.words.filter(o => o.cy > H * 0.035 && o.cy < (steps ? steps.cy - 8 : H * 0.11) && Math.abs(o.cx - W / 2) < W * 0.3 && /[a-z0-9]{3,}/i.test(o.text) && !/^(steps|complete|of)$/i.test(o.text))
-      .sort((a, b) => b.text.length - a.text.length)[0]
+    const band = (scr?.words ?? []).filter(o => o.cy > H * 0.035 && o.cy < (steps ? steps.cy - 8 : H * 0.11) && /[a-z0-9]{3,}/i.test(o.text) && !/^(steps|complete|of)$/i.test(o.text))
+    // nom centré (ancienne mise en page) sinon nom EN HAUT À GAUCHE (nouvelle mise en page d'Instagram, 28/11/2026 :
+    // le tap au centre tombait à côté → « Liste des comptes introuvable » sur LINAGER7/9)
+    const name = band.filter(o => Math.abs(o.cx - W / 2) < W * 0.3).sort((a, b) => b.text.length - a.text.length)[0]
+      ?? band.filter(o => o.cx < W * 0.75).sort((a, b) => b.text.length - a.text.length)[0]
     const y = name ? name.cy : steps ? Math.round(Math.min(0.068 * H, steps.cy - 0.04 * H)) : Math.round(0.068 * H)
-    await sendAction(key, deviceId, { type: 'tap', x: name ? name.cx : Math.round(0.5 * W), y })
+    // sans nom lu : centre, puis gauche (nouvelle mise en page), puis centre
+    const x = name ? name.cx : Math.round((k === 1 ? 0.28 : 0.5) * W)
+    await sendAction(key, deviceId, { type: 'tap', x, y })
     await sleep(2200); scr = await readScreenWords(key, deviceId)
     if (isSheet(scr)) return scr
   }

@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-28d',
+    date: '2026-11-28',
+    title: { fr: 'Posting : nouvelle barre d’onglets d’Instagram', en: 'Posting: Instagram’s new tab bar' },
+    items: {
+      fr: ['Certains iPhones ont la nouvelle version d’Instagram (barre « Accueil, Reels, Messages, Recherche, Profil », nom du compte en haut à gauche) : l’onglet Profil et la liste des comptes n’étaient plus trouvés (« Liste des comptes introuvable »). Les deux mises en page sont maintenant reconnues.'],
+      en: ['Some iPhones have the new Instagram version (“Home, Reels, Messages, Search, Profile” bar, account name at the top left): the Profile tab and the account list were no longer found (“Account list not found”). Both layouts are now recognised.'],
+    },
+  },
+  {
     id: '2026-11-28c',
     date: '2026-11-28',
     title: { fr: 'Posting : vidéos publiées toujours supprimées', en: 'Posting: posted videos always deleted' },
