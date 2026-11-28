@@ -829,18 +829,20 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
     const noRepeat = kind !== 'story'
     // Story CTA : JAMAIS l'original d'une photo spoofée en copies (demande de l'équipe) — seulement ses copies.
     // Original = marqué « spoof-src » par « Spoofer en copies », ou titre sans « · » dont des copies existent.
+    // Original d'un média spoofé (sert à refaire des copies) : jamais publié en Story CTA (en Reels : publié puis supprimé comme les autres)
+    const base = (v: VidRef) => (v.title || v.id).split(' · ')[0].trim().toLowerCase()
+    const copyBases = new Set(pool.filter(v => / · copie \d+/i.test(v.title)).map(base))
+    let srcIds = new Set<string>()
+    try {
+      let q = supabase.from('content_bank').select('id').contains('tags', ['spoof-src']).is('deleted_at', null)
+      q = bankScope.orgId ? q.eq('org_id', bankScope.orgId) : q.eq('user_id', bankScope.userId).is('org_id', null)
+      const { data } = await q
+      srcIds = new Set(((data ?? []) as { id: string }[]).map(r => r.id))
+    } catch { /* noop */ }
+    const isOriginal = (v: VidRef) => srcIds.has(v.id) || (!v.title.includes(' · ') && copyBases.has(base(v)))
     if (kind === 'story') {
-      const base = (v: VidRef) => (v.title || v.id).split(' · ')[0].trim().toLowerCase()
-      const copyBases = new Set(pool.filter(v => / · copie \d+/i.test(v.title)).map(base))
-      let srcIds = new Set<string>()
-      try {
-        let q = supabase.from('content_bank').select('id').contains('tags', ['spoof-src']).is('deleted_at', null)
-        q = bankScope.orgId ? q.eq('org_id', bankScope.orgId) : q.eq('user_id', bankScope.userId).is('org_id', null)
-        const { data } = await q
-        srcIds = new Set(((data ?? []) as { id: string }[]).map(r => r.id))
-      } catch { /* noop */ }
       const before = pool.length
-      pool = pool.filter(v => !srcIds.has(v.id) && !(!v.title.includes(' · ') && copyBases.has(base(v))))
+      pool = pool.filter(v => !isOriginal(v))
       if (pool.length < before) setLogs(l => [...l, `🧬 ${before - pool.length} photo(s) originale(s) écartée(s) : seules leurs copies spoofées sont publiées`])
       if (!pool.length) { setLogs([`⚠ Aucune photo publiable : ce sont toutes des originaux spoofés. Les copies sont-elles dans ce dossier ?`]); setRunning(false); return }
     }
@@ -856,6 +858,13 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
         if (fresh.size) pool = pool.map(v => fresh.get(v.id) ?? v).filter(v => !(v as { deleted_at?: string | null }).deleted_at)
       }
       const totalPicked = pool.length, usedPicked = pool.filter(v => (v.used_count ?? 0) > 0).length
+      // déjà publiées (avant que la suppression auto existe, ou par un autre outil) : mises à la corbeille maintenant,
+      // originaux compris (demande du propriétaire, 28/11/2026 : un média publié est consommé, quel qu'il soit)
+      if (reelOnce) {
+        const stale = pool.filter(v => (v.used_count ?? 0) > 0).map(v => v.id)
+        for (let i = 0; i < stale.length; i += 200) { try { await supabase.from('content_bank').update({ deleted_at: new Date().toISOString() }).in('id', stale.slice(i, i + 200)) } catch { /* noop */ } }
+        if (stale.length) setLogs(l => [...l, `🗑 ${stale.length} ${isImg ? 'photo(s)' : 'vidéo(s)'} déjà publiée(s) retirée(s) de la Banque (corbeille, 7 j)`])
+      }
       // dossier OU pool choisi à la main : seulement les médias jamais publiés (le texte de l'écran le promet)
       pool = pool.filter(v => (v.used_count ?? 0) === 0)
       pool = pool.filter((v, i, a) => a.findIndex(x => x.id === v.id) === i)

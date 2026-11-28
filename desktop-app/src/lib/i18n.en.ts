@@ -5343,6 +5343,7 @@ export const EN: Dict = {
     ["🔔 Alerte iOS ({0})", "🔔 iOS alert ({0})"],
     ["🎞️ Dernière vidéo (1re vignette avec durée {0}) → tap ({1}, {2})", "🎞️ Latest video (1st thumbnail with duration {0}) → tap ({1}, {2})"],
     ["écran « New post » → Next en haut à droite ({0}, {1})", "“New post” screen → Next at the top right ({0}, {1})"],
+    ["🗑 {0} {1} déjà publiée(s) retirée(s) de la Banque (corbeille, 7 j)", "🗑 {0} {1} already posted removed from the Bank (trash, 7 days)"],
     ["{0} {1} dans {2}, dont {3} déjà publiée(s) — astuce : « Spoofer en copies » sur les vidéos déjà publiées crée de nouvelles copies jamais publiées.", "{0} {1} in {2}, of which {3} already posted — tip: “Spoof into copies” on already-posted videos creates new never-posted copies."],
     ["le dossier", "the folder"],
     ["le pool", "the pool"],

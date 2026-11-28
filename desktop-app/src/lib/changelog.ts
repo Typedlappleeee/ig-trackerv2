@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-28c',
+    date: '2026-11-28',
+    title: { fr: 'Posting : vidéos publiées toujours supprimées', en: 'Posting: posted videos always deleted' },
+    items: {
+      fr: ['Reels / carrousels : toute vidéo publiée est retirée de la Banque (corbeille, 7 j), originaux compris. Au lancement, les vidéos du pool ou du dossier déjà publiées avant (ancienne version, autre outil) sont aussi mises à la corbeille, pour qu’elles ne bloquent plus le compte de vidéos disponibles.'],
+      en: ['Reels / carousels: every posted video is removed from the Bank (trash, 7 days), originals included. At launch, videos of the pool or folder already posted before (old version, other tool) are also trashed so they no longer block the count of available videos.'],
+    },
+  },
+  {
     id: '2026-11-28b',
     date: '2026-11-28',
     title: { fr: 'Banque : supprimer toutes les copies d’un coup', en: 'Bank: delete all copies at once' },
