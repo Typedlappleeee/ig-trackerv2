@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: '2026-11-28',
+    date: '2026-11-28',
+    title: { fr: 'Choix des vidéos : sélection en glissant', en: 'Video picker: drag to select' },
+    items: {
+      fr: ['Dans les fenêtres de choix de médias (ex. « Choisir des vidéos à décliner »), reste appuyé sur une vignette et glisse la souris : toutes les vignettes survolées sont cochées (ou décochées si la première l’était), comme dans la Banque.'],
+      en: ['In media picker windows (e.g. “Choose videos to vary”), hold the mouse on a thumbnail and drag: every thumbnail you pass over is checked (or unchecked if the first one was), like in the Bank.'],
+    },
+  },
+  {
     id: '2026-11-27i',
     date: '2026-11-27',
     title: { fr: 'Posting : compte déconnecté reconnu tout de suite', en: 'Posting: logged-out account recognised right away' },

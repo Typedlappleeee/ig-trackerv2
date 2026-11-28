@@ -32,8 +32,9 @@ const FAVS = '★ Favoris'
 // Tuile LAZY : ne monte l'aperçu (vidéo/image) que quand elle est visible à l'écran
 // (IntersectionObserver) et le décharge hors écran. Évite de monter 600 <video> d'un
 // coup → la banque ne rame/bug plus.
-function MediaTile({ m, prev, on, fav, accent, accentBtn, onToggle, onFav }: {
+function MediaTile({ m, prev, on, fav, accent, accentBtn, onToggle, onFav, onPaintStart, onPaintEnter }: {
   m: Media; prev: string | null; on: boolean; fav: boolean; hue: string; accent: string; accentBtn: string; onToggle: () => void; onFav: () => void
+  onPaintStart?: () => void; onPaintEnter?: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [vis, setVis] = useState(false)
@@ -45,7 +46,11 @@ function MediaTile({ m, prev, on, fav, accent, accentBtn, onToggle, onFav }: {
   const kind = mediaKindOf(m)
   const isVid = kind === 'video' && !m.thumbnail_url && !m.thumbnail_path
   return (
-    <button ref={ref} onClick={onToggle} title={m.title} style={{
+    <button ref={ref} title={m.title}
+      // multi : appui maintenu + glisser = coche / décoche toutes les vignettes survolées (comme dans la Banque)
+      onMouseDown={onPaintStart ? e => { if (e.button === 0) { e.preventDefault(); onPaintStart() } } : undefined}
+      onMouseEnter={onPaintEnter}
+      onClick={e => { if (!onPaintStart || e.detail === 0) onToggle() }} style={{
       position: 'relative', aspectRatio: kind === 'audio' ? '1 / 1' : '9 / 16', borderRadius: 6, padding: 0, cursor: 'pointer', overflow: 'hidden',
       border: '1px solid ' + (on ? accent : 'rgba(255,255,255,0.08)'),
       background: '#161618',
@@ -57,7 +62,7 @@ function MediaTile({ m, prev, on, fav, accent, accentBtn, onToggle, onFav }: {
           : vis && <img src={prev} alt="" loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />)}
       <span style={{ position: 'absolute', top: 5, right: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: 4, boxSizing: 'border-box', background: on ? accentBtn : 'rgba(10,10,11,0.7)', border: on ? 'none' : '1px solid rgba(255,255,255,0.16)', color: '#fff', fontSize: 9, fontWeight: 600 }}>{on ? '✓' : ''}</span>
       <span role="button" aria-label={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'} title={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-        onClick={e => { e.stopPropagation(); onFav() }}
+        onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onFav() }}
         style={{ position: 'absolute', top: 3, left: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 5, background: 'rgba(10,10,11,0.6)', color: fav ? '#FBBF24' : 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1, zIndex: 2 }}>{fav ? '★' : '☆'}</span>
     </button>
   )
@@ -163,6 +168,11 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
     return s ? caps.filter(c => (c.title ?? '').toLowerCase().includes(s) || c.content.toLowerCase().includes(s)) : caps
   }, [caps, q])
 
+  // sélection « au pinceau » : appui sur une vignette puis glisser → même action (cocher ou décocher) sur chaque vignette survolée
+  const paint = useRef<'add' | 'del' | null>(null)
+  useEffect(() => { const up = () => { paint.current = null }; window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up) }, [])
+  const paintStart = (id: string) => { const add = !sel.includes(id); paint.current = add ? 'add' : 'del'; setSel(cur => add ? [...new Set([...cur, id])] : cur.filter(x => x !== id)) }
+  const paintEnter = (id: string) => { const m = paint.current; if (!m) return; setSel(cur => m === 'add' ? (cur.includes(id) ? cur : [...cur, id]) : cur.filter(x => x !== id)) }
   const toggle = (id: string) => setSel(cur => multi
     ? (cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id])
     : (cur[0] === id ? [] : [id]))
@@ -358,7 +368,8 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 8 }}>
               {renderedMedia.map((m, i) => (
                 <MediaTile key={m.id} m={m} prev={thumbFor(m)} on={sel.includes(m.id)} fav={isFav(m)} hue={HUES[i % 6]}
-                  accent={theme.accent} accentBtn={theme.accentBtn} onToggle={() => toggle(m.id)} onFav={() => void toggleFav(m)} />
+                  accent={theme.accent} accentBtn={theme.accentBtn} onToggle={() => toggle(m.id)} onFav={() => void toggleFav(m)}
+                  onPaintStart={multi ? () => paintStart(m.id) : undefined} onPaintEnter={multi ? () => paintEnter(m.id) : undefined} />
               ))}
               {limit < filteredMedia.length && <div ref={moreRef} style={{ gridColumn: '1 / -1', height: 1 }} />}
             </div>
