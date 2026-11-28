@@ -16,8 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-28',
     title: { fr: 'Choix des vidéos : sélection en glissant', en: 'Video picker: drag to select' },
     items: {
-      fr: ['Dans les fenêtres de choix de médias (ex. « Choisir des vidéos à décliner »), reste appuyé sur une vignette et glisse la souris : toutes les vignettes survolées sont cochées (ou décochées si la première l’était), comme dans la Banque.', 'Pareil pour choisir les comptes avant un Posting / Story / setup iRemoTech : reste appuyé sur un compte et glisse sur les autres.'],
-      en: ['In media picker windows (e.g. “Choose videos to vary”), hold the mouse on a thumbnail and drag: every thumbnail you pass over is checked (or unchecked if the first one was), like in the Bank.', 'Same for choosing accounts before an iRemoTech Posting / Story / setup: hold on an account and drag over the others.'],
+      fr: ['Dans les fenêtres de choix de médias (ex. « Choisir des vidéos à décliner »), reste appuyé sur une vignette et glisse la souris : toutes les vignettes survolées sont cochées (ou décochées si la première l’était), comme dans la Banque.', 'Pareil pour choisir les comptes avant un Posting / Story / setup iRemoTech : reste appuyé sur un compte et glisse sur les autres.', 'Maj + clic : clique un média (ou un compte), puis Maj + clic sur un autre → tout ce qui est entre les deux est coché.'],
+      en: ['In media picker windows (e.g. “Choose videos to vary”), hold the mouse on a thumbnail and drag: every thumbnail you pass over is checked (or unchecked if the first one was), like in the Bank.', 'Same for choosing accounts before an iRemoTech Posting / Story / setup: hold on an account and drag over the others.', 'Shift + click: click a media (or an account), then Shift + click another → everything in between is checked.'],
     },
   },
   {

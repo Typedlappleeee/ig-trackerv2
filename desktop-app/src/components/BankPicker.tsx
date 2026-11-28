@@ -34,7 +34,7 @@ const FAVS = '★ Favoris'
 // coup → la banque ne rame/bug plus.
 function MediaTile({ m, prev, on, fav, accent, accentBtn, onToggle, onFav, onPaintStart, onPaintEnter }: {
   m: Media; prev: string | null; on: boolean; fav: boolean; hue: string; accent: string; accentBtn: string; onToggle: () => void; onFav: () => void
-  onPaintStart?: () => void; onPaintEnter?: () => void
+  onPaintStart?: (shift: boolean) => void; onPaintEnter?: () => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   const [vis, setVis] = useState(false)
@@ -48,7 +48,7 @@ function MediaTile({ m, prev, on, fav, accent, accentBtn, onToggle, onFav, onPai
   return (
     <button ref={ref} title={m.title}
       // multi : appui maintenu + glisser = coche / décoche toutes les vignettes survolées (comme dans la Banque)
-      onMouseDown={onPaintStart ? e => { if (e.button === 0) { e.preventDefault(); onPaintStart() } } : undefined}
+      onMouseDown={onPaintStart ? e => { if (e.button === 0) { e.preventDefault(); onPaintStart(e.shiftKey) } } : undefined}
       onMouseEnter={onPaintEnter}
       onClick={e => { if (!onPaintStart || e.detail === 0) onToggle() }} style={{
       position: 'relative', aspectRatio: kind === 'audio' ? '1 / 1' : '9 / 16', borderRadius: 6, padding: 0, cursor: 'pointer', overflow: 'hidden',
@@ -171,7 +171,14 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
   // sélection « au pinceau » : appui sur une vignette puis glisser → même action (cocher ou décocher) sur chaque vignette survolée
   const paint = useRef<'add' | 'del' | null>(null)
   useEffect(() => { const up = () => { paint.current = null }; window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up) }, [])
-  const paintStart = (id: string) => { const add = !sel.includes(id); paint.current = add ? 'add' : 'del'; setSel(cur => add ? [...new Set([...cur, id])] : cur.filter(x => x !== id)) }
+  // Maj + clic : coche toute la plage entre la dernière vignette cliquée et celle-ci
+  const anchor = useRef<string | null>(null)
+  const paintStart = (id: string, shift = false) => {
+    const ids = renderedMedia.map(m => m.id), a = anchor.current ? ids.indexOf(anchor.current) : -1, b = ids.indexOf(id)
+    if (shift && a >= 0 && b >= 0) { const range = ids.slice(Math.min(a, b), Math.max(a, b) + 1); setSel(cur => [...new Set([...cur, ...range])]); anchor.current = id; return }
+    anchor.current = id; paintStart0(id)
+  }
+  const paintStart0 = (id: string) => { const add = !sel.includes(id); paint.current = add ? 'add' : 'del'; setSel(cur => add ? [...new Set([...cur, id])] : cur.filter(x => x !== id)) }
   const paintEnter = (id: string) => { const m = paint.current; if (!m) return; setSel(cur => m === 'add' ? (cur.includes(id) ? cur : [...cur, id]) : cur.filter(x => x !== id)) }
   const toggle = (id: string) => setSel(cur => multi
     ? (cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id])
@@ -369,7 +376,7 @@ export default function BankPicker({ theme, user, org, kind, multi = true, initi
               {renderedMedia.map((m, i) => (
                 <MediaTile key={m.id} m={m} prev={thumbFor(m)} on={sel.includes(m.id)} fav={isFav(m)} hue={HUES[i % 6]}
                   accent={theme.accent} accentBtn={theme.accentBtn} onToggle={() => toggle(m.id)} onFav={() => void toggleFav(m)}
-                  onPaintStart={multi ? () => paintStart(m.id) : undefined} onPaintEnter={multi ? () => paintEnter(m.id) : undefined} />
+                  onPaintStart={multi ? shift => paintStart(m.id, shift) : undefined} onPaintEnter={multi ? () => paintEnter(m.id) : undefined} />
               ))}
               {limit < filteredMedia.length && <div ref={moreRef} style={{ gridColumn: '1 / -1', height: 1 }} />}
             </div>

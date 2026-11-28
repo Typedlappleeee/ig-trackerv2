@@ -704,6 +704,8 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
   }
   // sélection « au pinceau » des comptes : appui maintenu sur un compte puis glisser → même action sur chaque compte survolé
   const contPaint = useRef<boolean | null>(null)
+  const contOrder = useRef<[string, string][]>([])        // comptes affichés, dans l'ordre (Maj + clic = plage)
+  const contAnchor = useRef<[string, string] | null>(null)
   useEffect(() => { const up = () => { contPaint.current = null }; window.addEventListener('mouseup', up); return () => window.removeEventListener('mouseup', up) }, [])
   const setCont = (dev: string, name: string, on: boolean) => {
     setSelConts(sc => {
@@ -1575,6 +1577,7 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
           {opts?.manage && <div style={{ fontSize: 12, color: DIM, marginBottom: 10 }}>Groupe et marché de chaque iPhone : partagés avec toute l’équipe. Le marché de l’iPhone sert aux descriptions, à la localisation et aux bios de ses comptes (sauf marché propre à un compte).</div>}
           {!list.length && <div style={{ fontSize: 13, color: MUTED, padding: '6px 2px' }}>{base.length ? 'Aucun iPhone ne correspond. Détecte les comptes / containers dans « Téléphones » ou « Comptes Instagram ».' : 'Aucun iPhone.'}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', borderRadius: 10, border: list.length ? `1px solid ${EDGE}` : 'none', overflow: 'hidden' }}>
+        {(() => { contOrder.current = list.flatMap(d => (conts[d.public_id] ?? []).map(c => [d.public_id, c] as [string, string])); return null })()}
         {list.map(d => {
           const id = d.public_id, on = sel.has(id), live = isDeviceOn(d)
           const list = conts[id] ?? [], picked = selConts[id] ?? new Set<string>()
@@ -1618,7 +1621,12 @@ export function BlowAutoPilot({ user, org, tab, onTab }: { user: User; org: OrgS
                     const cp = on && picked.has(c)
                     return (
                       <span key={c} style={{ display: 'inline-flex', alignItems: 'center', height: 28, borderRadius: 7, fontSize: 12.5, fontWeight: 600, background: cp ? 'rgba(233,196,106,0.14)' : FIELD_BG, color: cp ? GOLD : '#A1A1AA', border: `1px solid ${cp ? 'rgba(233,196,106,0.45)' : FIELD_EDGE}`, fontVariantNumeric: 'tabular-nums' }}>
-                        <span onMouseDown={e => { if (e.button !== 0) return; e.preventDefault(); const v = !(on && picked.has(c)); contPaint.current = v; if (!on) setSelConts(sc => ({ ...sc, [id]: new Set() })); setCont(id, c, v) }}
+                        <span onMouseDown={e => { if (e.button !== 0) return; e.preventDefault()
+                          // Maj + clic : coche tous les comptes entre le dernier cliqué et celui-ci (même sur plusieurs iPhones)
+                          const ord = contOrder.current, a = contAnchor.current ? ord.findIndex(([d, x]) => d === contAnchor.current![0] && x === contAnchor.current![1]) : -1, b = ord.findIndex(([d, x]) => d === id && x === c)
+                          contAnchor.current = [id, c]
+                          if (e.shiftKey && a >= 0 && b >= 0) { const r = ord.slice(Math.min(a, b), Math.max(a, b) + 1); for (const d of new Set(r.map(([d]) => d))) if (!sel.has(d)) setSelConts(sc => ({ ...sc, [d]: new Set() })); for (const [d, x] of r) setCont(d, x, true); return }
+                          const v = !(on && picked.has(c)); contPaint.current = v; if (!on) setSelConts(sc => ({ ...sc, [id]: new Set() })); setCont(id, c, v) }}
                           onMouseEnter={() => { if (contPaint.current === null) return; if (!on && contPaint.current) setSelConts(sc => ({ ...sc, [id]: new Set() })); if (on || contPaint.current) setCont(id, c, contPaint.current) }}
                           onClick={e => { if (e.detail === 0) toggleCont(id, c) }} style={{ cursor: 'pointer', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: 5 }} data-no-tr>
                           {cp && on ? <span style={{ fontSize: 10 }}>✓</span> : null}{c}
